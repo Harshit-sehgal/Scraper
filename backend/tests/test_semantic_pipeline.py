@@ -14,11 +14,12 @@ from app.semantic_ir import (
     create_token,
 )
 from app.semantic_pipeline import (
-    _detect_semantic_type,
     filter_noise_records,
     run_pipeline,
     strip_metadata,
 )
+from app.semantic_mapper import detect_semantic_type, is_child_fragment
+from app.semantic_boundary_engine import group_adjacent_entities
 
 
 def _clean_engine():
@@ -28,6 +29,21 @@ def _clean_engine():
     reng.total_co_occurrences = 0
     reng.learning_count = 0
     reng.role_position_memory = {}
+    
+    from app.semantic_boundary_engine import get_boundary_engine
+    be = get_boundary_engine()
+    be.motif_learner.motif_counts.clear()
+    be.motif_learner.total_records = 0
+    be.transition_detector.observation_count = 0
+    be.transition_detector.transition_probs.clear()
+    from app.semantic_boundary_engine import _BOOTSTRAP_TRANSITIONS
+    be.transition_detector.transition_probs.update(_BOOTSTRAP_TRANSITIONS)
+    be.decision_history = []
+    be.cohesion_model.merge_success.clear()
+    be.cohesion_model.merge_attempts.clear()
+    be.cohesion_model.split_success.clear()
+    be.cohesion_model.split_attempts.clear()
+    # print(f"DEBUG: cohesion_model.merge_attempts after clear: {be.cohesion_model.merge_attempts}")
 
 
 def test_pipeline_none_input():
@@ -201,42 +217,42 @@ def test_filter_noise_none():
 
 
 def test_detect_price_with_symbol():
-    st, _ = _detect_semantic_type("\u00a3238", "price")
+    st, _ = detect_semantic_type("\u00a3238", "price")
     assert st == SemanticType.PRICE
 
 
 def test_detect_price_field_hint():
-    st, _ = _detect_semantic_type("238", "price_col")
+    st, _ = detect_semantic_type("238", "price_col")
     assert st == SemanticType.PRICE
 
 
 def test_detect_date():
-    st, _ = _detect_semantic_type("22-05-2026", "date")
+    st, _ = detect_semantic_type("22-05-2026", "date")
     assert st == SemanticType.DATE
 
 
 def test_detect_code():
-    st, _ = _detect_semantic_type("LON", "origin")
+    st, _ = detect_semantic_type("LON", "origin")
     assert st == SemanticType.CODE
 
 
 def test_detect_rating():
-    st, _ = _detect_semantic_type("4.5/5", "rating")
+    st, _ = detect_semantic_type("4.5/5", "rating")
     assert st == SemanticType.RATING
 
 
 def test_detect_organization():
-    st, _ = _detect_semantic_type("Lufthansa", "name")
+    st, _ = detect_semantic_type("Lufthansa", "name")
     assert st == SemanticType.ORGANIZATION
 
 
 def test_detect_product_name():
-    st, _ = _detect_semantic_type("iPhone", "name")
+    st, _ = detect_semantic_type("iPhone", "name")
     assert st == SemanticType.ORGANIZATION
 
 
 def test_detect_plain_text():
-    st, _ = _detect_semantic_type("hello", "name")
+    st, _ = detect_semantic_type("hello", "name")
     assert st == SemanticType.TEXT
 
 
@@ -262,49 +278,43 @@ def test_pipeline_noise_variants():
 
 
 def test_is_child_fragment_various():
-    from app.semantic_pipeline import _is_child_fragment
-    assert _is_child_fragment("5", {"4.2/5"})
-    assert _is_child_fragment("Cr", {"1.2 Cr"})
-    assert _is_child_fragment("22", {"22-05-2026"})
-    assert not _is_child_fragment("M", {"Marriott"})
-    assert not _is_child_fragment("5", {"25L"})
-    assert not _is_child_fragment("", {"test"})
+    assert is_child_fragment("5", {"4.2/5"})
+    assert is_child_fragment("Cr", {"1.2 Cr"})
+    assert is_child_fragment("22", {"22-05-2026"})
+    assert not is_child_fragment("M", {"Marriott"})
+    assert not is_child_fragment("5", {"25L"})
+    assert not is_child_fragment("", {"test"})
 
 
 def test_is_child_fragment_date():
-    from app.semantic_pipeline import _is_child_fragment
-    assert _is_child_fragment("22", {"22-05-2026"})
-    assert _is_child_fragment("05", {"22-05-2026"})
-    assert _is_child_fragment("2026", {"22-05-2026"})
-    assert not _is_child_fragment("5", {"25L"})
+    assert is_child_fragment("22", {"22-05-2026"})
+    assert is_child_fragment("05", {"22-05-2026"})
+    assert is_child_fragment("2026", {"22-05-2026"})
+    assert not is_child_fragment("5", {"25L"})
 
 
 def test_group_adjacent_entities_org_suffix():
-    from app.semantic_pipeline import _group_adjacent_entities
     recs = [{"data_seg_org_0": "Prestige", "data_seg_org_1": "Group"}]
-    result = _group_adjacent_entities(recs)
+    result = group_adjacent_entities(recs)
     assert "data_seg_org_0" in result[0]
     assert result[0]["data_seg_org_0"] == "Prestige Group"
 
 
 def test_group_adjacent_entities_number_code():
-    from app.semantic_pipeline import _group_adjacent_entities
     recs = [{"data_seg_number_0": "3", "data_seg_code_1": "BHK"}]
-    result = _group_adjacent_entities(recs)
+    result = group_adjacent_entities(recs)
     assert result[0].get("data_seg_number_0") == "3 BHK"
 
 
 def test_group_adjacent_entities_no_merge():
-    from app.semantic_pipeline import _group_adjacent_entities
     recs = [{"data_seg_org_0": "Honda", "data_seg_org_1": "Civic"}]
-    result = _group_adjacent_entities(recs)
+    result = group_adjacent_entities(recs)
     assert result[0].get("data_seg_org_0") == "Honda"
 
 
 def test_group_adjacent_entities_stop_word():
-    from app.semantic_pipeline import _group_adjacent_entities
     recs = [{"data_seg_org_0": "The", "data_seg_org_1": "Italian"}]
-    result = _group_adjacent_entities(recs)
+    result = group_adjacent_entities(recs)
     assert result[0].get("data_seg_org_0") == "The Italian"
 
 
@@ -324,6 +334,7 @@ def test_pipeline_mixed_types():
 
 
 def test_boundary_engine_merge():
+    _clean_engine()
     from app.semantic_boundary_engine import score_boundary
     for ta, tb, va, vb, exp in [
         ('org', 'org', 'Prestige', 'Group', True),
@@ -338,6 +349,7 @@ def test_boundary_engine_merge():
 
 
 def test_boundary_engine_scores():
+    _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
     e = get_boundary_engine()
     s = e.score_pair('org', 'org', 'Prestige', 'Group', 0, 1)
@@ -347,6 +359,7 @@ def test_boundary_engine_scores():
 
 
 def test_boundary_engine_history():
+    _clean_engine()
     from app.semantic_boundary_engine import MergeDecision, get_boundary_engine
     e = get_boundary_engine()
     n = len(e.decision_history)
@@ -355,6 +368,7 @@ def test_boundary_engine_history():
 
 
 def test_cohesion_model_records():
+    _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
     e = get_boundary_engine()
     m = e.cohesion_model
@@ -365,6 +379,7 @@ def test_cohesion_model_records():
 
 
 def test_cohesion_model_bias():
+    _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
     e = get_boundary_engine()
     m = e.cohesion_model
@@ -375,6 +390,7 @@ def test_cohesion_model_bias():
 
 
 def test_transition_detector_bootstrap():
+    _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
     e = get_boundary_engine()
     t = e.transition_detector
@@ -387,6 +403,7 @@ def test_transition_detector_bootstrap():
 
 
 def test_transition_detector_learns():
+    _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
     e = get_boundary_engine()
     t = e.transition_detector
@@ -400,6 +417,7 @@ def test_transition_detector_learns():
 
 
 def test_transition_detector_high_list():
+    _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
     e = get_boundary_engine()
     t = e.transition_detector
@@ -407,6 +425,7 @@ def test_transition_detector_high_list():
     assert len(high) >= 2  # Should have at least a few high-transition pairs
 
 def test_layer5_contradiction_learning():
+    _clean_engine()
     from app.semantic_allocation_engine import _get_role_engine
     from app.semantic_pipeline import run_pipeline
     
@@ -426,4 +445,3 @@ def test_layer5_contradiction_learning():
     # Give it a tiny bit of leeway for float imprecision, or adjust learning delta check
     # Note: If it didn't learn, it's because NotAPrice was assigned TEXT type and warnings caught it.
     assert compat <= 0.9, f"Engine should have penalized price=text mapping, got {compat}"
-

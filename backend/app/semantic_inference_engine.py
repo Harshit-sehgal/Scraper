@@ -252,8 +252,8 @@ class SemanticEnergyModel:
                 edge.confidence = min(edge.confidence + 0.02, 1.0)
 
         for _o_edge in graph.ownership_edges:
-            if edge.confidence >= 0.7:
-                edge.confidence = min(edge.confidence + 0.02, 1.0)
+            if _o_edge.confidence >= 0.7:
+                _o_edge.confidence = min(_o_edge.confidence + 0.02, 1.0)
 
     def decay_unstable(self, state: SemanticState, graph: SemanticGraph):
         """Decay unstable structures: suppress low-confidence edges."""
@@ -939,6 +939,8 @@ class RoleEmbeddingEngine:
     """
 
     def __init__(self):
+        import uuid
+        self.instance_id = str(uuid.uuid4())[:8]
         self.compatibility_cache: Dict[Tuple[str, str], float] = {}
         self.learning_count: int = 0
         self.co_occurrence: Dict[Tuple[str, str, str, str], int] = {}
@@ -1108,7 +1110,7 @@ class RoleEmbeddingEngine:
         return {
             "compatibility_cache": {f"{r}:{t}": v for (r, t), v in self.compatibility_cache.items()},
             "learning_count": self.learning_count,
-            "co_occurrence": {f"{a}:{b}:{c}:{d}": v for (a, b, c, d), v in self.co_occurrence.items()},
+            "co_occurrence": {":".join(str(x) for x in k): v for k, v in self.co_occurrence.items()},
             "total_co_occurrences": self.total_co_occurrences,
             "role_position_memory": {r: v for r, v in self.role_position_memory.items()},
             "learned_exclusions": {"|".join(k): v for k, v in self._learned_exclusions.items()},
@@ -1116,22 +1118,34 @@ class RoleEmbeddingEngine:
 
     def load_cache(self, data: dict):
         """Load a previously saved full state."""
-        cache = data.get("compatibility_cache", data)
+        self.compatibility_cache.clear()
+        cache = data.get("compatibility_cache", {})
         if isinstance(cache, dict):
             for key, value in cache.items():
                 if ':' in key:
-                    role, ttype = key.split(':', 1)
+                    parts = key.split(':')
+                    # Handle cases where role or type might contain colons (unlikely but safe)
+                    role = parts[0]
+                    ttype = ":".join(parts[1:])
                     self.compatibility_cache[(role, ttype)] = value
-        self.learning_count = data.get("learning_count", len(self.compatibility_cache))
+        
+        self.learning_count = data.get("learning_count", 0)
+        
+        self.co_occurrence.clear()
         co_occ = data.get("co_occurrence", {})
         for key, count in co_occ.items():
             parts = key.split(':')
             if len(parts) >= 4:
                 self.co_occurrence[tuple(parts)] = count
-        self.total_co_occurrences = data.get("total_co_occurrences", self.total_co_occurrences)
+        
+        self.total_co_occurrences = data.get("total_co_occurrences", 0)
+        
+        self.role_position_memory.clear()
         rpm = data.get("role_position_memory", {})
         for role, vals in rpm.items():
             self.role_position_memory[role] = vals
+            
+        self._learned_exclusions.clear()
         excl = data.get("learned_exclusions", {})
         for key, val in excl.items():
             self._learned_exclusions[tuple(key.split("|"))] = val

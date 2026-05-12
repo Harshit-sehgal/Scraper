@@ -103,8 +103,8 @@ def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
     raw = (os.getenv(name) or "").strip()
     try:
         value = int(raw) if raw else default
-    except Exception as e:
-        logging.exception(e)
+    except (ValueError, TypeError):
+        logging.warning(f"Invalid integer for env var {name}: {raw!r}. Using default: {default}")
         value = default
     return max(minimum, min(maximum, value))
 
@@ -409,8 +409,7 @@ def _llm_json(messages: list[dict], temperature: float = 0.1, timeout: int = 45)
         if parsed is not None:
             return parsed
     except Exception as e:
-        logging.exception(e)
-        print(f"[LLM] Pollinations JSON call failed: {e}")
+        logging.error(f"[LLM] Pollinations JSON call failed (prompt_len={len(messages)}): {e}")
 
     try:
         from g4f.client import Client
@@ -426,8 +425,7 @@ def _llm_json(messages: list[dict], temperature: float = 0.1, timeout: int = 45)
         if parsed is not None:
             return parsed
     except Exception as e:
-        logging.exception(e)
-        print(f"[LLM] g4f JSON fallback failed: {e}")
+        logging.error(f"[LLM] g4f JSON fallback failed (prompt_len={len(messages)}): {e}")
 
     return {}
 

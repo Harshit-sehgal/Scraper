@@ -48,6 +48,91 @@ ROLE_EXCLUSIVITY: List[Tuple[str, str]] = [
 ]
 
 
+# Minimal universal semantic roots for bootstrap seeding.
+_UNIVERSAL_ROOTS = [
+    (['pric', 'cost', 'prec', 'wert', 'salar'], SemanticType.PRICE),
+    (['date', 'zeit'], SemanticType.DATE),
+    (['loc', 'city', 'addr', 'ort'], SemanticType.LOCATION),
+    (['nam', 'comp', 'firm', 'brand', 'make', 'model', 'builder'], SemanticType.ORGANIZATION),
+    (['rat', 'scor', 'bewert'], SemanticType.RATING),
+    (['count', 'anzahl', 'experien', 'year', 'mileage', 'age'], SemanticType.NUMBER),
+    (['code', 'currenc', 'wahrung', 'ident'], SemanticType.CODE),
+]
+
+
+def _name_similarity(a: str, b: str) -> float:
+    """Compute longest common subsequence ratio between two role names."""
+    if not a or not b:
+        return 0.0
+    a, b = a.lower(), b.lower()
+    if a == b:
+        return 1.0
+    if a in b or b in a:
+        return 0.8
+    m, n = len(a), len(b)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if a[i-1] == b[j-1]:
+                dp[i][j] = dp[i-1][j-1] + 1
+            else:
+                dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+    lcs = dp[m][n]
+    return lcs / max(m, n)
+
+
+def seed_role_engine(schema_fields: list):
+    """Seed the RoleEmbeddingEngine with initial role-type compatibilities."""
+    reng = _get_role_engine()
+    
+    for f_name in schema_fields:
+        field_lower = f_name.lower()
+        
+        # Strategy 1: Universal roots
+        best_type = SemanticType.TEXT
+        for roots, stype in _UNIVERSAL_ROOTS:
+            if any(root in field_lower for root in roots):
+                best_type = stype
+                break
+        
+        # Strategy 2: Cache-derived nearest neighbor
+        if best_type == SemanticType.TEXT:
+            best_score = 0.0
+            for (known_role, type_str), compat in reng.compatibility_cache.items():
+                if compat < 0.6:
+                    continue
+                sim = _name_similarity(f_name, known_role)
+                if sim > best_score:
+                    best_score = sim
+                    if sim > 0.55:
+                        best_type = SemanticType(type_str)
+        
+        key = (f_name, best_type.value)
+        if key not in reng.compatibility_cache:
+            reng.compatibility_cache[key] = 0.7
+
+
+def warm_start_from_values(records: list, schema_fields: list):
+    """Warm-start the RoleEmbeddingEngine using actual value classifications."""
+    if not records or not schema_fields:
+        return
+    
+    reng = _get_role_engine()
+    first = records[0]
+    
+    from app.semantic_mapper import detect_semantic_type
+    
+    for f_name in schema_fields:
+        val = first.get(f_name)
+        if not isinstance(val, str) or not val.strip():
+            continue
+        
+        st, conf = detect_semantic_type(val, f_name)
+        key = (f_name, st.value)
+        if key not in reng.compatibility_cache:
+            reng.compatibility_cache[key] = 0.7
+
+
 def build_allocation_graph(record: SemanticRecord, schema_roles: List[str]) -> AllocationGraph:
     """Build an allocation graph from a record and desired schema roles.
 
@@ -375,15 +460,15 @@ def allocate_semantic_roles(
                 success=best_hyp['coherence'] > 0.5
             )
     
-        # Role position learning: record where each role was in the token order
-        for _idx, role_name in enumerate(schema_fields):
-            fill_val = graph.roles[role_name].filled_by
-            if fill_val and fill_val in graph.candidates:
-                token = graph.candidates[fill_val]
-                total_tokens = len(graph.candidates)
-                if total_tokens > 1:
-                    norm_pos = token.position / max(total_tokens - 1, 1)
-                    reng.learn_role_position(role_name, norm_pos)
+    # Role position learning: record where each role was in the token order
+    for _idx, role_name in enumerate(schema_fields):
+        fill_val = graph.roles[role_name].filled_by
+        if fill_val and fill_val in graph.candidates:
+            token = graph.candidates[fill_val]
+            total_tokens = len(graph.candidates)
+            if total_tokens > 1:
+                norm_pos = token.position / max(total_tokens - 1, 1)
+                reng.learn_role_position(role_name, norm_pos)
 
     return record, graph
 
@@ -403,13 +488,13 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
         if cand_key in assigned or role_name in filled:
             continue
         conflicting = False
-        for role_a, role_b in ROLE_EXCLUSIVITY:
+        for role_a, role_b in g.exclusivity_edges:
             other = role_b if role_name == role_a else (role_a if role_name == role_b else None)
             if other and other in filled and g.roles.get(other) and g.roles[other].filled_by == cand_key:
                 conflicting = True
                 break
                 
-        # Layer 5: Dynamic learned exclusivity
+        # Layer 5: Dynamic learned exclusivity (already covered if using g.exclusivity_edges)
         if not conflicting:
             reng = _get_role_engine()
             if hasattr(reng, 'get_learned_exclusion'):

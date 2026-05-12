@@ -12,7 +12,7 @@ not because it came from a "flight" page.
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from app.intent_parser import SEMANTIC_NEED_KEYWORDS, IntentSchema
 from app.page_profiler import StructureProfile, ValuePatterns
@@ -82,6 +82,104 @@ SEMANTIC_PATTERNS = {
         r"www\.[^\s]+",
     ],
 }
+
+
+from app.semantic_ir import SemanticType
+
+def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType, float]:
+    """Detect semantic type of a value using regex patterns and field name hints."""
+    # Field-name hinting (NOT domain-specific - just field role disambiguation)
+    name_lower = (field_name or "").lower()
+
+    # Price detection (currency symbol OR numeric in a price-type field)
+    if re.search(r"[\$\u20a8\u20ac\u00a3\u00a5\u20b9]", value):
+        return SemanticType.PRICE, 0.95
+    if any(k in name_lower for k in ["price", "cost", "fare", "amount", "salary"]):
+        if re.search(r"\d+", value):
+            return SemanticType.PRICE, 0.80
+
+    # Date detection
+    if re.search(r"\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}", value):
+        return SemanticType.DATE, 0.90
+
+    # Code detection (all-uppercase 2-5 chars)
+    if re.search(r"^[A-Z]{2,5}$", value):
+        return SemanticType.CODE, 0.80
+
+    # Rating detection
+    if re.search(r"\d+\.?\d*/\d+", value):
+        return SemanticType.RATING, 0.85
+
+    # Duration detection
+    if re.search(r"\d+h\s*\d*m|\d+h$", value):
+        return SemanticType.DURATION, 0.85
+
+    # Phone detection
+    if re.search(r"\+?\d[\d\s\-\(\)]{7,}", value):
+        return SemanticType.PHONE, 0.85
+
+    # Stop/quantifier detection - keep as number
+    if re.search(r"\d+\s*(stop|direct|non.?stop)", value, re.IGNORECASE):
+        return SemanticType.NUMBER, 0.70
+    
+    # Numeric with suffix (25L, 5+, 10K, 1.2Cr)
+    if re.search(r"^\d+\.?\d*[LkKmM]?$", value) and len(value) > 1:
+        return SemanticType.NUMBER, 0.60
+    if re.search(r"^\d+[+]$", value):
+        return SemanticType.NUMBER, 0.60
+    # Unit-suffixed numbers: "45000 m", "45000 miles", "1200 sqft"
+    if re.search(r"^\d+[\.]?\d*\s+(mi|km|m|ft|sqft|lbs|kg|g|hrs?|hours?|min|sec)", value, re.IGNORECASE):
+        return SemanticType.NUMBER, 0.60
+
+    # Generic number
+    if re.search(r"^\d+\.?\d*$", value) and len(value) >= 1:
+        return SemanticType.NUMBER, 0.60
+
+    # Organization-like (Title Case text)
+    if value and value[0].isupper():
+        return SemanticType.ORGANIZATION, 0.55
+    
+    # Product-like (brand naming: starts lowercase, has internal uppercase)
+    if value and len(value) >= 3 and value[0].islower():
+        has_internal_upper = any(c.isupper() for c in value[1:])
+        if has_internal_upper:
+            return SemanticType.ORGANIZATION, 0.50
+
+    return SemanticType.TEXT, 0.50
+
+
+def is_child_fragment(value: str, seen_values: set) -> bool:
+    """Check if a value is a child fragment of an already-seen larger value."""
+    if not value:
+        return False
+
+    for seen in seen_values:
+        if len(seen) > len(value) and value in seen:
+            # Only suppress if the child is a prefix or suffix of the parent
+            is_date = re.search(r"\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}", seen)
+            if not is_date and not (seen.startswith(value) or seen.endswith(value)):
+                continue
+            if re.search(r"\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}", seen):
+                if re.match(r"^\d+$", value):
+                    return True
+            if re.search(r"[\$\u20a8\u20ac\u00a3\u00a5\u20b9]", seen):
+                if re.match(r"^\d+$", value):
+                    return True
+            if "/" in seen and re.search(r"\d+\.?\d*/", seen):
+                if re.match(r"^\d+\.?\d*$", value):
+                    return True
+            if re.search(r"\d+\.?\d*\s*[a-zA-Z]+$", seen):
+                if re.match(r"^\d+\.?\d*$", value):
+                    return True
+                if re.match(r"^[a-zA-Z]+$", value) and seen.lower().endswith(value.lower()):
+                    return True
+            if re.search(r"[\$\u20a8\u20ac\u00a3\u00a5\u20b9]", seen):
+                if re.match(r"^\d+$", value):
+                    return True
+            if "/" in seen and re.search(r"\d+\.?\d*/", seen):
+                if re.match(r"^\d+\.?\d*$", value):
+                    return True
+    return False
 
 
 def match_values_to_intent(
