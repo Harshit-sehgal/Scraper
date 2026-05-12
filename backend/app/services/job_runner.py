@@ -1,0 +1,338 @@
+import asyncio
+import datetime
+import logging
+import time
+
+from app.discovery import discover_urls, infer_source_metadata
+from app.filters import apply_location_radius, process_results
+from app.models import FieldType, JobStatus, ScrapeMode
+from app.scraper import (
+    ai_clean_and_align_records,
+    scrape_url,
+)
+from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
+from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
+
+async def run_job(
+    job_id: str,
+    jobs_store: dict,
+    persist_state_fn,
+    max_discovery_urls: int,
+    max_job_runtime_seconds: int,
+    per_url_scrape_timeout_seconds: int,
+    ai_structuring_timeout_seconds: int,
+    insight_timeout_seconds: int,
+):
+    job = jobs_store.get(job_id)
+    if not job:
+        return
+
+    all_raw_results = []
+    warnings: list[str] = []
+    ai_source_prediction = {
+        "sources_attempted": 0,
+        "sources_with_ai_structuring": 0,
+        "records_processed": 0,
+        "records_ai_structured": 0,
+    }
+    ai_structuring_report = {
+        "applied": False,
+        "input_records": 0,
+        "output_records": 0,
+        "total_chunks": 0,
+        "ai_chunks": 0,
+        "fallback_chunks": 0,
+        "capped_records": 0,
+        "quality_filtered_after_ai": 0,
+    }
+    started_at = time.monotonic()
+    if not job.started_at:
+        job.started_at = datetime.datetime.now().isoformat()
+
+    if job.cancel_requested:
+        mark_job_canceled(job, "Canceled before execution.")
+        persist_state_fn()
+        return
+
+    try:
+        # Auto-discovery mode
+        if job.mode == ScrapeMode.AUTO:
+            job.status = JobStatus.DISCOVERING
+            persist_state_fn()
+            print(f"[Job {job_id}] Auto-discovering URLs for: {job.topic}")
+
+            # In auto mode, reuse max_pages as discovery count and cap to runtime-safe limits.
+            discovery_limit = int(job.max_pages or 10)
+            discovery_limit = max(1, min(discovery_limit, max_discovery_urls))
+            
+            discovered = await discover_urls(
+                query=job.topic,
+                domain=job.preferred_domain,
+                num_results=discovery_limit,
+                location=job.location,
+                data_fields=[f.name for f in job.schema_fields],
+                origin_location=job.origin_location,
+                max_distance_km=job.max_distance_km,
+                source_policy=job.source_policy,
+                max_per_domain=job.max_per_domain,
+            )
+            job.discovered_urls = discovered
+            job.urls = [d["url"] for d in discovered if "url" in d]
+
+            if not job.urls:
+                if job.cancel_requested:
+                    mark_job_canceled(job)
+                else:
+                    job.status = JobStatus.FAILED
+                    job.error = "Could not discover any URLs for this topic"
+                    job.completed_at = datetime.datetime.now().isoformat()
+                persist_state_fn()
+                return
+
+            print(f"[Job {job_id}] Discovered {len(job.urls)} URLs")
+
+            if job.cancel_requested:
+                mark_job_canceled(job)
+                persist_state_fn()
+                return
+
+        job.status = JobStatus.RUNNING
+        persist_state_fn()
+
+        for idx, url in enumerate(job.urls, start=1):
+            if job.cancel_requested:
+                mark_job_canceled(job)
+                persist_state_fn()
+                return
+
+            elapsed = time.monotonic() - started_at
+            if elapsed > max_job_runtime_seconds:
+                warnings.append(
+                    f"Job runtime limit reached at {int(elapsed)}s; partial results returned."
+                )
+                print(f"[Job {job_id}] Runtime limit reached after {int(elapsed)}s")
+                break
+
+            try:
+                results = await asyncio.wait_for(
+                    scrape_url(url, job.schema_fields, min_record_score=job.min_record_score, user_intent=job.intent),
+                    timeout=per_url_scrape_timeout_seconds,
+                )
+                ai_source_prediction["sources_attempted"] += 1
+                ai_structured_rows_for_source = 0
+                for record in results:
+                    if record.pop("_ai_source_structured", False):
+                        ai_structured_rows_for_source += 1
+                    record["source_url"] = url
+                    source_type = "unknown"
+                    source_trust_score = 0.4
+
+                    if job.discovered_urls:
+                        matched = next((d for d in job.discovered_urls if d.get("url") == url), None)
+                        if matched:
+                            source_type = str(matched.get("source_type") or "unknown")
+                            source_trust_score = safe_score(matched.get("source_trust_score") or 0.4)
+                        else:
+                            inferred = infer_source_metadata(url=url)
+                            source_type = str(inferred.get("source_type") or "unknown")
+                            source_trust_score = safe_score(inferred.get("source_trust_score") or 0.4)
+                    else:
+                        inferred = infer_source_metadata(url=url)
+                        source_type = str(inferred.get("source_type") or "unknown")
+                        source_trust_score = safe_score(inferred.get("source_trust_score") or 0.4)
+
+                    record["source_type"] = source_type
+                    record["source_trust_score"] = round(source_trust_score, 3)
+
+                ai_source_prediction["records_processed"] += len(results)
+                ai_source_prediction["records_ai_structured"] += ai_structured_rows_for_source
+                if ai_structured_rows_for_source > 0:
+                    ai_source_prediction["sources_with_ai_structuring"] += 1
+
+                all_raw_results.extend(results)
+                persist_state_fn()
+            except asyncio.TimeoutError:
+                msg = f"URL timeout skipped ({idx}/{len(job.urls)}): {url}"
+                warnings.append(msg)
+                print(f"[Job {job_id}] {msg}")
+            except Exception as e:
+                logging.exception(e)
+                msg = f"URL scrape failed ({idx}/{len(job.urls)}): {url}"
+                warnings.append(f"{msg} ({type(e).__name__})")
+                print(f"[Job {job_id}] {msg}: {e}")
+                continue
+
+        run_global_ai_structuring = (
+            bool(all_raw_results)
+            and bool(job.schema_fields)
+            and ai_source_prediction["sources_attempted"] == 0
+        )
+
+        if job.cancel_requested:
+            mark_job_canceled(job)
+            persist_state_fn()
+            return
+
+        if run_global_ai_structuring:
+            print(f"[Job {job_id}] AI structuring {len(all_raw_results)} scraped rows...")
+            try:
+                all_raw_results, ai_structuring_report = await asyncio.wait_for(
+                    ai_clean_and_align_records(
+                        all_raw_results,
+                        job.schema_fields,
+                        min_record_score=job.min_record_score,
+                    ),
+                    timeout=ai_structuring_timeout_seconds,
+                )
+                if ai_structuring_report.get("capped_records", 0) > 0:
+                    warnings.append(
+                        "AI structuring processed a capped subset of rows; "
+                        "remaining rows used deterministic cleaning."
+                    )
+                if ai_structuring_report.get("model_fallback_mode"):
+                    warnings.append(
+                        "AI structuring switched to deterministic fallback after repeated model timeouts/errors."
+                    )
+            except asyncio.TimeoutError:
+                warnings.append(
+                    f"AI structuring timed out after {ai_structuring_timeout_seconds}s; "
+                    "continuing with deterministic processing."
+                )
+                print(f"[Job {job_id}] AI structuring timed out")
+            except Exception as struct_err:
+                logging.exception(struct_err)
+                warnings.append("AI structuring failed; continuing with deterministic processing.")
+                print(f"[Job {job_id}] AI structuring failed: {struct_err}")
+        elif all_raw_results and job.schema_fields:
+            ai_structuring_report = {
+                "applied": False,
+                "reason": "skipped_global_ai_source_level_applied",
+                "input_records": len(all_raw_results),
+                "output_records": len(all_raw_results),
+                "total_chunks": 0,
+                "ai_chunks": 0,
+                "fallback_chunks": 0,
+                "model_fallback_mode": False,
+                "capped_records": 0,
+                "quality_filtered_after_ai": 0,
+            }
+
+        # Post-process
+        filtered_results, total, filtered_count, type_integrity_report = process_results(
+            all_raw_results, job.schema_fields, job.filters
+        )
+        post_filter_count = len(filtered_results)
+
+        # Optional radius filtering against origin location
+        location_field = next((f.name for f in job.schema_fields if f.field_type.value == "location"), "")
+        radius_report = {
+            "applied": False,
+            "reason": "not_configured",
+            "origin": job.origin_location,
+            "max_distance_km": job.max_distance_km,
+        }
+        if job.origin_location and job.max_distance_km is not None:
+            filtered_results, radius_report = apply_location_radius(
+                records=filtered_results,
+                schema_fields=job.schema_fields,
+                origin_address=job.origin_location,
+                max_distance_km=job.max_distance_km,
+                preferred_location_field=location_field,
+            )
+            filtered_count = len(filtered_results)
+        post_radius_count = len(filtered_results)
+
+        # Deduplication
+        if job.deduplicate and filtered_results:
+            filtered_results = deduplicate_results(
+                records=filtered_results,
+                schema_fields=job.schema_fields,
+                deduplicate_field=job.deduplicate_field,
+            )
+            filtered_count = len(filtered_results)
+
+        source_breakdown = compute_source_breakdown(filtered_results)
+
+        has_contact_fields = any(
+            field.field_type in {FieldType.EMAIL, FieldType.PHONE}
+            for field in job.schema_fields
+        )
+        if has_contact_fields and ai_source_prediction["sources_attempted"] > 0:
+            import os
+            if ai_source_prediction["records_ai_structured"] == 0:
+                if (os.getenv("GROQ_API_KEY") or "").strip():
+                    warnings.append(
+                        "AI source structuring covered 0% rows in this run; provider timeouts/rate limits may reduce phone/email extraction."
+                    )
+                else:
+                    warnings.append(
+                        "AI source structuring covered 0% rows in this run; set GROQ_API_KEY to improve phone/email extraction reliability."
+                    )
+
+        job.quality_report = build_quality_report(
+            raw_results=all_raw_results,
+            post_filter_count=post_filter_count,
+            post_radius_count=post_radius_count,
+            radius_report=radius_report,
+            final_results=filtered_results,
+            min_record_score=job.min_record_score,
+            type_integrity_report=type_integrity_report,
+            source_breakdown=source_breakdown,
+            ai_source_prediction=ai_source_prediction,
+            ai_structuring_report=ai_structuring_report,
+            warnings=warnings,
+        )
+
+        job.results = normalize_job_results(filtered_results, job.schema_fields)
+        job.total_records = total
+        job.filtered_records = filtered_count
+        
+        # Add scraped_at timestamp to each record
+        scraped_at = datetime.datetime.now().isoformat()
+        for record in job.results:
+            record["scraped_at"] = scraped_at
+        
+        # AI Insight Phase
+        if job.results:
+            if job.cancel_requested:
+                mark_job_canceled(job)
+                persist_state_fn()
+                return
+
+            job.status = JobStatus.RUNNING
+            print(f"[Job {job_id}] Generating AI insights over {len(job.results)} records...")
+            try:
+                from app.scraper import generate_data_insight
+                analysis_text = await asyncio.wait_for(
+                    generate_data_insight(job.results),
+                    timeout=insight_timeout_seconds,
+                )
+                job.analysis = analysis_text
+            except asyncio.TimeoutError:
+                print(
+                    f"[Job {job_id}] AI insight timed out after "
+                    f"{insight_timeout_seconds}s; continuing without insight."
+                )
+                job.analysis = "Insight generation timed out."
+            except Exception as ai_e:
+                logging.exception(ai_e)
+                print(f"[Job {job_id}] AI insight generation failed: {ai_e}")
+                
+        job.status = JobStatus.COMPLETED
+        job.cancel_requested = False
+        job.completed_at = datetime.datetime.now().isoformat()
+        persist_state_fn()
+
+        print(f"[Job {job_id}] Completed: {total} total, {filtered_count} after filtering")
+
+    except Exception as e:
+        logging.exception(e)
+        if job.cancel_requested:
+            mark_job_canceled(job)
+            print(f"[Job {job_id}] Canceled")
+        else:
+            job.status = JobStatus.FAILED
+            job.error = str(e)
+            job.completed_at = datetime.datetime.now().isoformat()
+            print(f"[Job {job_id}] Failed: {e}")
+        persist_state_fn()
