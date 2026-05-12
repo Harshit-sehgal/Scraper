@@ -1,3 +1,4 @@
+
 """
 Layer 1: Intent Parser
 ======================
@@ -7,7 +8,9 @@ regardless of domain (flight, hotel, product, job, etc.)
 Core principle: Match by semantic need (price, date, rating), not by domain.
 """
 
+import logging
 from dataclasses import dataclass, field
+
 from app.models import FieldType
 
 
@@ -291,8 +294,8 @@ Rules:
                 required_needs=result.get("required_needs", []),
                 optional_needs=result.get("optional_needs", [])
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logging.exception(e)
 
     # Fallback to rule-based parsing
     return parse_user_intent(query)

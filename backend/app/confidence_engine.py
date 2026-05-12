@@ -13,12 +13,18 @@ Multi-level confidence scoring that considers:
 Core principle: Confidence is multi-dimensional, not a single number.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple
-from collections import Counter
 import math
+from collections import Counter
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
 
-from app.semantic_ir import SemanticToken, SemanticType, RelationshipEdge, SemanticRecord, DatasetIR
+from app.semantic_ir import (
+    DatasetIR,
+    RelationshipEdge,
+    SemanticRecord,
+    SemanticToken,
+    SemanticType,
+)
 
 
 @dataclass
@@ -126,7 +132,7 @@ def compute_structural_consistency(
 
     # Also check similarity to known patterns
     similarity_bonus = 0.0
-    for known_sig, known_count in dataset.structural_memory.items():
+    for known_sig, _known_count in dataset.structural_memory.items():
         if known_sig == signature:
             continue
         sim = _signature_similarity(signature, known_sig)
@@ -157,7 +163,7 @@ def compute_record_confidence(
         report.token_confidences[i] = compute_token_confidence(token)
 
     # Field-level
-    for f_name, value in record.mapped_fields.items():
+    for f_name, _value in record.mapped_fields.items():
         conf = record.mapped_confidences.get(f_name, 0.5)
         report.field_confidences[f_name] = conf
 

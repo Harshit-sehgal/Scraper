@@ -1,5 +1,5 @@
-import json
 import csv
+import json
 
 INPUT_FILE = "/home/harshit/Documents/Work/Money/scraper/chennai_leads.json"
 OUTPUT_FILE = "/home/harshit/Documents/Work/Money/scraper/chennai_interior_designers.csv"
@@ -53,6 +53,8 @@ def clean_leads(input_file=INPUT_FILE, output_file=OUTPUT_FILE):
 
         print(f"Cleaned JSON into CSV! Found {len(valid_leads)} high-quality leads.")
     except Exception as e:
+        import logging
+        logging.exception(e)
         print(f"Error processing keys: {e}")
 
 

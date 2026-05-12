@@ -1,7 +1,7 @@
-import asyncio
 import json
+
 import requests
-import sys
+
 
 def test_pollinations_api():
     markdown = """
@@ -43,6 +43,8 @@ def test_pollinations_api():
         print(f"Extracted json:\n{json.dumps(parsed, indent=2)}")
         
     except Exception as e:
+        import logging
+        logging.exception(e)
         print("Error:", e)
 
 test_pollinations_api()

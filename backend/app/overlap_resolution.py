@@ -20,10 +20,9 @@ Core rule:
   Price > number fragments, Date > number parts, Email > substrings.
 """
 
-from typing import List, Dict, Set
+from typing import Dict, List, Set
 
-from app.semantic_ir import SemanticToken, SemanticType, SemanticRecord
-
+from app.semantic_ir import SemanticRecord, SemanticToken, SemanticType
 
 # Hierarchical dominance: broader types dominate narrower ones
 DOMINANCE_HIERARCHY = {

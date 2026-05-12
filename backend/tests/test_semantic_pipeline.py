@@ -1,11 +1,24 @@
 """Tests for the core semantic pipeline and allocation engine."""
 
-from app.semantic_pipeline import run_pipeline, strip_metadata, filter_noise_records, _detect_semantic_type
-from app.semantic_allocation_engine import allocate_semantic_roles, _get_role_engine
-from app.semantic_ir import (
-    SemanticToken, SemanticType, Span, SemanticRecord, create_token,
+from app.semantic_allocation_engine import _get_role_engine, allocate_semantic_roles
+from app.semantic_inference_engine import (
+    BeliefField,
+    RoleEmbeddingEngine,
+    SemanticState,
 )
-from app.semantic_inference_engine import BeliefField, SemanticState, RoleEmbeddingEngine
+from app.semantic_ir import (
+    SemanticRecord,
+    SemanticToken,
+    SemanticType,
+    Span,
+    create_token,
+)
+from app.semantic_pipeline import (
+    _detect_semantic_type,
+    filter_noise_records,
+    run_pipeline,
+    strip_metadata,
+)
 
 
 def _clean_engine():
@@ -334,7 +347,7 @@ def test_boundary_engine_scores():
 
 
 def test_boundary_engine_history():
-    from app.semantic_boundary_engine import get_boundary_engine, MergeDecision
+    from app.semantic_boundary_engine import MergeDecision, get_boundary_engine
     e = get_boundary_engine()
     n = len(e.decision_history)
     e.record_decision(MergeDecision('org', 'org', 'X', 'Y', True, 0.9, True))
@@ -394,8 +407,8 @@ def test_transition_detector_high_list():
     assert len(high) >= 2  # Should have at least a few high-transition pairs
 
 def test_layer5_contradiction_learning():
-    from app.semantic_pipeline import run_pipeline
     from app.semantic_allocation_engine import _get_role_engine
+    from app.semantic_pipeline import run_pipeline
     
     # 1. Provide a record and force a bad allocation that violates universal roots
     # "price" expects a PRICE type, but we force it to accept a TEXT type.

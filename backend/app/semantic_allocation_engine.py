@@ -16,15 +16,17 @@ Role-type compatibility is LEARNED, not hardcoded.
 Uses RoleEmbeddingEngine from semantic_inference_engine.
 """
 
-from typing import List, Optional, Tuple, Set
-from copy import deepcopy
 import random
+from copy import deepcopy
+from typing import List, Optional, Set, Tuple
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, SemanticRole, AllocationGraph,
+    AllocationGraph,
     SemanticRecord,
+    SemanticRole,
+    SemanticToken,
+    SemanticType,
 )
-
 
 # SHARED role embedding engine instance (learned, not hardcoded)
 # Imported lazily to avoid circular deps
@@ -38,12 +40,11 @@ def _get_role_engine():
     return _role_engine
 
 
-# Exclusivity constraints (structural invariants, NOT domain-specific)
+# Exclusivity constraints (bootstrap seeds, others learned dynamically)
 ROLE_EXCLUSIVITY: List[Tuple[str, str]] = [
     ("origin", "destination"),
-    ("price", "date"),
-    ("name", "price"),
-    ("phone", "email"),
+    ("departure", "arrival"),
+    ("start", "end"),
 ]
 
 
@@ -82,9 +83,20 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str]) -> A
                 graph.compatibility[(cand_key, role_name)] = score
 
     # Build exclusivity edges
+    reng = _get_role_engine()
     for role_a, role_b in ROLE_EXCLUSIVITY:
         if role_a in graph.roles and role_b in graph.roles:
             graph.exclusivity_edges.append((role_a, role_b))
+            
+    # Add dynamic learned exclusions
+    roles = list(graph.roles.keys())
+    for i in range(len(roles)):
+        for j in range(i + 1, len(roles)):
+            r1, r2 = roles[i], roles[j]
+            if (r1, r2) in graph.exclusivity_edges or (r2, r1) in graph.exclusivity_edges:
+                continue
+            if reng.get_learned_exclusion(r1, r2) > 0.4:
+                graph.exclusivity_edges.append((r1, r2))
 
     # Initial coherence
     graph.coherence_score = _compute_allocation_coherence(graph)
@@ -96,9 +108,19 @@ def _infer_role_type(role_name: str) -> SemanticType:
     """Infer the expected SemanticType for a role name.
 
     Delegates to RoleEmbeddingEngine which learns dynamically.
-    No hardcoded mappings. No symbolic ontology expansion.
+    Finds the type with the highest learned compatibility for this role.
     """
-    return SemanticType.TEXT
+    reng = _get_role_engine()
+    best_type = SemanticType.TEXT
+    best_compat = -1.0
+    
+    for t in SemanticType:
+        compat = reng.get_compatibility(role_name, t)
+        if compat > best_compat:
+            best_compat = compat
+            best_type = t
+            
+    return best_type
 
 
 def _compute_compatibility(
@@ -278,7 +300,7 @@ def allocate_semantic_roles(
     candidates = [(cand, role, score) for (cand, role), score in graph.compatibility.items()]
     hypotheses = []
     
-    for strategy, key_fn in [
+    for _strategy, key_fn in [
         ('primary', lambda x: -x[2]),
         ('reverse', lambda x: x[2]),
         ('noisy', lambda x: -x[2] + random.random() * 0.05),
@@ -354,7 +376,7 @@ def allocate_semantic_roles(
             )
     
         # Role position learning: record where each role was in the token order
-        for idx, role_name in enumerate(schema_fields):
+        for _idx, role_name in enumerate(schema_fields):
             fill_val = graph.roles[role_name].filled_by
             if fill_val and fill_val in graph.candidates:
                 token = graph.candidates[fill_val]

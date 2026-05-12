@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import threading
 from collections.abc import Callable
 from typing import TypeVar
@@ -30,7 +31,8 @@ async def run_sync_in_thread(
     def _worker() -> None:
         try:
             result["value"] = func(*args, **kwargs)
-        except BaseException as exc:
+        except Exception as exc:
+            logging.exception(exc)
             result["error"] = exc
         finally:
             done.set()

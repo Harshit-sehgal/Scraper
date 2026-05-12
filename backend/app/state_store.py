@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 import os
 from pathlib import Path
 from threading import Lock
@@ -33,6 +34,7 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job]]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except Exception as e:
+        logging.exception(e)
         print(f"[State] Failed to read state file {path}: {e}")
         return {}, {}
 
@@ -44,6 +46,7 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job]]:
             job = Job.model_validate(raw)
             jobs_store[job.id] = job
         except Exception as e:
+            logging.exception(e)
             print(f"[State] Skipping invalid job entry: {e}")
 
     for raw in payload.get("recycle_bin", []):
@@ -51,6 +54,7 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job]]:
             job = Job.model_validate(raw)
             recycle_bin_store[job.id] = job
         except Exception as e:
+            logging.exception(e)
             print(f"[State] Skipping invalid recycle-bin entry: {e}")
 
     # Jobs that were in-progress during shutdown are marked failed on recovery.
@@ -80,4 +84,5 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
             temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
             temp_path.replace(path)
     except Exception as e:
+        logging.exception(e)
         print(f"[State] Failed to persist state to {path}: {e}")

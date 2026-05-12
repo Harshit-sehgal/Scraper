@@ -1,14 +1,17 @@
+
 """
 Post-Processing Engine: Type coercion, Geospatial distance calculation, and Data Filtering.
 Uses geopy (free OpenStreetMap Nominatim geocoder) for distance calculations.
 """
 
+import logging
 import re
 from typing import Optional
-from geopy.geocoders import Nominatim
-from geopy.distance import geodesic
-from app.models import SchemaField, FieldType, FilterRule, FilterOperator
 
+from geopy.distance import geodesic
+from geopy.geocoders import Nominatim
+
+from app.models import FieldType, FilterOperator, FilterRule, SchemaField
 
 # ──────────────────────────────────────────────
 # Geocoding & Distance (100% Free via Nominatim)
@@ -31,6 +34,7 @@ def geocode_address(address: str) -> Optional[tuple[float, float]]:
             _geocode_cache[address] = coords
             return coords
     except Exception as e:
+        logging.exception(e)
         print(f"[Geocode Error] {address}: {e}")
 
     _geocode_cache[address] = None
@@ -116,7 +120,8 @@ def coerce_value(value, field_type: FieldType):
         else:
             return str(value) if value is not None else None
 
-    except Exception:
+    except Exception as e:
+        logging.exception(e)
         return str(value) if value is not None else None
 
 

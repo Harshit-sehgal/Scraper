@@ -1,9 +1,11 @@
+
 """
 Auto-Discovery Engine: Given a topic/query, automatically finds the best
 web pages to scrape by searching the web and ranking results.
 Uses free search via DuckDuckGo.
 """
 
+import logging
 import os
 from collections import defaultdict
 from typing import Optional
@@ -13,7 +15,6 @@ from ddgs import DDGS
 
 from app.async_utils import run_sync_in_thread
 from app.models import SourcePolicy
-
 
 NOISY_URL_PARTS = (
     "/login",
@@ -112,7 +113,8 @@ def _canonicalize_url(url: str) -> str:
             return ""
         path = (p.path or "/").rstrip("/") or "/"
         return urlunparse((p.scheme.lower(), p.netloc.lower(), path, "", "", ""))
-    except Exception:
+    except Exception as e:
+        logging.exception(e)
         return ""
 
 
@@ -199,7 +201,8 @@ def _build_search_query(
 def _extract_domain(url: str) -> str:
     try:
         return urlparse(url).netloc.lower().replace("www.", "")
-    except Exception:
+    except Exception as e:
+        logging.exception(e)
         return ""
 
 
@@ -366,6 +369,7 @@ async def discover_urls(
         print(f"[Discovery] Found {len(results)} real URLs.")
         return results
     except Exception as e:
+        logging.exception(e)
         print(f"[Discovery Error]: {e}")
         return []
 

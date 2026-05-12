@@ -1,3 +1,4 @@
+
 """
 Semantic Pipeline Orchestrator
 ================================
@@ -13,16 +14,19 @@ Metadata must NEVER participate in semantic mapping.
 Each layer has ONE responsibility.
 """
 
+import logging
 from dataclasses import dataclass, field
-from typing import List, Tuple, Set
+from typing import List, Set, Tuple
 
+from app.semantic_allocation_engine import _get_role_engine, allocate_semantic_roles
+from app.semantic_boundary_engine import record_motif_observation, score_boundary
 from app.semantic_ir import (
-    SemanticToken, SemanticType, SemanticRecord, Span,
+    SemanticRecord,
+    SemanticToken,
+    SemanticType,
+    Span,
 )
-from app.semantic_allocation_engine import allocate_semantic_roles, _get_role_engine
-from app.semantic_boundary_engine import score_boundary, record_motif_observation
-from app.semantic_segmentation import expand_composite_records, StructuralMemoryTracker
-
+from app.semantic_segmentation import StructuralMemoryTracker, expand_composite_records
 
 # Seed patterns are now embedded in _seed_role_engine as substring-based
 # type hints. This approach generalizes across languages without manual
@@ -225,7 +229,11 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
         return []
     
     filtered = []
-    from app.semantic_boundary_engine import get_boundary_engine, _BOOTSTRAP_SUFFIXES, _STOP_WORDS
+    from app.semantic_boundary_engine import (
+        _BOOTSTRAP_SUFFIXES,
+        _STOP_WORDS,
+        get_boundary_engine,
+    )
     be = get_boundary_engine()
     
     # Entity-relevant types (types that indicate a real data record)
@@ -308,18 +316,12 @@ def run_pipeline(
         return []
     
     # Load persisted learning cache (if available)
+    from app.semantic_persistence import load_semantic_state, save_semantic_state
+    load_semantic_state()
+    
     reng = _get_role_engine()
-    import os
     from app.semantic_boundary_engine import get_boundary_engine
     be = get_boundary_engine()
-    
-    cache_path = os.environ.get('SEMANTIC_CACHE_PATH', '/tmp/semantic_cache.json')
-    boundary_cache_path = os.environ.get('SEMANTIC_BOUNDARY_CACHE_PATH', '/tmp/semantic_boundary_cache.json')
-    
-    if reng.learning_count == 0:
-        reng.load_from_file(cache_path)
-    if be.motif_learner.total_records == 0:
-        be.load_from_file(boundary_cache_path)
     
     # Bootstrap: seed the RoleEmbeddingEngine using substring hints + value warm-start
     if schema_fields:
@@ -436,7 +438,7 @@ def run_pipeline(
                         output["_confidence"] = ie_coherence
                         output["_refined_by"] = "inference_engine"
             except Exception as exc:
-                import logging
+                logging.exception(exc)
                 logging.getLogger(__name__).warning(
                     "InferenceEngine failed: %s", exc)
         
@@ -446,71 +448,29 @@ def run_pipeline(
         output["_calibrated_confidence"] = reng.get_calibrated_confidence(output["_confidence"])
         
         # Stage 3: Contradiction detection
-        # Check for duplicate values across different schema fields (contradiction)
-        filled_vals: dict[str, str] = {}
-        contradictions = []
-        for role_name in schema_fields:
-            val = output.get(role_name)
-            if val:
-                if val in filled_vals:
-                    contradictions.append(f'{filled_vals[val]}={val} and {role_name}={val}')
-                filled_vals[val] = role_name
+        from app.semantic_contradiction_engine import (
+            apply_contradiction_learning,
+            detect_allocation_contradictions,
+            detect_role_swap_warnings,
+        )
+        contradictions = detect_allocation_contradictions(output, schema_fields)
         if contradictions:
             output["_contradictions"] = contradictions
             output["_confidence"] *= 0.7
             
-            # Layer 5: Contradiction-aware learning
-            # Penalize both roles' compatibility with this value's type
-            for role_name in schema_fields:
-                val = output.get(role_name)
-                if val:
-                    for other_role in schema_fields:
-                        if other_role != role_name and output.get(other_role) == val:
-                            val_type, _ = _detect_semantic_type(val, "")
-                            reng.learn_from_allocation(role_name, val_type, val, success=False, delta=0.15)
-                            if hasattr(reng, 'learn_contradiction'):
-                                reng.learn_contradiction(role_name, other_role, val_type.value)
-        
-        # Role swap detection: check if value types match field expectations
-        warnings = []
-        for role_name in schema_fields:
-            val = output.get(role_name)
-            if not val:
-                continue
-            val_type, _ = _detect_semantic_type(val, role_name)
-            seed_type = SemanticType.TEXT
-            # Determine expected type from universal roots
-            for roots, stype in _UNIVERSAL_ROOTS:
-                if any(root in role_name.lower() for root in roots):
-                    seed_type = stype
-                    break
-            # Flag type mismatch between expected role type and actual value type
-            if seed_type != SemanticType.TEXT and val_type != seed_type:
-                warnings.append(f'{role_name}: expected {seed_type.value}, got {val_type.value} ({val})')
-                # Layer 5: Contradiction-aware learning
-                # Penalize this mismatched type heavily so it learns not to do this again
-                reng.learn_from_allocation(role_name, val_type, val, success=False, delta=0.2)
+        # Role swap detection
+        warnings = detect_role_swap_warnings(output, schema_fields, _detect_semantic_type, _UNIVERSAL_ROOTS)
         if warnings:
             output["_warnings"] = warnings
             
+        # Layer 5: Contradiction-aware learning
+        apply_contradiction_learning(output, schema_fields, reng, _detect_semantic_type, contradictions, warnings, _UNIVERSAL_ROOTS)
+            
         # Layer 8: Meta-cognition diagnostics (Decision Explanation)
-        reasoning = []
-        for role_name in schema_fields:
-            val = output.get(role_name)
-            if val:
-                val_type, conf = _detect_semantic_type(val, role_name)
-                compat = reng.compatibility_cache.get((role_name, val_type.value), 0.5)
-                if compat > 0.7:
-                    reasoning.append(f"Mapped '{val}' ({val_type.value}) to {role_name} due to high learned compatibility ({compat:.2f}).")
-                elif conf > 0.8:
-                    reasoning.append(f"Mapped '{val}' to {role_name} based on strong value structure ({val_type.value}).")
-                else:
-                    reasoning.append(f"Mapped '{val}' to {role_name} via structural best-fit (compatibility: {compat:.2f}).")
-        
-        if contradictions:
-            reasoning.append(f"Penalized confidence due to contradictory claims: {', '.join(contradictions)}.")
-        
-        output["_reasoning"] = reasoning
+        from app.semantic_diagnostics import generate_allocation_diagnostics
+        output["_reasoning"] = generate_allocation_diagnostics(
+            output, schema_fields, reng, contradictions, _detect_semantic_type
+        )
         
         # Record merge/split feedback for boundary engine learning
         coherence = output["_confidence"]
@@ -525,10 +485,7 @@ def run_pipeline(
     report.after_allocation = len(allocated_records)
 
     # Persist learned cache for next session
-    if reng.learning_count > 0:
-        reng.save_to_file(cache_path)
-    if be.motif_learner.total_records > 0:
-        be.save_to_file(boundary_cache_path)
+    save_semantic_state()
 
     return allocated_records
 

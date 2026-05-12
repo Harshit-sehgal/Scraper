@@ -22,17 +22,19 @@ All other modules are SUPPORTING SUBSYSTEMS.
 This module is THE REASONING CORE.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-from collections import defaultdict, Counter
 import math
 import random
+from collections import Counter, defaultdict
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set, Tuple
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType,
-    RelationshipEdge, SemanticGraph, DatasetIR,
+    DatasetIR,
+    RelationshipEdge,
+    SemanticGraph,
+    SemanticToken,
+    SemanticType,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # COMPONENT 1: UNIFIED SEMANTIC STATE
@@ -249,7 +251,7 @@ class SemanticEnergyModel:
             if edge.confidence >= 0.7:
                 edge.confidence = min(edge.confidence + 0.02, 1.0)
 
-        for o_edge in graph.ownership_edges:
+        for _o_edge in graph.ownership_edges:
             if edge.confidence >= 0.7:
                 edge.confidence = min(edge.confidence + 0.02, 1.0)
 
@@ -298,7 +300,7 @@ class BeliefFieldPropagator:
             return BeliefField({}, {})
 
         field = self.field
-        for it in range(iterations):
+        for _it in range(iterations):
             new_beliefs: Dict[int, Dict[SemanticType, float]] = {}
             new_uncertainties: Dict[int, float] = {}
 
@@ -815,7 +817,7 @@ class InferenceEngine:
 
             # 6e: Topology analysis (every 3 iterations)
             if iteration % 3 == 0:
-                for h_id, state in hypotheses.hypotheses.items():
+                for _h_id, state in hypotheses.hypotheses.items():
                     state.centrality = topology.compute_centrality()
                     state.communities = topology.detect_communities()
                     state.motifs = topology.detect_motifs()
@@ -900,7 +902,6 @@ class SemanticMemory:
 
     def __init__(self):
         self.successful_motifs: Counter[Tuple[str, ...]] = Counter()
-        self.ownership_patterns: Dict[str, int] = Counter()
         self.total_runs: int = 0
 
     def record_success(self, state: SemanticState):
@@ -938,7 +939,6 @@ class RoleEmbeddingEngine:
     """
 
     def __init__(self):
-        self.embeddings: Dict[str, List[float]] = {}
         self.compatibility_cache: Dict[Tuple[str, str], float] = {}
         self.learning_count: int = 0
         self.co_occurrence: Dict[Tuple[str, str, str, str], int] = {}
@@ -946,6 +946,7 @@ class RoleEmbeddingEngine:
         # Role position memory: tracks average position of each role across records
         # Key: role_name, Value: [sum_of_positions, count]
         self.role_position_memory: Dict[str, List[float]] = {}
+        self._learned_exclusions: Dict[Tuple[str, ...], float] = {}
 
     def learn_role_position(self, role_name: str, position: float):
         """Learn the typical position of a role from an allocation."""
@@ -1012,16 +1013,12 @@ class RoleEmbeddingEngine:
         This dynamically discovers exclusive roles (e.g. 'origin' and 'destination'
         should never claim the exact same value).
         """
-        if not hasattr(self, '_learned_exclusions'):
-            self._learned_exclusions: dict[tuple[str, ...], float] = {}
         key = tuple(sorted([role_a, role_b]))
         self._learned_exclusions[key] = self._learned_exclusions.get(key, 0.0) + 0.15
         self._learned_exclusions[key] = min(1.0, self._learned_exclusions[key])
 
     def get_learned_exclusion(self, role_a: str, role_b: str) -> float:
         """Get the learned exclusion penalty between two roles."""
-        if not hasattr(self, '_learned_exclusions'):
-            return 0.0
         key = tuple(sorted([role_a, role_b]))
         return self._learned_exclusions.get(key, 0.0)
 
@@ -1114,6 +1111,7 @@ class RoleEmbeddingEngine:
             "co_occurrence": {f"{a}:{b}:{c}:{d}": v for (a, b, c, d), v in self.co_occurrence.items()},
             "total_co_occurrences": self.total_co_occurrences,
             "role_position_memory": {r: v for r, v in self.role_position_memory.items()},
+            "learned_exclusions": {"|".join(k): v for k, v in self._learned_exclusions.items()},
         }
 
     def load_cache(self, data: dict):
@@ -1134,10 +1132,14 @@ class RoleEmbeddingEngine:
         rpm = data.get("role_position_memory", {})
         for role, vals in rpm.items():
             self.role_position_memory[role] = vals
+        excl = data.get("learned_exclusions", {})
+        for key, val in excl.items():
+            self._learned_exclusions[tuple(key.split("|"))] = val
 
     def save_to_file(self, filepath: str):
         """Persist the compatibility cache to a JSON file."""
-        import json, os
+        import json
+        import os
         data = self.save_cache()
         os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
         with open(filepath, 'w') as f:
@@ -1148,7 +1150,8 @@ class RoleEmbeddingEngine:
         
         Returns True if data was loaded, False if file doesn't exist.
         """
-        import json, os
+        import json
+        import os
         if not os.path.exists(filepath):
             return False
         try:
@@ -1328,7 +1331,7 @@ class GraphEquilibriumSolver:
         3. Adjust toward lower energy
         4. Track convergence path
         """
-        for step in range(max_steps):
+        for _step in range(max_steps):
             # Compute current equilibrium
             equilibrium = state.compute_equilibrium()
             energy = state.compute_energy(graph)
@@ -1358,7 +1361,7 @@ class GraphEquilibriumSolver:
                 edge.confidence = min(edge.confidence + 0.03, 1.0)
 
         # Suppress contradictory edges
-        for o_edge in graph.ownership_edges:
+        for _o_edge in graph.ownership_edges:
             if edge.confidence < 0.3:
                 edge.confidence = 0.0
 
@@ -1448,7 +1451,7 @@ class RelationalEmbeddingSpace:
         """Compute cosine similarity between two token embeddings."""
         emb_a = self.embeddings.get(idx_a, [0.0] * self.dimension)
         emb_b = self.embeddings.get(idx_b, [0.0] * self.dimension)
-        dot = sum(a * b for a, b in zip(emb_a, emb_b))
+        dot = sum(a * b for a, b in zip(emb_a, emb_b, strict=False))
         norm_a = sum(a * a for a in emb_a) ** 0.5 or 1.0
         norm_b = sum(b * b for b in emb_b) ** 0.5 or 1.0
         return dot / (norm_a * norm_b)
@@ -1510,7 +1513,7 @@ class LatentSemanticField:
             self.field_type[i] = token.primary_type.value
 
         # Phase 2: Propagate fields along edges
-        for iteration in range(3):
+        for _iteration in range(3):
             new_strength = dict(self.field_strength)
             for edge in self.graph.relationships:
                 src = edge.source_idx
@@ -1627,7 +1630,7 @@ class SemanticThermodynamics:
         High temperature: explore (accept worse states).
         Low temperature: exploit (only accept better states).
         """
-        for step in range(steps):
+        for _step in range(steps):
             current_energy = self.compute_energy(graph)
             self.energy_history.append(current_energy)
 

@@ -1,3 +1,4 @@
+
 """
 Layer 4: Validation & Repair
 ============================
@@ -10,11 +11,13 @@ Confidence-based validation that:
 Core principle: Empty fields are OK; wrong values are NOT.
 """
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
-from app.models import FieldType, SchemaField
+
 from app.intent_parser import IntentSchema
+from app.models import FieldType, SchemaField
 
 
 @dataclass
@@ -405,8 +408,8 @@ Return JSON array of fixed records with same structure.
 
         if isinstance(result, list):
             return result[:len(records_to_repair)]
-    except Exception:
-        pass
+    except Exception as e:
+        logging.exception(e)
 
     # If repair fails, return original records
     return records
@@ -422,7 +425,7 @@ def get_validation_summary_text(summary: Dict) -> str:
 
     if summary.get("rejected_fields"):
         lines.append("Rejected fields:")
-        for f_name, count in summary["rejected_fields"].items():
+        for _f_name, count in summary["rejected_fields"].items():
             lines.append(f"  - {field}: {count} records")
 
     return "\n".join(lines)

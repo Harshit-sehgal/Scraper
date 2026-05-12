@@ -1,6 +1,9 @@
-import asyncio, sys
+import asyncio
+import sys
+
 sys.path.insert(0, '/home/harshit/Documents/Work/Money/scraper/backend')
 from app.scraper import generate_data_insight
+
 
 async def test():
     records = [

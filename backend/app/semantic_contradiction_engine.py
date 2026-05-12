@@ -14,11 +14,14 @@ Core principle: Syntactically valid ≠ semantically possible.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Set
+from typing import Dict, List, Set
 
 from app.semantic_ir import (
-    SemanticType, RegionType, SemanticToken,
-    SemanticRegion, SemanticGraph,
+    RegionType,
+    SemanticGraph,
+    SemanticRegion,
+    SemanticToken,
+    SemanticType,
 )
 
 
@@ -209,3 +212,61 @@ def apply_contradiction_penalties(
     graph.has_contradictions = len(contradictions) > 0
     graph.coherence_score *= (1.0 - penalty)
     return graph
+
+def detect_allocation_contradictions(output: Dict[str, str], schema_fields: List[str]) -> List[str]:
+    """Check for duplicate values across different schema fields (contradiction)."""
+    filled_vals: Dict[str, str] = {}
+    contradictions = []
+    for role_name in schema_fields:
+        val = output.get(role_name)
+        if val:
+            if val in filled_vals:
+                contradictions.append(f'{filled_vals[val]}={val} and {role_name}={val}')
+            filled_vals[val] = role_name
+    return contradictions
+
+def detect_role_swap_warnings(output: Dict[str, str], schema_fields: List[str], detect_type_fn, universal_roots) -> List[str]:
+    """Check if value types match expected field types based on universal roots."""
+    warnings = []
+    for role_name in schema_fields:
+        val = output.get(role_name)
+        if not val:
+            continue
+        val_type, _ = detect_type_fn(val, role_name)
+        seed_type = SemanticType.TEXT
+        # Determine expected type from universal roots
+        for roots, stype in universal_roots:
+            if any(root in role_name.lower() for root in roots):
+                seed_type = stype
+                break
+        # Flag type mismatch between expected role type and actual value type
+        if seed_type != SemanticType.TEXT and val_type != seed_type:
+            warnings.append(f'{role_name}: expected {seed_type.value}, got {val_type.value} ({val})')
+    return warnings
+
+def apply_contradiction_learning(output: Dict[str, str], schema_fields: List[str], reng, detect_type_fn, contradictions: List[str], warnings: List[str], universal_roots):
+    """Update role engine learning based on detected contradictions and role swaps."""
+    if contradictions:
+        for role_name in schema_fields:
+            val = output.get(role_name)
+            if val:
+                for other_role in schema_fields:
+                    if other_role != role_name and output.get(other_role) == val:
+                        val_type, _ = detect_type_fn(val, "")
+                        reng.learn_from_allocation(role_name, val_type, val, success=False, delta=0.15)
+                        if hasattr(reng, 'learn_contradiction'):
+                            reng.learn_contradiction(role_name, other_role, val_type.value)
+                            
+    if warnings:
+        for role_name in schema_fields:
+            val = output.get(role_name)
+            if not val:
+                continue
+            val_type, _ = detect_type_fn(val, role_name)
+            seed_type = SemanticType.TEXT
+            for roots, stype in universal_roots:
+                if any(root in role_name.lower() for root in roots):
+                    seed_type = stype
+                    break
+            if seed_type != SemanticType.TEXT and val_type != seed_type:
+                reng.learn_from_allocation(role_name, val_type, val, success=False, delta=0.2)

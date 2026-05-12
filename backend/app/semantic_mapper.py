@@ -1,3 +1,4 @@
+
 """
 Layer 3: Semantic Mapper
 =========================
@@ -8,10 +9,12 @@ Core principle: "£238" maps to "price" because it LOOKS like a price,
 not because it came from a "flight" page.
 """
 
+import logging
 import re
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
-from app.intent_parser import IntentSchema, SEMANTIC_NEED_KEYWORDS
+from typing import Dict, List, Optional
+
+from app.intent_parser import SEMANTIC_NEED_KEYWORDS, IntentSchema
 from app.page_profiler import StructureProfile, ValuePatterns
 
 
@@ -367,7 +370,7 @@ def resolve_conflicts(mappings: List[FieldMapping]) -> List[FieldMapping]:
 
     # For each need, keep only the best mapping
     resolved = []
-    for need, need_mappings in by_need.items():
+    for _need, need_mappings in by_need.items():
         if len(need_mappings) == 1:
             resolved.append(need_mappings[0])
         else:
@@ -484,7 +487,7 @@ If a value cannot be confidently mapped, do not include it.
 
         if isinstance(result, dict):
             return result
-    except Exception:
-        pass
+    except Exception as e:
+        logging.exception(e)
 
     return {}

@@ -1,5 +1,7 @@
 import asyncio
+
 import g4f
+
 
 async def test_provider(provider):
     print(f"Testing {provider.__name__}...")
@@ -12,6 +14,8 @@ async def test_provider(provider):
         print(f"[SUCCESS] {provider.__name__}: {response.choices[0].message.content[:50]}")
         return True
     except Exception as e:
+        import logging
+        logging.exception(e)
         print(f"[FAILED] {provider.__name__}: {str(e)[:100]}")
         return False
 

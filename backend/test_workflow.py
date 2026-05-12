@@ -1,5 +1,6 @@
-import requests
 import time
+
+import requests
 
 API = "http://localhost:8000"
 

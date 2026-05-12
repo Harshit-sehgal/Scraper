@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Standalone regex extraction test — no Playwright, no g4f, just BS4."""
-import re, json, sys
+import json
+import re
+import sys
+
 sys.path.insert(0, '/home/harshit/Documents/Work/Money/scraper/backend')
 
 from bs4 import BeautifulSoup

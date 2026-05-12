@@ -3,14 +3,14 @@ End-to-end test: scrape flight data from flightsnholidays.co.uk
 Uses the scraper's scrape_url function directly (manual mode).
 """
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, '.')
 os.environ['DATAFORGE_STATE_FILE'] = 'data/jobs_state_test.json'
 
-from app.models import FieldType, SchemaField
 from app import scraper as scraper_mod
+from app.models import FieldType, SchemaField
 
 
 async def test_flights_scrape():

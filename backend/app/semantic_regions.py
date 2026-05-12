@@ -11,13 +11,15 @@ Example:
   → [entity_name] [location] [date] [quantifier] [location]
 """
 
-from typing import List, Dict
+from typing import Dict, List
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, RegionType, SemanticRegion,
+    RegionType,
     SemanticRecord,
+    SemanticRegion,
+    SemanticToken,
+    SemanticType,
 )
-
 
 # Token type → region type mapping (universal, NOT domain-specific)
 TYPE_TO_REGION: Dict[SemanticType, RegionType] = {

@@ -12,12 +12,14 @@ If 95% of rows follow [text][price][date], anomalous rows should:
 - or get rejected
 """
 
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import List, Tuple
-from collections import Counter
 
 from app.semantic_ir import (
-    SemanticRecord, SemanticGraph, DatasetIR,
+    DatasetIR,
+    SemanticGraph,
+    SemanticRecord,
 )
 
 

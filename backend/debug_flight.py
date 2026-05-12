@@ -1,17 +1,17 @@
 """Debug the flight scraping pipeline step by step."""
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, '.')
 os.environ['DATAFORGE_STATE_FILE'] = 'data/jobs_state_test.json'
 
-from app.models import FieldType, SchemaField
 from app import scraper as scraper_mod
-from app.semantic_segmentation import expand_composite_records, StructuralMemoryTracker
-from app.semantic_mapper import match_values_to_intent, map_to_schema_fields
-from app.page_profiler import detect_page_structure, detect_value_patterns
 from app.intent_parser import parse_user_intent
+from app.models import FieldType, SchemaField
+from app.page_profiler import detect_page_structure, detect_value_patterns
+from app.semantic_mapper import map_to_schema_fields, match_values_to_intent
+from app.semantic_segmentation import StructuralMemoryTracker, expand_composite_records
 
 
 async def debug_flight_scrape():
@@ -40,7 +40,7 @@ async def debug_flight_scrape():
     print(f"Step 2: Structure={profile.structure_type}, headers={profile.headers[:3]}")
 
     # Step 3: Extract (fallback to regex since no selector)
-    html_snippet = scraper_mod.clean_html_for_selectors(html, max_chars=12000)
+    scraper_mod.clean_html_for_selectors(html, max_chars=12000)
     results = scraper_mod.extract_with_regex(html, schema)
     print(f"Step 3: Regex extracted {len(results)} raw records")
     if results:

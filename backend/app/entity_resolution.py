@@ -16,12 +16,15 @@ Identity emerges from:
 This replaces purely string-centric identity with graph-aware identity.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Set
 import re
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set
 
 from app.semantic_ir import (
-    SemanticType, SemanticRecord, SemanticGraph, DatasetIR,
+    DatasetIR,
+    SemanticGraph,
+    SemanticRecord,
+    SemanticType,
 )
 
 

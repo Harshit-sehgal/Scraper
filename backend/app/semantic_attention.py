@@ -15,14 +15,15 @@ Attention factors:
 5. Confidence weight (high confidence = more attention)
 """
 
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 from app.semantic_ir import (
-    SemanticType, RegionType,
-    SemanticToken, SemanticRegion,
+    RegionType,
     SemanticGraph,
+    SemanticRegion,
+    SemanticToken,
+    SemanticType,
 )
-
 
 # Intrinsic salience of semantic types (universal, NOT domain-specific)
 TYPE_SALIENCE: Dict[SemanticType, float] = {

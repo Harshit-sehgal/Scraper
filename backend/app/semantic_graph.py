@@ -14,14 +14,21 @@ Phases:
 5. Resolve graph conflicts
 """
 
-from typing import List, Dict
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
+from typing import Dict, List
 
-from app.semantic_ir import (
-    RegionType, SemanticRecord, SemanticGraph, DatasetIR,
+from app.ownership_inference import (
+    infer_semantic_ownership,
+    propagate_ownership_consistency,
 )
-from app.semantic_regions import detect_semantic_regions, build_region_hierarchy
-from app.ownership_inference import infer_semantic_ownership, propagate_ownership_consistency
+from app.semantic_contradiction_engine import detect_contradictions
+from app.semantic_ir import (
+    DatasetIR,
+    RegionType,
+    SemanticGraph,
+    SemanticRecord,
+)
+from app.semantic_regions import build_region_hierarchy, detect_semantic_regions
 
 
 def build_semantic_graph(
@@ -53,8 +60,9 @@ def build_semantic_graph(
 
     # Phase 4: Compute graph properties
     graph.coherence_score = compute_graph_coherence(graph)
-    graph.contradiction_score = detect_contradictions(graph)
-    graph.has_contradictions = graph.contradiction_score > 0.5
+    graph.contradictions = detect_contradictions(graph)
+    graph.contradiction_score = sum(c.confidence_damage for c in graph.contradictions)
+    graph.has_contradictions = len(graph.contradictions) > 0
 
     return graph
 
@@ -166,44 +174,7 @@ def compute_graph_coherence(graph: SemanticGraph) -> float:
     return min(coherence, 1.0)
 
 
-def detect_contradictions(graph: SemanticGraph) -> float:
-    """Detect semantic contradictions in the graph.
 
-    Contradictions include:
-    - A price region owning another price region
-    - A date region owning the primary entity
-    - Circular ownership
-    """
-    contradiction_count = 0
-    total_checks = 0
-
-    # Check ownership direction: non-entity owning entity
-    for edge in graph.ownership_edges:
-        total_checks += 1
-        owner = graph.get_region(edge.owner_region_id)
-        owned = graph.get_region(edge.owned_region_id)
-
-        if not owner or not owned:
-            continue
-
-        # Price owning entity = contradiction
-        if owner.region_type == RegionType.PRICE_REGION and owned.region_type == RegionType.ENTITY_NAME:
-            contradiction_count += 1
-
-        # Date owning entity = contradiction
-        if owner.region_type == RegionType.DATE_REGION and owned.region_type == RegionType.ENTITY_NAME:
-            contradiction_count += 1
-
-    # Check circular ownership (region owns itself)
-    for edge in graph.ownership_edges:
-        total_checks += 1
-        if edge.owner_region_id == edge.owned_region_id:
-            contradiction_count += 1
-
-    if total_checks == 0:
-        return 0.0
-
-    return contradiction_count / total_checks
 
 
 def resolve_graph_conflicts(graph: SemanticGraph) -> SemanticGraph:

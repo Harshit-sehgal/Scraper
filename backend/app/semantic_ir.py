@@ -13,8 +13,8 @@ Core principle: Everything is a relationship, nothing is an island.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class SemanticType(Enum):
@@ -252,6 +252,7 @@ class SemanticGraph:
 
     # Global properties
     coherence_score: float = 0.0
+    contradictions: List[Any] = field(default_factory=list)
     contradiction_score: float = 0.0
     has_contradictions: bool = False
 

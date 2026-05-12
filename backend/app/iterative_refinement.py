@@ -17,21 +17,22 @@ Pipeline phases:
 Core principle: Later stages CAN modify earlier assumptions.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Tuple, Callable
 from copy import deepcopy
+from dataclasses import dataclass, field
+from typing import Callable, List, Tuple
 
-from app.semantic_ir import (
-    SemanticRecord, DatasetIR,
-)
-from app.semantic_regions import detect_semantic_regions, build_region_hierarchy
+from app.global_graph_coherence import enhance_dataset_with_global_coherence
 from app.semantic_allocation_engine import allocate_semantic_roles
 from app.semantic_constraints import check_all_constraints, compute_constraint_penalty
 from app.semantic_contradiction_engine import detect_contradictions
-from app.semantic_repair import repair_graph
-from app.global_graph_coherence import enhance_dataset_with_global_coherence
-from app.semantic_graph import build_semantic_graph
 from app.semantic_density import compute_density_profile
+from app.semantic_graph import build_semantic_graph
+from app.semantic_ir import (
+    DatasetIR,
+    SemanticRecord,
+)
+from app.semantic_regions import build_region_hierarchy, detect_semantic_regions
+from app.semantic_repair import repair_graph
 
 
 @dataclass
@@ -72,7 +73,8 @@ def refine_record(
         name="regions", fn=lambda: None, description=f"decomposed into {len(regions)} regions",
         applied=True, changes_made=len(regions),
     ))
-    if verbose: print(f"  Phase 1: {len(regions)} regions")
+    if verbose:
+        print(f"  Phase 1: {len(regions)} regions")
 
     # Phase 2: Semantic allocation
     current, alloc_graph = allocate_semantic_roles(current, schema_fields)
@@ -81,7 +83,8 @@ def refine_record(
         name="allocation", fn=lambda: None, description=f"{changes} roles assigned",
         applied=True, changes_made=changes,
     ))
-    if verbose: print(f"  Phase 2: {changes} roles assigned")
+    if verbose:
+        print(f"  Phase 2: {changes} roles assigned")
 
     # Phase 3: Constraint checking
     violations = check_all_constraints(current, alloc_graph)
@@ -93,7 +96,8 @@ def refine_record(
             description=f"{len(violations)} violations, penalty={penalty:.2f}",
             applied=True, changes_made=len(violations),
         ))
-        if verbose: print(f"  Phase 3: {len(violations)} constraint violations")
+        if verbose:
+            print(f"  Phase 3: {len(violations)} constraint violations")
 
     # Phase 4: Graph building + contradiction detection
     graph = build_semantic_graph(current)
@@ -106,7 +110,8 @@ def refine_record(
             description=f"{len(repair_actions)} repairs, {len(contradictions)} contradictions",
             applied=True, changes_made=len(repair_actions),
         ))
-        if verbose: print(f"  Phase 4: {len(repair_actions)} repairs")
+        if verbose:
+            print(f"  Phase 4: {len(repair_actions)} repairs")
 
     # Phase 5: Density classification
     density = compute_density_profile(current.tokens)

@@ -10,13 +10,15 @@ Key insight: entity records have HIGH semantic density (prices, dates, codes, na
 Filter/control records have LOW semantic density (ranges, labels, buttons).
 """
 
-from typing import List, Tuple, Set
+from typing import List, Set, Tuple
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, RecordType, SemanticRecord,
     DatasetIR,
+    RecordType,
+    SemanticRecord,
+    SemanticToken,
+    SemanticType,
 )
-
 
 # Universal indicators of non-entity records
 # These are structural patterns, NOT domain-specific keywords

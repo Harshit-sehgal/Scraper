@@ -1,3 +1,4 @@
+
 """
 Scraping engine with LLM-guided selector mapping, schema-aware cleanup,
 record quality scoring, and optional Groq support.
@@ -11,6 +12,7 @@ Now using universal intent-driven extraction layers:
 
 import asyncio
 import json
+import logging
 import os
 import re
 import time
@@ -25,11 +27,11 @@ from app.models import FieldType, SchemaField
 
 # Import new universal layers
 from app.page_profiler import detect_page_structure, detect_value_patterns
+from app.semantic_pipeline import run_pipeline
 from app.semantic_segmentation import (
     is_likely_noise_field,
     segment_single_text,
 )
-from app.semantic_pipeline import run_pipeline
 
 EMPTY_TOKENS = {
     "home",
@@ -101,7 +103,8 @@ def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
     raw = (os.getenv(name) or "").strip()
     try:
         value = int(raw) if raw else default
-    except Exception:
+    except Exception as e:
+        logging.exception(e)
         value = default
     return max(minimum, min(maximum, value))
 
@@ -168,7 +171,7 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
     - Content entropy evaluation
     """
     all_values = []
-    for key, value in record.items():
+    for _key, value in record.items():
         if value and not _is_empty_value(value):
             text = _compact_text(str(value)).lower()
             all_values.append(text)
@@ -275,22 +278,22 @@ def _extract_json_payload(text: str):
     for candidate in (raw,):
         try:
             return json.loads(candidate)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.exception(e)
 
     match = re.search(r"\{[\s\S]*\}", raw)
     if match:
         try:
             return json.loads(match.group(0))
-        except Exception:
-            pass
+        except Exception as e:
+            logging.exception(e)
 
     match = re.search(r"\[[\s\S]*\]", raw)
     if match:
         try:
             return json.loads(match.group(0))
-        except Exception:
-            pass
+        except Exception as e:
+            logging.exception(e)
 
     return None
 
@@ -323,6 +326,7 @@ def _call_openai_compatible_json(
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             return _extract_json_payload(content)
         except Exception as error:
+            logging.exception(error)
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
@@ -349,6 +353,7 @@ def _call_openai_compatible_text(
             data = response.json()
             return (data.get("choices", [{}])[0].get("message", {}).get("content", "") or "").strip()
         except Exception as error:
+            logging.exception(error)
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
@@ -389,6 +394,7 @@ def _llm_json(messages: list[dict], temperature: float = 0.1, timeout: int = 45)
                 if parsed is not None:
                     return parsed
             except Exception as e:
+                logging.exception(e)
                 stage = "Groq JSON call" if idx == 0 else "Groq JSON fallback model call"
                 print(f"[LLM] {stage} failed ({model}): {e}")
 
@@ -403,6 +409,7 @@ def _llm_json(messages: list[dict], temperature: float = 0.1, timeout: int = 45)
         if parsed is not None:
             return parsed
     except Exception as e:
+        logging.exception(e)
         print(f"[LLM] Pollinations JSON call failed: {e}")
 
     try:
@@ -419,6 +426,7 @@ def _llm_json(messages: list[dict], temperature: float = 0.1, timeout: int = 45)
         if parsed is not None:
             return parsed
     except Exception as e:
+        logging.exception(e)
         print(f"[LLM] g4f JSON fallback failed: {e}")
 
     return {}
@@ -445,6 +453,7 @@ def _llm_json_fast(messages: list[dict], temperature: float = 0.0, timeout: int 
                 if parsed is not None:
                     return parsed
             except Exception as e:
+                logging.exception(e)
                 stage = "Groq fast JSON call" if idx == 0 else "Groq fast JSON fallback model call"
                 print(f"[LLM] {stage} failed ({model}): {e}")
 
@@ -463,6 +472,7 @@ def _llm_json_fast(messages: list[dict], temperature: float = 0.0, timeout: int 
         if parsed is not None:
             return parsed
     except Exception as e:
+        logging.exception(e)
         print(f"[LLM] Pollinations fast JSON call failed: {e}")
 
     return {}
@@ -488,6 +498,7 @@ def _llm_text(messages: list[dict], temperature: float = 0.4, timeout: int = 45)
                 if text:
                     return text
             except Exception as e:
+                logging.exception(e)
                 stage = "Groq text call" if idx == 0 else "Groq text fallback model call"
                 print(f"[LLM] {stage} failed ({model}): {e}")
 
@@ -501,6 +512,7 @@ def _llm_text(messages: list[dict], temperature: float = 0.4, timeout: int = 45)
         if text:
             return text
     except Exception as e:
+        logging.exception(e)
         print(f"[LLM] Pollinations text call failed: {e}")
 
     try:
@@ -514,6 +526,7 @@ def _llm_text(messages: list[dict], temperature: float = 0.4, timeout: int = 45)
         )
         return (res.choices[0].message.content or "").strip()
     except Exception as e:
+        logging.exception(e)
         print(f"[LLM] g4f text fallback failed: {e}")
         return ""
 
@@ -545,18 +558,19 @@ async def fetch_page_content(url: str) -> str:
             html = await page.content()
             return html
     except Exception as e:
+        logging.exception(e)
         print(f"[Scraper] Playwright failed for {url}: {e}. Falling back to requests")
     finally:
         if context is not None:
             try:
                 await context.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logging.exception(e)
         if browser is not None:
             try:
                 await browser.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logging.exception(e)
 
     resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
     resp.raise_for_status()
@@ -857,7 +871,8 @@ def _extract_contacts_from_node(node) -> tuple[str | None, str | None]:
         if text:
             email = _valid_email(text)
             phone = _valid_phone(text)
-    except Exception:
+    except Exception as e:
+        logging.exception(e)
         text = ""
 
     for link in node.select("a[href]"):
@@ -1061,7 +1076,8 @@ def _apply_page_level_contact_fallback(
 def _extract_page_contacts(html: str) -> tuple[str | None, str | None]:
     try:
         soup = BeautifulSoup(html, "html.parser")
-    except Exception:
+    except Exception as e:
+        logging.exception(e)
         return None, None
     return _extract_contacts_from_node(soup)
 
@@ -1302,6 +1318,7 @@ def apply_selectors(html: str, selectors_map: dict, schema_fields: list[SchemaFi
             try:
                 nodes = container.select(selector)
             except Exception as e:
+                logging.exception(e)
                 print(f"[Scraper] Invalid selector '{selector}' for {field.name}: {e}")
                 record[field.name] = None
                 continue
@@ -1690,7 +1707,8 @@ VALIDATION RULES:
                 else:
                     report["fallback_chunks"] += 1
                     consecutive_model_failures += 1
-            except Exception:
+            except Exception as e:
+                logging.exception(e)
                 ai_rows = []
                 report["fallback_chunks"] += 1
                 consecutive_model_failures += 1
@@ -1764,6 +1782,7 @@ async def scrape_url(url: str, schema_fields: list[SchemaField], min_record_scor
             intent = parse_user_intent(user_intent)
             print(f"[Scraper] User intent: {intent.semantic_needs}")
         except Exception as e:
+            logging.exception(e)
             print(f"[Scraper] Intent parsing failed: {e}")
 
     # STEP 2: Profile page structure (universal)
@@ -1820,7 +1839,8 @@ def _normalize_field_type(value: str) -> str:
     raw = (value or "").strip().lower()
     try:
         return FieldType(raw).value
-    except Exception:
+    except Exception as e:
+        logging.exception(e)
         return FieldType.STRING.value
 
 
@@ -1925,7 +1945,8 @@ Rules:
                 radius = float(radius)
                 if radius < 0:
                     radius = None
-            except Exception:
+            except Exception as e:
+                logging.exception(e)
                 radius = None
 
         return {

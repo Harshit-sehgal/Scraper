@@ -87,7 +87,9 @@ def workspace_root() -> Path:
 def domain_of(url: str) -> str:
     try:
         return urlparse(url).netloc.lower().replace("www.", "")
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.exception(e)
         return ""
 
 
@@ -193,7 +195,9 @@ def normalize_website(value: str) -> str:
 def safe_float(value, default: float = 0.0) -> float:
     try:
         return float(value)
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.exception(e)
         return default
 
 
@@ -213,7 +217,9 @@ def extract_addresses_from_json_ld(soup: BeautifulSoup) -> list[str]:
     for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
         try:
             payload = json.loads(tag.get_text(strip=True) or "{}")
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.exception(e)
             continue
 
         nodes = payload if isinstance(payload, list) else [payload]
@@ -355,7 +361,9 @@ def search_official_website(company_name: str, city: str = "Chennai") -> str | N
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=8))
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.exception(e)
         return None
 
     ranked: list[tuple[float, str]] = []
@@ -422,7 +430,9 @@ def enrich_lead(lead: dict) -> dict:
     for idx, url in enumerate(dedupe_keep_order(targets)):
         try:
             html = fetch_html(url)
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.exception(e)
             continue
 
         data = extract_contact_data_from_html(html)
@@ -436,7 +446,9 @@ def enrich_lead(lead: dict) -> dict:
             for cl in candidate_contact_links(url, html):
                 try:
                     contact_html = fetch_html(cl)
-                except Exception:
+                except Exception as e:
+                    import logging
+                    logging.exception(e)
                     continue
                 cdata = extract_contact_data_from_html(contact_html)
                 emails.extend(cdata.emails)
@@ -513,6 +525,8 @@ def main() -> None:
         try:
             row = enrich_lead(lead)
         except Exception as e:
+            import logging
+            logging.exception(e)
             row = dict(lead)
             row["enrichment_status"] = f"error: {e}"
             row["enrichment_confidence"] = 0.0

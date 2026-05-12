@@ -15,14 +15,16 @@ NOT from:
 - positional heuristics
 """
 
-from typing import List, Dict, Optional, Tuple
 from collections import defaultdict
+from typing import Dict, List, Optional, Tuple
 
 from app.semantic_ir import (
-    RegionType, SemanticRegion, OwnershipEdge,
-    SemanticGraph, RelationshipEdge,
+    OwnershipEdge,
+    RegionType,
+    RelationshipEdge,
+    SemanticGraph,
+    SemanticRegion,
 )
-
 
 # Universal ownership rules (emerge from graph structure, not domain)
 # These are structural patterns, NOT domain knowledge.

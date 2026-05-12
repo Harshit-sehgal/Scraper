@@ -9,12 +9,11 @@ This is the FIRST step in the new pipeline, before any values are touched.
 Core principle: Understand structure first, extract values second.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict
 from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Dict, List
 
 from bs4 import BeautifulSoup, Tag
-
 
 
 @dataclass

@@ -13,16 +13,19 @@ Mechanisms:
 4. Amplification: contradictory edges increase uncertainty
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict
-from collections import defaultdict
 import math
+from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Dict, List
 
-from app.semantic_ir import (
-    SemanticToken, SemanticRegion, SemanticGraph,
-)
 from app.semantic_contradiction_engine import (
-    detect_contradictions, compute_contradiction_impact,
+    compute_contradiction_impact,
+    detect_contradictions,
+)
+from app.semantic_ir import (
+    SemanticGraph,
+    SemanticRegion,
+    SemanticToken,
 )
 
 

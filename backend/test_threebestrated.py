@@ -1,7 +1,9 @@
 import asyncio
 import csv
-from playwright.async_api import async_playwright
+
 from bs4 import BeautifulSoup
+from playwright.async_api import async_playwright
+
 
 async def scrape_threebest():
     async with async_playwright() as p:
@@ -17,7 +19,6 @@ async def scrape_threebest():
         html = await page.content()
         soup = BeautifulSoup(html, "html.parser")
         
-        designers = []
         # ThreeBestRated usually wraps businesses in specific article or div elements
         # Usually it's `.single-business` or similar class
         businesses = soup.select(".list-item")
@@ -32,7 +33,7 @@ async def scrape_threebest():
         print(f"Discovered {len(businesses)} potential elements. Refining...")
         
         # We can also just read the raw text block if classes fail
-        raw_text_blocks = soup.get_text(separator="\n").split("\n")
+        soup.get_text(separator="\n").split("\n")
         
         # A more dynamic fallback: iterate strong headers
         businesses = []

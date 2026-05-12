@@ -18,10 +18,9 @@ IMPORTANT: Relationship types emerge from graph topology and
 structural consistency, NOT from hardcoded domain ontology.
 """
 
-from typing import List, Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from app.semantic_ir import SemanticToken, SemanticType, RelationshipEdge
-
+from app.semantic_ir import RelationshipEdge, SemanticToken, SemanticType
 
 # Type → role mapping (universal structural roles, NOT domain knowledge)
 TYPE_SEMANTIC_ROLE: Dict[SemanticType, str] = {

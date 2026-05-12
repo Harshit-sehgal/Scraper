@@ -13,13 +13,16 @@ The engine understands:
 - Temporal grouping (multiple dates in same record)
 """
 
-from dataclasses import dataclass, field
-from typing import List, Optional
-from datetime import datetime, timedelta
 import re
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import List, Optional
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, RelationshipEdge, SemanticGraph,
+    RelationshipEdge,
+    SemanticGraph,
+    SemanticToken,
+    SemanticType,
 )
 
 

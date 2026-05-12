@@ -3,8 +3,8 @@ import os
 import sys
 from pathlib import Path
 
-import pytest
 import httpx
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = ROOT / "backend"

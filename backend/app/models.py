@@ -3,12 +3,13 @@ Pydantic models for the scraper API.
 Defines the data structures for jobs, schemas, filters, and results.
 """
 
-from pydantic import BaseModel, Field, model_validator
-from typing import Optional
-from enum import Enum
-import uuid
 import datetime
+import uuid
+from enum import Enum
+from typing import Optional
 from urllib.parse import urlparse
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class FieldType(str, Enum):

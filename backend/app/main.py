@@ -1,28 +1,43 @@
+
 """
 FastAPI Main Server — DataForge General-Purpose Web Scraper API.
 """
 
 import asyncio
 import csv
+import datetime
 import io
 import json
-import datetime
+import logging
 import os
 import re
 import time
+from pathlib import Path
 from statistics import mean
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
 from openpyxl import Workbook
 
-from app.models import Job, JobCreate, JobStatus, ScrapeMode, DiscoveryRequest, SchemaSuggestionRequest, FieldType
-from app.scraper import scrape_url, suggest_schema_from_intent, ai_clean_and_align_records
-from app.filters import process_results, apply_location_radius
 from app.discovery import discover_urls, infer_source_metadata
-from app.state_store import load_state, save_state, get_state_file_path
+from app.filters import apply_location_radius, process_results
+from app.models import (
+    DiscoveryRequest,
+    FieldType,
+    Job,
+    JobCreate,
+    JobStatus,
+    SchemaSuggestionRequest,
+    ScrapeMode,
+)
+from app.scraper import (
+    ai_clean_and_align_records,
+    scrape_url,
+    suggest_schema_from_intent,
+)
+from app.state_store import get_state_file_path, load_state, save_state
 
 app = FastAPI(
     title="DataForge — General-Purpose Web Scraper",
@@ -45,7 +60,8 @@ def _env_int(name: str, default: int, minimum: int | None = None, maximum: int |
     else:
         try:
             value = int(raw)
-        except Exception:
+        except Exception as e:
+            logging.exception(e)
             value = default
 
     if minimum is not None:
@@ -268,6 +284,7 @@ async def reclean_job(job_id: str):
             f"AI re-clean timed out after {AI_STRUCTURING_TIMEOUT_SECONDS}s; used deterministic post-processing."
         )
     except Exception as e:
+        logging.exception(e)
         cleaned_rows = working_rows
         reclean_warnings.append("AI re-clean failed; used deterministic post-processing.")
         print(f"[Job {job_id}] Re-clean failed: {e}")
@@ -605,7 +622,8 @@ def _normalized_dedup_text(value) -> str:
 def _safe_score(value) -> float:
     try:
         return float(value)
-    except Exception:
+    except Exception as e:
+        logging.exception(e)
         return 0.0
 
 
@@ -877,6 +895,7 @@ async def _run_job(job_id: str):
                 warnings.append(msg)
                 print(f"[Job {job_id}] {msg}")
             except Exception as e:
+                logging.exception(e)
                 msg = f"URL scrape failed ({idx}/{len(job.urls)}): {url}"
                 warnings.append(f"{msg} ({type(e).__name__})")
                 print(f"[Job {job_id}] {msg}: {e}")
@@ -920,6 +939,7 @@ async def _run_job(job_id: str):
                 )
                 print(f"[Job {job_id}] AI structuring timed out")
             except Exception as struct_err:
+                logging.exception(struct_err)
                 warnings.append("AI structuring failed; continuing with deterministic processing.")
                 print(f"[Job {job_id}] AI structuring failed: {struct_err}")
         elif all_raw_results and job.schema_fields:
@@ -1033,6 +1053,7 @@ async def _run_job(job_id: str):
                 )
                 job.analysis = "Insight generation timed out."
             except Exception as ai_e:
+                logging.exception(ai_e)
                 print(f"[Job {job_id}] AI insight generation failed: {ai_e}")
                 
         job.status = JobStatus.COMPLETED
@@ -1043,6 +1064,7 @@ async def _run_job(job_id: str):
         print(f"[Job {job_id}] Completed: {total} total, {filtered_count} after filtering")
 
     except Exception as e:
+        logging.exception(e)
         if job.cancel_requested:
             _mark_job_canceled(job)
             print(f"[Job {job_id}] Canceled")

@@ -11,10 +11,9 @@ Nearby tokens can be one entity, multiple entities, or a role transition.
 The engine must learn which is which.
 """
 
+from collections import Counter
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Tuple
-
-
+from typing import Dict, List, Optional, Tuple
 
 # Known entity suffixes for bootstrap (will be replaced by learning)
 _BOOTSTRAP_SUFFIXES = {'group', 'inc', 'corp', 'llc', 'ltd', 'company', 'airlines',
@@ -178,8 +177,6 @@ class CohesionModel:
 # MOTIF LEARNER
 # ═══════════════════════════════════════════════════════════════════════════════
 
-from collections import Counter
-
 
 class MotifLearner:
     """Learns recurring multi-token structural patterns (motifs).
@@ -294,13 +291,6 @@ class SemanticBoundaryEngine:
             score.uncertainty = 0.3
             return score
 
-        # 3. Stop-word prefix: "The" + org → merge
-        if value_a.lower() in _STOP_WORDS and type_b in ('org', 'organization'):
-            score.cohesion = 0.85
-            score.separation = 0.1
-            score.uncertainty = 0.15
-            return score
-
         # 4. Role transition check: known boundary patterns
         ts = self.transition_detector.score_transition(type_a, type_b)
         if ts.probability > 0.6:
@@ -380,13 +370,15 @@ class SemanticBoundaryEngine:
             }
 
     def save_to_file(self, filepath: str):
-        import json, os
+        import json
+        import os
         os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
         with open(filepath, 'w') as f:
             json.dump(self.save_state(), f, indent=2)
 
     def load_from_file(self, filepath: str):
-        import json, os
+        import json
+        import os
         if os.path.exists(filepath):
             with open(filepath, 'r') as f:
                 self.load_state(json.load(f))

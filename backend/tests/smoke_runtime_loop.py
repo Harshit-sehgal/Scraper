@@ -29,7 +29,9 @@ def _request(method: str, url: str, payload: dict | None = None, timeout: int = 
         body = e.read().decode("utf-8") if e.fp else "{}"
         try:
             return e.code, json.loads(body) if body else {}
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.exception(e)
             return e.code, {"detail": body}
 
 

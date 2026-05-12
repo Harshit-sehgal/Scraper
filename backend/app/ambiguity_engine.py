@@ -12,11 +12,11 @@ The system MUST support:
 Core principle: Do NOT force certainty prematurely.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple
 from copy import deepcopy
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
 
-from app.semantic_ir import SemanticToken, SemanticType, SemanticRecord
+from app.semantic_ir import SemanticRecord, SemanticToken, SemanticType
 
 
 @dataclass

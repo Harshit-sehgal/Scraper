@@ -16,12 +16,15 @@ Strategies:
 from dataclasses import dataclass
 from typing import List, Tuple
 
-from app.semantic_ir import (
-    SemanticType, RegionType, SemanticRecord,
-    SemanticGraph,
-)
 from app.semantic_contradiction_engine import (
-    detect_contradictions, Contradiction,
+    Contradiction,
+    detect_contradictions,
+)
+from app.semantic_ir import (
+    RegionType,
+    SemanticGraph,
+    SemanticRecord,
+    SemanticType,
 )
 
 

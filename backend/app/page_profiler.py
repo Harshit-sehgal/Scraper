@@ -1,3 +1,4 @@
+
 """
 Layer 2: Page Profiler
 ======================
@@ -6,9 +7,11 @@ Universal page structure detection that works for ANY data type.
 Core principle: Detect structure and value patterns, not domain-specific features.
 """
 
+import logging
 import re
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import List, Optional
+
 from bs4 import BeautifulSoup
 
 
@@ -361,7 +364,8 @@ def find_data_containers(html: str, profile: StructureProfile) -> List:
     try:
         containers = soup.select(selector)
         return containers
-    except Exception:
+    except Exception as e:
+        logging.exception(e)
         return []
 
 

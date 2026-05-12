@@ -13,12 +13,15 @@ Core principle: Semantic graphs must remain sparse and meaningful,
 not dense and noisy.
 """
 
-from dataclasses import dataclass
-from typing import List, Dict, Tuple, Set
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Dict, List, Set, Tuple
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, RelationshipEdge, SemanticGraph,
+    RelationshipEdge,
+    SemanticGraph,
+    SemanticToken,
+    SemanticType,
 )
 
 
