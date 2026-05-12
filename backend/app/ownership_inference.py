@@ -15,14 +15,12 @@ NOT from:
 - positional heuristics
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Dict, Optional, Tuple
 from collections import defaultdict
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, RegionType,
-    SemanticRegion, OwnershipEdge, SemanticGraph,
-    RelationshipEdge, SemanticRecord, DatasetIR,
+    RegionType, SemanticRegion, OwnershipEdge,
+    SemanticGraph, RelationshipEdge,
 )
 
 

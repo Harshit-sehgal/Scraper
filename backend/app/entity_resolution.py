@@ -17,13 +17,11 @@ This replaces purely string-centric identity with graph-aware identity.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-from collections import defaultdict
+from typing import List, Dict, Optional, Set
 import re
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, SemanticRecord, SemanticRegion,
-    SemanticGraph, DatasetIR,
+    SemanticType, SemanticRecord, SemanticGraph, DatasetIR,
 )
 
 

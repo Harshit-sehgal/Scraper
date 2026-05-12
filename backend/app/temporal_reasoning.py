@@ -14,14 +14,12 @@ The engine understands:
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-from collections import defaultdict
+from typing import List, Optional
 from datetime import datetime, timedelta
 import re
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, SemanticRecord, SemanticRegion,
-    RelationshipEdge, SemanticGraph,
+    SemanticToken, SemanticType, RelationshipEdge, SemanticGraph,
 )
 
 

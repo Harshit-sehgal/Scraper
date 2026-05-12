@@ -4,7 +4,6 @@ Uses geopy (free OpenStreetMap Nominatim geocoder) for distance calculations.
 """
 
 import re
-import math
 from typing import Optional
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
@@ -174,7 +173,6 @@ def enforce_schema_integrity(record: dict, schema_fields: list[SchemaField]) -> 
     cleaned = dict(record)
     mismatches: list[str] = []
 
-    field_type_map = {f.name: f.field_type for f in schema_fields}
     email_fields = [f.name for f in schema_fields if f.field_type == FieldType.EMAIL]
     phone_fields = [f.name for f in schema_fields if f.field_type == FieldType.PHONE]
 

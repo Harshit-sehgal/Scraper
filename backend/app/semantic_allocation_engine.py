@@ -16,16 +16,13 @@ Role-type compatibility is LEARNED, not hardcoded.
 Uses RoleEmbeddingEngine from semantic_inference_engine.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-from collections import defaultdict
+from typing import List, Optional, Tuple, Set
 from copy import deepcopy
 import random
 
 from app.semantic_ir import (
     SemanticToken, SemanticType, SemanticRole, AllocationGraph,
-    SemanticRecord, SemanticGraph, DatasetIR,
-    RegionType,
+    SemanticRecord,
 )
 
 
@@ -135,7 +132,6 @@ def _compute_compatibility(
         total_roles = len(role_order)
         if total_roles > 1:
             # Learned position from past allocations (if available)
-            _learned_pos = reng.get_typical_position(role_name)
             schema_pos = role_idx / (total_roles - 1)
             # When learning count is low, use stronger positional signal.
             # Over time, learned compatibility takes over.
@@ -379,7 +375,7 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
     """
     g = deepcopy(graph)
     assigned = set()
-    filled = set()
+    filled: set[str] = set()
     
     for cand_key, role_name, score in sorted_assignments:
         if cand_key in assigned or role_name in filled:

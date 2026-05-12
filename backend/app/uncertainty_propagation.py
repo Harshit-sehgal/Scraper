@@ -14,16 +14,15 @@ Mechanisms:
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Dict
 from collections import defaultdict
 import math
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, SemanticRegion,
-    RelationshipEdge, OwnershipEdge, SemanticGraph,
+    SemanticToken, SemanticRegion, SemanticGraph,
 )
 from app.semantic_contradiction_engine import (
-    detect_contradictions, Contradiction, compute_contradiction_impact,
+    detect_contradictions, compute_contradiction_impact,
 )
 
 

@@ -163,8 +163,8 @@ class SemanticState:
 
         # Orphan contribution (unowned regions)
         owned = set()
-        for edge in graph.ownership_edges:
-            owned.add(edge.owned_region_id)
+        for o_edge in graph.ownership_edges:
+            owned.add(o_edge.owned_region_id)
         for region in graph.regions:
             if region.region_id not in owned:
                 energy += 1.0
@@ -250,7 +250,7 @@ class SemanticEnergyModel:
             if edge.confidence >= 0.7:
                 edge.confidence = min(edge.confidence + 0.02, 1.0)
 
-        for edge in graph.ownership_edges:
+        for o_edge in graph.ownership_edges:
             if edge.confidence >= 0.7:
                 edge.confidence = min(edge.confidence + 0.02, 1.0)
 
@@ -1016,15 +1016,15 @@ class RoleEmbeddingEngine:
         if not hasattr(self, 'learned_exclusions'):
             self.learned_exclusions = {}
         key = tuple(sorted([role_a, role_b]))
-        self.learned_exclusions[key] = self.learned_exclusions.get(key, 0.0) + 0.15
-        self.learned_exclusions[key] = min(1.0, self.learned_exclusions[key])
+        getattr(self, 'learned_exclusions')[key] = getattr(self, 'learned_exclusions').get(key, 0.0) + 0.15
+        getattr(self, 'learned_exclusions')[key] = min(1.0, self.learned_exclusions[key])
 
     def get_learned_exclusion(self, role_a: str, role_b: str) -> float:
         """Get the learned exclusion penalty between two roles."""
         if not hasattr(self, 'learned_exclusions'):
             return 0.0
         key = tuple(sorted([role_a, role_b]))
-        return self.learned_exclusions.get(key, 0.0)
+        return getattr(self, 'learned_exclusions').get(key, 0.0)
 
     def learn_from_allocation(
         self,
@@ -1342,7 +1342,7 @@ class GraphEquilibriumSolver:
                 edge.confidence = min(edge.confidence + 0.03, 1.0)
 
         # Suppress contradictory edges
-        for edge in graph.ownership_edges:
+        for o_edge in graph.ownership_edges:
             if edge.confidence < 0.3:
                 edge.confidence = 0.0
 
@@ -1591,7 +1591,7 @@ class SemanticThermodynamics:
 
         # Ownership entropy: unowned regions increase energy
         owned_regions = set()
-        for edge in graph.ownership_edges:
+        for o_edge in graph.ownership_edges:
             owned_regions.add(edge.owned_region_id)
         for region in graph.regions:
             if region.region_id not in owned_regions:

@@ -11,14 +11,11 @@ Example:
   → [entity_name] [location] [date] [quantifier] [location]
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-from collections import defaultdict
+from typing import List, Dict
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, RegionType, RecordType,
-    SemanticRegion, RelationshipEdge, SemanticRecord, DatasetIR,
-    Span,
+    SemanticToken, SemanticType, RegionType, SemanticRegion,
+    SemanticRecord,
 )
 
 

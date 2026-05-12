@@ -11,12 +11,9 @@ Nearby tokens can be one entity, multiple entities, or a role transition.
 The engine must learn which is which.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-import re
+from dataclasses import dataclass
+from typing import List, Dict, Optional, Tuple
 
-from app.semantic_ir import SemanticType
-from app.semantic_allocation_engine import _get_role_engine
 
 
 # Known entity suffixes for bootstrap (will be replaced by learning)

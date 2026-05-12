@@ -4,7 +4,6 @@ web pages to scrape by searching the web and ranking results.
 Uses free search via DuckDuckGo.
 """
 
-import asyncio
 import os
 from collections import defaultdict
 from typing import Optional

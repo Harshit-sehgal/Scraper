@@ -14,10 +14,10 @@ Each layer has ONE responsibility.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Tuple, Set
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, SemanticRecord, DatasetIR, Span,
+    SemanticToken, SemanticType, SemanticRecord, Span,
 )
 from app.semantic_allocation_engine import allocate_semantic_roles, _get_role_engine
 from app.semantic_boundary_engine import score_boundary, record_motif_observation
@@ -133,7 +133,7 @@ def _group_adjacent_entities(records: list) -> list:
 
     for record in records:
         # First, suppress child fragments
-        seen = set()
+        seen: set[str] = set()
         keys_to_delete = []
         for k in list(record.keys()):
             v = record.get(k)
@@ -356,7 +356,7 @@ def run_pipeline(
         # Convert dict to SemanticRecord
         tokens = []
         pos = 0
-        seen_values = set()  # Suppress child fragments that duplicate parent values
+        seen_values: set[str] = set()  # Suppress child fragments that duplicate parent values
         # Process segmented values first (composite text), then standalone fields.
         # This preserves positional ordering for text values.
         seg_keys = [k for k in record if '_seg_' in k]
@@ -411,7 +411,7 @@ def run_pipeline(
                 
 
         # Build output dict from allocation
-        output = {}
+        output: dict = {}
         for role_name in schema_fields:
             role = alloc_graph.roles.get(role_name)
             if role and role.filled_by:
@@ -428,7 +428,7 @@ def run_pipeline(
                 ie = InferenceEngine(max_iterations=3)
                 ie_result = ie.infer(tokens, schema_fields)
                 if ie_result and ie_result.role_assignments:
-                    ie_coherence = ie_result.coherence_score
+                    ie_coherence = getattr(ie_result, 'coherence_score', 0.5)
                     if ie_coherence > output["_confidence"]:
                         for role_name, value in ie_result.role_assignments.items():
                             if value:
@@ -445,7 +445,7 @@ def run_pipeline(
         
         # Stage 3: Contradiction detection
         # Check for duplicate values across different schema fields (contradiction)
-        filled_vals = {}
+        filled_vals: dict[str, str] = {}
         contradictions = []
         for role_name in schema_fields:
             val = output.get(role_name)

@@ -14,15 +14,11 @@ Phases:
 5. Resolve graph conflicts
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set, Any
+from typing import List, Dict
 from collections import defaultdict, Counter
-import math
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, RegionType, RecordType,
-    SemanticRegion, RelationshipEdge, OwnershipEdge,
-    SemanticRecord, SemanticGraph, DatasetIR,
+    RegionType, SemanticRecord, SemanticGraph, DatasetIR,
 )
 from app.semantic_regions import detect_semantic_regions, build_region_hierarchy
 from app.ownership_inference import infer_semantic_ownership, propagate_ownership_consistency

@@ -15,14 +15,12 @@ Attention factors:
 5. Confidence weight (high confidence = more attention)
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-from collections import defaultdict
+from typing import List, Dict, Optional
 
 from app.semantic_ir import (
     SemanticType, RegionType,
     SemanticToken, SemanticRegion,
-    RelationshipEdge, SemanticGraph,
+    SemanticGraph,
 )
 
 

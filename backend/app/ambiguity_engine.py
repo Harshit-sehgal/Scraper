@@ -13,7 +13,7 @@ Core principle: Do NOT force certainty prematurely.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Callable
+from typing import List, Dict, Optional, Tuple
 from copy import deepcopy
 
 from app.semantic_ir import SemanticToken, SemanticType, SemanticRecord

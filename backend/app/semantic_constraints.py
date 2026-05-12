@@ -13,13 +13,12 @@ Examples:
 - Ownership must be acyclic
 """
 
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 
 from app.semantic_ir import (
-    SemanticType, SemanticToken, SemanticRecord,
-    SemanticRegion, RelationshipEdge, SemanticGraph,
-    AllocationGraph, SemanticRole,
+    SemanticType, SemanticRecord, SemanticGraph,
+    AllocationGraph,
 )
 from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
 

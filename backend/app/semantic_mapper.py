@@ -10,7 +10,7 @@ not because it came from a "flight" page.
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 from app.intent_parser import IntentSchema, SEMANTIC_NEED_KEYWORDS
 from app.page_profiler import StructureProfile, ValuePatterns
 
@@ -388,7 +388,6 @@ def map_to_schema_fields(
 
     Map semantic need names to actual schema field names.
     """
-    from app.models import SchemaField
 
     results = []
 

@@ -18,12 +18,9 @@ Core principle: WHAT values are, not WHERE they came from.
 """
 
 import re
-import math
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple, Set
-from collections import Counter
 
-from app.page_profiler import ValuePatterns
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

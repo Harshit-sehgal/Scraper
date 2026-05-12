@@ -7,9 +7,7 @@ regardless of domain (flight, hotel, product, job, etc.)
 Core principle: Match by semantic need (price, date, rating), not by domain.
 """
 
-import re
 from dataclasses import dataclass, field
-from typing import Optional
 from app.models import FieldType
 
 

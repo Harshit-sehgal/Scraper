@@ -18,22 +18,20 @@ Core principle: Later stages CAN modify earlier assumptions.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Any, Callable
+from typing import List, Tuple, Callable
 from copy import deepcopy
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, SemanticRecord, SemanticGraph, DatasetIR,
-    RecordType, AllocationGraph,
+    SemanticRecord, DatasetIR,
 )
 from app.semantic_regions import detect_semantic_regions, build_region_hierarchy
-from app.semantic_allocation_engine import allocate_semantic_roles, optimize_semantic_assignment
-from app.ownership_inference import infer_semantic_ownership
+from app.semantic_allocation_engine import allocate_semantic_roles
 from app.semantic_constraints import check_all_constraints, compute_constraint_penalty
 from app.semantic_contradiction_engine import detect_contradictions
 from app.semantic_repair import repair_graph
-from app.global_graph_coherence import compute_global_coherence, enhance_dataset_with_global_coherence
+from app.global_graph_coherence import enhance_dataset_with_global_coherence
 from app.semantic_graph import build_semantic_graph
-from app.semantic_density import compute_density_profile, classify_by_density
+from app.semantic_density import compute_density_profile
 
 
 @dataclass

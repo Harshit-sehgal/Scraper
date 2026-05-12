@@ -24,18 +24,12 @@ from app.async_utils import run_sync_in_thread
 from app.models import FieldType, SchemaField
 
 # Import new universal layers
-from app.intent_parser import parse_user_intent, infer_schema_from_intent, get_universal_schema
-from app.page_profiler import detect_page_structure, detect_value_patterns, find_data_containers
-from app.semantic_mapper import match_values_to_intent, map_to_schema_fields, ai_repair_mapping
-from app.validation import validate_records, compute_field_confidence, DEFAULT_MIN_CONFIDENCE
+from app.page_profiler import detect_page_structure, detect_value_patterns
 from app.semantic_segmentation import (
-    expand_composite_records,
     is_likely_noise_field,
     segment_single_text,
-    compute_semantic_density,
-    StructuralMemoryTracker,
 )
-from app.semantic_pipeline import run_pipeline, strip_metadata, filter_noise_records
+from app.semantic_pipeline import run_pipeline
 
 EMPTY_TOKENS = {
     "home",

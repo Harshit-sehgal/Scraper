@@ -10,13 +10,11 @@ Key insight: entity records have HIGH semantic density (prices, dates, codes, na
 Filter/control records have LOW semantic density (ranges, labels, buttons).
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-from enum import Enum
+from typing import List, Tuple, Set
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, RecordType, RegionType,
-    SemanticRecord, SemanticRegion, DatasetIR,
+    SemanticToken, SemanticType, RecordType, SemanticRecord,
+    DatasetIR,
 )
 
 

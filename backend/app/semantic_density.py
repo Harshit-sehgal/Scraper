@@ -10,12 +10,11 @@ This replaces keyword-based noise filtering with structural density analysis.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Dict
 import math
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, SemanticRecord, SemanticRegion,
-    SemanticGraph, RecordType, Span,
+    SemanticToken, SemanticType, SemanticRegion, RecordType,
 )
 
 

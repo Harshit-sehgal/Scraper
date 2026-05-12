@@ -8,7 +8,7 @@ Core principle: Detect structure and value patterns, not domain-specific feature
 
 import re
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict
+from typing import Optional, List
 from bs4 import BeautifulSoup
 
 

@@ -13,18 +13,15 @@ Strategies:
 5. Repair broken region hierarchies
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-from collections import defaultdict
-import copy
+from dataclasses import dataclass
+from typing import List, Tuple
 
 from app.semantic_ir import (
-    SemanticType, RegionType, RecordType,
-    SemanticToken, SemanticRecord, SemanticRegion,
-    RelationshipEdge, OwnershipEdge, SemanticGraph,
+    SemanticType, RegionType, SemanticRecord,
+    SemanticGraph,
 )
 from app.semantic_contradiction_engine import (
-    detect_contradictions, Contradiction, compute_contradiction_impact,
+    detect_contradictions, Contradiction,
 )
 
 

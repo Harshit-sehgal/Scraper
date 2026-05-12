@@ -13,14 +13,12 @@ If 95% of rows follow [text][price][date], anomalous rows should:
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-from collections import Counter, defaultdict
+from typing import List, Tuple
+from collections import Counter
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, SemanticRecord, SemanticGraph, DatasetIR,
-    RecordType,
+    SemanticRecord, SemanticGraph, DatasetIR,
 )
-from app.semantic_density import compute_semantic_density, compute_density_profile
 
 
 @dataclass
