@@ -1592,7 +1592,7 @@ class SemanticThermodynamics:
         # Ownership entropy: unowned regions increase energy
         owned_regions = set()
         for o_edge in graph.ownership_edges:
-            owned_regions.add(edge.owned_region_id)
+            owned_regions.add(o_edge.owned_region_id)
         for region in graph.regions:
             if region.region_id not in owned_regions:
                 energy += 1.0
