@@ -350,6 +350,50 @@ class SemanticBoundaryEngine:
         score.uncertainty = 0.5
         return score
 
+    
+    def save_state(self) -> dict:
+        """Export learned memory for persistence."""
+        return {
+            "transitions": {f"{k[0]}|{k[1]}": v for k, v in self.transition_detector.transition_probs.items()},
+            "motifs": {",".join(k): v for k, v in self.motif_learner.motif_counts.items()},
+            "total_records": self.motif_learner.total_records,
+            "cohesion_merge": {f"{k[0]}|{k[1]}": v for k, v in self.cohesion_model.merge_success.items()},
+            "cohesion_split": {f"{k[0]}|{k[1]}": v for k, v in self.cohesion_model.split_success.items()}
+        }
+
+    def load_state(self, state: dict):
+        """Import learned memory from persistence."""
+        if "transitions" in state:
+            self.transition_detector.transition_probs = {
+                tuple(k.split("|")): v for k, v in state["transitions"].items()
+            }
+        if "motifs" in state:
+            self.motif_learner.motif_counts.update({
+                tuple(k.split(",")): v for k, v in state["motifs"].items()
+            })
+        if "total_records" in state:
+            self.motif_learner.total_records = state["total_records"]
+        if "cohesion_merge" in state:
+            self.cohesion_model.merge_success = {
+                tuple(k.split("|")): v for k, v in state["cohesion_merge"].items()
+            }
+        if "cohesion_split" in state:
+            self.cohesion_model.split_success = {
+                tuple(k.split("|")): v for k, v in state["cohesion_split"].items()
+            }
+
+    def save_to_file(self, filepath: str):
+        import json, os
+        os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
+        with open(filepath, 'w') as f:
+            json.dump(self.save_state(), f, indent=2)
+
+    def load_from_file(self, filepath: str):
+        import json, os
+        if os.path.exists(filepath):
+            with open(filepath, 'r') as f:
+                self.load_state(json.load(f))
+
     def decide_merge(self, type_a: str, type_b: str, value_a: str, value_b: str,
                      position_a: int, position_b: int) -> bool:
         """Decide whether two adjacent tokens should merge."""

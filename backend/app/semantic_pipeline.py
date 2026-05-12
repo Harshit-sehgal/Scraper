@@ -310,9 +310,16 @@ def run_pipeline(
     # Load persisted learning cache (if available)
     reng = _get_role_engine()
     import os
+    from app.semantic_boundary_engine import get_boundary_engine
+    be = get_boundary_engine()
+    
     cache_path = os.environ.get('SEMANTIC_CACHE_PATH', '/tmp/semantic_cache.json')
+    boundary_cache_path = os.environ.get('SEMANTIC_BOUNDARY_CACHE_PATH', '/tmp/semantic_boundary_cache.json')
+    
     if reng.learning_count == 0:
         reng.load_from_file(cache_path)
+    if be.motif_learner.total_records == 0:
+        be.load_from_file(boundary_cache_path)
     
     # Bootstrap: seed the RoleEmbeddingEngine using substring hints + value warm-start
     if schema_fields:
@@ -483,6 +490,25 @@ def run_pipeline(
                 reng.learn_from_allocation(role_name, val_type, val, success=False, delta=0.2)
         if warnings:
             output["_warnings"] = warnings
+            
+        # Layer 8: Meta-cognition diagnostics (Decision Explanation)
+        reasoning = []
+        for role_name in schema_fields:
+            val = output.get(role_name)
+            if val:
+                val_type, conf = _detect_semantic_type(val, role_name)
+                compat = reng.compatibility_cache.get((role_name, val_type.value), 0.5)
+                if compat > 0.7:
+                    reasoning.append(f"Mapped '{val}' ({val_type.value}) to {role_name} due to high learned compatibility ({compat:.2f}).")
+                elif conf > 0.8:
+                    reasoning.append(f"Mapped '{val}' to {role_name} based on strong value structure ({val_type.value}).")
+                else:
+                    reasoning.append(f"Mapped '{val}' to {role_name} via structural best-fit (compatibility: {compat:.2f}).")
+        
+        if contradictions:
+            reasoning.append(f"Penalized confidence due to contradictory claims: {', '.join(contradictions)}.")
+        
+        output["_reasoning"] = reasoning
         
         # Record merge/split feedback for boundary engine learning
         coherence = output["_confidence"]
@@ -499,6 +525,8 @@ def run_pipeline(
     # Persist learned cache for next session
     if reng.learning_count > 0:
         reng.save_to_file(cache_path)
+    if be.motif_learner.total_records > 0:
+        be.save_to_file(boundary_cache_path)
 
     return allocated_records
 
