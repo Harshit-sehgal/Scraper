@@ -97,7 +97,7 @@ class EntityRegistry:
         self.entities[eid] = CanonicalEntity(
             entity_id=eid,
             canonical_name=normalized,
-            primary_type=SemanticType.ORGANIZATION,
+            entity_type=SemanticType.ORGANIZATION,
             aliases={normalized},
             occurrence_count=1,
             confidence=0.7,

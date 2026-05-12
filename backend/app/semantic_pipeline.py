@@ -435,8 +435,10 @@ def run_pipeline(
                                 output[role_name] = value
                         output["_confidence"] = ie_coherence
                         output["_refined_by"] = "inference_engine"
-            except Exception:
-                pass
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "InferenceEngine failed: %s", exc)
         
         # Add calibration from RoleEmbeddingEngine learning state
         output["_certainty"] = reng.get_certainty()

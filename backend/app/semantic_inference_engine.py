@@ -315,7 +315,7 @@ class BeliefFieldPropagator:
                     current[ntype] = current.get(ntype, 0) + influence
 
                 # Self-reinforcement: boost max belief
-                max_type = max(current, key=current.get)
+                max_type = max(current, key=lambda k: current[k])
                 current[max_type] *= 1.05
 
                 # Normalize
@@ -899,7 +899,7 @@ class SemanticMemory:
     """
 
     def __init__(self):
-        self.successful_motifs: Dict[Tuple[str, ...], int] = Counter()
+        self.successful_motifs: Counter[Tuple[str, ...]] = Counter()
         self.ownership_patterns: Dict[str, int] = Counter()
         self.total_runs: int = 0
 
@@ -1012,18 +1012,18 @@ class RoleEmbeddingEngine:
         This dynamically discovers exclusive roles (e.g. 'origin' and 'destination'
         should never claim the exact same value).
         """
-        if not hasattr(self, 'learned_exclusions'):
-            self.learned_exclusions = {}
+        if not hasattr(self, '_learned_exclusions'):
+            self._learned_exclusions: dict[tuple[str, ...], float] = {}
         key = tuple(sorted([role_a, role_b]))
-        getattr(self, 'learned_exclusions')[key] = getattr(self, 'learned_exclusions').get(key, 0.0) + 0.15
-        getattr(self, 'learned_exclusions')[key] = min(1.0, self.learned_exclusions[key])
+        self._learned_exclusions[key] = self._learned_exclusions.get(key, 0.0) + 0.15
+        self._learned_exclusions[key] = min(1.0, self._learned_exclusions[key])
 
     def get_learned_exclusion(self, role_a: str, role_b: str) -> float:
         """Get the learned exclusion penalty between two roles."""
-        if not hasattr(self, 'learned_exclusions'):
+        if not hasattr(self, '_learned_exclusions'):
             return 0.0
         key = tuple(sorted([role_a, role_b]))
-        return getattr(self, 'learned_exclusions').get(key, 0.0)
+        return self._learned_exclusions.get(key, 0.0)
 
     def learn_from_allocation(
         self,
@@ -1107,16 +1107,33 @@ class RoleEmbeddingEngine:
         return 0.5 + (base_confidence - 0.5) * certainty
 
     def save_cache(self) -> dict:
-        """Serialize the compatibility cache for persistence."""
-        return {f"{r}:{t}": v for (r, t), v in self.compatibility_cache.items()}
+        """Serialize ALL learned state for persistence."""
+        return {
+            "compatibility_cache": {f"{r}:{t}": v for (r, t), v in self.compatibility_cache.items()},
+            "learning_count": self.learning_count,
+            "co_occurrence": {f"{a}:{b}:{c}:{d}": v for (a, b, c, d), v in self.co_occurrence.items()},
+            "total_co_occurrences": self.total_co_occurrences,
+            "role_position_memory": {r: v for r, v in self.role_position_memory.items()},
+        }
 
     def load_cache(self, data: dict):
-        """Load a previously saved cache."""
-        for key, value in data.items():
-            if ':' in key:
-                role, ttype = key.split(':', 1)
-                self.compatibility_cache[(role, ttype)] = value
-                self.learning_count += 1
+        """Load a previously saved full state."""
+        cache = data.get("compatibility_cache", data)
+        if isinstance(cache, dict):
+            for key, value in cache.items():
+                if ':' in key:
+                    role, ttype = key.split(':', 1)
+                    self.compatibility_cache[(role, ttype)] = value
+        self.learning_count = data.get("learning_count", len(self.compatibility_cache))
+        co_occ = data.get("co_occurrence", {})
+        for key, count in co_occ.items():
+            parts = key.split(':')
+            if len(parts) >= 4:
+                self.co_occurrence[tuple(parts)] = count
+        self.total_co_occurrences = data.get("total_co_occurrences", self.total_co_occurrences)
+        rpm = data.get("role_position_memory", {})
+        for role, vals in rpm.items():
+            self.role_position_memory[role] = vals
 
     def save_to_file(self, filepath: str):
         """Persist the compatibility cache to a JSON file."""

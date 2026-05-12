@@ -10,6 +10,8 @@ probabilistic reasoning at every level.
 Core principle: Everything is a relationship, nothing is an island.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
 from enum import Enum
@@ -160,7 +162,7 @@ class SemanticGroup:
 class SemanticRecord:
     """Complete semantic representation of one extracted record."""
     tokens: List[SemanticToken]
-    groups: List[SemanticGroup] = field(default_factory=list)
+    groups: list[SemanticRegion] = field(default_factory=list)
     relationships: List[RelationshipEdge] = field(default_factory=list)
     structural_signature: Tuple[str, ...] = field(default_factory=tuple)
 
@@ -174,6 +176,7 @@ class SemanticRecord:
     is_noise: bool = False
     noise_confidence: float = 0.0
     noise_evidence: List[str] = field(default_factory=list)
+    evidence: List[str] = field(default_factory=list)
 
     # Original data context
     source_text: str = ""

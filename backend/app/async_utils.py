@@ -40,7 +40,7 @@ async def run_sync_in_thread(
     while not done.is_set():
         await asyncio.sleep(poll_interval)
 
-    if "error" in result:
+    if "error" in result and isinstance(result["error"], BaseException):
         raise result["error"]
 
     return result.get("value")  # type: ignore[return-value]

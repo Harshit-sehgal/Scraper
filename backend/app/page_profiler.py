@@ -182,7 +182,7 @@ def _detect_cards_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
 
         # Check if these are actual data cards (not just styled divs)
         item_count = 0
-        sample_texts = []
+        sample_texts: list[str] = []
 
         for container in containers[:20]:
             text = container.get_text(strip=True)
