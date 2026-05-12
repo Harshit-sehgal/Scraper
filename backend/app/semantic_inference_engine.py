@@ -467,10 +467,10 @@ class MultiHypothesisEngine:
         if strategy == "progressive":
             # Uniform priority: iterate schema fields, assign best match
             # without any type-based priority ordering
-            for field in schema_fields:
+            for f_name in schema_fields:
                 for token in tokens:
                     if token.raw not in used:
-                        assignments[field] = token.raw
+                        assignments[f_name] = token.raw
                         used.add(token.raw)
                         break
 
@@ -480,16 +480,16 @@ class MultiHypothesisEngine:
                 if token.raw in used:
                     continue
                 type_name = token.primary_type.value
-                for field in schema_fields:
-                    if field not in assignments and (type_name in field or field in type_name):
-                        assignments[field] = token.raw
+                for f_name in schema_fields:
+                    if f_name not in assignments and (type_name in f_name or f_name in type_name):
+                        assignments[f_name] = token.raw
                         used.add(token.raw)
                         break
 
             # Leave unfilled roles empty
-            for field in schema_fields:
-                if field not in assignments:
-                    assignments[field] = ""
+            for f_name in schema_fields:
+                if f_name not in assignments:
+                    assignments[f_name] = ""
 
         elif strategy == "exploratory":
             # Type-consistent random assignments
@@ -503,8 +503,8 @@ class MultiHypothesisEngine:
                     if f not in assignments
                 ]
                 if compatible_fields:
-                    field = random.choice(compatible_fields)
-                    assignments[field] = token.raw
+                    f_name = random.choice(compatible_fields)
+                    assignments[f_name] = token.raw
                     used.add(token.raw)
 
         return assignments

@@ -20,8 +20,8 @@ from app.semantic_ir import (
     SemanticToken, SemanticType, SemanticRecord, DatasetIR, Span,
 )
 from app.semantic_allocation_engine import allocate_semantic_roles, _get_role_engine
-from app.semantic_boundary_engine import score_boundary, record_boundary_feedback, record_motif_observation, get_boundary_engine, _BOOTSTRAP_SUFFIXES, _STOP_WORDS
-from app.semantic_segmentation import expand_composite_records, StructuralMemoryTracker, extract_candidate_values
+from app.semantic_boundary_engine import score_boundary, record_motif_observation
+from app.semantic_segmentation import expand_composite_records, StructuralMemoryTracker
 
 
 # Seed patterns are now embedded in _seed_role_engine as substring-based
@@ -76,8 +76,8 @@ def _seed_role_engine(schema_fields: list):
     """
     reng = _get_role_engine()
     
-    for field in schema_fields:
-        field_lower = field.lower()
+    for f_name in schema_fields:
+        field_lower = f_name.lower()
         
         # Strategy 1: Universal roots
         best_type = SemanticType.TEXT
@@ -92,13 +92,13 @@ def _seed_role_engine(schema_fields: list):
             for (known_role, type_str), compat in reng.compatibility_cache.items():
                 if compat < 0.6:
                     continue
-                sim = _name_similarity(field, known_role)
+                sim = _name_similarity(f_name, known_role)
                 if sim > best_score:
                     best_score = sim
                     if sim > 0.55:
                         best_type = SemanticType(type_str)
         
-        key = (field, best_type.value)
+        key = (f_name, best_type.value)
         if key not in reng.compatibility_cache:
             reng.compatibility_cache[key] = 0.7
 
@@ -115,13 +115,13 @@ def _warm_start_from_values(records: list, schema_fields: list):
     reng = _get_role_engine()
     first = records[0]
     
-    for field in schema_fields:
-        val = first.get(field)
+    for f_name in schema_fields:
+        val = first.get(f_name)
         if not isinstance(val, str) or not val.strip():
             continue
         
-        st, conf = _detect_semantic_type(val, field)
-        key = (field, st.value)
+        st, conf = _detect_semantic_type(val, f_name)
+        key = (f_name, st.value)
         if key not in reng.compatibility_cache:
             reng.compatibility_cache[key] = 0.7
 
@@ -398,17 +398,17 @@ def run_pipeline(
             record_motif_observation(type_sequence)
 
         sem_record = SemanticRecord(tokens=tokens)
-        allocated, alloc_graph = allocate_semantic_roles(sem_record, schema_fields)
+        _, alloc_graph = allocate_semantic_roles(sem_record, schema_fields)
 
         # Two-pass refinement: second pass with learning disabled.
         # The first pass already updated the cache via comparative learning.
         # The second pass uses the improved cache without further corruption.
         if len(tokens) >= 2:
             sem_record2 = SemanticRecord(tokens=tokens)
-            allocated2, alloc_graph2 = allocate_semantic_roles(sem_record2, schema_fields, learn=False)
+            _, alloc_graph2 = allocate_semantic_roles(sem_record2, schema_fields, learn=False)
             if alloc_graph2.coherence_score > alloc_graph.coherence_score:
                 alloc_graph = alloc_graph2
-                allocated = allocated2
+                
 
         # Build output dict from allocation
         output = {}

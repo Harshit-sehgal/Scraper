@@ -135,7 +135,7 @@ def _compute_compatibility(
         total_roles = len(role_order)
         if total_roles > 1:
             # Learned position from past allocations (if available)
-            learned_pos = reng.get_typical_position(role_name)
+            _learned_pos = reng.get_typical_position(role_name)
             schema_pos = role_idx / (total_roles - 1)
             # When learning count is low, use stronger positional signal.
             # Over time, learned compatibility takes over.
@@ -377,7 +377,6 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
                         pre-sorted by desired strategy.
     Returns {'roles': {role: candidate}, 'coherence': float}.
     """
-    from copy import deepcopy
     g = deepcopy(graph)
     assigned = set()
     filled = set()
