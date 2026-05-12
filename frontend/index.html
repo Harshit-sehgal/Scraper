@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataForge</title>
+    <meta name="description" content="AI-powered web scraper. Extract structured data from any website.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div id="app">
+
+        <!-- ─── Top Bar ─── -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <span class="brand">DataForge Studio</span>
+                <span class="sep">/</span>
+                <nav class="tabs">
+                    <button class="tab active" data-view="jobs" id="tab-jobs">Jobs</button>
+                    <button class="tab" data-view="new" id="tab-new">New</button>
+                    <button class="tab recycle-tab" data-view="recycle" id="tab-recycle">Recycle Bin</button>
+                </nav>
+            </div>
+            <div class="topbar-right">
+                <span class="shortcut-hint" title="Keyboard shortcuts">N new • / search • Esc clear</span>
+                <span class="engine-status" id="engine-status"><span class="dot"></span><span id="engine-status-text">Ready</span></span>
+            </div>
+        </header>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Jobs List                     -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view active" id="view-jobs">
+            <div class="container">
+                <div class="page-head">
+                    <div>
+                        <h1>Scraping Jobs</h1>
+                        <p class="subtle">Manage and track your data extraction tasks</p>
+                    </div>
+                    <button class="btn primary" onclick="switchView('new')" id="btn-create-new">Create Job</button>
+                </div>
+
+                <div class="jobs-toolbar">
+                    <div class="jobs-toolbar-left">
+                        <input type="text" id="jobs-search" placeholder="Search jobs by name...">
+                        <select id="jobs-status-filter">
+                            <option value="all">All statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="discovering">Discovering</option>
+                            <option value="running">Running</option>
+                            <option value="completed">Completed</option>
+                            <option value="canceled">Canceled</option>
+                            <option value="failed">Failed</option>
+                        </select>
+                    </div>
+                    <div class="jobs-toolbar-right">
+                        <span class="jobs-last-updated" id="jobs-last-updated">Never updated</span>
+                        <button class="btn ghost small" onclick="clearTerminalJobs()" id="btn-clear-terminal">Clear terminal</button>
+                        <button class="btn ghost small" onclick="refreshJobsManual()" id="btn-refresh-jobs">Refresh</button>
+                    </div>
+                </div>
+
+                <!-- Mini Stats -->
+                <div class="kpi-row" id="kpi-row">
+                    <div class="kpi"><span class="kpi-val" id="kpi-total">0</span><span class="kpi-label">Total</span></div>
+                    <div class="kpi"><span class="kpi-val" id="kpi-running">0</span><span class="kpi-label">Running</span></div>
+                    <div class="kpi"><span class="kpi-val" id="kpi-done">0</span><span class="kpi-label">Done</span></div>
+                    <div class="kpi"><span class="kpi-val" id="kpi-records">0</span><span class="kpi-label">Records</span></div>
+                </div>
+
+                <div class="list-head">
+                    <span>Job</span>
+                    <span>URLs</span>
+                    <span>Status</span>
+                    <span>Records</span>
+                    <span>Actions</span>
+                </div>
+
+                <!-- Jobs List -->
+                <div class="list" id="jobs-list">
+                    <div class="empty" id="empty-state">
+                        <p>No jobs yet</p>
+                        <span class="subtle">Click "New Job" to start scraping</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Recycle Bin                   -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-recycle">
+            <div class="container">
+                <div class="page-head">
+                    <div>
+                        <h1>Recycle Bin</h1>
+                        <p class="subtle">Restore or permanently delete jobs</p>
+                    </div>
+                    <button class="btn ghost small" onclick="clearRecycleBin()" id="btn-clear-recycle">Empty Bin</button>
+                </div>
+
+                <div class="list-head recycle-list-head">
+                    <span>Job</span>
+                    <span>Status</span>
+                    <span>Records</span>
+                    <span>Actions</span>
+                </div>
+
+                <div class="list" id="recycle-list">
+                    <div class="empty" id="empty-recycle-state">
+                        <p>Recycle bin is empty</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: New Job / Editor              -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-new">
+            <div class="container narrow">
+                <div class="page-head">
+                    <div>
+                        <h1>New Job</h1>
+                        <p class="subtle">Configure what data to extract</p>
+                    </div>
+                </div>
+
+                <form id="job-form" onsubmit="submitJob(event)">
+
+                    <!-- Mode Toggle -->
+                    <div class="section">
+                        <label class="section-label">Source Mode</label>
+                        <div class="toggle-group" id="mode-toggle">
+                            <button type="button" class="toggle active" data-mode="manual" onclick="setMode('manual')">Manual URLs</button>
+                            <button type="button" class="toggle" data-mode="auto" onclick="setMode('auto')">Auto Discover</button>
+                        </div>
+                    </div>
+
+                    <!-- Job Name -->
+                    <div class="section">
+                        <label class="section-label" for="inp-name">Name</label>
+                        <input type="text" id="inp-name" placeholder="e.g. Chennai Interior Designers" required>
+                    </div>
+
+                    <!-- Intent -->
+                    <div class="section">
+                        <label class="section-label" for="inp-intent">Describe The Data You Want</label>
+                        <textarea id="inp-intent" rows="3" placeholder="Example: Find interior designers in Chennai, include company name, phone, email, address and keep only businesses within 15 km of T Nagar."></textarea>
+                        <div class="form-actions" style="border-top: 0; margin-top: 0.5rem; padding-top: 0; justify-content: flex-start;">
+                            <button type="button" class="btn secondary small" onclick="suggestSchemaFromIntent()" id="btn-suggest-schema">Suggest topic + schema from intent</button>
+                        </div>
+                        <p id="suggestion-note" class="hint-block hidden"></p>
+                    </div>
+
+                    <!-- Manual Mode: URLs -->
+                    <div class="section" id="section-manual">
+                        <label class="section-label" for="inp-urls">Target URLs <span class="hint">one per line</span></label>
+                        <textarea id="inp-urls" rows="4" placeholder="https://example.com/directory&#10;https://example.com/page2"></textarea>
+                    </div>
+
+                    <!-- Auto Mode: Topic -->
+                    <div class="section hidden" id="section-auto">
+                        <label class="section-label" for="inp-topic">What do you want to find?</label>
+                        <input type="text" id="inp-topic" placeholder="e.g. Interior designers in Chennai with contact info">
+
+                        <div class="row-2" style="margin-top: 0.75rem;">
+                            <div>
+                                <label class="section-label small" for="inp-location">Location focus</label>
+                                <input type="text" id="inp-location" placeholder="e.g. Chennai, India">
+                            </div>
+                            <div>
+                                <label class="section-label small" for="inp-domain">Preferred domain</label>
+                                <input type="text" id="inp-domain" placeholder="e.g. justdial.com (optional)">
+                            </div>
+                        </div>
+                        <div class="row-2" style="margin-top: 0.75rem;">
+                            <div>
+                                <label class="section-label small" for="inp-origin-location">Origin for radius optimization</label>
+                                <input type="text" id="inp-origin-location" placeholder="e.g. T Nagar, Chennai">
+                            </div>
+                            <div>
+                                <label class="section-label small" for="inp-max-distance-km">Max distance (km)</label>
+                                <input type="number" id="inp-max-distance-km" min="0" step="0.5" placeholder="e.g. 15">
+                            </div>
+                        </div>
+                        <div class="row-2" style="margin-top: 0.75rem;">
+                            <div>
+                                <label class="section-label small" for="inp-discover-pages">Max Pages to Discover</label>
+                                <input type="number" id="inp-discover-pages" placeholder="Default: 12" value="12" min="1" max="20">
+                            </div>
+                            <div>
+                                <label class="section-label small" for="inp-max-per-domain">Max URLs per domain</label>
+                                <input type="number" id="inp-max-per-domain" placeholder="Default: 4" value="4" min="1" max="25">
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn secondary small" onclick="previewDiscovery()" id="btn-preview" style="margin-top: 0.75rem;">
+                            Preview discovered URLs
+                        </button>
+                        <div id="discovery-preview" class="discovery-preview hidden"></div>
+                    </div>
+
+                    <!-- Schema -->
+                    <div class="section">
+                        <label class="section-label" for="inp-source-policy">Source Coverage Policy</label>
+                        <select id="inp-source-policy">
+                            <option value="official_plus_directory" selected>Official + Directory (recommended)</option>
+                            <option value="official_only">Official only (strict)</option>
+                            <option value="all_sources">All sources (max coverage)</option>
+                        </select>
+                        <p class="hint-block">All-sources gives broader coverage; strict mode gives cleaner official-only data.</p>
+                    </div>
+
+                    <div class="section">
+                        <label class="section-label">Data Schema</label>
+                        <p class="hint-block">Define the columns of data you want extracted</p>
+                        <div id="schema-container"></div>
+                        <button type="button" class="btn ghost small" onclick="addField()" id="btn-add-field">+ Add Field</button>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="section">
+                        <div class="section-head-row">
+                            <label class="section-label">Filters</label>
+                            <span class="hint">optional</span>
+                        </div>
+                        <p class="hint-block">Remove records that don't match your criteria</p>
+                        <div id="filters-container"></div>
+                        <button type="button" class="btn ghost small" onclick="addFilter()" id="btn-add-filter">+ Add Filter</button>
+                    </div>
+
+                    <!-- Advanced -->
+                    <details class="section collapsible">
+                        <summary class="section-label clickable">Advanced Options</summary>
+                        <div class="advanced-body">
+                            <div class="row-2">
+                                <label class="check-label">
+                                    <input type="checkbox" id="chk-dedup" checked>
+                                    <span>Remove duplicate records</span>
+                                </label>
+                                <div>
+                                    <label class="section-label small" for="inp-dedup-field">Dedup by field</label>
+                                    <input type="text" id="inp-dedup-field" placeholder="e.g. company_name">
+                                </div>
+                            </div>
+                            <div class="row-2" style="margin-top: 0.5rem;">
+                                <label class="check-label">
+                                    <input type="checkbox" id="chk-pagination">
+                                    <span>Follow pagination</span>
+                                </label>
+                                <div>
+                                    <label class="section-label small" for="inp-max-pages">Max pages</label>
+                                    <input type="number" id="inp-max-pages" value="10" min="1" max="100">
+                                </div>
+                            </div>
+                            <div style="margin-top: 0.75rem;">
+                                <label class="section-label small" for="inp-min-score">Minimum record quality score (0 to 1)</label>
+                                <input type="number" id="inp-min-score" value="0.35" min="0" max="1" step="0.05">
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Actions -->
+                    <div class="form-actions">
+                        <button type="button" class="btn ghost" onclick="switchView('jobs')">Cancel</button>
+                        <button type="submit" class="btn primary" id="btn-submit">Start Scraping →</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Results Detail                -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-results">
+            <div class="container">
+                <div class="page-head">
+                    <div>
+                        <button class="btn ghost small" onclick="switchView('jobs')" style="margin-bottom: 0.5rem;">← Back</button>
+                        <h1 id="res-title">Results</h1>
+                        <p class="subtle" id="res-meta"></p>
+                    </div>
+                    <div class="btn-group" id="export-group" style="display:none;">
+                        <button class="btn secondary small" onclick="recleanCurrentJob()" id="btn-reclean">AI Re-clean</button>
+                        <button class="btn secondary small" onclick="exportCSV()" id="btn-csv">CSV ↓</button>
+                        <button class="btn secondary small" onclick="exportJSON()" id="btn-json">JSON ↓</button>
+                        <button class="btn secondary small" onclick="exportExcel()" id="btn-excel">Excel ↓</button>
+                    </div>
+                </div>
+
+                <div id="ai-insight-panel" class="ai-insight hidden">
+                    <h4 class="insight-title">✨ AI Data Insight</h4>
+                    <p id="ai-insight-text">Analyzing dataset...</p>
+                </div>
+
+                <div id="quality-panel" class="ai-insight hidden">
+                    <h4 class="insight-title">Data Quality Report</h4>
+                    <p id="quality-text"></p>
+                </div>
+
+                <div class="results-scrollbar hidden" id="results-scrollbar">
+                    <span class="scroll-label">Columns</span>
+                    <input type="range" id="results-scroll-slider" min="0" max="0" value="0" step="1">
+                    <span class="scroll-pos" id="results-scroll-pos">0%</span>
+                </div>
+
+                <div class="table-wrap">
+                    <div class="results-toolbar" id="results-toolbar">
+                        <input type="text" id="inp-result-search" placeholder="Filter rows in this result set...">
+                        <span class="table-copy-hint">Double-click a cell to copy</span>
+                        <span class="table-count" id="result-count-label">0 rows</span>
+                    </div>
+                    <table id="res-table">
+                        <thead id="res-thead"></thead>
+                        <tbody id="res-tbody">
+                            <tr><td class="empty-cell"><p>Select a job to view results</p></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Toast -->
+    <div id="toasts"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

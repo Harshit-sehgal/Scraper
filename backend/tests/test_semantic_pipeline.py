@@ -1,0 +1,343 @@
+"""Tests for the core semantic pipeline and allocation engine."""
+
+import os
+import json
+from app.semantic_pipeline import run_pipeline, strip_metadata, filter_noise_records, _detect_semantic_type
+from app.semantic_allocation_engine import allocate_semantic_roles, _get_role_engine
+from app.semantic_ir import (
+    SemanticToken, SemanticType, Span, SemanticRecord, create_token, AllocationGraph,
+)
+from app.semantic_inference_engine import BeliefField, SemanticState, RoleEmbeddingEngine
+
+
+def _clean_engine():
+    reng = _get_role_engine()
+    reng.compatibility_cache = {}
+    reng.co_occurrence = {}
+    reng.total_co_occurrences = 0
+    reng.learning_count = 0
+    reng.role_position_memory = {}
+
+
+def test_pipeline_none_input():
+    assert run_pipeline(None, ["name"]) == []
+
+
+def test_pipeline_empty_input():
+    assert run_pipeline([], ["name"]) == []
+
+
+def test_pipeline_garbage_filtered():
+    assert run_pipeline([{"text": "!@#$%"}], ["name"]) == []
+
+
+def test_pipeline_navigation_filtered():
+    assert run_pipeline(
+        [{"text": "Home About Contact info@example.com"}], ["name", "phone"]
+    ) == []
+
+
+def test_pipeline_metadata_stripped():
+    res = run_pipeline(
+        [{"text": "Lufthansa 238", "record_score": "0.9", "_field_confidences": {"p": 0.9}}],
+        ["name", "price"],
+    )
+    assert len(res) > 0
+    assert "record_score" not in res[0]
+    assert "_field_confidences" not in res[0]
+    assert res[0].get("name") is not None
+    assert res[0].get("price") is not None
+
+
+def _check_allocation(records, schema, checks):
+    res = run_pipeline(records, schema)
+    assert len(res) > 0, f"No records returned for {schema}"
+    for field, validator in checks.items():
+        val = res[0].get(field, "")
+        assert validator(val), f"Field {field}={val!r} failed check"
+
+
+def test_flight_allocation():
+    _clean_engine()
+    _check_allocation(
+        [{"details": "Lufthansa LON PAR", "price_col": "450"}],
+        ["name", "origin", "destination", "price"],
+        {
+            "name": lambda v: v and v in ("Lufthansa", "450"),
+            "origin": lambda v: v and len(v) == 3,
+            "destination": lambda v: v and len(v) == 3,
+            "price": lambda v: "450" in v,
+        },
+    )
+
+
+def test_hotel_allocation():
+    _clean_engine()
+    res = run_pipeline(
+        [{"info": "Marriott 4.2/5 8500 22-06-2026"}],
+        ["name", "rating", "price", "date"],
+    )
+    assert len(res) > 0
+    r = res[0]
+    assert r["name"] == "Marriott"
+    assert r["rating"] and any(c.isdigit() for c in r["rating"])
+    assert r["date"] and "-" in r["date"]
+
+
+def test_product_allocation():
+    _clean_engine()
+    res = run_pipeline(
+        [{"data": "iPhone 16 1199 4.8/5"}],
+        ["name", "price", "rating"],
+    )
+    assert len(res) > 0
+    r = res[0]
+    assert r["name"]
+    assert r["price"] and any(c.isdigit() for c in r["price"])
+    assert r["rating"] and any(c.isdigit() for c in r["rating"])
+
+
+def test_job_allocation():
+    _clean_engine()
+    res = run_pipeline(
+        [{"listing": "Google 25L INR 5+ years"}],
+        ["company", "salary", "currency", "experience"],
+    )
+    assert len(res) > 0
+    r = res[0]
+    assert r["company"] == "Google"
+    has_digit = any(r.get(f) and any(c.isdigit() for c in str(r.get(f)))
+                    for f in ["salary", "experience"])
+    assert has_digit, f"No fields have digits: { {f: r.get(f) for f in ['company', 'salary', 'currency', 'experience']} }"
+
+
+def test_spanish_allocation():
+    _clean_engine()
+    _check_allocation(
+        [{"details": "Lufthansa LON PAR", "price_col": "450"}],
+        ["nombre", "origen", "destino", "precio"],
+        {
+            "nombre": lambda v: v and v in ("Lufthansa", "450"),
+            "precio": lambda v: "450" in v,
+        },
+    )
+
+
+def test_alloc_empty_tokens():
+    result, graph = allocate_semantic_roles(SemanticRecord(tokens=[]), ["name"])
+    assert graph.roles["name"].filled_by is None
+
+
+def test_alloc_empty_schema():
+    t = create_token("test", 0, 4, 0, SemanticType.TEXT)
+    result, graph = allocate_semantic_roles(SemanticRecord(tokens=[t]), [])
+    assert len(graph.roles) == 0
+
+
+def test_alloc_simple():
+    tokens = [
+        SemanticToken(raw="Lufthansa", normalized="Lufthansa", span=Span(0, 9), position=0,
+                      primary_type=SemanticType.ORGANIZATION,
+                      type_distribution={SemanticType.ORGANIZATION: 0.85}),
+        SemanticToken(raw="238", normalized="238", span=Span(10, 13), position=1,
+                      primary_type=SemanticType.PRICE,
+                      type_distribution={SemanticType.PRICE: 0.85}),
+    ]
+    result, graph = allocate_semantic_roles(SemanticRecord(tokens=tokens), ["name", "price"])
+    assert graph.roles["price"].filled_by == "238"
+    assert graph.roles["name"].filled_by == "Lufthansa"
+
+
+def test_role_engine_learns():
+    reng = RoleEmbeddingEngine()
+    assert reng.get_compatibility("price", SemanticType.PRICE) == 0.5
+    reng.learn_from_allocation("price", SemanticType.PRICE, "238", success=True, delta=0.3)
+    assert reng.get_compatibility("price", SemanticType.PRICE) > 0.5
+    reng.learn_from_allocation("name", SemanticType.PRICE, "238", success=False, delta=0.3)
+    assert reng.get_compatibility("name", SemanticType.PRICE) < 0.5
+
+
+def test_role_engine_certainty():
+    reng = RoleEmbeddingEngine()
+    assert reng.get_certainty() == 0.0
+    reng.learn_from_allocation("price", SemanticType.PRICE, "238", success=True, delta=0.3)
+    assert reng.get_certainty() > 0.0
+
+
+def test_role_engine_persistent_cache():
+    reng = RoleEmbeddingEngine()
+    reng.learn_from_allocation("test", SemanticType.TEXT, "x", success=True, delta=0.2)
+    saved = reng.save_cache()
+    assert len(saved) > 0
+    reng2 = RoleEmbeddingEngine()
+    reng2.load_cache(saved)
+    assert reng2.learning_count > 0
+
+
+def test_strip_metadata_none():
+    assert strip_metadata(None) == []
+
+
+def test_strip_metadata_removes_fields():
+    r = strip_metadata([{"name": "test", "record_score": "0.9", "_field_confidences": {}}])
+    assert "record_score" not in r[0]
+    assert "_field_confidences" not in r[0]
+    assert r[0]["name"] == "test"
+
+
+def test_filter_noise_none():
+    assert filter_noise_records(None) == []
+
+
+def test_detect_price_with_symbol():
+    st, _ = _detect_semantic_type("\u00a3238", "price")
+    assert st == SemanticType.PRICE
+
+
+def test_detect_price_field_hint():
+    st, _ = _detect_semantic_type("238", "price_col")
+    assert st == SemanticType.PRICE
+
+
+def test_detect_date():
+    st, _ = _detect_semantic_type("22-05-2026", "date")
+    assert st == SemanticType.DATE
+
+
+def test_detect_code():
+    st, _ = _detect_semantic_type("LON", "origin")
+    assert st == SemanticType.CODE
+
+
+def test_detect_rating():
+    st, _ = _detect_semantic_type("4.5/5", "rating")
+    assert st == SemanticType.RATING
+
+
+def test_detect_organization():
+    st, _ = _detect_semantic_type("Lufthansa", "name")
+    assert st == SemanticType.ORGANIZATION
+
+
+def test_detect_product_name():
+    st, _ = _detect_semantic_type("iPhone", "name")
+    assert st == SemanticType.ORGANIZATION
+
+
+def test_detect_plain_text():
+    st, _ = _detect_semantic_type("hello", "name")
+    assert st == SemanticType.TEXT
+
+
+def test_empty_graph_equilibrium():
+    state = SemanticState(belief_field=BeliefField.from_tokens([]))
+    assert state.compute_equilibrium() == 0.0
+
+
+def test_pipeline_garbage_variants():
+    for text in ["!@#$%", "\n\t\r", "   ", "a"]:
+        res = run_pipeline([{"text": text}], ["name"])
+        assert len(res) == 0, f"'{text}' should be filtered"
+
+
+def test_pipeline_noise_variants():
+    for text in [
+        "Home About Contact info@example.com",
+        "Privacy Policy Terms of Service",
+        "Copyright 2024 All Rights Reserved",
+    ]:
+        res = run_pipeline([{"text": text}], ["name", "phone"])
+        assert len(res) == 0, f"'{text[:30]}' should be filtered"
+
+
+def test_is_child_fragment_various():
+    from app.semantic_pipeline import _is_child_fragment
+    assert _is_child_fragment("5", {"4.2/5"})
+    assert _is_child_fragment("Cr", {"1.2 Cr"})
+    assert _is_child_fragment("22", {"22-05-2026"})
+    assert not _is_child_fragment("M", {"Marriott"})
+    assert not _is_child_fragment("5", {"25L"})
+    assert not _is_child_fragment("", {"test"})
+
+
+def test_is_child_fragment_date():
+    from app.semantic_pipeline import _is_child_fragment
+    assert _is_child_fragment("22", {"22-05-2026"})
+    assert _is_child_fragment("05", {"22-05-2026"})
+    assert _is_child_fragment("2026", {"22-05-2026"})
+    assert not _is_child_fragment("5", {"25L"})
+
+
+def test_group_adjacent_entities_org_suffix():
+    from app.semantic_pipeline import _group_adjacent_entities
+    recs = [{"data_seg_org_0": "Prestige", "data_seg_org_1": "Group"}]
+    result = _group_adjacent_entities(recs)
+    assert "data_seg_org_0" in result[0]
+    assert result[0]["data_seg_org_0"] == "Prestige Group"
+
+
+def test_group_adjacent_entities_number_code():
+    from app.semantic_pipeline import _group_adjacent_entities
+    recs = [{"data_seg_number_0": "3", "data_seg_code_1": "BHK"}]
+    result = _group_adjacent_entities(recs)
+    assert result[0].get("data_seg_number_0") == "3 BHK"
+
+
+def test_group_adjacent_entities_no_merge():
+    from app.semantic_pipeline import _group_adjacent_entities
+    recs = [{"data_seg_org_0": "Honda", "data_seg_org_1": "Civic"}]
+    result = _group_adjacent_entities(recs)
+    assert result[0].get("data_seg_org_0") == "Honda"
+
+
+def test_group_adjacent_entities_stop_word():
+    from app.semantic_pipeline import _group_adjacent_entities
+    recs = [{"data_seg_org_0": "The", "data_seg_org_1": "Italian"}]
+    result = _group_adjacent_entities(recs)
+    assert result[0].get("data_seg_org_0") == "The Italian"
+
+
+def test_pipeline_metadata_fields():
+    res = run_pipeline([{"text": "test 123", "record_score": "0.5", "source_url": "http://x.com"}], ["name"])
+    assert not res or "record_score" not in res[0]
+
+
+def test_pipeline_large_text():
+    res = run_pipeline([{"text": "word " * 500}], ["name"])
+    assert len(res) == 0
+
+
+def test_pipeline_mixed_types():
+    res = run_pipeline([{"text": 123, "flag": True}], ["name"])
+    assert len(res) == 0
+
+
+def test_boundary_engine_merge():
+    from app.semantic_boundary_engine import score_boundary
+    for ta, tb, va, vb, exp in [
+        ('org', 'org', 'Prestige', 'Group', True),
+        ('org', 'org', 'Honda', 'Civic', False),
+        ('org', 'org', 'British', 'Airways', True),
+        ('number', 'code', '3', 'BHK', True),
+        ('org', 'org', 'Music', 'Festival', True),
+        ('org', 'number', 'Honda', '2020', False),
+        ('org', 'org', 'The', 'Italian', True),
+    ]:
+        assert score_boundary(ta, tb, va, vb) == exp, f"{va}+{vb}"
+
+
+def test_boundary_engine_scores():
+    from app.semantic_boundary_engine import get_boundary_engine
+    e = get_boundary_engine()
+    s = e.score_pair('org', 'org', 'Prestige', 'Group', 0, 1)
+    assert s.cohesion > 0.7
+    s2 = e.score_pair('org', 'org', 'Honda', 'Civic', 0, 1)
+    assert s2.separation > 0.6
+
+
+def test_boundary_engine_history():
+    from app.semantic_boundary_engine import get_boundary_engine, MergeDecision
+    e = get_boundary_engine()
+    n = len(e.decision_history)
+    e.record_decision(MergeDecision('org', 'org', 'X', 'Y', True, 0.9, True))
+    assert len(e.decision_history) == n + 1
