@@ -1006,6 +1006,26 @@ class RoleEmbeddingEngine:
             boosts[role_i] = boost / max(len(items) - 1, 1)
         return boosts
 
+
+    def learn_contradiction(self, role_a: str, role_b: str, token_type: str):
+        """Learn that role_a and role_b contradicted by claiming the same value/type.
+        
+        This dynamically discovers exclusive roles (e.g. 'origin' and 'destination'
+        should never claim the exact same value).
+        """
+        if not hasattr(self, 'learned_exclusions'):
+            self.learned_exclusions = {}
+        key = tuple(sorted([role_a, role_b]))
+        self.learned_exclusions[key] = self.learned_exclusions.get(key, 0.0) + 0.15
+        self.learned_exclusions[key] = min(1.0, self.learned_exclusions[key])
+
+    def get_learned_exclusion(self, role_a: str, role_b: str) -> float:
+        """Get the learned exclusion penalty between two roles."""
+        if not hasattr(self, 'learned_exclusions'):
+            return 0.0
+        key = tuple(sorted([role_a, role_b]))
+        return self.learned_exclusions.get(key, 0.0)
+
     def learn_from_allocation(
         self,
         role: str,

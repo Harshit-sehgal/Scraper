@@ -451,6 +451,18 @@ def run_pipeline(
         if contradictions:
             output["_contradictions"] = contradictions
             output["_confidence"] *= 0.7
+            
+            # Layer 5: Contradiction-aware learning
+            # Penalize both roles' compatibility with this value's type
+            for role_name in schema_fields:
+                val = output.get(role_name)
+                if val:
+                    for other_role in schema_fields:
+                        if other_role != role_name and output.get(other_role) == val:
+                            val_type, _ = _detect_semantic_type(val, "")
+                            reng.learn_from_allocation(role_name, val_type, val, success=False, delta=0.15)
+                            if hasattr(reng, 'learn_contradiction'):
+                                reng.learn_contradiction(role_name, other_role, val_type.value)
         
         # Role swap detection: check if value types match field expectations
         warnings = []
@@ -468,6 +480,9 @@ def run_pipeline(
             # Flag type mismatch between expected role type and actual value type
             if seed_type != SemanticType.TEXT and val_type != seed_type:
                 warnings.append(f'{role_name}: expected {seed_type.value}, got {val_type.value} ({val})')
+                # Layer 5: Contradiction-aware learning
+                # Penalize this mismatched type heavily so it learns not to do this again
+                reng.learn_from_allocation(role_name, val_type, val, success=False, delta=0.2)
         if warnings:
             output["_warnings"] = warnings
         

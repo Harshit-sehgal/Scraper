@@ -394,3 +394,23 @@ def test_transition_detector_high_list():
     t = e.transition_detector
     high = t.get_high_transition_types()
     assert len(high) >= 2  # Should have at least a few high-transition pairs
+
+def test_layer5_contradiction_learning():
+    from app.semantic_pipeline import run_pipeline
+    from app.semantic_allocation_engine import _get_role_engine
+    
+    # 1. Provide a record and force a bad allocation that violates universal roots
+    # "price" expects a PRICE type, but we force it to accept a TEXT type.
+    records = [{"company": "Google", "price": "NotAPrice"}]
+    schema = ["company_name", "price"]
+    
+    reng = _get_role_engine()
+    # Force it to think text is great for price
+    reng.compatibility_cache[("price", "text")] = 0.9
+    
+    out = run_pipeline(records, schema)
+    
+    # The pipeline should detect the type warning and penalize the compatibility
+    compat = reng.compatibility_cache.get(("price", "text"), 0.5)
+    assert compat < 0.9, f"Engine should have penalized price=text mapping, got {compat}"
+

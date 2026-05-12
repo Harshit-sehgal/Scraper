@@ -391,6 +391,18 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
             if other and other in filled and g.roles.get(other) and g.roles[other].filled_by == cand_key:
                 conflicting = True
                 break
+                
+        # Layer 5: Dynamic learned exclusivity
+        if not conflicting:
+            reng = _get_role_engine()
+            if hasattr(reng, 'get_learned_exclusion'):
+                for filled_role in filled:
+                    if g.roles.get(filled_role) and g.roles[filled_role].filled_by == cand_key:
+                        exclusion_score = reng.get_learned_exclusion(role_name, filled_role)
+                        if exclusion_score > 0.3:
+                            conflicting = True
+                            break
+                            
         if conflicting:
             continue
         g.roles[role_name].filled_by = cand_key
