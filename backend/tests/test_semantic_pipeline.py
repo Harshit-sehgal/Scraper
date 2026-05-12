@@ -341,3 +341,56 @@ def test_boundary_engine_history():
     n = len(e.decision_history)
     e.record_decision(MergeDecision('org', 'org', 'X', 'Y', True, 0.9, True))
     assert len(e.decision_history) == n + 1
+
+
+def test_cohesion_model_records():
+    from app.semantic_boundary_engine import get_boundary_engine
+    e = get_boundary_engine()
+    m = e.cohesion_model
+    assert m.merge_success_rate('org', 'org') == 0.5
+    m.record('org', 'org', True, True)
+    m.record('org', 'org', True, True)
+    assert m.merge_success_rate('org', 'org') == 1.0
+
+
+def test_cohesion_model_bias():
+    from app.semantic_boundary_engine import get_boundary_engine
+    e = get_boundary_engine()
+    m = e.cohesion_model
+    assert m.get_cohesion_bias('price', 'price') == 0.0
+    m.record('price', 'price', False, True)
+    m.record('price', 'price', False, True)
+    assert m.get_cohesion_bias('price', 'price') < 0
+
+
+def test_transition_detector_bootstrap():
+    from app.semantic_boundary_engine import get_boundary_engine
+    e = get_boundary_engine()
+    t = e.transition_detector
+    # Bootstrap transitions should have high probability
+    assert t.score_transition('org', 'price').probability > 0.6
+    assert t.score_transition('org', 'number').probability > 0.6
+    assert t.score_transition('organization', 'price').probability > 0.6
+    # number + code transition should be low (they merge)
+    assert t.score_transition('number', 'code').probability < 0.5
+
+
+def test_transition_detector_learns():
+    from app.semantic_boundary_engine import get_boundary_engine
+    e = get_boundary_engine()
+    t = e.transition_detector
+    # Initially test: org+org transitions have moderate probability
+    before = t.score_transition('org', 'org').probability
+    # Observe successful role boundary (not merged, successful)
+    t.observe_transition('org', 'org', is_role_boundary=True)
+    t.observe_transition('org', 'org', is_role_boundary=True)
+    after = t.score_transition('org', 'org').probability
+    assert after > before  # Probability should increase
+
+
+def test_transition_detector_high_list():
+    from app.semantic_boundary_engine import get_boundary_engine
+    e = get_boundary_engine()
+    t = e.transition_detector
+    high = t.get_high_transition_types()
+    assert len(high) >= 2  # Should have at least a few high-transition pairs

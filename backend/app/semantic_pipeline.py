@@ -20,7 +20,7 @@ from app.semantic_ir import (
     SemanticToken, SemanticType, SemanticRecord, DatasetIR, Span,
 )
 from app.semantic_allocation_engine import allocate_semantic_roles, _get_role_engine
-from app.semantic_boundary_engine import score_boundary, get_boundary_engine, MergeDecision, _BOOTSTRAP_SUFFIXES, _STOP_WORDS
+from app.semantic_boundary_engine import score_boundary, record_boundary_feedback, record_motif_observation, get_boundary_engine, _BOOTSTRAP_SUFFIXES, _STOP_WORDS
 from app.semantic_segmentation import expand_composite_records, StructuralMemoryTracker, extract_candidate_values
 
 
@@ -386,6 +386,11 @@ def run_pipeline(
         for t in tokens:
             if t.raw in original_positions:
                 t.position = original_positions[t.raw]
+        
+        # Record motif observation for structural learning
+        if tokens:
+            type_sequence = [t.primary_type.value for t in tokens]
+            record_motif_observation(type_sequence)
 
         sem_record = SemanticRecord(tokens=tokens)
         allocated, alloc_graph = allocate_semantic_roles(sem_record, schema_fields)
@@ -465,6 +470,14 @@ def run_pipeline(
                 warnings.append(f'{role_name}: expected {seed_type.value}, got {val_type.value} ({val})')
         if warnings:
             output["_warnings"] = warnings
+        
+        # Record merge/split feedback for boundary engine learning
+        coherence = output["_confidence"]
+        be = get_boundary_engine()
+        for md in be.decision_history[-20:]:
+            md.coherence_after = coherence
+            # Update: success = coherence > 0.6
+            md.success = coherence > 0.6
         
         allocated_records.append(output)
 
