@@ -150,6 +150,13 @@ class JobStatus(str, Enum):
     FAILED = "failed"
 
 
+class LogEntry(BaseModel):
+    """A single log entry for a job."""
+    timestamp: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
+    message: str
+    level: str = "info"
+
+
 class Job(BaseModel):
     """A scraping job with its current state."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -183,3 +190,4 @@ class Job(BaseModel):
     analysis: Optional[str] = None
     discovered_urls: list[dict] = Field(default_factory=list)
     quality_report: dict = Field(default_factory=dict)
+    logs: list[LogEntry] = Field(default_factory=list)

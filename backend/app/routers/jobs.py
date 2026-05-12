@@ -361,6 +361,6 @@ def create_jobs_router(
         recycle_bin_store.clear()
         if count:
             persist_state_fn()
-        return {"message": f"Recycle bin cleared ({count} items)"}
+        return {"message": f"Recycle bin cleared ({count} items)", "cleared": count}
 
     return router

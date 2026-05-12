@@ -309,6 +309,22 @@ async function pollJob(id) {
         const r = await fetch(`${API}/api/jobs/${id}`);
         if (!r.ok) return;
         const j = await r.json();
+
+        // If we are looking at this job's results, refresh the logs/results
+        if (currentView === 'results' && currentJobId === id) {
+            // Update logs even while running
+            const logsPanel = document.getElementById('logs-panel');
+            if (Array.isArray(j.logs) && j.logs.length) {
+                logsPanel.classList.remove('hidden');
+                renderLogs(j.logs);
+            }
+            
+            // If it's done, fully refresh to get results
+            if (j.status === 'completed' || j.status === 'failed' || j.status === 'canceled') {
+                viewResults(id);
+            }
+        }
+
         if (j.status === 'completed' || j.status === 'failed' || j.status === 'canceled') {
             clearInterval(pollers[id]);
             delete pollers[id];
@@ -457,6 +473,14 @@ async function viewResults(id) {
             aiPanel.classList.add('hidden');
         }
 
+        const logsPanel = document.getElementById('logs-panel');
+        if (Array.isArray(j.logs) && j.logs.length) {
+            logsPanel.classList.remove('hidden');
+            renderLogs(j.logs);
+        } else {
+            logsPanel.classList.add('hidden');
+        }
+
         const qualityPanel = document.getElementById('quality-panel');
         const qualityText = document.getElementById('quality-text');
         if (j.quality_report && typeof j.quality_report === 'object') {
@@ -585,6 +609,27 @@ async function onResultsCellDoubleClick(e) {
     } catch {
         toast('Copy failed', 'error');
     }
+}
+
+function renderLogs(logs) {
+    const container = document.getElementById('logs-container');
+    if (!container) return;
+    
+    // Sort logs by timestamp (though they should already be in order)
+    const sorted = [...logs].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    
+    container.innerHTML = sorted.map(log => {
+        const time = new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return `
+            <div class="log-entry">
+                <span class="log-time">[${time}]</span>
+                <span class="log-msg ${log.level || 'info'}">${esc(log.message)}</span>
+            </div>
+        `;
+    }).join('');
+    
+    // Scroll to bottom
+    container.scrollTop = container.scrollHeight;
 }
 
 function renderTable(results, emptyMessage = 'No results') {

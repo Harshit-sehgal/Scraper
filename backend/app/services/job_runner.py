@@ -13,6 +13,12 @@ from app.scraper import (
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
 
+def _add_job_log(job, message: str, level: str = "info", persist_fn=None):
+    from app.models import LogEntry
+    job.logs.append(LogEntry(message=message, level=level))
+    if persist_fn:
+        persist_fn()
+
 async def run_job(
     job_id: str,
     jobs_store: dict,
@@ -26,6 +32,8 @@ async def run_job(
     job = jobs_store.get(job_id)
     if not job:
         return
+
+    _add_job_log(job, f"Initializing job: {job.name}", persist_fn=persist_state_fn)
 
     all_raw_results = []
     warnings: list[str] = []
@@ -58,7 +66,7 @@ async def run_job(
         # Auto-discovery mode
         if job.mode == ScrapeMode.AUTO:
             job.status = JobStatus.DISCOVERING
-            persist_state_fn()
+            _add_job_log(job, f"Starting auto-discovery for topic: {job.topic}", persist_fn=persist_state_fn)
             print(f"[Job {job_id}] Auto-discovering URLs for: {job.topic}")
 
             # In auto mode, reuse max_pages as discovery count and cap to runtime-safe limits.
@@ -82,27 +90,29 @@ async def run_job(
             if not job.urls:
                 if job.cancel_requested:
                     mark_job_canceled(job)
+                    _add_job_log(job, "Job canceled during discovery", level="warning", persist_fn=persist_state_fn)
                 else:
                     job.status = JobStatus.FAILED
                     job.error = "Could not discover any URLs for this topic"
                     job.completed_at = datetime.datetime.now().isoformat()
-                persist_state_fn()
+                    _add_job_log(job, "Discovery failed: No URLs found", level="error", persist_fn=persist_state_fn)
                 return
 
+            _add_job_log(job, f"Discovered {len(job.urls)} potential source URLs", persist_fn=persist_state_fn)
             print(f"[Job {job_id}] Discovered {len(job.urls)} URLs")
 
             if job.cancel_requested:
                 mark_job_canceled(job)
-                persist_state_fn()
+                _add_job_log(job, "Job canceled after discovery", level="warning", persist_fn=persist_state_fn)
                 return
 
         job.status = JobStatus.RUNNING
-        persist_state_fn()
+        _add_job_log(job, f"Scraping started ({len(job.urls)} URLs queue)", persist_fn=persist_state_fn)
 
         for idx, url in enumerate(job.urls, start=1):
             if job.cancel_requested:
                 mark_job_canceled(job)
-                persist_state_fn()
+                _add_job_log(job, f"Job canceled during scraping (at URL {idx})", level="warning", persist_fn=persist_state_fn)
                 return
 
             elapsed = time.monotonic() - started_at
@@ -110,9 +120,11 @@ async def run_job(
                 warnings.append(
                     f"Job runtime limit reached at {int(elapsed)}s; partial results returned."
                 )
+                _add_job_log(job, f"Runtime limit reached ({int(elapsed)}s), stopping early", level="warning")
                 print(f"[Job {job_id}] Runtime limit reached after {int(elapsed)}s")
                 break
 
+            _add_job_log(job, f"Scraping ({idx}/{len(job.urls)}): {url}", persist_fn=persist_state_fn)
             try:
                 results = await asyncio.wait_for(
                     scrape_url(url, job.schema_fields, min_record_score=job.min_record_score, user_intent=job.intent),
@@ -150,15 +162,18 @@ async def run_job(
                     ai_source_prediction["sources_with_ai_structuring"] += 1
 
                 all_raw_results.extend(results)
+                _add_job_log(job, f"Extracted {len(results)} raw records from {url}")
                 persist_state_fn()
             except asyncio.TimeoutError:
                 msg = f"URL timeout skipped ({idx}/{len(job.urls)}): {url}"
                 warnings.append(msg)
+                _add_job_log(job, f"Timeout on {url}", level="warning", persist_fn=persist_state_fn)
                 print(f"[Job {job_id}] {msg}")
             except Exception as e:
                 logging.exception(e)
                 msg = f"URL scrape failed ({idx}/{len(job.urls)}): {url}"
                 warnings.append(f"{msg} ({type(e).__name__})")
+                _add_job_log(job, f"Failed to scrape {url}: {type(e).__name__}", level="warning", persist_fn=persist_state_fn)
                 print(f"[Job {job_id}] {msg}: {e}")
                 continue
 
@@ -174,6 +189,7 @@ async def run_job(
             return
 
         if run_global_ai_structuring:
+            _add_job_log(job, f"Running global AI structuring on {len(all_raw_results)} records...", persist_fn=persist_state_fn)
             print(f"[Job {job_id}] AI structuring {len(all_raw_results)} scraped rows...")
             try:
                 all_raw_results, ai_structuring_report = await asyncio.wait_for(
@@ -193,15 +209,18 @@ async def run_job(
                     warnings.append(
                         "AI structuring switched to deterministic fallback after repeated model timeouts/errors."
                     )
+                _add_job_log(job, "AI structuring complete")
             except asyncio.TimeoutError:
                 warnings.append(
                     f"AI structuring timed out after {ai_structuring_timeout_seconds}s; "
                     "continuing with deterministic processing."
                 )
+                _add_job_log(job, "AI structuring timed out, using fallback", level="warning")
                 print(f"[Job {job_id}] AI structuring timed out")
             except Exception as struct_err:
                 logging.exception(struct_err)
                 warnings.append("AI structuring failed; continuing with deterministic processing.")
+                _add_job_log(job, "AI structuring failed, using fallback", level="error")
                 print(f"[Job {job_id}] AI structuring failed: {struct_err}")
         elif all_raw_results and job.schema_fields:
             ai_structuring_report = {
@@ -218,6 +237,7 @@ async def run_job(
             }
 
         # Post-process
+        _add_job_log(job, "Applying filters and deduplication...", persist_fn=persist_state_fn)
         filtered_results, total, filtered_count, type_integrity_report = process_results(
             all_raw_results, job.schema_fields, job.filters
         )
@@ -296,10 +316,11 @@ async def run_job(
         if job.results:
             if job.cancel_requested:
                 mark_job_canceled(job)
-                persist_state_fn()
+                _add_job_log(job, "Job canceled before AI insight", level="warning", persist_fn=persist_state_fn)
                 return
 
             job.status = JobStatus.RUNNING
+            _add_job_log(job, f"Generating AI insights for {len(job.results)} records...", persist_fn=persist_state_fn)
             print(f"[Job {job_id}] Generating AI insights over {len(job.results)} records...")
             try:
                 from app.scraper import generate_data_insight
@@ -308,7 +329,9 @@ async def run_job(
                     timeout=insight_timeout_seconds,
                 )
                 job.analysis = analysis_text
+                _add_job_log(job, "AI insights generated successfully")
             except asyncio.TimeoutError:
+                _add_job_log(job, "AI insight generation timed out", level="warning")
                 print(
                     f"[Job {job_id}] AI insight timed out after "
                     f"{insight_timeout_seconds}s; continuing without insight."
@@ -316,12 +339,13 @@ async def run_job(
                 job.analysis = "Insight generation timed out."
             except Exception as ai_e:
                 logging.exception(ai_e)
+                _add_job_log(job, "AI insight generation failed", level="error")
                 print(f"[Job {job_id}] AI insight generation failed: {ai_e}")
                 
         job.status = JobStatus.COMPLETED
         job.cancel_requested = False
         job.completed_at = datetime.datetime.now().isoformat()
-        persist_state_fn()
+        _add_job_log(job, "Job completed successfully", persist_fn=persist_state_fn)
 
         print(f"[Job {job_id}] Completed: {total} total, {filtered_count} after filtering")
 
@@ -329,10 +353,12 @@ async def run_job(
         logging.exception(e)
         if job.cancel_requested:
             mark_job_canceled(job)
+            _add_job_log(job, "Job canceled", level="warning")
             print(f"[Job {job_id}] Canceled")
         else:
             job.status = JobStatus.FAILED
             job.error = str(e)
             job.completed_at = datetime.datetime.now().isoformat()
+            _add_job_log(job, f"Job failed: {str(e)}", level="error")
             print(f"[Job {job_id}] Failed: {e}")
         persist_state_fn()

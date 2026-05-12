@@ -1,8 +1,12 @@
 import asyncio
+import pytest
 
 from app import main as main_mod
-from app.discovery import SOURCE_TRUST_SCORE, infer_source_metadata
+from app.discovery import SOURCE_TRUST_SCORE, infer_source_metadata, discover_urls
 from app.models import FieldType, Job, JobStatus, SchemaField, ScrapeMode
+from app.utils.quality import build_quality_report
+from app.services.state import prune_history_stores
+from app.scraper import scrape_url
 
 
 def test_system_status_shape(client):
@@ -112,7 +116,7 @@ def test_reclean_running_returns_409_before_no_results(client):
 
 
 def test_quality_report_exposes_overall_score():
-    report = main_mod.build_quality_report(
+    report = build_quality_report(
         raw_results=[
             {"record_score": 0.6, "source_trust_score": 0.8},
             {"record_score": 0.4, "source_trust_score": 0.6},
@@ -139,7 +143,7 @@ def test_quality_report_exposes_overall_score():
 
 
 def test_quality_report_empty_results_scores_zero():
-    report = main_mod.build_quality_report(
+    report = build_quality_report(
         raw_results=[],
         post_filter_count=0,
         post_radius_count=0,
@@ -162,8 +166,9 @@ def test_prune_history_stores_keeps_active_and_recent_terminal(monkeypatch):
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
-    monkeypatch.setattr(main_mod, "MAX_JOB_HISTORY", 3)
-    monkeypatch.setattr(main_mod, "MAX_RECYCLE_BIN_HISTORY", 2)
+    # Update CONFIG directly in main_mod
+    monkeypatch.setitem(main_mod.CONFIG, "max_job_history", 3)
+    monkeypatch.setitem(main_mod.CONFIG, "max_recycle_bin_history", 2)
 
     # Active jobs should always survive pruning.
     main_mod.jobs_store["active-running"] = Job(
@@ -218,7 +223,12 @@ def test_prune_history_stores_keeps_active_and_recent_terminal(monkeypatch):
         created_at="2026-04-07T09:58:02",
     )
 
-    main_mod._prune_history_stores()
+    prune_history_stores(
+        main_mod.jobs_store, 
+        main_mod.recycle_bin_store, 
+        main_mod.CONFIG["max_job_history"], 
+        main_mod.CONFIG["max_recycle_bin_history"]
+    )
 
     assert set(main_mod.jobs_store.keys()) == {"active-running", "active-pending", "term-new"}
     assert set(main_mod.recycle_bin_store.keys()) == {"rb-mid", "rb-new"}
@@ -231,8 +241,10 @@ def test_auto_discovery_empty_with_cancel_marks_canceled(monkeypatch):
     async def fake_discover_urls(**kwargs):
         return []
 
-    monkeypatch.setattr(main_mod, "discover_urls", fake_discover_urls)
-    monkeypatch.setattr(main_mod, "_persist_state", lambda: None)
+    # Mock in the routers/jobs module where it's used
+    monkeypatch.setattr("app.routers.jobs.discover_urls", fake_discover_urls)
+    # Mock the wrapper in main_mod
+    monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
     job = Job(
         id="job-cancel-empty-discovery",
@@ -244,7 +256,7 @@ def test_auto_discovery_empty_with_cancel_marks_canceled(monkeypatch):
     )
     main_mod.jobs_store[job.id] = job
 
-    asyncio.run(main_mod._run_job(job.id))
+    asyncio.run(main_mod._run_job_wrapper(job.id))
 
     assert main_mod.jobs_store[job.id].status == JobStatus.CANCELED
     assert main_mod.jobs_store[job.id].completed_at is not None
@@ -257,8 +269,11 @@ def test_auto_discovery_empty_marks_failed_with_terminal_time(monkeypatch):
     async def fake_discover_urls(**kwargs):
         return []
 
-    monkeypatch.setattr(main_mod, "discover_urls", fake_discover_urls)
-    monkeypatch.setattr(main_mod, "_persist_state", lambda: None)
+    # Mock in the routers/jobs module where it's used
+    monkeypatch.setattr("app.routers.jobs.discover_urls", fake_discover_urls)
+    # Also mock in services/job_runner where it might be used
+    monkeypatch.setattr("app.services.job_runner.discover_urls", fake_discover_urls)
+    monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
     job = Job(
         id="job-fail-empty-discovery",
@@ -270,7 +285,7 @@ def test_auto_discovery_empty_marks_failed_with_terminal_time(monkeypatch):
     )
     main_mod.jobs_store[job.id] = job
 
-    asyncio.run(main_mod._run_job(job.id))
+    asyncio.run(main_mod._run_job_wrapper(job.id))
 
     assert main_mod.jobs_store[job.id].status == JobStatus.FAILED
     assert main_mod.jobs_store[job.id].completed_at is not None
@@ -374,10 +389,10 @@ def test_run_job_source_breakdown_counts_final_records(monkeypatch):
     async def fake_generate_data_insight(rows):
         return "ok"
 
-    monkeypatch.setattr(main_mod, "discover_urls", fake_discover_urls)
-    monkeypatch.setattr(main_mod, "scrape_url", fake_scrape_url)
+    monkeypatch.setattr("app.services.job_runner.discover_urls", fake_discover_urls)
+    monkeypatch.setattr("app.services.job_runner.scrape_url", fake_scrape_url)
     monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
-    monkeypatch.setattr(main_mod, "_persist_state", lambda: None)
+    monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
     job = Job(
         id="job-source-breakdown-record-count",
@@ -389,7 +404,7 @@ def test_run_job_source_breakdown_counts_final_records(monkeypatch):
     )
     main_mod.jobs_store[job.id] = job
 
-    asyncio.run(main_mod._run_job(job.id))
+    asyncio.run(main_mod._run_job_wrapper(job.id))
 
     finished = main_mod.jobs_store[job.id]
     assert finished.status == JobStatus.COMPLETED
@@ -409,9 +424,9 @@ def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch):
     async def fake_generate_data_insight(rows):
         return "ok"
 
-    monkeypatch.setattr(main_mod, "scrape_url", fake_scrape_url)
+    monkeypatch.setattr("app.services.job_runner.scrape_url", fake_scrape_url)
     monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
-    monkeypatch.setattr(main_mod, "_persist_state", lambda: None)
+    monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
     job = Job(
         id="job-warnings-on-scrape-failure",
@@ -422,7 +437,7 @@ def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch):
     )
     main_mod.jobs_store[job.id] = job
 
-    asyncio.run(main_mod._run_job(job.id))
+    asyncio.run(main_mod._run_job_wrapper(job.id))
 
     finished = main_mod.jobs_store[job.id]
     assert finished.status == JobStatus.COMPLETED
@@ -441,9 +456,9 @@ def test_run_job_warns_when_contact_ai_coverage_zero_without_groq(monkeypatch):
         return "ok"
 
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    monkeypatch.setattr(main_mod, "scrape_url", fake_scrape_url)
+    monkeypatch.setattr("app.services.job_runner.scrape_url", fake_scrape_url)
     monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
-    monkeypatch.setattr(main_mod, "_persist_state", lambda: None)
+    monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
     job = Job(
         id="job-contact-ai-warning",
@@ -457,8 +472,40 @@ def test_run_job_warns_when_contact_ai_coverage_zero_without_groq(monkeypatch):
     )
     main_mod.jobs_store[job.id] = job
 
-    asyncio.run(main_mod._run_job(job.id))
+    asyncio.run(main_mod._run_job_wrapper(job.id))
 
     finished = main_mod.jobs_store[job.id]
     warnings = (finished.quality_report or {}).get("warnings") or []
     assert any("set GROQ_API_KEY" in w for w in warnings)
+
+
+def test_run_job_creates_logs(monkeypatch):
+    main_mod.jobs_store.clear()
+    main_mod.recycle_bin_store.clear()
+
+    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent=""):
+        return [{"company_name": "Log Studio", "record_score": 0.9}]
+
+    async def fake_generate_data_insight(rows):
+        return "ok"
+
+    monkeypatch.setattr("app.services.job_runner.scrape_url", fake_scrape_url)
+    monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
+    monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
+
+    job = Job(
+        id="job-log-test",
+        name="job-log-test",
+        mode=ScrapeMode.MANUAL,
+        urls=["https://log.example"],
+        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+    )
+    main_mod.jobs_store[job.id] = job
+
+    asyncio.run(main_mod._run_job_wrapper(job.id))
+
+    finished = main_mod.jobs_store[job.id]
+    assert len(finished.logs) > 0
+    assert any("Initializing job" in log.message for log in finished.logs)
+    assert any("Scraping started" in log.message for log in finished.logs)
+    assert any("Job completed successfully" in log.message for log in finished.logs)

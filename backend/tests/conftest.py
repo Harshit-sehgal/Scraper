@@ -52,8 +52,8 @@ def client(monkeypatch):
         return None
 
     # Avoid writing persistence files in API unit tests.
-    monkeypatch.setattr(main_mod, "_persist_state", lambda: None)
-    monkeypatch.setattr(main_mod, "_run_job", fake_run_job)
+    monkeypatch.setattr("app.services.state.persist_state", lambda **kwargs: None)
+    monkeypatch.setattr(main_mod, "run_job", fake_run_job)
     monkeypatch.setattr(main_mod, "_schedule_background_task", fake_schedule_background_task)
 
     main_mod.jobs_store.clear()

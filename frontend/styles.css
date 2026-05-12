@@ -777,6 +777,36 @@ select {
     margin-bottom: 0.34rem;
 }
 
+.logs-container {
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding-top: 0.4rem;
+}
+
+.log-entry {
+    display: flex;
+    gap: 0.6rem;
+    line-height: 1.4;
+}
+
+.log-time {
+    color: var(--ink-faint);
+    flex-shrink: 0;
+    font-size: 0.7rem;
+}
+
+.log-msg {
+    color: var(--ink-main);
+}
+
+.log-msg.error { color: var(--danger); }
+.log-msg.warning { color: var(--warning); }
+
 #ai-insight-text,
 #quality-text {
     color: var(--ink-main);
