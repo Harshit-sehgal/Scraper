@@ -318,6 +318,7 @@ async def run_job(
         job.results = normalize_job_results(filtered_results, job.schema_fields)
         job.total_records = total
         job.filtered_records = filtered_count
+        _add_job_log(job, f"Final results: {filtered_count} records kept after filtering ({total} raw)", persist_fn=persist_state_fn)
         
         # Add scraped_at timestamp to each record
         scraped_at = datetime.datetime.now().isoformat()
