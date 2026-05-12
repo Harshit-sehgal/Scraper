@@ -1203,7 +1203,6 @@ def _validate_extracted_data(record: dict, schema_fields: list[SchemaField]) -> 
 
         # Be more lenient with date, currency, and string fields
         # Don't reject composite data that might contain useful information
-        name_lower = field.name.lower()
 
     return True
 

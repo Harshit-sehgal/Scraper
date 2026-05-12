@@ -99,7 +99,7 @@ class EntityRegistry:
         self.entities[eid] = CanonicalEntity(
             entity_id=eid,
             canonical_name=normalized,
-            entity_type=entity_type,
+            primary_type=SemanticType.ORGANIZATION,
             aliases={normalized},
             occurrence_count=1,
             confidence=0.7,
@@ -146,29 +146,6 @@ class EntityRegistry:
                 break
         return ":".join(parts) if parts else ""
 
-        # Check for fuzzy match with existing entities
-        for eid, entity in self.entities.items():
-            if _fuzzy_match(normalized, _normalize_entity_name(entity.canonical_name)):
-                self.alias_to_entity[normalized] = eid
-                entity.aliases.add(normalized)
-                entity.occurrence_count += 1
-                entity.last_seen = max(entity.last_seen, position)
-                return eid
-
-        # Create new entity
-        eid = f"entity_{len(self.entities)}"
-        self.entities[eid] = CanonicalEntity(
-            entity_id=eid,
-            canonical_name=normalized,
-            entity_type=entity_type,
-            aliases={normalized},
-            occurrence_count=1,
-            confidence=0.7,
-            first_seen=position,
-            last_seen=position,
-        )
-        self.alias_to_entity[normalized] = eid
-        return eid
 
     def merge(self, entity_id_a: str, entity_id_b: str):
         """Merge two entities into one (a absorbs b)."""
