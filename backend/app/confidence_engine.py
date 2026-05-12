@@ -14,7 +14,7 @@ Core principle: Confidence is multi-dimensional, not a single number.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Dict, Optional, Tuple
 from collections import Counter
 import math
 
@@ -157,9 +157,9 @@ def compute_record_confidence(
         report.token_confidences[i] = compute_token_confidence(token)
 
     # Field-level
-    for field, value in record.mapped_fields.items():
-        conf = record.mapped_confidences.get(field, 0.5)
-        report.field_confidences[field] = conf
+    for f_name, value in record.mapped_fields.items():
+        conf = record.mapped_confidences.get(f_name, 0.5)
+        report.field_confidences[f_name] = conf
 
     # Relationship-level
     report.relationship_confidence = compute_relationship_confidence(record.relationships)

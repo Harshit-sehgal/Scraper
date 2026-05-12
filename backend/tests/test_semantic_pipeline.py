@@ -1,11 +1,9 @@
 """Tests for the core semantic pipeline and allocation engine."""
 
-import os
-import json
 from app.semantic_pipeline import run_pipeline, strip_metadata, filter_noise_records, _detect_semantic_type
 from app.semantic_allocation_engine import allocate_semantic_roles, _get_role_engine
 from app.semantic_ir import (
-    SemanticToken, SemanticType, Span, SemanticRecord, create_token, AllocationGraph,
+    SemanticToken, SemanticType, Span, SemanticRecord, create_token,
 )
 from app.semantic_inference_engine import BeliefField, SemanticState, RoleEmbeddingEngine
 
@@ -408,7 +406,7 @@ def test_layer5_contradiction_learning():
     # Force it to think text is great for price
     reng.compatibility_cache[("price", "text")] = 0.9
     
-    out = run_pipeline(records, schema)
+    run_pipeline(records, schema)
     
     # The pipeline should detect the type warning and penalize the compatibility
     compat = reng.compatibility_cache.get(("price", "text"), 0.5)

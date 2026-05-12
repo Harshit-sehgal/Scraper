@@ -12,7 +12,7 @@ Core principle: Empty fields are OK; wrong values are NOT.
 
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 from app.models import FieldType, SchemaField
 from app.intent_parser import IntentSchema
 
@@ -79,7 +79,7 @@ def compute_field_confidence(
         return 0.0  # Empty values have no confidence
 
     value_str = str(value).strip()
-    value_lower = value_str.lower()
+        # value_str.lower() used later
 
     # Check for noise patterns (domain-agnostic)
     if _is_invalid_for_any_field(value_str):
@@ -195,10 +195,10 @@ def validate_record(
     # Get semantic needs from intent
     semantic_needs = intent.semantic_needs if intent else {}
 
-    for field in schema_fields:
-        field_name = field.name
+    for schema_field in schema_fields:
+        field_name = schema_field.name
         value = record.get(field_name)
-        field_type = field.field_type
+        field_type = schema_field.field_type
 
         # Get semantic need for this field
         semantic_need = None
@@ -216,7 +216,7 @@ def validate_record(
         field_confidences[field_name] = confidence
 
         # Check against requirements
-        if field.required:
+        if schema_field.required:
             if confidence < min_confidence and confidence > 0:
                 rejected_fields.append(field_name)
                 issues.append(f"Required field '{field_name}' has low confidence ({confidence:.2f})")
@@ -298,7 +298,7 @@ def validate_records(
                 validation_summary["invalid"] += 1
 
             # Track rejected field counts
-            for field in result.rejected_fields:
+            for _field in result.rejected_fields:
                 validation_summary["rejected_fields"][field] = \
                     validation_summary["rejected_fields"].get(field, 0) + 1
 
@@ -422,7 +422,7 @@ def get_validation_summary_text(summary: Dict) -> str:
 
     if summary.get("rejected_fields"):
         lines.append("Rejected fields:")
-        for field, count in summary["rejected_fields"].items():
+        for f_name, count in summary["rejected_fields"].items():
             lines.append(f"  - {field}: {count} records")
 
     return "\n".join(lines)

@@ -14,13 +14,11 @@ Core principle: Syntactically valid ≠ semantically possible.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-from collections import defaultdict
+from typing import List, Dict, Set
 
 from app.semantic_ir import (
-    SemanticType, RegionType, RecordType,
-    SemanticToken, SemanticRecord, SemanticRegion,
-    RelationshipEdge, OwnershipEdge, SemanticGraph,
+    SemanticType, RegionType, SemanticToken,
+    SemanticRegion, SemanticGraph,
 )
 
 
@@ -113,7 +111,7 @@ def _detect_ownership_contradictions(graph: SemanticGraph) -> List[Contradiction
                 owned.region_type == RegionType.ENTITY_NAME):
             contradictions.append(Contradiction(
                 contradiction_type="inverted_ownership",
-                description=f"Price region owns entity name (inverted)",
+                description="Price region owns entity name (inverted)",
                 source_ids=[owner.region_id, owned.region_id],
                 confidence_damage=0.5,
                 severity="major",

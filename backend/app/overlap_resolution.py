@@ -20,10 +20,9 @@ Core rule:
   Price > number fragments, Date > number parts, Email > substrings.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Dict, Set
 
-from app.semantic_ir import SemanticToken, Span, SemanticType, SemanticRecord
+from app.semantic_ir import SemanticToken, SemanticType, SemanticRecord
 
 
 # Hierarchical dominance: broader types dominate narrower ones
@@ -67,7 +66,6 @@ def resolve_overlaps(tokens: List[SemanticToken]) -> List[SemanticToken]:
             -(t.span.end - t.span.start)
         )
     )
-    original_indices = {id(t): i for i, t in enumerate(sorted_tokens)}
 
     # Build suppression set: higher-dominance tokens suppress overlapping lower-dominance ones
     suppressed: Set[int] = set()

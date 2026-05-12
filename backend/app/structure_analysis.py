@@ -10,13 +10,11 @@ Core principle: Understand structure first, extract values second.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Dict
 from collections import defaultdict
-import re
 
-from bs4 import BeautifulSoup, Tag, NavigableString
+from bs4 import BeautifulSoup, Tag
 
-from app.semantic_ir import SemanticToken, SemanticRecord, SemanticType, Span, DatasetIR
 
 
 @dataclass
@@ -115,7 +113,6 @@ def detect_repeated_containers(html: str, min_repetition: int = 3) -> List[Conta
 
     # Find all tags that might be containers
     candidates: List[ContainerCandidate] = []
-    seen_selectors: Dict[str, int] = defaultdict(int)
 
     for tag in ["div", "li", "tr", "article", "section", "ul", "ol"]:
         elements = soup.find_all(tag)

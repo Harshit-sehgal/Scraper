@@ -23,15 +23,14 @@ This module is THE REASONING CORE.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set, Callable
+from typing import List, Dict, Optional, Tuple, Set
 from collections import defaultdict, Counter
 import math
 import random
 
 from app.semantic_ir import (
-    SemanticToken, SemanticType, SemanticRecord, SemanticRegion,
-    RelationshipEdge, OwnershipEdge, SemanticGraph, DatasetIR,
-    RegionType, RecordType, Span,
+    SemanticToken, SemanticType,
+    RelationshipEdge, SemanticGraph, DatasetIR,
 )
 
 
@@ -799,10 +798,10 @@ class InferenceEngine:
                 state.belief_field = field
 
                 # Recompute energy
-                energy = energy_model.compute(state, graph)
+                energy_model.compute(state, graph)
 
                 # Recompute equilibrium
-                equilibrium = state.compute_equilibrium()
+                state.compute_equilibrium()
 
                 # Check convergence
                 if energy_model.converged:

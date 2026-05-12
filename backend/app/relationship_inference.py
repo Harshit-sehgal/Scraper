@@ -18,11 +18,9 @@ IMPORTANT: Relationship types emerge from graph topology and
 structural consistency, NOT from hardcoded domain ontology.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-from collections import defaultdict
+from typing import List, Dict, Optional, Tuple
 
-from app.semantic_ir import SemanticToken, SemanticType, RelationshipEdge, SemanticRecord, Span
+from app.semantic_ir import SemanticToken, SemanticType, RelationshipEdge
 
 
 # Type → role mapping (universal structural roles, NOT domain knowledge)
@@ -110,7 +108,7 @@ def _build_semantic_relationship(
         target_idx=bi,
         relationship_type=rel_type,
         confidence=confidence,
-        evidence=evidence + ([f"adjacent"] if is_adjacent else [f"proximal:{gap}"]),
+        evidence=evidence + (["adjacent"] if is_adjacent else [f"proximal:{gap}"]),
     )
 
 
