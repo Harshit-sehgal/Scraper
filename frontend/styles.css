@@ -352,6 +352,39 @@ body::after {
     opacity: 0.82;
 }
 
+.job-name-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    overflow: hidden;
+}
+
+.job-progress-wrap {
+    height: 6px;
+    background: #eef5f1;
+    border-radius: 99px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    width: 140px;
+}
+
+.job-progress-bar {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.4s ease;
+}
+
+.job-progress-text {
+    position: absolute;
+    right: -34px;
+    font-size: 0.65rem;
+    font-family: var(--mono);
+    color: var(--ink-soft);
+    font-weight: 600;
+}
+
 .job-name {
     color: var(--ink-strong);
     font-size: 0.87rem;

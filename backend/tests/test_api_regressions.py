@@ -509,3 +509,32 @@ def test_run_job_creates_logs(monkeypatch):
     assert any("Initializing job" in log.message for log in finished.logs)
     assert any("Scraping started" in log.message for log in finished.logs)
     assert any("Job completed successfully" in log.message for log in finished.logs)
+
+
+def test_run_job_updates_progress(monkeypatch):
+    main_mod.jobs_store.clear()
+    main_mod.recycle_bin_store.clear()
+
+    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent=""):
+        return [{"company_name": "Progress Studio", "record_score": 0.9}]
+
+    monkeypatch.setattr("app.services.job_runner.scrape_url", fake_scrape_url)
+    monkeypatch.setattr("app.scraper.generate_data_insight", lambda r: "ok")
+    monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
+
+    job = Job(
+        id="job-progress-test",
+        name="job-progress-test",
+        mode=ScrapeMode.MANUAL,
+        urls=["https://p1.example", "https://p2.example"],
+        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+    )
+    main_mod.jobs_store[job.id] = job
+
+    # We can't easily check intermediate progress in a sync test run, 
+    # but we can check the total and the final current.
+    asyncio.run(main_mod._run_job_wrapper(job.id))
+
+    finished = main_mod.jobs_store[job.id]
+    assert finished.progress_total == 3 # 2 URLs + 1 final
+    assert finished.progress_current == finished.progress_total

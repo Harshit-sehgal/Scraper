@@ -191,3 +191,5 @@ class Job(BaseModel):
     discovered_urls: list[dict] = Field(default_factory=list)
     quality_report: dict = Field(default_factory=dict)
     logs: list[LogEntry] = Field(default_factory=list)
+    progress_current: int = 0
+    progress_total: int = 0

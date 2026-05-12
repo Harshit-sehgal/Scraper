@@ -284,6 +284,10 @@
                         <button class="btn ghost small" onclick="switchView('jobs')" style="margin-bottom: 0.5rem;">← Back</button>
                         <h1 id="res-title">Results</h1>
                         <p class="subtle" id="res-meta"></p>
+                        <div id="res-progress-wrap" class="job-progress-wrap hidden" style="margin-top: 0.6rem; width: 240px;">
+                            <div id="res-progress-bar" class="job-progress-bar" style="width: 0%"></div>
+                            <span id="res-progress-text" class="job-progress-text" style="right: -40px;">0%</span>
+                        </div>
                     </div>
                     <div class="btn-group" id="export-group" style="display:none;">
                         <button class="btn secondary small" onclick="recleanCurrentJob()" id="btn-reclean">AI Re-clean</button>

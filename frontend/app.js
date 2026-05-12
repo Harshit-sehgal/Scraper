@@ -286,22 +286,36 @@ function renderJobs(jobs) {
         return;
     }
 
-    list.innerHTML = jobs.map(j => `
-        <div class="job-row">
-            <div class="job-name">
-                ${esc(j.name)}
-                <span class="mode-tag">${j.mode === 'auto' ? 'auto' : 'manual'}</span>
+    list.innerHTML = jobs.map(j => {
+        const isActive = ['pending', 'discovering', 'running'].includes(j.status);
+        const hasProgress = j.progress_total > 0;
+        const pct = hasProgress ? Math.round((j.progress_current / j.progress_total) * 100) : 0;
+        
+        return `
+            <div class="job-row">
+                <div class="job-name-col">
+                    <div class="job-name">
+                        ${esc(j.name)}
+                        <span class="mode-tag">${j.mode === 'auto' ? 'auto' : 'manual'}</span>
+                    </div>
+                    ${isActive && hasProgress ? `
+                        <div class="job-progress-wrap">
+                            <div class="job-progress-bar" style="width: ${pct}%"></div>
+                            <span class="job-progress-text">${pct}%</span>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="job-urls">${j.urls.length} URL${j.urls.length !== 1 ? 's' : ''}</div>
+                <div><span class="badge ${j.status}">${j.status}</span></div>
+                <div class="job-records">${j.total_records > 0 ? `${j.filtered_records}` : '—'}</div>
+                <div class="job-actions">
+                    ${j.status === 'completed' ? `<button class="btn ghost small" onclick="viewResults('${j.id}')">View</button>` : ''}
+                    ${isActive ? `<button class="btn warn-ghost small" onclick="cancelJob('${j.id}')">Cancel</button>` : ''}
+                    <button class="btn danger-ghost small" onclick="deleteJob('${j.id}')">✕</button>
+                </div>
             </div>
-            <div class="job-urls">${j.urls.length} URL${j.urls.length !== 1 ? 's' : ''}</div>
-            <div><span class="badge ${j.status}">${j.status}</span></div>
-            <div class="job-records">${j.total_records > 0 ? `${j.filtered_records}` : '—'}</div>
-            <div class="job-actions">
-                ${j.status === 'completed' ? `<button class="btn ghost small" onclick="viewResults('${j.id}')">View</button>` : ''}
-                ${['pending', 'discovering', 'running'].includes(j.status) ? `<button class="btn warn-ghost small" onclick="cancelJob('${j.id}')">Cancel</button>` : ''}
-                <button class="btn danger-ghost small" onclick="deleteJob('${j.id}')">✕</button>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 async function pollJob(id) {
@@ -317,6 +331,17 @@ async function pollJob(id) {
             if (Array.isArray(j.logs) && j.logs.length) {
                 logsPanel.classList.remove('hidden');
                 renderLogs(j.logs);
+            }
+
+            // Update progress bar
+            const resProgWrap = document.getElementById('res-progress-wrap');
+            if (j.progress_total > 0) {
+                resProgWrap.classList.remove('hidden');
+                const pct = Math.round((j.progress_current / j.progress_total) * 100);
+                document.getElementById('res-progress-bar').style.width = `${pct}%`;
+                document.getElementById('res-progress-text').textContent = `${pct}%`;
+            } else {
+                resProgWrap.classList.add('hidden');
             }
             
             // If it's done, fully refresh to get results
@@ -511,6 +536,17 @@ async function viewResults(id) {
         } else {
             qualityPanel.classList.add('hidden');
             qualityText.textContent = '';
+        }
+
+        const isActive = ['pending', 'discovering', 'running'].includes(j.status);
+        const resProgWrap = document.getElementById('res-progress-wrap');
+        if (isActive && j.progress_total > 0) {
+            resProgWrap.classList.remove('hidden');
+            const pct = Math.round((j.progress_current / j.progress_total) * 100);
+            document.getElementById('res-progress-bar').style.width = `${pct}%`;
+            document.getElementById('res-progress-text').textContent = `${pct}%`;
+        } else {
+            resProgWrap.classList.add('hidden');
         }
 
         currentResultsCache = Array.isArray(j.results) ? j.results : [];

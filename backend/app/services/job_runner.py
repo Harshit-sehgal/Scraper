@@ -66,6 +66,8 @@ async def run_job(
         # Auto-discovery mode
         if job.mode == ScrapeMode.AUTO:
             job.status = JobStatus.DISCOVERING
+            job.progress_total = int(job.max_pages or 10) + 2 # Discovery + URLs + Final
+            job.progress_current = 1
             _add_job_log(job, f"Starting auto-discovery for topic: {job.topic}", persist_fn=persist_state_fn)
             print(f"[Job {job_id}] Auto-discovering URLs for: {job.topic}")
 
@@ -99,6 +101,8 @@ async def run_job(
                 return
 
             _add_job_log(job, f"Discovered {len(job.urls)} potential source URLs", persist_fn=persist_state_fn)
+            job.progress_total = len(job.urls) + 2
+            job.progress_current = 1
             print(f"[Job {job_id}] Discovered {len(job.urls)} URLs")
 
             if job.cancel_requested:
@@ -107,6 +111,9 @@ async def run_job(
                 return
 
         job.status = JobStatus.RUNNING
+        if job.mode == ScrapeMode.MANUAL:
+            job.progress_total = len(job.urls) + 1
+            job.progress_current = 0
         _add_job_log(job, f"Scraping started ({len(job.urls)} URLs queue)", persist_fn=persist_state_fn)
 
         for idx, url in enumerate(job.urls, start=1):
@@ -125,6 +132,11 @@ async def run_job(
                 break
 
             _add_job_log(job, f"Scraping ({idx}/{len(job.urls)}): {url}", persist_fn=persist_state_fn)
+            if job.mode == ScrapeMode.AUTO:
+                job.progress_current = 1 + idx
+            else:
+                job.progress_current = idx
+            
             try:
                 results = await asyncio.wait_for(
                     scrape_url(url, job.schema_fields, min_record_score=job.min_record_score, user_intent=job.intent),
@@ -345,6 +357,7 @@ async def run_job(
         job.status = JobStatus.COMPLETED
         job.cancel_requested = False
         job.completed_at = datetime.datetime.now().isoformat()
+        job.progress_current = job.progress_total
         _add_job_log(job, "Job completed successfully", persist_fn=persist_state_fn)
 
         print(f"[Job {job_id}] Completed: {total} total, {filtered_count} after filtering")
