@@ -215,29 +215,22 @@ def strip_metadata(records: list) -> list:
 
 
 def filter_noise_records(records: List[dict]) -> List[dict]:
-    """Filter out likely noise records using semantic density.
+    """Filter out likely noise records using graph-based relational density.
 
-    Footer/contact/navigation records have LOW semantic density.
-    Entity records have HIGH semantic density.
-
-    Uses entity-type detection (organization, price, date, code, location)
-    NOT generic type detection (phone, email, text) which can be misleading.
+    A record is considered meaningful if its tokens form a dense semantic graph
+    (e.g., they have valid transitions, form recognizable motifs, or represent
+    a core entity with attributes). Contact-only or isolated tokens lack this density.
     """
     if not records:
         return []
     
-    # Entity-relevant types (types that indicate a real data record)
-    ENTITY_TYPES = {SemanticType.ORGANIZATION, SemanticType.PRICE, SemanticType.DATE,
-                    SemanticType.CODE, SemanticType.LOCATION, SemanticType.RATING,
-                    SemanticType.DURATION, SemanticType.NAME}
-
-    # Strong numeric signals (digits-only values likely represent prices or quantities)
-    STRONG_NUMERIC_TYPES = {SemanticType.PRICE, SemanticType.NUMBER}
-
-    # Contact-only types (NOT sufficient alone to indicate an entity record)
-    CONTACT_TYPES = {SemanticType.PHONE, SemanticType.EMAIL, SemanticType.URL}
-
     filtered = []
+    from app.semantic_boundary_engine import get_boundary_engine, _BOOTSTRAP_SUFFIXES, _STOP_WORDS
+    be = get_boundary_engine()
+    
+    # Entity-relevant types (types that indicate a real data record)
+    ENTITY_TYPES = {'organization', 'price', 'date', 'code', 'location', 'rating', 'duration', 'name'}
+    
     for record in records:
         all_text = " ".join(str(v) for v in record.values() if v and isinstance(v, str))
         if not all_text:
@@ -246,55 +239,60 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
         # Quick navigation/meta check before expensive extraction
         lower = all_text.lower()
         nav_phrases = ["copyright", "all rights reserved", "privacy policy", "terms of service",
-                       "terms and conditions", "cookie policy", "powered by"]
+                       "terms and conditions", "cookie policy", "powered by", "home about contact"]
         if any(p in lower for p in nav_phrases):
             continue
 
         from app.semantic_segmentation import extract_candidate_values
         cands = extract_candidate_values(all_text)
-        tokens = []
-        type_map = {
-            'price': SemanticType.PRICE, 'date': SemanticType.DATE, 'code': SemanticType.CODE,
-            'text': SemanticType.TEXT, 'number': SemanticType.NUMBER, 'duration': SemanticType.DURATION,
-            'phone': SemanticType.PHONE, 'email': SemanticType.EMAIL, 'url': SemanticType.URL,
-            'rating': SemanticType.RATING, 'organization': SemanticType.ORGANIZATION,
-        }
-        for c in cands:
-            st = type_map.get(c.primary_type, SemanticType.TEXT)
-            tokens.append(SemanticToken(raw=c.raw, normalized=c.cleaned,
-                                        span=Span(c.span_start, c.span_end),
-                                        position=c.position, primary_type=st))
-
-        # Entity types present
-        entity_types = {t.primary_type for t in tokens if t.primary_type in ENTITY_TYPES}
-        numeric_types = {t.primary_type for t in tokens if t.primary_type in STRONG_NUMERIC_TYPES}
-        contact_types = {t.primary_type for t in tokens if t.primary_type in CONTACT_TYPES}
-
-        # A record is valid if:
-        # 1. Has at least 2 distinct entity types, OR
-        # 2. Has 1 entity type + 1 numeric type (price/quantity), OR
-        # 3. Has at least 2 tokens of the same entity type (multi-word entity names)
-        # Contact-only records (phone + email with no entity) are filtered
-        # Single-type records (just email, just phone) are filtered
-        all_meaningful = entity_types | numeric_types
-        if len(entity_types) >= 2:
+        
+        if len(cands) == 0:
+            continue
+            
+        types = [c.primary_type for c in cands]
+        
+        # Count core entities
+        core_count = sum(1 for t in types if t in ENTITY_TYPES)
+        
+        if len(cands) == 1:
+            # Single token records are only valid if they are strong entities (Org)
+            if cands[0].primary_type == 'organization':
+                filtered.append(record)
+            continue
+            
+        # Calculate Relational Density Score
+        density_score = 0.0
+        
+        # 1. Edge Density (Transitions)
+        for i in range(len(types) - 1):
+            t1, t2 = types[i], types[i+1]
+            ts = be.transition_detector.score_transition(t1, t2)
+            density_score += ts.probability
+            
+        # 2. Motif Density
+        for size in range(2, min(len(types) + 1, 4)):
+            for start in range(len(types) - size + 1):
+                motif = tuple(types[start:start + size])
+                density_score += be.motif_learner.stability(motif) * 0.5
+                
+        # 3. Core Entity Centrality
+        density_score += core_count * 0.5
+        
+        # Normalize density by max possible edges
+        max_edges = len(types) - 1
+        normalized_density = density_score / max(1, max_edges)
+        
+        # If it's pure contact/noise info, core_count is usually 0 and density is low.
+        if core_count >= 2 or normalized_density > 0.8:
             filtered.append(record)
-        elif len(all_meaningful) >= 2:
-            filtered.append(record)
-        elif len(entity_types) == 1:
-            # Only keep if entity grouping would merge tokens (multi-word entity)
-            # Check if any token matches a known entity suffix
-            has_suffix = any(t.raw.lower() in _BOOTSTRAP_SUFFIXES for t in tokens)
-            if not has_suffix:
-                # Check if first token is a stop word (like "The") followed by another org
-                org_tokens = [t for t in tokens if t.primary_type == next(iter(entity_types))]
-                has_named_entity = len(org_tokens) >= 2 and any(
-                    t.raw.lower() in _STOP_WORDS for t in org_tokens
-                )
-                if not has_named_entity:
-                    continue
-            filtered.append(record)
-
+        elif core_count == 1:
+            # Multi-word entity check
+            has_suffix = any(c.raw.lower() in _BOOTSTRAP_SUFFIXES for c in cands)
+            org_cands = [c for c in cands if c.primary_type in ENTITY_TYPES]
+            has_named_entity = len(org_cands) >= 2 and any(c.raw.lower() in _STOP_WORDS for c in org_cands)
+            if has_suffix or has_named_entity or normalized_density > 0.6:
+                 filtered.append(record)
+                 
     return filtered
 
 
