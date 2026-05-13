@@ -163,7 +163,11 @@ class SemanticWorldState:
                     baseline += 0.08 * (0.5 - stability)
 
         # 2. Compatibility pressure (topology-native): divergent type preferences → exclusion
-        for ttype in ["price", "date", "location", "organization", "phone", "email", "url", "number", "rating"]:
+        # Types derived dynamically from role_compatibility — no fixed list
+        observed_types = set()
+        for r, t in self.role_compatibility:
+            observed_types.add(t)
+        for ttype in observed_types:
             ca = self.role_compatibility.get((role_a, ttype), 0.5)
             cb = self.role_compatibility.get((role_b, ttype), 0.5)
             if abs(ca - cb) > 0.3:
