@@ -227,10 +227,9 @@ class SemanticWorldState:
     def propagate_field_regions(self) -> int:
         """Propagate instability from field regions to neighboring roles.
 
-        Each field region spreads a fraction of its instability to all
-        roles in the schema that share an exclusivity relationship with
-        the competing roles. This makes the field state evolve before
-        allocation, so allocation sees propagated pressure.
+        Propagation is DAMPED — each wave spreads less energy than the last.
+        This prevents recursive amplification while still allowing the field
+        to evolve before allocation sees the propagated pressure.
         Returns the number of affected roles.
         """
         from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
@@ -244,8 +243,9 @@ class SemanticWorldState:
                     elif role == rb:
                         peer = ra
                     if peer is not None and peer not in region.competing_roles:
-                        # Spread a fraction of instability to the peer
-                        spread = region.instability * 0.3
+                        # Damped propagation: each wave spreads less energy
+                        decay = 1.0 / (1.0 + self.field_activation_count * 0.1)
+                        spread = region.instability * 0.3 * decay
                         key = tuple(sorted([role, peer]))
                         current = self.learned_exclusions.get(key, 0.0)
                         self.learned_exclusions[key] = min(1.0, current + spread)

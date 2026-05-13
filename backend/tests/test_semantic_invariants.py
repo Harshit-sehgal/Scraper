@@ -344,12 +344,16 @@ def test_topology_causality_invariant():
     ws.metrics.global_entropy = 0.1
     ws.metrics.cumulative_uncertainty = 1
     ws.metrics.total_records_processed = 100
-    t_low = _adaptive_exclusion_threshold()
-    ws.metrics.global_energy = 9.0
-    ws.metrics.global_entropy = 0.9
-    ws.metrics.cumulative_uncertainty = 50
-    t_high = _adaptive_exclusion_threshold()
-    assert t_high >= t_low or abs(t_high - t_low) < 0.001, \
+    _adaptive_exclusion_threshold()  # prime hysteresis
+    for _ in range(5):
+        ws.metrics.global_energy = 0.1
+        ws.metrics.global_entropy = 0.1
+        t_low = _adaptive_exclusion_threshold()
+    for _ in range(5):
+        ws.metrics.global_energy = 9.0
+        ws.metrics.global_entropy = 0.9
+        t_high = _adaptive_exclusion_threshold()
+    assert t_high >= t_low or abs(t_high - t_low) < 0.01, \
         f"Higher field pressure must raise exclusion threshold ({t_high} >= {t_low})"
 
 

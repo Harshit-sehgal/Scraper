@@ -48,31 +48,35 @@ ROLE_EXCLUSIVITY: List[Tuple[str, str]] = [
 ]
 
 
-def _adaptive_exclusion_threshold() -> float:
-    """Exclusion threshold emerges from field pressure + topology density.
+_smoothed_structural = 0.4
+_smoothed_runtime = 0.3
 
-    High field pressure = permissive (allow weak exclusions to form).
-    High topology density = tight (dense graphs need stronger evidence
-    because conflicts propagate more easily through many connections).
-    """
+def _adaptive_exclusion_threshold() -> float:
+    """Exclusion threshold with hysteresis to prevent oscillation."""
+    global _smoothed_structural
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
     maturity = min(ws.metrics.total_records_processed / 100.0, 1.0)
     pressure = ws.metrics.field_pressure
     density = ws.topology_density
-    adaptive = 0.4 - (maturity * 0.2) + (pressure * 0.3) + (density * 0.2)
-    return max(0.2, min(0.6, adaptive))
+    target = 0.4 - (maturity * 0.2) + (pressure * 0.3) + (density * 0.2)
+    target = max(0.2, min(0.6, target))
+    _smoothed_structural = _smoothed_structural * 0.7 + target * 0.3
+    return _smoothed_structural
 
 
 def _adaptive_runtime_exclusion_threshold() -> float:
-    """Runtime exclusion threshold uses field pressure + topology density."""
+    """Runtime exclusion threshold with hysteresis."""
+    global _smoothed_runtime
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
     maturity = min(ws.metrics.total_records_processed / 100.0, 1.0)
     pressure = ws.metrics.field_pressure
     density = ws.topology_density
-    base = 0.3 - (maturity * 0.15) + (pressure * 0.3) + (density * 0.15)
-    return max(0.15, min(0.5, base))
+    target = 0.3 - (maturity * 0.15) + (pressure * 0.3) + (density * 0.15)
+    target = max(0.15, min(0.5, target))
+    _smoothed_runtime = _smoothed_runtime * 0.7 + target * 0.3
+    return _smoothed_runtime
 
 
 # Bootstrap seeds for role-type compatibility.
