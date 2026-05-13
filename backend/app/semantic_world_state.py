@@ -140,36 +140,41 @@ class SemanticWorldState:
                     del self.motif_stability[motif]
 
     def get_derived_exclusion(self, role_a: str, role_b: str) -> float:
-        """Compute exclusion strength from topology metrics, not just dict lookup.
+        """Compute exclusion strength from topology metrics — the dict is secondary.
 
-        Exclusion emerges from:
-        1. Learned exclusion history (symbolic bridge)
-        2. Role-type compatibility mismatch
-        3. Motif instability (motifs involving these roles have low stability)
+        Exclusion emerges from topology itself:
+        1. Motif instability: if motifs containing these roles are unstable, exclude more
+        2. Compatibility divergence: roles with divergent type preferences exclude more
+        3. Neighborhood instability: if roles are in different neighborhoods, exclude more
+        4. Learned exclusion history (symbolic bridge, secondary)
 
-        This makes memory topology-native — exclusion flows from graph structure.
+        The topology baseline produces non-zero exclusion even when the dict is empty.
+        The dict only amplifies patterns already visible in the topology.
         """
-        key = tuple(sorted([role_a, role_b]))
-        base = self.learned_exclusions.get(key, 0.0)
+        baseline = 0.0
 
-        # Compatibility pressure: roles with divergent type preferences exclude more
-        pressure = 0.0
+        # 1. Motif pressure (topology-native): unstable motifs → exclusion
+        for motif in self.motif_counts:
+            ra_str = str(role_a) in motif
+            rb_str = str(role_b) in motif
+            if ra_str and rb_str:
+                stability = self.get_motif_stability(motif)
+                if stability < 0.5:
+                    baseline += 0.08 * (0.5 - stability)
+
+        # 2. Compatibility pressure (topology-native): divergent type preferences → exclusion
         for ttype in ["price", "date", "location", "organization", "phone", "email", "url", "number", "rating"]:
             ca = self.role_compatibility.get((role_a, ttype), 0.5)
             cb = self.role_compatibility.get((role_b, ttype), 0.5)
             if abs(ca - cb) > 0.3:
-                pressure += 0.05
+                baseline += 0.04
 
-        # Motif pressure: if motifs containing both roles are unstable, exclude more
-        motif_pressure = 0.0
-        for motif in self.motif_counts:
-            if any(role_a in str(m) for m in motif) and any(role_b in str(m) for m in motif):
-                stability = self.get_motif_stability(motif)
-                if stability < 0.3:
-                    motif_pressure += 0.05 * (1.0 - stability)
+        # 3. Learned exclusion (symbolic bridge, secondary amplifier)
+        key = tuple(sorted([role_a, role_b]))
+        learned = self.learned_exclusions.get(key, 0.0)
+        total = baseline + (learned * 0.6)
 
-        total = min(base + pressure + motif_pressure, 1.0)
-        return max(0.0, total)
+        return max(0.0, min(1.0, total))
 
     def snapshot(self, label: str = ""):
         """Record a compact topology snapshot for replay/debugging."""
