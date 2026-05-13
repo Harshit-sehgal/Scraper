@@ -138,13 +138,15 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
         if has_specific and len(cands) > 1:
             cands = [c for c in cands if (c.primary_type.value if hasattr(c.primary_type, 'value') else str(c.primary_type)) != 'text']
         
-        # Deduplicate identical raw strings
+        # Deduplicate identical raw strings only at the SAME position
+        # (same value from different record positions is a contradiction signal)
         seen_raw = set()
         unique = []
         for c in cands:
-            if c.raw not in seen_raw:
+            key = (c.raw, c.position)
+            if key not in seen_raw:
                 unique.append(c)
-                seen_raw.add(c.raw)
+                seen_raw.add(key)
         cands = unique
         
         types = [(c.primary_type.value if hasattr(c.primary_type, 'value') else str(c.primary_type)) for c in cands]
@@ -359,6 +361,23 @@ def run_pipeline(
             detect_role_swap_warnings,
         )
         contradictions = detect_allocation_contradictions(output, schema_fields)
+        # Also check pre-allocation tokens for exclusivity violations
+        # (allocation may resolve exclusivity before contradictions are checked)
+        if not contradictions and tokens:
+            from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
+            value_fields: dict = {}
+            for t in tokens:
+                if t.raw and t.source_field:
+                    if t.raw in value_fields:
+                        prev_field = value_fields[t.raw]
+                        pair = (prev_field, t.source_field)
+                        rev_pair = (t.source_field, prev_field)
+                        if pair in ROLE_EXCLUSIVITY or rev_pair in ROLE_EXCLUSIVITY:
+                            contradictions.append(
+                                f"Token '{t.raw}' assigned to exclusive roles '{prev_field}' and '{t.source_field}'"
+                            )
+                    else:
+                        value_fields[t.raw] = t.source_field
         if contradictions:
             output["_contradictions"] = contradictions
             output["_confidence"] *= _CONTRADICTION_CONFIDENCE_PENALTY

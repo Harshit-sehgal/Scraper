@@ -136,8 +136,10 @@ def is_child_fragment(value: str, seen_values: set) -> bool:
     if not value:
         return False
 
+    value_lower = value.lower().strip()
     for seen in seen_values:
-        if len(seen) > len(value) and value in seen:
+        seen_lower = seen.lower().strip() if isinstance(seen, str) else str(seen).lower().strip()
+        if len(seen_lower) > len(value_lower) and value_lower in seen_lower:
             # Only suppress if the child is a prefix or suffix of the parent
             is_date = re.search(r"\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}", seen)
             if not is_date and not (seen.startswith(value) or seen.endswith(value)):

@@ -153,21 +153,20 @@ def apply_contradiction_learning(output: Dict[str, str], schema_fields: List[str
         # Learn exclusion edges between roles that fought over the same token
         filled_vals = {}
         for role, val in output.items():
-            if val:
-                if val in filled_vals:
-                    r1, r2 = filled_vals[val], role
-                    key = tuple(sorted([r1, r2]))
-                    # Strengthen exclusion edge
-                    current = state.learned_exclusions.get(key, 0.0)
-                    state.learned_exclusions[key] = min(current + _EXCLUSION_LEARN_RATE, 1.0)
-                    
-                    dispatcher.dispatch(SemanticEvent(
-                        event_type=SemanticEventType.CONTRADICTION_DETECTED,
-                        source="contradiction_engine",
-                        payload={"role_pair": key, "conflict_type": "identity_clash"},
-                        instability_delta=_EXCLUSION_CONTRADICTION_DELTA
-                    ))
-                filled_vals[val] = role
+            if role.startswith('_') or not val:
+                continue
+            if val in filled_vals:
+                r1, r2 = filled_vals[val], role
+                key = tuple(sorted([r1, r2]))
+                current = state.learned_exclusions.get(key, 0.0)
+                state.learned_exclusions[key] = min(current + _EXCLUSION_LEARN_RATE, 1.0)
+                dispatcher.dispatch(SemanticEvent(
+                    event_type=SemanticEventType.CONTRADICTION_DETECTED,
+                    source="contradiction_engine",
+                    payload={"role_pair": key, "conflict_type": "identity_clash"},
+                    instability_delta=_EXCLUSION_CONTRADICTION_DELTA
+                ))
+            filled_vals[val] = role
 
     # Original warning learning bridge
     if warnings:
