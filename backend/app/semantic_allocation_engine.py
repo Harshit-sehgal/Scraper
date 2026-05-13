@@ -49,28 +49,29 @@ ROLE_EXCLUSIVITY: List[Tuple[str, str]] = [
 
 
 def _adaptive_exclusion_threshold() -> float:
-    """Exclusion threshold emerges from unified field pressure, not hardcoded.
+    """Exclusion threshold emerges from field pressure + topology density.
 
-    Uses the unified field_pressure metric which fuses energy, entropy,
-    and uncertainty into a single scalar. High pressure = permissive
-    (allow weak exclusions to form). Low pressure = tight (only strong
-    recurring exclusions survive).
+    High field pressure = permissive (allow weak exclusions to form).
+    High topology density = tight (dense graphs need stronger evidence
+    because conflicts propagate more easily through many connections).
     """
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
     maturity = min(ws.metrics.total_records_processed / 100.0, 1.0)
     pressure = ws.metrics.field_pressure
-    adaptive = 0.4 - (maturity * 0.2) + (pressure * 0.3)
+    density = ws.topology_density
+    adaptive = 0.4 - (maturity * 0.2) + (pressure * 0.3) + (density * 0.2)
     return max(0.2, min(0.6, adaptive))
 
 
 def _adaptive_runtime_exclusion_threshold() -> float:
-    """Runtime exclusion threshold uses unified field pressure."""
+    """Runtime exclusion threshold uses field pressure + topology density."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
     maturity = min(ws.metrics.total_records_processed / 100.0, 1.0)
     pressure = ws.metrics.field_pressure
-    base = 0.3 - (maturity * 0.15) + (pressure * 0.3)
+    density = ws.topology_density
+    base = 0.3 - (maturity * 0.15) + (pressure * 0.3) + (density * 0.15)
     return max(0.15, min(0.5, base))
 
 

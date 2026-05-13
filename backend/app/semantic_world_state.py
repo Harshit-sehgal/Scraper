@@ -211,6 +211,19 @@ class SemanticWorldState:
 
         return max(0.0, min(1.0, total))
 
+    @property
+    def topology_density(self) -> float:
+        """Graph interconnectedness — edges per possible role pair.
+
+        Dense topology = many exclusivity relationships = conflicts
+        propagate easily. Used to tighten exclusion thresholds so the
+        graph geometry itself governs cognition.
+        """
+        from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
+        possible = len(ROLE_EXCLUSIVITY) + max(len(self.learned_exclusions), 1)
+        actual = len(self.learned_exclusions)
+        return min(actual / possible, 1.0) if possible > 0 else 0.0
+
     def propagate_field_regions(self) -> int:
         """Propagate instability from field regions to neighboring roles.
 
