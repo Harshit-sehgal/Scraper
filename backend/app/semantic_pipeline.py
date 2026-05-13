@@ -42,6 +42,13 @@ from app.event_dispatcher import get_dispatcher
 from app.semantic_events import SemanticEvent, SemanticEventType
 
 
+# Pipeline thresholds — isolated as named constants for observability
+_INSTABILITY_SPIKE_THRESHOLD = 0.8
+_CONTRADICTION_CONFIDENCE_PENALTY = 0.7
+_COHERENCE_SUCCESS_THRESHOLD = 0.6
+_DIAGNOSTIC_HISTORY_WINDOW = 20
+
+
 METADATA_FIELDS: Set[str] = {
     "record_score", "_field_confidences",
     "source_url", "source_type", "source_trust_score",
@@ -306,7 +313,7 @@ def run_pipeline(
         instability = 1.0 - output["_confidence"]
         relative_instability = instability / max(0.1, state.metrics.average_uncertainty)
         
-        if relative_instability > 0.8:
+        if relative_instability > _INSTABILITY_SPIKE_THRESHOLD:
             dispatcher.dispatch(SemanticEvent(
                 event_type=SemanticEventType.UNCERTAINTY_SPIKE,
                 source="allocation_engine",
@@ -314,7 +321,7 @@ def run_pipeline(
                 instability_delta=0.3
             ))
 
-        if relative_instability > 0.8 and tokens:
+        if relative_instability > _INSTABILITY_SPIKE_THRESHOLD and tokens:
             from app.semantic_inference_engine import InferenceEngine
             try:
                 # Inference as Iterative Graph Relaxation
@@ -345,7 +352,8 @@ def run_pipeline(
         contradictions = detect_allocation_contradictions(output, schema_fields)
         if contradictions:
             output["_contradictions"] = contradictions
-            output["_confidence"] *= 0.7
+            output["_confidence"] *= _CONTRADICTION_CONFIDENCE_PENALTY
+            output["_contradiction_energy"] = len(contradictions)
             dispatcher.dispatch(SemanticEvent(
                 event_type=SemanticEventType.CONTRADICTION_DETECTED,
                 source="contradiction_engine",
@@ -359,6 +367,18 @@ def run_pipeline(
             output["_warnings"] = warnings
             
         apply_contradiction_learning(output, schema_fields, reng, detect_semantic_type, contradictions, warnings, _UNIVERSAL_ROOTS)
+
+        # Re-allocation pass: feed contradiction pressure back into the graph
+        if contradictions and tokens:
+            sem_record3 = SemanticRecord(tokens=tokens)
+            _, re_alloc_graph = allocate_semantic_roles(sem_record3, schema_fields, learn=False)
+            if re_alloc_graph.coherence_score > output["_confidence"]:
+                for role_name in schema_fields:
+                    role = re_alloc_graph.roles.get(role_name)
+                    if role and role.filled_by:
+                        output[role_name] = role.filled_by
+                output["_confidence"] = re_alloc_graph.coherence_score
+                output["_contradiction_resolved"] = True
             
         # Stage 8: Diagnostics
         from app.semantic_diagnostics import generate_allocation_diagnostics
@@ -368,9 +388,9 @@ def run_pipeline(
         
         coherence = output["_confidence"]
         be = get_boundary_engine()
-        for md in be.decision_history[-20:]:
+        for md in be.decision_history[-_DIAGNOSTIC_HISTORY_WINDOW:]:
             md.coherence_after = coherence
-            md.success = coherence > 0.6
+            md.success = coherence > _COHERENCE_SUCCESS_THRESHOLD
         
         allocated_records.append(output)
 

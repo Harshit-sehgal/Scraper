@@ -62,8 +62,13 @@ class GraphUpdateScheduler:
                 ))
         
         if virtual_tokens:
-            # The engine relaxation propagates belief and minimizes contradiction energy
             ie.infer(virtual_tokens, list(ws.role_position_memory.keys()))
+            self.dispatcher.dispatch(SemanticEvent(
+                event_type=SemanticEventType.EQUILIBRIUM_REACHED,
+                source="graph_update_scheduler",
+                payload={"energy": ws.metrics.global_energy},
+                instability_delta=-0.1
+            ))
 
 # Global Scheduler
 _scheduler = GraphUpdateScheduler()

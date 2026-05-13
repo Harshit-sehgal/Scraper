@@ -231,6 +231,32 @@ class SemanticWorldState:
         self.global_centrality = data.get("global_centrality", {})
         self.last_update_time = data.get("last_update", time.time())
 
+    def mutation_diff(self, other: "SemanticWorldState") -> dict:
+        """Compute a structural diff between two world states for observability."""
+        diff: dict = {}
+        if self.metrics.total_records_processed != other.metrics.total_records_processed:
+            diff["records_processed"] = (self.metrics.total_records_processed, other.metrics.total_records_processed)
+        if self.metrics.global_energy != other.metrics.global_energy:
+            diff["global_energy"] = (self.metrics.global_energy, other.metrics.global_energy)
+        if self.metrics.global_entropy != other.metrics.global_entropy:
+            diff["global_entropy"] = (self.metrics.global_entropy, other.metrics.global_entropy)
+        added_roles = set(other.role_compatibility) - set(self.role_compatibility)
+        if added_roles:
+            diff["added_role_compatibilities"] = {str(k): v for k, v in other.role_compatibility.items() if k in added_roles}
+        changed_roles = {
+            k for k in set(self.role_compatibility) & set(other.role_compatibility)
+            if abs(self.role_compatibility[k] - other.role_compatibility[k]) > 0.01
+        }
+        if changed_roles:
+            diff["changed_role_compatibilities"] = {str(k): (self.role_compatibility[k], other.role_compatibility[k]) for k in changed_roles}
+        added_motifs = set(other.motif_counts) - set(self.motif_counts)
+        if added_motifs:
+            diff["added_motifs"] = [str(m) for m in added_motifs]
+        new_exclusions = set(other.learned_exclusions) - set(self.learned_exclusions)
+        if new_exclusions:
+            diff["new_exclusions"] = [str(e) for e in new_exclusions]
+        return diff
+
 
 # Global Singleton
 _world_state: Optional[SemanticWorldState] = None
