@@ -426,6 +426,20 @@ def run_pipeline(
             output, schema_fields, reng, contradictions, detect_semantic_type, tokens=tokens
         )
         
+        # Phase 4: Semantic memory as topology pressure
+        # Stable motifs strengthen role-type compatibility — memory becomes gravity
+        if tokens:
+            for size in range(2, min(len(type_sequence) + 1, 4)):
+                for start in range(len(type_sequence) - size + 1):
+                    motif = tuple(type_sequence[start:start + size])
+                    stability = state.get_motif_stability(motif)
+                    if stability > 0.5:
+                        for role_name in schema_fields:
+                            key = (role_name, motif[0])
+                            current = reng.compatibility_cache.get(key, 0.5)
+                            boost = (stability - 0.5) * 0.05
+                            reng.compatibility_cache[key] = min(1.0, current + boost)
+
         coherence = output["_confidence"]
         be = get_boundary_engine()
         for md in be.decision_history[-_DIAGNOSTIC_HISTORY_WINDOW:]:
