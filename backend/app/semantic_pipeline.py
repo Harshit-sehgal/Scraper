@@ -398,6 +398,18 @@ def run_pipeline(
 
         # Re-allocation pass: feed contradiction pressure back into the graph
         if contradictions and len(tokens) >= _EVOLUTION_REALLOC_MIN_TOKENS:
+            # Boost learned exclusions proportional to contradiction energy
+            # so the re-allocation graph feels the pressure in real time
+            contradiction_energy = output.get("_contradiction_energy", 0)
+            if contradiction_energy > 0:
+                for t in tokens:
+                    if t.raw and t.source_field:
+                        for t2 in tokens:
+                            if t2.raw and t2.source_field and t.raw == t2.raw and t.source_field != t2.source_field:
+                                key = tuple(sorted([t.source_field, t2.source_field]))
+                                current = state.learned_exclusions.get(key, 0.0)
+                                boost = contradiction_energy * 0.3
+                                state.learned_exclusions[key] = min(current + boost, 1.0)
             sem_record3 = SemanticRecord(tokens=tokens)
             _, re_alloc_graph = allocate_semantic_roles(sem_record3, schema_fields, learn=False)
             if re_alloc_graph.coherence_score > output["_confidence"]:
