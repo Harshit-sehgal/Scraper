@@ -426,6 +426,6 @@ def get_validation_summary_text(summary: Dict) -> str:
     if summary.get("rejected_fields"):
         lines.append("Rejected fields:")
         for _f_name, count in summary["rejected_fields"].items():
-            lines.append(f"  - {field}: {count} records")
+            lines.append(f"  - {_f_name}: {count} records")
 
     return "\n".join(lines)

@@ -12,7 +12,7 @@ regardless of whether it was found on a flight site or a product page.
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.intent_parser import SEMANTIC_NEED_KEYWORDS, IntentSchema
 from app.page_profiler import StructureProfile, ValuePatterns

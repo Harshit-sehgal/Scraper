@@ -13,16 +13,26 @@ Mandatory features:
 - Conflict Localization
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List
 
 from app.semantic_ir import (
+    SemanticGraph,
     SemanticToken,
     SemanticType,
 )
 from app.semantic_world_state import get_world_state
 from app.event_dispatcher import get_dispatcher
 from app.semantic_events import SemanticEvent, SemanticEventType
+
+
+@dataclass
+class Contradiction:
+    """A detected contradiction in the semantic graph."""
+    description: str
+    confidence_damage: float
+    nodes: list = field(default_factory=list)
+    contradiction_type: str = "generic"
 
 
 @dataclass
@@ -184,3 +194,37 @@ def detect_role_swap_warnings(output: Dict[str, str], schema_fields: List[str], 
         if expected_type != 'text' and v_type_str != expected_type:
             warnings.append(f"{role_name}: expected {expected_type}, got {v_type_str} ({val})")
     return warnings
+
+
+def detect_contradictions(graph: SemanticGraph) -> List[Contradiction]:
+    """Detect contradictions in a semantic graph."""
+    contradictions: List[Contradiction] = []
+
+    # 1. Identity contradictions (same value in multiple roles)
+    value_to_roles: Dict[str, List[str]] = {}
+    for region in graph.regions:
+        for token in region.tokens:
+            if token.raw:
+                if token.raw not in value_to_roles:
+                    value_to_roles[token.raw] = []
+                value_to_roles[token.raw].append(f"region_{region.region_id}")
+
+    for value, roles in value_to_roles.items():
+        if len(roles) > 1:
+            contradictions.append(Contradiction(
+                description=f"Token '{value}' appears in multiple regions: {roles}",
+                confidence_damage=0.3 * len(roles),
+                contradiction_type="identity_clash",
+            ))
+
+    # 2. Structural incompatibilities in ownership
+    for edge in graph.ownership_edges:
+        if edge.owner_region_id == edge.owned_region_id:
+            contradictions.append(Contradiction(
+                description=f"Circular ownership edge: region {edge.owner_region_id} owns itself",
+                confidence_damage=0.5,
+                nodes=[edge.owner_region_id],
+                contradiction_type="circular_ownership",
+            ))
+
+    return contradictions
