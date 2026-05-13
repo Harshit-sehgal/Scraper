@@ -78,6 +78,7 @@ class GraphUpdateScheduler:
             
             pressure_after = ws.metrics.field_pressure
             drop = pressure_before - pressure_after
+            ws.snapshot(label=f"relax_wave_{self._wave_count}")
             
             self.dispatcher.dispatch(SemanticEvent(
                 event_type=SemanticEventType.EQUILIBRIUM_REACHED,

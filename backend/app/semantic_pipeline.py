@@ -425,6 +425,9 @@ def run_pipeline(
             
         # Stage 8: Diagnostics
         from app.semantic_diagnostics import generate_allocation_diagnostics
+        # Phase 7: Topology snapshot for observability + replay
+        state.snapshot(label=f"alloc_{len(allocated_records)}")
+
         output["_reasoning"] = generate_allocation_diagnostics(
             output, schema_fields, reng, contradictions, detect_semantic_type, tokens=tokens
         )

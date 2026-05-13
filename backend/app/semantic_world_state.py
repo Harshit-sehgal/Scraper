@@ -85,6 +85,7 @@ class SemanticWorldState:
         
         # Uncertainty Fields & Diagnostics
         self.decision_history: list = []
+        self.topology_snapshots: list = []
         self.last_update_time: float = time.time()
 
     def reinforce_motif(self, motif: Tuple[str, ...]):
@@ -129,6 +130,41 @@ class SemanticWorldState:
                     del self.motif_timestamps[motif]
                 if motif in self.motif_stability:
                     del self.motif_stability[motif]
+
+    def snapshot(self, label: str = ""):
+        """Record a compact topology snapshot for replay/debugging."""
+        self.topology_snapshots.append({
+            "label": label,
+            "time": self.metrics.total_records_processed,
+            "energy": self.metrics.global_energy,
+            "entropy": self.metrics.global_entropy,
+            "uncertainty": self.metrics.average_uncertainty,
+            "field_pressure": self.metrics.field_pressure,
+            "exclusions": len(self.learned_exclusions),
+            "compatibilities": len(self.role_compatibility),
+            "motifs": len(self.motif_counts),
+        })
+        if len(self.topology_snapshots) > 500:
+            self.topology_snapshots = self.topology_snapshots[-250:]
+
+    def replay(self) -> list:
+        """Return topology evolution as a sequence of snapshots for replay."""
+        return list(self.topology_snapshots)
+
+    def diff_snapshots(self, idx_a: int = -2, idx_b: int = -1) -> dict:
+        """Return the diff between two snapshots for causal chain inspection."""
+        if len(self.topology_snapshots) < 2:
+            return {}
+        a = self.topology_snapshots[idx_a]
+        b = self.topology_snapshots[idx_b]
+        diff = {}
+        for k in a:
+            if k in ("label", "time"):
+                continue
+            delta = b.get(k, 0) - a.get(k, 0)
+            if abs(delta) > 0.001:
+                diff[k] = delta
+        return diff
 
     def clear(self):
         self.metrics = TopologyMetrics()
