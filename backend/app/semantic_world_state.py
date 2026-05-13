@@ -177,29 +177,37 @@ class SemanticWorldState:
         baseline = 0.0
 
         # 1. Motif pressure (topology-native): unstable motifs → exclusion
+        # Stable motifs REPEL exclusion (they indicate compatible neighborhoods)
         for motif in self.motif_counts:
             ra_str = str(role_a) in motif
             rb_str = str(role_b) in motif
             if ra_str and rb_str:
                 stability = self.get_motif_stability(motif)
                 if stability < 0.5:
-                    baseline += 0.08 * (0.5 - stability)
+                    baseline += 0.18 * (0.5 - stability)
+                else:
+                    baseline -= 0.03 * (stability - 0.5)
 
         # 2. Compatibility pressure (topology-native): divergent type preferences → exclusion
-        # Types derived dynamically from role_compatibility — no fixed list
         observed_types = set()
         for r, t in self.role_compatibility:
             observed_types.add(t)
         for ttype in observed_types:
             ca = self.role_compatibility.get((role_a, ttype), 0.5)
             cb = self.role_compatibility.get((role_b, ttype), 0.5)
-            if abs(ca - cb) > 0.3:
-                baseline += 0.04
+            if abs(ca - cb) > 0.2:
+                baseline += 0.06
 
-        # 3. Learned exclusion (symbolic bridge, secondary amplifier)
+        # 3. Topology persistence: stable field regions reduce exclusion
+        for region in self.field_regions:
+            if role_a in region.competing_roles and role_b in region.competing_roles:
+                if region.instability < 0.3:
+                    baseline -= 0.05
+
+        # 4. Learned exclusion (symbolic bridge, secondary cache — 0.1x weight)
         key = tuple(sorted([role_a, role_b]))
-        learned = self.learned_exclusions.get(key, 0.0)
-        total = baseline + (learned * 0.6)
+        learned = self.learned_exclusions.get(key, 0.0) * 0.1
+        total = baseline + learned
 
         return max(0.0, min(1.0, total))
 
