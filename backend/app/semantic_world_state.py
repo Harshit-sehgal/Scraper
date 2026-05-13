@@ -2,7 +2,26 @@ import math
 import time
 from collections import Counter
 from typing import Dict, List, Tuple, Optional, Set
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+@dataclass
+class FieldConflictRegion:
+    """A persistent, pre-resolution conflict in the semantic field.
+
+    Contradictions are NOT immediately resolved. They persist as
+    topology structures that propagate, restructure the field,
+    and bias equilibrium before interpretation emerges.
+    """
+    competing_roles: List[str]
+    token: str
+    instability: float
+    semantic_pressure: float = 0.0
+    propagation_radius: int = 1
+    recurrence_score: float = 0.0
+    topology_neighbors: List[str] = field(default_factory=list)
+    source_record: str = ""
+
 
 @dataclass
 class TopologyMetrics:
@@ -91,6 +110,10 @@ class SemanticWorldState:
         self.global_centrality: Dict[str, float] = {}
         self.global_communities: List[Set[str]] = []
         
+        # Persistent pre-resolution field state
+        self.field_regions: List[FieldConflictRegion] = []
+        self.field_activation_count: int = 0
+
         # Uncertainty Fields & Diagnostics
         self.decision_history: list = []
         self.topology_snapshots: list = []
@@ -179,6 +202,51 @@ class SemanticWorldState:
         total = baseline + (learned * 0.6)
 
         return max(0.0, min(1.0, total))
+
+    def capture_pre_allocation_field(self, tokens: list, schema_fields: list) -> int:
+        """Capture pre-allocation conflict topology from tokens.
+
+        Before allocation resolves exclusivity conflicts, this method
+        preserves the raw instability geometry as persistent field regions.
+        Returns the number of conflict regions captured.
+        """
+        from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
+        captured = 0
+        value_roles: Dict[str, List[str]] = {}
+        for t in tokens:
+            if not t.raw or not t.source_field:
+                continue
+            if t.raw not in value_roles:
+                value_roles[t.raw] = []
+            value_roles[t.raw].append(t.source_field)
+
+        for token_val, roles in value_roles.items():
+            if len(roles) < 2:
+                continue
+            for i in range(len(roles)):
+                for j in range(i + 1, len(roles)):
+                    pair = (roles[i], roles[j])
+                    rev_pair = (roles[j], roles[i])
+                    if pair in ROLE_EXCLUSIVITY or rev_pair in ROLE_EXCLUSIVITY:
+                        region = FieldConflictRegion(
+                            competing_roles=[roles[i], roles[j]],
+                            token=token_val,
+                            instability=0.5 + 0.1 * len([r for r in self.field_regions
+                                                        if r.token == token_val]),
+                            semantic_pressure=self.metrics.field_pressure,
+                            recurrence_score=self.learned_exclusions.get(
+                                tuple(sorted([roles[i], roles[j]])), 0.0
+                            ),
+                            topology_neighbors=list(set(roles)),
+                        )
+                        self.field_regions.append(region)
+                        captured += 1
+                        self.field_activation_count += 1
+
+        # Prune old regions
+        if len(self.field_regions) > 100:
+            self.field_regions = self.field_regions[-50:]
+        return captured
 
     def snapshot(self, label: str = ""):
         """Record a compact topology snapshot for replay/debugging."""
