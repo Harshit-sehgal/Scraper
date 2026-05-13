@@ -237,7 +237,7 @@ def _map_single_record(
             all_values.append(v_str)
 
     # For each semantic need the user has, try to find a matching value
-    used_values = set()
+    used_values: set[str] = set()
     for semantic_need in intent.semantic_needs.keys():
         best_mapping = _find_best_value_for_need(
             all_values,
@@ -459,7 +459,7 @@ def resolve_conflicts(mappings: List[FieldMapping]) -> List[FieldMapping]:
         return []
 
     # Group by semantic need
-    by_need = {}
+    by_need: dict[str, list[str]] = {}
     for mapping in mappings:
         need = mapping.semantic_need
         if need not in by_need:

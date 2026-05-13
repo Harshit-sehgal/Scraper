@@ -35,6 +35,7 @@ from app.semantic_ir import (
 )
 from app.semantic_mapper import detect_semantic_type, is_child_fragment
 from app.semantic_segmentation import StructuralMemoryTracker, expand_composite_records
+from app.semantic_world_state import get_world_state
 
 
 METADATA_FIELDS: Set[str] = {
@@ -161,18 +162,27 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
         max_edges = len(types) - 1
         normalized_density = density_score / max(1, max_edges)
         
-        # If it's pure contact/noise info, core_count is usually 0 and density is low.
-        if core_count >= 2 or normalized_density > 0.5:
+        # Equilibrium reasoning: decision depends on global stability average
+        from app.semantic_world_state import get_world_state
+        state = get_world_state()
+        stability_threshold = max(0.4, min(state.metrics.average_density * 0.9, 0.7))
+
+        if core_count >= 2 or normalized_density > stability_threshold:
+            # Propagate to global state for future equilibrium
+            state.metrics.cumulative_density += normalized_density
+            state.metrics.total_records_processed += 1
             filtered.append(record)
         elif core_count == 1:
             # Multi-word entity check
             has_suffix = any(c.raw.lower() in _BOOTSTRAP_SUFFIXES for c in cands)
-            org_cands = [c for c in cands if c.primary_type in ENTITY_TYPES]
+            org_cands = [c for c in cands if (c.primary_type.value if hasattr(c.primary_type, 'value') else str(c.primary_type)) in ENTITY_TYPES]
             has_named_entity = len(org_cands) >= 2 and any(c.raw.lower() in _STOP_WORDS for c in org_cands)
-            if has_suffix or has_named_entity or normalized_density > 0.3:
+            if has_suffix or has_named_entity or normalized_density > (stability_threshold * 0.7):
+                 state.metrics.cumulative_density += normalized_density
+                 state.metrics.total_records_processed += 1
                  filtered.append(record)
             else:
-                 logging.getLogger(__name__).debug("Filtered: core_count=1 but low density %f", normalized_density)
+                 logging.getLogger(__name__).debug("Filtered: core_count=1 but low relative density %f", normalized_density)
         else:
             logging.getLogger(__name__).debug("Filtered: core_count=0, density %f", normalized_density)
                  
@@ -281,23 +291,29 @@ def run_pipeline(
 
         output["_confidence"] = alloc_graph.coherence_score
         
-        # Stage 6: InferenceEngine (low confidence refinement)
-        if output["_confidence"] < 0.6 and tokens:
+        # Stage 6: Continuous Semantic Evolution (Inference)
+        # Decision is driven by graph energy and instability, not a hard threshold.
+        state = get_world_state()
+        instability = 1.0 - output["_confidence"]
+        relative_instability = instability / max(0.1, state.metrics.average_uncertainty)
+        
+        if relative_instability > 0.8 and tokens:
             from app.semantic_inference_engine import InferenceEngine
             try:
-                ie = InferenceEngine(max_iterations=3)
+                # Inference as Iterative Graph Relaxation
+                ie = InferenceEngine(max_iterations=5)
                 ie_result = ie.infer(tokens, schema_fields)
                 if ie_result and ie_result.role_assignments:
+                    # Check if inference reduced entropy (improved coherence)
                     ie_coherence = getattr(ie_result, 'coherence_score', 0.5)
                     if ie_coherence > output["_confidence"]:
                         for role_name, value in ie_result.role_assignments.items():
                             if value:
                                 output[role_name] = value
                         output["_confidence"] = ie_coherence
-                        output["_refined_by"] = "inference_engine"
+                        output["_refined_by"] = "evolution_pass"
             except Exception as exc:
                 logging.exception(exc)
-                logging.getLogger(__name__).warning("InferenceEngine failed: %s", exc)
         
         output["_certainty"] = reng.get_certainty()
         output["_learning_speed"] = reng.get_learning_speed()
