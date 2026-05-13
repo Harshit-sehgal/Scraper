@@ -304,6 +304,13 @@ def run_pipeline(
             from app.semantic_world_state import get_world_state as _gws_pre
             _gws_pre().capture_pre_allocation_field(tokens, schema_fields)
 
+        # Phase 4C: Propagate field regions before allocation
+        # Instability spreads to neighboring roles, so allocation sees
+        # propagated pressure rather than raw resolved state
+        if tokens:
+            from app.semantic_world_state import get_world_state as _gws_prop
+            _gws_prop().propagate_field_regions()
+
         sem_record = SemanticRecord(tokens=tokens)
         _, alloc_graph = allocate_semantic_roles(sem_record, schema_fields)
 

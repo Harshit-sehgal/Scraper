@@ -203,6 +203,34 @@ class SemanticWorldState:
 
         return max(0.0, min(1.0, total))
 
+    def propagate_field_regions(self) -> int:
+        """Propagate instability from field regions to neighboring roles.
+
+        Each field region spreads a fraction of its instability to all
+        roles in the schema that share an exclusivity relationship with
+        the competing roles. This makes the field state evolve before
+        allocation, so allocation sees propagated pressure.
+        Returns the number of affected roles.
+        """
+        from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
+        affected = 0
+        for region in self.field_regions:
+            for role in region.competing_roles:
+                for ra, rb in ROLE_EXCLUSIVITY:
+                    peer = None
+                    if role == ra:
+                        peer = rb
+                    elif role == rb:
+                        peer = ra
+                    if peer is not None and peer not in region.competing_roles:
+                        # Spread a fraction of instability to the peer
+                        spread = region.instability * 0.3
+                        key = tuple(sorted([role, peer]))
+                        current = self.learned_exclusions.get(key, 0.0)
+                        self.learned_exclusions[key] = min(1.0, current + spread)
+                        affected += 1
+        return affected
+
     def capture_pre_allocation_field(self, tokens: list, schema_fields: list) -> int:
         """Capture pre-allocation conflict topology from tokens.
 
