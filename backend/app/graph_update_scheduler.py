@@ -13,11 +13,6 @@ class GraphUpdateScheduler:
     Schedules topological updates based on incoming semantic events.
     Prevents update storms by batching and prioritizing convergence.
     """
-    def __init__(self):
-        self.pending_updates = 0
-        self.dispatcher = get_dispatcher()
-        self._setup_subscriptions()
-
     def _setup_subscriptions(self):
         """Subscribe to events that require graph recalculation."""
         self.dispatcher.subscribe(SemanticEventType.CONTRADICTION_DETECTED, self.on_instability)
@@ -38,19 +33,32 @@ class GraphUpdateScheduler:
             ws.decision_history = ws.decision_history[-500:]
         self.run_relaxation_pass()
 
+    def __init__(self):
+        self.pending_updates = 0
+        self._wave_count = 0
+        self.dispatcher = get_dispatcher()
+        self._setup_subscriptions()
+
     def run_relaxation_pass(self):
-        """Perform a graph relaxation pass to restore equilibrium."""
+        """Perform a graph relaxation pass to restore equilibrium.
+
+        Implements PROPAGATION WAVES: if pressure doesn't drop enough,
+        a secondary event fires to trigger another relaxation iteration.
+        This creates cascading topology activation until equilibrium.
+        """
         from app.semantic_inference_engine import InferenceEngine
         from app.semantic_ir import SemanticToken, Span, SemanticType
         
-        # In a global world state context, we relax the entire topology
-        # using the InferenceEngine's energy minimization logic.
+        # Limit propagation waves to prevent infinite cascading
+        if self._wave_count >= 3:
+            self._wave_count = 0
+            return
+        self._wave_count += 1
+        
         ie = InferenceEngine(max_iterations=5)
         ws = get_world_state()
+        pressure_before = ws.metrics.field_pressure
         
-        # Convert world state role compatibilities into a virtual token sequence 
-        # for the engine to relax. 
-        # (This is a minimal bridge to the iterative energy model)
         virtual_tokens = []
         for (role, ttype), compat in list(ws.role_compatibility.items()):
             if compat > 0.0:
@@ -63,17 +71,29 @@ class GraphUpdateScheduler:
         
         if virtual_tokens:
             result = ie.infer(virtual_tokens, list(ws.role_position_memory.keys()))
-            # Write inference results back to world state
             ws.metrics.global_energy = result.energy
             if result.belief_field:
                 ws.metrics.average_entropy = result.belief_field.field_entropy
                 ws.metrics.global_entropy = result.belief_field.field_entropy
+            
+            pressure_after = ws.metrics.field_pressure
+            drop = pressure_before - pressure_after
+            
             self.dispatcher.dispatch(SemanticEvent(
                 event_type=SemanticEventType.EQUILIBRIUM_REACHED,
                 source="graph_update_scheduler",
-                payload={"energy": result.energy},
+                payload={"energy": result.energy, "wave": self._wave_count, "pressure_drop": drop},
                 instability_delta=-0.1
             ))
+            
+            # Propagation wave: if pressure didn't drop enough, cascade
+            if drop < 0.02 and pressure_before > 0.3 and self._wave_count < 3:
+                self.dispatcher.dispatch(SemanticEvent(
+                    event_type=SemanticEventType.TOPOLOGY_SHIFT,
+                    source=f"propagation_wave_{self._wave_count}",
+                    payload={"wave": self._wave_count, "pressure": pressure_after},
+                    instability_delta=0.05
+                ))
 
 # Global Scheduler (lazy — created on first access to avoid circular imports)
 _scheduler = None
