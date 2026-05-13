@@ -412,6 +412,22 @@ def run_pipeline(
             
         apply_contradiction_learning(output, schema_fields, reng, detect_semantic_type, contradictions, warnings, _UNIVERSAL_ROOTS)
 
+        # Phase 4E: Topology-native interpretation — field arbitration on allocation output
+        # The field regions act as final arbiter: if a role's assignment contradicts
+        # the field's equilibrium (high instability), the output is marked uncertain.
+        if tokens:
+            from app.semantic_world_state import get_world_state as _gws_arb
+            _ws_arb = _gws_arb()
+            for region in _ws_arb.field_regions:
+                for role in region.competing_roles:
+                    if role in output and output[role]:
+                        # If this role is in an active field conflict, the assignment
+                        # is tentative — the field hasn't stabilized on it.
+                        output["_field_arbitrated"] = True
+                        output["_field_instability"] = max(
+                            output.get("_field_instability", 0), region.instability
+                        )
+
         # Phase 3: Uncertainty redistribution — contradiction waves spread through topology
         # Check tokens (pre-allocation) since allocation resolves exclusivity conflicts
         if contradictions and tokens:
