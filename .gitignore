@@ -10,3 +10,7 @@ build/
 *.csv
 *.json
 frontend/node_modules/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+backend/.mypy_cache/
