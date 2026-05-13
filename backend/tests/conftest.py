@@ -48,7 +48,6 @@ def client(monkeypatch):
         await asyncio.sleep(0.01)
 
     def fake_schedule_background_task(coro):
-        coro.close()
         return None
 
     # Avoid writing persistence files in API unit tests.

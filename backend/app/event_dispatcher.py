@@ -26,8 +26,10 @@ class EventDispatcher:
     def dispatch(self, event: SemanticEvent):
         """Propagate an event to all interested subscribers."""
         event.timestamp = time.time()
-        # logging.getLogger(__name__).debug(f"[EVENT] {event.event_type.value} from {event.source}")
-        
+        logging.getLogger(__name__).debug(
+            "[SEMANTIC EVENT] %s from %s (instability=%.3f)",
+            event.event_type.value, event.source, event.instability_delta)
+
         for callback in self.subscribers.get(event.event_type, []):
             try:
                 callback(event)

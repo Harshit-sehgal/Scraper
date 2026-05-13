@@ -10,6 +10,7 @@ from app.scraper import (
     ai_clean_and_align_records,
     scrape_url,
 )
+from app.semantic_persistence import load_semantic_state, save_semantic_state
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
 
@@ -63,6 +64,8 @@ async def run_job(
         return
 
     try:
+        load_semantic_state()
+
         # Auto-discovery mode
         if job.mode == ScrapeMode.AUTO:
             job.status = JobStatus.DISCOVERING
@@ -359,6 +362,7 @@ async def run_job(
         job.cancel_requested = False
         job.completed_at = datetime.datetime.now().isoformat()
         job.progress_current = job.progress_total
+        save_semantic_state()
         _add_job_log(job, "Job completed successfully", persist_fn=persist_state_fn)
 
         print(f"[Job {job_id}] Completed: {total} total, {filtered_count} after filtering")

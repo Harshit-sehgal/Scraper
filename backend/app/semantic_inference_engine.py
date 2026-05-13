@@ -189,7 +189,18 @@ class InferenceEngine:
                     ))
 
     def _relax_graph(self, state: SemanticState, graph: SemanticGraph):
-        pass
+        """Propagate beliefs along graph edges to reduce uncertainty."""
+        if not graph.tokens or not state.belief_field.node_beliefs:
+            return
+        for edge in graph.exclusion_edges:
+            src_beliefs = state.belief_field.node_beliefs.get(edge.source_id)
+            tgt_beliefs = state.belief_field.node_beliefs.get(edge.target_id)
+            if src_beliefs and tgt_beliefs:
+                mutual = set(src_beliefs.keys()) & set(tgt_beliefs.keys())
+                for t in mutual:
+                    avg = (src_beliefs[t] + tgt_beliefs[t]) / 2
+                    src_beliefs[t] = src_beliefs[t] * 0.9 + avg * 0.1
+                    tgt_beliefs[t] = tgt_beliefs[t] * 0.9 + avg * 0.1
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # COMPONENT 4: ROLE EMBEDDING ENGINE (Unified State Proxy)
@@ -335,24 +346,26 @@ class SemanticMemory:
     def get_confidence_boost(self, motif: Tuple[str, ...]) -> float:
         return self.ws.get_motif_stability(motif) * 0.2
 
-# Additional legacy/utility classes
 @dataclass
 class RelationshipEmbeddingSpace:
     dimension: int = 16
     def compute_embedding(self, node_idx: int, graph: SemanticGraph) -> List[float]:
+        if node_idx < len(graph.tokens):
+            token = graph.tokens[node_idx]
+            vec = [0.5] * self.dimension
+            type_idx = {
+                SemanticType.PRICE: 0, SemanticType.DATE: 1,
+                SemanticType.LOCATION: 2, SemanticType.ORGANIZATION: 3,
+                SemanticType.PHONE: 4, SemanticType.EMAIL: 5,
+                SemanticType.URL: 6, SemanticType.NUMBER: 7,
+                SemanticType.RATING: 8, SemanticType.DURATION: 9,
+                SemanticType.CODE: 10, SemanticType.NAME: 11,
+                SemanticType.TEXT: 12, SemanticType.IDENTIFIER: 13,
+            }.get(token.primary_type)
+            if type_idx is not None:
+                vec[type_idx] = 1.0
+            if token.span and graph.tokens:
+                vec[-2] = token.position / max(len(graph.tokens), 1)
+                vec[-1] = token.type_entity
+            return vec
         return [0.5] * self.dimension
-
-class TopologyDynamicsEngine:
-    def __init__(self, graph: SemanticGraph):
-        self.graph = graph
-    def evolve(self):
-        pass
-
-class DynamicAttention:
-    def __init__(self, graph: SemanticGraph):
-        self.graph = graph
-    def compute(self) -> Dict[str, float]:
-        return {}
-
-def is_likely_noise_field(field_name: str, value: str) -> Tuple[bool, float, List[str]]:
-    return False, 1.0, []

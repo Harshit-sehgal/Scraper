@@ -21,22 +21,22 @@ def _extract_json_payload(text: str):
     for candidate in (raw,):
         try:
             return json.loads(candidate)
-        except Exception as e:
-            logging.exception(e)
+        except Exception:
+            pass
 
     match = re.search(r"\{[\s\S]*\}", raw)
     if match:
         try:
             return json.loads(match.group(0))
-        except Exception as e:
-            logging.exception(e)
+        except Exception:
+            pass
 
     match = re.search(r"\[[\s\S]*\]", raw)
     if match:
         try:
             return json.loads(match.group(0))
-        except Exception as e:
-            logging.exception(e)
+        except Exception:
+            pass
 
     return None
 

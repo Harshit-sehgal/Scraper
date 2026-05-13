@@ -201,10 +201,6 @@ def run_pipeline(
     if not records:
         return []
     
-    # Load persisted learning cache
-    from app.semantic_persistence import load_semantic_state, save_semantic_state
-    load_semantic_state()
-    
     reng = _get_role_engine()
     be = get_boundary_engine()
     dispatcher = get_dispatcher()
@@ -379,5 +375,4 @@ def run_pipeline(
         allocated_records.append(output)
 
     report.after_allocation = len(allocated_records)
-    save_semantic_state()
     return allocated_records
