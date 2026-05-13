@@ -334,49 +334,45 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
     """
     assigned_candidates: Set[str] = set()
     filled_roles: Set[str] = set()
+    field_conflicts: list = []  # preserve conflict geometry for field arbitration
 
-    # Build sorted assignment queue (highest compatibility first)
     assignments = sorted(
         [(score, cand, role) for (cand, role), score in graph.compatibility.items()],
         key=lambda x: -x[0],
     )
 
     for score, cand_key, role_name in assignments:
+        # Check exclusivity BEFORE generic 'already assigned' — preserve conflict geometry
+        conflicting = False
+        conflict_reason = ""
+        for role_a, role_b in graph.exclusivity_edges:
+            if role_name == role_a and role_b in filled_roles and graph.roles[role_b].filled_by == cand_key:
+                conflicting = True
+                conflict_reason = f"exclusivity:{role_name}↔{role_b}"
+                break
+            if role_name == role_b and role_a in filled_roles and graph.roles[role_a].filled_by == cand_key:
+                conflicting = True
+                conflict_reason = f"exclusivity:{role_name}↔{role_a}"
+                break
+
+        if conflicting:
+            field_conflicts.append({
+                "role": role_name, "candidate": cand_key,
+                "reason": conflict_reason, "score": score
+            })
+            continue
+
         if cand_key in assigned_candidates:
             continue
         if role_name in filled_roles:
             continue
 
-        # Check exclusivity: a candidate cannot fill two exclusive roles
-        # e.g., same code cannot be both origin AND destination
-        conflicting = False
-        for role_a, role_b in graph.exclusivity_edges:
-            other_role = None
-            if role_name == role_a:
-                other_role = role_b
-            elif role_name == role_b:
-                other_role = role_a
-            if other_role and other_role in filled_roles:
-                # Only conflict if the SAME candidate would fill both
-                if graph.roles[other_role].filled_by == cand_key:
-                    conflicting = True
-                    break
-
-        if conflicting:
-            continue
-
-        # Assign
         graph.roles[role_name].filled_by = cand_key
         graph.roles[role_name].fill_confidence = score
         assigned_candidates.add(cand_key)
         filled_roles.add(role_name)
 
-        graph.assignment_history.append({
-            "role": role_name,
-            "candidate": cand_key,
-            "confidence": score,
-        })
-
+    graph._field_conflicts = field_conflicts
     graph.coherence_score = _compute_allocation_coherence(graph)
     return graph
 

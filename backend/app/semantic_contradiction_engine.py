@@ -70,15 +70,16 @@ class IncompatibilityTopology:
         # 1. Identity Conflict (Duplicate usage of same token for distinct roles)
         usage_map = {}
         for role, val in assignments.items():
-            if val:
-                if val in usage_map:
-                    conflicts.append(ConflictSource(
-                        nodes=[], # Tracing nodes is done by value match here
-                        conflict_type="identity_clash",
-                        energy_penalty=_CONTRADICTION_ENERGY_CAP,
-                        description=f"Token '{val}' assigned to multiple roles: {usage_map[val]} and {role}"
-                    ))
-                usage_map[val] = role
+            if not val or role.startswith('_'):
+                continue
+            if val in usage_map:
+                conflicts.append(ConflictSource(
+                    nodes=[],
+                    conflict_type="identity_clash",
+                    energy_penalty=_CONTRADICTION_ENERGY_CAP,
+                    description=f"Token '{val}' assigned to multiple roles: {usage_map[val]} and {role}"
+                ))
+            usage_map[val] = role
 
         # 2. Structural Incompatibility (Learned Exclusions + Bootstrap ROLE_EXCLUSIVITY)
         from app.semantic_allocation_engine import ROLE_EXCLUSIVITY

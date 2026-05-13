@@ -330,7 +330,17 @@ def run_pipeline(
                 output[role_name] = None
 
         output["_confidence"] = alloc_graph.coherence_score
-        
+
+        # Preserve conflict geometry from allocation for field arbitration
+        alloc_conflicts = getattr(alloc_graph, '_field_conflicts', [])
+        if alloc_conflicts:
+            output["_allocation_conflicts"] = alloc_conflicts
+            for fc in alloc_conflicts:
+                role = fc["role"]
+                if role not in output or not output[role]:
+                    output[role] = fc["candidate"]
+                    output[f"_{role}_conflict"] = fc["reason"]
+
         # Stage 6: Continuous Semantic Evolution (Inference)
         # Decision is driven by graph energy and instability, not a hard threshold.
         state = get_world_state()
