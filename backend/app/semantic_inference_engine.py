@@ -303,8 +303,14 @@ class RoleEmbeddingEngine:
         self._learned_exclusions[key] = min(1.0, self._learned_exclusions.get(key, 0.0) + 0.15)
 
     def get_learned_exclusion(self, role_a: str, role_b: str) -> float:
-        key = tuple(sorted([role_a, role_b]))
-        return self._learned_exclusions.get(key, 0.0)
+        """Exclusion emerges from topology, not pure dict lookup.
+
+        Delegates to WorldState's get_derived_exclusion which fuses:
+        - learned exclusion history (symbolic bridge)
+        - role-type compatibility mismatch (compatibility pressure)
+        - motif instability (motif pressure)
+        """
+        return self.ws.get_derived_exclusion(role_a, role_b)
 
     def learn_from_allocation(self, role: str, token_type: SemanticType, token_raw: str, success: bool, delta: float = 0.05):
         type_str = token_type.value if hasattr(token_type, 'value') else str(token_type)
