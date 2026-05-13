@@ -14,6 +14,7 @@ Mandatory features:
 """
 
 import math
+import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Set, Tuple, Optional
 
@@ -23,6 +24,8 @@ from app.semantic_ir import (
     SemanticType,
 )
 from app.semantic_world_state import get_world_state
+from app.event_dispatcher import get_dispatcher
+from app.semantic_events import SemanticEvent, SemanticEventType
 
 
 @dataclass
@@ -47,7 +50,7 @@ class IncompatibilityTopology:
         conflicts = []
         
         # 1. Identity Conflict (Duplicate usage of same token for distinct roles)
-        usage_map: dict[str, str] = {}
+        usage_map = {}
         for role, val in assignments.items():
             if val:
                 if val in usage_map:
@@ -115,39 +118,55 @@ def apply_contradiction_learning(output: Dict[str, str], schema_fields: List[str
     Contradictions create exclusion edges.
     """
     state = get_world_state()
+    dispatcher = get_dispatcher()
     
     if contradictions:
         # Learn exclusion edges between roles that fought over the same token
-        filled_vals: dict[str, str] = {}
+        filled_vals = {}
         for role, val in output.items():
             if val:
                 if val in filled_vals:
-                    r1 = filled_vals.get(val, "")
-                    r2 = role
-                    key = (r1, r2)
+                    r1, r2 = filled_vals[val], role
+                    key = tuple(sorted([r1, r2]))
                     # Strengthen exclusion edge
                     current = state.learned_exclusions.get(key, 0.0)
                     state.learned_exclusions[key] = min(current + 0.1, 1.0)
+                    
+                    dispatcher.dispatch(SemanticEvent(
+                        event_type=SemanticEventType.CONTRADICTION_DETECTED,
+                        source="contradiction_engine",
+                        payload={"role_pair": key, "conflict_type": "identity_clash"},
+                        instability_delta=0.2
+                    ))
                 filled_vals[val] = role
 
     # Original warning learning bridge
     if warnings:
         for role_name in schema_fields:
-            _val = output.get(role_name)
-            if _val is None:
+            val = output.get(role_name)
+            if not val:
                 continue
-            val_type, _ = detect_type_fn(_val, role_name)
+            val_type, _ = detect_type_fn(val, role_name)
             # Find expected type
             seed_type = SemanticType.TEXT
             for roots, stype in universal_roots:
                 if any(root in role_name.lower() for root in roots):
                     seed_type = stype
                     break
-            if seed_type != SemanticType.TEXT and val_type != seed_type:
+            
+            v_type_str = val_type.value if hasattr(val_type, 'value') else str(val_type)
+            if seed_type != SemanticType.TEXT and v_type_str != (seed_type.value if hasattr(seed_type, 'value') else str(seed_type)):
                 # Penalize compatibility in world state
-                key = (role_name, val_type.value if hasattr(val_type, 'value') else str(val_type))
+                key = (role_name, v_type_str)
                 current = state.role_compatibility.get(key, 0.5)
                 state.role_compatibility[key] = max(0.0, current - 0.2)
+                
+                dispatcher.dispatch(SemanticEvent(
+                    event_type=SemanticEventType.UNCERTAINTY_SPIKE,
+                    source="warning_learning",
+                    payload={"role": role_name, "type_mismatch": v_type_str},
+                    instability_delta=0.1
+                ))
 
 def detect_role_swap_warnings(output: Dict[str, str], schema_fields: List[str], detect_type_fn, universal_roots) -> List[str]:
     """Identifies role-type mismatches that suggest a potential swap or misallocation."""

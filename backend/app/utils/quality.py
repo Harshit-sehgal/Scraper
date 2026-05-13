@@ -1,5 +1,7 @@
 import logging
+import re
 from statistics import mean
+from app.models import SchemaField, FieldType
 
 def clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
@@ -28,6 +30,79 @@ def compute_source_breakdown(rows: list[dict]) -> dict:
         st = str((row or {}).get("source_type") or "unknown")
         breakdown[st if st in breakdown else "unknown"] += 1
     return breakdown
+
+def _value_quality(field: SchemaField, value) -> float:
+    """Measure the semantic quality of a specific field value."""
+    if value is None:
+        return 0.0
+
+    if isinstance(value, list):
+        if not value:
+            return 0.0
+        scores = [_value_quality(field, v) for v in value]
+        return sum(scores) / len(scores)
+
+    text = str(value).strip()
+    if not text:
+        return 0.0
+
+    # Minimum length for meaningful values (except codes/ratings)
+    if field.field_type not in (FieldType.CODE, FieldType.RATING, FieldType.NUMBER):
+        if len(text) < 2:
+            return 0.2
+
+    score = 0.5 # Baseline for present value
+
+    # Type-specific quality boosts
+    if field.field_type == FieldType.EMAIL:
+        if "@" in text and "." in text:
+            score += 0.4
+    elif field.field_type == FieldType.PHONE:
+        digits = re.sub(r"\D", "", text)
+        if len(digits) >= 7:
+            score += 0.4
+    elif field.field_type == FieldType.URL:
+        if text.startswith(("http", "www")):
+            score += 0.4
+    elif field.field_type == FieldType.CURRENCY:
+        if any(c.isdigit() for c in text):
+            score += 0.3
+    elif field.field_type == FieldType.RATING:
+        if any(c.isdigit() for c in text) or any(w in text.lower() for w in ["one", "two", "three", "four", "five"]):
+            score += 0.4
+
+    return min(score, 1.0)
+
+
+def score_record_quality(record: dict, schema_fields: list[SchemaField]) -> float:
+    """Calculate an overall quality score for an extracted record."""
+    if not record or not schema_fields:
+        return 0.0
+
+    field_scores = []
+    required_missing = False
+
+    for field in schema_fields:
+        val = record.get(field.name)
+        quality = _value_quality(field, val)
+
+        if field.required and quality < 0.3:
+            required_missing = True
+
+        # Weighting: required fields impact score more
+        weight = 1.5 if field.required else 1.0
+        field_scores.append(quality * weight)
+
+    if not field_scores:
+        return 0.0
+
+    avg_quality = sum(field_scores) / sum(1.5 if f.required else 1.0 for f in schema_fields)
+
+    # Penalty for missing required fields
+    if required_missing:
+        avg_quality *= 0.5
+
+    return round(clamp01(avg_quality), 3)
 
 def build_quality_report(
     raw_results: list[dict],

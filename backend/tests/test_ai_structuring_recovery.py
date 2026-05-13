@@ -66,7 +66,8 @@ def test_llm_json_fast_uses_groq_fallback_model(monkeypatch):
             return {"records": [{"company_name": "Fallback Row"}]}
         return {}
 
-    monkeypatch.setattr(scraper_mod, "_call_openai_compatible_json", fake_openai_json)
+    import app.llm_bridge
+    monkeypatch.setattr(app.llm_bridge, "_call_openai_compatible_json", fake_openai_json)
 
     out = scraper_mod._llm_json_fast(
         messages=[{"role": "user", "content": "test"}],

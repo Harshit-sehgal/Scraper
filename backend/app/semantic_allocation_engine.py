@@ -366,6 +366,11 @@ def allocate_semantic_roles(
             record.mapped_confidences[role_name] = role.fill_confidence
 
     record.overall_confidence = graph.coherence_score
+    
+    # Propagate uncertainty to global state
+    from app.semantic_world_state import get_world_state
+    state = get_world_state()
+    state.metrics.cumulative_uncertainty += (1.0 - graph.coherence_score)
 
     if not learn:
         return record, graph

@@ -25,6 +25,9 @@ class FieldType(str, Enum):
     LIST_STRING = "list_string"
     CURRENCY = "currency"
     PERCENTAGE = "percentage"
+    CODE = "code"
+    RATING = "rating"
+    NUMBER = "number"
 
 
 class FilterOperator(str, Enum):

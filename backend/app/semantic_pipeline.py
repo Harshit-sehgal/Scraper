@@ -10,7 +10,9 @@ Flow:
 3. Segmentation (expand composite records)
 4. Entity grouping (boundary-aware merge)
 5. Global allocation (multi-hypothesis role assignment)
-6. Diagnostics (decision explanation)
+6. Continuous Evolution (Inference relaxation)
+7. Contradiction Topology (Conflict propagation)
+8. Diagnostics (Topological introspection)
 """
 
 import logging
@@ -36,6 +38,8 @@ from app.semantic_ir import (
 from app.semantic_mapper import detect_semantic_type, is_child_fragment
 from app.semantic_segmentation import StructuralMemoryTracker, expand_composite_records
 from app.semantic_world_state import get_world_state
+from app.event_dispatcher import get_dispatcher
+from app.semantic_events import SemanticEvent, SemanticEventType
 
 
 METADATA_FIELDS: Set[str] = {
@@ -203,6 +207,7 @@ def run_pipeline(
     
     reng = _get_role_engine()
     be = get_boundary_engine()
+    dispatcher = get_dispatcher()
     
     # Bootstrap engines
     if schema_fields:
@@ -220,6 +225,14 @@ def run_pipeline(
     records = filter_noise_records(records)
     report.noise_removed = noise_count - len(records)
     report.after_noise_filter = len(records)
+    
+    if report.noise_removed > 0:
+        dispatcher.dispatch(SemanticEvent(
+            event_type=SemanticEventType.TOPOLOGY_SHIFT,
+            source="pipeline_filter",
+            payload={"removed": report.noise_removed},
+            instability_delta=0.1
+        ))
 
     if not records:
         return []
@@ -297,6 +310,14 @@ def run_pipeline(
         instability = 1.0 - output["_confidence"]
         relative_instability = instability / max(0.1, state.metrics.average_uncertainty)
         
+        if relative_instability > 0.8:
+            dispatcher.dispatch(SemanticEvent(
+                event_type=SemanticEventType.UNCERTAINTY_SPIKE,
+                source="allocation_engine",
+                payload={"instability": relative_instability},
+                instability_delta=0.3
+            ))
+
         if relative_instability > 0.8 and tokens:
             from app.semantic_inference_engine import InferenceEngine
             try:
@@ -329,6 +350,12 @@ def run_pipeline(
         if contradictions:
             output["_contradictions"] = contradictions
             output["_confidence"] *= 0.7
+            dispatcher.dispatch(SemanticEvent(
+                event_type=SemanticEventType.CONTRADICTION_DETECTED,
+                source="contradiction_engine",
+                payload={"conflicts": contradictions},
+                instability_delta=0.5
+            ))
             
         from app.semantic_allocation_engine import _UNIVERSAL_ROOTS
         warnings = detect_role_swap_warnings(output, schema_fields, detect_semantic_type, _UNIVERSAL_ROOTS)
@@ -340,7 +367,7 @@ def run_pipeline(
         # Stage 8: Diagnostics
         from app.semantic_diagnostics import generate_allocation_diagnostics
         output["_reasoning"] = generate_allocation_diagnostics(
-            output, schema_fields, reng, contradictions, detect_semantic_type
+            output, schema_fields, reng, contradictions, detect_semantic_type, tokens=tokens
         )
         
         coherence = output["_confidence"]

@@ -100,7 +100,7 @@ def test_boost_contacts_with_page_html_injects_page_contact_when_missing():
     </body></html>
     """
 
-    boosted = scraper_mod._boost_contacts_with_page_html(rows, schema, html)
+    boosted = scraper_mod._boost_contacts_with_page_html(rows, html, schema)
 
     assert boosted[0].get("email") == "hello@gamma.example"
     assert re.sub(r"\D", "", boosted[0].get("phone") or "") == "919000011111"

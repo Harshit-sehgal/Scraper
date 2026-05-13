@@ -9,11 +9,13 @@ boundary decisions based on structural signals and learned history.
 """
 
 import logging
+import math
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from app.semantic_ir import SemanticToken, SemanticType
+from app.semantic_world_state import get_world_state
 
 
 @dataclass
@@ -87,8 +89,22 @@ class RoleTransitionDetector:
     """Learns which type transitions likely mark a semantic role boundary."""
 
     def __init__(self):
-        self.transition_probs: Dict[Tuple[str, str], float] = dict(_BOOTSTRAP_TRANSITIONS)
-        self.observation_count: int = 0
+        # Ensure bootstrap transitions are present in the world state
+        ws = get_world_state()
+        if not ws.transition_probs:
+            ws.transition_probs.update(_BOOTSTRAP_TRANSITIONS)
+
+    @property
+    def transition_probs(self) -> Dict[Tuple[str, str], float]:
+        return get_world_state().transition_probs
+
+    @property
+    def observation_count(self) -> int:
+        return get_world_state().metrics.transition_observations
+
+    @observation_count.setter
+    def observation_count(self, value: int):
+        get_world_state().metrics.transition_observations = value
 
     def score_transition(self, type_a: str, type_b: str) -> TransitionScore:
         """Score how likely a transition between these types represents a role boundary."""
@@ -121,11 +137,23 @@ class CohesionModel:
     """
 
     def __init__(self):
-        # Pattern → count of successful outcomes
-        self.merge_success: Dict[Tuple[str, str], float] = {}
-        self.merge_attempts: Dict[Tuple[str, str], float] = {}
-        self.split_success: Dict[Tuple[str, str], float] = {}
-        self.split_attempts: Dict[Tuple[str, str], float] = {}
+        pass
+
+    @property
+    def merge_success(self) -> Dict[Tuple[str, str], float]:
+        return get_world_state().cohesion_merge_success
+
+    @property
+    def merge_attempts(self) -> Dict[Tuple[str, str], float]:
+        return get_world_state().cohesion_merge_attempts
+
+    @property
+    def split_success(self) -> Dict[Tuple[str, str], float]:
+        return get_world_state().cohesion_split_success
+
+    @property
+    def split_attempts(self) -> Dict[Tuple[str, str], float]:
+        return get_world_state().cohesion_split_attempts
 
     def record(self, type_a: str, type_b: str, did_merge: bool, success: bool):
         """Record whether a merge or split decision was successful."""
@@ -176,24 +204,30 @@ class MotifLearner:
     """
 
     def __init__(self):
-        self.motif_counts: Counter = Counter()
-        self.total_records: int = 0
+        pass
+
+    @property
+    def total_records(self) -> int:
+        return get_world_state().metrics.total_records_processed
+
+    @total_records.setter
+    def total_records(self, value: int):
+        get_world_state().metrics.total_records_processed = value
 
     def observe_types(self, types: List[str]):
-        """Record a type sequence from a record."""
+        """Record and REINFORCE a type sequence from a record."""
+        ws = get_world_state()
         self.total_records += 1
+
         # Record all n-grams of length 2-4 as motifs
         for size in range(2, min(len(types) + 1, 5)):
             for start in range(len(types) - size + 1):
                 motif = tuple(types[start:start + size])
-                self.motif_counts[motif] += 1
+                ws.reinforce_motif(motif)
 
     def stability(self, motif: Tuple[str, ...]) -> float:
         """Get the stability score for a type motif (0-1)."""
-        if self.total_records == 0:
-            return 0.0
-        count = self.motif_counts.get(motif, 0)
-        return min(count / max(self.total_records, 1), 1.0)
+        return get_world_state().get_motif_stability(motif)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -204,11 +238,13 @@ class SemanticBoundaryEngine:
     """Scores adjacent token pairs for cohesion vs separation."""
 
     def __init__(self):
-        self.decision_history: List[MergeDecision] = []
-        self.learned_transitions: Dict[Tuple[str, str], float] = {}
         self.cohesion_model = CohesionModel()
         self.transition_detector = RoleTransitionDetector()
         self.motif_learner = MotifLearner()
+
+    @property
+    def decision_history(self) -> list:
+        return get_world_state().decision_history
 
     def score_pair(self, type_a: str, type_b: str, value_a: str, value_b: str,
                    position_a: int, position_b: int) -> BoundaryScore:
@@ -281,50 +317,11 @@ class SemanticBoundaryEngine:
 
     def save_state(self) -> dict:
         """Export learned memory for persistence."""
-        return {
-            "transitions": {f"{k[0]}|{k[1]}": v for k, v in self.transition_detector.transition_probs.items()},
-            "transition_count": self.transition_detector.observation_count,
-            "motifs": {",".join(k): v for k, v in self.motif_learner.motif_counts.items()},
-            "total_records": self.motif_learner.total_records,
-            "cohesion": {
-                "merge_success": {f"{k[0]}|{k[1]}": v for k, v in self.cohesion_model.merge_success.items()},
-                "merge_attempts": {f"{k[0]}|{k[1]}": v for k, v in self.cohesion_model.merge_attempts.items()},
-                "split_success": {f"{k[0]}|{k[1]}": v for k, v in self.cohesion_model.split_success.items()},
-                "split_attempts": {f"{k[0]}|{k[1]}": v for k, v in self.cohesion_model.split_attempts.items()},
-            }
-        }
+        return get_world_state().to_dict()
 
     def load_state(self, state: dict):
         """Import learned memory from persistence."""
-        if "transitions" in state:
-            self.transition_detector.transition_probs = {
-                tuple(k.split("|")): v for k, v in state["transitions"].items()
-            }
-        if "transition_count" in state:
-            self.transition_detector.observation_count = state["transition_count"]
-            
-        if "motifs" in state:
-            self.motif_learner.motif_counts.clear()
-            self.motif_learner.motif_counts.update({
-                tuple(k.split(",")): v for k, v in state["motifs"].items()
-            })
-        if "total_records" in state:
-            self.motif_learner.total_records = state["total_records"]
-            
-        if "cohesion" in state:
-            coh = state["cohesion"]
-            self.cohesion_model.merge_success = {
-                tuple(k.split("|")): v for k, v in coh.get("merge_success", {}).items()
-            }
-            self.cohesion_model.merge_attempts = {
-                tuple(k.split("|")): v for k, v in coh.get("merge_attempts", {}).items()
-            }
-            self.cohesion_model.split_success = {
-                tuple(k.split("|")): v for k, v in coh.get("split_success", {}).items()
-            }
-            self.cohesion_model.split_attempts = {
-                tuple(k.split("|")): v for k, v in coh.get("split_attempts", {}).items()
-            }
+        get_world_state().from_dict(state)
 
     def decide_merge(self, type_a: str, type_b: str, value_a: str, value_b: str,
                      position_a: int, position_b: int) -> bool:

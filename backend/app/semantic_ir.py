@@ -239,6 +239,16 @@ class OwnershipEdge:
 
 
 @dataclass
+class ExclusionEdge:
+    """A scored exclusion relationship between two nodes/regions.
+    Exclusion edges propagate conflict pressure through the topology.
+    """
+    source_id: int
+    target_id: int
+    strength: float # 0-1, higher means more mutually exclusive
+    evidence: List[str] = field(default_factory=list)
+
+@dataclass
 class SemanticGraph:
     """Complete semantic graph for a dataset row or page.
 
@@ -249,13 +259,15 @@ class SemanticGraph:
     tokens: List[SemanticToken] = field(default_factory=list)
     relationships: List[RelationshipEdge] = field(default_factory=list)
     ownership_edges: List[OwnershipEdge] = field(default_factory=list)
+    exclusion_edges: List[ExclusionEdge] = field(default_factory=list)
 
-    # Global properties
+    # Global properties & Equilibrium metrics
     coherence_score: float = 0.0
-    contradictions: List[Any] = field(default_factory=list)
     contradiction_score: float = 0.0
+    semantic_energy: float = 5.0
     has_contradictions: bool = False
-
+    uncertainty_field: Dict[int, float] = field(default_factory=dict) # node_id -> uncertainty
+    
     # Sub-graphs
     sub_graphs: List["SemanticGraph"] = field(default_factory=list)
 
@@ -359,8 +371,8 @@ def populate_type_vector(token: SemanticToken, primary_type: SemanticType,
     """
     if graph:
         # Derive type_vector from graph neighborhood
-        from app.semantic_inference_engine import RelationalEmbeddingSpace
-        emb_space = RelationalEmbeddingSpace(dimension=16)
+        from app.semantic_inference_engine import RelationshipEmbeddingSpace
+        emb_space = RelationshipEmbeddingSpace(dimension=16)
         # Find the token in the graph
         for i, t in enumerate(graph.tokens):
             if t is token or t.raw == token.raw:
