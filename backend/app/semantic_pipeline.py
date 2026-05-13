@@ -40,6 +40,9 @@ from app.semantic_segmentation import StructuralMemoryTracker, expand_composite_
 from app.semantic_world_state import get_world_state
 from app.event_dispatcher import get_dispatcher
 from app.semantic_events import SemanticEvent, SemanticEventType
+# Import scheduler singleton to wire event subscriptions at module load time
+from app.graph_update_scheduler import get_scheduler
+get_scheduler()
 
 
 # Pipeline thresholds — isolated as named constants for observability
@@ -395,8 +398,12 @@ def run_pipeline(
         coherence = output["_confidence"]
         be = get_boundary_engine()
         for md in be.decision_history[-_DIAGNOSTIC_HISTORY_WINDOW:]:
-            md.coherence_after = coherence
-            md.success = coherence > _COHERENCE_SUCCESS_THRESHOLD
+            if isinstance(md, dict):
+                md["coherence_after"] = coherence
+                md["success"] = coherence > _COHERENCE_SUCCESS_THRESHOLD
+            else:
+                md.coherence_after = coherence
+                md.success = coherence > _COHERENCE_SUCCESS_THRESHOLD
         
         allocated_records.append(output)
 
