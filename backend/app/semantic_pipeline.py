@@ -399,6 +399,32 @@ def run_pipeline(
             
         apply_contradiction_learning(output, schema_fields, reng, detect_semantic_type, contradictions, warnings, _UNIVERSAL_ROOTS)
 
+        # Phase 3: Uncertainty redistribution — contradiction waves spread through topology
+        # Check tokens (pre-allocation) since allocation resolves exclusivity conflicts
+        if contradictions and tokens:
+            from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
+            value_fields: dict = {}
+            for t in tokens:
+                if t.raw and t.source_field:
+                    if t.raw in value_fields:
+                        prev_field = value_fields[t.raw]
+                        pair = (prev_field, t.source_field)
+                        rev_pair = (t.source_field, prev_field)
+                        if pair in ROLE_EXCLUSIVITY or rev_pair in ROLE_EXCLUSIVITY:
+                            propagate_to = set()
+                            for other_a, other_b in ROLE_EXCLUSIVITY:
+                                for role in (prev_field, t.source_field):
+                                    peer = other_b if role == other_a else (other_a if role == other_b else None)
+                                    if peer is not None:
+                                        propagate_to.add(peer)
+                            for peer in propagate_to:
+                                for ttype in ["price", "date", "location", "organization", "phone", "email"]:
+                                    key = (peer, ttype)
+                                    current = reng.compatibility_cache.get(key, 0.5)
+                                    decay = 0.02 * max(len(contradictions), 1)
+                                    reng.compatibility_cache[key] = max(0.0, current - decay)
+                    value_fields[t.raw] = t.source_field
+
         # Re-allocation pass: feed contradiction pressure back into the graph
         if contradictions and len(tokens) >= _EVOLUTION_REALLOC_MIN_TOKENS:
             # Boost learned exclusions proportional to contradiction energy
