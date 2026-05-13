@@ -72,6 +72,11 @@ class SemanticWorldState:
         # Contradiction Topology: Impossible neighborhoods, exclusion edges
         self.learned_exclusions: Dict[Tuple[str, str], float] = {}
         self.impossible_neighborhoods: List[Set[str]] = []
+        # Neighborhood cohesion: tracks how well role pairs work together
+        # High cohesion = roles frequently co-occur without contradictions
+        # Low cohesion = roles frequently conflict, candidates for restructuring
+        self.neighborhood_cohesion: Dict[Tuple[str, str], float] = {}
+        self.restructuring_queue: Set[Tuple[str, str]] = set()
         
         # Cohesion Field: Merge vs Split biases
         self.cohesion_merge_success: Dict[Tuple[str, str], float] = {}

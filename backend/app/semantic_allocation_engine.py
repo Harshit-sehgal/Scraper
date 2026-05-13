@@ -214,6 +214,15 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str]) -> A
             if reng.get_learned_exclusion(r1, r2) > exclusion_threshold:
                 graph.exclusivity_edges.append((r1, r2))
 
+    # Phase 4: Check restructuring queue — flag role pairs for separation
+    from app.semantic_world_state import get_world_state as _gws
+    _ws = _gws()
+    for pair in list(_ws.restructuring_queue):
+        r1, r2 = pair
+        if r1 in graph.roles and r2 in graph.roles:
+            if (r1, r2) not in graph.exclusivity_edges and (r2, r1) not in graph.exclusivity_edges:
+                graph.exclusivity_edges.append((r1, r2))
+
     # Initial coherence
     graph.coherence_score = _compute_allocation_coherence(graph)
 

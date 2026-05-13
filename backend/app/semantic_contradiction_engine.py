@@ -176,6 +176,32 @@ def apply_contradiction_learning(output: Dict[str, str], schema_fields: List[str
                 ))
             filled_vals[val] = role
 
+        # Phase 4: Neighborhood cohesion tracking
+        # Decrement cohesion for role pairs in contradiction descriptions
+        for c in contradictions:
+            c_str = str(c)
+            for role in schema_fields:
+                if role in c_str:
+                    for other_role in schema_fields:
+                        if other_role != role and other_role in c_str:
+                            key = tuple(sorted([role, other_role]))
+                            current = state.neighborhood_cohesion.get(key, 0.5)
+                            state.neighborhood_cohesion[key] = max(0.0, current - 0.1)
+                            if state.neighborhood_cohesion[key] < 0.3:
+                                state.restructuring_queue.add(key)
+
+    # Increment cohesion for non-conflicting co-occurrences
+    if not contradictions:
+        for role in output:
+            if role.startswith('_') or not output[role]:
+                continue
+            for other_role in output:
+                if other_role.startswith('_') or not output[other_role] or other_role == role:
+                    continue
+                key = tuple(sorted([role, other_role]))
+                current = state.neighborhood_cohesion.get(key, 0.5)
+                state.neighborhood_cohesion[key] = min(1.0, current + 0.02)
+
     # Original warning learning bridge
     if warnings:
         for role_name in schema_fields:
