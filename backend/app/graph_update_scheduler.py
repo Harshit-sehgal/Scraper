@@ -62,11 +62,16 @@ class GraphUpdateScheduler:
                 ))
         
         if virtual_tokens:
-            ie.infer(virtual_tokens, list(ws.role_position_memory.keys()))
+            result = ie.infer(virtual_tokens, list(ws.role_position_memory.keys()))
+            # Write inference results back to world state
+            ws.metrics.global_energy = result.energy
+            if result.belief_field:
+                ws.metrics.average_entropy = result.belief_field.field_entropy
+                ws.metrics.global_entropy = result.belief_field.field_entropy
             self.dispatcher.dispatch(SemanticEvent(
                 event_type=SemanticEventType.EQUILIBRIUM_REACHED,
                 source="graph_update_scheduler",
-                payload={"energy": ws.metrics.global_energy},
+                payload={"energy": result.energy},
                 instability_delta=-0.1
             ))
 

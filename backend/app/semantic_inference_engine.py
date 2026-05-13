@@ -160,6 +160,8 @@ class InferenceEngine:
         """Evolve the graph topology until equilibrium is reached."""
         graph = SemanticGraph(regions=[], tokens=tokens)
         self._build_exclusion_topology(graph, schema_fields)
+        # Populate relationships so stabilize() has edges to work on
+        graph.relationships = list(graph.exclusion_edges)
         
         state = SemanticState(belief_field=BeliefField.from_tokens(tokens))
         
@@ -170,6 +172,16 @@ class InferenceEngine:
                 break
             self.thermo.stabilize(state, graph)
             self.ws.metrics.cumulative_uncertainty += (1.0 - state.belief_field.field_coherence)
+            
+        # Populate role assignments so pipeline can use inference results
+        for i, token in enumerate(tokens):
+            if i < len(schema_fields):
+                state.role_assignments[schema_fields[i]] = token.raw
+        
+        # Persist results back to world state
+        self.ws.metrics.global_energy = state.energy
+        self.ws.metrics.average_entropy = state.belief_field.field_entropy
+        self.ws.metrics.global_entropy = state.belief_field.field_entropy
             
         self.dispatcher.dispatch(SemanticEvent(
             event_type=SemanticEventType.EQUILIBRIUM_REACHED,
