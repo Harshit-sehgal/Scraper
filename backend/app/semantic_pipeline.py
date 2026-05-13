@@ -323,6 +323,9 @@ def run_pipeline(
         state = get_world_state()
         instability = 1.0 - output["_confidence"]
         relative_instability = instability / max(0.1, state.metrics.average_uncertainty)
+        # Unified field pressure modulates: high pressure amplifies instability
+        pressure = state.metrics.field_pressure
+        relative_instability *= (1.0 + pressure * 0.5)
         
         if relative_instability > _INSTABILITY_SPIKE_THRESHOLD:
             dispatcher.dispatch(SemanticEvent(

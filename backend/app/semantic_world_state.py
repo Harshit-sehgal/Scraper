@@ -28,6 +28,18 @@ class TopologyMetrics:
             return 0.5
         return self.cumulative_uncertainty / self.total_records_processed
 
+    @property
+    def field_pressure(self) -> float:
+        """Unified semantic field pressure — fuses energy, entropy, and uncertainty.
+
+        All cognition should derive from this single scalar.
+        High pressure = unstable, contradictory, uncertain field.
+        Low pressure = stable, coherent, convergent field.
+        """
+        norm_energy = min(self.global_energy / 10.0, 1.0)
+        pressure = (norm_energy + self.global_entropy + self.average_uncertainty) / 3.0
+        return max(0.0, min(1.0, pressure))
+
 class SemanticWorldState:
     """
     Canonical Semantic World State.
