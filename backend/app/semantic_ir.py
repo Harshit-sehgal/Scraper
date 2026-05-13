@@ -242,11 +242,21 @@ class OwnershipEdge:
 class ExclusionEdge:
     """A scored exclusion relationship between two nodes/regions.
     Exclusion edges propagate conflict pressure through the topology.
+    Unified with RelationshipEdge via confidence/strength duality.
     """
     source_id: int
     target_id: int
-    strength: float # 0-1, higher means more mutually exclusive
+    strength: float = 1.0
+    confidence: float = 1.0
     evidence: List[str] = field(default_factory=list)
+
+    def __init__(self, source_id: int, target_id: int, strength: float = 1.0,
+                 confidence: Optional[float] = None, evidence: Optional[List[str]] = None):
+        self.source_id = source_id
+        self.target_id = target_id
+        self.strength = strength
+        self.confidence = confidence if confidence is not None else strength
+        self.evidence = evidence or []
 
 @dataclass
 class SemanticGraph:
