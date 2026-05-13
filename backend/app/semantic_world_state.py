@@ -277,18 +277,28 @@ class SemanticWorldState:
                     pair = (roles[i], roles[j])
                     rev_pair = (roles[j], roles[i])
                     if pair in ROLE_EXCLUSIVITY or rev_pair in ROLE_EXCLUSIVITY:
-                        region = FieldConflictRegion(
-                            competing_roles=[roles[i], roles[j]],
-                            token=token_val,
-                            instability=0.5 + 0.1 * len([r for r in self.field_regions
-                                                        if r.token == token_val]),
-                            semantic_pressure=self.metrics.field_pressure,
-                            recurrence_score=self.learned_exclusions.get(
-                                tuple(sorted([roles[i], roles[j]])), 0.0
-                            ),
-                            topology_neighbors=list(set(roles)),
-                        )
-                        self.field_regions.append(region)
+                        # Update existing region or create new one — persistent evolution
+                        sorted_roles = tuple(sorted([roles[i], roles[j]]))
+                        existing = None
+                        for r in self.field_regions:
+                            if r.token == token_val and tuple(sorted(r.competing_roles)) == sorted_roles:
+                                existing = r
+                                break
+                        if existing:
+                            existing.instability = min(1.0, existing.instability + 0.15)
+                            existing.recurrence_score = min(1.0, existing.recurrence_score + 0.1)
+                            existing.semantic_pressure = self.metrics.field_pressure
+                            existing.source_record = f"recurrence_{self.field_activation_count}"
+                        else:
+                            region = FieldConflictRegion(
+                                competing_roles=[roles[i], roles[j]],
+                                token=token_val,
+                                instability=0.5,
+                                semantic_pressure=self.metrics.field_pressure,
+                                recurrence_score=self.learned_exclusions.get(sorted_roles, 0.0),
+                                topology_neighbors=list(set(roles)),
+                            )
+                            self.field_regions.append(region)
                         captured += 1
                         self.field_activation_count += 1
 
