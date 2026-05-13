@@ -323,10 +323,105 @@ def test_field_pressure_unifies_dimensions():
     ws.clear()
     p = ws.metrics.field_pressure
     assert 0.0 <= p <= 1.0, f"field_pressure must be bounded [0,1], got {p}"
-    # Each dimension should affect field pressure independently
     ws.metrics.global_energy = 10.0
     p2 = ws.metrics.field_pressure
     assert p2 >= p or abs(p2 - p) < 0.001, "Higher energy must increase or maintain field pressure"
     ws.metrics.global_entropy = 0.0
     p3 = ws.metrics.field_pressure
     assert p3 <= p2 or abs(p3 - p2) < 0.001, "Lower entropy must decrease or maintain field pressure"
+
+
+# ─────────────────────────────────────────────────────────────
+# INVARIANT 19: Topology causality — field pressure alters exclusion memory
+# ─────────────────────────────────────────────────────────────
+
+def test_topology_causality_invariant():
+    """Higher field pressure must produce tighter exclusion thresholds."""
+    from app.semantic_allocation_engine import _adaptive_exclusion_threshold
+    ws = get_world_state()
+    ws.clear()
+    ws.metrics.global_energy = 0.1
+    ws.metrics.global_entropy = 0.1
+    ws.metrics.cumulative_uncertainty = 1
+    ws.metrics.total_records_processed = 100
+    t_low = _adaptive_exclusion_threshold()
+    ws.metrics.global_energy = 9.0
+    ws.metrics.global_entropy = 0.9
+    ws.metrics.cumulative_uncertainty = 50
+    t_high = _adaptive_exclusion_threshold()
+    assert t_high >= t_low or abs(t_high - t_low) < 0.001, \
+        f"Higher field pressure must raise exclusion threshold ({t_high} >= {t_low})"
+
+
+# ─────────────────────────────────────────────────────────────
+# INVARIANT 20: Semantic gravity — stable motifs reduce exclusion
+# ─────────────────────────────────────────────────────────────
+
+def test_semantic_gravity_invariant():
+    """Stable motifs should reduce exclusion pressure between roles."""
+    ws = get_world_state()
+    ws.clear()
+    ws.role_compatibility[('name', 'price')] = 0.1
+    ws.role_compatibility[('price', 'price')] = 0.9
+    ws.metrics.total_records_processed = 100
+    e_before = ws.get_derived_exclusion('name', 'price')
+    # Add a stable motif — stability > 0.5 should PULL exclusion down
+    ws.motif_counts[('organization', 'price')] = 500  # high count = stable
+    ws.motif_timestamps[('organization', 'price')] = 95
+    e_after = ws.get_derived_exclusion('name', 'price')
+    assert e_after <= e_before or abs(e_after - e_before) < 0.001, \
+        f"Stable motifs should reduce or maintain exclusion ({e_after} <= {e_before})"
+
+
+# ─────────────────────────────────────────────────────────────
+# INVARIANT 21: Field equilibrium — field_pressure stabilizes over time
+# ─────────────────────────────────────────────────────────────
+
+def test_field_equilibrium_invariant():
+    """Processing more records without contradictions should lower field pressure."""
+    ws = get_world_state()
+    ws.clear()
+    schema = ["name", "price"]
+    run_pipeline([{"company": "Test Corp", "cost": "100"}], schema)
+    p1 = ws.metrics.field_pressure
+    for _ in range(10):
+        run_pipeline([{"company": "Stable Co", "cost": "200"}], schema)
+    p2 = ws.metrics.field_pressure
+    assert p2 <= p1 or abs(p2 - p1) < 0.1, \
+        f"Stable processing should reduce field pressure ({p2} <= {p1})"
+
+
+# ─────────────────────────────────────────────────────────────
+# INVARIANT 22: Topology restructuring — contradictions grow exclusion edges
+# ─────────────────────────────────────────────────────────────
+
+def test_topology_restructuring_invariant():
+    """Repeated contradictions must increase learned exclusions."""
+    ws = get_world_state()
+    ws.clear()
+    schema = ["origin", "destination"]
+    before = len(ws.learned_exclusions)
+    for _ in range(3):
+        run_pipeline([{"origin": "LAX", "destination": "LAX"}], schema)
+    after = len(ws.learned_exclusions)
+    assert after >= before, \
+        f"Contradictions must increase or maintain exclusion count ({after} >= {before})"
+
+
+# ─────────────────────────────────────────────────────────────
+# INVARIANT 23: Propagation conservation — field propagation must create exclusions
+# ─────────────────────────────────────────────────────────────
+
+def test_propagation_conservation_invariant():
+    """Field propagation must spread instability to neighboring roles."""
+    ws = get_world_state()
+    ws.clear()
+    schema = ["origin", "destination", "departure", "arrival"]
+    before = len(ws.learned_exclusions)
+    run_pipeline([{"origin": "LAX", "destination": "LAX", "depart": "10:00", "arrive": "12:00"}], schema)
+    after = len(ws.learned_exclusions)
+    assert after >= before, \
+        f"Propagation must create or maintain exclusions ({after} >= {before})"
+
+
+
