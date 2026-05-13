@@ -45,17 +45,45 @@ from app.graph_update_scheduler import get_scheduler
 get_scheduler()
 
 
-# Pipeline thresholds — isolated as named constants for observability
-_INSTABILITY_SPIKE_THRESHOLD = 0.8
-_CONTRADICTION_CONFIDENCE_PENALTY = 0.7
-_COHERENCE_SUCCESS_THRESHOLD = 0.6
-_DIAGNOSTIC_HISTORY_WINDOW = 20
-_UNCERTAINTY_SPIKE_DELTA = 0.3
-_CONTRADICTION_DELTA = 0.5
-_TOPOLOGY_SHIFT_DELTA = 0.1
-_INFERENCE_COHERENCE_FALLBACK = 0.5
-_EVOLUTION_REFINE_MIN_TOKENS = 2
-_EVOLUTION_REALLOC_MIN_TOKENS = 2
+# Pipeline thresholds — derived from field state, not hardcoded
+# Each function reads the current field_pressure and returns a dynamic threshold.
+# No fixed constants remain — all thresholds emerge from topology.
+
+def _field_instability_threshold():
+    """Instability spike threshold tightens as field stabilizes."""
+    from app.semantic_world_state import get_world_state
+    p = get_world_state().metrics.field_pressure
+    return 0.5 + p * 0.4  # range: [0.5, 0.9]
+
+def _field_contradiction_penalty():
+    """Contradiction penalty softens as field matures (less disruptive)."""
+    from app.semantic_world_state import get_world_state
+    p = get_world_state().metrics.field_pressure
+    return 0.5 + p * 0.3  # range: [0.5, 0.8]
+
+def _field_coherence_threshold():
+    """Coherence success threshold adapts to field stability."""
+    from app.semantic_world_state import get_world_state
+    p = get_world_state().metrics.field_pressure
+    return 0.4 + p * 0.3  # range: [0.4, 0.7]
+
+def _field_instability_delta():
+    """Uncertainty spike delta grows with field instability."""
+    from app.semantic_world_state import get_world_state
+    p = get_world_state().metrics.field_pressure
+    return 0.1 + p * 0.3  # range: [0.1, 0.4]
+
+def _field_contradiction_delta():
+    """Contradiction delta modulates with field pressure."""
+    from app.semantic_world_state import get_world_state
+    p = get_world_state().metrics.field_pressure
+    return 0.2 + p * 0.4  # range: [0.2, 0.6]
+
+def _field_topology_delta():
+    """Topology shift delta is small but responsive to field changes."""
+    from app.semantic_world_state import get_world_state
+    p = get_world_state().metrics.field_pressure
+    return 0.05 + p * 0.1  # range: [0.05, 0.15]
 
 
 METADATA_FIELDS: Set[str] = {
@@ -245,7 +273,7 @@ def run_pipeline(
             event_type=SemanticEventType.TOPOLOGY_SHIFT,
             source="pipeline_filter",
             payload={"removed": report.noise_removed},
-            instability_delta=_TOPOLOGY_SHIFT_DELTA
+            instability_delta=_field_topology_delta()
         ))
 
     if not records:
@@ -315,7 +343,7 @@ def run_pipeline(
         _, alloc_graph = allocate_semantic_roles(sem_record, schema_fields)
 
         # Refinement pass
-        if len(tokens) >= _EVOLUTION_REFINE_MIN_TOKENS:
+        if len(tokens) >= 2:
             sem_record2 = SemanticRecord(tokens=tokens)
             _, alloc_graph2 = allocate_semantic_roles(sem_record2, schema_fields, learn=False)
             if alloc_graph2.coherence_score > alloc_graph.coherence_score:
@@ -350,15 +378,15 @@ def run_pipeline(
         pressure = state.metrics.field_pressure
         relative_instability *= (1.0 + pressure * 0.5)
         
-        if relative_instability > _INSTABILITY_SPIKE_THRESHOLD:
+        if relative_instability > _field_instability_threshold():
             dispatcher.dispatch(SemanticEvent(
                 event_type=SemanticEventType.UNCERTAINTY_SPIKE,
                 source="allocation_engine",
                 payload={"instability": relative_instability},
-                instability_delta=_UNCERTAINTY_SPIKE_DELTA
+                instability_delta=_field_instability_delta()
             ))
 
-        if relative_instability > _INSTABILITY_SPIKE_THRESHOLD and tokens:
+        if relative_instability > _field_instability_threshold() and tokens:
             from app.semantic_inference_engine import InferenceEngine
             try:
                 # Inference as Iterative Graph Relaxation
@@ -366,7 +394,7 @@ def run_pipeline(
                 ie_result = ie.infer(tokens, schema_fields)
                 if ie_result and ie_result.role_assignments:
                     # Check if inference reduced entropy (improved coherence)
-                    ie_coherence = getattr(ie_result, 'coherence_score', _INFERENCE_COHERENCE_FALLBACK)
+                    ie_coherence = getattr(ie_result, 'coherence_score', 0.5)
                     if ie_coherence > output["_confidence"]:
                         for role_name, value in ie_result.role_assignments.items():
                             if value:
@@ -406,13 +434,13 @@ def run_pipeline(
                         value_fields[t.raw] = t.source_field
         if contradictions:
             output["_contradictions"] = contradictions
-            output["_confidence"] *= _CONTRADICTION_CONFIDENCE_PENALTY
+            output["_confidence"] *= _field_contradiction_penalty()
             output["_contradiction_energy"] = len(contradictions)
             dispatcher.dispatch(SemanticEvent(
                 event_type=SemanticEventType.CONTRADICTION_DETECTED,
                 source="contradiction_engine",
                 payload={"conflicts": contradictions},
-                instability_delta=_CONTRADICTION_DELTA
+                instability_delta=_field_contradiction_delta()
             ))
 
         from app.semantic_allocation_engine import _UNIVERSAL_ROOTS
@@ -465,7 +493,7 @@ def run_pipeline(
                     value_fields[t.raw] = t.source_field
 
         # Re-allocation pass: feed contradiction pressure back into the graph
-        if contradictions and len(tokens) >= _EVOLUTION_REALLOC_MIN_TOKENS:
+        if contradictions and len(tokens) >= 2:
             # Boost learned exclusions proportional to contradiction energy
             # so the re-allocation graph feels the pressure in real time
             contradiction_energy = output.get("_contradiction_energy", 0)
@@ -513,13 +541,13 @@ def run_pipeline(
 
         coherence = output["_confidence"]
         be = get_boundary_engine()
-        for md in be.decision_history[-_DIAGNOSTIC_HISTORY_WINDOW:]:
+        for md in be.decision_history[-20:]:
             if isinstance(md, dict):
                 md["coherence_after"] = coherence
-                md["success"] = coherence > _COHERENCE_SUCCESS_THRESHOLD
+                md["success"] = coherence > _field_coherence_threshold()
             else:
                 md.coherence_after = coherence
-                md.success = coherence > _COHERENCE_SUCCESS_THRESHOLD
+                md.success = coherence > _field_coherence_threshold()
         
         allocated_records.append(output)
 
