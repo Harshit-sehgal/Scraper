@@ -112,8 +112,9 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
         return True
 
     # Social media links: structural noise on listing pages
+    # Only flag if multiple platforms appear (single mention is likely legitimate)
     social = ["facebook", "instagram", "twitter", "linkedin", "youtube"]
-    if any(v in combined for v in social):
+    if sum(v in combined for v in social) >= 3:
         return True
 
     # Entity field check: use semantic density on the name field

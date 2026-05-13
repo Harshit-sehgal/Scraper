@@ -11,7 +11,6 @@ Confidence-based validation that:
 Core principle: Empty fields are OK; wrong values are NOT.
 """
 
-import logging
 import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
@@ -348,71 +347,6 @@ def _compute_overall_validation_score(
     overall = (0.7 * required_avg) + (0.3 * optional_avg)
 
     return round(max(min(overall, 1.0), 0.0), 3)
-
-
-def repair_bad_mappings(
-    records: List[Dict],
-    schema_fields: List[SchemaField],
-    intent: IntentSchema,
-    page_html: str
-) -> List[Dict]:
-    """
-    Use AI to repair records with low-confidence or invalid mappings.
-
-    This is called when we have records that failed validation.
-    """
-    from app.scraper import _llm_json
-
-    # Find records that need repair
-    records_to_repair = []
-    for record in records:
-        validation = record.get("_validation", {})
-        if not validation.get("is_valid", True):
-            records_to_repair.append(record)
-
-    if not records_to_repair:
-        return records
-
-    schema_desc = [{"name": f.name, "type": f.field_type.value, "required": f.required} for f in schema_fields]
-
-    prompt = f"""Repair these scraped records that have invalid or low-confidence field mappings.
-
-USER INTENT: {intent.raw_query}
-
-SCHEMA:
-{schema_desc}
-
-PROBLEMATIC RECORDS:
-{records_to_repair[:5]}  # Limit to 5 for API call
-
-Each record has a "_validation" object showing:
-- score: overall quality score
-- field_confidences: per-field confidence (0-1)
-- issues: what's wrong
-
-Task:
-1. For each record, fix incorrect field mappings
-2. Remove values that don't match their field types
-3. Keep empty fields as null (empty is OK)
-4. Do NOT invent values - use null if unsure
-
-Return JSON array of fixed records with same structure.
-"""
-
-    try:
-        messages = [
-            {"role": "system", "content": "You repair invalid scraped data intelligently."},
-            {"role": "user", "content": prompt}
-        ]
-        result = _llm_json(messages, temperature=0.1)
-
-        if isinstance(result, list):
-            return result[:len(records_to_repair)]
-    except Exception as e:
-        logging.exception(e)
-
-    # If repair fails, return original records
-    return records
 
 
 def get_validation_summary_text(summary: Dict) -> str:

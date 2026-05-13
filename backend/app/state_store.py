@@ -31,12 +31,13 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job]]:
     if not path.exists():
         return {}, {}
 
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as e:
-        logging.exception(e)
-        print(f"[State] Failed to read state file {path}: {e}")
-        return {}, {}
+    with _STATE_LOCK:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as e:
+            logging.exception(e)
+            print(f"[State] Failed to read state file {path}: {e}")
+            return {}, {}
 
     jobs_store: dict[str, Job] = {}
     recycle_bin_store: dict[str, Job] = {}

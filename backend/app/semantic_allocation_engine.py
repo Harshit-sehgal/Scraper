@@ -48,15 +48,19 @@ ROLE_EXCLUSIVITY: List[Tuple[str, str]] = [
 ]
 
 
-# Minimal universal semantic roots for bootstrap seeding.
+# Bootstrap seeds for role-type compatibility.
+# These are TEMPORARY priors — learning overrides them over time.
+# They are NOT universal truths; they give the system a starting point
+# so that the first records processed have non-zero compatibility.
+# After enough observations, learned compatibilities dominate.
 _UNIVERSAL_ROOTS = [
-    (['pric', 'cost', 'prec', 'wert', 'salar'], SemanticType.PRICE),
-    (['date', 'zeit'], SemanticType.DATE),
-    (['loc', 'city', 'addr', 'ort'], SemanticType.LOCATION),
+    (['pric', 'cost', 'salar', 'fare'], SemanticType.PRICE),
+    (['date', 'time', 'schedule'], SemanticType.DATE),
+    (['loc', 'city', 'addr', 'place'], SemanticType.LOCATION),
     (['nam', 'comp', 'firm', 'brand', 'make', 'model', 'builder'], SemanticType.ORGANIZATION),
-    (['rat', 'scor', 'bewert'], SemanticType.RATING),
-    (['count', 'anzahl', 'experien', 'year', 'mileage', 'age'], SemanticType.NUMBER),
-    (['code', 'currenc', 'wahrung', 'ident'], SemanticType.CODE),
+    (['rat', 'scor', 'review'], SemanticType.RATING),
+    (['count', 'number', 'year', 'mileage', 'age', 'experien'], SemanticType.NUMBER),
+    (['code', 'currenc', 'ident', 'id'], SemanticType.CODE),
 ]
 
 
