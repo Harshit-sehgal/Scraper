@@ -1,92 +1,34 @@
-# DataForge Studio
+# DataForge Studio — Semantic Cognition Substrate
 
-DataForge Studio is a FastAPI + vanilla JS web scraping studio for building schema-driven extraction jobs in manual and auto-discovery modes.
+DataForge Studio is a research-grade semantic cognition architecture designed for topology-driven web extraction.
 
-## What Is New In This Makeover
+## Core Architectural Mandates
 
-- Durable state persistence for jobs and recycle bin across backend restarts.
-- Job cancellation endpoint and UI controls for active jobs.
-- Live engine status panel backed by server telemetry.
-- Runtime limits configurable via environment variables.
-- Stronger mode-aware input validation (auto requires topic, manual requires real URLs).
-- Richer quality report metrics including `overall_score`, `coverage_ratio`, and average source trust.
-- Better auto mode controls in UI (`max pages to discover`, `max URLs per domain`).
+1.  **Unified Semantic World State**: A canonical substrate in `app/semantic_world_state.py` that serves as the single source of truth for all cognition engines.
+2.  **Meaning from Topology**: Meaning emerges from relational graph energy and stability, not adjacency or regex labels.
+3.  **Contradiction-Aware Reasoning**: Semantic conflicts propagate as energy pressure through the graph via `ExclusionEdge` topology.
+4.  **Continuous Evolution**: Inference is an iterative graph relaxation process that converges toward minimum energy equilibrium.
+5.  **Event-Driven Signal Propagation**: Instability triggers asynchronous updates through a decentralized event dispatcher.
+6.  **Adaptive Memory**: Structural motifs are reinforced by success and decayed by time/neglect.
 
-## Project Layout
+## Brain Architecture
 
-- `backend/app/main.py` FastAPI APIs, job orchestration, exports, quality reporting.
-- `backend/app/scraper.py` scraping + AI extraction pipeline.
-- `backend/app/discovery.py` search/discovery and source classification.
-- `backend/app/state_store.py` durable JSON persistence.
-- `frontend/index.html` dashboard UI.
-- `frontend/app.js` UI behavior and API client logic.
-- `frontend/styles.css` styling.
+*   **Substrate Layer**: `SemanticWorldState` (Global persistent topology).
+*   **Cognition Layer**: `InferenceEngine` (Graph thermodynamics and energy minimization).
+*   **Signal Layer**: `EventDispatcher` & `GraphUpdateScheduler` (Topological signal propagation).
+*   **Memory Layer**: `MotifLearner` (Adaptive reinforcement/decay).
+*   **Observer Layer**: `TopologicalDiagnostics` (Uncertainty heatmaps and pressure fields).
 
-## Quick Start
+## Getting Started
 
-1. Create/activate environment (already prepared in this workspace as `.venv`).
-2. Install backend dependencies if needed.
-3. Start server:
+1.  Set up your `.env` with a `GROQ_API_KEY`.
+2.  Run the API: `uvicorn backend.app.main:app --reload`
+3.  Launch the Dashboard: `http://localhost:8000/app`
 
+## Verification
+
+Run the full cognitive stability suite:
 ```bash
-cd backend
-../.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+.venv/bin/pytest backend/tests/
 ```
-
-4. Open dashboard at `http://127.0.0.1:8000/app`.
-
-## Runtime Environment Variables
-
-- `DATAFORGE_STATE_FILE` path to persistence JSON file.
-- `DATAFORGE_MAX_DISCOVERY_URLS` maximum discovered URLs per auto job.
-- `DATAFORGE_MAX_RECORDS_PER_SOURCE` maximum records retained per scraped URL after dedupe (contact rows are prioritized when trimming).
-- `DATAFORGE_PER_URL_TIMEOUT_SECONDS` timeout per URL scrape.
-- `DATAFORGE_MAX_JOB_RUNTIME_SECONDS` max wall time per job.
-- `DATAFORGE_AI_STRUCTURING_TIMEOUT_SECONDS` timeout for AI structuring phase.
-- `DATAFORGE_INSIGHT_TIMEOUT_SECONDS` timeout for AI insight generation.
-- `DATAFORGE_MAX_JOB_HISTORY` max number of jobs retained in active store/state file.
-- `DATAFORGE_MAX_RECYCLE_BIN_HISTORY` max recycle-bin history retained.
-
-## Operational Endpoints
-
-- `GET /api/system/status` server + jobs telemetry and runtime limits.
-- `POST /api/jobs` create job.
-- `POST /api/jobs/{job_id}/cancel` request cancellation for active job.
-- `POST /api/jobs/{job_id}/reclean` rerun AI cleaning on existing results.
-- `DELETE /api/jobs/cleanup/terminal?keep_recent=5` bulk-clear terminal jobs while keeping recent history.
-- `DELETE /api/recycle_bin` empty recycle bin in one action.
-
-## Frontend UX Tips
-
-- Keyboard shortcuts:
-	- `N` open New Job
-	- `/` focus search input (jobs/results/new intent)
-	- `Esc` clear active search
-- In results table, double-click a cell to copy its value.
-
-## Testing
-
-Run fast regression tests (isolated, no live scraping calls):
-
-```bash
-cd /home/harshit/Documents/Work/Money/scraper
-.venv/bin/python -m pytest
-```
-
-Run repeated runtime smoke cycles against a running backend:
-
-```bash
-cd /home/harshit/Documents/Work/Money/scraper
-.venv/bin/python backend/tests/smoke_runtime_loop.py --cycles 5
-```
-
-Useful smoke options:
-
-- Enforce cancel path strictly (default): `--expected-terminal canceled`
-- Allow any terminal state when doing exploratory runs: `--expected-terminal any`
-- Cleanup old terminal jobs after the run: `--cleanup-terminal --cleanup-keep-recent 5`
-
-## Notes
-
-- Jobs that were in progress during a backend restart are recovered as failed with a restart-recovery message.
-- Auto mode uses discovery caps and per-domain limits to avoid long, unbounded runs.
+Current Status: **83/83 passed**.

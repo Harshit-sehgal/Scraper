@@ -1,5 +1,5 @@
 {
-  "saved_at": "2026-05-12T13:48:47.308780",
+  "saved_at": "2026-05-12T18:48:14.015308",
   "jobs": [
     {
       "id": "a1bcef56-1ecf-4ac8-968f-b022f6f7eee3",
@@ -1117,6 +1117,1608 @@
             "page_type": "universal"
           },
           "warnings": []
+        }
+      }
+    },
+    {
+      "id": "0cee9245-5cd7-4003-baf4-3e9ea8e004c8",
+      "name": "Manual Test",
+      "mode": "manual",
+      "intent": "Get interior designers",
+      "urls": [
+        "https://irishinterior.com/contact-us/"
+      ],
+      "topic": "interior designers",
+      "location": "",
+      "preferred_domain": "",
+      "source_policy": "all_sources",
+      "max_per_domain": 4,
+      "origin_location": "",
+      "max_distance_km": null,
+      "schema_fields": [
+        {
+          "name": "company_name",
+          "field_type": "string",
+          "description": "name of company",
+          "required": true
+        },
+        {
+          "name": "email",
+          "field_type": "email",
+          "description": "email address",
+          "required": false
+        }
+      ],
+      "filters": [],
+      "pagination": false,
+      "max_pages": 10,
+      "deduplicate": true,
+      "deduplicate_field": "",
+      "min_record_score": 0.35,
+      "cancel_requested": false,
+      "status": "completed",
+      "created_at": "2026-05-12T18:35:41.172840",
+      "started_at": "2026-05-12T18:35:41.178381",
+      "completed_at": "2026-05-12T18:36:42.925152",
+      "total_records": 24,
+      "filtered_records": 24,
+      "error": null,
+      "results": [
+        {
+          "company_name": "Best Interior designers in Chennai",
+          "email": "admin@irishinterior.com",
+          "record_score": 1.0,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Interior Design Services",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "On-Site Services",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Space Saving Furnitures",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Portfolio",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Get Quote",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Request Maintenance",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Join Us",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Refer & Earn",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "10 Years Warranty",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Customized Designs",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "45 Days Delivery",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "1 Year Free Service",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Expert Craftsmanship",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "High Quality Materials",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Hassle-Free Service",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "No Hidden Cost",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "space-saving dining table",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Living Room Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Bedroom Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Kitchen Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Pooja Room Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        },
+        {
+          "company_name": "Terms & Conditions",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:36:36.279634"
+        }
+      ],
+      "analysis": "Analysis generation encountered an upstream model error.",
+      "discovered_urls": [],
+      "quality_report": {
+        "raw_records": 24,
+        "post_filter_records": 24,
+        "post_radius_records": 24,
+        "final_records": 24,
+        "overall_score": 0.909,
+        "quality_threshold": 0.35,
+        "avg_record_score": 0.856,
+        "avg_final_record_score": 0.856,
+        "coverage_ratio": 1.0,
+        "avg_source_trust_score": 0.92,
+        "records_below_threshold": 0,
+        "type_integrity": {
+          "records_with_type_mismatch": 0,
+          "total_type_mismatches": 0
+        },
+        "source_breakdown": {
+          "official": 24,
+          "directory": 0,
+          "social": 0,
+          "search_result": 0,
+          "unknown": 0
+        },
+        "ai_source_prediction": {
+          "sources_attempted": 1,
+          "sources_with_ai_structuring": 1,
+          "records_processed": 24,
+          "records_ai_structured": 24,
+          "ai_row_rate": 1.0
+        },
+        "ai_structuring": {
+          "applied": false,
+          "reason": "skipped_global_ai_source_level_applied",
+          "input_records": 24,
+          "output_records": 24,
+          "total_chunks": 0,
+          "ai_chunks": 0,
+          "fallback_chunks": 0,
+          "model_fallback_mode": false,
+          "capped_records": 0,
+          "quality_filtered_after_ai": 0
+        },
+        "warnings": [],
+        "radius": {
+          "applied": false,
+          "reason": "not_configured",
+          "origin": "",
+          "max_distance_km": null
+        }
+      }
+    },
+    {
+      "id": "023d66c8-c4ad-4efd-a37c-4ac9ff286461",
+      "name": "Auto Test",
+      "mode": "auto",
+      "intent": "Get interior designers in Chennai",
+      "urls": [
+        "https://www.magicbricks.com/home-interior/interior-designers-in-chennai"
+      ],
+      "topic": "interior designers in chennai",
+      "location": "chennai",
+      "preferred_domain": "",
+      "source_policy": "all_sources",
+      "max_per_domain": 4,
+      "origin_location": "",
+      "max_distance_km": null,
+      "schema_fields": [
+        {
+          "name": "company_name",
+          "field_type": "string",
+          "description": "name of company",
+          "required": true
+        },
+        {
+          "name": "email",
+          "field_type": "email",
+          "description": "email address",
+          "required": false
+        }
+      ],
+      "filters": [],
+      "pagination": false,
+      "max_pages": 1,
+      "deduplicate": true,
+      "deduplicate_field": "",
+      "min_record_score": 0.35,
+      "cancel_requested": false,
+      "status": "completed",
+      "created_at": "2026-05-12T18:36:43.303039",
+      "started_at": "2026-05-12T18:36:43.312569",
+      "completed_at": "2026-05-12T18:38:23.680313",
+      "total_records": 25,
+      "filtered_records": 25,
+      "error": null,
+      "results": [
+        {
+          "company_name": "1 41 Upto 15% off 40",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Upto 15% off",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Experience 10 Years",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Experience",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Available 3 Designers",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Available",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "3 Designers",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Warranty 10 Years",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Upto 15% off 5",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Experience 12 Years",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Available 2 Designers",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "2 Designers",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Anna Nagar Anna Nagar OMR OMR",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Upto 15% off 1",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Experience 17 Years",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Available 10 Designers",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "10 Designers",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Warranty 12 Years",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Upto 20% off 1",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Upto 20% off",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Experience 6 Years",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Available 345 Designers",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "345 Designers",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Warranty 5 Years",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        },
+        {
+          "company_name": "Madhanandapuram Madhanandapuram",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:38:17.291019"
+        }
+      ],
+      "analysis": "Analysis generation encountered an upstream model error.",
+      "discovered_urls": [
+        {
+          "url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "canonical_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "title": "26+ Top Interior Designers in Chennai | Verified Interior ...Top Interior Designers in Chennai | Interbuild SolutionsBest Interior Designers in Chennai - CasaDezina InteriorsWOODSCAPE INTERIORS Pvt Ltd: Best Interior Designers in ChennaiBest Interior Designers in Chennai | Concept Interior StudioBest Interior Designers in Chennai | Babson Interio",
+          "reason": "2 days ago ·Find the best 26+interiordesignersinChennaifor modern, affordable, and customized home interiors. Compare portfolios, prices & reviews to choose the rightdesi...",
+          "source_domain": "magicbricks.com",
+          "source_type": "directory",
+          "source_trust_score": 0.62,
+          "relevance_score": 1.9120000000000001,
+          "expected_records": 10
+        }
+      ],
+      "quality_report": {
+        "raw_records": 25,
+        "post_filter_records": 25,
+        "post_radius_records": 25,
+        "final_records": 25,
+        "overall_score": 0.86,
+        "quality_threshold": 0.35,
+        "avg_record_score": 0.85,
+        "avg_final_record_score": 0.85,
+        "coverage_ratio": 1.0,
+        "avg_source_trust_score": 0.62,
+        "records_below_threshold": 0,
+        "type_integrity": {
+          "records_with_type_mismatch": 0,
+          "total_type_mismatches": 0
+        },
+        "source_breakdown": {
+          "official": 0,
+          "directory": 25,
+          "social": 0,
+          "search_result": 0,
+          "unknown": 0
+        },
+        "ai_source_prediction": {
+          "sources_attempted": 1,
+          "sources_with_ai_structuring": 0,
+          "records_processed": 25,
+          "records_ai_structured": 0,
+          "ai_row_rate": 0.0
+        },
+        "ai_structuring": {
+          "applied": false,
+          "reason": "skipped_global_ai_source_level_applied",
+          "input_records": 25,
+          "output_records": 25,
+          "total_chunks": 0,
+          "ai_chunks": 0,
+          "fallback_chunks": 0,
+          "model_fallback_mode": false,
+          "capped_records": 0,
+          "quality_filtered_after_ai": 0
+        },
+        "warnings": [
+          "AI source structuring covered 0% rows in this run; set GROQ_API_KEY to improve phone/email extraction reliability."
+        ],
+        "radius": {
+          "applied": false,
+          "reason": "not_configured",
+          "origin": "",
+          "max_distance_km": null
+        }
+      }
+    },
+    {
+      "id": "18e5fed4-5e8a-4313-ac73-0f4fa360e182",
+      "name": "Manual Test",
+      "mode": "manual",
+      "intent": "Get interior designers",
+      "urls": [
+        "https://irishinterior.com/contact-us/"
+      ],
+      "topic": "interior designers",
+      "location": "",
+      "preferred_domain": "",
+      "source_policy": "all_sources",
+      "max_per_domain": 4,
+      "origin_location": "",
+      "max_distance_km": null,
+      "schema_fields": [
+        {
+          "name": "company_name",
+          "field_type": "string",
+          "description": "name of company",
+          "required": true
+        },
+        {
+          "name": "email",
+          "field_type": "email",
+          "description": "email address",
+          "required": false
+        }
+      ],
+      "filters": [],
+      "pagination": false,
+      "max_pages": 10,
+      "deduplicate": true,
+      "deduplicate_field": "",
+      "min_record_score": 0.35,
+      "cancel_requested": false,
+      "status": "completed",
+      "created_at": "2026-05-12T18:37:55.118398",
+      "started_at": "2026-05-12T18:37:55.125150",
+      "completed_at": "2026-05-12T18:38:45.694097",
+      "total_records": 24,
+      "filtered_records": 24,
+      "error": null,
+      "results": [
+        {
+          "company_name": "Best Interior designers in Chennai",
+          "email": "admin@irishinterior.com",
+          "record_score": 1.0,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Interior Design Services",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "On-Site Services",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Space Saving Furnitures",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Portfolio",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Get Quote",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Request Maintenance",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Join Us",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Refer & Earn",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "10 Years Warranty",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Customized Designs",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "45 Days Delivery",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "1 Year Free Service",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Expert Craftsmanship",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "High Quality Materials",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Hassle-Free Service",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "No Hidden Cost",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "space-saving dining table",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Living Room Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Bedroom Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Kitchen Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Pooja Room Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        },
+        {
+          "company_name": "Terms & Conditions",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:38:39.567228"
+        }
+      ],
+      "analysis": "Analysis generation encountered an upstream model error.",
+      "discovered_urls": [],
+      "quality_report": {
+        "raw_records": 24,
+        "post_filter_records": 24,
+        "post_radius_records": 24,
+        "final_records": 24,
+        "overall_score": 0.909,
+        "quality_threshold": 0.35,
+        "avg_record_score": 0.856,
+        "avg_final_record_score": 0.856,
+        "coverage_ratio": 1.0,
+        "avg_source_trust_score": 0.92,
+        "records_below_threshold": 0,
+        "type_integrity": {
+          "records_with_type_mismatch": 0,
+          "total_type_mismatches": 0
+        },
+        "source_breakdown": {
+          "official": 24,
+          "directory": 0,
+          "social": 0,
+          "search_result": 0,
+          "unknown": 0
+        },
+        "ai_source_prediction": {
+          "sources_attempted": 1,
+          "sources_with_ai_structuring": 1,
+          "records_processed": 24,
+          "records_ai_structured": 24,
+          "ai_row_rate": 1.0
+        },
+        "ai_structuring": {
+          "applied": false,
+          "reason": "skipped_global_ai_source_level_applied",
+          "input_records": 24,
+          "output_records": 24,
+          "total_chunks": 0,
+          "ai_chunks": 0,
+          "fallback_chunks": 0,
+          "model_fallback_mode": false,
+          "capped_records": 0,
+          "quality_filtered_after_ai": 0
+        },
+        "warnings": [],
+        "radius": {
+          "applied": false,
+          "reason": "not_configured",
+          "origin": "",
+          "max_distance_km": null
+        }
+      }
+    },
+    {
+      "id": "65afb575-2c48-4349-8893-a0752e628037",
+      "name": "Auto Test",
+      "mode": "auto",
+      "intent": "Get interior designers in Chennai",
+      "urls": [
+        "https://www.magicbricks.com/home-interior/interior-designers-in-chennai"
+      ],
+      "topic": "interior designers in chennai",
+      "location": "chennai",
+      "preferred_domain": "",
+      "source_policy": "all_sources",
+      "max_per_domain": 4,
+      "origin_location": "",
+      "max_distance_km": null,
+      "schema_fields": [
+        {
+          "name": "company_name",
+          "field_type": "string",
+          "description": "name of company",
+          "required": true
+        },
+        {
+          "name": "email",
+          "field_type": "email",
+          "description": "email address",
+          "required": false
+        }
+      ],
+      "filters": [],
+      "pagination": false,
+      "max_pages": 1,
+      "deduplicate": true,
+      "deduplicate_field": "",
+      "min_record_score": 0.35,
+      "cancel_requested": false,
+      "status": "completed",
+      "created_at": "2026-05-12T18:38:47.234788",
+      "started_at": "2026-05-12T18:38:47.246057",
+      "completed_at": "2026-05-12T18:40:04.344425",
+      "total_records": 1,
+      "filtered_records": 1,
+      "error": null,
+      "results": [
+        {
+          "company_name": "Bathroom Designs",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.62,
+          "source_type": "directory",
+          "source_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "scraped_at": "2026-05-12T18:39:57.731244"
+        }
+      ],
+      "analysis": "Analysis generation encountered an upstream model error.",
+      "discovered_urls": [
+        {
+          "url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "canonical_url": "https://www.magicbricks.com/home-interior/interior-designers-in-chennai",
+          "title": "26+ Top Interior Designers in Chennai - MagicBricks",
+          "reason": "Find the best 26+interiordesignersinChennaifor modern, affordable, and customized homeinteriors. Compare portfolios, prices & reviews to choose the rightdesigner....",
+          "source_domain": "magicbricks.com",
+          "source_type": "directory",
+          "source_trust_score": 0.62,
+          "relevance_score": 1.9120000000000001,
+          "expected_records": 10
+        }
+      ],
+      "quality_report": {
+        "raw_records": 1,
+        "post_filter_records": 1,
+        "post_radius_records": 1,
+        "final_records": 1,
+        "overall_score": 0.86,
+        "quality_threshold": 0.35,
+        "avg_record_score": 0.85,
+        "avg_final_record_score": 0.85,
+        "coverage_ratio": 1.0,
+        "avg_source_trust_score": 0.62,
+        "records_below_threshold": 0,
+        "type_integrity": {
+          "records_with_type_mismatch": 0,
+          "total_type_mismatches": 0
+        },
+        "source_breakdown": {
+          "official": 0,
+          "directory": 1,
+          "social": 0,
+          "search_result": 0,
+          "unknown": 0
+        },
+        "ai_source_prediction": {
+          "sources_attempted": 1,
+          "sources_with_ai_structuring": 0,
+          "records_processed": 1,
+          "records_ai_structured": 0,
+          "ai_row_rate": 0.0
+        },
+        "ai_structuring": {
+          "applied": false,
+          "reason": "skipped_global_ai_source_level_applied",
+          "input_records": 1,
+          "output_records": 1,
+          "total_chunks": 0,
+          "ai_chunks": 0,
+          "fallback_chunks": 0,
+          "model_fallback_mode": false,
+          "capped_records": 0,
+          "quality_filtered_after_ai": 0
+        },
+        "warnings": [
+          "AI source structuring covered 0% rows in this run; set GROQ_API_KEY to improve phone/email extraction reliability."
+        ],
+        "radius": {
+          "applied": false,
+          "reason": "not_configured",
+          "origin": "",
+          "max_distance_km": null
+        }
+      }
+    },
+    {
+      "id": "ac3a2117-4b62-4b1f-b232-ded5471ac486",
+      "name": "Manual Test",
+      "mode": "manual",
+      "intent": "Get interior designers",
+      "urls": [
+        "https://irishinterior.com/contact-us/"
+      ],
+      "topic": "interior designers",
+      "location": "",
+      "preferred_domain": "",
+      "source_policy": "all_sources",
+      "max_per_domain": 4,
+      "origin_location": "",
+      "max_distance_km": null,
+      "schema_fields": [
+        {
+          "name": "company_name",
+          "field_type": "string",
+          "description": "name of company",
+          "required": true
+        },
+        {
+          "name": "email",
+          "field_type": "email",
+          "description": "email address",
+          "required": false
+        }
+      ],
+      "filters": [],
+      "pagination": false,
+      "max_pages": 10,
+      "deduplicate": true,
+      "deduplicate_field": "",
+      "min_record_score": 0.35,
+      "cancel_requested": false,
+      "status": "completed",
+      "created_at": "2026-05-12T18:46:31.312139",
+      "started_at": "2026-05-12T18:46:31.318091",
+      "completed_at": "2026-05-12T18:47:17.411323",
+      "total_records": 24,
+      "filtered_records": 24,
+      "error": null,
+      "results": [
+        {
+          "company_name": "Best Interior designers in Chennai",
+          "email": "admin@irishinterior.com",
+          "record_score": 1.0,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Interior Design Services",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "On-Site Services",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Space Saving Furnitures",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Portfolio",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Get Quote",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Request Maintenance",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Join Us",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Refer & Earn",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "10 Years Warranty",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Customized Designs",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "45 Days Delivery",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "1 Year Free Service",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Expert Craftsmanship",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "High Quality Materials",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Hassle-Free Service",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "No Hidden Cost",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "space-saving dining table",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Living Room Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Bedroom Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Kitchen Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Pooja Room Interior Design Ideas",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        },
+        {
+          "company_name": "Terms & Conditions",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://irishinterior.com/contact-us/",
+          "scraped_at": "2026-05-12T18:47:11.054367"
+        }
+      ],
+      "analysis": "Analysis generation encountered an upstream model error.",
+      "discovered_urls": [],
+      "quality_report": {
+        "raw_records": 24,
+        "post_filter_records": 24,
+        "post_radius_records": 24,
+        "final_records": 24,
+        "overall_score": 0.909,
+        "quality_threshold": 0.35,
+        "avg_record_score": 0.856,
+        "avg_final_record_score": 0.856,
+        "coverage_ratio": 1.0,
+        "avg_source_trust_score": 0.92,
+        "records_below_threshold": 0,
+        "type_integrity": {
+          "records_with_type_mismatch": 0,
+          "total_type_mismatches": 0
+        },
+        "source_breakdown": {
+          "official": 24,
+          "directory": 0,
+          "social": 0,
+          "search_result": 0,
+          "unknown": 0
+        },
+        "ai_source_prediction": {
+          "sources_attempted": 1,
+          "sources_with_ai_structuring": 1,
+          "records_processed": 24,
+          "records_ai_structured": 24,
+          "ai_row_rate": 1.0
+        },
+        "ai_structuring": {
+          "applied": false,
+          "reason": "skipped_global_ai_source_level_applied",
+          "input_records": 24,
+          "output_records": 24,
+          "total_chunks": 0,
+          "ai_chunks": 0,
+          "fallback_chunks": 0,
+          "model_fallback_mode": false,
+          "capped_records": 0,
+          "quality_filtered_after_ai": 0
+        },
+        "warnings": [],
+        "radius": {
+          "applied": false,
+          "reason": "not_configured",
+          "origin": "",
+          "max_distance_km": null
+        }
+      }
+    },
+    {
+      "id": "0d9a8398-9eb5-4252-aa5a-047ec736f010",
+      "name": "Auto Test",
+      "mode": "auto",
+      "intent": "Get interior designers in Chennai",
+      "urls": [
+        "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx"
+      ],
+      "topic": "interior designers in chennai",
+      "location": "chennai",
+      "preferred_domain": "",
+      "source_policy": "all_sources",
+      "max_per_domain": 4,
+      "origin_location": "",
+      "max_distance_km": null,
+      "schema_fields": [
+        {
+          "name": "company_name",
+          "field_type": "string",
+          "description": "name of company",
+          "required": true
+        },
+        {
+          "name": "email",
+          "field_type": "email",
+          "description": "email address",
+          "required": false
+        }
+      ],
+      "filters": [],
+      "pagination": false,
+      "max_pages": 1,
+      "deduplicate": true,
+      "deduplicate_field": "",
+      "min_record_score": 0.35,
+      "cancel_requested": false,
+      "status": "completed",
+      "created_at": "2026-05-12T18:47:17.428526",
+      "started_at": "2026-05-12T18:47:17.435365",
+      "completed_at": "2026-05-12T18:48:14.015164",
+      "total_records": 10,
+      "filtered_records": 10,
+      "error": null,
+      "results": [
+        {
+          "company_name": "Open navigation menu",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx",
+          "scraped_at": "2026-05-12T18:48:05.274376"
+        },
+        {
+          "company_name": "Top Interior Design Firms in Chennai",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx",
+          "scraped_at": "2026-05-12T18:48:05.274376"
+        },
+        {
+          "company_name": "50% Add to project",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx",
+          "scraped_at": "2026-05-12T18:48:05.274376"
+        },
+        {
+          "company_name": "Chennai Architects Contact List",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx",
+          "scraped_at": "2026-05-12T18:48:05.274376"
+        },
+        {
+          "company_name": "33% Add to project",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx",
+          "scraped_at": "2026-05-12T18:48:05.274376"
+        },
+        {
+          "company_name": "List of Architects in Chennai",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx",
+          "scraped_at": "2026-05-12T18:48:05.274376"
+        },
+        {
+          "company_name": "100% Add to project",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx",
+          "scraped_at": "2026-05-12T18:48:05.274376"
+        },
+        {
+          "company_name": "Documents",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx",
+          "scraped_at": "2026-05-12T18:48:05.274376"
+        },
+        {
+          "company_name": "Back to top",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx",
+          "scraped_at": "2026-05-12T18:48:05.274376"
+        },
+        {
+          "company_name": "Get our free apps",
+          "email": null,
+          "record_score": 0.85,
+          "source_trust_score": 0.92,
+          "source_type": "official",
+          "source_url": "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx",
+          "scraped_at": "2026-05-12T18:48:05.274376"
+        }
+      ],
+      "analysis": "Analysis generation encountered an upstream model error.",
+      "discovered_urls": [
+        {
+          "url": "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx",
+          "canonical_url": "https://www.scribd.com/document/441882134/firms-list-in-chennai-docx",
+          "title": "Top Interior Design Firms in Chennai | PDF | Interior Design | Architect",
+          "reason": "This document provides information on 12 architecture, interior design and landscaping companies in Chennai, India. For each company it lists the company name, contact de...",
+          "source_domain": "scribd.com",
+          "source_type": "official",
+          "source_trust_score": 0.92,
+          "relevance_score": 1.972,
+          "expected_records": 10
+        }
+      ],
+      "quality_report": {
+        "raw_records": 10,
+        "post_filter_records": 10,
+        "post_radius_records": 10,
+        "final_records": 10,
+        "overall_score": 0.905,
+        "quality_threshold": 0.35,
+        "avg_record_score": 0.85,
+        "avg_final_record_score": 0.85,
+        "coverage_ratio": 1.0,
+        "avg_source_trust_score": 0.92,
+        "records_below_threshold": 0,
+        "type_integrity": {
+          "records_with_type_mismatch": 0,
+          "total_type_mismatches": 0
+        },
+        "source_breakdown": {
+          "official": 10,
+          "directory": 0,
+          "social": 0,
+          "search_result": 0,
+          "unknown": 0
+        },
+        "ai_source_prediction": {
+          "sources_attempted": 1,
+          "sources_with_ai_structuring": 0,
+          "records_processed": 10,
+          "records_ai_structured": 0,
+          "ai_row_rate": 0.0
+        },
+        "ai_structuring": {
+          "applied": false,
+          "reason": "skipped_global_ai_source_level_applied",
+          "input_records": 10,
+          "output_records": 10,
+          "total_chunks": 0,
+          "ai_chunks": 0,
+          "fallback_chunks": 0,
+          "model_fallback_mode": false,
+          "capped_records": 0,
+          "quality_filtered_after_ai": 0
+        },
+        "warnings": [
+          "AI source structuring covered 0% rows in this run; set GROQ_API_KEY to improve phone/email extraction reliability."
+        ],
+        "radius": {
+          "applied": false,
+          "reason": "not_configured",
+          "origin": "",
+          "max_distance_km": null
         }
       }
     }

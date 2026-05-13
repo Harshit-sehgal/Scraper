@@ -31,10 +31,30 @@ class GraphUpdateScheduler:
 
     def run_relaxation_pass(self):
         """Perform a graph relaxation pass to restore equilibrium."""
-        state = get_world_state()
-        # In a full implementation, this would trigger 
-        # graph-wide belief propagation.
-        pass
+        from app.semantic_inference_engine import InferenceEngine
+        from app.semantic_ir import SemanticToken, Span, SemanticType
+        
+        # In a global world state context, we relax the entire topology
+        # using the InferenceEngine's energy minimization logic.
+        ie = InferenceEngine(max_iterations=5)
+        ws = get_world_state()
+        
+        # Convert world state role compatibilities into a virtual token sequence 
+        # for the engine to relax. 
+        # (This is a minimal bridge to the iterative energy model)
+        virtual_tokens = []
+        for (role, ttype), compat in list(ws.role_compatibility.items()):
+            if compat > 0.0:
+                stype = SemanticType(ttype) if isinstance(ttype, str) else ttype
+                virtual_tokens.append(SemanticToken(
+                    raw=role, normalized=role, span=Span(0,0), position=0,
+                    primary_type=stype,
+                    type_distribution={stype: compat}
+                ))
+        
+        if virtual_tokens:
+            # The engine relaxation propagates belief and minimizes contradiction energy
+            ie.infer(virtual_tokens, list(ws.role_position_memory.keys()))
 
 # Global Scheduler
 _scheduler = GraphUpdateScheduler()
