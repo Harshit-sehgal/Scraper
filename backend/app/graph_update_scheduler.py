@@ -22,10 +22,20 @@ class GraphUpdateScheduler:
         """Subscribe to events that require graph recalculation."""
         self.dispatcher.subscribe(SemanticEventType.CONTRADICTION_DETECTED, self.on_instability)
         self.dispatcher.subscribe(SemanticEventType.UNCERTAINTY_SPIKE, self.on_instability)
+        self.dispatcher.subscribe(SemanticEventType.TOPOLOGY_SHIFT, self.on_instability)
 
     def on_instability(self, event: SemanticEvent):
-        """React to destabilizing signals."""
-        # logging.getLogger(__name__).info(f"Instability signal received from {event.source}. Triggering relaxation.")
+        """React to destabilizing signals — record to history + relax topology."""
+        ws = get_world_state()
+        ws.decision_history.append({
+            "type": event.event_type.value,
+            "source": event.source,
+            "delta": event.instability_delta,
+            "timestamp": event.timestamp or 0,
+        })
+        # Keep history bounded
+        if len(ws.decision_history) > 1000:
+            ws.decision_history = ws.decision_history[-500:]
         self.run_relaxation_pass()
 
     def run_relaxation_pass(self):
