@@ -336,6 +336,52 @@ class SemanticWorldState:
                 diff[k] = delta
         return diff
 
+    def trace_field_evolution(self) -> dict:
+        """Reconstruct the causal chain of field state evolution.
+
+        Returns a dict mapping each field region to its propagation
+        effects, equilibrium influence, and persistence over time.
+        This enables semantic lineage tracing and causal chain
+        reconstruction for debugging field dynamics.
+        """
+        chain = {
+            "regions": len(self.field_regions),
+            "activations": self.field_activation_count,
+            "current_pressure": self.metrics.field_pressure,
+            "topology_density": self.topology_density,
+            "exclusion_count": len(self.learned_exclusions),
+            "wave_events": len(self.trace_waves()),
+        }
+        if self.field_regions:
+            regions_by_token = {}
+            for r in self.field_regions:
+                token = r.token
+                if token not in regions_by_token:
+                    regions_by_token[token] = []
+                regions_by_token[token].append({
+                    "roles": r.competing_roles,
+                    "instability": round(r.instability, 3),
+                    "pressure": round(r.semantic_pressure, 3),
+                    "recurrence": round(r.recurrence_score, 3),
+                })
+            chain["regions_by_token"] = regions_by_token
+        return chain
+
+    def field_lineage(self, token: str) -> list:
+        """Trace the lineage of a specific conflicting token across records.
+
+        Returns the history of field regions for this token, showing how
+        its instability, exclusion pressure, and recurrence evolved.
+        """
+        return [
+            {
+                "roles": r.competing_roles,
+                "instability": round(r.instability, 3),
+                "pressure": round(r.semantic_pressure, 3),
+            }
+            for r in self.field_regions if r.token == token
+        ]
+
     def clear(self):
         self.metrics = TopologyMetrics()
         self.role_compatibility.clear()
