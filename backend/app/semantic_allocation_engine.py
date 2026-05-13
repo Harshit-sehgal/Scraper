@@ -197,6 +197,21 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str]) -> A
             if score > 0:
                 graph.compatibility[(cand_key, role_name)] = score
 
+    # Phase 4D: Equilibrium search — modulate compatibility by field region instability
+    # Roles in active conflict regions have their compatibility scores weighted down
+    # by field pressure, so allocation hesitates rather than confidently resolving.
+    from app.semantic_world_state import get_world_state as _gws_eq
+    _ws_eq = _gws_eq()
+    for region in _ws_eq.field_regions:
+        for role in region.competing_roles:
+            if role in graph.roles:
+                instability = min(region.instability, 1.0)
+                for cand_key in graph.candidates:
+                    key = (cand_key, role)
+                    if key in graph.compatibility:
+                        weight = 1.0 - (instability * 0.3)
+                        graph.compatibility[key] *= weight
+
     # Build exclusivity edges
     reng = _get_role_engine()
     for role_a, role_b in ROLE_EXCLUSIVITY:
