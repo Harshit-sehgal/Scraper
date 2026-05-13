@@ -15,6 +15,7 @@ class TopologyMetrics:
     cumulative_uncertainty: float = 0.0
     global_energy: float = 5.0 # High energy = unstable universe
     global_entropy: float = 1.0 # High entropy = low order
+    exclusion_count: int = 0 # Number of active learned exclusions
     
     @property
     def average_density(self) -> float:
@@ -30,14 +31,16 @@ class TopologyMetrics:
 
     @property
     def field_pressure(self) -> float:
-        """Unified semantic field pressure — fuses energy, entropy, and uncertainty.
+        """Unified semantic field pressure — fuses energy, entropy, uncertainty,
+        and contradiction density into one scalar.
 
         All cognition should derive from this single scalar.
         High pressure = unstable, contradictory, uncertain field.
         Low pressure = stable, coherent, convergent field.
         """
         norm_energy = min(self.global_energy / 10.0, 1.0)
-        pressure = (norm_energy + self.global_entropy + self.average_uncertainty) / 3.0
+        contr_density = min(self.exclusion_count / max(self.total_records_processed, 1), 1.0)
+        pressure = (norm_energy + self.global_entropy + self.average_uncertainty + contr_density) / 4.0
         return max(0.0, min(1.0, pressure))
 
 class SemanticWorldState:
@@ -187,6 +190,10 @@ class SemanticWorldState:
     def replay(self) -> list:
         """Return topology evolution as a sequence of snapshots for replay."""
         return list(self.topology_snapshots)
+
+    def trace_waves(self) -> list:
+        """Return propagation wave entries from snapshots for wave tracing."""
+        return [s for s in self.topology_snapshots if "wave" in s.get("label", "")]
 
     def diff_snapshots(self, idx_a: int = -2, idx_b: int = -1) -> dict:
         """Return the diff between two snapshots for causal chain inspection."""

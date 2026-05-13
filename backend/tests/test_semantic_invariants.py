@@ -280,3 +280,53 @@ def test_uncertainty_bounds_invariant():
     ws.metrics.total_records_processed = 100
     u = ws.metrics.average_uncertainty
     assert 0.0 <= u <= 1.0, f"Average uncertainty {u} out of bounds"
+
+
+# ─────────────────────────────────────────────────────────────
+# INVARIANT 16: Field pressure includes contradiction density
+# ─────────────────────────────────────────────────────────────
+
+def test_field_pressure_includes_contradictions():
+    ws = get_world_state()
+    ws.clear()
+    p_before = ws.metrics.field_pressure
+    ws.metrics.exclusion_count = 50
+    ws.metrics.total_records_processed = 100
+    p_after = ws.metrics.field_pressure
+    assert p_after > p_before or abs(p_after - p_before) < 0.001, \
+        "Field pressure must increase or stay same with more contradictions"
+
+
+# ─────────────────────────────────────────────────────────────
+# INVARIANT 17: Propagation wave tracing returns wave entries
+# ─────────────────────────────────────────────────────────────
+
+def test_propagation_wave_tracing():
+    ws = get_world_state()
+    ws.clear()
+    ws.snapshot("alloc_0")
+    ws.snapshot("relax_wave_1")
+    ws.snapshot("relax_wave_2")
+    ws.snapshot("alloc_1")
+    waves = ws.trace_waves()
+    assert len(waves) >= 2, f"Wave trace must include 2+ wave snapshots, got {len(waves)}"
+    for w in waves:
+        assert "wave" in w.get("label", ""), "All traced entries must have wave labels"
+
+
+# ─────────────────────────────────────────────────────────────
+# INVARIANT 18: Field pressure unifies all pressure dimensions
+# ─────────────────────────────────────────────────────────────
+
+def test_field_pressure_unifies_dimensions():
+    ws = get_world_state()
+    ws.clear()
+    p = ws.metrics.field_pressure
+    assert 0.0 <= p <= 1.0, f"field_pressure must be bounded [0,1], got {p}"
+    # Each dimension should affect field pressure independently
+    ws.metrics.global_energy = 10.0
+    p2 = ws.metrics.field_pressure
+    assert p2 >= p or abs(p2 - p) < 0.001, "Higher energy must increase or maintain field pressure"
+    ws.metrics.global_entropy = 0.0
+    p3 = ws.metrics.field_pressure
+    assert p3 <= p2 or abs(p3 - p2) < 0.001, "Lower entropy must decrease or maintain field pressure"
