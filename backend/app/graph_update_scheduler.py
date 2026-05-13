@@ -75,8 +75,12 @@ class GraphUpdateScheduler:
                 instability_delta=-0.1
             ))
 
-# Global Scheduler
-_scheduler = GraphUpdateScheduler()
+# Global Scheduler (lazy — created on first access to avoid circular imports)
+_scheduler = None
 
-def get_scheduler() -> GraphUpdateScheduler:
+def get_scheduler():
+    global _scheduler
+    if _scheduler is None:
+        _scheduler = object()  # placeholder to prevent re-entrant creation
+        _scheduler = GraphUpdateScheduler()
     return _scheduler

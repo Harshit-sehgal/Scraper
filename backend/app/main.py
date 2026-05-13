@@ -21,9 +21,9 @@ from app.services.job_runner import run_job
 from app.services.state import persist_state
 from app.state_store import load_state
 from app.utils.env import env_int
-# Explicit scheduler initialization — guarantees event cascade wiring
-from app.graph_update_scheduler import get_scheduler as _init_scheduler
-_init_scheduler()
+# Initialize event cascade (safe: scheduler is lazy-created, no circular import)
+from app.graph_update_scheduler import get_scheduler
+get_scheduler()
 
 app = FastAPI(
     title="DataForge — General-Purpose Web Scraper",
