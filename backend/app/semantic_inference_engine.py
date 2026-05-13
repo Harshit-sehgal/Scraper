@@ -133,16 +133,19 @@ class SemanticThermodynamics:
     def stabilize(self, state: SemanticState, graph: SemanticGraph):
         """Reinforce stable edges, decay high-energy ones.
 
-        All edge types (ExclusionEdge, RelationshipEdge, OwnershipEdge)
-        share a common 'confidence' interface — no type-specific hacks.
+        Rates are driven by field_pressure — higher pressure = faster
+        stabilization. This eliminates fixed scalar multipliers.
         """
+        pressure = self.ws.metrics.field_pressure
+        reinforce_rate = 0.02 * (1.0 + pressure)
+        decay_rate = 0.05 * (1.0 + pressure)
         for edge in graph.relationships:
             val = edge.confidence
             if state.energy < self.ws.metrics.global_energy:
                 if val > 0.5:
-                    edge.confidence = min(val + 0.02, 1.0)
+                    edge.confidence = min(val + reinforce_rate, 1.0)
             else:
-                edge.confidence = max(val - 0.05, 0.0)
+                edge.confidence = max(val - decay_rate, 0.0)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
