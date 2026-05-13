@@ -1,11 +1,10 @@
-from typing import List, Dict, Any, Optional
-from app.models import SchemaField, FieldType
-from app.html_utils import _compact_text, _is_empty_value, _is_placeholder_value, _normalized_text_key
-from app.utils.quality import normalized_dedup_text
+from typing import Optional
+from app.models import SchemaField
 
 def normalize_scraped_record(record: dict, schema_fields: list[SchemaField]) -> dict:
     """Ensure consistent schema order and basic normalization of values."""
-    normalized: dict[str, str] = {}
+    from app.html_utils import _is_empty_value
+    normalized = {}
     for field in schema_fields:
         val = record.get(field.name)
         if _is_empty_value(val):
@@ -16,6 +15,7 @@ def normalize_scraped_record(record: dict, schema_fields: list[SchemaField]) -> 
 
 def _validate_extracted_data(record: dict, schema_fields: list[SchemaField]) -> bool:
     """Basic validation to ensure at least some meaningful data was found."""
+    from app.html_utils import _is_empty_value
     meaningful_count = 0
     for field in schema_fields:
         val = record.get(field.name)
@@ -28,6 +28,7 @@ def _dedupe_records(records: list[dict], schema_fields: list[SchemaField]) -> li
     if not records:
         return []
 
+    from app.utils.quality import normalized_dedup_text
     seen_keys = set()
     unique = []
 
@@ -66,13 +67,16 @@ def _limit_source_records(records: list[dict], schema_fields: list[SchemaField],
     return sorted(records, key=_priority, reverse=True)[:max_records]
 
 def _trim_prompt_value(value, max_chars: int = 180):
-    if value is None: return ""
+    if value is None:
+        return ""
     text = str(value).strip()
-    if len(text) <= max_chars: return text
+    if len(text) <= max_chars:
+        return text
     return text[:max_chars] + "..."
 
 def _prepare_records_for_ai(records: list[dict], schema_fields: list[SchemaField]) -> list[dict]:
     """Convert records to a compact JSON format for LLM processing."""
+    from app.html_utils import _is_empty_value
     prepared = []
     for r in records:
         item = {}

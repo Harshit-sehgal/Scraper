@@ -8,11 +8,11 @@ semantic world state.
 """
 
 import math
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from app.semantic_world_state import get_world_state
-from app.semantic_ir import SemanticToken, SemanticType
+from app.semantic_ir import SemanticToken
 
 
 @dataclass
@@ -88,7 +88,7 @@ def generate_allocation_diagnostics(
     reng,
     contradictions: List[str],
     detect_type_fn,
-    tokens: List[SemanticToken] = None
+    tokens: Optional[List[SemanticToken]] = None
 ) -> Dict[str, Any]:
     """Modern diagnostic orchestrator. Returns structured topological introspection data."""
     td = TopologicalDiagnostics()

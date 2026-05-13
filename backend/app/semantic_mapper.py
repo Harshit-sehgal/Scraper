@@ -5,8 +5,8 @@ Layer 3: Semantic Mapper
 Universal semantic mapping that matches values to user intent by WHAT THEY ARE,
 not by WHERE THEY CAME FROM or what DOMAIN the page is from.
 
-Core principle: "£238" maps to "price" because it LOOKS like a price,
-not because it came from a "flight" page.
+Core principle: "£238" matches "price" because it's a currency,
+regardless of whether it was found on a flight site or a product page.
 """
 
 import logging
@@ -16,66 +16,51 @@ from typing import Dict, List, Optional, Tuple
 
 from app.intent_parser import SEMANTIC_NEED_KEYWORDS, IntentSchema
 from app.page_profiler import StructureProfile, ValuePatterns
-
+from app.semantic_ir import SemanticType
 
 @dataclass
 class FieldMapping:
-    """Represents a mapping from an extracted value to a user's semantic need."""
-    field_name: str  # The schema field name (e.g., "price")
-    semantic_need: str  # What the user wanted (e.g., "price")
-    original_value: str  # The raw extracted value
-    mapped_value: str  # The cleaned/mapped value
-    confidence: float  # 0.0 - 1.0 how confident we are
-    matched_by: str  # How we matched: "pattern", "header", "position", "ai"
-    evidence: str = ""  # Why we made this match
-    # New: Multiple signals for debuggability
-    signals: List[str] = field(default_factory=list)  # List of signals that contributed
+    """Mapping of a single extracted value to a semantic need."""
+    field_name: str
+    semantic_need: str
+    original_value: str
+    mapped_value: str
+    confidence: float
+    matched_by: str  # "pattern", "header", "llm", "position"
+    evidence: str = ""
+    signals: List[str] = field(default_factory=list)
 
 
 @dataclass
 class RecordMapping:
-    """Complete mapping for a single record."""
-    original_data: Dict[str, str]  # Original extracted data
-    mapped_fields: Dict[str, str]  # Mapped to schema
-    confidence_scores: Dict[str, float]  # Per-field confidence
-    unmatched_values: List[str] = field(default_factory=list)  # Values we couldn't map
+    """Full mapping of an extracted record to user intent."""
+    original_data: Dict[str, str]
+    mapped_fields: Dict[str, str]
+    confidence_scores: Dict[str, float]
+    unmatched_values: List[str] = field(default_factory=list)
 
 
-# Universal pattern matching for semantic needs (NOT domain-specific)
+# Universal semantic patterns (regex)
 SEMANTIC_PATTERNS = {
     "price": [
-        r"[\$\u20a8\u20ac\u00a3\u00a5\u20b9]\s*\d+[\d,]*\.?\d*",  # 238, $450, 5,200
-        r"\d+[\d,]*\s*(inr|usd|eur|gbp|aud|cad)",  # 5000 INR
-        r"(rs\.?|rupees?)\s*\d+",  # Rs 500
-        r"(price|cost|fare|amount)\s*[:\-]?\s*[\$\u20a8\u20ac\u00a3\u00a5\u20b9]?\d+",  # Price: 500
-        r"\d+\.?\d*\s*(cr|crore|l|lakh|k|m|mn|million|thousand)",  # 25L, 1.2Cr, 50K
+        r"[\$\u20a8\u20ac\u00a3\u00a5\u20b9]\s*\d+[\d,]*\.?\d*",
+        r"\d+[\d,]*\.?\d*\s*(usd|eur|gbp|inr|rs|yen|pound)",
     ],
     "date": [
-        r"\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}",  # 22-05-2026
-        r"\d{4}[-\/]\d{2}[-\/]\d{1,2}",  # 2026-05-22
-        r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}",  # May 22
-        r"\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)",  # 22 May
-    ],
-    "duration": [
-        r"\d+h\s*\d+m",  # 2h 30m
-        r"\d+h$",  # 2h
-        r"\d+:\d{2}",  # 02:30
-        r"\d+\s*hours?",  # 3 hours
-    ],
-    "rating": [
-        r"\d+\.?\d*/\d+",  # 4.5/5, 8.5/10
-        r"[★☆]{1,5}",  # ★★★
-        r"\d+\.?\d*\s*(star|rating)",  # 4.5 stars
-    ],
-    "location": [
-        r"\b[A-Z]{3}\b",  # 3-letter codes (city codes, currency codes, etc.)
-        r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+,\s+[A-Z]{2,3}\b",  # City, State
-    ],
-    "phone": [
-        r"\+?\d[\d\s\-\(\)]{8,}",  # +91 9876543210
+        r"\d{1,2}[/-]\d{1,2}[/-](\d{2}|\d{4})",
+        r"\d{4}[-]\d{2}[-]\d{2}",
+        r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}(st|nd|rd|th)?(,\s*\d{4})?",
     ],
     "email": [
         r"[\w.+-]+@[\w-]+\.[\w.-]+",
+    ],
+    "phone": [
+        r"\+?\d[\d\s\-\(\)]{7,}",
+    ],
+    "rating": [
+        r"\d+\.?\d*\s*/\s*5",
+        r"rated\s*\d+\.?\d*",
+        r"\d+\.?\d*\s*stars?",
     ],
     "link": [
         r"https?://[^\s]+",
@@ -83,8 +68,6 @@ SEMANTIC_PATTERNS = {
     ],
 }
 
-
-from app.semantic_ir import SemanticType
 
 def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType, float]:
     """Detect semantic type of a value using regex patterns and field name hints."""
@@ -187,7 +170,7 @@ def match_values_to_intent(
     intent: IntentSchema,
     page_profile: StructureProfile,
     value_patterns: ValuePatterns,
-    headers: List[str] = None
+    headers: Optional[List[str]] = None
 ) -> List[RecordMapping]:
     """
     Match extracted values to user intent by WHAT THEY ARE, not where they came from.
@@ -278,7 +261,7 @@ def _find_best_value_for_need(
     semantic_need: str,
     headers: List[str],
     value_patterns: ValuePatterns,
-    used_values: set = None
+    used_values: Optional[set] = None
 ) -> Optional[FieldMapping]:
     """
     Find the best value that matches a semantic need.
@@ -459,7 +442,7 @@ def resolve_conflicts(mappings: List[FieldMapping]) -> List[FieldMapping]:
         return []
 
     # Group by semantic need
-    by_need: dict[str, list[str]] = {}
+    by_need: Dict[str, List[FieldMapping]] = {}
     for mapping in mappings:
         need = mapping.semantic_need
         if need not in by_need:
@@ -493,7 +476,7 @@ def map_to_schema_fields(
     results = []
 
     for record_mapping in mapped_records:
-        result = {}
+        result: Dict[str, Any] = {}
 
         for schema_field in schema_fields:
             field_name = schema_field.name

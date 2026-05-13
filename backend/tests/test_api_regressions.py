@@ -1,12 +1,10 @@
 import asyncio
-import pytest
 
 from app import main as main_mod
-from app.discovery import SOURCE_TRUST_SCORE, infer_source_metadata, discover_urls
+from app.discovery import SOURCE_TRUST_SCORE, infer_source_metadata
 from app.models import FieldType, Job, JobStatus, SchemaField, ScrapeMode
 from app.utils.quality import build_quality_report
 from app.services.state import prune_history_stores
-from app.scraper import scrape_url
 
 
 def test_system_status_shape(client):

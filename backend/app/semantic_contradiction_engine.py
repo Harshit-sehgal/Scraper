@@ -13,13 +13,10 @@ Mandatory features:
 - Conflict Localization
 """
 
-import math
-import logging
-from dataclasses import dataclass, field
-from typing import Dict, List, Set, Tuple, Optional
+from dataclasses import dataclass
+from typing import Dict, List
 
 from app.semantic_ir import (
-    SemanticGraph,
     SemanticToken,
     SemanticType,
 )

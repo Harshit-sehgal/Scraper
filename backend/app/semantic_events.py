@@ -6,7 +6,7 @@ Defines the signals that propagate through the cognition architecture.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 
 class SemanticEventType(Enum):

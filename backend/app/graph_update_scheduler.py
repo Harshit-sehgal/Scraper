@@ -4,7 +4,6 @@ Graph Update Scheduler
 Coordinates background graph relaxation and stabilization passes.
 """
 
-import logging
 from app.semantic_events import SemanticEvent, SemanticEventType
 from app.event_dispatcher import get_dispatcher
 from app.semantic_world_state import get_world_state

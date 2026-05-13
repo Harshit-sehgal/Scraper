@@ -7,7 +7,6 @@ import requests
 
 from app.models import SchemaField, FieldType
 from app.semantic_segmentation import segment_single_text, is_likely_noise_field
-from app.utils.quality import normalized_dedup_text
 
 EMPTY_TOKENS = {"-", "n/a", "na", "null", "none", "", "not available", "empty", "0", "false", "undefined"}
 PLACEHOLDER_PHRASES = {"no data", "not specified", "coming soon", "tbd", "unknown"}
@@ -62,7 +61,7 @@ def _is_noise_name_value(text: str) -> bool:
 
 def _is_likely_noise_entity(text: str) -> bool:
     """Check if text is noise using semantic density analysis."""
-    is_noise, conf, evidence = is_likely_noise_field("name", text)
+    is_noise, _conf, _evidence = is_likely_noise_field("name", text)
     return is_noise
 
 def _is_empty_value(value) -> bool:
@@ -119,11 +118,12 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
 
     # Entity field check: use semantic density on the name field
     entity_fields = [f.name for f in schema_fields if _is_entity_name_field(f.name)]
+    name_text = None
     if entity_fields:
         name_field = entity_fields[0]
         name_text = _compact_text(str(record.get(name_field) or ""))
         if name_text:
-            is_noise, conf, evidence = is_likely_noise_field(name_field, name_text)
+            is_noise, _conf, _evidence = is_likely_noise_field(name_field, name_text)
             if is_noise:
                 email_present = any(
                     record.get(f.name) for f in schema_fields
@@ -145,8 +145,19 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
             ""
         )
         address_text = _compact_text(str(record.get(address_field) or "")) if address_field else ""
-        if address_text and name_text and address_text.startswith(name_text[:40]) and not (email_present or phone_present or website_present):
-            return True
+        if address_text and name_text and address_text.startswith(name_text[:40]):
+             email_present = any(
+                    record.get(f.name) for f in schema_fields
+                    if f.field_type == FieldType.EMAIL and not _is_empty_value(record.get(f.name))
+                )
+             phone_present = any(
+                    record.get(f.name) for f in schema_fields
+                    if f.field_type == FieldType.PHONE and not _is_empty_value(record.get(f.name))
+                )
+             url_field = next((f.name for f in schema_fields if f.field_type == FieldType.URL), "")
+             website_present = bool(record.get(url_field)) if url_field else False
+             if not (email_present or phone_present or website_present):
+                return True
 
     return False
 
@@ -168,14 +179,16 @@ def _enrich_record_contacts(
     phone_field = next((f for f in schema_fields if f.field_type == FieldType.PHONE), None)
 
     if email_field and _is_empty_value(record.get(email_field.name)):
-        e, p = _extract_contacts_from_node(node)
-        if e: record[email_field.name] = e
+        e, _p = _extract_contacts_from_node(node)
+        if e:
+            record[email_field.name] = e
         elif allow_page_fallback and page_email:
             record[email_field.name] = page_email
 
     if phone_field and _is_empty_value(record.get(phone_field.name)):
-        e, p = _extract_contacts_from_node(node)
-        if p: record[phone_field.name] = p
+        _e, p = _extract_contacts_from_node(node)
+        if p:
+            record[phone_field.name] = p
         elif allow_page_fallback and page_phone:
             record[phone_field.name] = page_phone
 

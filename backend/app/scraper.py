@@ -11,32 +11,25 @@ Now using universal intent-driven extraction layers:
 - data_utils: Normalization, deduplication and limiting
 """
 
-import asyncio
 import logging
 import os
-import re
-import time
-from typing import Dict, List, Optional, Tuple, Any
+from typing import List, Optional, Tuple, Any
 
-from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright
 
 from app.async_utils import run_sync_in_thread
 from app.html_utils import (
-    _compact_text, _is_empty_value, _is_likely_noise_row,
-    fetch_page_content, clean_html_for_selectors,
-    _sanitize_field_value, _boost_contacts_with_page_html
+    _is_empty_value, fetch_page_content, clean_html_for_selectors,
+    _boost_contacts_with_page_html
 )
 from app.llm_bridge import (
     llm_json as _llm_json, 
     llm_json_fast as _llm_json_fast, 
     llm_text as _llm_text
 )
-from app.models import FieldType, SchemaField
+from app.models import SchemaField
 from app.semantic_pipeline import run_pipeline
 from app.selector_engine import (
-    _analyze_page_data_type, _intelligent_column_mapping,
-    build_selector_prompt, extract_css_selectors,
+    _analyze_page_data_type, build_selector_prompt, extract_css_selectors,
     apply_selectors, extract_with_regex
 )
 from app.data_utils import (

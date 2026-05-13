@@ -4,7 +4,6 @@ FastAPI Main Server — DataForge General-Purpose Web Scraper API.
 """
 
 import asyncio
-import os
 from pathlib import Path
 
 from fastapi import FastAPI

@@ -8,13 +8,9 @@ Replaces hardcoded suffix lists and merge patterns with scored
 boundary decisions based on structural signals and learned history.
 """
 
-import logging
-import math
-from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from app.semantic_ir import SemanticToken, SemanticType
 from app.semantic_world_state import get_world_state
 
 

@@ -411,7 +411,6 @@ def test_transition_detector_high_list():
 
 def test_layer5_contradiction_learning():
     _clean_engine()
-    from app.semantic_allocation_engine import _get_role_engine
     from app.semantic_pipeline import run_pipeline
     
     # 1. Provide a record and force a bad allocation that violates universal roots

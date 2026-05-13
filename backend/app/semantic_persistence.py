@@ -12,7 +12,6 @@ Unifies:
 import json
 import logging
 import os
-from typing import Dict, Optional
 
 from app.semantic_world_state import get_world_state
 

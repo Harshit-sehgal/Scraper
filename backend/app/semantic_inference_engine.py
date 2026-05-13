@@ -1,4 +1,3 @@
-
 """
 Unified Probabilistic Semantic Inference Engine (Evolutionary)
 ==============================================================
@@ -11,19 +10,14 @@ Meaning emerges from energy minimization over the relational topology.
 """
 
 import math
-import random
-from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple, Any
+from typing import Dict, List, Tuple
 
 from app.semantic_ir import (
-    DatasetIR,
-    RelationshipEdge,
     ExclusionEdge,
     SemanticGraph,
     SemanticToken,
     SemanticType,
-    SemanticRegion,
 )
 from app.semantic_world_state import get_world_state
 from app.event_dispatcher import get_dispatcher
@@ -51,7 +45,8 @@ class BeliefField:
             dist = dict(token.type_distribution) if token.type_distribution else {token.primary_type: 0.5}
             total = sum(dist.values())
             if total > 0:
-                for k in dist: dist[k] /= total
+                for k in dist:
+                    dist[k] /= total
             node_beliefs[i] = dist
             node_uncertainties[i] = 1.0 - max(dist.values())
         return BeliefField(
@@ -63,7 +58,8 @@ class BeliefField:
 
     @staticmethod
     def _compute_field_entropy(node_beliefs: Dict[int, Dict]) -> float:
-        if not node_beliefs: return 1.0
+        if not node_beliefs:
+            return 1.0
         total_e = 0.0
         for dist in node_beliefs.values():
             e = sum(-v * math.log2(v) for v in dist.values() if v > 0)
@@ -72,7 +68,8 @@ class BeliefField:
 
     @staticmethod
     def _compute_field_coherence(node_beliefs: Dict[int, Dict], node_uncertainties: Dict[int, float]) -> float:
-        if not node_beliefs: return 0.0
+        if not node_beliefs:
+            return 0.0
         return 1.0 - (sum(node_uncertainties.values()) / len(node_uncertainties))
 
 
@@ -91,7 +88,8 @@ class SemanticState:
 
     def compute_equilibrium(self) -> float:
         """Measure proximity to semantic equilibrium."""
-        if len(self.energy_history) < 2: return 0.0
+        if len(self.energy_history) < 2:
+            return 0.0
         variance = sum((e - sum(self.energy_history[-3:]) / 3)**2 for e in self.energy_history[-3:]) / 3
         self.equilibrium = 1.0 - min(variance, 1.0)
         return self.equilibrium
@@ -167,7 +165,7 @@ class InferenceEngine:
         
         for iteration in range(self.max_iterations):
             self._relax_graph(state, graph)
-            energy = self.thermo.compute_energy(state, graph)
+            self.thermo.compute_energy(state, graph)
             if state.compute_equilibrium() > 0.95:
                 break
             self.thermo.stabilize(state, graph)
@@ -228,7 +226,7 @@ class RoleEmbeddingEngine:
         self.ws.metrics.total_co_occurrences = value
 
     @property
-    def _learned_exclusions(self) -> Dict[tuple[str, ...], float]:
+    def _learned_exclusions(self) -> Dict[Tuple[str, str], float]:
         return self.ws.learned_exclusions
 
     @property
@@ -242,9 +240,11 @@ class RoleEmbeddingEngine:
         self.role_position_memory[role_name][1] += 1.0
 
     def get_typical_position(self, role_name: str) -> float:
-        if role_name not in self.role_position_memory: return 0.5
+        if role_name not in self.role_position_memory:
+            return 0.5
         mem = self.role_position_memory[role_name]
-        if mem[1] == 0: return 0.5
+        if mem[1] == 0:
+            return 0.5
         return mem[0] / mem[1]
 
     def learn_co_occurrence(self, assignment_a: tuple, assignment_b: tuple, success: bool):
@@ -255,7 +255,8 @@ class RoleEmbeddingEngine:
     def get_co_occurrence_boost(self, role_a: str, type_a: str, role_b: str, type_b: str) -> float:
         key = (role_a, type_a, role_b, type_b)
         count = self.co_occurrence.get(key, 0)
-        if self.total_co_occurrences == 0: return 0.0
+        if self.total_co_occurrences == 0:
+            return 0.0
         return max(-0.1, min(0.1, count / self.total_co_occurrences))
 
     def propagate_co_occurrence(self, assignments: Dict[str, Tuple[str, str]]) -> Dict[str, float]:
@@ -265,7 +266,8 @@ class RoleEmbeddingEngine:
             role_i, (type_i, _) = items[i]
             boost = 0.0
             for j in range(len(items)):
-                if i == j: continue
+                if i == j:
+                    continue
                 role_j, (type_j, _) = items[j]
                 boost += self.get_co_occurrence_boost(role_i, type_i, role_j, type_j)
             boosts[role_i] = boost / max(len(items) - 1, 1)
@@ -280,7 +282,8 @@ class RoleEmbeddingEngine:
         return self._learned_exclusions.get(key, 0.0)
 
     def learn_from_allocation(self, role: str, token_type: SemanticType, token_raw: str, success: bool, delta: float = 0.05):
-        key = (role, token_type.value if hasattr(token_type, 'value') else str(token_type))
+        type_str = token_type.value if hasattr(token_type, 'value') else str(token_type)
+        key = (role, type_str)
         current = self.get_compatibility(role, token_type)
         effective_delta = delta if success else -delta
         self.compatibility_cache[key] = max(0.0, min(1.0, current + effective_delta))
@@ -292,7 +295,8 @@ class RoleEmbeddingEngine:
         return self.compatibility_cache.get(key, 0.5)
 
     def get_certainty(self) -> float:
-        if not self.compatibility_cache: return 0.0
+        if not self.compatibility_cache:
+            return 0.0
         return sum(abs(v - 0.5) * 2 for v in self.compatibility_cache.values()) / len(self.compatibility_cache)
 
     def get_learning_speed(self) -> float:

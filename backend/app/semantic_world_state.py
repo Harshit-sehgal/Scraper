@@ -1,7 +1,3 @@
-from collections import Counter
-from typing import Dict, List, Tuple, Optional
-from dataclasses import dataclass
-
 import math
 import time
 from collections import Counter
@@ -62,7 +58,7 @@ class SemanticWorldState:
         self.motif_stability: Dict[Tuple[str, ...], float] = {}
         
         # Contradiction Topology: Impossible neighborhoods, exclusion edges
-        self.learned_exclusions: Dict[tuple[str, ...], float] = {}
+        self.learned_exclusions: Dict[Tuple[str, str], float] = {}
         self.impossible_neighborhoods: List[Set[str]] = []
         
         # Cohesion Field: Merge vs Split biases
@@ -117,8 +113,10 @@ class SemanticWorldState:
         for motif in list(self.motif_counts.keys()):
             if self.get_motif_stability(motif) < 0.01:
                 del self.motif_counts[motif]
-                if motif in self.motif_timestamps: del self.motif_timestamps[motif]
-                if motif in self.motif_stability: del self.motif_stability[motif]
+                if motif in self.motif_timestamps:
+                    del self.motif_timestamps[motif]
+                if motif in self.motif_stability:
+                    del self.motif_stability[motif]
 
     def clear(self):
         self.metrics = TopologyMetrics()
@@ -184,17 +182,20 @@ class SemanticWorldState:
 
         for k, v in data.get("role_compatibility", {}).items():
             parts = k.split("|")
-            if len(parts) == 2: self.role_compatibility[tuple(parts)] = v
+            if len(parts) == 2:
+                self.role_compatibility[tuple(parts)] = v
 
         self.role_position_memory = data.get("role_position_memory", {})
 
         for k, v in data.get("role_co_occurrence", {}).items():
             parts = k.split("|")
-            if len(parts) == 4: self.role_co_occurrence[tuple(parts)] = v
+            if len(parts) == 4:
+                self.role_co_occurrence[tuple(parts)] = v
 
         for k, v in data.get("transition_probs", {}).items():
             parts = k.split("|")
-            if len(parts) == 2: self.transition_probs[tuple(parts)] = v
+            if len(parts) == 2:
+                self.transition_probs[tuple(parts)] = v
 
         for k, v in data.get("motif_counts", {}).items():
             self.motif_counts[tuple(k.split("|"))] = v
@@ -204,23 +205,28 @@ class SemanticWorldState:
 
         for k, v in data.get("learned_exclusions", {}).items():
             parts = k.split("|")
-            if len(parts) == 2: self.learned_exclusions[tuple(parts)] = v
+            if len(parts) == 2:
+                self.learned_exclusions[tuple(parts)] = v
 
         for k, v in data.get("cohesion_merge_success", {}).items():
             parts = k.split("|")
-            if len(parts) == 2: self.cohesion_merge_success[tuple(parts)] = v
+            if len(parts) == 2:
+                self.cohesion_merge_success[tuple(parts)] = v
 
         for k, v in data.get("cohesion_merge_attempts", {}).items():
             parts = k.split("|")
-            if len(parts) == 2: self.cohesion_merge_attempts[tuple(parts)] = v
+            if len(parts) == 2:
+                self.cohesion_merge_attempts[tuple(parts)] = v
 
         for k, v in data.get("cohesion_split_success", {}).items():
             parts = k.split("|")
-            if len(parts) == 2: self.cohesion_split_success[tuple(parts)] = v
+            if len(parts) == 2:
+                self.cohesion_split_success[tuple(parts)] = v
 
         for k, v in data.get("cohesion_split_attempts", {}).items():
             parts = k.split("|")
-            if len(parts) == 2: self.cohesion_split_attempts[tuple(parts)] = v
+            if len(parts) == 2:
+                self.cohesion_split_attempts[tuple(parts)] = v
             
         self.global_centrality = data.get("global_centrality", {})
         self.last_update_time = data.get("last_update", time.time())
@@ -234,4 +240,3 @@ def get_world_state() -> SemanticWorldState:
     if _world_state is None:
         _world_state = SemanticWorldState()
     return _world_state
-
