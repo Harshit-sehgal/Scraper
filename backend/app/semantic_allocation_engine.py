@@ -223,6 +223,20 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str]) -> A
             if (r1, r2) not in graph.exclusivity_edges and (r2, r1) not in graph.exclusivity_edges:
                 graph.exclusivity_edges.append((r1, r2))
 
+    # Phase 4B: Field activation — topology mutates BEFORE allocation
+    # Reads persistent field regions and converts conflict geometry into
+    # exclusion edges, making the field state causally shape allocation.
+    for region in _ws.field_regions:
+        roles = region.competing_roles
+        for i in range(len(roles)):
+            for j in range(i + 1, len(roles)):
+                r1, r2 = roles[i], roles[j]
+                if r1 in graph.roles and r2 in graph.roles:
+                    pair = (r1, r2)
+                    rev_pair = (r2, r1)
+                    if pair not in graph.exclusivity_edges and rev_pair not in graph.exclusivity_edges:
+                        graph.exclusivity_edges.append((r1, r2))
+
     # Initial coherence
     graph.coherence_score = _compute_allocation_coherence(graph)
 
