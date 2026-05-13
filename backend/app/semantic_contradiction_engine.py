@@ -13,6 +13,7 @@ Mandatory features:
 - Conflict Localization
 """
 
+import logging
 from dataclasses import dataclass, field
 from typing import Dict, List
 
@@ -44,6 +45,16 @@ class ConflictSource:
     description: str
 
 
+# Learning and propagation constants — isolated for observability
+_EXCLUSION_LEARN_RATE = 0.1
+_COMPATIBILITY_DECAY_RATE = 0.2
+_EXCLUSION_CONTRADICTION_DELTA = 0.2
+_COMPATIBILITY_CONTRADICTION_DELTA = 0.1
+_CONTRADICTION_ENERGY_CAP = 0.8
+_EXCLUSION_STRENGTH_THRESHOLD = 0.5
+_INSTABILITY_PRESSURE_THRESHOLD = 0.4
+
+
 class IncompatibilityTopology:
     """
     Manages exclusion edges and impossible neighborhood structures.
@@ -64,23 +75,34 @@ class IncompatibilityTopology:
                     conflicts.append(ConflictSource(
                         nodes=[], # Tracing nodes is done by value match here
                         conflict_type="identity_clash",
-                        energy_penalty=0.8,
+                        energy_penalty=_CONTRADICTION_ENERGY_CAP,
                         description=f"Token '{val}' assigned to multiple roles: {usage_map[val]} and {role}"
                     ))
                 usage_map[val] = role
 
-        # 2. Structural Incompatibility (Learned Exclusions)
+        # 2. Structural Incompatibility (Learned Exclusions + Bootstrap ROLE_EXCLUSIVITY)
+        from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
         roles = list(assignments.keys())
         for i in range(len(roles)):
             for j in range(i + 1, len(roles)):
                 r1, r2 = roles[i], roles[j]
                 v1, v2 = assignments.get(r1), assignments.get(r2)
                 if v1 and v2:
-                    # Check if r1 and r2 are known to be exclusive
-                    exclusion_key = tuple(sorted([r1, r2]))
+                    # Check bootstrap exclusivity seeds (sorted to match ROLE_EXCLUSIVITY storage)
+                    sorted_pair = tuple(sorted([r1, r2]))
+                    if sorted_pair in ROLE_EXCLUSIVITY:
+                        if v1 == v2:
+                            conflicts.append(ConflictSource(
+                                nodes=[],
+                                conflict_type="topological_exclusion",
+                                energy_penalty=_CONTRADICTION_ENERGY_CAP,
+                                description=f"Roles {r1} and {r2} are mutually exclusive (seed rule)"
+                            ))
+                    # Check learned exclusions
+                    exclusion_key = sorted_pair
                     if exclusion_key in self.state.learned_exclusions:
                         strength = self.state.learned_exclusions[exclusion_key]
-                        if v1 == v2 and strength > 0.5:
+                        if v1 == v2 and strength > _EXCLUSION_STRENGTH_THRESHOLD:
                             conflicts.append(ConflictSource(
                                 nodes=[],
                                 conflict_type="topological_exclusion",
@@ -110,7 +132,7 @@ class ConflictPropagationField:
 
     def localize_instability(self) -> List[str]:
         """Identify zones of highest topological pressure."""
-        return [c.description for c in self.conflicts if c.energy_penalty > 0.4]
+        return [c.description for c in self.conflicts if c.energy_penalty > _INSTABILITY_PRESSURE_THRESHOLD]
 
 
 def detect_allocation_contradictions(output: Dict[str, str], schema_fields: List[str]) -> List[str]:
@@ -137,13 +159,13 @@ def apply_contradiction_learning(output: Dict[str, str], schema_fields: List[str
                     key = tuple(sorted([r1, r2]))
                     # Strengthen exclusion edge
                     current = state.learned_exclusions.get(key, 0.0)
-                    state.learned_exclusions[key] = min(current + 0.1, 1.0)
+                    state.learned_exclusions[key] = min(current + _EXCLUSION_LEARN_RATE, 1.0)
                     
                     dispatcher.dispatch(SemanticEvent(
                         event_type=SemanticEventType.CONTRADICTION_DETECTED,
                         source="contradiction_engine",
                         payload={"role_pair": key, "conflict_type": "identity_clash"},
-                        instability_delta=0.2
+                        instability_delta=_EXCLUSION_CONTRADICTION_DELTA
                     ))
                 filled_vals[val] = role
 
@@ -166,13 +188,14 @@ def apply_contradiction_learning(output: Dict[str, str], schema_fields: List[str
                 # Penalize compatibility in world state
                 key = (role_name, v_type_str)
                 current = state.role_compatibility.get(key, 0.5)
-                state.role_compatibility[key] = max(0.0, current - 0.2)
-                
+                state.role_compatibility[key] = max(0.0, current - _COMPATIBILITY_DECAY_RATE)
+                logger = logging.getLogger(__name__)
+                logger.debug("Decayed compatibility for %s: %.3f -> %.3f", key, current, current - _COMPATIBILITY_DECAY_RATE)
                 dispatcher.dispatch(SemanticEvent(
                     event_type=SemanticEventType.UNCERTAINTY_SPIKE,
-                    source="warning_learning",
-                    payload={"role": role_name, "type_mismatch": v_type_str},
-                    instability_delta=0.1
+                    source="contradiction_engine",
+                    payload={"role_pair": key, "decay": _COMPATIBILITY_DECAY_RATE},
+                    instability_delta=_COMPATIBILITY_CONTRADICTION_DELTA
                 ))
 
 def detect_role_swap_warnings(output: Dict[str, str], schema_fields: List[str], detect_type_fn, universal_roots) -> List[str]:

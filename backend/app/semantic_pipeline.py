@@ -47,6 +47,12 @@ _INSTABILITY_SPIKE_THRESHOLD = 0.8
 _CONTRADICTION_CONFIDENCE_PENALTY = 0.7
 _COHERENCE_SUCCESS_THRESHOLD = 0.6
 _DIAGNOSTIC_HISTORY_WINDOW = 20
+_UNCERTAINTY_SPIKE_DELTA = 0.3
+_CONTRADICTION_DELTA = 0.5
+_TOPOLOGY_SHIFT_DELTA = 0.1
+_INFERENCE_COHERENCE_FALLBACK = 0.5
+_EVOLUTION_REFINE_MIN_TOKENS = 2
+_EVOLUTION_REALLOC_MIN_TOKENS = 2
 
 
 METADATA_FIELDS: Set[str] = {
@@ -234,7 +240,7 @@ def run_pipeline(
             event_type=SemanticEventType.TOPOLOGY_SHIFT,
             source="pipeline_filter",
             payload={"removed": report.noise_removed},
-            instability_delta=0.1
+            instability_delta=_TOPOLOGY_SHIFT_DELTA
         ))
 
     if not records:
@@ -291,7 +297,7 @@ def run_pipeline(
         _, alloc_graph = allocate_semantic_roles(sem_record, schema_fields)
 
         # Refinement pass
-        if len(tokens) >= 2:
+        if len(tokens) >= _EVOLUTION_REFINE_MIN_TOKENS:
             sem_record2 = SemanticRecord(tokens=tokens)
             _, alloc_graph2 = allocate_semantic_roles(sem_record2, schema_fields, learn=False)
             if alloc_graph2.coherence_score > alloc_graph.coherence_score:
@@ -318,7 +324,7 @@ def run_pipeline(
                 event_type=SemanticEventType.UNCERTAINTY_SPIKE,
                 source="allocation_engine",
                 payload={"instability": relative_instability},
-                instability_delta=0.3
+                instability_delta=_UNCERTAINTY_SPIKE_DELTA
             ))
 
         if relative_instability > _INSTABILITY_SPIKE_THRESHOLD and tokens:
@@ -329,7 +335,7 @@ def run_pipeline(
                 ie_result = ie.infer(tokens, schema_fields)
                 if ie_result and ie_result.role_assignments:
                     # Check if inference reduced entropy (improved coherence)
-                    ie_coherence = getattr(ie_result, 'coherence_score', 0.5)
+                    ie_coherence = getattr(ie_result, 'coherence_score', _INFERENCE_COHERENCE_FALLBACK)
                     if ie_coherence > output["_confidence"]:
                         for role_name, value in ie_result.role_assignments.items():
                             if value:
@@ -358,9 +364,9 @@ def run_pipeline(
                 event_type=SemanticEventType.CONTRADICTION_DETECTED,
                 source="contradiction_engine",
                 payload={"conflicts": contradictions},
-                instability_delta=0.5
+                instability_delta=_CONTRADICTION_DELTA
             ))
-            
+
         from app.semantic_allocation_engine import _UNIVERSAL_ROOTS
         warnings = detect_role_swap_warnings(output, schema_fields, detect_semantic_type, _UNIVERSAL_ROOTS)
         if warnings:
@@ -369,7 +375,7 @@ def run_pipeline(
         apply_contradiction_learning(output, schema_fields, reng, detect_semantic_type, contradictions, warnings, _UNIVERSAL_ROOTS)
 
         # Re-allocation pass: feed contradiction pressure back into the graph
-        if contradictions and tokens:
+        if contradictions and len(tokens) >= _EVOLUTION_REALLOC_MIN_TOKENS:
             sem_record3 = SemanticRecord(tokens=tokens)
             _, re_alloc_graph = allocate_semantic_roles(sem_record3, schema_fields, learn=False)
             if re_alloc_graph.coherence_score > output["_confidence"]:
