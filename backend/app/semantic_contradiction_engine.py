@@ -149,6 +149,14 @@ def apply_contradiction_learning(output: Dict[str, str], schema_fields: List[str
     state = get_world_state()
     dispatcher = get_dispatcher()
     
+    # Global topology decay: weaken all learned exclusions slightly each cycle.
+    # Only strong, consistently-reinforced exclusions survive over time.
+    for key in list(state.learned_exclusions.keys()):
+        decay = state.learned_exclusions[key] * 0.05
+        state.learned_exclusions[key] = max(0.0, state.learned_exclusions[key] - decay)
+        if state.learned_exclusions[key] <= 0.01:
+            del state.learned_exclusions[key]
+    
     if contradictions:
         # Learn exclusion edges between roles that fought over the same token
         filled_vals = {}

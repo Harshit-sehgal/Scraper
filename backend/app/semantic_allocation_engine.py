@@ -48,6 +48,31 @@ ROLE_EXCLUSIVITY: List[Tuple[str, str]] = [
 ]
 
 
+def _adaptive_exclusion_threshold() -> float:
+    """Exclusion threshold emerges from topology dynamics, not hardcoded.
+
+    Immature graphs (few records, high uncertainty) use permissive thresholds
+    so weak exclusions can still form. Mature graphs tighten — only strong
+    recurring exclusions survive, preventing the field from freezing too early.
+    """
+    from app.semantic_world_state import get_world_state
+    ws = get_world_state()
+    maturity = min(ws.metrics.total_records_processed / 100.0, 1.0)
+    uncertainty = ws.metrics.average_uncertainty
+    adaptive = 0.4 - (maturity * 0.2) + (uncertainty * 0.3)
+    return max(0.2, min(0.6, adaptive))
+
+
+def _adaptive_runtime_exclusion_threshold() -> float:
+    """Runtime exclusion check threshold adapts to graph maturity and energy."""
+    from app.semantic_world_state import get_world_state
+    ws = get_world_state()
+    maturity = min(ws.metrics.total_records_processed / 100.0, 1.0)
+    energy = ws.metrics.global_energy
+    base = 0.3 - (maturity * 0.15) + (energy * 0.02)
+    return max(0.15, min(0.5, base))
+
+
 # Bootstrap seeds for role-type compatibility.
 # These are TEMPORARY priors — learning overrides them over time.
 # They are NOT universal truths; they give the system a starting point
@@ -184,7 +209,8 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str]) -> A
             r1, r2 = roles[i], roles[j]
             if (r1, r2) in graph.exclusivity_edges or (r2, r1) in graph.exclusivity_edges:
                 continue
-            if reng.get_learned_exclusion(r1, r2) > 0.4:
+            exclusion_threshold = _adaptive_exclusion_threshold()
+            if reng.get_learned_exclusion(r1, r2) > exclusion_threshold:
                 graph.exclusivity_edges.append((r1, r2))
 
     # Initial coherence
@@ -510,7 +536,8 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
                 for filled_role in filled:
                     if g.roles.get(filled_role) and g.roles[filled_role].filled_by == cand_key:
                         exclusion_score = reng.get_learned_exclusion(role_name, filled_role)
-                        if exclusion_score > 0.3:
+                        runtime_threshold = _adaptive_runtime_exclusion_threshold()
+                        if exclusion_score > runtime_threshold:
                             conflicting = True
                             break
                             

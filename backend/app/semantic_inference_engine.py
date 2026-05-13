@@ -132,15 +132,14 @@ class SemanticThermodynamics:
 
     def stabilize(self, state: SemanticState, graph: SemanticGraph):
         """Reinforce stable edges, decay high-energy ones."""
-        if state.energy < self.ws.metrics.global_energy:
-            # Universe cooling: stabilize
-            for edge in graph.relationships:
-                if edge.confidence > 0.5:
-                    edge.confidence = min(edge.confidence + 0.02, 1.0)
-        else:
-            # Universe heating: destabilize
-            for edge in graph.relationships:
-                edge.confidence = max(edge.confidence - 0.05, 0.0)
+        for edge in graph.relationships:
+            attr = 'strength' if hasattr(edge, 'strength') else 'confidence'
+            val = getattr(edge, attr, 0.5)
+            if state.energy < self.ws.metrics.global_energy:
+                if val > 0.5:
+                    setattr(edge, attr, min(val + 0.02, 1.0))
+            else:
+                setattr(edge, attr, max(val - 0.05, 0.0))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
