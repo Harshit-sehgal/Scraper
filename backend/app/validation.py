@@ -302,8 +302,8 @@ def validate_records(
 
             # Track rejected field counts
             for _field in result.rejected_fields:
-                validation_summary["rejected_fields"][field] = \
-                    validation_summary["rejected_fields"].get(field, 0) + 1
+                validation_summary["rejected_fields"][_field] = \
+                    validation_summary["rejected_fields"].get(_field, 0) + 1
 
     validation_summary["empty_allowed"] = len([r for r in valid_records if "_validation" in r and r["_validation"]["score"] > 0])
 

@@ -239,32 +239,14 @@ async def generate_data_insight(results: list[dict]) -> str:
     return await run_sync_in_thread(_sync_call)
 
 
-def suggest_schema_from_intent(intent: str) -> dict:
+async def suggest_schema_from_intent(intent: str, max_fields: int = 8) -> dict:
     """Convert a natural language intent into a structured SchemaField list."""
     def _sync_call() -> dict:
-        prompt = f"""Convert this scraping intent into a JSON plan.
-
-Intent:
-{intent}
-
-Return ONLY JSON with this shape:
-{{
-  "name": "Job Name",
-  "fields": [
-    {{"name": "field_name", "type": "string|number|url|email|phone|date", "required": true|false, "description": "..."}}
-  ]
-}}
-"""
-        messages = [
-            {"role": "system", "content": "You are a schema architect. Return only JSON."},
-            {"role": "user", "content": prompt},
-        ]
-        return _llm_json(messages)
-
-    return suggest_schema_from_intent_sync(intent)
+        return suggest_schema_from_intent_sync(intent, max_fields=max_fields)
+    return await run_sync_in_thread(_sync_call)
 
 
-def suggest_schema_from_intent_sync(intent: str) -> dict:
+def suggest_schema_from_intent_sync(intent: str, max_fields: int = 8) -> dict:
     """Sync version of suggest_schema_from_intent."""
     prompt = f"""Convert this scraping intent into a JSON plan.
 
@@ -278,6 +260,8 @@ Return ONLY JSON with this shape:
     {{"name": "field_name", "type": "string|number|url|email|phone|date", "required": true|false, "description": "..."}}
   ]
 }}
+
+Maximum number of fields: {max_fields}
 """
     messages = [
         {"role": "system", "content": "You are a schema architect. Return only JSON."},
