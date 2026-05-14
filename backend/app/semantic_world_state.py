@@ -307,6 +307,24 @@ class SemanticWorldState:
             self.field_regions = self.field_regions[-50:]
         return captured
 
+    def decay_field_regions(self):
+        """Apply local instability decay and prune converged regions.
+
+        Each field region decays toward 0 independently — this is
+        LOCAL equilibrium rather than global damping. Regions that
+        reach 0 instability are removed (they have converged).
+        High recurrence_score slows the decay (topology inertia).
+        """
+        surviving = []
+        for r in self.field_regions:
+            r.instability *= 0.95
+            # Inertia: high recurrence means the region resists decay
+            if r.recurrence_score > 0.3:
+                r.instability = min(r.instability + 0.02, 1.0)
+            if r.instability > 0.05:
+                surviving.append(r)
+        self.field_regions = surviving
+
     def snapshot(self, label: str = ""):
         """Record a compact topology snapshot for replay/debugging."""
         self.topology_snapshots.append({

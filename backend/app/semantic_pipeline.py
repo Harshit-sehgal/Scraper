@@ -543,6 +543,9 @@ def run_pipeline(
                 md.coherence_after = coherence
                 md.success = coherence > _field_coherence_threshold()
         
+        # Local field region decay — each region converges independently
+        state.decay_field_regions()
+        
         allocated_records.append(output)
 
     report.after_allocation = len(allocated_records)
