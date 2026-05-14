@@ -55,6 +55,11 @@ class FieldConflictRegion:
 
     _global_evolve_cycle: int = 0
 
+    def __post_init__(self):
+        """Each basin self-initializes its evolution counter on creation."""
+        self._evolve_counter = 0
+        self._propagation_count = 0
+
     def evolve(self, ws=None, force=False):
         """Autonomous basin evolution — self-scheduled.
 
