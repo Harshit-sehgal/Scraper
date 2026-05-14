@@ -463,9 +463,9 @@ def run_pipeline(
                     r1, r2 = roles[0], roles[1]
                     c1 = getattr(region, 'local_convergence', 0.5)
                     c2 = getattr(region, 'local_convergence', 0.5)
-                    # Continuous topology readout — sigmoid-weighted by instability
+                    # Continuous topology readout — weight is continuous 0-1
                     weight = 1.0 / (1.0 + 2.718 ** (-10 * (region.instability - 0.3)))
-                    if weight > 0.5 and region.token:
+                    if weight > 0.01 and region.token:
                         if c1 >= c2:
                             _, unstable_role = r1, r2
                         else:
@@ -537,7 +537,7 @@ def run_pipeline(
                 for start in range(len(type_sequence) - size + 1):
                     motif = tuple(type_sequence[start:start + size])
                     stability = state.get_motif_stability(motif)
-                    if stability > 0.5:
+                    if stability > 0.01:
                         for role_name in schema_fields:
                             key = (role_name, motif[0])
                             current = reng.compatibility_cache.get(key, 0.5)
