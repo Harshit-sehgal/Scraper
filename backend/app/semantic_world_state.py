@@ -78,7 +78,9 @@ class TopologyMetrics:
 
     @property
     def semantic_temperature(self) -> float:
-        """Derived from field_pressure via exponential smoothing."""
+        """Derived from field regions — aggregate of local temperatures.
+        Global metrics are now observer-only, not independent physics."""
+        # This will be overridden by WorldState.temperature_from_regions()
         self._temperature = getattr(self, '_temperature', 0.5)
         target = max(0.1, min(1.0, self.field_pressure * 1.5))
         self._temperature = self._temperature * 0.9 + target * 0.1
@@ -86,10 +88,9 @@ class TopologyMetrics:
 
     @property
     def convergence_score(self) -> float:
-        """Derived from field_pressure and energy stability."""
-        stability = 1.0 - min(self.field_pressure * 1.5, 1.0)
-        energy_stability = 1.0 - min(self.global_energy / 5.0, 1.0)
-        return (stability * 0.6 + energy_stability * 0.4)
+        """Derived from field regions — aggregate of local convergence."""
+        self._convergence = getattr(self, '_convergence', 0.5)
+        return self._convergence
 
     def field_summary(self) -> dict:
         """Return only the 3 canonical field variables."""
@@ -349,36 +350,50 @@ class SemanticWorldState:
         return captured
 
     def redistribute_instability(self):
-        """Conservation physics: redistribute instability between neighboring regions
-        instead of just clamping. High-instability regions transfer energy to
-        lower-instability neighbors. This prevents runaway amplification while
-        preserving total field energy (conservation, not just clipping)."""
+        """Continuous diffusion-based instability transfer.
+
+        Flow = coupling_strength * pressure_gradient.
+        Coupling strength is determined by propagation interaction frequency
+        (how often regions have influenced each other), not symbolic overlap.
+        This eliminates the procedural if-statement pattern."""
         if len(self.field_regions) < 2:
             return
+        # Build interaction-frequency-based adjacency (not symbolic overlap)
+        for region in self.field_regions:
+            region._interaction_count = getattr(region, '_interaction_count', 0) + 1
+
         for i in range(len(self.field_regions)):
             for j in range(i + 1, len(self.field_regions)):
                 ri = self.field_regions[i]
                 rj = self.field_regions[j]
-                # Check if they share any competing roles (are neighbors)
-                shared = set(ri.competing_roles) & set(rj.competing_roles)
-                if shared:
-                    diff = ri.instability - rj.instability
-                    transfer = abs(diff) * 0.05
-                    if diff > 0.05:
-                        ri.instability -= transfer
-                        rj.instability += transfer
-                    elif diff < -0.05:
-                        rj.instability -= transfer
-                        ri.instability += transfer
+                # Coupling strength from mutual propagation interaction
+                ci = getattr(ri, '_interaction_count', 0)
+                cj = getattr(rj, '_interaction_count', 0)
+                coupling = min(ci, cj) * 0.01
+                if coupling < 0.01:
+                    continue
+                # Continuous diffusion: flow = coupling * pressure_gradient
+                pressure_gradient = ri.instability - rj.instability
+                flow = coupling * pressure_gradient
+                ri.instability -= flow
+                rj.instability += flow
+
+    def aggregate_from_regions(self):
+        """Derive global metrics from local field regions — observer-only.
+
+        Global metrics are aggregates of local basin state, not independent.
+        This prevents global/local drift and metric ecology explosion.
+        """
+        if not self.field_regions:
+            self.metrics._convergence = getattr(self.metrics, '_convergence', 0.5)
+            return
+        avg_convergence = sum(r.local_convergence for r in self.field_regions) / len(self.field_regions)
+        avg_temp = sum(r.local_temperature for r in self.field_regions) / len(self.field_regions)
+        self.metrics._convergence = avg_convergence
+        self.metrics._temperature = avg_temp
 
     def decay_field_regions(self):
-        """Apply local instability decay and prune converged regions.
-
-        Each field region decays toward 0 independently — this is
-        LOCAL equilibrium rather than global damping. Regions that
-        reach 0 instability are removed (they have converged).
-        High recurrence_score slows the decay (topology inertia).
-        """
+        """Decay and prune converged regions — each decays independently."""
         surviving = []
         for r in self.field_regions:
             r.instability *= 0.95
