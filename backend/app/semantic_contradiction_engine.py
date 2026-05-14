@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from typing import Dict, List
 
 from app.semantic_ir import (
-    SemanticGraph,
     SemanticToken,
     SemanticType,
 )
@@ -122,44 +121,22 @@ class ConflictPropagationField:
     def __init__(self, conflicts: List[ConflictSource]):
         self.conflicts = conflicts
 
-    def compute_total_pressure(self) -> float:
-        """Compute the aggregate conflict energy of the field."""
-        if not self.conflicts:
-            return 0.0
-        
-        # Conflict energy adds non-linearly (entropy sum)
-        total_energy = sum(c.energy_penalty for c in self.conflicts)
-        return min(total_energy, 5.0) # Cap at 5.0 units of conflict energy
-
-    def localize_instability(self) -> List[str]:
-        """Identify zones of highest topological pressure."""
-        return [c.description for c in self.conflicts if c.energy_penalty > _INSTABILITY_PRESSURE_THRESHOLD]
-
 
 def detect_allocation_contradictions(output: Dict[str, str], schema_fields: List[str]) -> List[str]:
-    """Modern bridge to IncompatibilityTopology."""
     it = IncompatibilityTopology()
     conflicts = it.detect_impossible_neighborhoods([], output)
     return [c.description for c in conflicts]
 
-def apply_contradiction_learning(output: Dict[str, str], schema_fields: List[str], reng, detect_type_fn, contradictions: List[str], warnings: List[str], universal_roots):
-    """
-    Propagates conflict signals into the long-term World State.
-    Contradictions create exclusion edges.
-    """
+
+def apply_contradiction_learning(output, schema_fields, reng, detect_type_fn, contradictions, warnings, universal_roots):
     state = get_world_state()
     dispatcher = get_dispatcher()
-    
-    # Global topology decay: weaken all learned exclusions slightly each cycle.
-    # Only strong, consistently-reinforced exclusions survive over time.
     for key in list(state.learned_exclusions.keys()):
         decay = state.learned_exclusions[key] * 0.05
         state.learned_exclusions[key] = max(0.0, state.learned_exclusions[key] - decay)
         if state.learned_exclusions[key] <= 0.01:
             del state.learned_exclusions[key]
-    
     if contradictions:
-        # Learn exclusion edges between roles that fought over the same token
         filled_vals = {}
         for role, val in output.items():
             if role.startswith('_') or not val:
@@ -176,9 +153,6 @@ def apply_contradiction_learning(output: Dict[str, str], schema_fields: List[str
                     instability_delta=_EXCLUSION_CONTRADICTION_DELTA
                 ))
             filled_vals[val] = role
-
-        # Phase 4: Neighborhood cohesion tracking
-        # Decrement cohesion for role pairs in contradiction descriptions
         for c in contradictions:
             c_str = str(c)
             for role in schema_fields:
@@ -190,8 +164,6 @@ def apply_contradiction_learning(output: Dict[str, str], schema_fields: List[str
                             state.neighborhood_cohesion[key] = max(0.0, current - 0.1)
                             if state.neighborhood_cohesion[key] < 0.3:
                                 state.restructuring_queue.add(key)
-
-    # Increment cohesion for non-conflicting co-occurrences
     if not contradictions:
         for role in output:
             if role.startswith('_') or not output[role]:
@@ -203,23 +175,19 @@ def apply_contradiction_learning(output: Dict[str, str], schema_fields: List[str
                 current = state.neighborhood_cohesion.get(key, 0.5)
                 state.neighborhood_cohesion[key] = min(1.0, current + 0.02)
 
-    # Original warning learning bridge
     if warnings:
         for role_name in schema_fields:
             val = output.get(role_name)
             if not val:
                 continue
             val_type, _ = detect_type_fn(val, role_name)
-            # Find expected type
             seed_type = SemanticType.TEXT
             for roots, stype in universal_roots:
                 if any(root in role_name.lower() for root in roots):
                     seed_type = stype
                     break
-            
             v_type_str = val_type.value if hasattr(val_type, 'value') else str(val_type)
             if seed_type != SemanticType.TEXT and v_type_str != (seed_type.value if hasattr(seed_type, 'value') else str(seed_type)):
-                # Penalize compatibility in world state
                 key = (role_name, v_type_str)
                 current = state.role_compatibility.get(key, 0.5)
                 state.role_compatibility[key] = max(0.0, current - _COMPATIBILITY_DECAY_RATE)
@@ -232,8 +200,8 @@ def apply_contradiction_learning(output: Dict[str, str], schema_fields: List[str
                     instability_delta=_COMPATIBILITY_CONTRADICTION_DELTA
                 ))
 
-def detect_role_swap_warnings(output: Dict[str, str], schema_fields: List[str], detect_type_fn, universal_roots) -> List[str]:
-    """Identifies role-type mismatches that suggest a potential swap or misallocation."""
+
+def detect_role_swap_warnings(output, schema_fields, detect_type_fn, universal_roots) -> List[str]:
     warnings = []
     for role_name in schema_fields:
         val = output.get(role_name)
@@ -241,47 +209,12 @@ def detect_role_swap_warnings(output: Dict[str, str], schema_fields: List[str], 
             continue
         val_type, _ = detect_type_fn(val, role_name)
         v_type_str = val_type.value if hasattr(val_type, 'value') else str(val_type)
-        
         expected_type = 'text'
         for roots, stype in universal_roots:
             if any(root in role_name.lower() for root in roots):
                 expected_type = stype.value if hasattr(stype, 'value') else str(stype)
                 break
-        
         if expected_type != 'text' and v_type_str != expected_type:
             warnings.append(f"{role_name}: expected {expected_type}, got {v_type_str} ({val})")
     return warnings
 
-
-def detect_contradictions(graph: SemanticGraph) -> List[Contradiction]:
-    """Detect contradictions in a semantic graph."""
-    contradictions: List[Contradiction] = []
-
-    # 1. Identity contradictions (same value in multiple roles)
-    value_to_roles: Dict[str, List[str]] = {}
-    for region in graph.regions:
-        for token in region.tokens:
-            if token.raw:
-                if token.raw not in value_to_roles:
-                    value_to_roles[token.raw] = []
-                value_to_roles[token.raw].append(f"region_{region.region_id}")
-
-    for value, roles in value_to_roles.items():
-        if len(roles) > 1:
-            contradictions.append(Contradiction(
-                description=f"Token '{value}' appears in multiple regions: {roles}",
-                confidence_damage=0.3 * len(roles),
-                contradiction_type="identity_clash",
-            ))
-
-    # 2. Structural incompatibilities in ownership
-    for edge in graph.ownership_edges:
-        if edge.owner_region_id == edge.owned_region_id:
-            contradictions.append(Contradiction(
-                description=f"Circular ownership edge: region {edge.owner_region_id} owns itself",
-                confidence_damage=0.5,
-                nodes=[edge.owner_region_id],
-                contradiction_type="circular_ownership",
-            ))
-
-    return contradictions

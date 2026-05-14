@@ -7,7 +7,6 @@ Universal page structure detection that works for ANY data type.
 Core principle: Detect structure and value patterns, not domain-specific features.
 """
 
-import logging
 import re
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -347,82 +346,3 @@ def detect_value_patterns(html: str) -> ValuePatterns:
     return patterns
 
 
-def detect_value_patterns_from_samples(samples: List[str]) -> ValuePatterns:
-    """Detect value patterns from a list of text samples."""
-    text = " ".join(samples)
-    return detect_value_patterns(text)
-
-
-def find_data_containers(html: str, profile: StructureProfile) -> List:
-    """Find all data containers (rows, cards) on the page."""
-    soup = BeautifulSoup(html, "html.parser")
-
-    selector = profile.container_selector
-    if not selector:
-        return []
-
-    try:
-        containers = soup.select(selector)
-        return containers
-    except Exception as e:
-        logging.exception(e)
-        return []
-
-
-def get_column_headers(html: str, structure_type: str) -> List[str]:
-    """Extract column/field headers from the page."""
-    soup = BeautifulSoup(html, "html.parser")
-    headers = []
-
-    if structure_type == "table":
-        tables = soup.find_all("table")
-        for table in tables:
-            ths = table.find_all("th")
-            if ths:
-                headers = [th.get_text(strip=True) for th in ths[:10]]
-                break
-
-    elif structure_type in ["cards", "list"]:
-        # Try to find headers in first few containers
-        for tag in soup.find_all(["h1", "h2", "h3", "h4", "strong", "b"])[:10]:
-            text = tag.get_text(strip=True)
-            if text and len(text) < 50:
-                headers.append(text)
-
-    return headers
-
-
-def extract_all_text_values(html: str) -> List[str]:
-    """Extract all distinct text values from the page for pattern analysis."""
-    soup = BeautifulSoup(html, "html.parser")
-
-    # Get text from main content areas
-    values = set()
-
-    # Remove noise
-    for tag in soup(["script", "style", "nav", "footer", "header", "meta", "link"]):
-        tag.decompose()
-
-    # Extract text from common data containers
-    for selector in ["div[class*='item']", "div[class*='card']", "tr", "li", "article"]:
-        elements = soup.select(selector)
-        for el in elements[:50]:
-            text = el.get_text(strip=True)
-            if text and len(text) > 3 and len(text) < 200:
-                values.add(text)
-
-    return list(values)[:100]
-
-
-def analyze_page_complexity(html: str) -> dict:
-    """Analyze how complex the page structure is."""
-    soup = BeautifulSoup(html, "html.parser")
-
-    return {
-        "tag_count": len(soup.find_all(True)),
-        "div_count": len(soup.find_all("div")),
-        "table_count": len(soup.find_all("table")),
-        "link_count": len(soup.find_all("a")),
-        "text_length": len(soup.get_text()),
-        "unique_text_blocks": len(set(t.get_text(strip=True) for t in soup.find_all(True) if t.get_text(strip=True))),
-    }

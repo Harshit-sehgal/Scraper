@@ -608,13 +608,3 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
     return {'roles': {r: g.roles[r].filled_by for r in g.roles}, 'coherence': coh}
 
 
-def allocate_all_records(
-    records: List[SemanticRecord],
-    schema_fields: List[str],
-) -> List[Tuple[SemanticRecord, AllocationGraph]]:
-    """Allocate semantic roles for all records in a dataset."""
-    results = []
-    for record in records:
-        result, graph = allocate_semantic_roles(record, schema_fields)
-        results.append((result, graph))
-    return results
