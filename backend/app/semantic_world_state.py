@@ -305,11 +305,12 @@ class SemanticWorldState:
         return min(actual / possible, 1.0) if possible > 0 else 0.0
 
     def propagate_field_regions(self) -> int:
-        """Propagate instability from field regions to neighboring roles.
+        """Bounded propagation with finite radius — prevents semantic weather.
 
-        Propagation is LOCALLY DAMPED — each region spreads less energy
-        based on its own activation history, not a global counter.
-        This gives each field region its own propagation half-life.
+        Propagation radius is 1 (direct exclusivity neighbors only). Each
+        region spreads at most 30% of its instability, attenuated by local
+        propagation count. This prevents small contradictions from globally
+        destabilizing the field.
         """
         from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
         affected = 0
