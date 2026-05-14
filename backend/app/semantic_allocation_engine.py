@@ -477,7 +477,10 @@ def allocate_semantic_roles(
     # Propagate uncertainty to global state
     from app.semantic_world_state import get_world_state
     state = get_world_state()
-    state.metrics.cumulative_uncertainty += (1.0 - graph.coherence_score)
+    if state.field_regions:
+        state.field_regions[-1]._uncertainty = getattr(
+            state.field_regions[-1], '_uncertainty', 0.0
+        ) + (1.0 - graph.coherence_score)
 
     if not learn:
         return record, graph

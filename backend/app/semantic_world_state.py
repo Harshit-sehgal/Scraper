@@ -25,6 +25,7 @@ class FieldConflictRegion:
     stability_momentum: float = 0.0  # structural hysteresis — resists rapid change
     local_convergence: float = 0.3  # local settling score
     local_temperature: float = 0.5  # local exploration/exploitation
+    local_energy: float = 5.0  # local activation level
 
 
 @dataclass
@@ -387,10 +388,15 @@ class SemanticWorldState:
         if not self.field_regions:
             self.metrics._convergence = getattr(self.metrics, '_convergence', 0.5)
             return
-        avg_convergence = sum(r.local_convergence for r in self.field_regions) / len(self.field_regions)
-        avg_temp = sum(r.local_temperature for r in self.field_regions) / len(self.field_regions)
+        n = len(self.field_regions)
+        avg_convergence = sum(r.local_convergence for r in self.field_regions) / n
+        avg_temp = sum(r.local_temperature for r in self.field_regions) / n
+        avg_energy = sum(r.local_energy for r in self.field_regions) / n
+        total_uncertainty = sum(getattr(r, '_uncertainty', 0.0) for r in self.field_regions)
         self.metrics._convergence = avg_convergence
         self.metrics._temperature = avg_temp
+        self.metrics.global_energy = avg_energy
+        self.metrics.cumulative_uncertainty = total_uncertainty
 
     def decay_field_regions(self):
         """Decay and prune converged regions — each decays independently."""

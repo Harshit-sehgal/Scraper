@@ -176,17 +176,19 @@ class InferenceEngine:
             if state.compute_equilibrium() > 0.95:
                 break
             self.thermo.stabilize(state, graph)
-            self.ws.metrics.cumulative_uncertainty += (1.0 - state.belief_field.field_coherence)
             
         # Populate role assignments so pipeline can use inference results
         for i, token in enumerate(tokens):
             if i < len(schema_fields):
                 state.role_assignments[schema_fields[i]] = token.raw
         
-        # Persist results back to world state
-        self.ws.metrics.global_energy = state.energy
+        # Persist energy to the most recent field region (local, not global)
+        if self.ws.field_regions:
+            self.ws.field_regions[-1].local_energy = getattr(
+                self.ws.field_regions[-1], 'local_energy', 5.0
+            )
+            self.ws.field_regions[-1].local_energy = state.energy
         self.ws.metrics.average_entropy = state.belief_field.field_entropy
-        self.ws.metrics.global_entropy = state.belief_field.field_entropy
             
         self.dispatcher.dispatch(SemanticEvent(
             event_type=SemanticEventType.EQUILIBRIUM_REACHED,

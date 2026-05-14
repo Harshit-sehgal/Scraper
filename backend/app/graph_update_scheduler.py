@@ -71,10 +71,10 @@ class GraphUpdateScheduler:
         
         if virtual_tokens:
             result = ie.infer(virtual_tokens, list(ws.role_position_memory.keys()))
-            ws.metrics.global_energy = result.energy
+            if ws.field_regions:
+                ws.field_regions[-1].local_energy = result.energy
             if result.belief_field:
                 ws.metrics.average_entropy = result.belief_field.field_entropy
-                ws.metrics.global_entropy = result.belief_field.field_entropy
             
             pressure_after = ws.metrics.field_pressure
             drop = pressure_before - pressure_after
