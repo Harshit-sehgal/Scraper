@@ -315,7 +315,7 @@ def run_pipeline(
                 seen_values.add(value)
                 pos += len(value) + 1
 
-        from app.overlap_resolution import resolve_overlaps
+        from app.semantic_segmentation import resolve_overlaps
         original_positions = {t.raw: t.position for t in tokens}
         tokens = resolve_overlaps(tokens)
         for t in tokens:

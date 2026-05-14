@@ -21,6 +21,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 
+from app.semantic_ir import SemanticToken, SemanticType
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # INTERMEDIATE REPRESENTATION (IR)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -823,6 +825,57 @@ def expand_composite_records(
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONVENIENCE: FIELD-LEVEL NOISE CHECK
 # ═══════════════════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────
+# Overlap Resolution (merged from overlap_resolution.py)
+# ─────────────────────────────────────────────────────────────
+
+# Hierarchical dominance: broader types dominate narrower ones
+DOMINANCE_HIERARCHY = {
+    SemanticType.EMAIL: 100,
+    SemanticType.PRICE: 90,
+    SemanticType.DATE: 85,
+    SemanticType.PHONE: 80,
+    SemanticType.URL: 80,
+    SemanticType.DURATION: 70,
+    SemanticType.RATING: 65,
+    SemanticType.CODE: 50,
+    SemanticType.LOCATION: 45,
+    SemanticType.ORGANIZATION: 40,
+    SemanticType.NAME: 35,
+    SemanticType.NUMBER: 20,
+    SemanticType.IDENTIFIER: 15,
+    SemanticType.TEXT: 10,
+}
+
+
+def resolve_overlaps(tokens: List[SemanticToken]) -> List[SemanticToken]:
+    """Resolve span overlaps by suppressing dominated child tokens."""
+    if not tokens:
+        return tokens
+    sorted_tokens = sorted(
+        tokens,
+        key=lambda t: (
+            -DOMINANCE_HIERARCHY.get(t.primary_type, 0),
+            -(t.span.end - t.span.start)
+        )
+    )
+    suppressed: Set[int] = set()
+    for i in range(len(sorted_tokens)):
+        if i in suppressed:
+            continue
+        for j in range(i + 1, len(sorted_tokens)):
+            if j in suppressed:
+                continue
+            ti, tj = sorted_tokens[i], sorted_tokens[j]
+            if not ti.span.overlaps_with(tj.span):
+                continue
+            suppressed.add(j)
+    result = [t for idx, t in enumerate(sorted_tokens) if idx not in suppressed]
+    for pos, token in enumerate(result):
+        token.position = pos
+    return result
+
 
 def is_likely_noise_field(name: str, value: str) -> Tuple[bool, float, List[str]]:
     """Check if a field value is likely noise, using semantic analysis.
