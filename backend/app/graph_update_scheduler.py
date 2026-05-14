@@ -73,8 +73,6 @@ class GraphUpdateScheduler:
             result = ie.infer(virtual_tokens, list(ws.role_position_memory.keys()))
             if ws.field_regions:
                 ws.field_regions[-1].local_energy = result.energy
-            if result.belief_field:
-                ws.metrics.average_entropy = result.belief_field.field_entropy
             
             # Continuous basin evolution — not pipeline-phase-driven
             ws.decay_field_regions()

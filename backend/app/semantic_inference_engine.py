@@ -142,8 +142,8 @@ class SemanticThermodynamics:
         for edge in graph.relationships:
             val = edge.confidence
             if state.energy < self.ws.metrics.global_energy:
-                if val > 0.5:
-                    edge.confidence = min(val + reinforce_rate, 1.0)
+                reinforce = 1.0 / (1.0 + 2.718 ** (-10 * (val - 0.5)))
+                edge.confidence = min(val + reinforce_rate * reinforce, 1.0)
             else:
                 edge.confidence = max(val - decay_rate, 0.0)
 
@@ -188,7 +188,6 @@ class InferenceEngine:
                 self.ws.field_regions[-1], 'local_energy', 5.0
             )
             self.ws.field_regions[-1].local_energy = state.energy
-        self.ws.metrics.average_entropy = state.belief_field.field_entropy
             
         self.dispatcher.dispatch(SemanticEvent(
             event_type=SemanticEventType.EQUILIBRIUM_REACHED,
