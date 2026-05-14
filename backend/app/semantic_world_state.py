@@ -77,7 +77,7 @@ class FieldConflictRegion:
 
         self.instability *= 0.95 * plasticity
         effect = 1.0 / (1.0 + 2.718 ** (-10 * (self.recurrence_score - 0.3)))  # sigmoid
-        self.instability = min(1.0, self.instability + 0.02 * effect)
+        self.instability = min(1.0, self.instability + min(0.02 * effect, MAX_INSTABILITY_FLUX))
         self.persistence = min(2.0, self.persistence + 0.05)
         self.local_convergence = min(1.0, self.local_convergence + 0.02 * plasticity)
         decay = 1.0 / (1.0 + 2.718 ** (-10 * (self.instability - 0.3)))  # sigmoid
