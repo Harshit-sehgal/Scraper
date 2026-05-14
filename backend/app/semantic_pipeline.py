@@ -554,7 +554,11 @@ def run_pipeline(
                 md.coherence_after = coherence
                 md.success = coherence > _field_coherence_threshold()
         
-        # Basin evolution moved to scheduler relaxation (continuous, not procedural)
+        # Basin evolution — continuous, both event-triggered (scheduler) and
+        # pipeline-driven (here) to ensure evolution during non-event periods.
+        state.decay_field_regions()
+        state.aggregate_from_regions()
+        state.redistribute_instability()
         
         allocated_records.append(output)
 
