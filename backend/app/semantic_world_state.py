@@ -385,12 +385,22 @@ class SemanticWorldState:
             if r.recurrence_score > 0.3:
                 r.instability = min(r.instability + 0.02, 1.0)
             r.persistence = min(2.0, r.persistence + 0.05)
-            # Local convergence: based on local instability trajectory
             r.local_convergence = min(1.0, r.local_convergence + 0.02)
             if r.instability > 0.3:
                 r.local_convergence *= 0.95
-            # Local temperature: follows local instability
             r.local_temperature = r.local_temperature * 0.9 + (r.instability * 0.8) * 0.1
+
+            # Phase 3: Continuous distortion — field regions continuously perturb
+            # learned exclusions for their competing roles, not just on capture.
+            if r.instability > 0.3:
+                for role in r.competing_roles:
+                    for peer in r.competing_roles:
+                        if peer != role:
+                            key = tuple(sorted([role, peer]))
+                            current = self.learned_exclusions.get(key, 0.0)
+                            distortion = r.instability * 0.01
+                            self.learned_exclusions[key] = min(1.0, current + distortion)
+
             decay_floor = 0.05 / max(r.persistence, 0.5)
             if r.instability > decay_floor:
                 surviving.append(r)
