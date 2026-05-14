@@ -195,6 +195,22 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str]) -> A
             required=True,
         )
 
+    # Phase 6: Topology-driven allocation — check field regions BEFORE compatibility
+    # Field region conflicts add exclusion edges that shape which candidates
+    # are considered compatible, making topology the primary causal substrate.
+    from app.semantic_world_state import get_world_state as _gws_topo
+    _ws_topo = _gws_topo()
+    for region in _ws_topo.field_regions:
+        roles = region.competing_roles
+        for i in range(len(roles)):
+            for j in range(i + 1, len(roles)):
+                r1, r2 = roles[i], roles[j]
+                if r1 in graph.roles and r2 in graph.roles:
+                    pair = (r1, r2)
+                    rev = (r2, r1)
+                    if pair not in graph.exclusivity_edges and rev not in graph.exclusivity_edges:
+                        graph.exclusivity_edges.append(pair)
+
     # Compute compatibility scores
     for cand_key, token in graph.candidates.items():
         for role_name, role in graph.roles.items():

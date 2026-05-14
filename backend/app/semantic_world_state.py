@@ -22,6 +22,7 @@ class FieldConflictRegion:
     topology_neighbors: List[str] = field(default_factory=list)
     source_record: str = ""
     persistence: float = 1.0  # survives decay without reinforcement
+    stability_momentum: float = 0.0  # structural hysteresis — resists rapid change
 
 
 @dataclass
@@ -285,7 +286,10 @@ class SemanticWorldState:
                                 existing = r
                                 break
                         if existing:
-                            existing.instability = min(1.0, existing.instability + 0.15)
+                            # Structural hysteresis: instability change is smoothed by momentum
+                            target_instability = min(1.0, existing.instability + 0.15)
+                            existing.stability_momentum = existing.stability_momentum * 0.7 + 0.3 * target_instability
+                            existing.instability = existing.stability_momentum
                             existing.recurrence_score = min(1.0, existing.recurrence_score + 0.1)
                             existing.semantic_pressure = self.metrics.field_pressure
                             existing.persistence = max(0.5, existing.persistence - 0.1)
@@ -295,6 +299,7 @@ class SemanticWorldState:
                                 competing_roles=[roles[i], roles[j]],
                                 token=token_val,
                                 instability=0.5,
+                                stability_momentum=0.5,
                                 semantic_pressure=self.metrics.field_pressure,
                                 recurrence_score=self.learned_exclusions.get(sorted_roles, 0.0),
                                 topology_neighbors=list(set(roles)),
