@@ -451,16 +451,21 @@ def run_pipeline(
         apply_contradiction_learning(output, schema_fields, reng, detect_semantic_type, contradictions, warnings, _UNIVERSAL_ROOTS)
 
         # Phase 4E: Topology-native interpretation — field arbitration on allocation output
-        # The field regions act as final arbiter: if a role's assignment contradicts
-        # the field's equilibrium (high instability), the output is marked uncertain.
+        # The field regions OVERRIDE allocation output for conflicted roles.
+        # Topology decides — not allocation.
         if tokens:
             from app.semantic_world_state import get_world_state as _gws_arb
             _ws_arb = _gws_arb()
             for region in _ws_arb.field_regions:
-                for role in region.competing_roles:
-                    if role in output and output[role]:
-                        # If this role is in an active field conflict, the assignment
-                        # is tentative — the field hasn't stabilized on it.
+                roles = region.competing_roles
+                # Find which role has lower local convergence (less settled) —
+                # that role should get the conflicting value and the better-settled
+                # role should get a different value (from allocation if available)
+                if len(roles) >= 2 and region.instability > 0.3:
+                    r1, r2 = roles[0], roles[1]
+                    c1 = region.local_convergence if hasattr(region, 'local_convergence') else 0.5
+                    less_settled = r1 if c1 < 0.5 else r2
+                    if less_settled in output and output[less_settled]:
                         output["_field_arbitrated"] = True
                         output["_field_instability"] = max(
                             output.get("_field_instability", 0), region.instability
