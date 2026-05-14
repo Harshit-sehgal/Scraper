@@ -369,13 +369,12 @@ class SemanticWorldState:
                 diff[k] = delta
         return diff
 
-    def trace_field_evolution(self) -> dict:
+    def trace_field_evolution(self, token: str = "") -> dict:
         """Reconstruct the causal chain of field state evolution.
 
-        Returns a dict mapping each field region to its propagation
-        effects, equilibrium influence, and persistence over time.
-        This enables semantic lineage tracing and causal chain
-        reconstruction for debugging field dynamics.
+        If a token is specified, returns only lineage for that token.
+        Otherwise returns the full field evolution summary with
+        regions grouped by conflicting token.
         """
         chain = {
             "regions": len(self.field_regions),
@@ -385,35 +384,28 @@ class SemanticWorldState:
             "exclusion_count": len(self.learned_exclusions),
             "wave_events": len(self.trace_waves()),
         }
-        if self.field_regions:
+        if token:
+            chain["lineage"] = [
+                {
+                    "roles": r.competing_roles,
+                    "instability": round(r.instability, 3),
+                    "pressure": round(r.semantic_pressure, 3),
+                    "persistence": round(r.persistence, 3),
+                }
+                for r in self.field_regions if r.token == token
+            ]
+        elif self.field_regions:
             regions_by_token = {}
             for r in self.field_regions:
-                token = r.token
-                if token not in regions_by_token:
-                    regions_by_token[token] = []
-                regions_by_token[token].append({
+                regions_by_token.setdefault(r.token, []).append({
                     "roles": r.competing_roles,
                     "instability": round(r.instability, 3),
                     "pressure": round(r.semantic_pressure, 3),
                     "recurrence": round(r.recurrence_score, 3),
+                    "persistence": round(r.persistence, 3),
                 })
             chain["regions_by_token"] = regions_by_token
         return chain
-
-    def field_lineage(self, token: str) -> list:
-        """Trace the lineage of a specific conflicting token across records.
-
-        Returns the history of field regions for this token, showing how
-        its instability, exclusion pressure, and recurrence evolved.
-        """
-        return [
-            {
-                "roles": r.competing_roles,
-                "instability": round(r.instability, 3),
-                "pressure": round(r.semantic_pressure, 3),
-            }
-            for r in self.field_regions if r.token == token
-        ]
 
     def clear(self):
         self.metrics = TopologyMetrics()
