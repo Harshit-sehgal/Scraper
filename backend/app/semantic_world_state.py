@@ -21,6 +21,7 @@ class FieldConflictRegion:
     recurrence_score: float = 0.0
     topology_neighbors: List[str] = field(default_factory=list)
     source_record: str = ""
+    persistence: float = 1.0  # survives decay without reinforcement
 
 
 @dataclass
@@ -287,6 +288,7 @@ class SemanticWorldState:
                             existing.instability = min(1.0, existing.instability + 0.15)
                             existing.recurrence_score = min(1.0, existing.recurrence_score + 0.1)
                             existing.semantic_pressure = self.metrics.field_pressure
+                            existing.persistence = max(0.5, existing.persistence - 0.1)
                             existing.source_record = f"recurrence_{self.field_activation_count}"
                         else:
                             region = FieldConflictRegion(
@@ -320,7 +322,11 @@ class SemanticWorldState:
             # Inertia: high recurrence means the region resists decay
             if r.recurrence_score > 0.3:
                 r.instability = min(r.instability + 0.02, 1.0)
-            if r.instability > 0.05:
+            # Persistence: regions build up survival time
+            r.persistence = min(2.0, r.persistence + 0.05)
+            # High persistence slows the decay floor
+            decay_floor = 0.05 / max(r.persistence, 0.5)
+            if r.instability > decay_floor:
                 surviving.append(r)
         self.field_regions = surviving
 
