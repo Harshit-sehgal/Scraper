@@ -26,6 +26,7 @@ class FieldConflictRegion:
     local_convergence: float = 0.3  # local settling score
     local_temperature: float = 0.5  # local exploration/exploitation
     local_energy: float = 5.0  # local activation level
+    local_memory: dict = field(default_factory=dict)  # autonomous local memory
 
     _global_evolve_cycle: int = 0
 
@@ -53,15 +54,19 @@ class FieldConflictRegion:
         self.local_convergence *= (1.0 - decay * 0.05)
         self.local_temperature = self.local_temperature * 0.9 + (self.instability * 0.8) * 0.1
 
-        # Continuous distortion via sigmoid-weighted effect (no hard thresholds)
+        # Continuous distortion via sigmoid-weighted effect
+        # First writes to local memory, then syncs to global state
         distort = 1.0 / (1.0 + 2.718 ** (-10 * (self.instability - 0.3)))
         effect_strength = distort * self.instability * 0.01 * plasticity
         for role in self.competing_roles:
             for peer in self.competing_roles:
-                if peer != role and ws is not None:
+                if peer != role:
                     key = tuple(sorted([role, peer]))
-                    current = ws.learned_exclusions.get(key, 0.0)
-                    ws.learned_exclusions[key] = min(1.0, current + effect_strength)
+                    current = self.local_memory.get(str(key), 0.0)
+                    self.local_memory[str(key)] = min(1.0, current + effect_strength)
+                    if ws is not None:
+                        global_current = ws.learned_exclusions.get(key, 0.0)
+                        ws.learned_exclusions[key] = min(1.0, global_current + effect_strength)
 
     def propagate(self, ws=None):
         """Autonomous propagation — basin spreads instability to neighbors."""
@@ -466,7 +471,6 @@ class SemanticWorldState:
             "label": label,
             "time": self.metrics.total_records_processed,
             "energy": self.metrics.global_energy,
-            "entropy": self.metrics.global_entropy,
             "uncertainty": self.metrics.average_uncertainty,
             "field_pressure": self.metrics.field_pressure,
             "exclusions": len(self.learned_exclusions),
