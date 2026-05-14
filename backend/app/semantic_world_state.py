@@ -75,7 +75,7 @@ class TopologyMetrics:
         """
         norm_energy = min(self.global_energy / 10.0, 1.0)
         contr_density = min(self.exclusion_count / max(self.total_records_processed, 1), 1.0)
-        pressure = (norm_energy + self.global_entropy + self.average_uncertainty + contr_density) / 4.0
+        pressure = (norm_energy + self.average_uncertainty + contr_density) / 3.0
         return max(0.0, min(1.0, pressure))
 
 class SemanticWorldState:
