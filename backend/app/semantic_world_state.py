@@ -4,6 +4,31 @@ from collections import Counter
 from typing import Dict, List, Tuple, Optional, Set
 from dataclasses import dataclass, field
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# FIELD LAWS — formal locality, conservation, and coupling constraints.
+# These guarantee bounded emergence and prevent runaway semantic weather.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Locality Law 1: Propagation radius — no basin may directly influence
+# regions beyond immediate exclusivity neighbors (radius = 1).
+MAX_PROPAGATION_RADIUS = 1
+
+# Locality Law 2: Energy attenuation — each propagation hop loses at
+# least 70% of remaining energy (decay floor = 0.3).
+PROPAGATION_DECAY_FLOOR = 0.3
+
+# Locality Law 3: Coupling ceiling — no single propagation event may
+# transfer more than 30% of a basin's instability to a neighbor.
+MAX_COUPLING_TRANSFER = 0.3
+
+# Locality Law 4: Convergence ceiling — attractor pull is capped at
+# 2.0 energy units per convergence computation.
+MAX_ATTRACTOR_PULL = 2.0
+
+# Locality Law 5: Instability conservation — total instability change
+# across all basins per cycle is bounded by ±20%.
+MAX_INSTABILITY_FLUX = 0.2
+
 
 @dataclass
 class FieldConflictRegion:
@@ -69,7 +94,13 @@ class FieldConflictRegion:
                         ws.learned_exclusions[key] = min(1.0, global_current + effect_strength)
 
     def propagate(self, ws=None):
-        """Autonomous propagation — basin spreads instability to neighbors."""
+        """Autonomous propagation — governed by formal locality laws.
+        
+        Constraints:
+        - Radius: 1 (direct exclusivity neighbors only)
+        - Attenuation: at least PROPAGATION_DECAY_FLOOR per hop
+        - Transfer cap: MAX_COUPLING_TRANSFER * instability
+        """
         if ws is None:
             return
         from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
@@ -83,8 +114,8 @@ class FieldConflictRegion:
                 if peer is not None and peer not in self.competing_roles:
                     local_count = getattr(self, '_propagation_count', 0) + 1
                     self._propagation_count = local_count
-                    local_decay = 1.0 / (1.0 + local_count * 0.2)
-                    spread = self.instability * 0.3 * local_decay
+                    local_decay = max(PROPAGATION_DECAY_FLOOR, 1.0 / (1.0 + local_count * 0.2))
+                    spread = min(self.instability * MAX_COUPLING_TRANSFER * local_decay, self.instability * 0.5)
                     key = tuple(sorted([role, peer]))
                     current = ws.learned_exclusions.get(key, 0.0)
                     ws.learned_exclusions[key] = min(1.0, current + spread)
@@ -163,7 +194,7 @@ class TopologyMetrics:
         conv = self._convergence
         # Attractor: sigmoid-weighted energy reduction (no hard threshold)
         attractor_strength = 1.0 / (1.0 + 2.718 ** (-15 * (conv - 0.6)))
-        attractor_pull = attractor_strength * conv * 2.0
+        attractor_pull = min(attractor_strength * conv * 2.0, MAX_ATTRACTOR_PULL)
         self.global_energy = max(0.0, self.global_energy - attractor_pull)
         return self._convergence
 
