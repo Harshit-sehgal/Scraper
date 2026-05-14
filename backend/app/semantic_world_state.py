@@ -444,15 +444,15 @@ class SemanticWorldState:
         return captured
 
     def redistribute_instability(self):
-        """Continuous diffusion-based instability transfer.
+        """Conservation-constrained instability diffusion.
 
-        Flow = coupling_strength * pressure_gradient.
-        Coupling strength is determined by propagation interaction frequency
-        (how often regions have influenced each other), not symbolic overlap.
-        This eliminates the procedural if-statement pattern."""
+        Total instability across all regions is conserved before and after
+        redistribution (no net gain or loss). Flow follows coupling-strength
+        gradients with bounded transfer to prevent runaway amplification.
+        """
         if len(self.field_regions) < 2:
             return
-        # Build interaction-frequency-based adjacency (not symbolic overlap)
+        total_before = sum(r.instability for r in self.field_regions)
         for region in self.field_regions:
             region._interaction_count = getattr(region, '_interaction_count', 0) + 1
 
@@ -460,17 +460,23 @@ class SemanticWorldState:
             for j in range(i + 1, len(self.field_regions)):
                 ri = self.field_regions[i]
                 rj = self.field_regions[j]
-                # Coupling strength from mutual propagation interaction
                 ci = getattr(ri, '_interaction_count', 0)
                 cj = getattr(rj, '_interaction_count', 0)
                 coupling = min(ci, cj) * 0.01
                 if coupling < 0.01:
                     continue
-                # Continuous diffusion: flow = coupling * pressure_gradient
                 pressure_gradient = ri.instability - rj.instability
                 flow = coupling * pressure_gradient
+                flow = max(-0.1, min(0.1, flow))  # cap single-transfer at 0.1
                 ri.instability -= flow
                 rj.instability += flow
+
+        # Enforce conservation: restore original total if drift occurred
+        total_after = sum(r.instability for r in self.field_regions)
+        if abs(total_after - total_before) > 0.001 and total_after > 0:
+            scale = total_before / total_after
+            for r in self.field_regions:
+                r.instability *= scale
 
     def aggregate_from_regions(self):
         """Derive global metrics from local field regions — observer-only.
