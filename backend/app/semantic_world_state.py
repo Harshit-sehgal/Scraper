@@ -125,8 +125,13 @@ class TopologyMetrics:
 
     @property
     def convergence_score(self) -> float:
-        """Derived from field regions — aggregate of local convergence."""
+        """Attractor-stabilized convergence — pulls instability down when high."""
         self._convergence = getattr(self, '_convergence', 0.5)
+        conv = self._convergence
+        # Attractor: when convergence > 0.7, actively reduce energy
+        if conv > 0.7:
+            attractor = (conv - 0.7) * 3.0  # 0-0.9 pull toward 0
+            self.global_energy = max(0.0, self.global_energy - attractor)
         return self._convergence
 
     def field_summary(self) -> dict:

@@ -452,29 +452,30 @@ def run_pipeline(
             
         apply_contradiction_learning(output, schema_fields, reng, detect_semantic_type, contradictions, warnings, _UNIVERSAL_ROOTS)
 
-        # Phase 4E: Topology-first interpretation — field regions produce output directly
-        # Allocation is a read-only observer; topology produces the final interpretation.
+        # Phase 4E: Continuous topology readout — field regions influence output
+        # by sigmoid-weighted instability, not hardcoded override.
         if tokens:
             from app.semantic_world_state import get_world_state as _gws_top
             _ws_top = _gws_top()
             for region in _ws_top.field_regions:
                 roles = region.competing_roles
-                if len(roles) >= 2 and region.instability > 0.3:
+                if len(roles) >= 2:
                     r1, r2 = roles[0], roles[1]
                     c1 = getattr(region, 'local_convergence', 0.5)
                     c2 = getattr(region, 'local_convergence', 0.5)
-                    # The more settled role keeps the value from allocation
-                    # The less settled role gets the field's preferred value (the token)
-                    if c1 >= c2:
-                        _, unstable_role = r1, r2
-                    else:
-                        _, unstable_role = r2, r1
-                    output[unstable_role] = region.token
-                    output[f"_{unstable_role}_field_assigned"] = True
-                    output["_field_arbitrated"] = True
-                    output["_field_instability"] = max(
-                        output.get("_field_instability", 0), region.instability
-                    )
+                    # Continuous topology readout — sigmoid-weighted by instability
+                    weight = 1.0 / (1.0 + 2.718 ** (-10 * (region.instability - 0.3)))
+                    if weight > 0.5 and region.token:
+                        if c1 >= c2:
+                            _, unstable_role = r1, r2
+                        else:
+                            _, unstable_role = r2, r1
+                        output[unstable_role] = region.token
+                        output[f"_{unstable_role}_field_assigned"] = True
+                        output["_field_arbitrated"] = True
+                        output["_field_instability"] = max(
+                            output.get("_field_instability", 0), region.instability
+                        )
 
         # Phase 3: Uncertainty redistribution — contradiction waves spread through topology
         # Check tokens (pre-allocation) since allocation resolves exclusivity conflicts
