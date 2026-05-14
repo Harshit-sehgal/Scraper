@@ -27,6 +27,30 @@ class FieldConflictRegion:
     local_temperature: float = 0.5  # local exploration/exploitation
     local_energy: float = 5.0  # local activation level
 
+    def evolve(self):
+        """Autonomous basin evolution — each region evolves independently.
+
+        No global orchestrator should drive basin behavior. Each basin
+        decays, converges, and restructures itself based on local state.
+        """
+        self.instability *= 0.95
+        if self.recurrence_score > 0.3:
+            self.instability = min(self.instability + 0.02, 1.0)
+        self.persistence = min(2.0, self.persistence + 0.05)
+        self.local_convergence = min(1.0, self.local_convergence + 0.02)
+        if self.instability > 0.3:
+            self.local_convergence *= 0.95
+        self.local_temperature = self.local_temperature * 0.9 + (self.instability * 0.8) * 0.1
+        if self.instability > 0.3:
+            for role in self.competing_roles:
+                for peer in self.competing_roles:
+                    if peer != role:
+                        from app.semantic_world_state import get_world_state
+                        ws = get_world_state()
+                        key = tuple(sorted([role, peer]))
+                        current = ws.learned_exclusions.get(key, 0.0)
+                        ws.learned_exclusions[key] = min(1.0, current + self.instability * 0.01)
+
 
 @dataclass
 class TopologyMetrics:
@@ -399,29 +423,10 @@ class SemanticWorldState:
         self.metrics.cumulative_uncertainty = total_uncertainty
 
     def decay_field_regions(self):
-        """Decay and prune converged regions — each decays independently."""
+        """Each basin evolves autonomously — no global orchestration."""
         surviving = []
         for r in self.field_regions:
-            r.instability *= 0.95
-            if r.recurrence_score > 0.3:
-                r.instability = min(r.instability + 0.02, 1.0)
-            r.persistence = min(2.0, r.persistence + 0.05)
-            r.local_convergence = min(1.0, r.local_convergence + 0.02)
-            if r.instability > 0.3:
-                r.local_convergence *= 0.95
-            r.local_temperature = r.local_temperature * 0.9 + (r.instability * 0.8) * 0.1
-
-            # Phase 3: Continuous distortion — field regions continuously perturb
-            # learned exclusions for their competing roles, not just on capture.
-            if r.instability > 0.3:
-                for role in r.competing_roles:
-                    for peer in r.competing_roles:
-                        if peer != role:
-                            key = tuple(sorted([role, peer]))
-                            current = self.learned_exclusions.get(key, 0.0)
-                            distortion = r.instability * 0.01
-                            self.learned_exclusions[key] = min(1.0, current + distortion)
-
+            r.evolve()
             decay_floor = 0.05 / max(r.persistence, 0.5)
             if r.instability > decay_floor:
                 surviving.append(r)
