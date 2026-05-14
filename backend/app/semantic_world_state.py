@@ -125,13 +125,13 @@ class TopologyMetrics:
 
     @property
     def convergence_score(self) -> float:
-        """Attractor-stabilized convergence — pulls instability down when high."""
+        """Attractor-stabilized convergence — sigmoid-weighted energy reduction."""
         self._convergence = getattr(self, '_convergence', 0.5)
         conv = self._convergence
-        # Attractor: when convergence > 0.7, actively reduce energy
-        if conv > 0.7:
-            attractor = (conv - 0.7) * 3.0  # 0-0.9 pull toward 0
-            self.global_energy = max(0.0, self.global_energy - attractor)
+        # Attractor: sigmoid-weighted energy reduction (no hard threshold)
+        attractor_strength = 1.0 / (1.0 + 2.718 ** (-15 * (conv - 0.6)))
+        attractor_pull = attractor_strength * conv * 2.0
+        self.global_energy = max(0.0, self.global_energy - attractor_pull)
         return self._convergence
 
     def field_summary(self) -> dict:

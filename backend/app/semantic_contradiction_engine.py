@@ -162,7 +162,8 @@ def apply_contradiction_learning(output, schema_fields, reng, detect_type_fn, co
                             key = tuple(sorted([role, other_role]))
                             current = state.neighborhood_cohesion.get(key, 0.5)
                             state.neighborhood_cohesion[key] = max(0.0, current - 0.1)
-                            if state.neighborhood_cohesion[key] < 0.3:
+                            queue_prob = 1.0 / (1.0 + 2.718 ** (10 * (current - 0.35)))
+                            if queue_prob > 0.5:
                                 state.restructuring_queue.add(key)
     if not contradictions:
         for role in output:
