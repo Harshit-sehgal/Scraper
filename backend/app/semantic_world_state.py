@@ -28,19 +28,26 @@ class FieldConflictRegion:
     local_energy: float = 5.0  # local activation level
 
     def evolve(self):
-        """Autonomous basin evolution — each region evolves independently.
+        """Autonomous basin evolution with attractor physics.
 
-        No global orchestrator should drive basin behavior. Each basin
-        decays, converges, and restructures itself based on local state.
+        When local_convergence is high, the basin enters an equilibrium well —
+        it strongly resists change (topology freezing). When convergence is
+        low, the basin remains plastic and responsive.
         """
-        self.instability *= 0.95
+        # Attractor strength: high convergence = strong resistance to change
+        attractor = min(1.0, self.local_convergence * 1.5)
+        plasticity = 1.0 - attractor * 0.8
+
+        self.instability *= 0.95 * plasticity
         if self.recurrence_score > 0.3:
             self.instability = min(self.instability + 0.02, 1.0)
         self.persistence = min(2.0, self.persistence + 0.05)
-        self.local_convergence = min(1.0, self.local_convergence + 0.02)
+        self.local_convergence = min(1.0, self.local_convergence + 0.02 * plasticity)
         if self.instability > 0.3:
             self.local_convergence *= 0.95
         self.local_temperature = self.local_temperature * 0.9 + (self.instability * 0.8) * 0.1
+
+        # Continuous distortion (attenuated by attractor strength)
         if self.instability > 0.3:
             for role in self.competing_roles:
                 for peer in self.competing_roles:
@@ -49,7 +56,7 @@ class FieldConflictRegion:
                         ws = get_world_state()
                         key = tuple(sorted([role, peer]))
                         current = ws.learned_exclusions.get(key, 0.0)
-                        ws.learned_exclusions[key] = min(1.0, current + self.instability * 0.01)
+                        ws.learned_exclusions[key] = min(1.0, current + self.instability * 0.01 * plasticity)
 
 
 @dataclass
@@ -103,12 +110,19 @@ class TopologyMetrics:
 
     @property
     def semantic_temperature(self) -> float:
-        """Derived from field regions — aggregate of local temperatures.
-        Global metrics are now observer-only, not independent physics."""
-        # This will be overridden by WorldState.temperature_from_regions()
+        """Thermodynamic cooling — temperature drops as the field converges.
+
+        High convergence → cooling (exploitation phase).
+        Low convergence → stable temperature (exploration phase).
+        Cooling accelerates as the field settles (phase transition).
+        """
         self._temperature = getattr(self, '_temperature', 0.5)
-        target = max(0.1, min(1.0, self.field_pressure * 1.5))
-        self._temperature = self._temperature * 0.9 + target * 0.1
+        conv = self.convergence_score
+        # Cooling: high convergence pulls temperature down faster
+        cooling = 1.0 - conv * 0.3
+        target = max(0.1, min(1.0, self.field_pressure * 1.5 * cooling))
+        smoothing = 0.9 - conv * 0.2  # faster smoothing when converged
+        self._temperature = self._temperature * smoothing + target * (1 - smoothing)
         return self._temperature
 
     @property
