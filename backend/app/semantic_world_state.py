@@ -485,6 +485,55 @@ class SemanticWorldState:
                 diff[k] = delta
         return diff
 
+    def multi_scale_regions(self) -> dict:
+        """Group field regions into larger-scale meta-basins.
+
+        Micro: individual field regions (existing)
+        Meso: regions that share competing roles (clusters)
+        Macro: all regions aggregated (global summary)
+
+        This enables cross-scale emergence — behavior at one scale
+        can influence structure at adjacent scales.
+        """
+        micro = [{"token": r.token, "roles": r.competing_roles,
+                   "instability": round(r.instability, 3),
+                   "convergence": round(r.local_convergence, 3)}
+                  for r in self.field_regions]
+
+        # Meso: cluster regions by shared roles
+        meso = []
+        assigned = set()
+        for i in range(len(self.field_regions)):
+            if i in assigned:
+                continue
+            cluster = [i]
+            for j in range(i + 1, len(self.field_regions)):
+                if j in assigned:
+                    continue
+                shared = set(self.field_regions[i].competing_roles) & set(self.field_regions[j].competing_roles)
+                if shared:
+                    cluster.append(j)
+                    assigned.add(j)
+            assigned.add(i)
+            if len(cluster) > 1:
+                cluster_regions = [self.field_regions[k] for k in cluster]
+                meso.append({
+                    "size": len(cluster),
+                    "avg_instability": round(sum(r.instability for r in cluster_regions) / len(cluster_regions), 3),
+                    "avg_convergence": round(sum(r.local_convergence for r in cluster_regions) / len(cluster_regions), 3),
+                    "tokens": list(set(r.token for r in cluster_regions)),
+                })
+
+        # Macro: global aggregate
+        macro = {
+            "total_regions": len(self.field_regions),
+            "meso_clusters": len(meso),
+            "field_pressure": round(self.metrics.field_pressure, 3),
+            "convergence": round(self.metrics.convergence_score, 3),
+        }
+
+        return {"micro": micro, "meso": meso, "macro": macro}
+
     def local_view(self, role: str) -> dict:
         """Local-only view — a role sees only its neighbors, not the full field.
 
