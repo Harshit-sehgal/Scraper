@@ -435,6 +435,42 @@ class SemanticWorldState:
                 diff[k] = delta
         return diff
 
+    def local_view(self, role: str) -> dict:
+        """Local-only view — a role sees only its neighbors, not the full field.
+
+        This enforces locality: no system should access global state directly.
+        Each role sees:
+        - its own compatibility mappings
+        - exclusions for role pairs it participates in
+        - field regions it's involved in
+        - neighboring roles (from exclusivity edges)
+        """
+        from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
+        neighbors = set()
+        for ra, rb in ROLE_EXCLUSIVITY:
+            if role == ra:
+                neighbors.add(rb)
+            elif role == rb:
+                neighbors.add(ra)
+        local_exclusions = {
+            k: v for k, v in self.learned_exclusions.items()
+            if role in k
+        }
+        local_regions = [
+            r for r in self.field_regions if role in r.competing_roles
+        ]
+        local_compat = {
+            k: v for k, v in self.role_compatibility.items()
+            if k[0] == role
+        }
+        return {
+            "role": role,
+            "neighbors": list(neighbors),
+            "local_exclusions": local_exclusions,
+            "local_regions": len(local_regions),
+            "local_compatibilities": len(local_compat),
+        }
+
     def trace_field_evolution(self, token: str = "") -> dict:
         """Reconstruct the causal chain of field state evolution.
 
