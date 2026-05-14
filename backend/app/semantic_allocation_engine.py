@@ -387,6 +387,12 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
             })
             continue
 
+        # Already assigned candidates cannot cause exclusivity conflicts
+        if cand_key in assigned_candidates:
+            continue
+        if role_name in filled_roles:
+            continue
+
         conflicting = False
         conflict_reason = ""
         for role_a, role_b in graph.exclusivity_edges:
@@ -404,11 +410,6 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
                 "role": role_name, "candidate": cand_key,
                 "reason": conflict_reason, "score": score
             })
-            continue
-
-        if cand_key in assigned_candidates:
-            continue
-        if role_name in filled_roles:
             continue
 
         graph.roles[role_name].filled_by = cand_key
