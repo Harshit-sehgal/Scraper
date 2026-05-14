@@ -23,6 +23,8 @@ class FieldConflictRegion:
     source_record: str = ""
     persistence: float = 1.0  # survives decay without reinforcement
     stability_momentum: float = 0.0  # structural hysteresis — resists rapid change
+    local_convergence: float = 0.3  # local settling score
+    local_temperature: float = 0.5  # local exploration/exploitation
 
 
 @dataclass
@@ -339,6 +341,29 @@ class SemanticWorldState:
             self.field_regions = self.field_regions[-50:]
         return captured
 
+    def redistribute_instability(self):
+        """Conservation physics: redistribute instability between neighboring regions
+        instead of just clamping. High-instability regions transfer energy to
+        lower-instability neighbors. This prevents runaway amplification while
+        preserving total field energy (conservation, not just clipping)."""
+        if len(self.field_regions) < 2:
+            return
+        for i in range(len(self.field_regions)):
+            for j in range(i + 1, len(self.field_regions)):
+                ri = self.field_regions[i]
+                rj = self.field_regions[j]
+                # Check if they share any competing roles (are neighbors)
+                shared = set(ri.competing_roles) & set(rj.competing_roles)
+                if shared:
+                    diff = ri.instability - rj.instability
+                    transfer = abs(diff) * 0.05
+                    if diff > 0.05:
+                        ri.instability -= transfer
+                        rj.instability += transfer
+                    elif diff < -0.05:
+                        rj.instability -= transfer
+                        ri.instability += transfer
+
     def decay_field_regions(self):
         """Apply local instability decay and prune converged regions.
 
@@ -350,12 +375,15 @@ class SemanticWorldState:
         surviving = []
         for r in self.field_regions:
             r.instability *= 0.95
-            # Inertia: high recurrence means the region resists decay
             if r.recurrence_score > 0.3:
                 r.instability = min(r.instability + 0.02, 1.0)
-            # Persistence: regions build up survival time
             r.persistence = min(2.0, r.persistence + 0.05)
-            # High persistence slows the decay floor
+            # Local convergence: based on local instability trajectory
+            r.local_convergence = min(1.0, r.local_convergence + 0.02)
+            if r.instability > 0.3:
+                r.local_convergence *= 0.95
+            # Local temperature: follows local instability
+            r.local_temperature = r.local_temperature * 0.9 + (r.instability * 0.8) * 0.1
             decay_floor = 0.05 / max(r.persistence, 0.5)
             if r.instability > decay_floor:
                 surviving.append(r)

@@ -545,6 +545,8 @@ def run_pipeline(
         
         # Local field region decay — each region converges independently
         state.decay_field_regions()
+        # Conservation physics — redistribute instability between neighboring regions
+        state.redistribute_instability()
         
         allocated_records.append(output)
 
