@@ -29,17 +29,29 @@ class FieldConflictRegion:
 
 @dataclass
 class TopologyMetrics:
+    """Three primary causal variables. Everything else is derived.
+
+    Primary (written by system):
+    - field_energy: overall activation level (0-10)
+    - cumulative_uncertainty: accumulated disorder
+    - total_records_processed: experience counter
+    - exclusion_count: active topological constraints
+
+    Derived (computed, read by system):
+    - field_pressure: unified instability scalar
+    - semantic_temperature: exploration vs exploitation
+    - convergence_score: settling proximity
+    """
     total_records_processed: int = 0
     total_co_occurrences: int = 0
     transition_observations: int = 0
     learning_count: int = 0
-    # Equilibrium metrics
     cumulative_density: float = 0.0
     cumulative_uncertainty: float = 0.0
-    global_energy: float = 5.0 # High energy = unstable universe
-    global_entropy: float = 1.0 # High entropy = low order
-    exclusion_count: int = 0 # Number of active learned exclusions
-    
+    global_energy: float = 5.0
+    global_entropy: float = 1.0
+    exclusion_count: int = 0
+
     @property
     def average_density(self) -> float:
         if self.total_records_processed == 0:
@@ -53,44 +65,39 @@ class TopologyMetrics:
         return self.cumulative_uncertainty / self.total_records_processed
 
     @property
-    def convergence_score(self) -> float:
-        """How close the field is to settling — high = converged.
+    def field_pressure(self) -> float:
+        """Unified field pressure — the PRIMARY field state variable.
 
-        Computed from pressure trajectory and energy. When the field
-        has low pressure and low energy variation, it's converged.
-        Used to actively dampen changes near convergence.
+        All cognition derives from this single scalar.
+        High = unstable, contradictory, uncertain field.
+        Low = stable, coherent, convergent field.
         """
-        stability = 1.0 - min(self.field_pressure * 1.5, 1.0)
-        energy_stability = 1.0 - min(self.global_energy / 5.0, 1.0)
-        return (stability * 0.6 + energy_stability * 0.4)
+        norm_energy = min(self.global_energy / 10.0, 1.0)
+        contr_density = min(self.exclusion_count / max(self.total_records_processed, 1), 1.0)
+        return max(0.0, min(1.0, (norm_energy + self.average_uncertainty + contr_density) / 3.0))
 
     @property
     def semantic_temperature(self) -> float:
-        """Exploration vs exploitation — high = explore, low = exploit.
-
-        Temperature is driven by field pressure. Unstable fields have
-        high temperature (more exploration, weaker stabilization).
-        Stable fields have low temperature (stronger convergence).
-        Evolves gradually via exponential smoothing of field_pressure.
-        """
+        """Derived from field_pressure via exponential smoothing."""
         self._temperature = getattr(self, '_temperature', 0.5)
         target = max(0.1, min(1.0, self.field_pressure * 1.5))
         self._temperature = self._temperature * 0.9 + target * 0.1
         return self._temperature
 
     @property
-    def field_pressure(self) -> float:
-        """Unified semantic field pressure — fuses energy, entropy, uncertainty,
-        and contradiction density into one scalar.
+    def convergence_score(self) -> float:
+        """Derived from field_pressure and energy stability."""
+        stability = 1.0 - min(self.field_pressure * 1.5, 1.0)
+        energy_stability = 1.0 - min(self.global_energy / 5.0, 1.0)
+        return (stability * 0.6 + energy_stability * 0.4)
 
-        All cognition should derive from this single scalar.
-        High pressure = unstable, contradictory, uncertain field.
-        Low pressure = stable, coherent, convergent field.
-        """
-        norm_energy = min(self.global_energy / 10.0, 1.0)
-        contr_density = min(self.exclusion_count / max(self.total_records_processed, 1), 1.0)
-        pressure = (norm_energy + self.average_uncertainty + contr_density) / 3.0
-        return max(0.0, min(1.0, pressure))
+    def field_summary(self) -> dict:
+        """Return only the 3 canonical field variables."""
+        return {
+            "field_pressure": round(self.field_pressure, 3),
+            "semantic_temperature": round(self.semantic_temperature, 3),
+            "convergence_score": round(self.convergence_score, 3),
+        }
 
 class SemanticWorldState:
     """
