@@ -51,6 +51,18 @@ class TopologyMetrics:
         return self.cumulative_uncertainty / self.total_records_processed
 
     @property
+    def convergence_score(self) -> float:
+        """How close the field is to settling — high = converged.
+
+        Computed from pressure trajectory and energy. When the field
+        has low pressure and low energy variation, it's converged.
+        Used to actively dampen changes near convergence.
+        """
+        stability = 1.0 - min(self.field_pressure * 1.5, 1.0)
+        energy_stability = 1.0 - min(self.global_energy / 5.0, 1.0)
+        return (stability * 0.6 + energy_stability * 0.4)
+
+    @property
     def semantic_temperature(self) -> float:
         """Exploration vs exploitation — high = explore, low = exploit.
 

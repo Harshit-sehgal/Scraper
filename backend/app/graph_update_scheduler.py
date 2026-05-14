@@ -87,8 +87,9 @@ class GraphUpdateScheduler:
                 instability_delta=-0.1
             ))
             
-            # Propagation wave: if pressure didn't drop enough, cascade
-            if drop < 0.02 and pressure_before > 0.3 and self._wave_count < 3:
+            # Propagation wave: if pressure didn't drop enough AND field isn't converged, cascade
+            convergence = ws.metrics.convergence_score
+            if drop < 0.02 and pressure_before > 0.3 and self._wave_count < 3 and convergence < 0.8:
                 self.dispatcher.dispatch(SemanticEvent(
                     event_type=SemanticEventType.TOPOLOGY_SHIFT,
                     source=f"propagation_wave_{self._wave_count}",
