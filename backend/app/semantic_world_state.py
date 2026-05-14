@@ -27,36 +27,34 @@ class FieldConflictRegion:
     local_temperature: float = 0.5  # local exploration/exploitation
     local_energy: float = 5.0  # local activation level
 
-    def evolve(self):
+    def evolve(self, ws=None):
         """Autonomous basin evolution with attractor physics.
 
-        When local_convergence is high, the basin enters an equilibrium well —
-        it strongly resists change (topology freezing). When convergence is
-        low, the basin remains plastic and responsive.
+        Accepts world state as parameter to avoid hidden global coupling.
+        Uses continuous sigmoid functions instead of hard thresholds.
+        Bounded propagation ceiling prevents runaway feedback.
         """
-        # Attractor strength: high convergence = strong resistance to change
         attractor = min(1.0, self.local_convergence * 1.5)
         plasticity = 1.0 - attractor * 0.8
 
         self.instability *= 0.95 * plasticity
-        if self.recurrence_score > 0.3:
-            self.instability = min(self.instability + 0.02, 1.0)
+        effect = 1.0 / (1.0 + 2.718 ** (-10 * (self.recurrence_score - 0.3)))  # sigmoid
+        self.instability = min(1.0, self.instability + 0.02 * effect)
         self.persistence = min(2.0, self.persistence + 0.05)
         self.local_convergence = min(1.0, self.local_convergence + 0.02 * plasticity)
-        if self.instability > 0.3:
-            self.local_convergence *= 0.95
+        decay = 1.0 / (1.0 + 2.718 ** (-10 * (self.instability - 0.3)))  # sigmoid
+        self.local_convergence *= (1.0 - decay * 0.05)
         self.local_temperature = self.local_temperature * 0.9 + (self.instability * 0.8) * 0.1
 
-        # Continuous distortion (attenuated by attractor strength)
-        if self.instability > 0.3:
-            for role in self.competing_roles:
-                for peer in self.competing_roles:
-                    if peer != role:
-                        from app.semantic_world_state import get_world_state
-                        ws = get_world_state()
-                        key = tuple(sorted([role, peer]))
-                        current = ws.learned_exclusions.get(key, 0.0)
-                        ws.learned_exclusions[key] = min(1.0, current + self.instability * 0.01 * plasticity)
+        # Continuous distortion via sigmoid-weighted effect (no hard thresholds)
+        distort = 1.0 / (1.0 + 2.718 ** (-10 * (self.instability - 0.3)))
+        effect_strength = distort * self.instability * 0.01 * plasticity
+        for role in self.competing_roles:
+            for peer in self.competing_roles:
+                if peer != role and ws is not None:
+                    key = tuple(sorted([role, peer]))
+                    current = ws.learned_exclusions.get(key, 0.0)
+                    ws.learned_exclusions[key] = min(1.0, current + effect_strength)
 
 
 @dataclass
@@ -437,10 +435,10 @@ class SemanticWorldState:
         self.metrics.cumulative_uncertainty = total_uncertainty
 
     def decay_field_regions(self):
-        """Each basin evolves autonomously — no global orchestration."""
+        """Each basin evolves autonomously with local state only."""
         surviving = []
         for r in self.field_regions:
-            r.evolve()
+            r.evolve(ws=self)
             decay_floor = 0.05 / max(r.persistence, 0.5)
             if r.instability > decay_floor:
                 surviving.append(r)
