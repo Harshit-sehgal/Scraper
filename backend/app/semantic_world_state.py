@@ -63,6 +63,27 @@ class FieldConflictRegion:
                     current = ws.learned_exclusions.get(key, 0.0)
                     ws.learned_exclusions[key] = min(1.0, current + effect_strength)
 
+    def propagate(self, ws=None):
+        """Autonomous propagation — basin spreads instability to neighbors."""
+        if ws is None:
+            return
+        from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
+        for role in self.competing_roles:
+            for ra, rb in ROLE_EXCLUSIVITY:
+                peer = None
+                if role == ra:
+                    peer = rb
+                elif role == rb:
+                    peer = ra
+                if peer is not None and peer not in self.competing_roles:
+                    local_count = getattr(self, '_propagation_count', 0) + 1
+                    self._propagation_count = local_count
+                    local_decay = 1.0 / (1.0 + local_count * 0.2)
+                    spread = self.instability * 0.3 * local_decay
+                    key = tuple(sorted([role, peer]))
+                    current = ws.learned_exclusions.get(key, 0.0)
+                    ws.learned_exclusions[key] = min(1.0, current + spread)
+
 
 @dataclass
 class TopologyMetrics:
@@ -312,31 +333,13 @@ class SemanticWorldState:
         return min(actual / possible, 1.0) if possible > 0 else 0.0
 
     def propagate_field_regions(self) -> int:
-        """Bounded propagation with finite radius — prevents semantic weather.
-
-        Propagation radius is 1 (direct exclusivity neighbors only). Each
-        region spreads at most 30% of its instability, attenuated by local
-        propagation count. This prevents small contradictions from globally
-        destabilizing the field.
-        """
-        from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
+        """Each basin owns its own propagation — delegating to region.propagate()."""
         affected = 0
         for region in self.field_regions:
-            region._propagation_count = getattr(region, '_propagation_count', 0) + 1
-            local_decay = 1.0 / (1.0 + region._propagation_count * 0.2)
-            for role in region.competing_roles:
-                for ra, rb in ROLE_EXCLUSIVITY:
-                    peer = None
-                    if role == ra:
-                        peer = rb
-                    elif role == rb:
-                        peer = ra
-                    if peer is not None and peer not in region.competing_roles:
-                        spread = region.instability * 0.3 * local_decay
-                        key = tuple(sorted([role, peer]))
-                        current = self.learned_exclusions.get(key, 0.0)
-                        self.learned_exclusions[key] = min(1.0, current + spread)
-                        affected += 1
+            before = len(self.learned_exclusions)
+            region.propagate(ws=self)
+            after = len(self.learned_exclusions)
+            affected += after - before
         return affected
 
     def capture_pre_allocation_field(self, tokens: list, schema_fields: list) -> int:
