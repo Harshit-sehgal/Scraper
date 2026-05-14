@@ -50,10 +50,12 @@ get_scheduler()
 # No fixed constants remain — all thresholds emerge from topology.
 
 def _field_instability_threshold():
-    """Instability spike threshold tightens as field stabilizes."""
+    """Instability spike threshold tightens as field stabilizes and converges."""
     from app.semantic_world_state import get_world_state
-    p = get_world_state().metrics.field_pressure
-    return 0.5 + p * 0.4  # range: [0.5, 0.9]
+    ws = get_world_state()
+    p = ws.metrics.field_pressure
+    c = ws.metrics.convergence_score
+    return max(0.4, min(0.9, 0.5 + p * 0.4 - c * 0.2))
 
 def _field_contradiction_penalty():
     """Contradiction penalty softens as field matures (less disruptive)."""
