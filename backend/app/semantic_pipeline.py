@@ -548,10 +548,7 @@ def run_pipeline(
                 md.coherence_after = coherence
                 md.success = coherence > _field_coherence_threshold()
         
-        # Local field region decay — each region converges independently
-        state.decay_field_regions()
-        state.aggregate_from_regions()
-        state.redistribute_instability()
+        # Basin evolution moved to scheduler relaxation (continuous, not procedural)
         
         allocated_records.append(output)
 

@@ -76,6 +76,11 @@ class GraphUpdateScheduler:
             if result.belief_field:
                 ws.metrics.average_entropy = result.belief_field.field_entropy
             
+            # Continuous basin evolution — not pipeline-phase-driven
+            ws.decay_field_regions()
+            ws.aggregate_from_regions()
+            ws.redistribute_instability()
+
             pressure_after = ws.metrics.field_pressure
             drop = pressure_before - pressure_after
             ws.snapshot(label=f"relax_wave_{self._wave_count}")
