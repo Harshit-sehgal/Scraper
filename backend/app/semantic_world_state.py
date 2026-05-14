@@ -483,7 +483,12 @@ class SemanticWorldState:
         self.cohesion_split_attempts.clear()
         self.global_centrality.clear()
         self.global_communities.clear()
+        self.field_regions.clear()
+        self.field_activation_count = 0
+        self.neighborhood_cohesion.clear()
+        self.restructuring_queue.clear()
         self.decision_history.clear()
+        self.topology_snapshots.clear()
         self.last_update_time = time.time()
 
     def to_dict(self) -> dict:
