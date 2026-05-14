@@ -51,6 +51,20 @@ class TopologyMetrics:
         return self.cumulative_uncertainty / self.total_records_processed
 
     @property
+    def semantic_temperature(self) -> float:
+        """Exploration vs exploitation — high = explore, low = exploit.
+
+        Temperature is driven by field pressure. Unstable fields have
+        high temperature (more exploration, weaker stabilization).
+        Stable fields have low temperature (stronger convergence).
+        Evolves gradually via exponential smoothing of field_pressure.
+        """
+        self._temperature = getattr(self, '_temperature', 0.5)
+        target = max(0.1, min(1.0, self.field_pressure * 1.5))
+        self._temperature = self._temperature * 0.9 + target * 0.1
+        return self._temperature
+
+    @property
     def field_pressure(self) -> float:
         """Unified semantic field pressure — fuses energy, entropy, uncertainty,
         and contradiction density into one scalar.

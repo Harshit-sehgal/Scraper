@@ -52,7 +52,7 @@ _smoothed_structural = 0.4
 _smoothed_runtime = 0.3
 
 def _adaptive_exclusion_threshold() -> float:
-    """Exclusion threshold with hysteresis to prevent oscillation."""
+    """Exclusion threshold with hysteresis + temperature modulation."""
     global _smoothed_structural
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
@@ -62,11 +62,13 @@ def _adaptive_exclusion_threshold() -> float:
     target = 0.4 - (maturity * 0.2) + (pressure * 0.3) + (density * 0.2)
     target = max(0.2, min(0.6, target))
     _smoothed_structural = _smoothed_structural * 0.7 + target * 0.3
-    return _smoothed_structural
+    temp = ws.metrics.semantic_temperature
+    result = _smoothed_structural - (temp - 0.5) * 0.2
+    return max(0.2, min(0.6, result))
 
 
 def _adaptive_runtime_exclusion_threshold() -> float:
-    """Runtime exclusion threshold with hysteresis."""
+    """Runtime exclusion threshold with hysteresis + temperature."""
     global _smoothed_runtime
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
@@ -76,7 +78,9 @@ def _adaptive_runtime_exclusion_threshold() -> float:
     target = 0.3 - (maturity * 0.15) + (pressure * 0.3) + (density * 0.15)
     target = max(0.15, min(0.5, target))
     _smoothed_runtime = _smoothed_runtime * 0.7 + target * 0.3
-    return _smoothed_runtime
+    temp = ws.metrics.semantic_temperature
+    result = _smoothed_runtime - (temp - 0.5) * 0.15
+    return max(0.15, min(0.5, result))
 
 
 # Bootstrap seeds for role-type compatibility.
