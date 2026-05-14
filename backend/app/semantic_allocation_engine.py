@@ -366,8 +366,25 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
         key=lambda x: -x[0],
     )
 
+    # Pre-check: field regions declare which roles are field-owned
+    # Allocation must NOT assign these — topology decides, not allocation.
+    from app.semantic_world_state import get_world_state as _gws_top
+    _ws_top = _gws_top()
+    field_owned_roles: Set[str] = set()
+    for region in _ws_top.field_regions:
+        if region.instability > 0.3:
+            for role in region.competing_roles:
+                field_owned_roles.add(role)
+
     for score, cand_key, role_name in assignments:
-        # Check exclusivity BEFORE generic 'already assigned' — preserve conflict geometry
+        # Field-owned roles are not for allocation — skip entirely
+        if role_name in field_owned_roles:
+            field_conflicts.append({
+                "role": role_name, "candidate": cand_key,
+                "reason": "field_owned", "score": score
+            })
+            continue
+
         conflicting = False
         conflict_reason = ""
         for role_a, role_b in graph.exclusivity_edges:

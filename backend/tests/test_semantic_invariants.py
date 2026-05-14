@@ -74,7 +74,8 @@ def test_contradiction_pipeline_invariant():
     r = result[0]
     assert r.get("_contradictions"), "Contradictions must be detected"
     assert r.get("_contradiction_energy", 0) > 0, "Contradiction energy must be tracked"
-    assert "_contradiction_resolved" in r, "Re-allocation must run"
+    assert r.get("_field_arbitrated", False) or "_contradiction_resolved" in r, \
+        "Field must arbitrate or re-allocation must run"
 
 
 # ─────────────────────────────────────────────────────────────
