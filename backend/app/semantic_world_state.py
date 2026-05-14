@@ -27,13 +27,20 @@ class FieldConflictRegion:
     local_temperature: float = 0.5  # local exploration/exploitation
     local_energy: float = 5.0  # local activation level
 
-    def evolve(self, ws=None):
-        """Autonomous basin evolution with attractor physics.
+    _global_evolve_cycle: int = 0
 
-        Accepts world state as parameter to avoid hidden global coupling.
-        Uses continuous sigmoid functions instead of hard thresholds.
-        Bounded propagation ceiling prevents runaway feedback.
+    def evolve(self, ws=None, force=False):
+        """Autonomous basin evolution — self-scheduled.
+
+        Each basin tracks its own evolution cadence. When called without
+        force, it only evolves every 3 calls (self-throttled). This
+        reduces dependency on external scheduling while maintaining
+        continuous local evolution.
         """
+        if not force:
+            self._evolve_counter = getattr(self, '_evolve_counter', 0) + 1
+            if self._evolve_counter % 3 != 0:
+                return
         attractor = min(1.0, self.local_convergence * 1.5)
         plasticity = 1.0 - attractor * 0.8
 
@@ -444,7 +451,7 @@ class SemanticWorldState:
         """Each basin evolves autonomously with local state only."""
         surviving = []
         for r in self.field_regions:
-            r.evolve(ws=self)
+            r.evolve(ws=self, force=True)
             decay_floor = 0.05 / max(r.persistence, 0.5)
             if r.instability > decay_floor:
                 surviving.append(r)
