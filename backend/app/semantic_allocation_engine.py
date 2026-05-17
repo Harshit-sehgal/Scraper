@@ -194,8 +194,8 @@ def warm_start_from_values(records: list, schema_fields: list):
 def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abstraction_gradient: float = 0.0) -> AllocationGraph:
     """Build an allocation graph from a record and desired schema roles with Hierarchical Synthesis (Phase 38)."""
     graph = AllocationGraph()
-    from app.semantic_world_state import get_world_state as _gws_topo
-    ws = _gws_topo()
+    from app.semantic_world_state import get_world_state
+    ws = get_world_state()
 
     # Expand schema roles to include constituents if gradient allows
     # Preserve order using dict.fromkeys (Phase 38)

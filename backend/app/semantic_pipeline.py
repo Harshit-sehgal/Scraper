@@ -371,9 +371,7 @@ def run_pipeline(
         # P1: Topology-driven output — allocator is candidate generator only
         # Output comes from topology state when the allocator detected a conflict
         # (field_owned_roles). Otherwise the allocator's assignment is used.
-        from app.semantic_world_state import get_world_state as _gws_out
-        _ws_out = _gws_out()
-        topo_view = _ws_out._topology.get_view()
+        topo_view = get_world_state()._topology.get_view()
         output: dict = {}
         field_owned = {fc["role"] for fc in getattr(alloc_graph, 'field_conflicts', [])}
         for role_name in schema_fields:
