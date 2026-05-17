@@ -34,8 +34,7 @@ def geocode_address(address: str) -> Optional[tuple[float, float]]:
             _geocode_cache[address] = coords
             return coords
     except Exception as e:
-        logging.exception(e)
-        print(f"[Geocode Error] {address}: {e}")
+        logging.exception("Geocode error for %s", address)
 
     _geocode_cache[address] = None
     return None
@@ -310,7 +309,7 @@ def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField
             return str_val in allowed
 
     except (ValueError, TypeError) as e:
-        print(f"[Filter Warning] Could not apply filter on {rule.field_name}: {e}")
+        logging.warning("Could not apply filter on %s: %s", rule.field_name, e)
         return False
 
     return True
@@ -328,7 +327,7 @@ def _apply_distance_filter(location_value, rule: FilterRule) -> bool:
     origin_coords = geocode_address(rule.origin_address)
 
     if not target_coords or not origin_coords:
-        print(f"[Distance] Could not geocode: {location_value} or {rule.origin_address}")
+        logging.warning("Could not geocode: %s or %s", location_value, rule.origin_address)
         return False
 
     unit = rule.distance_unit or "km"

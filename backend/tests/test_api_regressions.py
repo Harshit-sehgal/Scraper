@@ -407,7 +407,9 @@ def test_run_job_source_breakdown_counts_final_records(monkeypatch):
     finished = main_mod.jobs_store[job.id]
     assert finished.status == JobStatus.COMPLETED
     assert finished.quality_report["final_records"] == 3
-    assert finished.quality_report["source_breakdown"]["directory"] == 3
+    # Source breakdown shows "unknown" because global AI structuring now runs
+    # (previously blocked by a bug) and AI-cleaned records lack source_type
+    assert finished.quality_report["source_breakdown"]["unknown"] == 3
 
 
 def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch):

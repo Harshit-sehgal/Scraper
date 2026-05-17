@@ -4,13 +4,17 @@ from app.models import SchemaField
 def normalize_scraped_record(record: dict, schema_fields: list[SchemaField]) -> dict:
     """Ensure consistent schema order and basic normalization of values."""
     from app.html_utils import _is_empty_value
-    normalized = {}
+    normalized: dict = {}
     for field in schema_fields:
         val = record.get(field.name)
         if _is_empty_value(val):
             normalized[field.name] = None
         else:
             normalized[field.name] = val
+    # Preserve metadata fields needed for source breakdown and tracking
+    for mf in ("source_type", "source_url", "source_trust_score", "record_score", "_key"):
+        if mf in record:
+            normalized[mf] = record[mf]
     return normalized
 
 def _validate_extracted_data(record: dict, schema_fields: list[SchemaField]) -> bool:
@@ -58,10 +62,14 @@ def _limit_source_records(records: list[dict], schema_fields: list[SchemaField],
     
     if len(records) <= max_records:
         return records
-        
+    
+    from app.models import FieldType
+    email_fields = {f.name for f in schema_fields if f.field_type == FieldType.EMAIL}
+    phone_fields = {f.name for f in schema_fields if f.field_type == FieldType.PHONE}
+    
     def _priority(r):
-        has_email = 1 if r.get("email") else 0
-        has_phone = 1 if r.get("phone") else 0
+        has_email = 1 if any(r.get(f) for f in email_fields) else 0
+        has_phone = 1 if any(r.get(f) for f in phone_fields) else 0
         return (has_email + has_phone, r.get("record_score", 0.0))
 
     return sorted(records, key=_priority, reverse=True)[:max_records]

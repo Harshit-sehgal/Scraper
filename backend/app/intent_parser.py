@@ -142,7 +142,7 @@ def _determine_required_needs(semantic_needs: dict, query_lower: str) -> list:
     required = []
 
     # Explicit requirement markers
-    explicit_markers = ["with", "including", "showing", "including", "need", "want", "must have"]
+    explicit_markers = ["with", "including", "showing", "need", "want", "must have"]
 
     for need in semantic_needs:
         # Check if explicitly mentioned with requirement marker
@@ -171,4 +171,15 @@ def _determine_optional_needs(semantic_needs: dict, required_needs: list) -> lis
     return optional
 
 
-# Universal fallback schema for any query
+def get_fallback_schema(max_fields: int = 5) -> list:
+    """Return a minimal universal schema for any query that fails intent parsing."""
+    from app.models import SchemaField, FieldType
+    templates = [
+        SchemaField(name="name", field_type=FieldType.STRING, required=True, description="Entity name"),
+        SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description="Price or cost"),
+        SchemaField(name="rating", field_type=FieldType.FLOAT, required=False, description="Rating or score"),
+        SchemaField(name="location", field_type=FieldType.LOCATION, required=False, description="Address or location"),
+        SchemaField(name="phone", field_type=FieldType.PHONE, required=False, description="Contact phone number"),
+        SchemaField(name="email", field_type=FieldType.EMAIL, required=False, description="Contact email"),
+    ]
+    return templates[:max(1, min(max_fields, len(templates)))]

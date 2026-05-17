@@ -1,67 +1,56 @@
-"""Test contradiction-driven re-allocation — verifies graph-native contradiction pressure."""
+"""Test field-driven exclusion learning — verifies continuous field tension learning."""
 
-from app.semantic_contradiction_engine import (
-    detect_allocation_contradictions,
-    apply_contradiction_learning,
-    IncompatibilityTopology,
-)
 from app.semantic_world_state import get_world_state
+from app.semantic_ir import SemanticToken, SemanticType, Span
 
 
-def test_detect_exclusive_role_contradiction():
-    """When exclusive roles receive the same value, a contradiction must be detected."""
+def test_field_conflict_drives_exclusion_learning():
+    """When allocation conflicts exist, observe_field_perturbation must reinforce exclusions."""
     ws = get_world_state()
     ws.clear()
 
-    output = {"origin": "LAX", "destination": "LAX"}
-    schema = ["origin", "destination"]
+    # Record with deliberate conflicts
+    output = {
+        "origin": "LAX",
+        "destination": "LAX",
+        "_allocation_conflicts": [
+            {"role": "origin", "candidate": "LAX", "reason": "exclusivity", "score": 0.8},
+        ],
+    }
 
-    contradictions = detect_allocation_contradictions(output, schema)
-    assert len(contradictions) > 0, "Exclusive roles with same value must trigger contradiction"
+    tokens = [
+        SemanticToken(raw="LAX", normalized="lax", primary_type=SemanticType.LOCATION,
+                     span=Span(0, 3), position=0)
+    ]
 
-
-def test_learned_exclusion_persists():
-    """After a contradiction, the learned exclusion must strengthen in world state."""
-    ws = get_world_state()
-    ws.clear()
-
-    output = {"origin": "LAX", "destination": "LAX"}
-    schema = ["origin", "destination"]
-
-    contradictions = detect_allocation_contradictions(output, schema)
-    assert len(contradictions) > 0, "Must detect contradiction first"
-
-    # Mock reng + detect_type_fn since apply_contradiction_learning needs them
-    from app.semantic_inference_engine import RoleEmbeddingEngine
-    reng = RoleEmbeddingEngine()
-    from app.semantic_mapper import detect_semantic_type
-    from app.semantic_allocation_engine import _UNIVERSAL_ROOTS
-
-    apply_contradiction_learning(output, schema, reng, detect_semantic_type, contradictions, [], _UNIVERSAL_ROOTS)
+    ws.observe_field_perturbation(output, tokens)
 
     key = ("destination", "origin")
     learned = ws.learned_exclusions.get(key, 0.0)
-    assert learned > 0.0, f"Expected learned exclusion > 0, got {learned}"
+    assert learned > 0.0, f"Expected learned exclusion > 0 from field conflicts, got {learned}"
 
 
-def test_detect_allocation_contradictions_with_schema():
-    """detect_allocation_contradictions must work with schema that has no exclusivity rules."""
+def test_no_field_conflict_does_not_reinforce():
+    """Without allocation conflicts, learned_exclusions must decay (not reinforce)."""
     ws = get_world_state()
     ws.clear()
 
-    # No exclusivity violation
-    output = {"name": "Acme Corp", "price": "100"}
-    schema = ["name", "price"]
-    contradictions = detect_allocation_contradictions(output, schema)
-    assert len(contradictions) == 0, "No contradiction for distinct values on non-exclusive roles"
+    # Seed an existing exclusion
+    key = ("destination", "origin")
+    ws._instability.set_exclusion(key, 0.5)
 
+    output = {"origin": "JFK", "destination": "LAX"}
+    tokens = [
+        SemanticToken(raw="JFK", normalized="jfk", primary_type=SemanticType.LOCATION,
+                     span=Span(0, 3), position=0),
+        SemanticToken(raw="LAX", normalized="lax", primary_type=SemanticType.LOCATION,
+                     span=Span(4, 7), position=1)
+    ]
+    
+    # Observe clean record
+    ws.observe_field_perturbation(output, tokens)
+    # Trigger decay (Law 3)
+    ws.relax_topology()
 
-def test_identity_clash_detection():
-    """Same value assigned to multiple roles must trigger identity clash."""
-    it = IncompatibilityTopology()
-    assignments = {"from": "LAX", "to": "LAX"}
-    conflicts = it.detect_impossible_neighborhoods([], assignments)
-
-    identity_clashes = [c for c in conflicts if c.conflict_type == "identity_clash"]
-    assert len(identity_clashes) > 0, "Identity clash must be detected for duplicate value"
-    assert identity_clashes[0].energy_penalty > 0, "Energy penalty must be positive"
+    learned = ws.learned_exclusions.get(key, 0.0)
+    assert learned < 0.5, f"Exclusion should decay without reinforcement, got {learned}"

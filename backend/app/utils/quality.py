@@ -145,7 +145,7 @@ def build_quality_report(
 
     source_ai = dict(ai_source_prediction or {})
     processed = int(source_ai.get("records_processed") or 0)
-    structured = int(source_ai.get("records_ai_structured") or 0)
+    structured = int(source_ai.get("ai_chunks") or 0)
     source_ai["ai_row_rate"] = round((structured / processed), 3) if processed else 0.0
 
     return {

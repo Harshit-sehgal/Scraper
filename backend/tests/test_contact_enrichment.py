@@ -7,10 +7,10 @@ from app.scraper import apply_selectors, extract_with_regex
 
 def _lead_schema() -> list[SchemaField]:
     return [
-        SchemaField(name="company_name", field_type=FieldType.STRING, required=True),
-        SchemaField(name="phone", field_type=FieldType.PHONE, required=False),
-        SchemaField(name="email", field_type=FieldType.EMAIL, required=False),
-        SchemaField(name="website", field_type=FieldType.URL, required=False),
+        SchemaField(name="company_name", field_type=FieldType.STRING, required=True, description=""),
+        SchemaField(name="phone", field_type=FieldType.PHONE, required=False, description=""),
+        SchemaField(name="email", field_type=FieldType.EMAIL, required=False, description=""),
+        SchemaField(name="website", field_type=FieldType.URL, required=False, description=""),
     ]
 
 

@@ -1064,3 +1064,17 @@ tr:hover td {
         max-width: 180px;
     }
 }
+
+/* ─── Thermodynamic Gating Styles ─── */
+.unstable-row {
+    background-color: rgba(173, 96, 83, 0.05) !important;
+}
+
+.unstable-cell {
+    color: #ad6053 !important;
+    font-weight: 600;
+}
+
+.unstable-row td {
+    border-bottom: 1px solid rgba(173, 96, 83, 0.1);
+}

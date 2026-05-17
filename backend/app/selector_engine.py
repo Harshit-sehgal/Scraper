@@ -57,7 +57,7 @@ def _analyze_page_data_type(html: str, schema_fields: list[SchemaField]) -> dict
 
 def _intelligent_column_mapping(html: str, schema_fields: list[SchemaField]) -> dict:
     soup = BeautifulSoup(html, "html.parser")
-    mapping_hints: dict[str, str] = {}
+    mapping_hints: dict = {}
 
     table = soup.find("table") or soup.find("div", class_=lambda x: x and ("table" in x or "grid" in x))
     if not table:
@@ -224,7 +224,7 @@ def apply_selectors(html: str, selectors_map: dict, schema_fields: list[SchemaFi
     field_sels = selectors_map.get("fields", {}) or {}
 
     if not container_sel:
-        print("[Scraper] No item_container selector generated")
+        logging.warning("No item_container selector generated")
         return []
 
     soup = BeautifulSoup(html, "html.parser")
@@ -237,13 +237,13 @@ def apply_selectors(html: str, selectors_map: dict, schema_fields: list[SchemaFi
             logging.error(f"[Scraper] Invalid container selector '{container_sel}': {e}")
             return []
 
-    print(f"[Scraper] Containers found with '{container_sel}': {len(containers)}")
+    logging.info("Containers found with '%s': %d", container_sel, len(containers))
     page_email, page_phone = _extract_contacts_from_node(soup)
     allow_page_contact_fallback = len(containers) == 1
     results = []
 
     for container in containers:
-        record: dict[str, str] = {}
+        record: dict = {}
         for field in schema_fields:
             selector = field_sels.get(field.name)
             if not selector:
@@ -336,7 +336,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
         if len(text) < 5:
             continue
 
-        record: dict[str, str] = {}
+        record: dict = {}
         text_field = schema_fields[0].name if schema_fields else "text"
         for field in schema_fields:
             field_name = field.name.lower()

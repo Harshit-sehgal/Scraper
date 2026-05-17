@@ -1,7 +1,5 @@
 """Async helpers for running blocking calls without relying on asyncio.to_thread."""
 
-from __future__ import annotations
-
 import asyncio
 import logging
 import threading

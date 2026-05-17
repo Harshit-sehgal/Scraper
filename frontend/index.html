@@ -23,6 +23,7 @@
                     <button class="tab active" data-view="jobs" id="tab-jobs">Jobs</button>
                     <button class="tab" data-view="new" id="tab-new">New</button>
                     <button class="tab recycle-tab" data-view="recycle" id="tab-recycle">Recycle Bin</button>
+                    <button class="tab cognition-tab" data-view="cognition" id="tab-cognition">Cognition</button>
                 </nav>
             </div>
             <div class="topbar-right">
@@ -330,6 +331,80 @@
                             <tr><td class="empty-cell"><p>Select a job to view results</p></td></tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Cognition State               -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-cognition">
+            <div class="container">
+                <div class="page-head">
+                    <div>
+                        <h1>Cognition State</h1>
+                        <p class="subtle">Live topological map of the semantic fields</p>
+                    </div>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn ghost small" onclick="refreshCognition()">Refresh</button>
+                        <a href="/api/system/export/knowledge" download="knowledge-manifold.json" class="btn small">Download Knowledge</a>
+                    </div>
+                </div>
+
+                <!-- Cognition KPIs -->
+                <div class="kpi-row" id="cognition-kpi-row">
+                    <div class="kpi"><span class="kpi-val" id="kpi-pressure">0</span><span class="kpi-label">Field Pressure</span></div>
+                    <div class="kpi"><span class="kpi-val" id="kpi-integrity">0</span><span class="kpi-label">Field Integrity</span></div>
+                    <div class="kpi"><span class="kpi-val" id="kpi-energy">0</span><span class="kpi-label">Global Energy</span></div>
+                    <div class="kpi"><span class="kpi-val" id="kpi-exclusions">0</span><span class="kpi-label">Learned Exclusions</span></div>
+                    <div class="kpi"><span class="kpi-val" id="kpi-basins">0</span><span class="kpi-label">Active Basins</span></div>
+                </div>
+
+                <!-- Cognition Grid -->
+                <div class="row-2" style="margin-top: 2rem;">
+                    <!-- Left: Semantic Communities (Macro Scale) -->
+                    <div class="ai-insight" style="display: block;">
+                        <h4 class="insight-title">Semantic Communities</h4>
+                        <div class="list" id="community-list" style="margin-top: 1rem; max-height: 300px; overflow-y: auto;">
+                            <div class="empty"><p>No stable communities identified</p></div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Stable Schema Patterns -->
+                    <div class="ai-insight" style="display: block;">
+                        <h4 class="insight-title">Learned Schema Patterns</h4>
+                        <div class="list" id="schema-pattern-list" style="margin-top: 1rem; max-height: 300px; overflow-y: auto;">
+                            <div class="empty"><p>No recurring schemas learned yet</p></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row-2" style="margin-top: 2rem;">
+                    <!-- Left: Learned Exclusions -->
+                    <div class="ai-insight" style="display: block;">
+                        <h4 class="insight-title">Learned Exclusions</h4>
+                        <div class="list" id="exclusion-list" style="margin-top: 1rem; max-height: 400px; overflow-y: auto;">
+                            <div class="empty"><p>No exclusions learned yet</p></div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Role Similarities -->
+                    <div class="ai-insight" style="display: block;">
+                        <h4 class="insight-title">Manifold Alignment (Similarity)</h4>
+                        <div class="list" id="role-similarity-list" style="margin-top: 1rem; max-height: 400px; overflow-y: auto;">
+                            <div class="empty"><p>Manifold is cold</p></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Basins (Micro Scale) -->
+                <div style="margin-top: 2rem;">
+                    <div class="ai-insight" style="display: block;">
+                        <h4 class="insight-title">Active Field Basins (High Entropy Zones)</h4>
+                        <div class="list" id="basin-list" style="margin-top: 1rem; max-height: 400px; overflow-y: auto;">
+                            <div class="empty"><p>No active conflict basins</p></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>

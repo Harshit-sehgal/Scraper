@@ -87,38 +87,37 @@ class RoleTransitionDetector:
     def __init__(self):
         # Ensure bootstrap transitions are present in the world state
         ws = get_world_state()
-        if not ws.transition_probs:
-            ws.transition_probs.update(_BOOTSTRAP_TRANSITIONS)
+        ws._transition.update_seed(_BOOTSTRAP_TRANSITIONS)
+
+    @property
+    def _transition_state(self):
+        """Access the owned TransitionState."""
+        return get_world_state()._transition
 
     @property
     def transition_probs(self) -> Dict[Tuple[str, str], float]:
-        return get_world_state().transition_probs
+        return self._transition_state.transition_probs
 
     @property
     def observation_count(self) -> int:
-        return get_world_state().metrics.transition_observations
+        return self._transition_state.transition_observations
 
     @observation_count.setter
     def observation_count(self, value: int):
-        get_world_state().metrics.transition_observations = value
+        self._transition_state.transition_observations = value
 
     def score_transition(self, type_a: str, type_b: str) -> TransitionScore:
         """Score how likely a transition between these types represents a role boundary."""
-        pair = (type_a, type_b)
-        prob = self.transition_probs.get(pair, 0.4)  # Default: low transition probability
+        prob = self._transition_state.get_prob(type_a, type_b)
         return TransitionScore(probability=prob, type_pair=f"{type_a}→{type_b}")
 
     def observe_transition(self, type_a: str, type_b: str, is_role_boundary: bool):
         """Observe whether a transition was a role boundary or entity continuation."""
-        pair = (type_a, type_b)
-        current = self.transition_probs.get(pair, 0.4)
-        delta = 0.05 if is_role_boundary else -0.05
-        self.transition_probs[pair] = max(0.0, min(1.0, current + delta))
-        self.observation_count += 1
+        self._transition_state.observe(type_a, type_b, is_role_boundary)
 
     def get_high_transition_types(self) -> List[Tuple[str, str]]:
         """Get type pairs with high transition probability."""
-        return [(a, b) for (a, b), p in self.transition_probs.items() if p > 0.6]
+        return self._transition_state.get_high_transition_types()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -131,9 +130,6 @@ class CohesionModel:
     Tracks success rates per (type_a, type_b, merged) pattern.
     Over time, learned rates override bootstrap defaults.
     """
-
-    def __init__(self):
-        pass
 
     @property
     def merge_success(self) -> Dict[Tuple[str, str], float]:
@@ -154,14 +150,15 @@ class CohesionModel:
     def record(self, type_a: str, type_b: str, did_merge: bool, success: bool):
         """Record whether a merge or split decision was successful."""
         pair = (type_a, type_b)
+        ws = get_world_state()
         if did_merge:
-            self.merge_attempts[pair] = self.merge_attempts.get(pair, 0.0) + 1.0
+            ws._topology.record_cohesion_merge_attempt(pair)
             if success:
-                self.merge_success[pair] = self.merge_success.get(pair, 0.0) + 1.0
+                ws._topology.record_cohesion_merge_success(pair)
         else:
-            self.split_attempts[pair] = self.split_attempts.get(pair, 0.0) + 1.0
+            ws._topology.record_cohesion_split_attempt(pair)
             if success:
-                self.split_success[pair] = self.split_success.get(pair, 0.0) + 1.0
+                ws._topology.record_cohesion_split_success(pair)
 
     def merge_success_rate(self, type_a: str, type_b: str) -> float:
         """Get the learned success rate for merging this type pair."""
@@ -199,9 +196,6 @@ class MotifLearner:
     Stable motifs represent reliable semantic structures.
     """
 
-    def __init__(self):
-        pass
-
     @property
     def total_records(self) -> int:
         return get_world_state().metrics.total_records_processed
@@ -211,6 +205,8 @@ class MotifLearner:
         get_world_state().metrics.total_records_processed = value
 
     def observe_types(self, types: List[str]):
+        # Identity Protection: filter out known-noisy motifs
+        if any(t == "text" for t in types) and len(types) > 4: return
         """Record and REINFORCE a type sequence from a record."""
         ws = get_world_state()
         self.total_records += 1
@@ -247,23 +243,33 @@ class SemanticBoundaryEngine:
         """Score an adjacent token pair for cohesion vs separation."""
         score = BoundaryScore()
 
-        # 1. High-confidence transition check
+        # 1. TOPOLOGICAL MOTIF CHECK (Primary Strategy)
+        # If this sequence (A, B) is part of a stable recurring motif, prefer cohesion
+        motif = (type_a, type_b)
+        stability = self.motif_learner.stability(motif)
+        if stability > 0.6:
+            score.cohesion = 0.5 + stability * 0.4
+            score.separation = 1.0 - score.cohesion
+            score.uncertainty = 0.2
+            return score
+
+        # 2. Role Transition check (Topological Discontinuity)
+        ts = self.transition_detector.score_transition(type_a, type_b)
+        if ts.probability > 0.6:
+            score.separation = ts.probability
+            score.transition = ts.probability
+            score.cohesion = 1.0 - ts.probability
+            return score
+
+        # 3. High-confidence transition check (Bootstrap)
         pair = (type_a, type_b)
         if pair in _HIGH_TRANSITION_PAIRS:
             score.transition = 0.8
             score.separation = 0.7
             score.cohesion = 0.2
-            score.uncertainty = 0.3
             return score
 
-        # 2. Stop-word prefix: "The" + org → merge (check before same-type)
-        if value_a.lower() in _STOP_WORDS and type_b in ('org', 'organization'):
-            score.cohesion = 0.85
-            score.separation = 0.1
-            score.uncertainty = 0.15
-            return score
-
-        # 3. Learned cohesion bias from past outcomes (HIGHER PRIORITY)
+        # 4. Learned cohesion bias from past outcomes
         bias = self.cohesion_model.get_cohesion_bias(type_a, type_b)
         if abs(bias) > 0.2:
             if bias > 0:
@@ -272,11 +278,15 @@ class SemanticBoundaryEngine:
             else:
                 score.separation = 0.5 + abs(bias) * 0.4
                 score.cohesion = 1.0 - score.separation
-            score.transition = 0.3 + abs(bias) * 0.3
-            score.uncertainty = 0.4
             return score
 
-        # 4. Same-type check
+        # 5. Symbolic/Hardcoded fallbacks (Lowest priority)
+        # "The" + org → merge
+        if value_a.lower() in _STOP_WORDS and type_b in ('org', 'organization'):
+            score.cohesion = 0.85
+            score.separation = 0.1
+            return score
+
         if type_a == type_b:
             if type_a in ('org', 'organization'):
                 if value_b.lower() in _BOOTSTRAP_SUFFIXES:
@@ -290,24 +300,15 @@ class SemanticBoundaryEngine:
             score.separation = 0.7
             return score
 
-        # 5. Role transition detector check
-        ts = self.transition_detector.score_transition(type_a, type_b)
-        if ts.probability > 0.6:
-            score.separation = ts.probability
-            score.transition = ts.probability
-            score.cohesion = 1.0 - ts.probability
-            return score
-
-        # 6. Number + code: "3 BHK" → merge
+        # Number + code: "3 BHK" → merge
         if type_a == 'number' and type_b == 'code':
             score.cohesion = 0.8
             score.separation = 0.2
             return score
 
-        # 7. Default
+        # 6. Default
         score.cohesion = 0.4
         score.separation = 0.5
-        score.transition = 0.3
         score.uncertainty = 0.5
         return score
 
@@ -325,10 +326,21 @@ class SemanticBoundaryEngine:
         return score.should_merge()
 
     def record_decision(self, decision: MergeDecision):
-        self.decision_history.append(decision)
+        decision_dict = decision.__dict__ if hasattr(decision, '__dict__') else {}
+        get_world_state()._history.record_decision(decision_dict)
         self.cohesion_model.record(decision.type_a, decision.type_b, decision.merged, decision.success)
         is_role_boundary = not decision.merged and decision.success
         self.transition_detector.observe_transition(decision.type_a, decision.type_b, is_role_boundary)
+
+    def update_recent_decisions(self, coherence: float, threshold: float):
+        """Update the most recent decisions with coherence/success metadata.
+        
+        Uses controlled access through HistoryState to avoid in-place
+        alias mutation of internal list elements.
+        """
+        ws = get_world_state()
+        recent = ws._history.get_recent_decisions(20)
+        ws._history.update_recent_decision_metadata(recent, coherence, threshold)
 
 
 def group_adjacent_entities(records: list) -> list:
@@ -337,46 +349,103 @@ def group_adjacent_entities(records: list) -> list:
         return records
 
     for record in records:
+        # Step 1: Clean up child fragments that are already part of larger values
         seen: set[str] = set()
         keys_to_delete = []
         from app.semantic_mapper import is_child_fragment
-        for k in list(record.keys()):
+        
+        # Sort keys to ensure we process in a predictable order
+        all_keys = list(record.keys())
+        for k in all_keys:
             v = record.get(k)
             if v and isinstance(v, str):
                 if is_child_fragment(v, seen):
                     keys_to_delete.append(k)
-                seen.add(v)
+                else:
+                    seen.add(v)
+        
         for k in keys_to_delete:
             if k in record:
                 del record[k]
 
-        def _sort_key(k):
-            parts = k.rsplit('_', 1)
-            return int(parts[-1]) if parts[-1].isdigit() else 0
+        # Step 2: Merge adjacent segments (_seg_ keys)
+        def _get_topo_info(k):
+            # New Format: {key}_seg_{type}_{i}_{start}_{end}
+            # Old Format: {key}_seg_{type}_{i}
+            parts = k.rsplit('_', 2)
+            if len(parts) >= 3 and parts[-1].isdigit() and parts[-2].isdigit():
+                return int(parts[-2]), int(parts[-1]), int(k.rsplit('_', 3)[-3] if '_' in k else 0)
+            
+            # Fallback to linear index if spans missing
+            idx_part = k.rsplit('_', 1)[-1]
+            idx = int(idx_part) if idx_part.isdigit() else 0
+            return 0, 0, idx
 
-        seg_keys = sorted([k for k in record if '_seg_' in k], key=_sort_key)
+        # Sort by start span if available, otherwise by linear index
+        seg_keys = sorted([k for k in record if '_seg_' in k], 
+                         key=lambda k: (info := _get_topo_info(k), info[0] if info[0] > 0 else info[2]))
         if len(seg_keys) < 2:
             continue
 
-        merged = set()
-        i = 0
-        while i < len(seg_keys) - 1:
-            k1, k2 = seg_keys[i], seg_keys[i + 1]
-            t1 = k1.split('_')[-2] if len(k1.split('_')) >= 3 else ''
-            t2 = k2.split('_')[-2] if len(k2.split('_')) >= 3 else ''
-            v1, v2 = record.get(k1, ''), record.get(k2, '')
-            if v1 and v2:
-                if score_boundary(t1, t2, v1, v2, i, i + 1):
-                    record[k1] = f"{v1} {v2}"
-                    record[k2] = None
-                    merged.add(k2)
-                    i += 2
-                    continue
-            i += 1
+        merged_keys = set()
+        current_idx = 0
+        while current_idx < len(seg_keys) - 1:
+            k_head = seg_keys[current_idx]
+            h_start, h_end, h_idx = _get_topo_info(k_head)
+            
+            # Try to merge subsequent tokens into the head
+            lookahead = 1
+            while current_idx + lookahead < len(seg_keys):
+                k_next = seg_keys[current_idx + lookahead]
+                n_start, n_end, n_idx = _get_topo_info(k_next)
+                
+                # Adjacency check:
+                # If spans exist: max 3 chars gap
+                # If no spans: must be consecutive indices (e.g. 0 and 1)
+                if h_start > 0 or n_start > 0:
+                    if n_start - h_end > 3: break
+                else:
+                    if n_idx - h_idx > 1: break
 
-        for k in merged:
+                # Extract types from key names
+                parts_h = k_head.split('_')
+                parts_n = k_next.split('_')
+                
+                # Format detection: new format has at least 5 parts
+                if len(parts_h) >= 5 and parts_h[-1].isdigit() and parts_h[-2].isdigit():
+                    t_head = parts_h[-4]
+                    t_next = parts_n[-4] if len(parts_n) >= 5 else ''
+                else:
+                    # Old format: {key}_seg_{type}_{i}
+                    t_head = parts_h[-2] if len(parts_h) >= 3 else ''
+                    t_next = parts_n[-2] if len(parts_n) >= 3 else ''
+                
+                v_head = record.get(k_head, '')
+                v_next = record.get(k_next, '')
+                
+                if v_head and v_next:
+                    # Boundary engine scores based on types and values
+                    if score_boundary(t_head, t_next, v_head, v_next, h_start, n_start):
+                        # Merge into head
+                        record[k_head] = f"{v_head} {v_next}".strip()
+                        record[k_next] = None
+                        merged_keys.add(k_next)
+                        # Update head's end span for next adjacency check
+                        h_end = n_end
+                        lookahead += 1
+                        continue
+                
+                # If no merge, stop lookahead for this head
+                break
+            
+            # Move to the next un-merged token
+            current_idx += lookahead
+
+        # Final cleanup
+        for k in merged_keys:
             if k in record:
                 del record[k]
+                
     return records
 
 

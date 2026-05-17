@@ -287,7 +287,7 @@ async def discover_urls(
         max_distance_km=max_distance_km,
     )
 
-    print(f"[Discovery] DuckDuckGo query: '{search_query}' (max {num_results})")
+    logging.info("DuckDuckGo query: '%s' (max %d)", search_query, num_results)
 
     results = []
     try:
@@ -300,7 +300,7 @@ async def discover_urls(
         raw_results = await run_sync_in_thread(fetch_ddg)
 
         seen_urls = set()
-        ranked = []
+        ranked: list = []
         for r in raw_results:
             url = (r.get("href") or "").strip()
             canonical = _canonicalize_url(url)
@@ -330,6 +330,27 @@ async def discover_urls(
                 source_type=metadata["source_type"],
             )
             score += metadata["source_trust_score"] * 0.1
+            
+            # Semantic Steering (Phase 20)
+            # Discovery adapts to the current state of the semantic field.
+            from app.semantic_world_state import get_world_state
+            ws = get_world_state()
+            field_pressure = ws.metrics.field_pressure
+            global_entropy = ws.metrics.global_entropy
+            
+            # Causal Steering:
+            # 1. High entropy (disorder) rewards domain novelty (Exploration)
+            if global_entropy > 0.7:
+                # Roughly check if domain is novel (not in top results yet)
+                domain = _extract_domain(url)
+                if domain not in [r[2].get("source_domain") for r in ranked[:5]]:
+                    score += 0.2
+            
+            # 2. High pressure (stress) rewards high-trust markers (Stabilization)
+            if field_pressure > 0.6:
+                if metadata["source_type"] == "official":
+                    score += 0.15
+            
             if score <= 0:
                 continue
             ranked.append((score, r, metadata, canonical))
@@ -366,11 +387,10 @@ async def discover_urls(
             if len(results) >= num_results:
                 break
 
-        print(f"[Discovery] Found {len(results)} real URLs.")
+        logging.info("Found %d real URLs.", len(results))
         return results
     except Exception as e:
-        logging.exception(e)
-        print(f"[Discovery Error]: {e}")
+        logging.exception("Discovered error: %s", e)
         return []
 
 

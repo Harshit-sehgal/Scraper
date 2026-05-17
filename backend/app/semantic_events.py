@@ -10,12 +10,9 @@ from typing import Any, Dict
 
 
 class SemanticEventType(Enum):
-    BOUNDARY_INSTABILITY = "boundary_instability"
-    CONTRADICTION_DETECTED = "contradiction_detected"
     UNCERTAINTY_SPIKE = "uncertainty_spike"
     TOPOLOGY_SHIFT = "topology_shift"
     EQUILIBRIUM_REACHED = "equilibrium_reached"
-    MEMORY_REINFORCED = "memory_reinforced"
 
 
 @dataclass

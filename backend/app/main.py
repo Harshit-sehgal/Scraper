@@ -126,3 +126,136 @@ async def system_status():
         "runtime_limits": CONFIG,
         "state_file": str(get_state_file_path()),
     }
+
+@app.get("/api/system/topology")
+async def system_topology():
+    """Exposes the raw state of the semantic cognition substrate."""
+    from app.semantic_world_state import get_world_state
+    ws = get_world_state()
+    view = ws._topology.get_view()
+    return {
+        "metrics": {
+            "field_pressure": round(ws.metrics.field_pressure, 3),
+            "global_energy": round(ws.metrics.global_energy, 3),
+            "semantic_temperature": round(ws.metrics.semantic_temperature, 3),
+            "global_entropy": round(ws.metrics.global_entropy, 3),
+            "exclusion_count": len(ws.learned_exclusions),
+            "learning_count": ws.learning_count,
+            "integrity_score": round(ws.metrics.integrity_score, 3),
+            "crystalline_count": len(ws.crystalline_records),
+        },
+        "global_communities": [list(c) for c in ws.global_communities],
+        "schema_patterns": [{"roles": list(k), "count": v} for k, v in ws.schema_patterns.items()],
+        "learned_exclusions": [{"roles": list(k), "strength": round(v, 3)} for k, v in ws.learned_exclusions.items()],
+        "field_regions": view.all_region_dicts(),
+        "role_compatibility": [{"role": k[0], "type": k[1], "score": round(v, 3)} for k, v in ws.role_compatibility.items()]
+    }
+
+
+@app.get("/api/system/crystalline")
+async def system_crystalline():
+    """Returns the synthesized high-integrity knowledge units."""
+    from app.semantic_world_state import get_world_state
+    ws = get_world_state()
+    return {
+        "records": ws.crystalline_records,
+        "count": len(ws.crystalline_records)
+    }
+
+@app.get("/api/system/export/knowledge")
+async def export_knowledge():
+    """Export the synthesized knowledge manifold as a portable schema."""
+    import time
+    from app.semantic_world_state import get_world_state
+    ws = get_world_state()
+    return {
+        "version": "3.1-crystalline",
+        "timestamp": time.time(),
+        "manifold_size": len(ws.role_manifold),
+        "role_manifold": ws.role_manifold,
+        "crystalline_records": ws.crystalline_records,
+        "communities": [list(c) for c in ws.global_communities],
+        "schema_patterns": [{"roles": list(k), "count": v} for k, v in ws.schema_patterns.items()],
+        "learned_exclusions": {"|".join(k): v for k, v in ws.learned_exclusions.items()},
+    }
+
+@app.post("/api/system/merge/knowledge")
+async def merge_knowledge(data: dict):
+    """Merge an external knowledge manifold into the current field (Phase 23)."""
+    from app.semantic_world_state import get_world_state
+    ws = get_world_state()
+    
+    # 1. Merge Manifold (Geometric Beliefs)
+    remote_manifold = data.get("role_manifold", {})
+    merged_roles = 0
+    for role, vec in remote_manifold.items():
+        if ws._manifold.has_manifold_role(role):
+            # Blend vectors (Physical Consensus) — controlled mutation through ManifoldState
+            ws._manifold.blend_manifold_vector(role, list(vec), alpha=0.7, beta=0.3)
+        else:
+            ws._manifold.set_manifold_vector(role, list(vec))
+        merged_roles += 1
+            
+    # 2. Merge Exclusions (Topological Constraints)
+    remote_exc = data.get("learned_exclusions", {})
+    for k_str, val in remote_exc.items():
+        parts = k_str.split("|")
+        if len(parts) == 2:
+            key = tuple(sorted(parts))
+            ws._instability.set_exclusion(key, max(ws._instability.get_exclusion_by_key(key), val))
+            
+    return {"status": "merged", "roles_merged": merged_roles, "total_manifold": len(ws.role_manifold)}
+
+@app.get("/api/system/search")
+async def system_search(query: str, limit: int = 5):
+    """Perform topological search on crystalline records."""
+    from app.semantic_world_state import get_world_state
+    ws = get_world_state()
+    results = ws.topological_search(query)[:limit]
+    return {"results": results, "query": query}
+
+@app.get("/api/system/observability")
+async def system_observability():
+    """Exposes real-time telemetry and activity heatmaps."""
+    from app.semantic_world_state import get_world_state
+    ws = get_world_state()
+    return {
+        "telemetry": ws._observability.telemetry[-50:],
+        "heatmap": ws._observability.heatmap,
+        "causal_trace": ws._observability.get_causal_telemetry()[-20:],
+        "hierarchy": {
+            "envelopes": list(ws._abstraction.envelopes.keys()),
+            "levels": {r: ws._abstraction.get_role_level(r) for r in ws.role_manifold}
+        }
+    }
+
+@app.post("/api/system/scheduler/step")
+async def process_cognitive_tasks(budget_ms: float = 100.0):
+    """Manually trigger processing of the cognitive task queue."""
+    from app.semantic_world_state import get_world_state
+    ws = get_world_state()
+    completed = ws.process_cognitive_queue(budget_ms=budget_ms)
+    return {"status": "success", "tasks_completed": completed}
+
+@app.get("/api/system/agency")
+async def system_agency():
+    """Returns the state of autonomous agency and tools."""
+    from app.semantic_world_state import get_world_state
+    from app.llm_bridge import get_plugin_manager
+    ws = get_world_state()
+    plugins = get_plugin_manager(ws=ws)
+    return {
+        "active_actions": ws._action.active_actions,
+        "available_tools": plugins.get_available_tools(),
+        "action_history": ws._action.action_history[-30:],
+        "active_intents": ws._intent.active_intents
+    }
+
+@app.post("/api/system/refactor/compress")
+async def trigger_manifold_compression():
+    """Trigger an autonomous manifold compression cycle."""
+    from app.semantic_world_state import get_world_state
+    from app.llm_bridge import get_plugin_manager
+    plugins = get_plugin_manager(ws=get_world_state())
+    result = plugins.call_tool("manifold_compressor")
+    return {"result": result}

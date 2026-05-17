@@ -12,13 +12,12 @@ And instead asks:
 Candidates compete GLOBALLY for semantic roles.
 The optimal assignment maximizes global coherence.
 
-Role-type compatibility is LEARNED, not hardcoded.
-Uses RoleEmbeddingEngine from semantic_inference_engine.
+Role-type compatibility is derived geometrically from the Role Manifold.
 """
 
 import random
 from copy import deepcopy
-from typing import List, Optional, Set, Tuple
+from typing import List, Set, Tuple
 
 from app.semantic_ir import (
     AllocationGraph,
@@ -40,64 +39,48 @@ def _get_role_engine():
     return _role_engine
 
 
-# Exclusivity constraints (bootstrap seeds, others learned dynamically)
-ROLE_EXCLUSIVITY: List[Tuple[str, str]] = [
-    ("origin", "destination"),
-    ("departure", "arrival"),
-    ("start", "end"),
-]
+# Exclusivity constraints — now defined in field_laws.py to prevent
+# upward dependency from core_types.py to this allocation engine.
+# Imported here for backward compatibility and local usage.
+from app.field_laws import ROLE_EXCLUSIVITY
 
-
-_smoothed_structural = 0.4
-_smoothed_runtime = 0.3
 
 def _adaptive_exclusion_threshold() -> float:
     """Exclusion threshold with hysteresis + temperature modulation."""
-    global _smoothed_structural
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
-    maturity = min(ws.metrics.total_records_processed / 100.0, 1.0)
-    pressure = ws.metrics.field_pressure
-    density = ws.topology_density
-    target = 0.4 - (maturity * 0.2) + (pressure * 0.3) + (density * 0.2)
-    target = max(0.2, min(0.6, target))
-    _smoothed_structural = _smoothed_structural * 0.7 + target * 0.3
+    # Read-only access to smoothed metrics updated during evolution
+    base = getattr(ws.metrics, "_smoothed_structural", 0.4)
     temp = ws.metrics.semantic_temperature
-    conv = ws.metrics.convergence_score
-    result = _smoothed_structural - (temp - 0.5) * 0.2 - (conv - 0.5) * 0.15
+    conv = ws.metrics.integrity_score
+    # Stress (temp) increases threshold; Convergence (trust) decreases it
+    result = base + (temp - 0.5) * 0.2 - (conv - 0.5) * 0.15
     return max(0.2, min(0.6, result))
 
 
 def _adaptive_runtime_exclusion_threshold() -> float:
     """Exclusion threshold with hysteresis + temperature + convergence."""
-    global _smoothed_runtime
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
-    maturity = min(ws.metrics.total_records_processed / 100.0, 1.0)
-    pressure = ws.metrics.field_pressure
-    density = ws.topology_density
-    target = 0.3 - (maturity * 0.15) + (pressure * 0.3) + (density * 0.15)
-    target = max(0.15, min(0.5, target))
-    _smoothed_runtime = _smoothed_runtime * 0.7 + target * 0.3
+    # Read-only access to smoothed metrics updated during evolution
+    base = getattr(ws.metrics, "_smoothed_runtime", 0.3)
     temp = ws.metrics.semantic_temperature
-    conv = ws.metrics.convergence_score
-    result = _smoothed_runtime - (temp - 0.5) * 0.15 - (conv - 0.5) * 0.1
+    conv = ws.metrics.integrity_score
+    # Stress (temp) increases threshold; Convergence (trust) decreases it
+    result = base + (temp - 0.5) * 0.15 - (conv - 0.5) * 0.1
     return max(0.15, min(0.5, result))
 
 
 # Bootstrap seeds for role-type compatibility.
 # These are TEMPORARY priors — learning overrides them over time.
-# They are NOT universal truths; they give the system a starting point
-# so that the first records processed have non-zero compatibility.
-# After enough observations, learned compatibilities dominate.
 _UNIVERSAL_ROOTS = [
-    (['pric', 'cost', 'salar', 'fare'], SemanticType.PRICE),
-    (['date', 'time', 'schedule'], SemanticType.DATE),
-    (['loc', 'city', 'addr', 'place'], SemanticType.LOCATION),
-    (['nam', 'comp', 'firm', 'brand', 'make', 'model', 'builder'], SemanticType.ORGANIZATION),
-    (['rat', 'scor', 'review'], SemanticType.RATING),
-    (['count', 'number', 'year', 'mileage', 'age', 'experien'], SemanticType.NUMBER),
-    (['code', 'currenc', 'ident', 'id'], SemanticType.CODE),
+    (['pric', 'cost', 'salar', 'fare', 'preci', 'prix', 'wert'], SemanticType.PRICE),
+    (['date', 'time', 'schedule', 'fecha', 'zeit', 'horar'], SemanticType.DATE),
+    (['loc', 'city', 'addr', 'place', 'dest', 'orig', 'ubica', 'stadt', 'code'], SemanticType.LOCATION),
+    (['nam', 'comp', 'firm', 'brand', 'make', 'model', 'builder', 'nombr', 'hotel', 'resort'], SemanticType.ORGANIZATION),
+    (['rat', 'scor', 'review', 'calif', 'bewert'], SemanticType.RATING),
+    (['count', 'number', 'year', 'mileage', 'age', 'experien', 'num', 'jahr'], SemanticType.NUMBER),
+    (['code', 'currenc', 'ident', 'id', 'codig'], SemanticType.CODE),
 ]
 
 
@@ -123,42 +106,64 @@ def _name_similarity(a: str, b: str) -> float:
 
 
 def seed_role_engine(schema_fields: list):
-    """Seed the RoleEmbeddingEngine with initial role-type compatibilities."""
+    """Seed the RoleEmbeddingEngine manifold with initial priors and Manifold Transfer."""
     reng = _get_role_engine()
+    ws = reng.ws
     
     for f_name in schema_fields:
+        if f_name in reng.manifold:
+            continue
+            
         field_lower = f_name.lower()
         
-        # Strategy 1: Universal roots
+        # 1. Manifold Transfer: inherit from existing similar stable roles (Phase 23)
+        # Search for a stable role with a similar name
+        inherited = False
+        for existing_role, vec in reng.manifold.items():
+            if _name_similarity(field_lower, existing_role.lower()) >= 0.8:
+                instability = ws._energy.get_schema_instability(existing_role)
+                if instability < 0.2:
+                    # Found a stable similar role; inherit its physical state
+                    ws._manifold.set_manifold_vector(f_name, list(vec))
+                    ws._energy.set_schema_instability(f_name, instability)
+                    inherited = True
+                    break
+        
+        if inherited:
+            continue
+
+        # 2. Universal Roots: fallback to symbolic seeds
         best_type = SemanticType.TEXT
         for roots, stype in _UNIVERSAL_ROOTS:
             if any(root in field_lower for root in roots):
                 best_type = stype
                 break
         
-        # Strategy 2: Cache-derived nearest neighbor
         if best_type == SemanticType.TEXT:
-            best_score = 0.0
-            for (known_role, type_str), compat in reng.compatibility_cache.items():
-                if compat < 0.6:
-                    continue
-                sim = _name_similarity(f_name, known_role)
-                if sim > best_score:
-                    best_score = sim
-                    if sim > 0.55:
-                        best_type = SemanticType(type_str)
+            for st in SemanticType:
+                if _name_similarity(field_lower, st.value) > 0.6:
+                    best_type = st
+                    break
         
-        key = (f_name, best_type.value)
-        if key not in reng.compatibility_cache:
-            reng.compatibility_cache[key] = 0.7
+        # Initialize manifold vector through controlled method
+        ws._manifold.set_manifold_vector(f_name, reng._get_type_vector(best_type))
+        
+        # Initial instability for new roles (Medium) through controlled method
+        current_instability = ws._energy.get_schema_instability(f_name)
+        if current_instability == 0.5:
+            # Already the default — no mutation needed
+            pass
+        else:
+            ws._energy.set_schema_instability(f_name, 0.5)
 
 
 def warm_start_from_values(records: list, schema_fields: list):
-    """Warm-start the RoleEmbeddingEngine using actual value classifications."""
+    """Warm-start the Role Manifold with observed values."""
     if not records or not schema_fields:
         return
     
     reng = _get_role_engine()
+    ws = reng.ws
     first = records[0]
     
     from app.semantic_mapper import detect_semantic_type
@@ -168,76 +173,169 @@ def warm_start_from_values(records: list, schema_fields: list):
         if not isinstance(val, str) or not val.strip():
             continue
         
-        st, conf = detect_semantic_type(val, f_name)
-        key = (f_name, st.value)
-        if key not in reng.compatibility_cache:
-            reng.compatibility_cache[key] = 0.7
+        st, _ = detect_semantic_type(val, f_name)
+        expected_type = _infer_role_type(f_name)
+        
+        # Grounding check: only seed if types are near
+        is_compatible = (st == expected_type) or \
+                        (st == SemanticType.TEXT) or \
+                        (expected_type == SemanticType.TEXT) or \
+                        (st == SemanticType.CODE and expected_type in [SemanticType.LOCATION, SemanticType.PRICE, SemanticType.CODE, SemanticType.IDENTIFIER])
+        
+        if is_compatible:
+            # Move manifold point toward this observed type through controlled blend
+            if f_name not in reng.manifold:
+                ws._manifold.set_manifold_vector(f_name, reng._get_type_vector(expected_type))
+            
+            target_vec = reng._get_type_vector(st)
+            ws._manifold.blend_manifold_vector(f_name, target_vec, alpha=0.7, beta=0.3)
 
 
-def build_allocation_graph(record: SemanticRecord, schema_roles: List[str]) -> AllocationGraph:
-    """Build an allocation graph from a record and desired schema roles.
-
-    Each candidate token competes for each role.
-    The graph captures compatibility scores and exclusivity constraints.
-    """
+def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abstraction_gradient: float = 0.0) -> AllocationGraph:
+    """Build an allocation graph from a record and desired schema roles with Hierarchical Synthesis (Phase 38)."""
     graph = AllocationGraph()
+    from app.semantic_world_state import get_world_state as _gws_topo
+    ws = _gws_topo()
 
-    # Register role order (for positional ordering signals)
-    graph.role_order = list(schema_roles)
+    # Expand schema roles to include constituents if gradient allows
+    # Preserve order using dict.fromkeys (Phase 38)
+    role_list = list(schema_roles)
+    if abstraction_gradient > 0.3:
+        for role in list(role_list):
+            level = ws._abstraction.get_role_level(role)
+            if level > 0:
+                env = ws._abstraction.get_envelope(role)
+                if env:
+                    # Include constituents in interpretation
+                    for c in env["constituents"]:
+                        if c not in role_list:
+                            role_list.append(c)
 
-    # Register candidates (deduplicated by text)
+    # Register candidates
     seen = set()
     for token in record.tokens:
         if token.raw not in seen:
             seen.add(token.raw)
             graph.candidates[token.raw] = token
 
-    # Register roles
-    for role_name in schema_roles:
+    # Register roles in order
+    for role_name in role_list:
         expected_type = _infer_role_type(role_name)
         graph.roles[role_name] = SemanticRole(
             role_name=role_name,
             field_type=expected_type,
-            required=True,
+            required=(role_name in schema_roles), # Only top-level roles are required
         )
 
-    # Phase 6: Topology-driven allocation — check field regions BEFORE compatibility
-    # Field region conflicts add exclusion edges that shape which candidates
-    # are considered compatible, making topology the primary causal substrate.
-    from app.semantic_world_state import get_world_state as _gws_topo
-    _ws_topo = _gws_topo()
-    for region in _ws_topo.field_regions:
+    # Topology-driven exclusion edges from field regions
+    _ws_topo = ws
+    topo_view = _ws_topo._topology.get_view()
+    for region in topo_view.all_regions():
         roles = region.competing_roles
         for i in range(len(roles)):
             for j in range(i + 1, len(roles)):
                 r1, r2 = roles[i], roles[j]
                 if r1 in graph.roles and r2 in graph.roles:
                     pair = (r1, r2)
-                    rev = (r2, r1)
-                    if pair not in graph.exclusivity_edges and rev not in graph.exclusivity_edges:
+                    if pair not in graph.exclusivity_edges and (r2, r1) not in graph.exclusivity_edges:
                         graph.exclusivity_edges.append(pair)
 
-    # Compute compatibility scores
+    # Compute compatibility scores (Geometric)
     for cand_key, token in graph.candidates.items():
-        for role_name, role in graph.roles.items():
-            score = _compute_compatibility(token, role_name, role, graph.role_order)
+        for role_name, role in graph.roles.items():  # type: ignore[assignment]
+            score = _compute_compatibility(token, role_name, role)  # type: ignore[arg-type]
             if score > 0:
                 graph.compatibility[(cand_key, role_name)] = score
 
-    # Phase 4D: Equilibrium search — modulate compatibility by field region instability
-    # Roles in active conflict regions have their compatibility scores weighted down
-    # by field pressure, so allocation hesitates rather than confidently resolving.
-    from app.semantic_world_state import get_world_state as _gws_eq
-    _ws_eq = _gws_eq()
-    for region in _ws_eq.field_regions:
+    # Field instability damping
+    # Unstable basins reduce proposal confidence for their roles.
+    for region in topo_view.all_regions():
         for role in region.competing_roles:
             if role in graph.roles:
                 instability = min(region.instability, 1.0)
                 for cand_key in graph.candidates:
                     key = (cand_key, role)
                     if key in graph.compatibility:
-                        weight = 1.0 - (instability * 0.3)
-                        graph.compatibility[key] *= weight
+                        # Unstable basins reduce proposal confidence
+                        graph.compatibility[key] *= (1.0 - instability * 0.3)
+
+    # Topological Inference (Phase 18): Community Pull
+    # Roles that are part of a macro-scale community pull each other.
+    if _ws_topo.global_communities:
+        role_comm_map = {}
+        for i, comm in enumerate(_ws_topo.global_communities):
+            for role_name in comm:
+                role_comm_map[role_name] = i
+        
+        # Calculate community "Presence" in this record
+        comm_max_scores: dict = {}
+        for (cand, role), score in graph.compatibility.items():
+            if role in role_comm_map:
+                c_idx = role_comm_map[role]
+                comm_max_scores[c_idx] = max(comm_max_scores.get(c_idx, 0.0), score)
+        
+        # Apply pull: roles in an "active" community get a boost
+        for (cand, role), score in list(graph.compatibility.items()):
+            if role in role_comm_map:
+                c_idx = role_comm_map[role]
+                pull = comm_max_scores.get(c_idx, 0.0)
+                if pull > 0.7:
+                    # Community is present; boost other roles in it
+                    # (Boost is proportional to community pull and current score)
+                    graph.compatibility[(cand, role)] = min(1.0, score + (1.0 - score) * 0.1 * pull)
+
+    # Schema Gravity Pull (Phase 19): Macro-Scale Structural memory
+    # If the set of schema roles matches a learned stable pattern, boost compatibility.
+    if _ws_topo.schema_patterns:
+        current_roles = sorted(graph.roles.keys())
+        # Check role-pair subsets against stored 2-tuple patterns
+        schema_frequency = 0
+        for i in range(len(current_roles)):
+            for j in range(i + 1, len(current_roles)):
+                pair = (current_roles[i], current_roles[j])
+                schema_frequency = max(schema_frequency, _ws_topo.schema_patterns.get(pair, 0))
+        if schema_frequency > 10:
+            # Learned stable schema; boost all compatible roles
+            boost = min(0.1, schema_frequency / 500.0)
+            for key in graph.compatibility:
+                graph.compatibility[key] = min(1.0, graph.compatibility[key] + (1.0 - graph.compatibility[key]) * boost)
+
+    # Crystalline Gravity (Phase 22): Predictive Pull from Synthesized Units
+    # If a token matches a crystalline record by identity, pull missing fields.
+    token_vals = list(graph.candidates.keys())
+    attractors = _ws_topo.get_crystalline_attractors(token_vals)
+    for attractor in attractors:
+        # Every field in the attractor exerts a pull on matching candidate tokens
+        for role_name, attr_val in attractor.items():
+            if role_name in graph.roles:
+                for cand_val, token in graph.candidates.items():
+                    if cand_val == attr_val:
+                        # Direct match found in crystalline unit; boost compatibility
+                        key = (cand_val, role_name)
+                        current = graph.compatibility.get(key, 0.5)
+                        # Strong pull: synthesized knowledge is high-integrity
+                        graph.compatibility[key] = min(1.0, current + (1.0 - current) * 0.5)
+
+    # Topological Law Bias (Phase 24): Proximity Laws
+    # If roles A and B have a proximity law and are close, boost.
+    if _ws_topo.topological_laws:
+        for (r1, r2), strength in _ws_topo.topological_laws.items():
+            if r1 in graph.roles and r2 in graph.roles:
+                # Find candidate positions for these roles
+                for c1, t1 in graph.candidates.items():
+                    for c2, t2 in graph.candidates.items():
+                        if c1 == c2: continue
+                        dist = abs(t1.position - t2.position)
+                        if dist < 50: # Physically close
+                            # Boost compatibility for both
+                            for role in [r1, r2]:
+                                for cand in [c1, c2]:
+                                    key = (cand, role)
+                                    if key in graph.compatibility:
+                                        # Boost proportional to law strength and physical proximity
+                                        proximity_factor = (50 - dist) / 50.0
+                                        boost = 0.1 * strength * proximity_factor
+                                        graph.compatibility[key] = min(1.0, graph.compatibility[key] + boost)
 
     # Build exclusivity edges
     reng = _get_role_engine()
@@ -245,152 +343,103 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str]) -> A
         if role_a in graph.roles and role_b in graph.roles:
             graph.exclusivity_edges.append((role_a, role_b))
             
-    # Add dynamic learned exclusions
-    roles = list(graph.roles.keys())
-    for i in range(len(roles)):
-        for j in range(i + 1, len(roles)):
-            r1, r2 = roles[i], roles[j]
+    # Dynamic topological exclusions
+    role_names = list(graph.roles.keys())
+    for i in range(len(role_names)):
+        for j in range(i + 1, len(role_names)):
+            r1, r2 = role_names[i], role_names[j]
             if (r1, r2) in graph.exclusivity_edges or (r2, r1) in graph.exclusivity_edges:
                 continue
-            exclusion_threshold = _adaptive_exclusion_threshold()
-            if reng.get_learned_exclusion(r1, r2) > exclusion_threshold:
+            if reng.get_learned_exclusion(r1, r2) > _adaptive_exclusion_threshold():
                 graph.exclusivity_edges.append((r1, r2))
 
-    # Phase 4: Check restructuring queue — flag role pairs for separation
-    from app.semantic_world_state import get_world_state as _gws
-    _ws = _gws()
-    for pair in list(_ws.restructuring_queue):
-        r1, r2 = pair
-        if r1 in graph.roles and r2 in graph.roles:
-            if (r1, r2) not in graph.exclusivity_edges and (r2, r1) not in graph.exclusivity_edges:
-                graph.exclusivity_edges.append((r1, r2))
-
-    # Phase 4B: Field activation — topology mutates BEFORE allocation
-    # Reads persistent field regions and converts conflict geometry into
-    # exclusion edges, making the field state causally shape allocation.
-    for region in _ws.field_regions:
-        roles = region.competing_roles
-        for i in range(len(roles)):
-            for j in range(i + 1, len(roles)):
-                r1, r2 = roles[i], roles[j]
-                if r1 in graph.roles and r2 in graph.roles:
-                    pair = (r1, r2)
-                    rev_pair = (r2, r1)
-                    if pair not in graph.exclusivity_edges and rev_pair not in graph.exclusivity_edges:
-                        graph.exclusivity_edges.append((r1, r2))
-
-    # Initial coherence
     graph.coherence_score = _compute_allocation_coherence(graph)
-
     return graph
 
 
 def _infer_role_type(role_name: str) -> SemanticType:
-    """Infer the expected SemanticType for a role name.
-
-    Delegates to RoleEmbeddingEngine which learns dynamically.
-    Finds the type with the highest learned compatibility for this role.
-    """
+    """Infer the expected SemanticType for a role name."""
     reng = _get_role_engine()
+    
+    # 1. Anchor to bootstrap seed
+    field_lower = role_name.lower()
+    seed_type = SemanticType.TEXT
+    for roots, stype in _UNIVERSAL_ROOTS:
+        if any(root in field_lower for root in roots):
+            seed_type = stype
+            break
+
+    # 2. Check manifold geometry
     best_type = SemanticType.TEXT
-    best_compat = -1.0
+    best_compat = 0.55
     
     for t in SemanticType:
         compat = reng.get_compatibility(role_name, t)
         if compat > best_compat:
             best_compat = compat
             best_type = t
-            
+
+    # 3. Identity Protection: only switch if overwhelmingly stable
+    if seed_type != SemanticType.TEXT:
+        return best_type if best_compat > 0.9 else seed_type
     return best_type
 
 
 def _compute_compatibility(
-    token: SemanticToken, role_name: str, role: SemanticRole,
-    role_order: Optional[List[str]] = None
+    token: SemanticToken, role_name: str, role: SemanticRole
 ) -> float:
-    """Compute how compatible a candidate is with a semantic role.
-
-    Uses learned role embeddings from RoleEmbeddingEngine.
-    Adds positional ordering bonus: earlier tokens match earlier schema roles.
-    No hardcoded TYPE_ROLE_COMPATIBILITY matrix.
-    No hardcoded pattern matching.
-    Purely emergent from learning.
-    """
-    # Use learned role embeddings for compatibility
+    """Geometric compatibility: emergent from Role Manifold similarity."""
     reng = _get_role_engine()
-    learned_compat = reng.get_compatibility(role_name, token.primary_type)
+    learned_compat = reng.get_compatibility(role_name, token.primary_type, token=token)
 
-    # Ambiguity penalty (universal, not symbolic)
+    # Ambiguity penalty (universal entropy constraint)
     dist = token.type_distribution
     if dist and len(dist) > 1:
         primary_conf = dist.get(token.primary_type, 0.5)
-        ambiguity_penalty = (1.0 - primary_conf) * 0.2
-        learned_compat -= ambiguity_penalty
+        learned_compat *= primary_conf
 
-    # Positional ordering bonus (structural signal, not domain-specific)
-    # Tokens earlier in the text are preferred for earlier schema roles.
-    # Blends schema-order positions with learned role positions.
-    if role_order and role_name in role_order:
-        role_idx = role_order.index(role_name)
-        total_roles = len(role_order)
-        if total_roles > 1:
-            # Learned position from past allocations (if available)
-            schema_pos = role_idx / (total_roles - 1)
-            # When learning count is low, use stronger positional signal.
-            # Over time, learned compatibility takes over.
-            learning_count = reng.learning_count
-            pos_weight = 0.15 + max(0, 0.20 - learning_count * 0.02)  # Starts at 0.35, decays to 0.15
-            ideal_pos = schema_pos
-            
-            token_pos = min(token.position / 20, 1.0)
-            pos_accuracy = 1.0 - abs(ideal_pos - token_pos)
-            learned_compat += pos_accuracy * pos_weight
-
-    return max(min(learned_compat, 1.0), 0.0)
+    return max(0.0, min(1.0, learned_compat))
 
 
 def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
-    """Optimize semantic role assignment globally.
-
-    Greedy algorithm:
-    1. Score every candidate-role pair
-    2. Assign highest-confidence pairs first
-    3. Remove assigned candidates and filled roles from pool
-    4. Resolve exclusivity conflicts
-    5. Repeat until all roles filled or no candidates remain
-    """
+    """Optimize semantic role assignment globally."""
     assigned_candidates: Set[str] = set()
     filled_roles: Set[str] = set()
-    field_conflicts: list = []  # preserve conflict geometry for field arbitration
+    field_conflicts: list = []
 
     assignments = sorted(
         [(score, cand, role) for (cand, role), score in graph.compatibility.items()],
         key=lambda x: -x[0],
     )
 
-    # Pre-check: field regions declare which roles are field-owned
-    # Allocation must NOT assign these — topology decides, not allocation.
     from app.semantic_world_state import get_world_state as _gws_top
     _ws_top = _gws_top()
+    topo_view = _ws_top._topology.get_view()
     field_owned_roles: Set[str] = set()
-    for region in _ws_top.field_regions:
+    for region in topo_view.all_regions():
         if region.instability > 0.3:
             for role in region.competing_roles:
                 field_owned_roles.add(role)
 
     for score, cand_key, role_name in assignments:
-        # Field-owned roles are not for allocation — skip entirely
         if role_name in field_owned_roles:
-            field_conflicts.append({
-                "role": role_name, "candidate": cand_key,
-                "reason": "field_owned", "score": score
-            })
-            continue
+            conflicts_with_field = any(
+                region.token == cand_key
+                for region in topo_view.all_regions()
+                if role_name in region.competing_roles
+            )
+            if conflicts_with_field:
+                already_assigned_to_peer = False
+                for ra, rb in graph.exclusivity_edges:
+                    peer = rb if role_name == ra else (ra if role_name == rb else None)
+                    if peer and peer in filled_roles and graph.roles[peer].filled_by == cand_key:
+                        already_assigned_to_peer = True
+                        break
+                if already_assigned_to_peer:
+                    field_conflicts.append({"role": role_name, "candidate": cand_key, "reason": "exclusivity:self", "score": score})
+                    continue
 
-        # Already assigned candidates cannot cause exclusivity conflicts
-        if cand_key in assigned_candidates:
-            continue
-        if role_name in filled_roles:
+        if cand_key in assigned_candidates or role_name in filled_roles:
             continue
 
         conflicting = False
@@ -406,10 +455,7 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
                 break
 
         if conflicting:
-            field_conflicts.append({
-                "role": role_name, "candidate": cand_key,
-                "reason": conflict_reason, "score": score
-            })
+            field_conflicts.append({"role": role_name, "candidate": cand_key, "reason": conflict_reason, "score": score})
             continue
 
         graph.roles[role_name].filled_by = cand_key
@@ -417,31 +463,22 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
         assigned_candidates.add(cand_key)
         filled_roles.add(role_name)
 
-    graph._field_conflicts = field_conflicts
+    graph.field_conflicts = field_conflicts
     graph.coherence_score = _compute_allocation_coherence(graph)
     return graph
 
 
 def _compute_allocation_coherence(graph: AllocationGraph) -> float:
-    """Compute coherence of the allocation.
-
-    Factors:
-    - Fill ratio (how many roles are filled)
-    - Average fill confidence
-    - Exclusivity satisfaction
-    """
+    """Compute coherence of the allocation."""
     if not graph.roles:
         return 0.0
 
-    # Fill ratio
     filled = sum(1 for r in graph.roles.values() if r.filled_by is not None)
     fill_ratio = filled / len(graph.roles)
 
-    # Average confidence
     confidences = [r.fill_confidence for r in graph.roles.values() if r.filled_by is not None]
     avg_conf = sum(confidences) / len(confidences) if confidences else 0.0
 
-    # Exclusivity satisfaction
     exclusivity_violations = 0
     for role_a, role_b in graph.exclusivity_edges:
         if role_a in graph.roles and role_b in graph.roles:
@@ -450,7 +487,7 @@ def _compute_allocation_coherence(graph: AllocationGraph) -> float:
                 exclusivity_violations += 1
     exclusivity_score = 1.0 - (exclusivity_violations / max(len(graph.exclusivity_edges), 1))
 
-    coherence = (fill_ratio * 0.4) + (avg_conf * 0.4) + (exclusivity_score * 0.2)
+    coherence = (fill_ratio * 0.3) + (avg_conf * 0.5) + (exclusivity_score * 0.2)
     return min(coherence, 1.0)
 
 
@@ -458,146 +495,66 @@ def allocate_semantic_roles(
     record: SemanticRecord,
     schema_fields: List[str],
     learn: bool = True,
+    abstraction_gradient: float = 0.0,
 ) -> Tuple[SemanticRecord, AllocationGraph]:
-    """Full semantic allocation for a record.
-
-    When learn=False, the feedback loop is skipped (seeds are preserved).
-    Use learn=False for the first pass, learn=True for refinement passes.
-
-    Returns (updated_record, allocation_graph).
-    """
-    graph = build_allocation_graph(record, schema_fields)
+    """Full semantic allocation for a record with Hierarchical support."""
+    graph = build_allocation_graph(record, schema_fields, abstraction_gradient=abstraction_gradient)
     graph = optimize_semantic_assignment(graph)
 
-    # Apply allocation to record
     for role_name, role in graph.roles.items():
         if role.filled_by:
             record.mapped_fields[role_name] = role.filled_by
             record.mapped_confidences[role_name] = role.fill_confidence
 
     record.overall_confidence = graph.coherence_score
-    
-    # Propagate uncertainty to global state
-    from app.semantic_world_state import get_world_state
-    state = get_world_state()
-    if state.field_regions:
-        state.field_regions[-1]._uncertainty = getattr(
-            state.field_regions[-1], '_uncertainty', 0.0
-        ) + (1.0 - graph.coherence_score)
+
+    # Semantic Entropy Filter (Phase 18)
+    # High entropy (disorder) in the graph indicates unreliable interpretation.
+    ws = _get_role_engine().ws
+    # Quality gated by global field pressure and local coherence
+    is_unstable = (graph.coherence_score < 0.3) or (ws.metrics.global_entropy > 0.8)
+    record.is_unstable = is_unstable
+    graph.is_unstable = is_unstable
 
     if not learn:
         return record, graph
 
-    # CLOSE THE FEEDBACK LOOP via multi-hypothesis comparison
-    # Four allocation strategies compete:
-    #   1. Primary: default greedy (score descending)
-    #   2. Reverse: reversed score order  
-    #   3. Noisy: scores perturbed with noise
-    #   4. Random: shuffled candidates for genuine exploration
-    # The assignments that DIFFER between best and worst hypotheses
-    # (by coherence) provide comparative learning signals.
-    # Learning rate adapts: fast when uncertain, slow when certain.
     reng = _get_role_engine()
-    
-    # Build competing hypotheses
     candidates = [(cand, role, score) for (cand, role), score in graph.compatibility.items()]
     hypotheses = []
     
     for _strategy, key_fn in [
         ('primary', lambda x: -x[2]),
-        ('reverse', lambda x: x[2]),
         ('noisy', lambda x: -x[2] + random.random() * 0.05),
         ('random', lambda x: random.random()),
     ]:
         h = _run_allocation(graph, sorted(candidates, key=key_fn))
         hypotheses.append(h)
     
-    # Sort by coherence
     hypotheses.sort(key=lambda h: h['coherence'])
     
     if len(hypotheses) >= 2:
         best = hypotheses[-1]
         worst = hypotheses[0]
-        coherence_gap = best['coherence'] - worst['coherence']
-        
-        # Only learn when the coherence gap is significant (> 0.15).
-        # Small gaps mean both hypotheses are equally plausible — 
-        # learning from noise would reinforce wrong patterns.
-        if coherence_gap > 0.15:
+        if (best['coherence'] - worst['coherence']) > 0.15:
             for role_name in graph.roles:
                 best_val = best['roles'].get(role_name)
                 worst_val = worst['roles'].get(role_name)
                 
                 if best_val and worst_val and best_val != worst_val:
-                    # Check confidence gap: if the greedy algorithm had a clear
-                    # winner (score gap > 0.15 to second place), don't let
-                    # comparative learning override it.
-                    role_scores = sorted([
-                        (graph.compatibility.get((c, role_name), 0), c)
-                        for c in graph.candidates
-                    ], key=lambda x: -x[0])
-                    if len(role_scores) >= 2:
-                        gap = role_scores[0][0] - role_scores[1][0]
-                        if gap > 0.15:
-                            continue  # Confident assignment, don't override
-                    
                     token = graph.candidates.get(best_val)
                     if token:
-                        key = (role_name, token.primary_type.value)
-                        current_compat = reng.compatibility_cache.get(key, 0.5)
-                        certainty = abs(current_compat - 0.5) * 2
-                        base_rate = 0.05 * (1.0 - certainty * 0.5)
-                        delta = abs(best['coherence'] - 0.5) * base_rate
-                        reng.learn_from_allocation(role_name, token.primary_type, token.raw, success=True, delta=delta)
+                        reng.learn_from_allocation(role_name, token.primary_type, token.raw, success=True, delta=0.05, coherence=best['coherence'])
                     
                     token2 = graph.candidates.get(worst_val)
                     if token2:
-                        key2 = (role_name, token2.primary_type.value)
-                        current2 = reng.compatibility_cache.get(key2, 0.5)
-                        certainty2 = abs(current2 - 0.5) * 2
-                        base_rate2 = 0.05 * (1.0 - certainty2 * 0.5)
-                        delta2 = abs(0.5 - worst['coherence']) * base_rate2
-                        reng.learn_from_allocation(role_name, token2.primary_type, token2.raw, success=False, delta=delta2)
+                        reng.learn_from_allocation(role_name, token2.primary_type, token2.raw, success=False, delta=0.05, coherence=best['coherence'])
     
-    # Co-occurrence learning: record which (role, type) pairs co-occur successfully
-    best_hyp = hypotheses[-1] if len(hypotheses) >= 2 else hypotheses[0]
-    assignments = {}
-    for role_name in graph.roles:
-        val = best_hyp['roles'].get(role_name)
-        if val and val in graph.candidates:
-            token = graph.candidates[val]
-            assignments[role_name] = (token.primary_type.value, val)
-    
-    items = list(assignments.items())
-    for i in range(len(items)):
-        for j in range(i + 1, len(items)):
-            role_i, (type_i, val_i) = items[i]
-            role_j, (type_j, val_j) = items[j]
-            reng.learn_co_occurrence(
-                (role_i, type_i), (role_j, type_j),
-                success=best_hyp['coherence'] > 0.5
-            )
-    
-    # Role position learning: record where each role was in the token order
-    for _idx, role_name in enumerate(schema_fields):
-        fill_val = graph.roles[role_name].filled_by
-        if fill_val and fill_val in graph.candidates:
-            token = graph.candidates[fill_val]
-            total_tokens = len(graph.candidates)
-            if total_tokens > 1:
-                norm_pos = token.position / max(total_tokens - 1, 1)
-                reng.learn_role_position(role_name, norm_pos)
-
     return record, graph
 
 
 def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
-    """Run a full allocation given a sorted assignment list.
-    
-    sorted_assignments: list of (cand_key, role_name, score) tuples, 
-                        pre-sorted by desired strategy.
-    Returns {'roles': {role: candidate}, 'coherence': float}.
-    """
+    """Run a full allocation given a sorted assignment list."""
     g = deepcopy(graph)
     assigned = set()
     filled: set[str] = set()
@@ -605,6 +562,7 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
     for cand_key, role_name, score in sorted_assignments:
         if cand_key in assigned or role_name in filled:
             continue
+
         conflicting = False
         for role_a, role_b in g.exclusivity_edges:
             other = role_b if role_name == role_a else (role_a if role_name == role_b else None)
@@ -612,17 +570,13 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
                 conflicting = True
                 break
                 
-        # Layer 5: Dynamic learned exclusivity (already covered if using g.exclusivity_edges)
         if not conflicting:
             reng = _get_role_engine()
-            if hasattr(reng, 'get_learned_exclusion'):
-                for filled_role in filled:
-                    if g.roles.get(filled_role) and g.roles[filled_role].filled_by == cand_key:
-                        exclusion_score = reng.get_learned_exclusion(role_name, filled_role)
-                        runtime_threshold = _adaptive_runtime_exclusion_threshold()
-                        if exclusion_score > runtime_threshold:
-                            conflicting = True
-                            break
+            for filled_role in filled:
+                if g.roles.get(filled_role) and g.roles[filled_role].filled_by == cand_key:
+                    if reng.get_learned_exclusion(role_name, filled_role) > _adaptive_runtime_exclusion_threshold():
+                        conflicting = True
+                        break
                             
         if conflicting:
             continue
@@ -634,4 +588,55 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
     coh = _compute_allocation_coherence(g)
     return {'roles': {r: g.roles[r].filled_by for r in g.roles}, 'coherence': coh}
 
-
+def explain_assignment(role_name: str, candidate_val: str, graph: AllocationGraph) -> dict:
+    """Explain why a role was assigned to a candidate using topological evidence."""
+    if role_name not in graph.roles:
+        return {"error": f"Role {role_name} not found in graph"}
+    
+    token = graph.candidates.get(candidate_val)
+    if not token:
+        return {"error": f"Candidate {candidate_val} not found in graph"}
+    
+    reng = _get_role_engine()
+    ws = reng.ws
+    
+    # 1. Manifold Evidence
+    compat = reng.get_compatibility(role_name, token.primary_type, token=token)
+    
+    # 2. Community Evidence
+    community = None
+    comm_pull = 0.0
+    for comm in ws.global_communities:
+        if role_name in comm:
+            community = list(comm)
+            # Find strongest community presence in this graph
+            for peer_role in comm:
+                if peer_role != role_name and peer_role in graph.roles:
+                    peer_role_obj = graph.roles[peer_role]
+                    if peer_role_obj.filled_by:
+                        comm_pull = max(comm_pull, peer_role_obj.fill_confidence)
+            break
+            
+    # 3. Schema Evidence
+    schema_pattern_match = False
+    current_roles = sorted(graph.roles.keys())
+    for i in range(len(current_roles)):
+        for j in range(i + 1, len(current_roles)):
+            pair = (current_roles[i], current_roles[j])
+            if pair in ws.schema_patterns:
+                schema_pattern_match = True
+                break
+        if schema_pattern_match:
+            break
+        
+    return {
+        "role": role_name,
+        "candidate": candidate_val,
+        "evidence": {
+            "manifold_compatibility": round(compat, 3),
+            "community_pull": round(comm_pull, 3),
+            "community_context": community,
+            "learned_schema_match": schema_pattern_match,
+        },
+        "coherence_contribution": round(graph.coherence_score, 3)
+    }

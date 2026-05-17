@@ -39,130 +39,169 @@ class RecordMapping:
     unmatched_values: List[str] = field(default_factory=list)
 
 
-# Universal semantic patterns (regex)
+# Consolidated Semantic Patterns
 SEMANTIC_PATTERNS = {
-    "price": [
+    SemanticType.PRICE: [
         r"[\$\u20a8\u20ac\u00a3\u00a5\u20b9]\s*\d+[\d,]*\.?\d*",
         r"\d+[\d,]*\.?\d*\s*(usd|eur|gbp|inr|rs|yen|pound)",
     ],
-    "date": [
+    SemanticType.DATE: [
         r"\d{1,2}[/-]\d{1,2}[/-](\d{2}|\d{4})",
         r"\d{4}[-]\d{2}[-]\d{2}",
         r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}(st|nd|rd|th)?(,\s*\d{4})?",
     ],
-    "email": [
+    SemanticType.EMAIL: [
         r"[\w.+-]+@[\w-]+\.[\w.-]+",
     ],
-    "phone": [
+    SemanticType.PHONE: [
         r"\+?\d[\d\s\-\(\)]{7,}",
     ],
-    "rating": [
+    SemanticType.RATING: [
         r"\d+\.?\d*\s*/\s*5",
         r"rated\s*\d+\.?\d*",
         r"\d+\.?\d*\s*stars?",
     ],
-    "link": [
+    SemanticType.URL: [
         r"https?://[^\s]+",
         r"www\.[^\s]+",
+    ],
+    SemanticType.IDENTIFIER: [
+        r"\b[A-Z\-_]+\d+[A-Z\d\-_]*\b",
+        r"\b\d+[A-Z\-_]+[A-Z\d\-_]*\b",
+    ],
+    SemanticType.DURATION: [
+        r"\d+h\s*\d*m|\d+h$",
+    ],
+    SemanticType.CODE: [
+        r"^[A-Z]{2,5}$",
     ],
 }
 
 
 def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType, float]:
     """Detect semantic type of a value using regex patterns and field name hints."""
-    # Field-name hinting (NOT domain-specific - just field role disambiguation)
+    if not value:
+        return SemanticType.TEXT, 0.0
+
+    # 1. Field-name hinting (higher priority for disambiguation)
     name_lower = (field_name or "").lower()
+    
+    # 2. Pattern-based matching (universal physics)
+    for stype, patterns in SEMANTIC_PATTERNS.items():
+        # Case-sensitivity varies by type
+        flags = 0 if stype == SemanticType.CODE else re.IGNORECASE
+        for pattern in patterns:
+            if re.search(pattern, str(value), flags):
+                # Boost confidence if field name also matches
+                confidence = 0.95
+                return stype, confidence
 
-    # Price detection (currency symbol OR numeric in a price-type field)
-    if re.search(r"[\$\u20a8\u20ac\u00a3\u00a5\u20b9]", value):
-        return SemanticType.PRICE, 0.95
-    if any(k in name_lower for k in ["price", "cost", "fare", "amount", "salary"]):
-        if re.search(r"\d+", value):
+    # 3. Numeric context
+    if re.search(r"\d+", str(value)):
+        if any(k in name_lower for k in ["price", "cost", "fare", "amount", "salary"]):
             return SemanticType.PRICE, 0.80
+        if any(k in name_lower for k in ["date", "time", "start", "end", "schedule"]):
+            return SemanticType.DATE, 0.80
+        
+        # Numeric with quantifier
+        if re.search(r"\d+\s*(stop|direct|non.?stop)", str(value), re.IGNORECASE):
+            return SemanticType.NUMBER, 0.70
+        
+        # Generic number
+        if re.match(r"^\d+\.?\d*$", str(value).strip()):
+            return SemanticType.NUMBER, 0.60
 
-    # Date detection
-    if re.search(r"\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}", value):
-        return SemanticType.DATE, 0.90
-
-    # Code detection (all-uppercase 2-5 chars)
-    if re.search(r"^[A-Z]{2,5}$", value):
-        return SemanticType.CODE, 0.80
-
-    # Rating detection
-    if re.search(r"\d+\.?\d*/\d+", value):
-        return SemanticType.RATING, 0.85
-
-    # Duration detection
-    if re.search(r"\d+h\s*\d*m|\d+h$", value):
-        return SemanticType.DURATION, 0.85
-
-    # Phone detection
-    if re.search(r"\+?\d[\d\s\-\(\)]{7,}", value):
-        return SemanticType.PHONE, 0.85
-
-    # Stop/quantifier detection - keep as number
-    if re.search(r"\d+\s*(stop|direct|non.?stop)", value, re.IGNORECASE):
-        return SemanticType.NUMBER, 0.70
+    # 4. Organization/Entity context
+    v_str = str(value).strip()
+    v_lower = v_str.lower()
+    _UI_NOISE = {
+        'view', 'more', 'skip', 'contact', 'home', 'menu', 'search', 
+        'filter', 'sort', 'send', 'get', 'touch', 'back', 'next',
+        'previous', 'click', 'here', 'read', 'learn', 'all', 'rights',
+        'reserved', 'copyright', 'powered', 'by', 'content', 'submit',
+        'cancel', 'save', 'delete', 'edit', 'update', 'share'
+    }
     
-    # Numeric with suffix (25L, 5+, 10K, 1.2Cr)
-    if re.search(r"^\d+\.?\d*[LkKmM]?$", value) and len(value) > 1:
-        return SemanticType.NUMBER, 0.60
-    if re.search(r"^\d+[+]$", value):
-        return SemanticType.NUMBER, 0.60
-    # Unit-suffixed numbers: "45000 m", "45000 miles", "1200 sqft"
-    if re.search(r"^\d+[\.]?\d*\s+(mi|km|m|ft|sqft|lbs|kg|g|hrs?|hours?|min|sec)", value, re.IGNORECASE):
-        return SemanticType.NUMBER, 0.60
+    if v_lower in _UI_NOISE:
+        return SemanticType.TEXT, 0.30
 
-    # Generic number
-    if re.search(r"^\d+\.?\d*$", value) and len(value) >= 1:
-        return SemanticType.NUMBER, 0.60
-
-    # Organization-like (Title Case text)
-    if value and value[0].isupper():
-        return SemanticType.ORGANIZATION, 0.55
-    
-    # Product-like (brand naming: starts lowercase, has internal uppercase)
-    if value and len(value) >= 3 and value[0].islower():
-        has_internal_upper = any(c.isupper() for c in value[1:])
-        if has_internal_upper:
-            return SemanticType.ORGANIZATION, 0.50
+    if v_str and v_str[0].isupper():
+        # Heuristic: multi-word title case or single word with enough length
+        words = v_str.split()
+        if len(words) > 1:
+            # Check if it's "Title Case" (all words start with upper)
+            if all(w[0].isupper() for w in words if len(w) > 2):
+                return SemanticType.ORGANIZATION, 0.65
+            else:
+                return SemanticType.TEXT, 0.50
+        else:
+            if len(v_str) > 3:
+                return SemanticType.ORGANIZATION, 0.55
+            else:
+                return SemanticType.TEXT, 0.50
+        
+    # Product-like (brand naming: starts lowercase, has internal uppercase, e.g. iPhone)
+    if v_str and len(v_str) >= 3 and v_str[0].islower() and any(c.isupper() for c in v_str[1:]):
+        return SemanticType.ORGANIZATION, 0.60
 
     return SemanticType.TEXT, 0.50
 
 
 def is_child_fragment(value: str, seen_values: set) -> bool:
-    """Check if a value is a child fragment of an already-seen larger value."""
-    if not value:
+    """Check if a value is a child fragment of an already-seen larger value.
+    
+    Prevents over-segmentation by suppressing tokens that are physically contained 
+    within larger, already processed tokens, especially for composite entities 
+    like currencies and dates.
+    """
+    if not value or not seen_values:
         return False
 
     value_lower = value.lower().strip()
+    value_is_digit = value_lower.isdigit()
+
     for seen in seen_values:
-        seen_lower = seen.lower().strip() if isinstance(seen, str) else str(seen).lower().strip()
-        if len(seen_lower) > len(value_lower) and value_lower in seen_lower:
-            # Only suppress if the child is a prefix or suffix of the parent
-            is_date = re.search(r"\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}", seen)
-            if not is_date and not (seen.startswith(value) or seen.endswith(value)):
-                continue
-            if re.search(r"\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}", seen):
-                if re.match(r"^\d+$", value):
+        if not seen:
+            continue
+        seen_str = str(seen)
+        seen_lower = seen_str.lower().strip()
+        
+        # Must be a strict substring
+        if len(seen_lower) <= len(value_lower) or value_lower not in seen_lower:
+            continue
+            
+        # Strategy 1: Sub-numeric suppression (e.g., "238" inside "£238")
+        if value_is_digit:
+            # Suppress if it's a boundary fragment (prefix/suffix)
+            is_boundary = seen_lower.startswith(value_lower) or seen_lower.endswith(value_lower)
+            
+            # OR if it's bounded by common separators (middle fragment, e.g. "-05-" in date)
+            if not is_boundary:
+                # Check for separators around the value in the parent string
+                idx = seen_lower.find(value_lower)
+                if idx > 0 and idx + len(value_lower) < len(seen_lower):
+                    before = seen_lower[idx-1]
+                    after = seen_lower[idx + len(value_lower)]
+                    if before in " /-." and after in " /-.":
+                        is_boundary = True
+
+            if is_boundary:
+                # If the parent is a currency, date, or rated value, suppress pure digits
+                if any(sym in seen_str for sym in "$\u20a8\u20ac\u00a3\u00a5\u20b9/-"):
                     return True
-            if re.search(r"[\$\u20a8\u20ac\u00a3\u00a5\u20b9]", seen):
-                if re.match(r"^\d+$", value):
+                # If parent has numbers followed by text (e.g., "45000 miles")
+                if re.search(r"\d+\s*[a-zA-Z]+", seen_str):
                     return True
-            if "/" in seen and re.search(r"\d+\.?\d*/", seen):
-                if re.match(r"^\d+\.?\d*$", value):
-                    return True
-            if re.search(r"\d+\.?\d*\s*[a-zA-Z]+$", seen):
-                if re.match(r"^\d+\.?\d*$", value):
-                    return True
-                if re.match(r"^[a-zA-Z]+$", value) and seen.lower().endswith(value.lower()):
-                    return True
-            if re.search(r"[\$\u20a8\u20ac\u00a3\u00a5\u20b9]", seen):
-                if re.match(r"^\d+$", value):
-                    return True
-            if "/" in seen and re.search(r"\d+\.?\d*/", seen):
-                if re.match(r"^\d+\.?\d*$", value):
-                    return True
+        
+        # Strategy 2: Prefix/Suffix suppression for fragments
+        if seen_lower.startswith(value_lower) or seen_lower.endswith(value_lower):
+            # Only suppress if it's very short and part of a multi-word or compound value
+            if len(value_lower) < 5:
+                # If the separator is space or punctuation, it's a fragment
+                if value_is_digit or any(c in " /-,." for c in seen_lower.replace(value_lower, "", 1)):
+                    if not (value_lower.isalpha() and len(value_lower) == 1):
+                        return True
+
     return False
 
 
@@ -281,7 +320,10 @@ def _find_best_value_for_need(
     candidates = []
 
     # Strategy 1: Pattern matching
-    patterns = SEMANTIC_PATTERNS.get(semantic_need, [])
+    try:
+        patterns = SEMANTIC_PATTERNS.get(SemanticType(semantic_need), [])
+    except ValueError:
+        patterns = []
     if patterns:
         for value in values:
             if not value or _is_noise_value(value):
@@ -371,19 +413,19 @@ def _detect_value_type(values: List[str], value_patterns: ValuePatterns) -> Opti
 
     # Currency check
     if value_patterns.currencies:
-        for pattern in SEMANTIC_PATTERNS["price"]:
+        for pattern in SEMANTIC_PATTERNS.get(SemanticType.PRICE, []):
             if re.search(pattern, sample, re.IGNORECASE):
                 return "price"
 
     # Date check
     if value_patterns.dates:
-        for pattern in SEMANTIC_PATTERNS["date"]:
+        for pattern in SEMANTIC_PATTERNS.get(SemanticType.DATE, []):
             if re.search(pattern, sample, re.IGNORECASE):
                 return "date"
 
     # Rating check
     if value_patterns.ratings:
-        for pattern in SEMANTIC_PATTERNS["rating"]:
+        for pattern in SEMANTIC_PATTERNS.get(SemanticType.RATING, []):
             if re.search(pattern, sample, re.IGNORECASE):
                 return "rating"
 

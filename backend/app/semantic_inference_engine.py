@@ -1,285 +1,394 @@
 """
-Unified Probabilistic Semantic Inference Engine (Evolutionary)
-==============================================================
-THE CENTRAL BRAIN of the semantic cognition system.
-
-Implements Continuous Semantic Evolution via Graph Relaxation 
-and Topological Stabilization.
-
-Meaning emerges from energy minimization over the relational topology.
+Role Embedding Engine
+=====================
+Learns and maintains geometric role embeddings within a topological manifold.
+Meaning is derived from similarity and stable field motifs.
 """
 
-import math
-from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+import concurrent.futures
+import logging
+import threading
+from dataclasses import dataclass
+from typing import Dict, List, Tuple, Optional
 
 from app.semantic_ir import (
-    ExclusionEdge,
     SemanticGraph,
     SemanticToken,
     SemanticType,
 )
 from app.semantic_world_state import get_world_state
-from app.event_dispatcher import get_dispatcher
-from app.semantic_events import SemanticEvent, SemanticEventType
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# COMPONENT 1: BELIEF FIELD (Graph-Native)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@dataclass
-class BeliefField:
-    """A continuous probabilistic belief field over the graph topology.
-    Beliefs propagate along edges, biased by global motif memory.
-    """
-    node_beliefs: Dict[int, Dict[SemanticType, float]]
-    node_uncertainties: Dict[int, float]
-    field_entropy: float = 0.0
-    field_coherence: float = 0.0
-
-    @staticmethod
-    def from_tokens(tokens: List[SemanticToken]) -> "BeliefField":
-        node_beliefs = {}
-        node_uncertainties = {}
-        for i, token in enumerate(tokens):
-            dist = dict(token.type_distribution) if token.type_distribution else {token.primary_type: 0.5}
-            total = sum(dist.values())
-            if total > 0:
-                for k in dist:
-                    dist[k] /= total
-            node_beliefs[i] = dist
-            node_uncertainties[i] = 1.0 - max(dist.values())
-        return BeliefField(
-            node_beliefs=node_beliefs,
-            node_uncertainties=node_uncertainties,
-            field_entropy=BeliefField._compute_field_entropy(node_beliefs),
-            field_coherence=BeliefField._compute_field_coherence(node_beliefs, node_uncertainties),
-        )
-
-    @staticmethod
-    def _compute_field_entropy(node_beliefs: Dict[int, Dict]) -> float:
-        if not node_beliefs:
-            return 1.0
-        total_e = 0.0
-        for dist in node_beliefs.values():
-            e = sum(-v * math.log2(v) for v in dist.values() if v > 0)
-            total_e += e
-        return total_e / len(node_beliefs)
-
-    @staticmethod
-    def _compute_field_coherence(node_beliefs: Dict[int, Dict], node_uncertainties: Dict[int, float]) -> float:
-        if not node_beliefs:
-            return 0.0
-        return 1.0 - (sum(node_uncertainties.values()) / len(node_uncertainties))
-
-
-@dataclass
-class SemanticState:
-    """A single hypothesis for the graph topology."""
-    belief_field: BeliefField
-    energy: float = 5.0
-    equilibrium: float = 0.0
-    convergence: float = 0.0
-    
-    role_assignments: Dict[str, str] = field(default_factory=dict)
-    motifs: List[Tuple[str, ...]] = field(default_factory=list)
-    
-    energy_history: List[float] = field(default_factory=list)
-
-    def compute_equilibrium(self) -> float:
-        """Measure proximity to semantic equilibrium."""
-        if len(self.energy_history) < 2:
-            return 0.0
-        variance = sum((e - sum(self.energy_history[-3:]) / 3)**2 for e in self.energy_history[-3:]) / 3
-        self.equilibrium = 1.0 - min(variance, 1.0)
-        return self.equilibrium
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# COMPONENT 2: SEMANTIC THERMODYNAMICS (Energy Minimization)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class SemanticThermodynamics:
-    """Manages the evolution of the graph toward minimum energy equilibrium."""
-
-    def __init__(self):
-        self.ws = get_world_state()
-
-    def compute_energy(self, state: SemanticState, graph: SemanticGraph) -> float:
-        """Energy = Uncertainty + Contradiction + Entropy."""
-        energy = 0.0
-        
-        # 1. Uncertainty heat (Global average vs local)
-        local_u = sum(state.belief_field.node_uncertainties.values()) / max(len(graph.tokens), 1)
-        energy += local_u * 3.0
-        
-        # 2. Contradiction pressure (Exclusion edges)
-        for edge in graph.exclusion_edges:
-            # If both nodes are active/assigned in this hypothesis, energy spikes
-            v_src = state.role_assignments.get(str(edge.source_id))
-            v_tgt = state.role_assignments.get(str(edge.target_id))
-            if v_src and v_tgt and v_src == v_tgt:
-                energy += edge.strength * 5.0
-                
-        # 3. Motif stability (Negative energy / Stabilizing force)
-        for motif in state.motifs:
-            stability = self.ws.get_motif_stability(motif)
-            energy -= stability * 2.0
-            
-        state.energy = max(energy, 0.0)
-        state.energy_history.append(state.energy)
-        return state.energy
-
-    def stabilize(self, state: SemanticState, graph: SemanticGraph):
-        """Reinforce stable edges, decay high-energy ones.
-
-        Rates are driven by field_pressure — higher pressure = faster
-        stabilization. This eliminates fixed scalar multipliers.
-        """
-        pressure = self.ws.metrics.field_pressure
-        reinforce_rate = 0.02 * (1.0 + pressure)
-        decay_rate = 0.05 * (1.0 + pressure)
-        for edge in graph.relationships:
-            val = edge.confidence
-            if state.energy < self.ws.metrics.global_energy:
-                reinforce = 1.0 / (1.0 + 2.718 ** (-10 * (val - 0.5)))
-                edge.confidence = min(val + reinforce_rate * reinforce, 1.0)
-            else:
-                edge.confidence = max(val - decay_rate, 0.0)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# COMPONENT 3: CONTINUOUS INFERENCE ENGINE
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class InferenceEngine:
-    """Orchestrates topological evolution and convergence."""
-
-    def __init__(self, max_iterations: int = 10):
-        self.max_iterations = max_iterations
-        self.thermo = SemanticThermodynamics()
-        self.ws = get_world_state()
-        self.dispatcher = get_dispatcher()
-
-    def infer(self, tokens: List[SemanticToken], schema_fields: List[str]) -> SemanticState:
-        """Evolve the graph topology until equilibrium is reached."""
-        graph = SemanticGraph(regions=[], tokens=tokens)
-        self._build_exclusion_topology(graph, schema_fields)
-        # Populate relationships so stabilize() has edges to work on
-        graph.relationships = list(graph.exclusion_edges)
-        
-        state = SemanticState(belief_field=BeliefField.from_tokens(tokens))
-        
-        for iteration in range(self.max_iterations):
-            self._relax_graph(state, graph)
-            self.thermo.compute_energy(state, graph)
-            if state.compute_equilibrium() > 0.95:
-                break
-            self.thermo.stabilize(state, graph)
-            
-        # Populate role assignments so pipeline can use inference results
-        for i, token in enumerate(tokens):
-            if i < len(schema_fields):
-                state.role_assignments[schema_fields[i]] = token.raw
-        
-        # Persist energy to the most recent field region (local, not global)
-        if self.ws.field_regions:
-            self.ws.field_regions[-1].local_energy = getattr(
-                self.ws.field_regions[-1], 'local_energy', 5.0
-            )
-            self.ws.field_regions[-1].local_energy = state.energy
-            
-        self.dispatcher.dispatch(SemanticEvent(
-            event_type=SemanticEventType.EQUILIBRIUM_REACHED,
-            source="inference_engine",
-            payload={"energy": state.energy}
-        ))
-        return state
-
-    def _build_exclusion_topology(self, graph: SemanticGraph, fields: List[str]):
-        for i in range(len(fields)):
-            for j in range(i+1, len(fields)):
-                pair = tuple(sorted([fields[i], fields[j]]))
-                if pair in self.ws.learned_exclusions:
-                    graph.exclusion_edges.append(ExclusionEdge(
-                        source_id=i, target_id=j, 
-                        strength=self.ws.learned_exclusions[pair]
-                    ))
-
-    def _relax_graph(self, state: SemanticState, graph: SemanticGraph):
-        """Propagate beliefs along graph edges to reduce uncertainty."""
-        if not graph.tokens or not state.belief_field.node_beliefs:
-            return
-        for edge in graph.exclusion_edges:
-            src_beliefs = state.belief_field.node_beliefs.get(edge.source_id)
-            tgt_beliefs = state.belief_field.node_beliefs.get(edge.target_id)
-            if src_beliefs and tgt_beliefs:
-                mutual = set(src_beliefs.keys()) & set(tgt_beliefs.keys())
-                for t in mutual:
-                    avg = (src_beliefs[t] + tgt_beliefs[t]) / 2
-                    src_beliefs[t] = src_beliefs[t] * 0.9 + avg * 0.1
-                    tgt_beliefs[t] = tgt_beliefs[t] * 0.9 + avg * 0.1
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# COMPONENT 4: ROLE EMBEDDING ENGINE (Unified State Proxy)
-# ═══════════════════════════════════════════════════════════════════════════════
 
 class RoleEmbeddingEngine:
-    """Learns role embeddings from global graph statistics."""
+    """Learns role embeddings from global field dynamics and stable motifs."""
 
     def __init__(self):
         self.ws = get_world_state()
+        # Ephemeral force buffer for manifold relaxation
+        self.force_buffer: Dict[str, List[float]] = {}
+        # Thread-safety lock for shared manifold_copy mutations across shards
+        self._relax_lock = threading.Lock()
+        self._seed_baseline_manifold()
+
+    def _seed_baseline_manifold(self):
+        if self.manifold:
+            return
+        from app.field_laws import ROLE_EXCLUSIVITY
+        from app.semantic_allocation_engine import _UNIVERSAL_ROOTS
+        seeded = set()
+        for ra, rb in ROLE_EXCLUSIVITY:
+            for role in (ra, rb):
+                if role not in seeded:
+                    seeded.add(role)
+                    best_type = SemanticType.TEXT
+                    for roots, stype in _UNIVERSAL_ROOTS:
+                        if any(root in role.lower() for root in roots):
+                            best_type = stype
+                            break
+                    vec = self._get_type_vector(best_type)
+                    # Dampen baseline toward neutral to leave room for learning
+                    for i in range(len(vec)):
+                        vec[i] = vec[i] * 0.85 + 0.5 * 0.15
+                    self.ws._manifold.set_manifold_vector(role, vec)
 
     @property
-    def compatibility_cache(self) -> Dict[Tuple[str, str], float]:
-        return self.ws.role_compatibility
+    def manifold(self) -> Dict[str, List[float]]:
+        return self.ws._manifold.role_manifold
 
     @property
     def learning_count(self) -> int:
-        return self.ws.metrics.learning_count
+        return self.ws._manifold.learning_count
 
     @learning_count.setter
     def learning_count(self, value: int):
-        self.ws.metrics.learning_count = value
+        self.ws._manifold.set_learning_count(value)
+
+    @property
+    def compatibility_cache(self) -> Dict[Tuple[str, str], float]:
+        """Legacy access to symbolic compatibility dict."""
+        return self.ws._manifold.role_compatibility
 
     @property
     def co_occurrence(self) -> Dict[Tuple[str, str, str, str], int]:
-        return self.ws.role_co_occurrence
+        return self.ws._manifold.role_co_occurrence
 
     @property
     def total_co_occurrences(self) -> int:
-        return self.ws.metrics.total_co_occurrences
+        return self.ws._manifold.total_co_occurrences
 
     @total_co_occurrences.setter
     def total_co_occurrences(self, value: int):
-        self.ws.metrics.total_co_occurrences = value
+        self.ws._manifold.set_total_co_occurrences(value)
 
     @property
     def _learned_exclusions(self) -> Dict[Tuple[str, str], float]:
-        return self.ws.learned_exclusions
+        return self.ws._instability.exclusions
+
+    def get_compatibility(self, role: str, stype: SemanticType, token: Optional[SemanticToken] = None) -> float:
+        """Geometric compatibility: dot product in the role manifold."""
+        role_vec = self.manifold.get(role)
+        if not role_vec:
+            # Cold start: fallback to legacy cache or default
+            type_str = stype.value if hasattr(stype, 'value') else str(stype)
+            return self.compatibility_cache.get((role, type_str), 0.5)
+        
+        # Use token embedding if available and sufficiently differentiated
+        if token and hasattr(token, 'embedding') and any(v != 0.5 for v in token.embedding):
+            type_vec = token.embedding
+        else:
+            type_vec = self._get_type_vector(stype)
+
+        # Similarity = dot product
+        sim = sum(rv * tv for rv, tv in zip(role_vec, type_vec))
+        
+        # Theoretical max sim for this specific role-type combination
+        is_role_core = role_vec[-1] > 0.7
+        is_type_core = type_vec[-1] > 0.7
+        
+        # Phase 34: Dynamic normalization based on dimensionality
+        dim = self.dimension
+        neutral = dim * 0.25
+        # Baseline: slightly above neutral
+        baseline = neutral + 0.25
+        # Core max contribution: 1.0 (both), 0.5 (one), 0.25 (neither)
+        core_max = 1.0 if (is_role_core and is_type_core) else (0.25 if not is_role_core and not is_type_core else 0.5)
+        theoretical_max = baseline + core_max
+        
+        if sim >= theoretical_max: 
+            result = 1.0
+        elif sim <= baseline: 
+            result = 0.0
+        else:
+            result = (sim - baseline) / (theoretical_max - baseline)
+        
+        # 3. Structural Bridges (Law 1 - Meaning from Topology)
+        # Codes are often used as abbreviations for Locations or Organizations.
+        # This provides a cold-start bridge for structural roles.
+        if stype == SemanticType.CODE:
+            # Simple root check to avoid recursion with _infer_role_type
+            structural_roots = ['loc', 'city', 'addr', 'place', 'dest', 'orig', 'nam', 'comp', 'firm', 'brand']
+            role_lower = role.lower()
+            if any(r in role_lower for r in structural_roots):
+                # Baseline 0.6 for structural codes matching structural roles
+                result = max(result, 0.6)
+
+        return result
+
+    def get_learned_exclusion(self, role_a: str, role_b: str) -> float:
+        """Topological exclusion: delegates to WorldState geometry."""
+        return self.ws.get_derived_exclusion(role_a, role_b)
+
+    def get_role_similarity(self, role_a: str, role_b: str) -> float:
+        """Geometric similarity between two roles in the manifold."""
+        va = self.manifold.get(role_a)
+        vb = self.manifold.get(role_b)
+        if not va or not vb:
+            return 0.0
+        
+        sim = sum(a * b for a, b in zip(va, vb))
+        
+        # Calibration (Phase 34): scale by dimensionality
+        dim = self.dimension
+        neutral = dim * 0.25
+        return max(0.0, min(1.0, (sim - neutral) / (dim * 0.1)))
 
     @property
-    def role_position_memory(self) -> Dict[str, List[float]]:
-        return self.ws.role_position_memory
+    def dimension(self) -> int:
+        return self.ws._manifold.dimension
 
-    def learn_role_position(self, role_name: str, position: float):
-        if role_name not in self.role_position_memory:
-            self.role_position_memory[role_name] = [0.0, 0.0]
-        self.role_position_memory[role_name][0] += position
-        self.role_position_memory[role_name][1] += 1.0
+    def _get_type_vector(self, stype: SemanticType) -> List[float]:
+        """Returns a canonical vector representing a SemanticType."""
+        dim = self.dimension
+        vec = [0.5] * dim
+        type_idx = {
+            SemanticType.PRICE: 0, SemanticType.DATE: 1,
+            SemanticType.LOCATION: 2, SemanticType.ORGANIZATION: 3,
+            SemanticType.PHONE: 4, SemanticType.EMAIL: 5,
+            SemanticType.URL: 6, SemanticType.NUMBER: 7,
+            SemanticType.RATING: 8, SemanticType.DURATION: 9,
+            SemanticType.CODE: 10, SemanticType.NAME: 11,
+            SemanticType.TEXT: 12, SemanticType.IDENTIFIER: 13,
+        }.get(stype)
+        if type_idx is not None and type_idx < dim:
+            vec[type_idx] = 1.0
 
-    def get_typical_position(self, role_name: str) -> float:
-        if role_name not in self.role_position_memory:
-            return 0.5
-        mem = self.role_position_memory[role_name]
-        if mem[1] == 0:
-            return 0.5
-        return mem[0] / mem[1]
+        # Topological Neutrality: dimension dim-2 (centrality) is 0.0 for seeds
+        if dim >= 2:
+            vec[-2] = 0.0
+            
+        # Core Entity Bias: seeds for structural types are anchored in the last dimension
+        is_core = 1.0 if stype in [
+            SemanticType.PRICE, SemanticType.DATE, 
+            SemanticType.LOCATION, SemanticType.ORGANIZATION
+        ] else 0.5
+        vec[-1] = is_core
+            
+        return vec
+
+    def learn_from_allocation(self, role: str, token_type: SemanticType, token_raw: str, success: bool, delta: float = 0.05, coherence: float = 1.0):
+        """Apply learning force directly to the manifold."""
+        if coherence < 0.6:
+            return
+
+        # Identity Protection Law: only reinforce if types are compatible
+        from app.semantic_allocation_engine import _infer_role_type
+        ideal_type = _infer_role_type(role)
+        is_compatible = (token_type == ideal_type) or \
+                        (token_type == SemanticType.TEXT) or \
+                        (ideal_type == SemanticType.TEXT) or \
+                        (token_type == SemanticType.CODE)
+        
+        if success and not is_compatible:
+            return
+
+        if not success and not self.ws._manifold.has_manifold_role(role):
+            return
+
+        # Initialize role vector if missing
+        if not self.ws._manifold.has_manifold_role(role):
+            self.ws._manifold.set_manifold_vector(role, self._get_type_vector(ideal_type))
+
+        role_vec = self.ws._manifold.get_manifold_vector(role)
+        type_vec = self._get_type_vector(token_type)
+        
+        effective_delta = delta if success else -delta
+        # Dynamic Learning Rate: slows down as role stabilizes
+        rate = 0.1 * (1.0 - self.get_certainty())
+        
+        # Apply learning force directly to the manifold
+        dim = self.dimension
+        for i in range(dim):
+            role_vec[i] = max(0.0, min(1.0, role_vec[i] + (type_vec[i] - role_vec[i]) * effective_delta * rate))
+        
+        self.ws._manifold.set_manifold_vector(role, role_vec)
+        self.learning_count += 1
+
+    def apply_motif_gravity(self, role_name: str, primary_type: SemanticType, stability: float):
+        """Accumulate gravity force from stable motifs."""
+        if stability < 0.1:
+            return
+            
+        if not self.ws._manifold.has_manifold_role(role_name):
+            from app.semantic_allocation_engine import _infer_role_type
+            self.ws._manifold.set_manifold_vector(role_name, self._get_type_vector(_infer_role_type(role_name)))
+            
+        role_vec = self.ws._manifold.get_manifold_vector(role_name)
+        type_vec = self._get_type_vector(primary_type)
+        
+        # Gravity Strength: proportional to motif stability
+        gravity = 0.05 * stability * (1.0 - self.get_certainty())
+        
+        # Accumulate force vector
+        dim = self.dimension
+        force = self.force_buffer.setdefault(role_name, [0.0] * dim)
+        for i in range(dim):
+            force[i] += (type_vec[i] - role_vec[i]) * gravity
+
+    def relax_manifold(self):
+        """Geometric relaxation of the Role Manifold with Semantic Sharding (Phase 35)."""
+        manifold_copy = self.manifold
+        if not manifold_copy:
+            return
+
+        all_roles = list(manifold_copy.keys())
+        shards = self.ws._manifold.get_shards()
+        
+        # Phase 34: Cognitive Elasticity — scale rate by system pressure
+        try:
+            pressure = self.ws.get_system_pressure()
+        except AttributeError:
+            pressure = 1.0 # Fallback
+            
+        base_rate = 0.02 * (1.0 - self.get_certainty()) * (0.5 + pressure)
+
+        # Thread-safety lock for shared manifold_copy mutations across shards — initialized in __init__
+        def _relax_roles_safe(roles, manifold_full, rate):
+            """Wrapper that locks shared manifold mutations."""
+            with self._relax_lock:
+                self._relax_roles(roles, manifold_full, rate)
+
+        if not shards:
+            # Fallback to monolithic relaxation
+            self._relax_roles(all_roles, manifold_copy, base_rate)
+        else:
+            # Phase 35: Parallel Relaxation Engine — now thread-safe
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                futures = []
+                for shard_id in shards:
+                    shard_roles = self.ws._manifold.get_shard_roles(shard_id)
+                    futures.append(executor.submit(_relax_roles_safe, shard_roles, manifold_copy, base_rate))
+                # Wait for all shards to complete
+                concurrent.futures.wait(futures)
+                
+        # Clear buffer after integration (Phase 1 across all shards)
+        self.force_buffer.clear()
+        
+        # Save mutated copies back
+        for role, vec in manifold_copy.items():
+            self.ws._manifold.set_manifold_vector(role, vec)
+
+        # Sync legacy compatibility cache
+        for role in all_roles:
+            for stype in SemanticType:
+                type_str = stype.value if hasattr(stype, 'value') else str(stype)
+                self.ws._manifold.set_compatibility(role, type_str, self.get_compatibility(role, stype))
+
+        self.detect_dimensionality_need()
+
+    def _relax_roles(self, roles: List[str], manifold_full: dict, base_rate: float):
+        """Internal helper for localized relaxation of a subset of roles."""
+        # 1. Filter out anchored roles
+        roles = [r for r in roles if not self.ws._manifold.is_role_anchored(r)]
+        if not roles:
+            return
+
+        # Phase 0: Calculate Role-specific Hysteresis (Solidification)
+        hysteresis = {}
+        for r in roles:
+            instability = self.ws.metrics.schema_instability.get(r, 0.5)
+            stability = max(0.0, 1.0 - instability)
+            hysteresis[r] = 1.0 - (stability ** 2) * 0.9
+            
+        # Phase 1: Apply accumulated forces
+        for role in roles:
+            force = self.force_buffer.get(role)
+            if force:
+                h = hysteresis.get(role, 1.0)
+                vec = manifold_full[role]
+                for k in range(self.dimension):
+                    vec[k] = max(0.0, min(1.0, vec[k] + force[k] * h))
+        
+        # Phase 2: Repulsion (Contrastive Repulsion Law)
+        if len(roles) >= 2:
+            for i in range(len(roles)):
+                for j in range(i + 1, len(roles)):
+                    ra, rb = roles[i], roles[j]
+                    exclusion = self.ws.get_derived_exclusion(ra, rb)
+                    if exclusion > 0.3:
+                        vec_a = manifold_full[ra]
+                        vec_b = manifold_full[rb]
+                        h_a, h_b = hysteresis.get(ra, 1.0), hysteresis.get(rb, 1.0)
+                        for k in range(self.dimension):
+                            diff = vec_a[k] - vec_b[k]
+                            force = exclusion * 0.1 * base_rate * h_a * h_b
+                            vec_a[k] = max(0.0, min(1.0, vec_a[k] + diff * force))
+                            vec_b[k] = max(0.0, min(1.0, vec_b[k] - diff * force))
+
+        # Phase 3: Attraction (Affinity Attraction Law)
+        # Note: only within-shard cohesion is considered here
+        for key, cohesion in self.ws.neighborhood_cohesion.items():
+            ra, rb = key
+            if ra in roles and rb in roles and cohesion > 0.6:
+                vec_a = manifold_full[ra]
+                vec_b = manifold_full[rb]
+                h_a, h_b = hysteresis.get(ra, 1.0), hysteresis.get(rb, 1.0)
+                for k in range(self.dimension):
+                    diff = vec_b[k] - vec_a[k]
+                    force = (cohesion - 0.5) * 0.1 * base_rate * h_a * h_b
+                    vec_a[k] = max(0.0, min(1.0, vec_a[k] + diff * force))
+                    vec_b[k] = max(0.0, min(1.0, vec_b[k] - diff * force))
+
+        # Phase 4: Re-Alignment (Restoring Force)
+        from app.semantic_allocation_engine import _infer_role_type
+        for role in roles:
+            seed_type = _infer_role_type(role)
+            seed_vec = self._get_type_vector(seed_type)
+            role_vec = manifold_full[role]
+            h = hysteresis.get(role, 1.0)
+            
+            for k in range(self.dimension):
+                diff = seed_vec[k] - role_vec[k]
+                force = 0.005 * (1.0 - h) * base_rate
+                role_vec[k] = max(0.0, min(1.0, role_vec[k] + diff * force))
+
+        # Phase 5: Intent Steering (Phase 36)
+        # Apply force toward user-defined cognitive goals
+        active_intents = self.ws._intent.active_intents
+        for intent_id, details in active_intents.items():
+            target_vec = details["target_vec"]
+            strength = details["strength"]
+            target_roles = details.get("target_roles", [])
+            
+            # Pad target_vec if dimensionality has expanded
+            if len(target_vec) < self.dimension:
+                target_vec = target_vec + [0.5] * (self.dimension - len(target_vec))
+            
+            for role in roles:
+                # Apply intent if either:
+                # 1. target_roles is empty (global intent)
+                # 2. role is explicitly targeted
+                if not target_roles or role in target_roles:
+                    role_vec = manifold_full[role]
+                    # Intent force is scaled by strength and base_rate
+                    for k in range(self.dimension):
+                        diff = target_vec[k] - role_vec[k]
+                        # Strength 1.0 = full attractor pull
+                        force = diff * strength * 0.1 * base_rate
+                        role_vec[k] = max(0.0, min(1.0, role_vec[k] + force))
 
     def learn_co_occurrence(self, assignment_a: tuple, assignment_b: tuple, success: bool):
         key = assignment_a + assignment_b
-        self.co_occurrence[key] = self.co_occurrence.get(key, 0) + (1 if success else -1)
-        self.total_co_occurrences += 1
+        self.ws._manifold.increment_co_occurrence(key, 1 if success else -1)
 
     def get_co_occurrence_boost(self, role_a: str, type_a: str, role_b: str, type_b: str) -> float:
         key = (role_a, type_a, role_b, type_b)
@@ -304,79 +413,69 @@ class RoleEmbeddingEngine:
 
     def learn_contradiction(self, role_a: str, role_b: str, token_type: str):
         key = tuple(sorted([role_a, role_b]))
-        self._learned_exclusions[key] = min(1.0, self._learned_exclusions.get(key, 0.0) + 0.15)
-
-    def get_learned_exclusion(self, role_a: str, role_b: str) -> float:
-        """Exclusion emerges from topology, not pure dict lookup.
-
-        Delegates to WorldState's get_derived_exclusion which fuses:
-        - learned exclusion history (symbolic bridge)
-        - role-type compatibility mismatch (compatibility pressure)
-        - motif instability (motif pressure)
-        """
-        return self.ws.get_derived_exclusion(role_a, role_b)
-
-    def learn_from_allocation(self, role: str, token_type: SemanticType, token_raw: str, success: bool, delta: float = 0.05):
-        type_str = token_type.value if hasattr(token_type, 'value') else str(token_type)
-        key = (role, type_str)
-        current = self.get_compatibility(role, token_type)
-        effective_delta = delta if success else -delta
-        self.compatibility_cache[key] = max(0.0, min(1.0, current + effective_delta))
-        self.learning_count += 1
-
-    def get_compatibility(self, role: str, token_type: SemanticType) -> float:
-        type_str = token_type.value if hasattr(token_type, 'value') else str(token_type)
-        key = (role, type_str)
-        return self.compatibility_cache.get(key, 0.5)
+        current = self.ws._instability.get_exclusion_by_key(key)
+        self.ws._instability.set_exclusion(key, min(1.0, current + 0.15))
 
     def get_certainty(self) -> float:
-        if not self.compatibility_cache:
+        if not self.manifold:
             return 0.0
-        return sum(abs(v - 0.5) * 2 for v in self.compatibility_cache.values()) / len(self.compatibility_cache)
-
-    def get_learning_speed(self) -> float:
-        return min(self.learning_count / 100.0, 1.0)
+        total_v = 0.0
+        for vec in self.manifold.values():
+            avg = sum(vec) / len(vec)
+            var = sum((x - avg)**2 for x in vec) / len(vec)
+            total_v += var
+        return min(1.0, (total_v / len(self.manifold)) * 4.0)
 
     def get_calibrated_confidence(self, score: float) -> float:
         certainty = self.get_certainty()
         return score * (0.7 + 0.3 * certainty)
+
+    def get_learning_speed(self) -> float:
+        return min(self.learning_count / 100.0, 1.0)
+
+    def detect_dimensionality_need(self):
+        """Analyze if current semantic resolution is sufficient (Phase 34)."""
+        if self.learning_count < 200:
+            return
+            
+        certainty = self.get_certainty()
+        # If certainty remains very low despite significant learning, 
+        # it indicates a crowded manifold (Semantic Collision).
+        if certainty < 0.2 and self.dimension < 64:
+            new_dim = self.dimension + 8
+            logging.getLogger(__name__).info(
+                f"DIMENSIONALITY INDUCTION: Expanding manifold resolution to {new_dim}."
+            )
+            self.ws._manifold.expand_dimensions(new_dim)
     
     def save_cache(self) -> dict:
-        return {f"{r}:{t}": v for (r, t), v in self.compatibility_cache.items()}
+        cache: dict = {}
+        for (r, t), v in self.compatibility_cache.items():
+            cache[f"compat:{r}:{t}"] = v
+        for role, vec in self.manifold.items():
+            cache[f"manifold:{role}"] = vec
+        return cache
 
     def load_cache(self, data: dict):
-        self.compatibility_cache.clear()
+        self.ws._manifold.clear_compatibility()
         for k, v in data.items():
-            if ':' in k:
-                parts = k.split(':')
-                self.compatibility_cache[(parts[0], parts[1])] = v
+            if k.startswith("compat:"):
+                parts = k.split(":")
+                self.ws._manifold.set_compatibility(parts[1], parts[2], v)
+            elif k.startswith("manifold:"):
+                role = k.split(":", 1)[1]
+                self.ws._manifold.set_manifold_vector(role, v)
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# COMPONENT 5: PERSISTENT SEMANTIC MEMORY
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class SemanticMemory:
-    def __init__(self):
-        self.ws = get_world_state()
-
-    def record_success(self, state: SemanticState):
-        for motif in state.motifs:
-            self.ws.reinforce_motif(motif)
-
-    def get_preferred_motifs(self, top_k: int = 5) -> List[Tuple[str, ...]]:
-        return [m for m, _ in self.ws.motif_counts.most_common(top_k)]
-
-    def get_confidence_boost(self, motif: Tuple[str, ...]) -> float:
-        return self.ws.get_motif_stability(motif) * 0.2
 
 @dataclass
 class RelationshipEmbeddingSpace:
-    dimension: int = 16
     def compute_embedding(self, node_idx: int, graph: SemanticGraph) -> List[float]:
+        ws = get_world_state()
+        dim = ws._manifold.dimension
+        
         if node_idx < len(graph.tokens):
             token = graph.tokens[node_idx]
-            vec = [0.5] * self.dimension
+            vec = [0.5] * dim
             type_idx = {
                 SemanticType.PRICE: 0, SemanticType.DATE: 1,
                 SemanticType.LOCATION: 2, SemanticType.ORGANIZATION: 3,
@@ -386,10 +485,20 @@ class RelationshipEmbeddingSpace:
                 SemanticType.CODE: 10, SemanticType.NAME: 11,
                 SemanticType.TEXT: 12, SemanticType.IDENTIFIER: 13,
             }.get(token.primary_type)
-            if type_idx is not None:
+            
+            if type_idx is not None and type_idx < dim:
                 vec[type_idx] = 1.0
+            
             if token.span and graph.tokens:
-                vec[-2] = token.position / max(len(graph.tokens), 1)
-                vec[-1] = token.type_entity
+                node_edges = [e for e in graph.relationships if e.source_idx == node_idx or e.target_idx == node_idx]
+                centrality = len(node_edges) / max(len(graph.relationships), 1)
+                if dim >= 2:
+                    vec[-2] = centrality
+                # Core Entity Bias: stable structural types have higher manifold priority
+                is_core = 1.0 if token.primary_type in [
+                    SemanticType.PRICE, SemanticType.DATE, 
+                    SemanticType.LOCATION, SemanticType.ORGANIZATION
+                ] else 0.5
+                vec[-1] = is_core
             return vec
-        return [0.5] * self.dimension
+        return [0.5] * dim

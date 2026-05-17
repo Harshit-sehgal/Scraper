@@ -14,7 +14,12 @@ if str(BACKEND_ROOT) not in sys.path:
 # Keep test state isolated from developer runtime state.
 os.environ.setdefault("DATAFORGE_STATE_FILE", str(ROOT / "backend" / "data" / "jobs_state_test.json"))
 
-from app import main as main_mod  # noqa: E402
+try:
+    from app import main as main_mod  # noqa: E402
+except ImportError as e:
+    import warnings
+    warnings.warn(f"Could not import app.main (tests requiring the client fixture will fail): {e}")
+    main_mod = None  # type: ignore[assignment]
 
 
 class LocalASGIClient:

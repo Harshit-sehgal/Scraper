@@ -1,6 +1,5 @@
 """Simple JSON persistence for job and recycle-bin state."""
 
-from __future__ import annotations
 
 import datetime
 import json
@@ -35,8 +34,7 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job]]:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except Exception as e:
-            logging.exception(e)
-            print(f"[State] Failed to read state file {path}: {e}")
+            logging.exception("Failed to read state file %s: %s", path, e)
             return {}, {}
 
     jobs_store: dict[str, Job] = {}
@@ -47,16 +45,14 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job]]:
             job = Job.model_validate(raw)
             jobs_store[job.id] = job
         except Exception as e:
-            logging.exception(e)
-            print(f"[State] Skipping invalid job entry: {e}")
+            logging.exception("Skipping invalid job entry: %s", e)
 
     for raw in payload.get("recycle_bin", []):
         try:
             job = Job.model_validate(raw)
             recycle_bin_store[job.id] = job
         except Exception as e:
-            logging.exception(e)
-            print(f"[State] Skipping invalid recycle-bin entry: {e}")
+            logging.exception("Skipping invalid recycle-bin entry: %s", e)
 
     # Jobs that were in-progress during shutdown are marked failed on recovery.
     for job in jobs_store.values():
@@ -85,5 +81,4 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
             temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
             temp_path.replace(path)
     except Exception as e:
-        logging.exception(e)
-        print(f"[State] Failed to persist state to {path}: {e}")
+        logging.exception("Failed to persist state to %s: %s", path, e)

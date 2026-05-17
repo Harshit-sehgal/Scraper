@@ -21,12 +21,11 @@ async def test_provider(provider):
 
 async def main():
     providers = [
-        g4f.Provider.DuckDuckGo,
-        g4f.Provider.Blackbox,
         g4f.Provider.PollinationsAI,
+        g4f.Provider.BlackboxPro,
         g4f.Provider.FreeNetfly,
         g4f.Provider.Liaobots,
-        g4f.Provider.Airforce,
+        g4f.Provider.ApiAirforce,
         g4f.Provider.DarkAI
     ]
     for p in providers:

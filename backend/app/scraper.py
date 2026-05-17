@@ -67,11 +67,11 @@ async def scrape_url(
     user_intent: str = "",
 ) -> list[dict]:
     """Orchestrate the full extraction flow for a single URL."""
-    print(f"[Scraper] Fetching: {url}")
+    logging.info("Fetching: %s", url)
     try:
         html = await fetch_page_content(url)
     except Exception as e:
-        print(f"[Scraper] Failed to fetch {url}: {e}")
+        logging.error("Failed to fetch %s: %s", url, e)
         return []
 
     # 1. Analyze page structure and patterns
@@ -93,7 +93,7 @@ async def scrape_url(
         results = apply_selectors(html, selectors, schema_fields, base_url=url)
     
     if not results:
-        print(f"[Scraper] Selectors failed or no results for {url}, falling back to regex")
+        logging.info("Selectors failed or no results for %s, falling back to regex", url)
         results = extract_with_regex(html, schema_fields, base_url=url)
 
     # 4. Global page-level contact boosting (if records are thin)
@@ -140,6 +140,7 @@ async def ai_clean_and_align_records(
     chunks = [target_records[i:i + chunk_size] for i in range(0, len(target_records), chunk_size)]
     
     final_records = []
+    unprocessed_records = []  # original records that couldn't be AI-processed — preserved, not dropped
     consecutive_failures = 0
     chunks_processed = 0
     fallback_chunks = 0
@@ -149,8 +150,9 @@ async def ai_clean_and_align_records(
         chunks_processed += 1
         if consecutive_failures >= AI_STRUCTURING_MAX_CONSECUTIVE_MODEL_FAILURES:
             fallback_chunks += 1
+            unprocessed_records.extend(chunk)
             continue
-            
+
         schema_hint = ", ".join([f"{f.name} ({f.field_type.value})" for f in schema_fields])
         prompt = f"""Clean and structure these {len(chunk)} data records.
 Target Schema: {schema_hint}
@@ -170,34 +172,35 @@ Rules:
                 {"role": "system", "content": "You are an expert data cleaning agent. Return only JSON."},
                 {"role": "user", "content": prompt}
             ]
-            
+
             raw_response = None
             try:
                 # Try fast-path first
                 raw_response = await run_sync_in_thread(lambda: _llm_json_fast(messages))
             except Exception:
                 pass
-            
+
             cleaned_list = _extract_list_from_json(raw_response)
-            
+
             if cleaned_list is None:
-                # Standard fallback triggered. 
+                # Standard fallback triggered.
                 any_standard_call = True
-                
+
                 raw_std = await run_sync_in_thread(lambda: _llm_json(messages))
                 cleaned_std = _extract_list_from_json(raw_std)
-                
+
                 if cleaned_std is None:
-                    # BOTH failed to return a list: this is the 'fallback_chunks' failure the test wants.
+                    # BOTH failed to return a list: treat as fallback chunk
                     fallback_chunks += 1
                     consecutive_failures += 1
-                    cleaned_list = None
+                    unprocessed_records.extend(chunk)
+                    continue  # skip the "add cleaned_list to final_records" block
                 else:
                     consecutive_failures = 0
                     cleaned_list = cleaned_std
             else:
                 consecutive_failures = 0
-            
+
             if cleaned_list is not None:
                 for item in cleaned_list:
                     norm = normalize_scraped_record(item, schema_fields)
@@ -209,6 +212,15 @@ Rules:
             logging.exception(e)
             consecutive_failures += 1
             fallback_chunks += 1
+            unprocessed_records.extend(chunk)
+
+    # Process ALL unprocessed records through the deterministic pipeline
+    if unprocessed_records:
+        for item in unprocessed_records:
+            norm = normalize_scraped_record(item, schema_fields)
+            norm["record_score"] = score_record_quality(norm, schema_fields)
+            if norm["record_score"] >= min_record_score:
+                final_records.append(norm)
 
     return final_records or records, {
         "applied": len(final_records) > 0,

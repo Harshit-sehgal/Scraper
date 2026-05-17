@@ -52,6 +52,7 @@ def test_persistence_round_trip():
     
     # 5. Clear in-memory state
     clear_semantic_state(clear_file=False)
+    reng.load_cache({})  # clear in-memory cache
     assert reng.get_compatibility("price", SemanticType.PRICE) == 0.5
     assert be.motif_learner.total_records == 0
     

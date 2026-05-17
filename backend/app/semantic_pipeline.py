@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import List, Set
 
 from app.semantic_allocation_engine import (
+    _UNIVERSAL_ROOTS,
     _get_role_engine,
     allocate_semantic_roles,
     seed_role_engine,
@@ -36,7 +37,7 @@ from app.semantic_ir import (
     Span,
 )
 from app.semantic_mapper import detect_semantic_type, is_child_fragment
-from app.semantic_segmentation import StructuralMemoryTracker, expand_composite_records
+from app.semantic_segmentation import StructuralMemoryTracker, expand_composite_records, sem_type_str
 from app.semantic_world_state import get_world_state
 from app.event_dispatcher import get_dispatcher
 from app.semantic_events import SemanticEvent, SemanticEventType
@@ -162,11 +163,11 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
             
         # Refine candidates: prefer specific types over generic 'text' or 'number'
         # when specific entity types are present.
-        cand_types = [(c.primary_type.value if hasattr(c.primary_type, 'value') else str(c.primary_type)) for c in cands]
+        cand_types = [sem_type_str(c.primary_type) for c in cands]
         has_specific = any(t in ENTITY_TYPES for t in cand_types)
         
         if has_specific and len(cands) > 1:
-            cands = [c for c in cands if (c.primary_type.value if hasattr(c.primary_type, 'value') else str(c.primary_type)) != 'text']
+            cands = [c for c in cands if sem_type_str(c.primary_type) != 'text']
         
         # Deduplicate identical raw strings only at the SAME position
         # (same value from different record positions is a contradiction signal)
@@ -179,13 +180,14 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
                 seen_raw.add(key)
         cands = unique
         
-        types = [(c.primary_type.value if hasattr(c.primary_type, 'value') else str(c.primary_type)) for c in cands]
+        types = [sem_type_str(c.primary_type) for c in cands]
         
         # Count core entities
         core_count = sum(1 for t in types if t in ENTITY_TYPES)
         
         if len(cands) == 1:
-            if cands[0].primary_type == SemanticType.ORGANIZATION:
+            pt = cands[0].primary_type
+            if (pt.value if isinstance(pt, SemanticType) else pt) == SemanticType.ORGANIZATION.value:
                 filtered.append(record)
             else:
                 logging.getLogger(__name__).debug("Filtered: single non-org cand %s", cands[0].primary_type)
@@ -197,14 +199,13 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
         # 1. Edge Density (Transitions)
         for i in range(len(types) - 1):
             t1, t2 = types[i], types[i+1]
-            ts = be.transition_detector.score_transition(t1.value if hasattr(t1, 'value') else str(t1), 
-                                                        t2.value if hasattr(t2, 'value') else str(t2))
+            ts = be.transition_detector.score_transition(t1, t2)
             density_score += ts.probability
             
         # 2. Motif Density
         for size in range(2, min(len(types) + 1, 4)):
             for start in range(len(types) - size + 1):
-                motif = tuple(t.value if hasattr(t, 'value') else str(t) for t in types[start:start + size])
+                motif = tuple(types[start:start + size])
                 density_score += be.motif_learner.stability(motif) * 0.5
                 
         # 3. Core Entity Centrality
@@ -215,23 +216,22 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
         normalized_density = density_score / max(1, max_edges)
         
         # Equilibrium reasoning: decision depends on global stability average
-        from app.semantic_world_state import get_world_state
         state = get_world_state()
         stability_threshold = max(0.4, min(state.metrics.average_density * 0.9, 0.7))
 
         if core_count >= 2 or normalized_density > stability_threshold:
             # Propagate to global state for future equilibrium
-            state.metrics.cumulative_density += normalized_density
-            state.metrics.total_records_processed += 1
+            state._energy.accumulate_density(normalized_density)
+            state._energy.increment_records()
             filtered.append(record)
         elif core_count == 1:
             # Multi-word entity check
             has_suffix = any(c.raw.lower() in _BOOTSTRAP_SUFFIXES for c in cands)
-            org_cands = [c for c in cands if (c.primary_type.value if hasattr(c.primary_type, 'value') else str(c.primary_type)) in ENTITY_TYPES]
+            org_cands = [c for c in cands if sem_type_str(c.primary_type) in ENTITY_TYPES]
             has_named_entity = len(org_cands) >= 2 and any(c.raw.lower() in _STOP_WORDS for c in org_cands)
             if has_suffix or has_named_entity or normalized_density > (stability_threshold * 0.7):
-                 state.metrics.cumulative_density += normalized_density
-                 state.metrics.total_records_processed += 1
+                 state._energy.accumulate_density(normalized_density)
+                 state._energy.increment_records()
                  filtered.append(record)
             else:
                  logging.getLogger(__name__).debug("Filtered: core_count=1 but low relative density %f", normalized_density)
@@ -239,6 +239,25 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
             logging.getLogger(__name__).debug("Filtered: core_count=0, density %f", normalized_density)
                  
     return filtered
+
+
+def detect_role_swap_warnings(output: dict, schema_fields: list, detect_type_fn, universal_roots) -> list:
+    """Detect potential role swap warnings from allocation output."""
+    from app.semantic_segmentation import sem_type_str
+    warnings = []
+    for role_name in schema_fields:
+        val = output.get(role_name)
+        if not val:
+            continue
+        val_type, _ = detect_type_fn(val, role_name)
+        for roots, stype in universal_roots:
+            if any(root in role_name.lower() for root in roots):
+                vts = sem_type_str(val_type)
+                sts = sem_type_str(stype)
+                if val_type != stype:
+                    warnings.append(f"{role_name}: expected {sts}, got {vts} ({val})")
+                break
+    return warnings
 
 
 def run_pipeline(
@@ -290,7 +309,7 @@ def run_pipeline(
     records = group_adjacent_entities(records)
     
     # Layer 5: Global semantic allocation
-    allocated_records = []
+    allocated_records: list = []
     for record in records:
         tokens = []
         pos = 0
@@ -356,19 +375,21 @@ def run_pipeline(
         # (field_owned_roles). Otherwise the allocator's assignment is used.
         from app.semantic_world_state import get_world_state as _gws_out
         _ws_out = _gws_out()
+        topo_view = _ws_out._topology.get_view()
         output: dict = {}
-        field_owned = {fc["role"] for fc in getattr(alloc_graph, '_field_conflicts', [])}
+        field_owned = {fc["role"] for fc in getattr(alloc_graph, 'field_conflicts', [])}
         for role_name in schema_fields:
-            if role_name in field_owned:
+            role = alloc_graph.roles.get(role_name)
+            allocator_confident = role and role.filled_by and role.fill_confidence > 0.8
+            if role_name in field_owned and not allocator_confident:
                 # Topology decides — find the matching field region
                 top_val = None
-                for region in _ws_out.field_regions:
+                for region in topo_view.all_regions():
                     if role_name in region.competing_roles and region.token:
                         top_val = region.token
                         break
                 output[role_name] = top_val
             else:
-                role = alloc_graph.roles.get(role_name)
                 if role and role.filled_by:
                     output[role_name] = role.filled_by
                 else:
@@ -377,7 +398,7 @@ def run_pipeline(
         output["_confidence"] = alloc_graph.coherence_score
 
         # Preserve conflict geometry from allocation for field arbitration
-        alloc_conflicts = getattr(alloc_graph, '_field_conflicts', [])
+        alloc_conflicts = getattr(alloc_graph, 'field_conflicts', [])
         if alloc_conflicts:
             output["_allocation_conflicts"] = alloc_conflicts
             for fc in alloc_conflicts:
@@ -389,6 +410,9 @@ def run_pipeline(
         # Stage 6: Continuous Semantic Evolution (Inference)
         # Decision is driven by graph energy and instability, not a hard threshold.
         state = get_world_state()
+
+        # Field perturbation: register learned exclusions from conflicts
+        state.observe_field_perturbation(output, tokens)
         instability = 1.0 - output["_confidence"]
         relative_instability = instability / max(0.1, state.metrics.average_uncertainty)
         # Unified field pressure modulates: high pressure amplifies instability
@@ -403,123 +427,15 @@ def run_pipeline(
                 instability_delta=_field_instability_delta()
             ))
 
-        if relative_instability > _field_instability_threshold() and tokens:
-            from app.semantic_inference_engine import InferenceEngine
-            try:
-                # Inference as Iterative Graph Relaxation
-                ie = InferenceEngine(max_iterations=5)
-                ie_result = ie.infer(tokens, schema_fields)
-                if ie_result and ie_result.role_assignments:
-                    # Check if inference reduced entropy (improved coherence)
-                    ie_coherence = getattr(ie_result, 'coherence_score', 0.5)
-                    if ie_coherence > output["_confidence"]:
-                        for role_name, value in ie_result.role_assignments.items():
-                            if value:
-                                output[role_name] = value
-                        output["_confidence"] = ie_coherence
-                        output["_refined_by"] = "evolution_pass"
-            except Exception as exc:
-                logging.exception(exc)
-        
         output["_certainty"] = reng.get_certainty()
         output["_learning_speed"] = reng.get_learning_speed()
         output["_calibrated_confidence"] = reng.get_calibrated_confidence(output["_confidence"])
         
-        # Stage 7: Contradiction & Warnings
-        from app.semantic_contradiction_engine import (
-            apply_contradiction_learning,
-            detect_allocation_contradictions,
-            detect_role_swap_warnings,
-        )
-        contradictions = detect_allocation_contradictions(output, schema_fields)
-        # Also check pre-allocation tokens for exclusivity violations
-        # (allocation may resolve exclusivity before contradictions are checked)
-        if not contradictions and tokens:
-            from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
-            value_fields: dict = {}
-            for t in tokens:
-                if t.raw and t.source_field:
-                    if t.raw in value_fields:
-                        prev_field = value_fields[t.raw]
-                        pair = (prev_field, t.source_field)
-                        rev_pair = (t.source_field, prev_field)
-                        if pair in ROLE_EXCLUSIVITY or rev_pair in ROLE_EXCLUSIVITY:
-                            contradictions.append(
-                                f"Token '{t.raw}' assigned to exclusive roles '{prev_field}' and '{t.source_field}'"
-                            )
-                    else:
-                        value_fields[t.raw] = t.source_field
-        if contradictions:
-            output["_contradictions"] = contradictions
-            output["_confidence"] *= _field_contradiction_penalty()
-            output["_contradiction_energy"] = len(contradictions)
-            dispatcher.dispatch(SemanticEvent(
-                event_type=SemanticEventType.CONTRADICTION_DETECTED,
-                source="contradiction_engine",
-                payload={"conflicts": contradictions},
-                instability_delta=_field_contradiction_delta()
-            ))
-
-        from app.semantic_allocation_engine import _UNIVERSAL_ROOTS
+        # Stage 7: Field tension is continuous — no explicit contradiction detection.
         warnings = detect_role_swap_warnings(output, schema_fields, detect_semantic_type, _UNIVERSAL_ROOTS)
         if warnings:
             output["_warnings"] = warnings
-            
-        apply_contradiction_learning(output, schema_fields, reng, detect_semantic_type, contradictions, warnings, _UNIVERSAL_ROOTS)
 
-        # Output is now topology-driven (built at line 354). No post-hoc override needed.
-
-        # Phase 3: Uncertainty redistribution — contradiction waves spread through topology
-        # Check tokens (pre-allocation) since allocation resolves exclusivity conflicts
-        if contradictions and tokens:
-            from app.semantic_allocation_engine import ROLE_EXCLUSIVITY
-            value_fields: dict = {}
-            for t in tokens:
-                if t.raw and t.source_field:
-                    if t.raw in value_fields:
-                        prev_field = value_fields[t.raw]
-                        pair = (prev_field, t.source_field)
-                        rev_pair = (t.source_field, prev_field)
-                        if pair in ROLE_EXCLUSIVITY or rev_pair in ROLE_EXCLUSIVITY:
-                            propagate_to = set()
-                            for other_a, other_b in ROLE_EXCLUSIVITY:
-                                for role in (prev_field, t.source_field):
-                                    peer = other_b if role == other_a else (other_a if role == other_b else None)
-                                    if peer is not None:
-                                        propagate_to.add(peer)
-                            for peer in propagate_to:
-                                for ttype in ["price", "date", "location", "organization", "phone", "email"]:
-                                    key = (peer, ttype)
-                                    current = reng.compatibility_cache.get(key, 0.5)
-                                    decay = 0.02 * max(len(contradictions), 1)
-                                    reng.compatibility_cache[key] = max(0.0, current - decay)
-                    value_fields[t.raw] = t.source_field
-
-        # Re-allocation pass: feed contradiction pressure back into the graph
-        if contradictions and len(tokens) >= 2:
-            # Delegate exclusion boosting to field regions (local, not global)
-            contradiction_energy = output.get("_contradiction_energy", 0)
-            if contradiction_energy > 0:
-                for t in tokens:
-                    if t.raw and t.source_field:
-                        for t2 in tokens:
-                            if t2.raw and t2.source_field and t.raw == t2.raw and t.source_field != t2.source_field:
-                                sorted_roles = tuple(sorted([t.source_field, t2.source_field]))
-                                for region in state.field_regions:
-                                    if (region.token == t.raw and
-                                        tuple(sorted(region.competing_roles)) == sorted_roles):
-                                        key_str = str(sorted_roles)
-                                        current = region.local_memory.get(key_str, 0.0)
-                                        region.local_memory[key_str] = min(1.0, current + contradiction_energy * 0.3)
-            sem_record3 = SemanticRecord(tokens=tokens)
-            _, re_alloc_graph = allocate_semantic_roles(sem_record3, schema_fields, learn=False)
-            if re_alloc_graph.coherence_score > output["_confidence"]:
-                for role_name in schema_fields:
-                    role = re_alloc_graph.roles.get(role_name)
-                    if role and role.filled_by:
-                        output[role_name] = role.filled_by
-                output["_confidence"] = re_alloc_graph.coherence_score
-                output["_contradiction_resolved"] = True
             
         # Phase 7: Topology snapshot for observability + replay
         state.snapshot(label=f"alloc_{len(allocated_records)}")
@@ -533,26 +449,26 @@ def run_pipeline(
                     stability = state.get_motif_stability(motif)
                     if stability > 0.01:
                         for role_name in schema_fields:
-                            key = (role_name, motif[0])
-                            current = reng.compatibility_cache.get(key, 0.5)
                             boost = (stability - 0.5) * 0.05
-                            reng.compatibility_cache[key] = min(1.0, current + boost)
+                            new_val = min(1.0, state._manifold.get_compatibility(role_name, motif[0]) + boost)
+                            state._manifold.set_compatibility(role_name, motif[0], new_val)
 
         coherence = output["_confidence"]
         be = get_boundary_engine()
-        for md in be.decision_history[-20:]:
-            if isinstance(md, dict):
-                md["coherence_after"] = coherence
-                md["success"] = coherence > _field_coherence_threshold()
-            else:
-                md.coherence_after = coherence
-                md.success = coherence > _field_coherence_threshold()
+        be.update_recent_decisions(coherence, _field_coherence_threshold())
         
         # Basin evolution — continuous, both event-triggered (scheduler) and
         # pipeline-driven (here) to ensure evolution during non-event periods.
         state.decay_field_regions()
         state.aggregate_from_regions()
         state.redistribute_instability()
+        
+        # Synthesize crystalline records for stable runs
+        if output["_confidence"] > 0.7 and tokens:
+            state._synthesize_crystalline_record(output)
+        
+        # Update communities from processed record
+        state.detect_communities()
         
         allocated_records.append(output)
 

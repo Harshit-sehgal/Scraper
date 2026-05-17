@@ -54,13 +54,14 @@ function switchView(name) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.getElementById(`view-${name}`).classList.add('active');
 
-    const tabMap = { jobs: 'tab-jobs', new: 'tab-new', results: 'tab-jobs', recycle: 'tab-recycle' };
+    const tabMap = { jobs: 'tab-jobs', new: 'tab-new', results: 'tab-jobs', recycle: 'tab-recycle', cognition: 'tab-cognition' };
     const tabEl = document.getElementById(tabMap[name]);
     if (tabEl) tabEl.classList.add('active');
 
     if (name === 'jobs') refreshJobs();
     if (name === 'new') initForm();
     if (name === 'recycle') refreshRecycleBin();
+    if (name === 'cognition') refreshCognition();
 
     writeUIState({ view: name });
 }
@@ -659,7 +660,7 @@ function renderLogs(logs) {
         return `
             <div class="log-entry">
                 <span class="log-time">[${time}]</span>
-                <span class="log-msg ${log.level || 'info'}">${esc(log.message)}</span>
+                <span class="log-msg ${esc(log.level || 'info')}">${esc(log.message)}</span>
             </div>
         `;
     }).join('');
@@ -700,13 +701,18 @@ function renderTable(results, emptyMessage = 'No results') {
     });
     const keys = [...preferredOrder.filter(k => seen.has(k)), ...discoveredKeys.filter(k => !preferredOrder.includes(k))];
     thead.innerHTML = `<tr>${keys.map(k => `<th>${esc(k)}</th>`).join('')}</tr>`;
-    tbody.innerHTML = results.map(row => `<tr>${keys.map(k => {
-        let v = row[k];
-        if (Array.isArray(v)) v = v.join(', ');
-        if (v === null || v === undefined) v = '—';
-        const text = String(v);
-        return `<td data-raw="${esc(text)}" title="${esc(text)}">${esc(text)}</td>`;
-    }).join('')}</tr>`).join('');
+    tbody.innerHTML = results.map(row => {
+        const isUnstable = row._is_unstable === true;
+        const rowClass = isUnstable ? 'unstable-row' : '';
+        return `<tr class="${rowClass}">${keys.map(k => {
+            let v = row[k];
+            if (Array.isArray(v)) v = v.join(', ');
+            if (v === null || v === undefined) v = '—';
+            const text = String(v);
+            const cellClass = (k === '_is_unstable' && isUnstable) ? 'unstable-cell' : '';
+            return `<td class="${cellClass}" data-raw="${esc(text)}" title="${esc(text)}">${esc(text)}</td>`;
+        }).join('')}</tr>`;
+    }).join('');
 }
 
 async function recleanCurrentJob() {
@@ -1105,6 +1111,100 @@ async function submitJob(e) {
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+// ─── Cognition State ───
+
+async function refreshCognition() {
+    try {
+        const res = await fetch(`${API}/api/system/topology`);
+        if (!res.ok) throw new Error('Topology unavailable');
+        const data = await res.json();
+
+        const metrics = data.metrics || {};
+        document.getElementById('kpi-pressure').textContent = (metrics.field_pressure || 0).toFixed(3);
+        document.getElementById('kpi-integrity').textContent = (metrics.integrity_score || 0).toFixed(3);
+        document.getElementById('kpi-energy').textContent = (metrics.global_energy || 0).toFixed(3);
+        document.getElementById('kpi-exclusions').textContent = metrics.exclusion_count || 0;
+        document.getElementById('kpi-basins').textContent = Array.isArray(data.field_regions) ? data.field_regions.length : 0;
+
+        const communities = data.global_communities || [];
+        const commList = document.getElementById('community-list');
+        if (!communities.length) {
+            commList.innerHTML = '<div class="empty"><p>No stable communities identified</p></div>';
+        } else {
+            commList.innerHTML = communities.map(c => `
+                <div style="padding: 0.75rem; border-bottom: 1px solid var(--border);">
+                    <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+                        ${c.map(role => `<span class="mode-tag">${esc(role)}</span>`).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        const patterns = data.schema_patterns || [];
+        const patternList = document.getElementById('schema-pattern-list');
+        if (!patterns.length) {
+            patternList.innerHTML = '<div class="empty"><p>No recurring schemas learned yet</p></div>';
+        } else {
+            patternList.innerHTML = patterns.sort((a,b) => b.count - a.count).map(p => `
+                <div style="padding: 0.75rem; border-bottom: 1px solid var(--border);">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+                            ${p.roles.map(role => `<span class="mode-tag">${esc(role)}</span>`).join('')}
+                        </div>
+                        <span style="color:var(--text-muted); font-size:0.85rem;">Count: ${p.count}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        const exclusions = data.learned_exclusions || [];
+        const excList = document.getElementById('exclusion-list');
+        if (!exclusions.length) {
+            excList.innerHTML = '<div class="empty"><p>No exclusions learned yet</p></div>';
+        } else {
+            excList.innerHTML = exclusions.sort((a,b) => b.strength - a.strength).map(e => `
+                <div style="display:flex; justify-content:space-between; padding: 0.5rem; border-bottom: 1px solid var(--border);">
+                    <span style="font-weight:600; color:var(--text-main);">${esc(e.roles.join(' ↔ '))}</span>
+                    <span style="color:var(--text-muted);">Strength: ${e.strength.toFixed(3)}</span>
+                </div>
+            `).join('');
+        }
+
+        const compats = data.role_compatibility || [];
+        const simList = document.getElementById('role-similarity-list');
+        if (!compats.length) {
+            simList.innerHTML = '<div class="empty"><p>Manifold is cold</p></div>';
+        } else {
+            // Filter for high compatibility scores
+            simList.innerHTML = compats.filter(c => c.score > 0.7).sort((a,b) => b.score - a.score).map(c => `
+                <div style="display:flex; justify-content:space-between; padding: 0.5rem; border-bottom: 1px solid var(--border);">
+                    <span style="font-weight:600; color:var(--text-main);">${esc(c.role)} <span style="color:var(--text-muted); font-weight:400;">≈</span> ${esc(c.type)}</span>
+                    <span style="color:var(--text-muted);">Score: ${c.score.toFixed(3)}</span>
+                </div>
+            `).join('');
+        }
+
+        const basins = data.field_regions || [];
+        const basinList = document.getElementById('basin-list');
+        if (!basins.length) {
+            basinList.innerHTML = '<div class="empty"><p>No active conflict basins</p></div>';
+        } else {
+            basinList.innerHTML = basins.sort((a,b) => b.instability - a.instability).map(b => `
+                <div style="padding: 0.5rem; border-bottom: 1px solid var(--border);">
+                    <div style="font-weight:600; color:var(--text-main); margin-bottom:0.25rem;">Token: "${esc(b.token)}"</div>
+                    <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.25rem;">Clash: ${esc(b.competing_roles.join(', '))}</div>
+                    <div style="font-size:0.85rem; color:var(--text-muted); display:flex; gap:1rem;">
+                        <span>Instability: ${b.instability.toFixed(3)}</span>
+                        <span>Energy: ${b.local_energy.toFixed(3)}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        toast(`Failed to load cognition state: ${e.message}`, 'error');
+    }
+}
+
 // ─── Init ───
 document.addEventListener('DOMContentLoaded', () => {
     const uiState = readUIState();
@@ -1150,7 +1250,7 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshSystemStatus();
     window.addEventListener('resize', syncResultsScrollSlider);
 
-    const initialView = ['jobs', 'new', 'recycle'].includes(String(uiState.view || ''))
+    const initialView = ['jobs', 'new', 'recycle', 'cognition'].includes(String(uiState.view || ''))
         ? String(uiState.view)
         : 'jobs';
     switchView(initialView);

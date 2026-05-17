@@ -27,12 +27,68 @@ from app.semantic_ir import SemanticToken, SemanticType
 # INTERMEDIATE REPRESENTATION (IR)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ─── Type String ↔ SemanticType Bridge ────────────────────────────────
+
+# Mapping from CandidateIR type strings to SemanticType enum values.
+# This ensures clean conversion between the segmentation layer (str-based)
+# and the semantic IR layer (enum-based) without fragile hasattr/isinstance checks.
+_TYPE_STR_TO_SEMANTIC = {
+    "price": SemanticType.PRICE,
+    "date": SemanticType.DATE,
+    "location": SemanticType.LOCATION,
+    "organization": SemanticType.ORGANIZATION,
+    "phone": SemanticType.PHONE,
+    "email": SemanticType.EMAIL,
+    "url": SemanticType.URL,
+    "number": SemanticType.NUMBER,
+    "rating": SemanticType.RATING,
+    "duration": SemanticType.DURATION,
+    "code": SemanticType.CODE,
+    "name": SemanticType.NAME,
+    "text": SemanticType.TEXT,
+    "identifier": SemanticType.IDENTIFIER,
+}
+
+
+def candidate_type_to_semantic(type_str: str) -> SemanticType:
+    """Convert a CandidateIR primary_type string to a SemanticType enum value."""
+    return _TYPE_STR_TO_SEMANTIC.get(type_str, SemanticType.TEXT)
+
+
+def to_semantic_type(value: object) -> SemanticType:
+    """Unified conversion: accepts str, SemanticType, or anything with .value."""
+    if isinstance(value, SemanticType):
+        return value
+    if hasattr(value, 'value'):
+        try:
+            return SemanticType(value.value)
+        except (ValueError, TypeError):
+            pass
+    return candidate_type_to_semantic(str(value))
+
+
+def sem_type_str(value: object) -> str:
+    """Unified string representation of a type (str or SemanticType or .value)."""
+    if isinstance(value, SemanticType):
+        return value.value
+    if hasattr(value, 'value'):
+        return str(value.value)
+    return str(value)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CANDIDATE IR
+# ═══════════════════════════════════════════════════════════════════════════════
+
 @dataclass
 class CandidateIR:
     """Intermediate Representation for a single extracted candidate.
 
     This is the core data structure. ALL later stages operate on IR objects,
     NOT raw strings. This prevents direct regex-to-schema coupling.
+
+    primary_type stores a type string (e.g. "price", "date").
+    Use candidate_type_to_semantic() or to_semantic_type() to convert to SemanticType.
     """
     raw: str
     cleaned: str
@@ -56,6 +112,32 @@ class CandidateIR:
 
     # Traceability
     signals: List[str] = field(default_factory=list)
+
+    def to_semantic_type(self) -> SemanticType:
+        """Convert this candidate's primary_type to SemanticType."""
+        return candidate_type_to_semantic(self.primary_type)
+
+    def sem_type_str(self) -> str:
+        """Return primary_type as a string (always works for both str and enum)."""
+        return self.primary_type
+
+    def as_token(self, source_field: str = "") -> "SemanticToken":
+        """Convert this candidate to a SemanticToken for the IR layer."""
+        from app.semantic_ir import Span
+        stype = self.to_semantic_type()
+        return SemanticToken(
+            raw=self.raw,
+            normalized=self.cleaned,
+            span=Span(self.span_start, self.span_end),
+            position=self.position,
+            primary_type=stype,
+            type_distribution={stype: self.primary_confidence},
+            source_field=source_field,
+        )
+
+    def type_distribution_semantic(self) -> Dict[SemanticType, float]:
+        """Convert type_distribution str keys to SemanticType keys."""
+        return {candidate_type_to_semantic(k): v for k, v in self.type_distribution.items()}
 
 
 @dataclass
@@ -101,9 +183,9 @@ class SegmentedIR:
 DETECTION_PATTERNS = {
     "price": [
         r"[\$\u20a8\u20ac\u00a3\u00a5\u20b9]\s*\d+[\d,]*\.?\d*",
-        r"\d+[\d,]*\.?\d*\s*(inr|usd|eur|gbp|aud|cad)",
-        r"(rs\.?|rupees?)\s*\d+[\d,]*\.?\d*",
-        r"\d+\.?\d*\s*(cr|crore|l|lakh|k|mn|million|thousand)",
+        r"\d+\.?\d*\s*(usd|eur|gbp|inr|rs|yen|pound)\b",
+        r"\b(rs\.?|rupees?)\s*\d+[\d,]*\.?\d*",
+        r"\d+\.?\d*\s*\b(cr|crore|l|lakh|k|mn|million|thousand)\b",
     ],
     "date": [
         r"\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}",
@@ -128,13 +210,21 @@ DETECTION_PATTERNS = {
         r"\b\d+\.?\d*%?\b",
     ],
     "phone": [
-        r"\+?\d{2,4}[\s\-]?\d{3,4}[\s\-]?\d{3,4}(?:[\s\-]?\d{3,4})?",
+        r"\+?\d{1,4}[\s\-]?\(?\d{2,5}\)?[\s\-]?\d{3,5}[\s\-]?\d{3,5}",
+        r"\b\d{3,4}[\s\-]?\d{3,4}[\s\-]?\d{3,4}\b",
     ],
     "email": [
         r"[\w.+-]+@[\w-]+\.[\w.-]+",
     ],
     "url": [
         r"https?://[^\s]+",
+    ],
+    "identifier": [
+        r"\b[A-Z\-_]+\d+[A-Z\d\-_]*\b",
+        r"\b\d+[A-Z\-_]+[A-Z\d\-_]*\b",
+    ],
+    "organization": [
+        r"\b[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})+\b",
     ],
 }
 
@@ -807,11 +897,13 @@ def expand_composite_records(
             # Add meaningful candidates as new fields
             meaningful = [c for c in ir.candidates if c.primary_type != "text"]
             for i, cand in enumerate(meaningful):
-                new_key = f"{key}_seg_{cand.primary_type}_{i}"
+                # Encode topological information in the key: type, index, and span
+                # Format: {key}_seg_{type}_{i}_{start}_{end}
+                new_key = f"{key}_seg_{cand.primary_type}_{i}_{cand.span_start}_{cand.span_end}"
                 new_record[new_key] = cand.cleaned
 
         # Update structural memory
-        ir_for_record = segment_single_text(str(list(record.values())))
+        ir_for_record = segment_single_text(" ".join(str(v) for v in record.values()))
         mem.record(ir_for_record.candidates, row_idx)
 
         if has_composite:
@@ -850,30 +942,56 @@ DOMINANCE_HIERARCHY = {
 
 
 def resolve_overlaps(tokens: List[SemanticToken]) -> List[SemanticToken]:
-    """Resolve span overlaps by suppressing dominated child tokens."""
+    """Resolve span overlaps and value containment.
+    
+    Suppresses dominated tokens:
+    1. Lower in DOMINANCE_HIERARCHY
+    2. Physically contained (Span.contains)
+    3. Semantically contained (raw value substring)
+    """
     if not tokens:
         return tokens
+        
+    # Sort by dominance then size
     sorted_tokens = sorted(
         tokens,
         key=lambda t: (
             -DOMINANCE_HIERARCHY.get(t.primary_type, 0),
-            -(t.span.end - t.span.start)
+            -(t.span.end - t.span.start),
+            -len(t.raw)
         )
     )
+    
     suppressed: Set[int] = set()
     for i in range(len(sorted_tokens)):
         if i in suppressed:
             continue
+        ti = sorted_tokens[i]
+        
         for j in range(i + 1, len(sorted_tokens)):
             if j in suppressed:
                 continue
-            ti, tj = sorted_tokens[i], sorted_tokens[j]
-            if not ti.span.overlaps_with(tj.span):
+            tj = sorted_tokens[j]
+            
+            # Case 1: Physical Span overlap
+            if ti.span.overlaps_with(tj.span):
+                suppressed.add(j)
                 continue
-            suppressed.add(j)
+                
+            # Case 2: Semantic Value Containment (Lexical Overlap)
+            # If tj.raw is a STRICT substring of ti.raw, it's likely a fragment
+            if len(tj.raw) > 2 and len(tj.raw) < len(ti.raw) and tj.raw.lower() in ti.raw.lower():
+                # Suppression rules for lexical containment:
+                # - If child is a NUMBER, always suppress
+                # - If child is same type as parent, always suppress
+                # - If parent is high-dominance (EMAIL, PHONE), always suppress child
+                if tj.primary_type == SemanticType.NUMBER or \
+                   tj.primary_type == ti.primary_type or \
+                   DOMINANCE_HIERARCHY.get(ti.primary_type, 0) >= 80:
+                    suppressed.add(j)
+                    continue
+
     result = [t for idx, t in enumerate(sorted_tokens) if idx not in suppressed]
-    for pos, token in enumerate(result):
-        token.position = pos
     return result
 
 

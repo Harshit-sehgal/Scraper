@@ -7,9 +7,7 @@ ALL stages operate on IR objects, NOT raw strings.
 This prevents direct regex-to-schema coupling and enables
 probabilistic reasoning at every level.
 
-Core principle: Everything is a relationship, nothing is an island.
-"""
-
+Core principle: Everything is a relationship, nothing is an island."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -97,19 +95,9 @@ class SemanticToken:
     span: Span
     position: int  # ordinal position in source
 
-    # Multi-dimensional type vector (replaces single primary_type for rich semantics)
-    # Each dimension represents a different semantic facet:
-    # ALL start at 0.5 (maximum entropy, no symbolic priors).
-    # Differentiation emerges from graph behavior.
-    type_value: float = 0.5
-    type_entity: float = 0.5
-    type_location: float = 0.5
-    type_temporal: float = 0.5
-    type_identifier: float = 0.5
-    type_quantity: float = 0.5
-    type_quality: float = 0.5
-    type_contact: float = 0.5
-    type_text: float = 0.5
+    # Semantic Embedding: 16-dimensional manifold point.
+    # Replaces individual type_facet fields for unified geometric meaning.
+    embedding: List[float] = field(default_factory=lambda: [0.5] * 16)
 
     # Classification: primary type + ambiguity distribution
     primary_type: SemanticType = SemanticType.TEXT
@@ -188,6 +176,7 @@ class SemanticRecord:
     # Mapped output (populated by semantic_mapper)
     mapped_fields: Dict[str, str] = field(default_factory=dict)
     mapped_confidences: Dict[str, float] = field(default_factory=dict)
+    is_unstable: bool = False  # Thermodynamic reasoning flag (Phase 18)
 
     # Record type classification
     record_type: RecordType = RecordType.UNKNOWN
@@ -222,6 +211,16 @@ class SemanticRegion:
     structural_signature: Tuple[str, ...] = field(default_factory=tuple)
 
     # Evidence
+    evidence: List[str] = field(default_factory=list)
+
+
+@dataclass
+class AffinityEdge:
+    """Soft cohesion between tokens (e.g. proximity-based contextual affinity)."""
+    source_id: int
+    target_id: int
+    strength: float = 0.5
+    confidence: float = 0.5
     evidence: List[str] = field(default_factory=list)
 
 
@@ -270,12 +269,11 @@ class SemanticGraph:
     relationships: List[RelationshipEdge] = field(default_factory=list)
     ownership_edges: List[OwnershipEdge] = field(default_factory=list)
     exclusion_edges: List[ExclusionEdge] = field(default_factory=list)
+    affinity_edges: List[AffinityEdge] = field(default_factory=list)
 
     # Global properties & Equilibrium metrics
     coherence_score: float = 0.0
-    contradiction_score: float = 0.0
     semantic_energy: float = 5.0
-    has_contradictions: bool = False
     uncertainty_field: Dict[int, float] = field(default_factory=dict) # node_id -> uncertainty
     
     # Sub-graphs
@@ -326,9 +324,10 @@ class AllocationGraph:
     roles: Dict[str, SemanticRole] = field(default_factory=dict)  # role_name → role
     compatibility: Dict[Tuple[str, str], float] = field(default_factory=dict)  # (candidate, role) → score
     exclusivity_edges: List[Tuple[str, str]] = field(default_factory=list)  # mutually exclusive candidates
+    field_conflicts: List[dict] = field(default_factory=list)
     coherence_score: float = 0.0
+    is_unstable: bool = False  # Thermodynamic reasoning flag (Phase 18)
     assignment_history: List[Dict] = field(default_factory=list)
-    role_order: List[str] = field(default_factory=list)  # schema field order for positional signals
 
 
 @dataclass
@@ -347,19 +346,23 @@ class DatasetIR:
 
 def create_token(raw: str, span_start: int, span_end: int, position: int,
                  primary_type: SemanticType = SemanticType.TEXT,
-                 extraction_method: str = "pattern") -> SemanticToken:
+                 confidence: float = 0.85,
+                 extraction_method: str = "pattern",
+                 source_field: str = "") -> SemanticToken:
     """Factory for creating SemanticToken with sensible defaults.
 
-    Also populates the multi-dimensional type_vector from the primary_type.
+    Also populates the 16-dimensional embedding from the primary_type.
     """
+    source = primary_type.value[:10].lower() if hasattr(primary_type, 'value') else ''
     tok = SemanticToken(
         raw=raw,
         normalized=raw.strip(),
         span=Span(span_start, span_end),
         position=position,
         primary_type=primary_type,
-        type_distribution={primary_type: 0.85},
+        type_distribution={primary_type: confidence},
         extraction_method=extraction_method,
+        source_field=source,
         evidence=[f"created:{extraction_method}"],
     )
     populate_type_vector(tok, primary_type)
@@ -368,49 +371,17 @@ def create_token(raw: str, span_start: int, span_end: int, position: int,
 
 def populate_type_vector(token: SemanticToken, primary_type: SemanticType,
                           graph: Optional[SemanticGraph] = None):
-    """Populate the multi-dimensional type_vector from graph context.
-
-    When a graph is available, type_vector is derived from:
-    - Relationship types the token participates in
-    - Neighborhood token types
-    - Ownership structure
-
-    When no graph is available, uses uniform defaults (no symbolic priors).
-
-    This replaces the hardcoded mapping dict with emergent graph-derived semantics.
-    """
+    """Populate the 16-dimensional embedding from graph context."""
     if graph:
-        # Derive type_vector from graph neighborhood
         from app.semantic_inference_engine import RelationshipEmbeddingSpace
-        emb_space = RelationshipEmbeddingSpace(dimension=16)
-        # Find the token in the graph
+        emb_space = RelationshipEmbeddingSpace()
         for i, t in enumerate(graph.tokens):
             if t is token or t.raw == token.raw:
-                emb = emb_space.compute_embedding(i, graph)
-                # Map embedding positions to type_vector fields
-                token.type_entity = emb[0]
-                token.type_value = emb[1]
-                token.type_location = emb[2]
-                token.type_temporal = emb[3]
-                token.type_identifier = emb[4]
-                token.type_quantity = emb[5]
-                token.type_quality = emb[6]
-                token.type_contact = emb[7]
-                token.type_text = emb[8]
+                token.embedding = emb_space.compute_embedding(i, graph)
                 return
     
-    # No graph available: use uniform defaults (emergent, no symbolic priors)
-    # All dimensions start at same value - differentiation comes from graph behavior
-    uniform = 0.5
-    token.type_entity = uniform
-    token.type_value = uniform
-    token.type_location = uniform
-    token.type_temporal = uniform
-    token.type_identifier = uniform
-    token.type_quantity = uniform
-    token.type_quality = uniform
-    token.type_contact = uniform
-    token.type_text = uniform
+    # No graph available: use uniform defaults (entropy anchored)
+    token.embedding = [0.5] * 16
 
 
 def compute_type_signature(tokens: List[SemanticToken]) -> Tuple[str, ...]:

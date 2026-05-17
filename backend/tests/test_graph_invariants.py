@@ -14,15 +14,14 @@ def test_world_state_round_trip_preserves_structure():
     ws = get_world_state()
     ws.clear()
 
-    ws.metrics.total_records_processed = 100
-    ws.metrics.global_energy = 3.14
-    ws.role_compatibility[("name", "text")] = 0.8
-    ws.role_position_memory["price"] = [15.0, 3.0]
-    ws.learned_exclusions[("origin", "destination")] = 0.9
-    ws.motif_counts[("A", "B")] = 5
-    ws.motif_timestamps[("A", "B")] = 42
-    ws.cohesion_merge_success[("a", "b")] = 3.0
-    ws.cohesion_merge_attempts[("a", "b")] = 5.0
+    ws._energy.total_records_processed = 100
+    ws._energy.set_energy(3.14)
+    ws._manifold.set_compatibility("name", "text", 0.8)
+    ws._instability.set_exclusion(tuple(sorted(["origin", "destination"])), 0.9)
+    ws._motif._motif_counts[tuple(sorted(["A", "B"]))] = 5
+    ws._motif._motif_timestamps[tuple(sorted(["A", "B"]))] = 42
+    ws._topology.get_cohesion_merge_success()[tuple(sorted(["a", "b"]))] = 3.0
+    ws._topology.get_cohesion_merge_attempts()[tuple(sorted(["a", "b"]))] = 5.0
 
     data = ws.to_dict()
     ws2 = SemanticWorldState()
@@ -31,25 +30,29 @@ def test_world_state_round_trip_preserves_structure():
     assert ws2.metrics.total_records_processed == 100
     assert abs(ws2.metrics.global_energy - 3.14) < 0.001
     assert ws2.role_compatibility.get(("name", "text"), 0) == 0.8
-    assert ws2.role_position_memory.get("price") == [15.0, 3.0]
-    assert ws2.learned_exclusions.get(("origin", "destination"), 0) == 0.9
-    assert ws2.motif_counts.get(("A", "B"), 0) == 5
-    assert ws2.motif_timestamps.get(("A", "B"), 0) == 42
-    assert ws2.cohesion_merge_success.get(("a", "b"), 0) == 3.0
-    assert ws2.cohesion_merge_attempts.get(("a", "b"), 0) == 5.0
+    
+    excl_key = tuple(sorted(["origin", "destination"]))
+    assert ws2.learned_exclusions.get(excl_key, 0) == 0.9
+    
+    motif_key = tuple(sorted(["A", "B"]))
+    assert ws2.motif_counts.get(motif_key, 0) == 5
+    assert ws2.motif_timestamps.get(motif_key, 0) == 42
+    
+    cohesion_key = tuple(sorted(["a", "b"]))
+    assert ws2.cohesion_merge_success.get(cohesion_key, 0) == 3.0
+    assert ws2.cohesion_merge_attempts.get(cohesion_key, 0) == 5.0
 
 
 def test_world_state_clear_resets_all():
     """Invariant: clear() must reset all fields to initial values."""
     ws = get_world_state()
     ws.clear()
-    ws.metrics.total_records_processed = 50
-    ws.role_compatibility[("test", "test")] = 1.0
+    ws._energy.increment_records(50)
+    ws._manifold.set_compatibility("test", "test", 1.0)
     ws.clear()
 
     assert ws.metrics.total_records_processed == 0
     assert len(ws.role_compatibility) == 0
-    assert len(ws.role_position_memory) == 0
     assert len(ws.learned_exclusions) == 0
     assert len(ws.motif_counts) == 0
     assert len(ws.motif_timestamps) == 0
@@ -81,9 +84,9 @@ def test_semantic_token_confidence_bounds():
         raw="test", normalized="test", span=Span(0, 4), position=0,
         primary_type=SemanticType.TEXT,
     )
-    assert 0.0 <= tok.type_value <= 1.0
-    assert 0.0 <= tok.type_entity <= 1.0
-    assert 0.0 <= tok.type_location <= 1.0
+    assert len(tok.embedding) == 16
+    for val in tok.embedding:
+        assert 0.0 <= val <= 1.0
 
 
 def test_event_dispatcher_dispatch_does_not_raise():

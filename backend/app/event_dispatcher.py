@@ -24,31 +24,17 @@ class EventDispatcher:
         self.subscribers[event_type].append(callback)
 
     def dispatch(self, event: SemanticEvent):
-        """Propagate an event to all interested subscribers.
-        
-        Also triggers basin evolution on each dispatch — making field
-        evolution continuous with event activity rather than solely
-        scheduler-triggered. Reduces scheduler's role as timing authority.
-        """
+        """Propagate an event to all interested subscribers."""
         event.timestamp = time.time()
         logging.getLogger(__name__).debug(
             "[SEMANTIC EVENT] %s from %s (instability=%.3f)",
             event.event_type.value, event.source, event.instability_delta)
-            
-        # Continuous basin evolution on every dispatch
-        try:
-            from app.semantic_world_state import get_world_state
-            ws = get_world_state()
-            ws.decay_field_regions()
-            ws.aggregate_from_regions()
-        except Exception:
-            pass
 
         for callback in self.subscribers.get(event.event_type, []):
             try:
                 callback(event)
             except Exception as e:
-                logging.error(f"Error in event callback: {e}")
+                logging.getLogger(__name__).error("Error in event callback: %s", e)
 
 # Global Dispatcher
 _dispatcher = EventDispatcher()
@@ -57,9 +43,9 @@ _bootstrap_done = False
 def get_dispatcher() -> EventDispatcher:
     global _bootstrap_done
     if not _bootstrap_done:
-        _bootstrap_done = True
         # Safe: graph_update_scheduler uses lazy singleton creation,
         # so importing the module does NOT trigger __init__ or event_dispatcher import.
         from app.graph_update_scheduler import get_scheduler
         get_scheduler()
+        _bootstrap_done = True
     return _dispatcher

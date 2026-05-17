@@ -8,7 +8,7 @@ from app.semantic_events import SemanticEventType
 def test_event_cascade_has_subscribers():
     """All dispatched event types must have at least one subscriber."""
     d = get_dispatcher()
-    for et in [SemanticEventType.TOPOLOGY_SHIFT, SemanticEventType.CONTRADICTION_DETECTED, SemanticEventType.UNCERTAINTY_SPIKE]:
+    for et in [SemanticEventType.TOPOLOGY_SHIFT, SemanticEventType.UNCERTAINTY_SPIKE]:
         assert len(d.subscribers.get(et, [])) >= 1, f"{et.value} has no subscribers"
 
 

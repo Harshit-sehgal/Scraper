@@ -4,9 +4,9 @@ Semantic Persistence Hub
 =========================
 Single orchestrator for all semantic memory and learned state.
 Unifies:
-1. Role compatibility (RoleEmbeddingEngine)
-2. Boundary decisions (SemanticBoundaryEngine)
-3. Successful motifs (SemanticMemory)
+1. Role compatibility (Role Manifold)
+2. Boundary decisions (Topological Cohesion)
+3. Learning count (experience manifold)
 """
 
 import json
@@ -96,4 +96,4 @@ def clear_semantic_state(clear_file: bool = True):
     # but since they might be singletons, we should be careful. Actually RoleTransitionDetector re-applies it in __init__ 
     # if it's empty, but if the engine object already exists, we might need to manually re-apply.)
     from app.semantic_boundary_engine import _BOOTSTRAP_TRANSITIONS
-    get_world_state().transition_probs.update(_BOOTSTRAP_TRANSITIONS)
+    get_world_state()._transition.update_seed(_BOOTSTRAP_TRANSITIONS)
