@@ -104,7 +104,7 @@ class RoleTransitionDetector:
 
     @observation_count.setter
     def observation_count(self, value: int):
-        self._transition_state.transition_observations = value
+        self._transition_state.set_transition_observations(value)
 
     def score_transition(self, type_a: str, type_b: str) -> TransitionScore:
         """Score how likely a transition between these types represents a role boundary."""

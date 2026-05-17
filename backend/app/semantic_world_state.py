@@ -483,7 +483,7 @@ class SemanticWorldState:
 
     @transition_observations.setter
     def transition_observations(self, value):
-        self._transition.transition_observations = value
+        self._transition.set_transition_observations(value)
 
     # ─── Delegation Properties: HistoryState ──────────────────────────────
 

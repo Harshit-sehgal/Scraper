@@ -79,6 +79,15 @@ class TransitionState:
 
     # ─── Controlled Mutations ────────────────────────────────────────────
 
+    def set_transition_observations(self, value: int):
+        """Set transition observation count through staging-aware API."""
+        self._set_struct("transition_observations", max(0, value))
+        self._record("set_transition_observations", {"value": value})
+
+    def get_transition_observations(self) -> int:
+        """Get transition observation count from staging-aware API."""
+        return self._get_struct("transition_observations")
+
     def set_prob(self, type_a: str, type_b: str, value: float):
         clamped = max(0.0, min(1.0, value))
         probs = self._get_struct("transition_probs")
