@@ -41,7 +41,7 @@ class TopologicalQuery:
 
     def find_stable_anchors(self) -> List[tuple]:
         """Return all protected relational anchors."""
-        return list(self.ws._topology.anchors)
+        return list(self.ws.topology_anchors)
 
     def execute_tql(self, query: str) -> dict:
         """Simple TQL Parser and Executor.

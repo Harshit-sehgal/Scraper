@@ -80,9 +80,6 @@ class RoleEmbeddingEngine:
     def total_co_occurrences(self, value: int):
         self.ws._manifold.set_total_co_occurrences(value)
 
-    @property
-    def _learned_exclusions(self) -> Dict[Tuple[str, str], float]:
-        return self.ws._instability.exclusions
 
     def get_compatibility(self, role: str, stype: SemanticType, token: Optional[SemanticToken] = None) -> float:
         """Geometric compatibility: dot product in the role manifold."""
@@ -412,9 +409,10 @@ class RoleEmbeddingEngine:
         return boosts
 
     def learn_contradiction(self, role_a: str, role_b: str, token_type: str):
-        key = tuple(sorted([role_a, role_b]))
-        current = self.ws._instability.get_exclusion_by_key(key)
-        self.ws._instability.set_exclusion(key, min(1.0, current + 0.15))
+        from app.instability_api import InstabilityAPI
+        inst_api = InstabilityAPI(ws=self.ws)
+        current = inst_api.get_learned_exclusion(role_a, role_b)
+        inst_api.set_exclusion(role_a, role_b, min(1.0, current + 0.15))
 
     def get_certainty(self) -> float:
         if not self.manifold:

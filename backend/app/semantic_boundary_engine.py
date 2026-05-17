@@ -152,13 +152,13 @@ class CohesionModel:
         pair = (type_a, type_b)
         ws = get_world_state()
         if did_merge:
-            ws._topology.record_cohesion_merge_attempt(pair)
+            ws.record_cohesion_merge_attempt(pair)
             if success:
-                ws._topology.record_cohesion_merge_success(pair)
+                ws.record_cohesion_merge_success(pair)
         else:
-            ws._topology.record_cohesion_split_attempt(pair)
+            ws.record_cohesion_split_attempt(pair)
             if success:
-                ws._topology.record_cohesion_split_success(pair)
+                ws.record_cohesion_split_success(pair)
 
     def merge_success_rate(self, type_a: str, type_b: str) -> float:
         """Get the learned success rate for merging this type pair."""
@@ -327,7 +327,7 @@ class SemanticBoundaryEngine:
 
     def record_decision(self, decision: MergeDecision):
         decision_dict = decision.__dict__ if hasattr(decision, '__dict__') else {}
-        get_world_state()._history.record_decision(decision_dict)
+        get_world_state().record_decision(decision_dict)
         self.cohesion_model.record(decision.type_a, decision.type_b, decision.merged, decision.success)
         is_role_boundary = not decision.merged and decision.success
         self.transition_detector.observe_transition(decision.type_a, decision.type_b, is_role_boundary)
@@ -339,8 +339,8 @@ class SemanticBoundaryEngine:
         alias mutation of internal list elements.
         """
         ws = get_world_state()
-        recent = ws._history.get_recent_decisions(20)
-        ws._history.update_recent_decision_metadata(recent, coherence, threshold)
+        recent = ws.get_recent_decisions(20)
+        ws.update_recent_decision_metadata(recent, coherence, threshold)
 
 
 def group_adjacent_entities(records: list) -> list:

@@ -121,11 +121,11 @@ def seed_role_engine(schema_fields: list):
         inherited = False
         for existing_role, vec in reng.manifold.items():
             if _name_similarity(field_lower, existing_role.lower()) >= 0.8:
-                instability = ws._energy.get_schema_instability(existing_role)
+                instability = ws.metrics.get_schema_instability(existing_role)
                 if instability < 0.2:
                     # Found a stable similar role; inherit its physical state
                     ws._manifold.set_manifold_vector(f_name, list(vec))
-                    ws._energy.set_schema_instability(f_name, instability)
+                    ws.metrics.set_schema_instability(f_name, instability)
                     inherited = True
                     break
         
@@ -149,12 +149,12 @@ def seed_role_engine(schema_fields: list):
         ws._manifold.set_manifold_vector(f_name, reng._get_type_vector(best_type))
         
         # Initial instability for new roles (Medium) through controlled method
-        current_instability = ws._energy.get_schema_instability(f_name)
+        current_instability = ws.metrics.get_schema_instability(f_name)
         if current_instability == 0.5:
             # Already the default — no mutation needed
             pass
         else:
-            ws._energy.set_schema_instability(f_name, 0.5)
+            ws.metrics.set_schema_instability(f_name, 0.5)
 
 
 def warm_start_from_values(records: list, schema_fields: list):

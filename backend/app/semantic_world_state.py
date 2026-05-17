@@ -59,6 +59,50 @@ class SemanticWorldState:
         self._parent_node_id: Optional[str] = None
         self._branch_label: Optional[str] = None
 
+    # ─── Public Delegation: History Operations ────────────────────────────
+
+    def record_decision(self, entry: dict):
+        """Record a decision in the decision history."""
+        self._history.record_decision(entry)
+
+    def trim_decision_history(self, max_size: int = 1000, keep: int = 500):
+        """Trim decision history to bounded size."""
+        self._history.trim_decision_history(max_size, keep)
+
+    def get_recent_decisions(self, n: int = 20) -> list:
+        """Get the n most recent decisions as copies."""
+        return self._history.get_recent_decisions(n)
+
+    def update_recent_decision_metadata(self, recent_copy: list, coherence: float, threshold: float):
+        """Update matching recent decisions with coherence/success metadata."""
+        self._history.update_recent_decision_metadata(recent_copy, coherence, threshold)
+
+    def get_topology_view(self):
+        """Get a read-only view of the topology graph."""
+        return self._topology.get_view()
+
+    def set_region_energy(self, region_id: int, energy: float):
+        """Set energy for a specific field region (delegated to TopologyState)."""
+        self._topology.set_region_energy(region_id, energy)
+
+    def record_cohesion_merge_attempt(self, pair: tuple):
+        """Record a cohesion merge attempt (delegated to TopologyState)."""
+        self._topology.record_cohesion_merge_attempt(pair)
+
+    def record_cohesion_merge_success(self, pair: tuple):
+        """Record a cohesion merge success (delegated to TopologyState)."""
+        self._topology.record_cohesion_merge_success(pair)
+
+    def record_cohesion_split_attempt(self, pair: tuple):
+        """Record a cohesion split attempt (delegated to TopologyState)."""
+        self._topology.record_cohesion_split_attempt(pair)
+
+    def record_cohesion_split_success(self, pair: tuple):
+        """Record a cohesion split success (delegated to TopologyState)."""
+        self._topology.record_cohesion_split_success(pair)
+
+    # ─── Branch ──────────────────────────────────────────────────────────
+
     def branch(self, label: str) -> "SemanticWorldState":
         """Create an isolated branch of the current semantic world (Phase 39)."""
         import uuid
@@ -668,7 +712,12 @@ class SemanticWorldState:
             get_injector().inject("propagate_field_regions")
             
             # Use TopologyState's bulk propagation instead of manual iteration
-            self._topology.propagate_all(ws=self)
+            effects = self._topology.propagate_all()
+            # Apply exclusion effects through formal InstabilityState API
+            for key, delta in effects:
+                if delta > 0:
+                    current = self._instability.get_exclusion_by_key(key)
+                    self._instability.set_exclusion(key, current + delta)
             count = self._topology.region_count()
             self.record_delta("topology", "propagate_all", {"regions": count})
             return count
@@ -843,7 +892,11 @@ class SemanticWorldState:
         
         Exclusion effects returned by evolve() are applied through formal state APIs.
         """
-        self._topology.evolve_all(ws=self, force=True)
+        effects = self._topology.evolve_all(force=True)
+        for key, delta in effects:
+            if delta > 0:
+                current = self._instability.get_exclusion_by_key(key)
+                self._instability.set_exclusion(key, current + delta)
 
     def snapshot(self, label: str = ""):
         """Record a compact topology snapshot for replay/debugging."""
@@ -1382,7 +1435,11 @@ class SemanticWorldState:
                 if not b.increment_cycle():
                     break
                     
-                self._topology.evolve_all(ws=self)
+                effects = self._topology.evolve_all()
+                for key, delta in effects:
+                    if delta > 0:
+                        current = self._instability.get_exclusion_by_key(key)
+                        self._instability.set_exclusion(key, current + delta)
                 self.relax_topology(budget=b)
                 self.evolve_macro_state()
                 for region in self._topology.iterate_regions():

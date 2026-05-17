@@ -132,7 +132,7 @@ async def system_topology():
     """Exposes the raw state of the semantic cognition substrate."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
-    view = ws._topology.get_view()
+    view = ws.get_topology_view()
     return {
         "metrics": {
             "field_pressure": round(ws.metrics.field_pressure, 3),
@@ -202,7 +202,10 @@ async def merge_knowledge(data: dict):
         parts = k_str.split("|")
         if len(parts) == 2:
             key = tuple(sorted(parts))
-            ws._instability.set_exclusion(key, max(ws._instability.get_exclusion_by_key(key), val))
+            from app.instability_api import InstabilityAPI
+            inst_api = InstabilityAPI(ws=ws)
+            current = inst_api.get_learned_exclusion(key[0], key[1])
+            inst_api.set_exclusion(key[0], key[1], max(current, val))
             
     return {"status": "merged", "roles_merged": merged_roles, "total_manifold": len(ws.role_manifold)}
 

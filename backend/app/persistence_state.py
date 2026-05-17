@@ -23,15 +23,4 @@ def world_state_from_dict(ws, data: dict):
 
 
 def clear_world_state(ws):
-    ws._energy.clear()
-    ws._topology.clear()
-    ws._instability.clear()
-    ws._manifold.clear()
-    ws._motif.clear()
-    ws._transition.clear()
-    ws._history.clear()
-    ws._intent.clear()
-    ws._action.clear()
-    ws._abstraction.clear()
-    ws._observability.clear()
-    # Note: ws._history.clear() now covers dataset_consensus and solidified_motifs
+    ws.clear()

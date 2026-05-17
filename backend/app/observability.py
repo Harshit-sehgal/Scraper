@@ -177,7 +177,7 @@ def topology_report(ws) -> dict:
     """Return a detailed report of the manifold's topology."""
     return {
         "pressure": ws.get_system_pressure(),
-        "region_count": ws._topology.get_view().region_count(),
+        "region_count": ws.get_topology_view().region_count(),
         "role_count": len(ws.role_manifold),
         "community_count": len(ws.global_communities)
     }

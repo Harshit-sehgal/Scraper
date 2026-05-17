@@ -6,7 +6,7 @@ import math
 def validate_world_state(ws) -> list:
     """Validate world state integrity. Returns list of issues found (empty = clean)."""
     issues = []
-    view = ws._topology.get_view()
+    view = ws.get_topology_view()
     regions = view.all_regions()
 
     # 1. NaN/Inf energy values

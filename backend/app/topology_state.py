@@ -746,32 +746,30 @@ class TopologyState:
 
     # ─── Bulk Operations ───────────────────────────────────────────────
 
-    def evolve_all(self, ws=None, force: bool = False):
+    def evolve_all(self, force: bool = False):
+        """Evolve all basins. Returns list of (exclusion_key, delta) effects
+        for the caller to apply through InstabilityState APIs.
+        """
         survivors = []
+        all_effects = []
         for r in self._get_regions():
             effects = r.evolve(force=force)
-            if ws is not None:
-                for key, delta in effects:
-                    if delta > 0:
-                        current = ws._instability.get_exclusion_by_key(key)
-                        ws._instability.set_exclusion(key, current + delta)
+            all_effects.extend(effects)
             decay_floor = 0.05 / max(r.persistence, 0.5)
             if r.instability > decay_floor:
                 survivors.append(r)
         self._set_regions(survivors)
+        return all_effects
 
-    def propagate_all(self, ws=None):
-        """Propagate all regions — applies returned deltas through formal state APIs."""
-        if ws is None:
-            return
-
+    def propagate_all(self):
+        """Propagate all regions — returns list of (exclusion_key, delta) effects
+        for the caller to apply through InstabilityState APIs.
+        """
+        all_effects = []
         for r in self._get_regions():
             effects = r.propagate()
-            # Apply exclusion effects through InstabilityState
-            for key, delta in effects:
-                if delta > 0:
-                    current = ws._instability.get_exclusion_by_key(key)
-                    ws._instability.set_exclusion(key, current + delta)
+            all_effects.extend(effects)
+        return all_effects
     def redistribute_instability(self):
         regs = self._get_regions()
         if len(regs) < 2:

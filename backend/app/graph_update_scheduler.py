@@ -110,13 +110,13 @@ class GraphUpdateScheduler:
 
     def on_instability(self, event: SemanticEvent):
         ws = get_world_state()
-        ws._history.record_decision({
+        ws.record_decision({
             "type": event.event_type.value,
             "source": event.source,
             "delta": event.instability_delta,
             "timestamp": event.timestamp or 0,
         })
-        ws._history.trim_decision_history()
+        ws.trim_decision_history()
         self.run_relaxation_pass()
 
     def __init__(self):
@@ -150,9 +150,9 @@ class GraphUpdateScheduler:
 
         if virtual_tokens:
             result = ie.infer(virtual_tokens, list(ws.role_position_memory.keys()))
-            regions = ws._topology.regions
+            regions = ws.field_regions
             if regions:
-                ws._topology.set_region_energy(regions[-1].region_id, result.energy)
+                ws.set_region_energy(regions[-1].region_id, result.energy)
 
             ws.decay_field_regions()
             ws.aggregate_from_regions()
