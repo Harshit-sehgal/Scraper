@@ -64,7 +64,7 @@ class SemanticOS:
 
     def get_substrate_clock(self) -> dict:
         """Return the current vector clock."""
-        return self.ws._vector_clock.to_dict()
+        return self.ws.get_vector_clock()
 
     def register_with_network(self):
         """Register this OS node with the virtual gossip network."""
@@ -81,7 +81,7 @@ class SemanticOS:
         # Send heartbeat to the substrate
         get_heartbeat_manager().record_heartbeat(
             node_id=self.ws.node_id,
-            clock=self.ws._vector_clock.to_dict(),
+            clock=self.ws.get_vector_clock(),
             checksum=self.ws.get_manifold_checksum(),
             energy=self.ws.metrics.global_energy
         )

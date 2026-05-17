@@ -34,7 +34,7 @@ def geocode_address(address: str) -> Optional[tuple[float, float]]:
             _geocode_cache[address] = coords
             return coords
     except Exception as e:
-        logging.exception("Geocode error for %s", address)
+        logging.exception("Geocode error for %s: %s", address, e)
 
     _geocode_cache[address] = None
     return None

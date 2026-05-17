@@ -568,6 +568,22 @@ class SemanticWorldState:
     def update_seed_transition(self, data: dict):
         self._transition.update_seed(data)
 
+    # ─── Vector Clock Delegation ─────────────────────────────────────────
+
+    def get_vector_clock(self) -> dict:
+        """Return the current vector clock state as a dict."""
+        return self._vector_clock.to_dict()
+
+    # ─── Instability Delegation Methods ──────────────────────────────────
+
+    def get_exclusion(self, r1: str, r2: str) -> float:
+        """Get exclusion strength between two roles."""
+        return self._instability.get_exclusion(r1, r2)
+
+    def set_exclusion_by_key(self, key: tuple, value: float):
+        """Set exclusion by tuple key."""
+        self._instability.set_exclusion(key, value)
+
     # ─── Topology Delegation Properties ──────────────────────────────────
 
     @property

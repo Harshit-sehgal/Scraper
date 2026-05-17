@@ -17,7 +17,7 @@ class InstabilityAPI:
     # ─── Query Operations ────────────────────────────────────────────────
 
     def get_learned_exclusion(self, r1: str, r2: str) -> float:
-        return self.ws._instability.get_exclusion(r1, r2)
+        return self.ws.get_exclusion(r1, r2)
 
     def get_exclusion(self, r1: str, r2: str) -> float:
         """Alias for get_learned_exclusion (legacy support)."""
@@ -27,7 +27,7 @@ class InstabilityAPI:
 
     def set_exclusion(self, r1: str, r2: str, value: float):
         with self.ws.transaction(f"api_exclusion:{r1}"):
-            self.ws._instability.set_exclusion((r1, r2), value)
+            self.ws.set_exclusion_by_key((r1, r2), value)
 
     def add_exclusion(self, r1: str, r2: str, delta: float):
         """Add to an existing exclusion (legacy support)."""
