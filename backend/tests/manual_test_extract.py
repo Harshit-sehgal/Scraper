@@ -2,13 +2,11 @@
 """Standalone regex extraction test — no Playwright, no g4f, just BS4."""
 import json
 import re
-import sys
-
-sys.path.insert(0, '/home/harshit/Documents/Work/Money/scraper/backend')
+from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-html = open('/home/harshit/Documents/Work/Money/scraper/backend/test_page.html').read()
+html = open(Path(__file__).parent / 'test_page.html').read()
 print(f"HTML length: {len(html)}")
 
 soup = BeautifulSoup(html, "html.parser")

@@ -28,19 +28,10 @@ class EnergyAPI:
     def get_global_energy(self) -> float:
         return self._energy.global_energy
 
-    def get_global_entropy(self) -> float:
-        return self._energy.global_entropy
-
     # ─── Mutation Operations (state-changing) ────────────────────────────
 
     def set_global_energy(self, value: float):
         self._energy.set_energy(value)
-
-    def adjust_global_energy(self, delta: float):
-        self._energy.adjust_energy(delta)
-
-    def set_global_entropy(self, value: float):
-        self._energy.set_entropy(value)
 
     # Region energy mutations belong to TopologyState — use TopologyAPI instead.
     # These were bypassing the topology ownership boundary. Removed in Phase 1.

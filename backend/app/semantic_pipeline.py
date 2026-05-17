@@ -187,7 +187,7 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
         
         if len(cands) == 1:
             pt = cands[0].primary_type
-            if (pt.value if isinstance(pt, SemanticType) else pt) == SemanticType.ORGANIZATION.value:
+            if sem_type_str(pt) == 'organization':
                 filtered.append(record)
             else:
                 logging.getLogger(__name__).debug("Filtered: single non-org cand %s", cands[0].primary_type)

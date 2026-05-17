@@ -4,10 +4,9 @@ Uses the scraper's scrape_url function directly (manual mode).
 """
 import asyncio
 import os
-import sys
+from pathlib import Path
 
-sys.path.insert(0, '.')
-os.environ['DATAFORGE_STATE_FILE'] = 'data/jobs_state_test.json'
+os.environ['DATAFORGE_STATE_FILE'] = str(Path(__file__).resolve().parent.parent / 'data' / 'jobs_state_test.json')
 
 from app import scraper as scraper_mod
 from app.models import FieldType, SchemaField

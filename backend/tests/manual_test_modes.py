@@ -1,8 +1,5 @@
-import sys
-
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, '/home/harshit/Documents/Work/Money/scraper/backend')
 from app.main import app
 
 client = TestClient(app)

@@ -387,3 +387,50 @@ def populate_type_vector(token: SemanticToken, primary_type: SemanticType,
 def compute_type_signature(tokens: List[SemanticToken]) -> Tuple[str, ...]:
     """Compute the type signature of a token sequence."""
     return tuple(t.primary_type.value for t in tokens)
+
+
+# ─── FieldType ↔ SemanticType Mapping (deferred import to avoid cycles) ────
+
+def semantic_to_field_type(st: SemanticType) -> "FieldType":
+    """Convert a SemanticType to its nearest FieldType equivalent."""
+    from app.models import FieldType
+    _map = {
+        SemanticType.PRICE: FieldType.CURRENCY,
+        SemanticType.DATE: FieldType.DATE,
+        SemanticType.PHONE: FieldType.PHONE,
+        SemanticType.EMAIL: FieldType.EMAIL,
+        SemanticType.URL: FieldType.URL,
+        SemanticType.LOCATION: FieldType.LOCATION,
+        SemanticType.CODE: FieldType.CODE,
+        SemanticType.RATING: FieldType.RATING,
+        SemanticType.NUMBER: FieldType.NUMBER,
+        SemanticType.TEXT: FieldType.STRING,
+        SemanticType.DURATION: FieldType.STRING,
+        SemanticType.ORGANIZATION: FieldType.STRING,
+        SemanticType.NAME: FieldType.STRING,
+        SemanticType.IDENTIFIER: FieldType.CODE,
+    }
+    return _map.get(st, FieldType.STRING)
+
+
+def field_type_to_semantic(ft: "FieldType") -> SemanticType:
+    """Convert a FieldType to its nearest SemanticType equivalent."""
+    from app.models import FieldType
+    _map = {
+        FieldType.STRING: SemanticType.TEXT,
+        FieldType.INTEGER: SemanticType.NUMBER,
+        FieldType.FLOAT: SemanticType.NUMBER,
+        FieldType.BOOLEAN: SemanticType.TEXT,
+        FieldType.EMAIL: SemanticType.EMAIL,
+        FieldType.URL: SemanticType.URL,
+        FieldType.PHONE: SemanticType.PHONE,
+        FieldType.LOCATION: SemanticType.LOCATION,
+        FieldType.DATE: SemanticType.DATE,
+        FieldType.LIST_STRING: SemanticType.TEXT,
+        FieldType.CURRENCY: SemanticType.PRICE,
+        FieldType.PERCENTAGE: SemanticType.NUMBER,
+        FieldType.CODE: SemanticType.CODE,
+        FieldType.RATING: SemanticType.RATING,
+        FieldType.NUMBER: SemanticType.NUMBER,
+    }
+    return _map.get(ft, SemanticType.TEXT)

@@ -1,8 +1,6 @@
 import asyncio
 import json
-import sys
 
-sys.path.insert(0, '/home/harshit/Documents/Work/Money/scraper/backend')
 from app.models import FieldType, SchemaField
 from app.scraper import scrape_url
 
