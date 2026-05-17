@@ -189,11 +189,11 @@ async def merge_knowledge(data: dict):
     remote_manifold = data.get("role_manifold", {})
     merged_roles = 0
     for role, vec in remote_manifold.items():
-        if ws._manifold.has_manifold_role(role):
+        if ws.has_manifold_role(role):
             # Blend vectors (Physical Consensus) — controlled mutation through ManifoldState
-            ws._manifold.blend_manifold_vector(role, list(vec), alpha=0.7, beta=0.3)
+            ws.blend_manifold_vector(role, list(vec), alpha=0.7, beta=0.3)
         else:
-            ws._manifold.set_manifold_vector(role, list(vec))
+            ws.set_manifold_vector(role, list(vec))
         merged_roles += 1
             
     # 2. Merge Exclusions (Topological Constraints)
@@ -223,12 +223,12 @@ async def system_observability():
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
     return {
-        "telemetry": ws._observability.telemetry[-50:],
-        "heatmap": ws._observability.heatmap,
-        "causal_trace": ws._observability.get_causal_telemetry()[-20:],
+        "telemetry": ws.observability_telemetry[-50:],
+        "heatmap": ws.observability_heatmap,
+        "causal_trace": ws.get_causal_telemetry()[-20:],
         "hierarchy": {
-            "envelopes": list(ws._abstraction.envelopes.keys()),
-            "levels": {r: ws._abstraction.get_role_level(r) for r in ws.role_manifold}
+            "envelopes": list(ws.abstraction_envelopes.keys()),
+            "levels": {r: ws.get_role_level(r) for r in ws.role_manifold}
         }
     }
 
@@ -248,10 +248,10 @@ async def system_agency():
     ws = get_world_state()
     plugins = get_plugin_manager(ws=ws)
     return {
-        "active_actions": ws._action.active_actions,
+        "active_actions": ws.active_actions,
         "available_tools": plugins.get_available_tools(),
-        "action_history": ws._action.action_history[-30:],
-        "active_intents": ws._intent.active_intents
+        "action_history": ws.action_history[-30:],
+        "active_intents": ws.active_intents
     }
 
 @app.post("/api/system/refactor/compress")

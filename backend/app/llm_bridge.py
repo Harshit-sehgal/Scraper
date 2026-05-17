@@ -314,10 +314,10 @@ class SubstratePluginManager:
             v2 = self.ws.role_manifold.get(role_b)
             if v1 and v2:
                 merged_v = [(a + b) / 2 for a, b in zip(v1, v2)]
-                self.ws._manifold.set_manifold_vector(role_a, merged_v)
+                self.ws.set_manifold_vector(role_a, merged_v)
                 # Redirect role_b to role_a in topology (simplified)
                 # Future: update all regions referencing role_b
-                self.ws._manifold.remove_manifold_role(role_b)
+                self.ws.remove_manifold_role(role_b)
                 return f"Success: Merged {role_b} into {role_a}"
         return "Fail"
 
@@ -330,7 +330,7 @@ class SubstratePluginManager:
             return "Skip: Manifold too sparse for compression"
             
         # Calculate variance per dimension
-        dim = self.ws._manifold.dimension
+        dim = self.ws.manifold_dimension
         variances = []
         for k in range(dim):
             vals = [v[k] for v in manifold.values()]

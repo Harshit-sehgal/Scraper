@@ -134,7 +134,7 @@ class GraphUpdateScheduler:
             return
         self._wave_count += 1
 
-        ie = RoleEmbeddingEngine(max_iterations=5)
+        ie = RoleEmbeddingEngine()
         ws = get_world_state()
         pressure_before = ws.metrics.field_pressure
 

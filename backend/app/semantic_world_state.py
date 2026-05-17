@@ -436,6 +436,144 @@ class SemanticWorldState:
             "stability_debt": round(self.metrics.stability_debt, 3)
         }
 
+    # ─── Manifold Delegation Methods ──────────────────────────────────────
+    # All _manifold mutations/external reads route through these public APIs.
+
+    def set_manifold_vector(self, role: str, vector: list):
+        self._manifold.set_manifold_vector(role, vector)
+
+    def get_manifold_vector(self, role: str) -> list:
+        return self._manifold.get_manifold_vector(role)
+
+    def has_manifold_role(self, role: str) -> bool:
+        return self._manifold.has_manifold_role(role)
+
+    def get_manifold_roles(self) -> list:
+        return self._manifold.get_manifold_roles()
+
+    def is_role_anchored(self, role: str) -> bool:
+        return self._manifold.is_role_anchored(role)
+
+    def remove_manifold_role(self, role: str):
+        self._manifold.remove_manifold_role(role)
+
+    def blend_manifold_vector(self, role: str, other_vector: list, alpha: float = 0.7, beta: float = 0.3):
+        self._manifold.blend_manifold_vector(role, other_vector, alpha, beta)
+
+    def get_manifold_checksum(self) -> str:
+        return self._manifold.get_manifold_checksum()
+
+    def clear_compatibility(self):
+        self._manifold.clear_compatibility()
+
+    def set_compatibility(self, role: str, type_str: str, value: float):
+        self._manifold.set_compatibility(role, type_str, value)
+
+    def expand_dimensions(self, new_dim: int):
+        self._manifold.expand_dimensions(new_dim)
+
+    def get_shards(self) -> set:
+        return self._manifold.get_shards()
+
+    def get_shard_roles(self, shard_id: str) -> list:
+        return self._manifold.get_shard_roles(shard_id)
+
+    def apply_force_to_manifold(self, role: str, deltas: list, clamp: bool = True):
+        self._manifold.apply_force_to_manifold(role, deltas, clamp)
+
+    def anchor_role(self, role: str):
+        self._manifold.anchor_role(role)
+
+    def increment_co_occurrence(self, key: tuple, delta: int = 1):
+        self._manifold.increment_co_occurrence(key, delta)
+
+    @property
+    def manifold_dimension(self) -> int:
+        return self._manifold.dimension
+
+    @property
+    def role_anchors(self) -> set:
+        return self._manifold.role_anchors
+
+    # ─── Abstraction Delegation Methods ───────────────────────────────────
+
+    def get_role_level(self, role: str) -> int:
+        return self._abstraction.get_role_level(role)
+
+    def get_envelope(self, envelope_id: str) -> Optional[dict]:
+        return self._abstraction.get_envelope(envelope_id)
+
+    @property
+    def abstraction_envelopes(self) -> dict:
+        return self._abstraction.envelopes
+
+    # ─── Observability Delegation Methods ────────────────────────────────
+
+    def emit_telemetry(self, event_type: str, details: dict):
+        self._observability.emit_telemetry(event_type, details)
+
+    @property
+    def observability_telemetry(self) -> list:
+        return self._observability.telemetry
+
+    @property
+    def observability_heatmap(self) -> dict:
+        return self._observability.heatmap
+
+    def get_role_drift(self, role: str) -> list:
+        return self._observability.get_role_drift(role)
+
+    def get_causal_telemetry(self) -> list:
+        return self._observability.get_causal_telemetry()
+
+    def log_drift(self, role: str, drift: float):
+        self._observability.log_drift(role, drift)
+
+    # ─── Intent Delegation Methods ───────────────────────────────────────
+
+    def set_intent(self, intent_id: str, target_vec: list, strength: float = 0.5, target_roles: Optional[list] = None):
+        self._intent.set_intent(intent_id, target_vec, strength, target_roles)
+
+    def remove_intent(self, intent_id: str):
+        self._intent.remove_intent(intent_id)
+
+    def clear_intents(self):
+        self._intent.clear()
+
+    @property
+    def active_intents(self) -> dict:
+        return self._intent.active_intents
+
+    # ─── Action Delegation Methods ───────────────────────────────────────
+
+    def register_action(self, action_id: str, target_vec: list, handler_name: str, threshold: float = 0.3):
+        self._action.register_action(action_id, target_vec, handler_name, threshold)
+
+    def log_action_execution(self, action_id: str, success: bool, details: Optional[dict] = None):
+        self._action.log_execution(action_id, success, details)
+
+    def get_action(self, action_id: str) -> Optional[dict]:
+        return self._action.get_action(action_id)
+
+    @property
+    def active_actions(self) -> dict:
+        return self._action.active_actions
+
+    @property
+    def action_history(self) -> list:
+        return self._action.action_history
+
+    # ─── Transition Delegation Methods ───────────────────────────────────
+
+    def update_seed_transition(self, data: dict):
+        self._transition.update_seed(data)
+
+    # ─── Topology Delegation Properties ──────────────────────────────────
+
+    @property
+    def topology_anchors(self) -> set:
+        return self._topology.anchors
+
     # ─── Authority Delegation Properties ─────────────────────────────────
     # These delegate to state objects. Direct self.field_regions / self.learned_exclusions
     # references in this class work transparently through these properties.

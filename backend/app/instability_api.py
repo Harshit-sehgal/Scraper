@@ -67,8 +67,8 @@ class ImmunityLayer:
         # 2. Regional Integrity
         # If any target roles are "Crystalline", check system energy
         for role in roles:
-            level = self.ws._abstraction.get_role_level(role)
-            if level > 0 or self.ws._manifold.is_role_anchored(role):
+            level = self.ws.get_role_level(role)
+            if level > 0 or self.ws.is_role_anchored(role):
                 if self.ws.metrics.global_energy > 7.0:
                     # System is too hot to allow mutation of high-level concepts
                     logging.getLogger(__name__).info(f"IMMUNITY: Shielded high-integrity role [{role}] from mutation (Energy too high)")

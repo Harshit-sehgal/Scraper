@@ -10,7 +10,7 @@ class TopologicalQuery:
 
     def find_roles_near(self, role_name: str, radius: float = 0.5) -> List[dict]:
         """Find roles within geometric radius in the manifold."""
-        target_vec = self.ws._manifold.get_manifold_vector(role_name)
+        target_vec = self.ws.get_manifold_vector(role_name)
         if not target_vec:
             return []
             
@@ -25,10 +25,10 @@ class TopologicalQuery:
 
     def _find_near_vec(self, target_vec: list, radius: float, exclude_role: Optional[str] = None) -> List[dict]:
         results = []
-        for role in self.ws._manifold.get_manifold_roles():
+        for role in self.ws.get_manifold_roles():
             if role == exclude_role:
                 continue
-            vec = self.ws._manifold.get_manifold_vector(role)
+            vec = self.ws.get_manifold_vector(role)
             # Distance: sum of squared differences
             dist = sum((a - b) ** 2 for a, b in zip(target_vec, vec)) ** 0.5
             if dist <= radius:
@@ -64,7 +64,7 @@ class TopologicalQuery:
             
         if cmd == "STABLE":
             threshold = float(parts[1]) if len(parts) > 1 else 0.2
-            stable_roles = [r for r in self.ws._manifold.get_manifold_roles() 
+            stable_roles = [r for r in self.ws.get_manifold_roles() 
                            if self.ws.metrics.get_schema_instability(r) <= threshold]
             return {"type": "roles", "data": stable_roles}
             

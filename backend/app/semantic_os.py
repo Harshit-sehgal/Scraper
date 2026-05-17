@@ -50,7 +50,7 @@ class SemanticOS:
 
     def get_substrate_checksum(self) -> str:
         """Return a cryptographic checksum of the current manifold geometry (Phase 31)."""
-        return self.ws._manifold.get_manifold_checksum()
+        return self.ws.get_manifold_checksum()
 
     def reset_engine(self):
         """Clear the entire semantic world state."""
@@ -82,7 +82,7 @@ class SemanticOS:
         get_heartbeat_manager().record_heartbeat(
             node_id=self.ws.node_id,
             clock=self.ws._vector_clock.to_dict(),
-            checksum=self.ws._manifold.get_manifold_checksum(),
+            checksum=self.ws.get_manifold_checksum(),
             energy=self.ws.metrics.global_energy
         )
 
@@ -107,17 +107,17 @@ class SemanticOS:
                              strength: float = 0.5, target_roles: Optional[List[str]] = None):
         """Inject a high-level goal to bias the semantic field (Phase 36)."""
         with self.ws.transaction(f"set_intent:{intent_id}"):
-            self.ws._intent.set_intent(intent_id, target_vec, strength, target_roles)
+            self.ws.set_intent(intent_id, target_vec, strength, target_roles)
 
     def remove_cognitive_intent(self, intent_id: str):
         """Remove a specific cognitive goal."""
         with self.ws.transaction(f"remove_intent:{intent_id}"):
-            self.ws._intent.remove_intent(intent_id)
+            self.ws.remove_intent(intent_id)
 
     def clear_all_intents(self):
         """Clear all active cognitive steering."""
         with self.ws.transaction("clear_intents"):
-            self.ws._intent.clear()
+            self.ws.clear_intents()
 
     # ─── Cognitive Agency (Phase 37) ─────────────────────────────────────
 
@@ -125,7 +125,7 @@ class SemanticOS:
                         handler_name: str, threshold: float = 0.3):
         """Map executable logic into the semantic field (Phase 37)."""
         with self.ws.transaction(f"register_action:{action_id}"):
-            self.ws._action.register_action(action_id, target_vec, handler_name, threshold)
+            self.ws.register_action(action_id, target_vec, handler_name, threshold)
 
     def trigger_actions(self) -> int:
         """Manually trigger autonomous dispatchers."""
@@ -134,14 +134,14 @@ class SemanticOS:
     def report_outcome(self, action_id: str, success: bool, details: Optional[dict] = None):
         """Feed action outcomes back into the manifold (Feedback Loop)."""
         with self.ws.transaction(f"action_outcome:{action_id}"):
-            self.ws._action.log_execution(action_id, success, details)
+            self.ws.log_action_execution(action_id, success, details)
             if success and details and "role" in details:
                 role = details["role"]
-                action = self.ws._action.get_action(action_id)
+                action = self.ws.get_action(action_id)
                 if action:
                     target_vec = action["target_vec"]
                     # Reward successful interpretation by pulling role toward action anchor
-                    self.ws._manifold.blend_manifold_vector(role, target_vec, alpha=0.9, beta=0.1)
+                    self.ws.blend_manifold_vector(role, target_vec, alpha=0.9, beta=0.1)
                     logging.getLogger(__name__).info(
                         f"FEEDBACK REINFORCED: Role [{role}] rewarded by Action [{action_id}]"
                     )
@@ -154,7 +154,7 @@ class SemanticOS:
 
     def get_role_abstraction_level(self, role: str) -> int:
         """Query the hierarchy level of a semantic role (0=base, 1=envelope)."""
-        return self.ws._abstraction.get_role_level(role)
+        return self.ws.get_role_level(role)
 
     # ─── Substrate Branching (Phase 39) ──────────────────────────────────
 
@@ -193,20 +193,20 @@ class SemanticOS:
 
     def get_telemetry(self) -> List[dict]:
         """Query the recent stream of cognitive events."""
-        return self.ws._observability.telemetry
+        return self.ws.observability_telemetry
 
     def get_activity_heatmap(self) -> Dict[str, float]:
         """Query the regional activity heatmap scores."""
-        return self.ws._observability.heatmap
+        return self.ws.observability_heatmap
 
     def get_manifold_drift_log(self, role: str) -> List[float]:
         """Query historical manifold drift for a specific role."""
-        return self.ws._observability.get_role_drift(role)
+        return self.ws.get_role_drift(role)
 
     def log_manual_telemetry(self, event_type: str, details: dict):
         """Inject a manual telemetry event into the stream."""
         with self.ws.transaction("manual_telemetry"):
-            self.ws._observability.emit_telemetry(event_type, details)
+            self.ws.emit_telemetry(event_type, details)
 
 _os_instance: Optional[SemanticOS] = None
 

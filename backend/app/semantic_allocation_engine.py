@@ -124,7 +124,7 @@ def seed_role_engine(schema_fields: list):
                 instability = ws.metrics.get_schema_instability(existing_role)
                 if instability < 0.2:
                     # Found a stable similar role; inherit its physical state
-                    ws._manifold.set_manifold_vector(f_name, list(vec))
+                    ws.set_manifold_vector(f_name, list(vec))
                     ws.metrics.set_schema_instability(f_name, instability)
                     inherited = True
                     break
@@ -146,7 +146,7 @@ def seed_role_engine(schema_fields: list):
                     break
         
         # Initialize manifold vector through controlled method
-        ws._manifold.set_manifold_vector(f_name, reng._get_type_vector(best_type))
+        ws.set_manifold_vector(f_name, reng._get_type_vector(best_type))
         
         # Initial instability for new roles (Medium) through controlled method
         current_instability = ws.metrics.get_schema_instability(f_name)
@@ -185,10 +185,10 @@ def warm_start_from_values(records: list, schema_fields: list):
         if is_compatible:
             # Move manifold point toward this observed type through controlled blend
             if f_name not in reng.manifold:
-                ws._manifold.set_manifold_vector(f_name, reng._get_type_vector(expected_type))
+                ws.set_manifold_vector(f_name, reng._get_type_vector(expected_type))
             
             target_vec = reng._get_type_vector(st)
-            ws._manifold.blend_manifold_vector(f_name, target_vec, alpha=0.7, beta=0.3)
+            ws.blend_manifold_vector(f_name, target_vec, alpha=0.7, beta=0.3)
 
 
 def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abstraction_gradient: float = 0.0) -> AllocationGraph:
@@ -202,9 +202,9 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
     role_list = list(schema_roles)
     if abstraction_gradient > 0.3:
         for role in list(role_list):
-            level = ws._abstraction.get_role_level(role)
+            level = ws.get_role_level(role)
             if level > 0:
-                env = ws._abstraction.get_envelope(role)
+                env = ws.get_envelope(role)
                 if env:
                     # Include constituents in interpretation
                     for c in env["constituents"]:
@@ -229,7 +229,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
 
     # Topology-driven exclusion edges from field regions
     _ws_topo = ws
-    topo_view = _ws_topo._topology.get_view()
+    topo_view = _ws_topo.get_topology_view()
     for region in topo_view.all_regions():
         roles = region.competing_roles
         for i in range(len(roles)):
@@ -414,7 +414,7 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
 
     from app.semantic_world_state import get_world_state as _gws_top
     _ws_top = _gws_top()
-    topo_view = _ws_top._topology.get_view()
+    topo_view = _ws_top.get_topology_view()
     field_owned_roles: Set[str] = set()
     for region in topo_view.all_regions():
         if region.instability > 0.3:

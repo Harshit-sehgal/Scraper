@@ -87,7 +87,7 @@ class RoleTransitionDetector:
     def __init__(self):
         # Ensure bootstrap transitions are present in the world state
         ws = get_world_state()
-        ws._transition.update_seed(_BOOTSTRAP_TRANSITIONS)
+        ws.update_seed_transition(_BOOTSTRAP_TRANSITIONS)
 
     @property
     def _transition_state(self):

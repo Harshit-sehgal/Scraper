@@ -109,6 +109,8 @@ def test_no_orphan_methods():
         "global_communities", "schema_patterns", "global_centrality",
         # ManifoldState delegate properties (accessed as properties, not method calls)
         "motif_stability", "motif_timestamps",
+        # New delegation properties (accessed as dot-property ending lines or via attribute chain)
+        "abstraction_envelopes", "active_intents", "manifold_dimension",
     }
     if "propagate_field_regions" in uncalled:
         uncalled.remove("propagate_field_regions")

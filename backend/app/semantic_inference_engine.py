@@ -49,36 +49,36 @@ class RoleEmbeddingEngine:
                     # Dampen baseline toward neutral to leave room for learning
                     for i in range(len(vec)):
                         vec[i] = vec[i] * 0.85 + 0.5 * 0.15
-                    self.ws._manifold.set_manifold_vector(role, vec)
+                    self.ws.set_manifold_vector(role, vec)
 
     @property
     def manifold(self) -> Dict[str, List[float]]:
-        return self.ws._manifold.role_manifold
+        return self.ws.role_manifold
 
     @property
     def learning_count(self) -> int:
-        return self.ws._manifold.learning_count
+        return self.ws.learning_count
 
     @learning_count.setter
     def learning_count(self, value: int):
-        self.ws._manifold.set_learning_count(value)
+        self.ws.learning_count = value
 
     @property
     def compatibility_cache(self) -> Dict[Tuple[str, str], float]:
         """Legacy access to symbolic compatibility dict."""
-        return self.ws._manifold.role_compatibility
+        return self.ws.role_compatibility
 
     @property
     def co_occurrence(self) -> Dict[Tuple[str, str, str, str], int]:
-        return self.ws._manifold.role_co_occurrence
+        return self.ws.role_co_occurrence
 
     @property
     def total_co_occurrences(self) -> int:
-        return self.ws._manifold.total_co_occurrences
+        return self.ws.total_co_occurrences
 
     @total_co_occurrences.setter
     def total_co_occurrences(self, value: int):
-        self.ws._manifold.set_total_co_occurrences(value)
+        self.ws.total_co_occurrences = value
 
 
     def get_compatibility(self, role: str, stype: SemanticType, token: Optional[SemanticToken] = None) -> float:
@@ -151,7 +151,7 @@ class RoleEmbeddingEngine:
 
     @property
     def dimension(self) -> int:
-        return self.ws._manifold.dimension
+        return self.ws.manifold_dimension
 
     def _get_type_vector(self, stype: SemanticType) -> List[float]:
         """Returns a canonical vector representing a SemanticType."""
@@ -198,14 +198,14 @@ class RoleEmbeddingEngine:
         if success and not is_compatible:
             return
 
-        if not success and not self.ws._manifold.has_manifold_role(role):
+        if not success and not self.ws.has_manifold_role(role):
             return
 
         # Initialize role vector if missing
-        if not self.ws._manifold.has_manifold_role(role):
-            self.ws._manifold.set_manifold_vector(role, self._get_type_vector(ideal_type))
+        if not self.ws.has_manifold_role(role):
+            self.ws.set_manifold_vector(role, self._get_type_vector(ideal_type))
 
-        role_vec = self.ws._manifold.get_manifold_vector(role)
+        role_vec = self.ws.get_manifold_vector(role)
         type_vec = self._get_type_vector(token_type)
         
         effective_delta = delta if success else -delta
@@ -217,7 +217,7 @@ class RoleEmbeddingEngine:
         for i in range(dim):
             role_vec[i] = max(0.0, min(1.0, role_vec[i] + (type_vec[i] - role_vec[i]) * effective_delta * rate))
         
-        self.ws._manifold.set_manifold_vector(role, role_vec)
+        self.ws.set_manifold_vector(role, role_vec)
         self.learning_count += 1
 
     def apply_motif_gravity(self, role_name: str, primary_type: SemanticType, stability: float):
@@ -225,11 +225,11 @@ class RoleEmbeddingEngine:
         if stability < 0.1:
             return
             
-        if not self.ws._manifold.has_manifold_role(role_name):
+        if not self.ws.has_manifold_role(role_name):
             from app.semantic_allocation_engine import _infer_role_type
-            self.ws._manifold.set_manifold_vector(role_name, self._get_type_vector(_infer_role_type(role_name)))
+            self.ws.set_manifold_vector(role_name, self._get_type_vector(_infer_role_type(role_name)))
             
-        role_vec = self.ws._manifold.get_manifold_vector(role_name)
+        role_vec = self.ws.get_manifold_vector(role_name)
         type_vec = self._get_type_vector(primary_type)
         
         # Gravity Strength: proportional to motif stability
@@ -248,7 +248,7 @@ class RoleEmbeddingEngine:
             return
 
         all_roles = list(manifold_copy.keys())
-        shards = self.ws._manifold.get_shards()
+        shards = self.ws.get_shards()
         
         # Phase 34: Cognitive Elasticity — scale rate by system pressure
         try:
@@ -272,7 +272,7 @@ class RoleEmbeddingEngine:
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 futures = []
                 for shard_id in shards:
-                    shard_roles = self.ws._manifold.get_shard_roles(shard_id)
+                    shard_roles = self.ws.get_shard_roles(shard_id)
                     futures.append(executor.submit(_relax_roles_safe, shard_roles, manifold_copy, base_rate))
                 # Wait for all shards to complete
                 concurrent.futures.wait(futures)
@@ -282,20 +282,20 @@ class RoleEmbeddingEngine:
         
         # Save mutated copies back
         for role, vec in manifold_copy.items():
-            self.ws._manifold.set_manifold_vector(role, vec)
+            self.ws.set_manifold_vector(role, vec)
 
         # Sync legacy compatibility cache
         for role in all_roles:
             for stype in SemanticType:
                 type_str = stype.value if hasattr(stype, 'value') else str(stype)
-                self.ws._manifold.set_compatibility(role, type_str, self.get_compatibility(role, stype))
+                self.ws.set_compatibility(role, type_str, self.get_compatibility(role, stype))
 
         self.detect_dimensionality_need()
 
     def _relax_roles(self, roles: List[str], manifold_full: dict, base_rate: float):
         """Internal helper for localized relaxation of a subset of roles."""
         # 1. Filter out anchored roles
-        roles = [r for r in roles if not self.ws._manifold.is_role_anchored(r)]
+        roles = [r for r in roles if not self.ws.is_role_anchored(r)]
         if not roles:
             return
 
@@ -360,7 +360,7 @@ class RoleEmbeddingEngine:
 
         # Phase 5: Intent Steering (Phase 36)
         # Apply force toward user-defined cognitive goals
-        active_intents = self.ws._intent.active_intents
+        active_intents =        self.ws.active_intents
         for intent_id, details in active_intents.items():
             target_vec = details["target_vec"]
             strength = details["strength"]
@@ -385,7 +385,7 @@ class RoleEmbeddingEngine:
 
     def learn_co_occurrence(self, assignment_a: tuple, assignment_b: tuple, success: bool):
         key = assignment_a + assignment_b
-        self.ws._manifold.increment_co_occurrence(key, 1 if success else -1)
+        self.ws.increment_co_occurrence(key, 1 if success else -1)
 
     def get_co_occurrence_boost(self, role_a: str, type_a: str, role_b: str, type_b: str) -> float:
         key = (role_a, type_a, role_b, type_b)
@@ -444,7 +444,7 @@ class RoleEmbeddingEngine:
             logging.getLogger(__name__).info(
                 f"DIMENSIONALITY INDUCTION: Expanding manifold resolution to {new_dim}."
             )
-            self.ws._manifold.expand_dimensions(new_dim)
+            self.ws.expand_dimensions(new_dim)
     
     def save_cache(self) -> dict:
         cache: dict = {}
@@ -455,21 +455,21 @@ class RoleEmbeddingEngine:
         return cache
 
     def load_cache(self, data: dict):
-        self.ws._manifold.clear_compatibility()
+        self.ws.clear_compatibility()
         for k, v in data.items():
             if k.startswith("compat:"):
                 parts = k.split(":")
-                self.ws._manifold.set_compatibility(parts[1], parts[2], v)
+                self.ws.set_compatibility(parts[1], parts[2], v)
             elif k.startswith("manifold:"):
                 role = k.split(":", 1)[1]
-                self.ws._manifold.set_manifold_vector(role, v)
+                self.ws.set_manifold_vector(role, v)
 
 
 @dataclass
 class RelationshipEmbeddingSpace:
     def compute_embedding(self, node_idx: int, graph: SemanticGraph) -> List[float]:
         ws = get_world_state()
-        dim = ws._manifold.dimension
+        dim = ws.manifold_dimension
         
         if node_idx < len(graph.tokens):
             token = graph.tokens[node_idx]
