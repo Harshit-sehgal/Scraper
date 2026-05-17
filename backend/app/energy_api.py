@@ -21,7 +21,7 @@ class EnergyAPI:
         if isinstance(ws, EnergyState):
             self._energy = ws
         else:
-            self._energy = ws._energy
+            self._energy = ws.energy_state
 
     # ─── Query Operations (read-only) ────────────────────────────────────
 

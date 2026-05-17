@@ -584,6 +584,18 @@ class SemanticWorldState:
         """Set exclusion by tuple key."""
         self._instability.set_exclusion(key, value)
 
+    # ─── Energy & Topology API Delegation Properties ───────────────────────
+
+    @property
+    def energy_state(self):
+        """Return the EnergyState for controlled API access."""
+        return self._energy
+
+    @property
+    def topology_state(self):
+        """Return the TopologyState for controlled API access."""
+        return self._topology
+
     # ─── Topology Delegation Properties ──────────────────────────────────
 
     @property

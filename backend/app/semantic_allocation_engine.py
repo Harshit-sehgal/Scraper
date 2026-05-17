@@ -228,8 +228,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
         )
 
     # Topology-driven exclusion edges from field regions
-    _ws_topo = ws
-    topo_view = _ws_topo.get_topology_view()
+    topo_view = ws.get_topology_view()
     for region in topo_view.all_regions():
         roles = region.competing_roles
         for i in range(len(roles)):
@@ -261,9 +260,9 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
 
     # Topological Inference (Phase 18): Community Pull
     # Roles that are part of a macro-scale community pull each other.
-    if _ws_topo.global_communities:
+    if ws.global_communities:
         role_comm_map = {}
-        for i, comm in enumerate(_ws_topo.global_communities):
+        for i, comm in enumerate(ws.global_communities):
             for role_name in comm:
                 role_comm_map[role_name] = i
         
@@ -286,14 +285,14 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
 
     # Schema Gravity Pull (Phase 19): Macro-Scale Structural memory
     # If the set of schema roles matches a learned stable pattern, boost compatibility.
-    if _ws_topo.schema_patterns:
+    if ws.schema_patterns:
         current_roles = sorted(graph.roles.keys())
         # Check role-pair subsets against stored 2-tuple patterns
         schema_frequency = 0
         for i in range(len(current_roles)):
             for j in range(i + 1, len(current_roles)):
                 pair = (current_roles[i], current_roles[j])
-                schema_frequency = max(schema_frequency, _ws_topo.schema_patterns.get(pair, 0))
+                schema_frequency = max(schema_frequency, ws.schema_patterns.get(pair, 0))
         if schema_frequency > 10:
             # Learned stable schema; boost all compatible roles
             boost = min(0.1, schema_frequency / 500.0)
@@ -303,7 +302,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
     # Crystalline Gravity (Phase 22): Predictive Pull from Synthesized Units
     # If a token matches a crystalline record by identity, pull missing fields.
     token_vals = list(graph.candidates.keys())
-    attractors = _ws_topo.get_crystalline_attractors(token_vals)
+    attractors = ws.get_crystalline_attractors(token_vals)
     for attractor in attractors:
         # Every field in the attractor exerts a pull on matching candidate tokens
         for role_name, attr_val in attractor.items():
@@ -318,8 +317,8 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
 
     # Topological Law Bias (Phase 24): Proximity Laws
     # If roles A and B have a proximity law and are close, boost.
-    if _ws_topo.topological_laws:
-        for (r1, r2), strength in _ws_topo.topological_laws.items():
+    if ws.topological_laws:
+        for (r1, r2), strength in ws.topological_laws.items():
             if r1 in graph.roles and r2 in graph.roles:
                 # Find candidate positions for these roles
                 for c1, t1 in graph.candidates.items():
@@ -412,9 +411,9 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
         key=lambda x: -x[0],
     )
 
-    from app.semantic_world_state import get_world_state as _gws_top
-    _ws_top = _gws_top()
-    topo_view = _ws_top.get_topology_view()
+    from app.semantic_world_state import get_world_state
+    ws = get_world_state()
+    topo_view = ws.get_topology_view()
     field_owned_roles: Set[str] = set()
     for region in topo_view.all_regions():
         if region.instability > 0.3:

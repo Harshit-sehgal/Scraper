@@ -350,15 +350,13 @@ def run_pipeline(
         # Phase 4A: Capture pre-allocation conflict topology
         # Preserves raw instability geometry before allocation resolves it
         if tokens:
-            from app.semantic_world_state import get_world_state as _gws_pre
-            _gws_pre().capture_pre_allocation_field(tokens, schema_fields)
+            get_world_state().capture_pre_allocation_field(tokens, schema_fields)
 
         # Phase 4C: Propagate field regions before allocation
         # Instability spreads to neighboring roles, so allocation sees
         # propagated pressure rather than raw resolved state
         if tokens:
-            from app.semantic_world_state import get_world_state as _gws_prop
-            _gws_prop().propagate_field_regions()
+            get_world_state().propagate_field_regions()
 
         sem_record = SemanticRecord(tokens=tokens)
         _, alloc_graph = allocate_semantic_roles(sem_record, schema_fields)

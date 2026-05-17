@@ -23,7 +23,7 @@ class TopologyAPI:
         if isinstance(ws, TopologyState):
             self._topology = ws
         else:
-            self._topology = ws._topology
+            self._topology = ws.topology_state
 
     # ─── Query Operations (read-only) ────────────────────────────────────
 
