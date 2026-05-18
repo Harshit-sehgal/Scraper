@@ -13,6 +13,7 @@ class SemanticEventType(Enum):
     UNCERTAINTY_SPIKE = "uncertainty_spike"
     TOPOLOGY_SHIFT = "topology_shift"
     EQUILIBRIUM_REACHED = "equilibrium_reached"
+    FIELD_WAVE = "field_wave" # Decentralized propagation wave
 
 
 @dataclass

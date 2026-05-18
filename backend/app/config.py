@@ -60,6 +60,28 @@ class Settings(BaseSettings):
     SCORE_GATE_ABSOLUTE_MIN: float = 0.1
     """Absolute floor for the quality gate threshold."""
 
+    # ─── Scraper Heuristics (Grounding abstractions) ───────────────────────
+    SELECTOR_SNIPPET_MAX_CHARS: int = 16000
+    """Max characters of HTML sent to LLM for selector discovery."""
+    REGEX_MAX_CONTAINERS: int = 300
+    """Hard limit on containers scanned by regex fallback."""
+    SELECTOR_MIN_TEXT_LEN: int = 5
+    """Min text length for a node to be considered a data container."""
+    SELECTOR_HEADING_FALLBACK_LEN: int = 70
+    """Max length of text considered as a heading fallback."""
+    NOISE_COHESION_THRESHOLD: float = 0.2
+    """Cohesion score below which a record is flagged as noise."""
+    NOISE_MIN_VALUES_FOR_REPETITION_CHECK: int = 3
+    """Number of identical fields required to trigger template-noise flag."""
+    NOISE_SOCIAL_PLATFORM_THRESHOLD: int = 3
+    """Number of social platforms seen in a row before flagging as footer noise."""
+    CONTACT_VALID_PHONE_MIN_DIGITS: int = 7
+    """Min digits for a valid phone number."""
+    CONTACT_VALID_PHONE_MAX_DIGITS: int = 15
+    """Max digits for a valid phone number."""
+    SELECTOR_MEMORY_MAX_FAILURES: int = 3
+    """Max consecutive failures for a remembered selector before it's suspended."""
+
     # ─── LLM Provider Timeouts ─────────────────────────────────────────────
     LLM_TIMEOUT: int = 45
     """Default timeout for LLM JSON/text calls (seconds)."""

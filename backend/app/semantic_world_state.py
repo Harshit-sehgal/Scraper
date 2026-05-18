@@ -69,6 +69,28 @@ class SemanticWorldState:
         self._parent_node_id: Optional[str] = None
         self._branch_label: Optional[str] = None
 
+        # Phase 71: Decentralized Field Waves
+        from app.event_dispatcher import get_dispatcher
+        from app.semantic_events import SemanticEventType
+        self._dispatcher = get_dispatcher()
+        self._dispatcher.subscribe(SemanticEventType.FIELD_WAVE, self._on_field_wave)
+
+    def _on_field_wave(self, event):
+        """Handle a field wave by processing it within a transaction."""
+        # Note: We must be careful about which instance handles the wave.
+        # Only the root world state or active branch should process it.
+        if self._replaying:
+            return
+
+        source_id = event.payload.get("source_id")
+        intensity = event.payload.get("intensity", 0.0)
+        
+        if source_id and intensity > 0:
+            # We use a separate transaction for the wave processing
+            # to ensure causality is tracked correctly.
+            with self.transaction(label=f"wave_processing:{source_id}"):
+                self._topology.process_field_wave(source_id, intensity)
+
     # ─── Public Delegation: History Operations ────────────────────────────
 
     def record_decision(self, entry: dict):
@@ -757,8 +779,17 @@ class SemanticWorldState:
         return self._instability.get_exclusion(r1, r2)
 
     def set_exclusion_by_key(self, key: tuple, value: float):
-        """Set exclusion by tuple key."""
+        """Set exclusion by tuple key and sync to topological laws."""
         self._instability.set_exclusion(key, value)
+        # ─── learned_exclusions ↔ topology bridge ───
+        # When exclusion is set, also update the corresponding topological law
+        # so both systems remain in sync. High exclusion → repulsive law.
+        if value > 0.3:
+            current_law = self._topology.topological_laws.get(key, 0.0)
+            # Sync exclusion strength as repulsive pressure on the law
+            new_law = current_law - value * 0.05
+            # new_law < current_law is guaranteed when value > 0.3
+            self._topology.set_topological_law(key, new_law)
 
     # ─── Energy Delegation Methods ────────────────────────────────────────
 
@@ -1668,16 +1699,54 @@ class SemanticWorldState:
                         "redirected": result["redirected"],
                         "through_edge_field": result["through_edge_field"],
                     })
+
+        # ─── Contradiction-Driven Topology Restructuring ───
+        # Track accumulated contradiction pressure and trigger restructuring
+        # when threshold is exceeded. This strengthens the topology restructuring
+        # pathway so contradictions directly drive structural change.
+        contested_tokens_in_conflicts = set()
+        for fc in alloc_conflicts:
+            if fc.get("candidate"):
+                contested_tokens_in_conflicts.add(fc["candidate"])
+        edge_field_routes = sum(
+            1 for fc in alloc_conflicts
+            for ra, rb in ROLE_EXCLUSIVITY
+            if fc.get("role", "") in (ra, rb) and fc.get("candidate")
+        )
+
+        # Accumulate contradiction telemetry for restructuring trigger
+        self._observability.emit_telemetry("contradiction_pressure", {
+            "conflict_count": len(alloc_conflicts),
+            "edge_field_routes": edge_field_routes,
+            "contested_tokens": len(contested_tokens_in_conflicts),
+            "system_pressure": round(self.metrics.field_pressure, 3),
+        })
+
+        # ─── Topology Restructuring Trigger ───
+        # When contradiction pressure is high (many edge field routes activated)
+        # AND system pressure is elevated, trigger topology restructuring to
+        # rewire the substrate and escape metastable contradiction locks.
+        contradiction_pressure = (len(alloc_conflicts) + edge_field_routes) / max(len(ROLE_EXCLUSIVITY), 1)
+        if contradiction_pressure > 0.3 and self.metrics.field_pressure > 0.5:
+            logging.getLogger(__name__).info(
+                "CONTRADICTION PRESSURE TRIGGER: %.3f contradiction pressure, "
+                "forcing topology restructuring on node [%s]",
+                contradiction_pressure, self.node_id
+            )
+            self._topology.restructure_topology()
+            self._observability.emit_telemetry("contradiction_restructuring", {
+                "contradiction_pressure": round(contradiction_pressure, 3),
+                "field_pressure": round(self.metrics.field_pressure, 3),
+                "conflict_count": len(alloc_conflicts),
+            })
+
         # Inlined from the former instability_state.observe_field_perturbation
         all_exclusions = set(ROLE_EXCLUSIVITY)
         for (r1, r2), strength in self.learned_exclusions.items():
             if strength > 0.3:
                 all_exclusions.add(tuple(sorted([r1, r2])))
 
-        contested_tokens = set()
-        for fc in alloc_conflicts:
-            if fc.get("candidate"):
-                contested_tokens.add(fc["candidate"])
+        contested_tokens = set(contested_tokens_in_conflicts)
         view = self._topology.get_view()
         for r in view.all_regions():
             if r.token not in contested_tokens:
@@ -1758,6 +1827,19 @@ class SemanticWorldState:
                 # Promote extremely stable exclusions to Anchors
                 if val > 0.9 and self._topology.topological_laws.get((r1, r2), 0) > 0.8:
                     self._topology.record_anchor((r1, r2))
+
+            # ─── learned_exclusions ↔ topology bridge (reverse direction) ───
+            # When topological laws have strong repulsive values that are NOT
+            # reflected in the exclusions dict, sync them back. This makes
+            # the bridge bidirectional: exclusions → laws (via set_exclusion_by_key)
+            # and laws → exclusions (here).
+            for law_key, law_val in self._topology.topological_laws.items():
+                if law_val < -0.3:
+                    # Strong repulsive law: ensure exclusion dict reflects it
+                    current_excl = self._instability.get_exclusion_by_key(law_key)
+                    expected_excl = min(1.0, abs(law_val) * 0.5)
+                    if expected_excl > current_excl + 0.1:
+                        self._instability.set_exclusion(law_key, expected_excl)
 
             self._topology.detect_communities()
             # ─── Semantic Sharding (Phase 35) ───
@@ -2541,3 +2623,8 @@ def get_world_state() -> SemanticWorldState:
     if _world_state is None:
         _world_state = SemanticWorldState()
     return _world_state
+
+def reset_world_state():
+    """Reset the global world state singleton (for testing)."""
+    global _world_state
+    _world_state = None

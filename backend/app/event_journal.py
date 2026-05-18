@@ -7,6 +7,9 @@ Every mutation to the world state is recorded as a journal entry with:
 - mutation type
 
 This enables replay, rollback, and causality chain analysis.
+
+ReplayBuffer integration: All journal entries are also persisted to the
+large-scale ReplayBuffer for streaming replay from persistent storage.
 """
 
 import time
@@ -20,6 +23,7 @@ class EventJournal:
     """Tracks mutations to the semantic field for replay and debugging.
     
     Now uses Delta-Encoding (Phase 57) to support million-event horizons.
+    Streams historical deltas to ReplayBuffer for persistent storage (Phase 66).
     """
 
     def __init__(self, max_entries: int = 10000):
@@ -30,7 +34,11 @@ class EventJournal:
         self._current_idx = 0
 
     def record(self, source: str, mutation_type: str, before: dict, after: dict, metadata: Optional[dict] = None):
-        """Record a mutation event using delta-encoding (Phase 57)."""
+        """Record a mutation event using delta-encoding (Phase 57).
+        
+        Also persists to the large-scale ReplayBuffer for streaming replay
+        from persistent storage (Phase 66).
+        """
         if not self._enabled:
             return
             
@@ -61,6 +69,26 @@ class EventJournal:
             
         self._entries.append(entry)
         self._current_idx += 1
+
+        # Phase 66/ArchWeakness: Persist each event to the large-scale ReplayBuffer
+        # for streaming replay from persistent storage.
+        try:
+            from app.replay_buffer import get_replay_buffer
+            rb = get_replay_buffer()
+            rb.append({
+                "type": f"{source}.{mutation_type}",
+                "delta": delta if delta else {"source": source, "mutation_type": mutation_type},
+                "metadata": {
+                    "source": source,
+                    "mutation_type": mutation_type,
+                    "idx": self._current_idx - 1,
+                    "trace_id": (metadata or {}).get("trace_id"),
+                    **({k: v for k, v in (metadata or {}).items() if k != "trace_id"}),
+                }
+            })
+        except Exception as e:
+            # ReplayBuffer failure is non-fatal — journal continues normally
+            logger.debug("ReplayBuffer persist skipped: %s", e)
         
         if len(self._entries) > self._max:
             # Phase 57/58/61/66: Semantic Retention Prioritization

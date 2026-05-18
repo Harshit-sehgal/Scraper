@@ -41,6 +41,14 @@ class ScrapeTelemetry:
     profile_match: bool = False            # Whether a selector profile was found
     profile_records: int = 0               # Records from profile extraction
     anti_bot_score: float = 0.0            # 0.0 = none, 1.0 = certain anti-bot detected
+    
+    # Granular Metrics (Grounding abstractions)
+    selector_hit_rate: float = 0.0          # Percentage of fields successfully matched
+    dom_mutation_rate: float = 0.0         # Rough proxy for dynamic behavior/instability
+    token_density: float = 0.0             # Text characters per DOM node
+    js_render_delay_ms: float = 0.0        # Time spent waiting for JS/DOM quiescence
+    confidence_map: dict = field(default_factory=dict) # Per-field extraction confidence scores
+    
     error: Optional[str] = None
     timestamp: float = field(default_factory=time.time)
 

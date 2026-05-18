@@ -1,6 +1,7 @@
 import re
 import logging
 import asyncio
+import time
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 import httpx
@@ -28,7 +29,7 @@ def _normalized_text_key(text: str) -> str:
 
 def _is_placeholder_value(text: str) -> bool:
     key = _normalized_text_key(text)
-    if not key:
+    if not key or len(key) < settings.SELECTOR_MIN_TEXT_LEN:
         return True
     if key in EMPTY_TOKENS or key in PLACEHOLDER_PHRASES:
         return True
@@ -95,7 +96,7 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
         return True
 
     # Structural: all values identical (likely template noise)
-    if len(all_values) >= 3 and len(set(all_values)) == 1:
+    if len(all_values) >= settings.NOISE_MIN_VALUES_FOR_REPETITION_CHECK and len(set(all_values)) == 1:
         return True
 
     combined = " ".join(all_values)
@@ -104,7 +105,7 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
     entity_fields = [f.name for f in schema_fields if _is_entity_name_field(f.name)]
     if not entity_fields:
         seg = segment_single_text(combined)
-        if not seg.structural_pattern and seg.overall_cohesion < 0.2:
+        if not seg.structural_pattern and seg.overall_cohesion < settings.NOISE_COHESION_THRESHOLD:
             return True
 
     # Privacy/legal/navigation: these are structurally distinct
@@ -115,7 +116,7 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
     # Social media links: structural noise on listing pages
     # Only flag if multiple platforms appear (single mention is likely legitimate)
     social = ["facebook", "instagram", "twitter", "linkedin", "youtube"]
-    if sum(v in combined for v in social) >= 3:
+    if sum(v in combined for v in social) >= settings.NOISE_SOCIAL_PLATFORM_THRESHOLD:
         return True
 
     # Entity field check: use semantic density on the name field
@@ -233,17 +234,15 @@ def _boost_contacts_with_page_html(
     e, p = _extract_page_contacts(html)
     return _apply_page_level_contact_fallback(results, schema_fields, e, p)
 
-async def fetch_page_content(url: str) -> str:
+async def fetch_page_content(url: str) -> tuple[str, float]:
     """Load a URL in a headless browser and fallback to plain HTTP when needed.
 
-    Strategy:
-    1. Use `networkidle` to wait for all network requests to settle (important for
-       sites that load data via XHR/AJAX after initial DOM).
-    2. If networkidle fails, fall back to `domcontentloaded` + extra wait.
-    3. Final fallback: plain requests (no JS).
+    Returns:
+        tuple of (html_content, js_render_delay_ms)
     """
     browser = None
     context = None
+    js_render_delay_ms = 0.0
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
@@ -260,48 +259,77 @@ async def fetch_page_content(url: str) -> str:
 
             await page.route("**/*", _route_filter)
 
-            # Phase 1: Try networkidle — waits for ALL network requests to settle
-            # This is critical for sites that populate flight/travel/listing
-            # results via XHR/fetch after the initial DOM content loads.
+            # Phase 1: Try networkidle
             try:
                 await page.goto(url, wait_until="networkidle", timeout=settings.PLAYWRIGHT_TIMEOUT)
-                # Adaptive post-network buffer: check DOM stabilization instead of fixed sleep
+                
+                # Wait for common loading indicators to disappear
+                loading_selectors = [
+                    ".loading", ".spinner", ".loader", "#loading", "#spinner",
+                    "[class*='Loading']", "[class*='Spinner']", "[class*='Loader']",
+                    ".sk-cube-grid", ".lds-ripple", ".bouncing-loader"
+                ]
+                for sel in loading_selectors:
+                    try:
+                        # Wait for it to be hidden, but don't block if it never appears
+                        await page.wait_for_selector(sel, state="hidden", timeout=2000)
+                    except Exception:
+                        pass
+
+                # Adaptive post-network buffer: check DOM stabilization
+                stabilization_start = time.time()
                 try:
                     await page.wait_for_function(
                         """() => {
                             const body = document.body;
                             if (!body) return true;
                             const html = body.innerHTML;
-                            // Wait until DOM stops changing (500ms quiescence)
                             return new Promise(resolve => {
                                 let lastHtml = html;
-                                let checks = 0;
+                                let stableChecks = 0;
+                                let totalChecks = 0;
                                 const interval = setInterval(() => {
                                     const current = document.body ? document.body.innerHTML : lastHtml;
-                                    if (current === lastHtml || checks > 5) {
+                                    if (current === lastHtml) {
+                                        stableChecks++;
+                                    } else {
+                                        stableChecks = 0;
+                                    }
+                                    
+                                    // Resolve if stable for 5 checks (1s) AND we've waited at least some time
+                                    // or if we hit the absolute check limit.
+                                    if ((stableChecks >= 5 && totalChecks > 15) || totalChecks > 60) {
                                         clearInterval(interval);
                                         resolve(true);
                                     }
                                     lastHtml = current;
-                                    checks++;
-                                }, 100);
+                                    totalChecks++;
+                                }, 200);
                             });
                         }""",
                         timeout=settings.PAGE_SETTLE_DELAY * 1000,
                     )
                 except Exception:
-                    # DOM stabilization check is best-effort; proceed with content
                     pass
+                js_render_delay_ms = (time.time() - stabilization_start) * 1000
+
+                # Optional: Auto-scroll to trigger lazy-loaders
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+                await asyncio.sleep(0.5)
+                await page.evaluate("window.scrollTo(0, 0)")
+
             except Exception as e:
                 logging.warning(
                     "[Scraper] networkidle timeout for %s: %s. Waiting longer with domcontentloaded",
                     url, e,
                 )
                 await page.wait_for_load_state("domcontentloaded")
+                fallback_start = time.time()
                 await asyncio.sleep(settings.PAGE_FALLBACK_EXTRA_WAIT)
+                js_render_delay_ms = (time.time() - fallback_start) * 1000
 
             html = await page.content()
-            return html
+            return html, js_render_delay_ms
     except Exception as e:
         logging.error(f"[Scraper] Playwright failed for {url}: {e}. Falling back to httpx")
     finally:
@@ -316,7 +344,7 @@ async def fetch_page_content(url: str) -> str:
             except Exception as e:
                 logging.debug(f"[Scraper] Ignoring browser close error: {e}")
 
-    # httpx fallback with connection pooling and retry
+    # httpx fallback
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(settings.REQUEST_TIMEOUT),
         headers={"User-Agent": settings.USER_AGENT},
@@ -325,7 +353,7 @@ async def fetch_page_content(url: str) -> str:
             try:
                 resp = await client.get(url)
                 resp.raise_for_status()
-                return resp.text
+                return resp.text, 0.0
             except (httpx.HTTPError, httpx.TimeoutException) as e:
                 if attempt < settings.MAX_RETRIES - 1:
                     wait = 0.5 * (attempt + 1)
@@ -340,9 +368,13 @@ async def fetch_page_content(url: str) -> str:
                         settings.MAX_RETRIES, url, e,
                     )
                     raise
+    return "", 0.0
 
-def clean_html_for_selectors(html: str, max_chars: int = 16000) -> str:
+def clean_html_for_selectors(html: str, max_chars: int | None = None) -> str:
     """Remove known-noise tags while preserving structure useful for selector discovery."""
+    if max_chars is None:
+        max_chars = settings.SELECTOR_SNIPPET_MAX_CHARS
+        
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup(["script", "style", "noscript", "svg", "iframe", "form"]):
         tag.decompose()
@@ -376,7 +408,7 @@ def _valid_phone(text: str) -> str | None:
     for c in candidates:
         c_norm = _compact_text(c).strip("- ,")
         digits = re.sub(r"\D", "", c_norm)
-        if len(digits) < 7 or len(digits) > 15:
+        if len(digits) < settings.CONTACT_VALID_PHONE_MIN_DIGITS or len(digits) > settings.CONTACT_VALID_PHONE_MAX_DIGITS:
             continue
         if c_norm not in seen:
             seen.add(c_norm)

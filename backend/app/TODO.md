@@ -366,15 +366,18 @@
 - [x] Add invariant tests for attractive, repulsive, impossible, and signed-law edge behavior.
 
 ## Current Architectural Weaknesses
-- [ ] Contradiction pressure still needs stronger global topology restructuring; current propagation and pressure dynamics are verified but not yet sufficient as the primary cognition substrate.
-- [ ] `learned_exclusions` remains a secondary symbolic bridge and should continue migrating toward topology-native memory.
-- [ ] Edge semantics remain split across cohesion, compatibility, exclusions, topological laws, and neighbor lists; unify these into a bounded edge field model.
-- [ ] Event propagation is still partly scheduler/policy orchestrated; move more activation into distributed field waves with replayable causal traces.
-- [ ] Observability now catches replay/governance failures, but pressure heatmaps and causal chain reconstruction are still partial.
-- [ ] Large-scale replay buffer remains unimplemented; historical replay is validated in-memory, not yet streamed from persistent storage.
+- [x] Contradiction pressure driven topology restructuring — implemented contradiction_pressure trigger in `observe_field_perturbation()` that restructures topology when pressure threshold exceeded.
+- [x] `learned_exclusions` ↔ topology bridge (bidirectional): `set_exclusion_by_key()` syncs exclusions → laws; `evolve_macro_state()` syncs laws → exclusions.
+- [x] Edge semantics unified into `EdgeFieldSnapshot` read model combining cohesion, topological laws, region pressure, and impossibility into one bounded edge field.
+- [x] Contradiction routed through unified edge fields via `route_contradiction()`: repulsive edges redirect pressure through high-affinity routes using `_redirect_repulsive_pressure()`.
+- [x] Large-scale replay buffer implemented with JSON-Lines persistent storage, O(log N) checkpoint seeks, streaming reads, and causal chain reconstruction.
+- [x] **Decentralized Field Waves** (Phase 71): Transitioned event propagation from centralized scheduler orchestration to distributed "field waves" that ripple through the topology.
+- [x] **Observability pressure heatmaps** (Phase 72): Implemented real-time visualization of edge field pressure and wave propagation ripples in the frontend dashboard.
 
 ## Smallest Coherent Next Step
-- [ ] Route contradiction propagation through unified edge fields so repulsive edges redirect uncertainty and pressure waves instead of only mutating scalar exclusions.
+- [x] **Real-time pressure visualization**: Enhanced the reliability dashboard with a live graph of edge field pressure flows and wave propagation traces.
+- [ ] **Multi-shard federation**: Test and harden state merging across geographically distributed substrate nodes.
+- [x] Add contradiction-driven topology restructuring trigger in `observe_field_perturbation()`.
 
 ## Project Status: Complete — All Phases Verified
 The engine passes architecture validation and the full invariant/test suite, with deterministic replay, governance, resource shedding, failure injection isolation, snapshot desync detection, transactional priority queuing, large-scale replay buffer, and pressure-triggered enforcement all implemented and verified.

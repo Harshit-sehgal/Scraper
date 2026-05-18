@@ -12,6 +12,7 @@ from app.llm_bridge import llm_json
 from app.async_utils import run_sync_in_thread
 from app.utils.quality import score_record_quality
 from app.data_utils import normalize_scraped_record
+from app.config import settings
 
 def _detect_table_headers(html: str) -> list[dict]:
     """Detect table/grid headers from HTML to understand column semantics."""
@@ -29,7 +30,7 @@ def _detect_table_headers(html: str) -> list[dict]:
 
     for header in soup.find_all(["h1", "h2", "h3", "h4"])[:5]:
         text = _compact_text(header.get_text())
-        if text and len(text) < 50:
+        if text and len(text) < settings.SELECTOR_HEADING_FALLBACK_LEN:
             headers_info.append({
                 "text": text,
                 "is_heading": True,
@@ -334,9 +335,9 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
         containers.append(soup.body)
 
     results = []
-    for container in containers[:300]:
+    for container in containers[:settings.REGEX_MAX_CONTAINERS]:
         text = _compact_text(container.get_text(separator=" ", strip=True))
-        if len(text) < 5:
+        if len(text) < settings.SELECTOR_MIN_TEXT_LEN:
             continue
 
         record: dict = {}
@@ -359,7 +360,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 record[field.name] = _sanitize_field_value(field, val)
             elif any(k in field_name for k in ["title", "name", "company"]):
                 heading = container.find(["h1", "h2", "h3", "h4", "a", "strong"])
-                candidate = heading.get_text(" ", strip=True) if heading else text[:70]
+                candidate = heading.get_text(" ", strip=True) if heading else text[:settings.SELECTOR_HEADING_FALLBACK_LEN]
                 record[field.name] = _sanitize_field_value(field, candidate)
             elif field.name == text_field:
                 # First non-special field gets full composite text for segmentation

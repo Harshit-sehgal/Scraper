@@ -22,6 +22,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import settings
 from app.routers.jobs import create_jobs_router
 from app.routers.exports import create_exports_router
+from app.routers.scraper import router as scraper_router
 from app.services.job_runner import run_job
 from app.services.state import persist_state
 from app.state_store import load_state, get_state_file_path
@@ -136,6 +137,8 @@ app.include_router(
 app.include_router(
     create_exports_router(jobs_store=jobs_store)
 )
+
+app.include_router(scraper_router)
 
 # Serve Frontend
 FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
@@ -335,6 +338,56 @@ async def system_agency():
         "action_history": ws.action_history[-30:],
         "active_intents": ws.active_intents
     }
+
+@app.get("/api/system/replay/status")
+async def system_replay_status():
+    """Returns the status of the large-scale persistent replay buffer."""
+    from app.replay_buffer import get_replay_buffer
+    rb = get_replay_buffer()
+    return {
+        "buffer": rb.status(),
+        "segments": rb.get_segment_info(),
+        "checkpoints": len(rb._checkpoints.entries) if hasattr(rb, "_checkpoints") else 0,
+    }
+
+
+@app.get("/api/system/replay/chain")
+async def system_replay_chains(limit: int = 20):
+    """Returns causal chains reconstructed from the persistent replay buffer.
+
+    Groups events by trace_id and type into causal sequences, showing
+    how one event leads to another through the semantic field's history.
+    """
+    from app.replay_buffer import get_replay_buffer
+    rb = get_replay_buffer()
+    chains = rb.get_causal_chains(limit=limit)
+    return {
+        "chains": chains,
+        "count": len(chains),
+        "total_buffer_entries": rb.status().get("total_entries", 0),
+    }
+
+
+@app.get("/api/system/replay/events")
+async def system_replay_events(start_idx: int = 0, end_idx: int = -1):
+    """Returns a range of events from the persistent replay buffer.
+
+    Uses streaming from disk to avoid loading the full buffer into memory.
+    If end_idx is -1, returns all events from start_idx to the end.
+    """
+    from app.replay_buffer import get_replay_buffer
+    rb = get_replay_buffer()
+    status = rb.status()
+    if end_idx == -1:
+        end_idx = status.get("total_entries", 0) - 1
+    events = rb.get_event_range(start_idx, end_idx)
+    return {
+        "events": events,
+        "count": len(events),
+        "range": {"start": start_idx, "end": end_idx},
+        "total_entries": status.get("total_entries", 0),
+    }
+
 
 @app.post("/api/system/refactor/compress")
 async def trigger_manifold_compression():

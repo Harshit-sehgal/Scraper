@@ -16,6 +16,7 @@ let historyData = {
 let topologyHistory = [];
 let isLiveMode = true;
 let currentReplayIdx = -1;
+let activeWaves = []; // Track recent wave_absorption events for animation
 
 function chartDefaults() {
     return {
@@ -315,7 +316,7 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
         });
     }
 
-    // 1. Draw Cohesion Edges (Relational Web)
+    // 1. Draw Cohesion Edges (Relational Web with Pressure)
     if (edges) {
         edges.forEach(e => {
             const r1 = regions.find(r => (r.competing_roles || []).includes(e.source));
@@ -329,16 +330,55 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
                     line.setAttribute("y1", p1.y);
                     line.setAttribute("x2", p2.x);
                     line.setAttribute("y2", p2.y);
-                    line.setAttribute("stroke", "#111");
-                    line.setAttribute("stroke-width", e.weight * 5);
-                    line.setAttribute("stroke-opacity", e.weight * 0.5);
+                    
+                    // Pressure-aware styling
+                    const pressure = e.pressure || 0;
+                    if (pressure > 0.7) {
+                        line.setAttribute("class", "edge-pressure-high");
+                    } else if (pressure > 0.3) {
+                        line.setAttribute("class", "edge-pressure-med");
+                    } else {
+                        line.setAttribute("class", "edge-pressure-low");
+                    }
+                    
+                    line.setAttribute("stroke-width", (e.weight || 0.1) * 6);
+                    line.setAttribute("stroke-opacity", Math.max(0.1, (e.weight || 0.1)));
                     svg.appendChild(line);
                 }
             }
         });
     }
 
-    // 2. Draw Regions (Attractor Nodes)
+    // 2. Draw Waves (Ripples)
+    activeWaves.forEach(w => {
+        const pos = regionPositions[w.id];
+        if (pos) {
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", pos.x);
+            circle.setAttribute("cy", pos.y);
+            circle.setAttribute("r", 5);
+            circle.setAttribute("class", "wave-ripple");
+            circle.style.strokeWidth = `${Math.max(1, w.intensity * 3)}px`;
+            svg.appendChild(circle);
+            
+            // Draw connection to source if available
+            const sourcePos = regionPositions[w.source];
+            if (sourcePos) {
+                const beam = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                beam.setAttribute("x1", sourcePos.x);
+                beam.setAttribute("y1", sourcePos.y);
+                beam.setAttribute("x2", pos.x);
+                beam.setAttribute("y2", pos.y);
+                beam.setAttribute("stroke", "#00ff41");
+                beam.setAttribute("stroke-width", Math.max(1, w.intensity * 2));
+                beam.setAttribute("stroke-opacity", "0.3");
+                beam.setAttribute("stroke-dasharray", "2,2");
+                svg.appendChild(beam);
+            }
+        }
+    });
+
+    // 3. Draw Regions (Attractor Nodes)
     regions.forEach((r, i) => {
         const radius = 5 + (Number(r.local_energy || 0) * 20);
         const opacity = 0.2 + (Number(r.integrity || 0) * 0.8);
@@ -454,10 +494,30 @@ function updateTelemetry(events) {
     const log = document.getElementById('telemetry-log');
     if (!events) return;
     
+    // Capture new wave events for animation
+    const now = Date.now();
+    events.forEach(e => {
+        if (e.type === 'wave_absorption' && (now - e.timestamp * 1000) < UPDATE_INTERVAL * 2) {
+            if (!activeWaves.some(w => w.id === e.details.region_id && Math.abs(w.time - e.timestamp) < 0.1)) {
+                activeWaves.push({
+                    id: e.details.region_id,
+                    source: e.details.source_id,
+                    intensity: e.details.intensity,
+                    time: e.timestamp,
+                    expire: now + 3000 // Animation duration
+                });
+            }
+        }
+    });
+    // Clean up expired waves
+    activeWaves = activeWaves.filter(w => w.expire > now);
+
     log.innerHTML = events.map(e => {
         const color = e.type === 'degradation' ? 'text-red-500' : 
-                      e.type === 'transaction' ? 'text-blue-400' : 'text-gray-500';
-        const icon = e.type === 'degradation' ? '⚠' : '◈';
+                      e.type === 'transaction' ? 'text-blue-400' :
+                      e.type === 'wave_absorption' ? 'text-green-400' : 'text-gray-500';
+        const icon = e.type === 'degradation' ? '⚠' : 
+                     e.type === 'wave_absorption' ? '⌇' : '◈';
         return `<div class="border-l border-gray-800 pl-2 py-1">
             <span class="${color} font-bold mr-2">${icon} [${escapeHtml(e.subsystem || e.type)}]</span>
             <span class="text-gray-400">${escapeHtml(e.action || e.label || '')}</span>

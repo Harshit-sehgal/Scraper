@@ -125,6 +125,7 @@ class GraphUpdateScheduler:
     def _setup_subscriptions(self):
         self.dispatcher.subscribe(SemanticEventType.UNCERTAINTY_SPIKE, self.on_instability)
         self.dispatcher.subscribe(SemanticEventType.TOPOLOGY_SHIFT, self.on_instability)
+        self.dispatcher.subscribe(SemanticEventType.FIELD_WAVE, self.on_field_wave)
 
     def on_instability(self, event: SemanticEvent):
         ws = get_world_state()
@@ -135,60 +136,62 @@ class GraphUpdateScheduler:
             "timestamp": event.timestamp or 0,
         })
         ws.trim_decision_history()
-        self.run_relaxation_pass()
+        
+        # Phase 71: Uncertainty spike now triggers a field wave from the source
+        # instead of a fixed relaxation wave count.
+        if event.event_type == SemanticEventType.UNCERTAINTY_SPIKE:
+            source_id = event.payload.get("region_id")
+            if source_id:
+                ws._topology.emit_field_wave(source_id, event.instability_delta * 2.0)
+
+    def on_field_wave(self, event: SemanticEvent):
+        """Monitor field waves to trigger global manifold relaxation."""
+        intensity = event.payload.get("intensity", 0.0)
+        self._total_wave_intensity += intensity
+        
+        # If total field agitation is high, trigger a manifold relaxation pass
+        if self._total_wave_intensity > 2.0:
+            self.run_global_relaxation()
+            self._total_wave_intensity *= 0.5 # Dampen after work
 
     def __init__(self):
         self.pending_updates = 0
-        self._wave_count = 0
+        self._total_wave_intensity = 0.0
         self.dispatcher = get_dispatcher()
         self._setup_subscriptions()
 
-    def run_relaxation_pass(self):
+    def run_global_relaxation(self):
+        """Global manifold relaxation triggered by field agitation."""
         from app.semantic_inference_engine import RoleEmbeddingEngine
-        from app.semantic_ir import SemanticToken, Span, SemanticType
-
-        if self._wave_count >= 3:
-            self._wave_count = 0
-            return
-        self._wave_count += 1
-
         ie = RoleEmbeddingEngine()
         ws = get_world_state()
+        
         pressure_before = ws.metrics.field_pressure
+        ie.relax_manifold()
+        pressure_after = ws.metrics.field_pressure
+        
+        ws.snapshot(label=f"global_relaxation_agitation_{round(self._total_wave_intensity, 2)}")
+        
+        self.dispatcher.dispatch(SemanticEvent(
+            event_type=SemanticEventType.EQUILIBRIUM_REACHED,
+            source="global_relaxation",
+            payload={
+                "energy": ws.metrics.global_energy, 
+                "agitation": self._total_wave_intensity,
+                "pressure_drop": pressure_before - pressure_after
+            },
+            instability_delta=-0.05
+        ))
 
-        virtual_tokens = []
-        for (role, ttype), compat in list(ws.role_compatibility.items()):
-            if compat > 0.0:
-                stype = SemanticType(ttype) if isinstance(ttype, str) else ttype
-                virtual_tokens.append(SemanticToken(
-                    raw=role, normalized=role, span=Span(0, 0), position=0,
-                    primary_type=stype,
-                    type_distribution={stype: compat}
-                ))
-
-        if virtual_tokens:
-            # Phase 35: Use formal relaxation API instead of legacy infer
-            ie.relax_manifold()
-            
-            pressure_after = ws.metrics.field_pressure
-            drop = pressure_before - pressure_after
-            ws.snapshot(label=f"relax_wave_{self._wave_count}")
-
-            self.dispatcher.dispatch(SemanticEvent(
-                event_type=SemanticEventType.EQUILIBRIUM_REACHED,
-                source="graph_update_scheduler",
-                payload={"energy": ws.metrics.global_energy, "wave": self._wave_count, "pressure_drop": drop},
-                instability_delta=-0.1
-            ))
-
-            convergence = ws.metrics.convergence_score
-            if drop < 0.02 and pressure_before > 0.3 and self._wave_count < 3 and convergence < 0.8:
-                self.dispatcher.dispatch(SemanticEvent(
-                    event_type=SemanticEventType.TOPOLOGY_SHIFT,
-                    source=f"propagation_wave_{self._wave_count}",
-                    payload={"wave": self._wave_count, "pressure": pressure_after},
-                    instability_delta=0.05
-                ))
+    def schedule(self, task_id: str, priority: TaskPriority,
+                 handler: Callable, *args, **kwargs):
+        """Delegate scheduling to the active world state's scheduler."""
+        ws = get_world_state()
+        if hasattr(ws, '_scheduler') and ws._scheduler:
+            ws._scheduler.schedule(task_id, priority, handler, *args, **kwargs)
+        else:
+            # Fallback for bootstrap/tests
+            logging.getLogger(__name__).warning(f"No active scheduler for task {task_id}")
 
 
 _scheduler = None

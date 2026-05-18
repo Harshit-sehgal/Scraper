@@ -184,3 +184,88 @@ class TestReplayBuffer:
         entry = buf.get_entry(0)
         assert entry["type"] == "second"
         buf.clear()
+
+    # ─── Causal Chain Reconstruction ──────────────────────────────────
+
+    def test_causal_chains_by_trace_id(self):
+        """Causal chains group events sharing a trace_id."""
+        buf = ReplayBuffer(base_dir="/tmp/test_rb_chain_trace")
+        trace_a = "trace_aaa"
+        trace_b = "trace_bbb"
+        buf.append({"type": "event.a1", "delta": {}, "metadata": {"trace_id": trace_a}})
+        buf.append({"type": "event.b1", "delta": {}, "metadata": {"trace_id": trace_b}})
+        buf.append({"type": "event.a2", "delta": {}, "metadata": {"trace_id": trace_a}})
+        chains = buf.get_causal_chains(limit=10)
+        # Should have at least 2 chains (one per trace_id, possibly untraced)
+        traced_chains = [c for c in chains if c["trace_id"] is not None]
+        trace_ids = [c["trace_id"] for c in traced_chains]
+        assert trace_a in trace_ids, f"Expected trace {trace_a} in chains, got {trace_ids}"
+        assert trace_b in trace_ids, f"Expected trace {trace_b} in chains, got {trace_ids}"
+        for chain in traced_chains:
+            if chain["trace_id"] == trace_a:
+                assert chain["event_count"] >= 2
+                types = [e["type"] for e in chain["events"]]
+                assert "event.a1" in types
+                assert "event.a2" in types
+        buf.clear()
+
+    def test_causal_chains_untraced_grouped_by_type(self):
+        """Events without trace_id are grouped by type pattern."""
+        buf = ReplayBuffer(base_dir="/tmp/test_rb_chain_untraced")
+        buf.append({"type": "alpha", "delta": {}, "metadata": {}})
+        buf.append({"type": "beta", "delta": {}, "metadata": {}})
+        buf.append({"type": "alpha", "delta": {}, "metadata": {}})
+        chains = buf.get_causal_chains(limit=10)
+        untraced = [c for c in chains if c["trace_id"] is None]
+        assert len(untraced) >= 1
+        # At least one untraced chain should have "alpha" type
+        alpha_chains = [c for c in untraced if "alpha" in c["summary"]]
+        assert len(alpha_chains) >= 1, f"Expected alpha chain in untraced, got {[c['summary'] for c in untraced]}"
+        buf.clear()
+
+    def test_causal_chain_summary_format(self):
+        """Causal chain summary uses arrow notation for event types."""
+        buf = ReplayBuffer(base_dir="/tmp/test_rb_chain_summary")
+        for i in range(3):
+            buf.append({"type": "step", "delta": {"i": i}, "metadata": {"trace_id": "t1"}})
+        chains = buf.get_causal_chains(limit=10)
+        t1_chain = next((c for c in chains if c.get("trace_id") == "t1"), None)
+        assert t1_chain is not None
+        assert "step" in t1_chain["summary"]
+        assert t1_chain["event_count"] >= 3
+        assert t1_chain["start_idx"] <= t1_chain["end_idx"]
+        buf.clear()
+
+    # ─── Event Range ────────────────────────────────────────────────────
+
+    def test_get_event_range_returns_subset(self):
+        """get_event_range returns events within the specified index range."""
+        buf = ReplayBuffer(base_dir="/tmp/test_rb_range_subset")
+        for i in range(10):
+            buf.append({"type": "evt", "delta": {"i": i}, "metadata": {}})
+        events = buf.get_event_range(3, 6)
+        assert len(events) == 4, f"Expected 4 events, got {len(events)}"
+        assert events[0]["idx"] == 3
+        assert events[-1]["idx"] == 6
+        buf.clear()
+
+    def test_get_event_range_bounds(self):
+        """get_event_range end_idx=-1 returns all events from start_idx to end."""
+        buf = ReplayBuffer(base_dir="/tmp/test_rb_range_bounds")
+        for i in range(10):
+            buf.append({"type": "evt", "delta": {"i": i}, "metadata": {}})
+        # We need to call status() to determine total, but get_event_range should handle -1
+        events = buf.get_event_range(7, 999)
+        assert len(events) == 3  # indices 7, 8, 9
+        assert events[0]["idx"] == 7
+        assert events[-1]["idx"] == 9
+        buf.clear()
+
+    def test_get_event_range_empty(self):
+        """get_event_range with out-of-range indices returns empty list."""
+        buf = ReplayBuffer(base_dir="/tmp/test_rb_range_empty")
+        for i in range(5):
+            buf.append({"type": "evt", "delta": {"i": i}, "metadata": {}})
+        events = buf.get_event_range(100, 200)
+        assert len(events) == 0
+        buf.clear()

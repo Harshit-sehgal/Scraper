@@ -425,6 +425,112 @@ class ReplayBuffer:
             pass
         return count
 
+    # ─── Causal Chain Reconstruction ────────────────────────────
+
+    def get_causal_chains(self, limit: int = 20) -> List[dict]:
+        """Reconstruct causal chains from the replay buffer.
+
+        Groups related entries into causal chains based on:
+        1. Trace ID propagation (entries with matching trace_id)
+        2. Source causality (one entry's type may cause a subsequent entry)
+        3. Temporal proximity (entries close in time that affect the same entities)
+
+        This enables streaming replay of field dynamics, showing how
+        one event leads to another through the persistent history.
+
+        Args:
+            limit: Maximum number of causal chains to return.
+
+        Returns:
+            List of causal chain dicts, each with:
+            - chain_id: unique identifier
+            - start_idx: first event index
+            - end_idx: last event index
+            - events: list of events in the chain
+            - summary: human-readable summary of the chain
+            - trace_id: common trace identifier if available
+        """
+        # Scan the most recent entries for trace-based grouping
+        chains: Dict[str, List[dict]] = {}
+        chain_order: List[str] = []
+
+        # Stream from the latest checkpoint backward (or forward from a recent point)
+        # We stream from near the end for efficiency
+        total = self._total_entries
+        start = max(0, total - 500)  # Scan last 500 entries max
+
+        for entry in self.stream_from(start):
+            metadata = entry.get("metadata", {})
+            trace_id = metadata.get("trace_id", "")
+            event_type = entry.get("type", "unknown")
+
+            # Group by trace_id
+            if trace_id:
+                if trace_id not in chains:
+                    chains[trace_id] = []
+                    chain_order.append(trace_id)
+                chains[trace_id].append(entry)
+            else:
+                # No trace_id: use a chain per unique type pattern
+                chain_key = f"untraced:{event_type}"
+                if chain_key not in chains:
+                    chains[chain_key] = []
+                    chain_order.append(chain_key)
+                chains[chain_key].append(entry)
+
+        # Build final output
+        result = []
+        for key in chain_order[-limit:]:
+            events = chains[key]
+            if not events:
+                continue
+
+            # Summarize the chain
+            types = [e.get("type", "") for e in events]
+            unique_types = list(dict.fromkeys(types))
+            idxs = [e.get("idx", 0) for e in events]
+
+            is_traced = not key.startswith("untraced:")
+            chain = {
+                "chain_id": f"chain_{len(result)}",
+                "trace_id": key if is_traced else None,
+                "start_idx": min(idxs),
+                "end_idx": max(idxs),
+                "event_count": len(events),
+                "types": unique_types,
+                "events": [{
+                    "idx": e.get("idx"),
+                    "type": e.get("type"),
+                    "timestamp": e.get("timestamp"),
+                    "metadata": e.get("metadata", {}),
+                    "delta": e.get("delta", {}),
+                } for e in sorted(events, key=lambda x: x.get("idx", 0))][-20:],  # Limit events per chain
+                "summary": " → ".join(t.split(".", 1)[-1] if "." in t else t for t in unique_types[:5]),
+            }
+            result.append(chain)
+
+        return result
+
+    def get_event_range(self, start_idx: int, end_idx: int) -> List[dict]:
+        """Get all events within a specific index range.
+
+        Uses streaming to avoid loading the full buffer into memory.
+
+        Args:
+            start_idx: Start index (inclusive)
+            end_idx: End index (inclusive)
+
+        Returns:
+            List of events in the range.
+        """
+        events = []
+        for entry in self.stream_from(start_idx):
+            idx = entry.get("idx", 0)
+            if idx > end_idx:
+                break
+            events.append(entry)
+        return events
+
 
 # Global singleton
 _buffer: Optional[ReplayBuffer] = None

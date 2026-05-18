@@ -909,6 +909,10 @@ class TopologyState:
             self._staging["structural_change"] = True
         self._record("add", {"competing_roles": competing_roles, "token": token, 
                             "instability": instability, "integrity": integrity, "domain": domain})
+        
+        # Phase 71: Emit wave on new region creation
+        self.emit_field_wave(region.region_id, instability)
+        
         return region
 
     def append_region(self, region: FieldConflictRegion):
@@ -1091,8 +1095,14 @@ class TopologyState:
     def set_region_instability(self, region_id: Any, value: float):
         r = self.get_region(region_id)
         if r: 
+            old_val = r.instability
             r.instability = max(0.01, min(1.0, value))
             self._record("set_region_instability", {"region_id": r.region_id, "value": value})
+            
+            # Phase 71: Emit wave on significant instability spike
+            delta = value - old_val
+            if delta > 0.15:
+                self.emit_field_wave(r.region_id, delta)
 
     def adjust_region_instability(self, region_id: Any, delta: float):
         r = self.get_region(region_id)
@@ -2274,3 +2284,90 @@ class TopologyState:
             if len(a) == 2: self.record_anchor(tuple(a))
             
         self._record("merge", {"remote_regions": len(remote_regions)})
+
+    # ─── Active Field Waves (Decentralized Propagation) ──────────────
+
+    def emit_field_wave(self, source_region_id: str, intensity: float):
+        """Emit a semantic wave from a region into the field.
+        
+        Instead of a global scheduler calling propagate(), individual regions
+        now emit "waves" that ripple through the topology.
+        """
+        if intensity < 0.01:
+            return
+
+        from app.event_dispatcher import get_dispatcher
+        from app.semantic_events import SemanticEvent, SemanticEventType
+        
+        get_dispatcher().dispatch(SemanticEvent(
+            event_type=SemanticEventType.FIELD_WAVE,
+            source=f"region:{source_region_id}",
+            payload={"intensity": intensity, "source_id": source_region_id},
+            instability_delta=intensity * 0.1
+        ))
+
+    def process_field_wave(self, source_region_id: str, intensity: float):
+        """Reactive handling of a field wave by neighboring regions."""
+        source = self.get_region(source_region_id)
+        if not source:
+            return
+
+        forces = self._compute_edge_field_forces()
+        regs = self._get_regions()
+        
+        # 1. Propagate along edge field forces
+        for target in regs:
+            if target.region_id == source_region_id:
+                continue
+                
+            # Find max route strength between any shared role pairs
+            max_route = 0.0
+            for ra in source.competing_roles:
+                for rb in target.competing_roles:
+                    pair = tuple(sorted([ra, rb]))
+                    f = forces.get(pair)
+                    if f:
+                        max_route = max(max_route, f['route_strength'])
+            
+            if max_route > 0.1:
+                # Wave intensity decays as it spreads
+                absorption = getattr(target, 'persistence', 0.5) * 0.2
+                received_intensity = intensity * max_route * (1.0 - absorption)
+                
+                if received_intensity > 0.01:
+                    # Update target region
+                    # Phase 71: Intensity now has a stronger impact to overcome natural decay
+                    target.instability = min(1.0, target.instability + received_intensity * 0.3)
+                    target.semantic_pressure = max(0.0, target.semantic_pressure + received_intensity * 0.1)
+                    
+                    # High intensity waves trigger immediate evolution pass
+                    if received_intensity > 0.4:
+                        target.evolve(force=True)
+                    
+                    self._record("wave_absorption", {
+                        "region_id": target.region_id,
+                        "source_id": source_region_id,
+                        "intensity": round(received_intensity, 4)
+                    })
+                    
+                    # Phase 71: Causal telemetry for field waves
+                    from app.semantic_world_state import get_world_state
+                    ws = get_world_state()
+                    ws.emit_telemetry("wave_absorption", {
+                        "region_id": target.region_id,
+                        "source_id": source_region_id,
+                        "intensity": round(received_intensity, 4)
+                    })
+                    
+                    # Causal chaining: target may emit its own (weaker) wave
+                    # (modulated to prevent infinite feedback loops)
+                    if received_intensity > 0.2:
+                        # Schedule next wave hop via dispatcher to avoid deep recursion
+                        from app.graph_update_scheduler import get_scheduler, TaskPriority
+                        get_scheduler().schedule(
+                            f"wave_hop:{target.region_id}",
+                            TaskPriority.NORMAL,
+                            self.emit_field_wave,
+                            target.region_id,
+                            received_intensity * 0.5
+                        )

@@ -7,11 +7,13 @@ Delegates to specialised sub-engines:
   - selector_engine:     CSS selector mapping & execution
   - html_utils:          DOM fetching, cleaning, contact extraction
   - scrape_telemetry:    Per-URL observability
+  - selector_memory:     Persistent extraction learning
 
 Extraction priority:
   1. Site-specific selector profile (JSON config in selector_profiles/profiles/)
-  2. Generic LLM-guided CSS selector pipeline
-  3. Regex fallback extraction
+  2. Remembered selectors from selector_memory
+  3. Generic LLM-guided CSS selector pipeline
+  4. Regex fallback extraction
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ from __future__ import annotations
 import logging
 import time
 from typing import List
+from bs4 import BeautifulSoup
 
 from app.config import settings
 from app.async_utils import run_sync_in_thread
@@ -42,6 +45,7 @@ from app.scrape_telemetry import (
     get_scrape_telemetry, detect_anti_bot, estimate_dom_nodes,
 )
 from app.crawl_policy import get_crawl_policy
+from app.selector_memory import get_selector_memory
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +70,11 @@ async def scrape_url(
 ) -> list[dict]:
     """Orchestrate the full extraction flow for a single URL.
 
-    Priority: profile → LLM selectors → regex fallback.
+    Priority: profile → memory → LLM selectors → regex fallback.
     """
     logger.info("Fetching: %s", url)
     telemetry = get_scrape_telemetry()
+    memory = get_selector_memory()
     start_time = time.time()
 
     # ── Step 0: Check crawl policy ────────────────────────────────
@@ -106,9 +111,10 @@ async def scrape_url(
 
     # ── Generic extraction pipeline ────────────────────────────────
     fetch_success = False
+    js_render_delay = 0.0
     try:
         fetch_start = time.time()
-        html = await fetch_page_content(url)
+        html, js_render_delay = await fetch_page_content(url)
         fetch_ms = (time.time() - fetch_start) * 1000
         fetch_success = True
     except Exception as e:
@@ -123,41 +129,69 @@ async def scrape_url(
     anti_bot = detect_anti_bot(html)
     dom_nodes = estimate_dom_nodes(html)
 
-    # 1. Analyze page structure
-    page_analysis = _analyze_page_data_type(html, schema_fields)
+    # Calculate token density (grounding abstraction)
+    soup_for_density = BeautifulSoup(html, "html.parser")
+    page_text = soup_for_density.get_text()
+    token_density = len(page_text) / max(1, dom_nodes)
 
-    # 2. Map schema to CSS selectors via LLM
-    html_snippet = clean_html_for_selectors(html)
-    prompt = build_selector_prompt(html_snippet, schema_fields, page_analysis)
-
-    try:
-        selectors = await extract_css_selectors(prompt)
-    except Exception as e:
-        logger.exception(e)
-        selectors = {}
-
-    # 3. Apply selectors or fallback to regex
+    # ── Step 2: Try remembered selectors ──────────────────────────
+    remembered_selectors = memory.get_selectors(url)
     results = []
     selector_success = False
     fallback_triggered = False
+    selectors = {}
+    gate_threshold = max(min_record_score * settings.SCORE_GATE_THRESHOLD_FACTOR, settings.SCORE_GATE_ABSOLUTE_MIN)
 
-    if selectors and selectors.get("item_container"):
-        results = apply_selectors(html, selectors, schema_fields, base_url=url)
+    if remembered_selectors:
+        logger.info("Trying remembered selectors for %s", url)
+        results = apply_selectors(html, remembered_selectors, schema_fields, base_url=url)
         if results:
             scores = [r.get("record_score", 0.0) for r in results]
             avg_score = sum(scores) / len(scores) if scores else 0.0
-            gate_threshold = max(min_record_score * settings.SCORE_GATE_THRESHOLD_FACTOR, settings.SCORE_GATE_ABSOLUTE_MIN)
             if avg_score >= gate_threshold:
+                logger.info("Remembered selectors SUCCEEDED for %s (avg score: %.2f)", url, avg_score)
                 selector_success = True
+                selectors = remembered_selectors
+                memory.record_success(url, selectors)
+            else:
+                logger.info("Remembered selectors FAILED for %s (avg score: %.2f)", url, avg_score)
+                memory.record_failure(url)
+                results = []
 
-        if not selector_success:
-            logger.info(
-                "LLM selectors for %s produced low-quality results "
-                "(avg score=%.2f, threshold=%.2f). Falling back to regex.",
-                url, avg_score if results else 0, gate_threshold,
-            )
-            results = []
+    # ── Step 3: Generic LLM-guided selectors ──────────────────────
+    if not selector_success:
+        # 1. Analyze page structure
+        page_analysis = _analyze_page_data_type(html, schema_fields)
 
+        # 2. Map schema to CSS selectors via LLM
+        html_snippet = clean_html_for_selectors(html)
+        prompt = build_selector_prompt(html_snippet, schema_fields, page_analysis)
+
+        try:
+            selectors = await extract_css_selectors(prompt)
+        except Exception as e:
+            logger.exception(e)
+            selectors = {}
+
+        if selectors and selectors.get("item_container"):
+            results = apply_selectors(html, selectors, schema_fields, base_url=url)
+            if results:
+                scores = [r.get("record_score", 0.0) for r in results]
+                avg_score = sum(scores) / len(scores) if scores else 0.0
+                if avg_score >= gate_threshold:
+                    selector_success = True
+                    # Record newly discovered selectors in memory
+                    memory.record_success(url, selectors)
+
+            if not selector_success:
+                logger.info(
+                    "LLM selectors for %s produced low-quality results "
+                    "(avg score=%.2f, threshold=%.2f). Falling back to regex.",
+                    url, avg_score if results else 0, gate_threshold,
+                )
+                results = []
+
+    # ── Step 4: Regex fallback ────────────────────────────────────
     if not results:
         logger.info("Selectors failed or no results for %s, falling back to regex", url)
         results = extract_with_regex(html, schema_fields, base_url=url)
@@ -182,6 +216,21 @@ async def scrape_url(
     # 6. Final semantic pipeline orchestration
     results = run_pipeline(results, [f.name for f in schema_fields])
 
+    # Calculate selector hit rate and confidence map
+    selector_hit_rate = 0.0
+    confidence_map = {}
+    if results:
+        field_hits = 0
+        total_slots = len(results) * len(schema_fields)
+        for r in results:
+            for f in schema_fields:
+                if not _is_empty_value(r.get(f.name)):
+                    field_hits += 1
+        selector_hit_rate = field_hits / max(1, total_slots)
+        
+        avg_score = sum(r.get("record_score", 0.0) for r in results) / len(results)
+        confidence_map = {"overall_avg": round(avg_score, 3)}
+
     telemetry.record(
         url=url,
         fetch_method="playwright",
@@ -195,6 +244,10 @@ async def scrape_url(
         records_after_dedup=records_after_dedup,
         records_final=len(results),
         anti_bot_score=anti_bot,
+        js_render_delay_ms=js_render_delay,
+        token_density=token_density,
+        selector_hit_rate=selector_hit_rate,
+        confidence_map=confidence_map,
     )
 
     return results

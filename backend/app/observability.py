@@ -243,7 +243,7 @@ class ObservabilityState:
         """Return formatted transaction lineages for visualization."""
         journal = self._telemetry_stream # Using telemetry stream for now
         # Filtering for transaction-related events
-        return [t for t in journal if t["type"] in ["transaction", "merge_branch", "federation"]]
+        return [t for t in journal if t["type"] in ["transaction", "merge_branch", "federation", "wave_absorption"]]
 
     def detect_oscillations(self, snapshots: List[dict], window: int = 20) -> List[dict]:
         """Analyze state history for cyclic instability or energy patterns (Phase 46)."""
