@@ -805,6 +805,15 @@ class SemanticWorldState:
         """
         return self._topology.compute_macro_from_meso()
 
+    @property
+    def macro_continents(self) -> list:
+        """Read-only access to macro continent data."""
+        return self._topology.get_view().get_macro_continents()
+
+    def compute_macro_continents(self):
+        """Compute macro-scale semantic continents from meso clusters."""
+        self._topology.compute_macro_continents()
+
     # ─── Authority Delegation Properties ─────────────────────────────────
     # These delegate to state objects. Direct self.field_regions / self.learned_exclusions
     # references in this class work transparently through these properties.
@@ -1119,6 +1128,10 @@ class SemanticWorldState:
             # 4. Detect communities from topology
             self._topology.detect_communities()
 
+            # 5. Multi-scale coupling: cross-scale pressure flow
+            #    Micro → Meso → Macro → Meso → Micro
+            self._topology.cross_scale_pressure_flow()
+
             self.record_delta("topology", "evolve_field", {
                 "region_count": self._topology.region_count(),
                 "pressure": self.metrics.field_pressure,
@@ -1277,13 +1290,81 @@ class SemanticWorldState:
                 self._topology.trim(100, 50)
             return captured
 
+    def capture_governance_snapshot(self) -> "GovernanceSnapshot":
+        """Capture a frozen snapshot of all data needed for governance reads.
+
+        This is called BEFORE governance logic runs, ensuring:
+        1. Governance decisions are based on a consistent field state
+        2. Observability reads do not causally couple to runtime mutation
+        3. Deterministic replay of governance decisions is possible
+
+        LAW: All governance methods that previously took `ws` now accept
+        a GovernanceSnapshot, breaking the causal chain between governance
+        reads and live state mutation during field evolution.
+        """
+        from app.observability import GovernanceSnapshot
+
+        # Role manifold data
+        role_names = tuple(self.role_manifold.keys())
+        role_certainties = {r: self._manifold.get_role_certainty(r) for r in role_names}
+
+        # Topology history snapshots
+        snapshots = tuple(self._history.topology_snapshots)
+
+        # Energy metrics
+        global_energy = self.metrics.global_energy
+        total_records = self.metrics.total_records_processed
+
+        # Drift data — frozen tuples from the observability drift log
+        drift_data = {}
+        for r in role_names:
+            drifts = self._observability.get_role_drift(r)
+            if drifts:
+                drift_data[r] = tuple(drifts)
+
+        # Serialized states for memory estimation
+        topo_dict = self._topology.to_dict()
+        manifold_dict = self._manifold.to_dict()
+        motif_dict = self._motif.to_dict()
+        history_dict = self._history.to_dict()
+
+        # Telemetry and pressure
+        telemetry = tuple(self._observability.telemetry)
+        system_pressure = self.get_system_pressure()
+
+        # Topology centrality
+        centrality = dict(self._topology.global_centrality)
+
+        return GovernanceSnapshot(
+            role_names=role_names,
+            role_certainties=role_certainties,
+            topology_snapshots=snapshots,
+            global_energy=global_energy,
+            total_records_processed=total_records,
+            drift_log_data=drift_data,
+            topology_dict=topo_dict,
+            manifold_dict=manifold_dict,
+            motif_dict=motif_dict,
+            history_dict=history_dict,
+            telemetry_stream=telemetry,
+            system_pressure=system_pressure,
+            topology_centrality=centrality,
+        )
+
     @requires_invariants
     def redistribute_instability(self):
-        """Govern the semantic field dynamics using adaptive policies (Phase 56)."""
-        report = self._observability.get_governance_report(self)
-        policy = self._observability.get_stability_policy(self)
+        """Govern the semantic field dynamics using adaptive policies (Phase 56).
 
-        # 1. Propagation Damping (Active Stability Control)
+        LAW: Governance decisions use a frozen snapshot, not live state.
+        This ensures governance reads do not causally couple to runtime mutation.
+        """
+        # 1. Capture frozen snapshot before any governance logic
+        snapshot = self.capture_governance_snapshot()
+
+        report = self._observability.get_governance_report(snapshot)
+        policy = self._observability.get_stability_policy(snapshot)
+
+        # 2. Propagation Damping (Active Stability Control)
         damping = policy.get("propagation_damping", 1.0)
 
         # Phase 56: Adaptive Damping — increase damping if diversity is low (Freezing risk)
@@ -1291,14 +1372,21 @@ class SemanticWorldState:
         if diversity < 0.4:
             damping *= 0.7 # Suppress propagation to force focus on new learning
 
-        self._topology.redistribute_instability(damping=damping)
+        flow_data = self._topology.redistribute_instability(damping=damping)
 
-        # 2. Attractor Governance
-        # Attractor Rebalancing (Energy Dissipation)
+        # Record energy flow for conservation tracking
+        if flow_data["total_flow"] > 0.0:
+            self._energy.record_energy_flow(
+                source_delta=flow_data["source_flow"],
+                sink_delta=flow_data["sink_flow"],
+            )
+
+        # 3. Attractor Governance
+        # Attractor Rebalancing (Energy Dissipation) — uses live certainties
         role_stabilities = {r: self._manifold.get_role_certainty(r) for r in self.role_manifold}
         self._energy.rebalance_attractors(role_stabilities)
 
-        # 3. Entropy Economy (Phase 56)
+        # 4. Entropy Economy (Phase 56)
         # Dynamic management of noise injection vs stabilization
         global_certainty = self._manifold.get_certainty()
 
@@ -1310,7 +1398,7 @@ class SemanticWorldState:
             # Maintenance noise only if diversity is low (Phase 56)
             self._energy.inject_diversification_entropy(scale=0.01)
 
-        # 4. Metastable Lock Escape (Restructuring)
+        # 5. Metastable Lock Escape (Restructuring)
         if policy.get("lock_escape_required", False):
             logging.warning("METASTABLE LOCK DETECTED: Forcing topology restructuring on node [%s]", self.node_id)
             self._topology.restructure_topology()
@@ -1367,13 +1455,15 @@ class SemanticWorldState:
 
         Micro: individual field regions (existing)
         Meso: topology-derived cluster data (first-class field structures)
-        Macro: aggregated from meso clusters via compute_macro_from_meso()
+        Macro: semantic continents derived from meso clusters (first-class
+               field structures with guidance_strength, diversity_pressure)
 
         This enables cross-scale emergence — behavior at one scale
-        can influence structure at adjacent scales.
+        can influence structure at adjacent scales. Pressure flows
+        bidirectionally: micro ↔ meso ↔ macro.
 
-        LAW: Meso clusters are computed by TopologyState and stored as
-        first-class field structures. They are NOT recomputed here.
+        LAW: Meso clusters and macro continents are computed by TopologyState
+        and stored as first-class field structures.
         """
         view = self._topology.get_view()
         regions = view.all_regions()
@@ -1383,10 +1473,11 @@ class SemanticWorldState:
                    "convergence": round(r.local_convergence, 3)}
                   for r in regions]
 
-        # Meso: use topology-stored meso clusters (first-class field structures)
+        # Meso: use topology-stored meso clusters (active entities)
         meso = []
-        for cluster in self.meso_clusters:
+        for cluster in view.get_meso_clusters():
             meso.append({
+                "cluster_id": cluster.get("cluster_id", ""),
                 "size": cluster["size"],
                 "avg_instability": cluster["avg_instability"],
                 "avg_convergence": cluster["avg_convergence"],
@@ -1394,17 +1485,38 @@ class SemanticWorldState:
                 "tokens": cluster["tokens"],
                 "shared_roles": cluster["shared_roles"],
                 "all_roles": cluster["all_roles"],
+                # Active entity properties
+                "entropy": cluster.get("entropy", 0.0),
+                "drift": cluster.get("drift", 0.0),
+                "stability": cluster.get("stability", 0.5),
+                "boundary_strength": cluster.get("boundary_strength", 0.5),
+                "interaction_policy": cluster.get("interaction_policy", "neutral"),
             })
 
-        # Macro: use field-derived macro from meso clusters
-        macro_props = self.compute_macro_from_meso() if meso else {}
+        # Macro: semantic continents (first-class field structures)
+        macro_continents = view.get_macro_continents()
         macro = {
             "total_regions": view.region_count(),
             "meso_clusters": len(meso),
+            "macro_continents": len(macro_continents),
             "field_pressure": round(self.metrics.field_pressure, 3),
             "convergence": round(self.metrics.convergence_score, 3),
-            **macro_props,
+            "continents": [],
         }
+
+        for continent in macro_continents:
+            macro["continents"].append({
+                "continent_id": continent.get("continent_id", ""),
+                "size": continent.get("size", 0),
+                "pressure": continent.get("pressure", 0.0),
+                "entropy": continent.get("entropy", 0.0),
+                "stability": continent.get("stability", 0.0),
+                "convergence": continent.get("convergence", 0.0),
+                "guidance_strength": continent.get("guidance_strength", 0.0),
+                "diversity_pressure": continent.get("diversity_pressure", 0.0),
+                "meso_cluster_count": len(continent.get("meso_cluster_ids", [])),
+                "all_roles": continent.get("all_roles", []),
+            })
 
         return {"micro": micro, "meso": meso, "macro": macro}
 

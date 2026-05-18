@@ -42,6 +42,7 @@ class RegionSnapshot:
     persistence: float
     semantic_pressure: float
     stability_momentum: float
+    free_energy: float  # thermodynamic potential = local_energy - local_temperature * instability
     local_convergence: float
     local_temperature: float
     source_record: str
@@ -70,6 +71,66 @@ class EdgeFieldSnapshot:
     semantics: str
 
 
+@dataclass(frozen=True)
+class MesoClusterSnapshot:
+    """Active meso-scale semantic entity — first-class field structure.
+
+    Unlike the previous passive summary dict, this carries its own
+    dynamic properties (pressure, entropy, drift, stability) and
+    governs its constituent regions through cross-scale feedback.
+
+    Meso clusters are the intermediate scale between micro (regions)
+    and macro (continents). They form naturally from shared roles
+    and exert top-down stabilization/perturbation on their regions.
+    """
+    cluster_id: str
+    size: int
+    region_ids: tuple
+    tokens: tuple
+    shared_roles: tuple
+    all_roles: tuple
+    avg_instability: float
+    avg_convergence: float
+    avg_pressure: float
+    # Active entity properties
+    entropy: float  # internal disorder
+    drift: float    # how much the cluster's center is moving
+    stability: float  # inverse of avg instability, smoothed
+    boundary_strength: float  # 0=porous, 1=tightly bounded
+    interaction_policy: str  # "cooperative", "competitive", "neutral", "isolated"
+    centroid: tuple  # center of mass in role space
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class MacroContinentSnapshot:
+    """Macro-scale semantic continent — large-scale field structure.
+
+    Continents group related meso clusters into the largest scale of
+    organization. They provide long-range guidance, preserve diversity,
+    and prevent monopolistic attractors from dominating the field.
+
+    Properties:
+    - pressure: Top-down governance pressure on constituent meso clusters
+    - entropy: Diversity of meso clusters within the continent
+    - stability: Long-term structural persistence
+    - guidance_strength: How strongly the continent influences its clusters
+    - diversity_pressure: Mechanism to prevent single-attractor dominance
+    """
+    continent_id: str
+    size: int  # total regions across all constituent clusters
+    meso_cluster_ids: tuple
+    all_roles: tuple
+    pressure: float
+    entropy: float
+    stability: float
+    convergence: float
+    guidance_strength: float  # how strongly this continent influences meso
+    diversity_pressure: float  # 0=monoculture risk, 1=max diversity
+    centroid: tuple  # center of mass
+    version: int = 1
+
+
 class TopologyView:
     """Read-only view of the topology graph.
     
@@ -83,6 +144,8 @@ class TopologyView:
                  impossible_neighborhoods, restructuring_queue,
                  cohesion_merge_success, cohesion_merge_attempts,
                  cohesion_split_success, cohesion_split_attempts,
+                 meso_clusters=None,
+                 macro_continents=None,
                  read_callback: Optional[Callable[[str, int], None]] = None):
         self._regions = list(regions)
         self._communities = [set(c) for c in global_communities]
@@ -96,11 +159,16 @@ class TopologyView:
         self._merge_attempts = dict(cohesion_merge_attempts)
         self._split_success = dict(cohesion_split_success)
         self._split_attempts = dict(cohesion_split_attempts)
+        self._meso_clusters = list(meso_clusters) if meso_clusters else []
+        self._macro_continents = list(macro_continents) if macro_continents else []
         self._read_callback = read_callback
 
     def _snapshot(self, r: FieldConflictRegion) -> RegionSnapshot:
         if self._read_callback:
             self._read_callback(r.region_id, r.version)
+        # Thermodynamic free energy = internal energy - temperature * entropy
+        # For field regions: local_energy (potential) - local_temperature * instability (disorder)
+        free_energy = r.local_energy - r.local_temperature * r.instability
         return RegionSnapshot(
             region_id=r.region_id,
             token=r.token,
@@ -114,6 +182,7 @@ class TopologyView:
             stability_momentum=r.stability_momentum,
             local_convergence=r.local_convergence,
             local_temperature=r.local_temperature,
+            free_energy=free_energy,
             source_record=r.source_record,
             domain=getattr(r, 'domain', ''),
             version=r.version,
@@ -190,7 +259,14 @@ class TopologyView:
             affinity = _clamp01(cohesion + max(law, 0.0) * (1.0 - cohesion))
             repulsion = _clamp01(max(-law, 1.0 if impossible else 0.0))
             route_strength = _clamp01(affinity * (1.0 - repulsion) * (1.0 - uncertainty * 0.5))
-            pressure = _clamp01(uncertainty + repulsion * 0.5 - affinity * 0.25)
+            # Thermodynamic edge pressure: field-derived from region free energy
+            # pressure = (uncertainty + repulsion) * (1.0 - affinity * 0.5)
+            # High uncertainty + repulsion = high pressure (wants to break)
+            # High affinity = low pressure (wants to stay together)
+            # This replaces the heuristic weight formula with a principled
+            # thermodynamic relationship: pressure scales with disorder and repulsion
+            # and is dampened by cohesive affinity.
+            pressure = _clamp01((uncertainty + repulsion) * (1.0 - affinity * 0.5))
             if repulsion > affinity and repulsion >= 0.2:
                 semantics = "repulsive"
             elif affinity > 0.2:
@@ -298,6 +374,16 @@ class TopologyView:
     def restructuring_queue(self) -> Set[Tuple[str, str]]:
         return set(self._restructuring)
 
+    # ─── Multi-Scale Access ──────────────────────────────────────────
+
+    def get_meso_clusters(self) -> List[dict]:
+        """Return meso clusters as active entity dicts."""
+        return list(self._meso_clusters)
+
+    def get_macro_continents(self) -> List[dict]:
+        """Return macro continents as active entity dicts."""
+        return list(self._macro_continents)
+
 
 class TopologyState:
     """Sole owner of the semantic field's topology structure."""
@@ -354,6 +440,10 @@ class TopologyState:
         
         # ─── Meso Clusters (Multi-Scale Topology) ────────────────────
         self._meso_clusters: List[dict] = []
+
+        # ─── Macro Continents (Multi-Scale Topology) ──────────────────
+        self._macro_continents: List[dict] = []
+        self._last_pressure_flow_time: float = 0.0
 
         # ─── Distributed Recovery (Phase 60) ──────────────────────────
         self._topology_epoch: int = 1
@@ -412,6 +502,7 @@ class TopologyState:
             "anchors": set(self._anchors),
             "crystalline_atoms": list(self._crystalline_atoms),
             "meso_clusters": list(self._meso_clusters),
+            "macro_continents": list(self._macro_continents),
             "tombstones": set(self._tombstones),
             "structural_change": False,
         }
@@ -452,6 +543,7 @@ class TopologyState:
             self._anchors = self._staging["anchors"]
             self._crystalline_atoms = self._staging["crystalline_atoms"]
             self._meso_clusters = self._staging["meso_clusters"]
+            self._macro_continents = self._staging["macro_continents"]
             self._tombstones_real = self._staging["tombstones"]
             
             self._staging = None
@@ -531,30 +623,31 @@ class TopologyState:
             "anchors": "_anchors",
             "crystalline_atoms": "_crystalline_atoms",
             "meso_clusters": "_meso_clusters",
+            "macro_continents": "_macro_continents",
         }
         return getattr(self, attr_map[key])
-
     def _set_struct(self, key: str, val):
         if self._staging is not None:
             self._staging[key] = val
-        else:
-            attr_map = {
-                "communities": "_communities",
-                "schema_patterns": "_schema_patterns",
-                "topological_laws": "_topological_laws",
-                "neighborhood_cohesion": "_neighborhood_cohesion",
-                "impossible_neighborhoods": "_impossible_neighborhoods",
-                "restructuring_queue": "_restructuring_queue",
-                "merge_success": "_cohesion_merge_success",
-                "merge_attempts": "_cohesion_merge_attempts",
-                "split_success": "_cohesion_split_success",
-                "split_attempts": "_cohesion_split_attempts",
-                "centrality": "_centrality",
+            return
+        attr_map = {
+            "communities": "_communities",
+            "schema_patterns": "_schema_patterns",
+            "topological_laws": "_topological_laws",
+            "neighborhood_cohesion": "_neighborhood_cohesion",
+            "impossible_neighborhoods": "_impossible_neighborhoods",
+            "restructuring_queue": "_restructuring_queue",
+            "merge_success": "_cohesion_merge_success",
+            "merge_attempts": "_cohesion_merge_attempts",
+            "split_success": "_cohesion_split_success",
+            "split_attempts": "_cohesion_split_attempts",
+            "centrality": "_centrality",
             "anchors": "_anchors",
             "crystalline_atoms": "_crystalline_atoms",
             "meso_clusters": "_meso_clusters",
+            "macro_continents": "_macro_continents",
         }
-            setattr(self, attr_map[key], val)
+        setattr(self, attr_map[key], val)
 
     # ─── Read-Only View — Regions ──────────────────────────────────────
 
@@ -593,6 +686,8 @@ class TopologyState:
             cohesion_merge_attempts=self._get_struct("merge_attempts"),
             cohesion_split_success=self._get_struct("split_success"),
             cohesion_split_attempts=self._get_struct("split_attempts"),
+            meso_clusters=self._get_struct("meso_clusters"),
+            macro_continents=self._get_struct("macro_continents"),
             read_callback=self._read_callback
         )
 
@@ -960,6 +1055,7 @@ class TopologyState:
             self._staging["anchors"].clear()
             self._staging["crystalline_atoms"].clear()
             self._staging["meso_clusters"].clear()
+            self._staging["macro_continents"].clear()
         else:
             self._regions.clear()
             self._communities.clear()
@@ -976,6 +1072,7 @@ class TopologyState:
             self._anchors.clear()
             self._crystalline_atoms.clear()
             self._meso_clusters.clear()
+            self._macro_continents.clear()
 
 
     # ─── Controlled Mutations — Region Attributes ──────────────────────
@@ -1104,7 +1201,7 @@ class TopologyState:
     # ─── Bulk Operations ───────────────────────────────────────────────
 
     def evolve_all(self, force: bool = False):
-        """Evolve all basins modulated by edge field forces and meso feedback.
+        """Evolve all basins modulated by edge field forces and multi-scale feedback.
 
         Returns list of (exclusion_key, delta) effects for the caller to
         apply through InstabilityState APIs.
@@ -1112,16 +1209,20 @@ class TopologyState:
         Multi-scale evolution:
         1. Micro: edge field forces (pressure, affinity) modulate per-region evolution
         2. Meso: clusters of related regions exert top-down feedback
-        3. All scales interact — no procedural overrides
+        3. Macro: continents provide long-range ecological governance
+        4. Cross-scale: pressure flows bidirectionally between all scales
 
         LAW: Edge field forces (pressure, affinity) modulate evolution speed.
         High pressure regions evolve faster; high affinity regions stabilize.
-        Meso clusters provide field-derived top-down coupling.
+        Meso clusters and macro continents provide field-derived multi-scale coupling.
+        All scales interact through the cross-scale pressure flow.
         """
         forces = self._compute_edge_field_forces()
 
-        # 1. Compute meso clusters BEFORE evolving (so feedback is from previous cycle)
+        # 1. Compute meso clusters and macro continents BEFORE evolving
+        #    (so feedback is from previous cycle's state)
         self.compute_meso_clusters()
+        self.compute_macro_continents()
 
         survivors = []
         all_effects = []
@@ -1153,11 +1254,9 @@ class TopologyState:
 
         self._set_regions(survivors)
 
-        # 2. Apply meso cluster feedback AFTER micro evolution
-        self._evolve_meso_clusters()
-
-        # 3. Recompute meso clusters with evolved state
-        self.compute_meso_clusters()
+        # 2. Apply full cross-scale pressure flow
+        #    Meso → Micro feedback + Macro → Meso guidance + complete sync
+        self.cross_scale_pressure_flow()
 
         return all_effects
 
@@ -1204,66 +1303,103 @@ class TopologyState:
                 effects = r.propagate()
             all_effects.extend(effects)
         return all_effects
-    def redistribute_instability(self, damping: float = 1.0):
-        """Redistribute instability across regions using edge field coupling.
+    def redistribute_instability(self, damping: float = 1.0) -> dict:
+        """Redistribute instability across regions using thermodynamic free energy gradients.
 
-        LAW 14: Instability is a fluid that flows from high-pressure to low-pressure
-        regions via edge-field-derived coupling, not interaction counts.
+        LAW 14: Instability is a fluid that flows from high free-energy to low free-energy
+        regions via edge field conductance. Flow = conductance * d(free_energy) * coefficient.
+
+        Free energy = local_energy - local_temperature * instability.
+        Regions with higher free energy (more trapped tension) transfer instability
+        to regions with lower free energy (more stable) through edge field connections.
+
+        Returns dict with flow tracking data for energy conservation recording.
         """
+        from app.field_laws import COUPLING_COEFFICIENT, FREE_ENERGY_CLAMP
         regs = self._get_regions()
         if len(regs) < 2:
-            return
+            return {"total_flow": 0.0, "source_flow": 0.0, "sink_flow": 0.0, "pairs_coupled": 0}
 
         forces = self._compute_edge_field_forces()
 
-        # 1. Track interactions for fallback coupling
-        for region in regs:
-            region._interaction_count += 1
+        # Compute free energy for each region
+        # free_energy = internal_energy - temperature * entropy
+        free_energies = {}
+        for r in regs:
+            fe = r.local_energy - r.local_temperature * r.instability
+            free_energies[r.region_id] = fe
 
-        # 2. Compute flows using edge field coupling
+        # 1. Compute flows using thermodynamic free energy gradient
         deltas = {r.region_id: 0.0 for r in regs}
+        source_flow = 0.0  # Flow OUT of source regions
+        sink_flow = 0.0    # Flow INTO sink regions
+        pairs_coupled = 0
+
         for i in range(len(regs)):
             for j in range(i + 1, len(regs)):
                 ri = regs[i]
                 rj = regs[j]
 
-                # Compute edge-field coupling between these regions
-                # Higher coupling = more instability flow
-                edge_coupling = 0.0
+                # Compute edge field conductance between these regions
+                # Conductance = max route_strength across all shared role pairs
+                edge_conductance = 0.0
                 for ra in ri.competing_roles:
                     for rb in rj.competing_roles:
                         pair = tuple(sorted([ra, rb]))
                         force = forces.get(pair)
                         if force:
-                            # Edge field coupling = pressure + route_strength
-                            coupling = force['pressure'] * 0.5 + force['route_strength'] * 0.5
-                            edge_coupling = max(edge_coupling, coupling)
+                            # Edge conductance = route_strength (how well signals flow)
+                            edge_conductance = max(edge_conductance, force['route_strength'])
 
-                if edge_coupling < 0.01:
-                    # Fallback: use interaction count for disconnected pairs
-                    ci = ri._interaction_count
-                    cj = rj._interaction_count
-                    edge_coupling = min(ci, cj) * 0.01
+                if edge_conductance < 0.01:
+                    continue  # No field connection: no thermodynamic coupling
 
-                if edge_coupling < 0.01:
-                    continue
+                pairs_coupled += 1
 
-                pressure_gradient = ri.instability - rj.instability
-                flow = edge_coupling * pressure_gradient * damping
-                # Clamp flow to prevent oscillations
+                # Thermodynamic free energy gradient
+                fe_ri = free_energies[ri.region_id]
+                fe_rj = free_energies[rj.region_id]
+                fe_gradient = fe_ri - fe_rj
+
+                # Clamp gradient to prevent extreme oscillations
+                fe_gradient = max(-FREE_ENERGY_CLAMP, min(FREE_ENERGY_CLAMP, fe_gradient))
+
+                # Flow = conductance * gradient * damping * coefficient
+                # This is analogous to Ohm's law: I = G * V
+                # Flow direction: positive = ri → rj (ri loses instability, rj gains)
+                flow = edge_conductance * fe_gradient * damping * COUPLING_COEFFICIENT
                 flow = max(-0.1, min(0.1, flow))
 
                 deltas[ri.region_id] -= flow
                 deltas[rj.region_id] += flow
 
-        # 3. Apply deltas
+                if flow > 0:
+                    source_flow += flow
+                    sink_flow += flow
+                else:
+                    source_flow += abs(flow)
+                    sink_flow += abs(flow)
+
+        # 2. Apply deltas
         for rid, delta in deltas.items():
             if abs(delta) > 1e-6:
                 r = self.get_region(rid)
                 if r:
                     self.set_region_instability(rid, r.instability + delta)
 
-        self._record("redistribute_instability", {"count": len(regs)})
+        total_flow = round(sum(abs(d) for d in deltas.values()), 4)
+        self._record("redistribute_instability", {
+            "count": len(regs),
+            "total_flow": total_flow,
+            "pairs_coupled": pairs_coupled,
+        })
+
+        return {
+            "total_flow": total_flow,
+            "source_flow": round(source_flow, 4),
+            "sink_flow": round(sink_flow, 4),
+            "pairs_coupled": pairs_coupled,
+        }
 
     def aggregate_metrics(self):
         regs = self._get_regions()
@@ -1304,15 +1440,27 @@ class TopologyState:
 
         Meso clusters group regions that share competing roles, forming
         intermediate-scale structures between micro (single region) and
-        macro (global aggregate). These clusters are first-class field
-        structures that exert feedback on their constituent regions.
+        macro (global aggregate). These clusters are now first-class field
+        entities with their own dynamics: pressure, entropy, drift, stability,
+        boundary_strength, and interaction_policy.
 
         LAW: Meso clustering is derived from topology itself, not from
-        any external partitioning scheme.
+        any external partitioning scheme. Clusters are active entities
+        that evolve and exert feedback on constituent regions.
         """
         regs = self._get_regions()
         clusters = []
         assigned = set()
+        import uuid
+
+        # Retrieve previous clusters to carry forward their dynamic properties
+        prev_clusters = self._get_struct("meso_clusters")
+        prev_map = {}
+        for pc in prev_clusters:
+            # Match by sorted tuple of region_ids for continuity
+            rid_tuple = tuple(sorted(pc.get("region_ids", [])))
+            prev_map[rid_tuple] = pc
+
         for i in range(len(regs)):
             if i in assigned:
                 continue
@@ -1342,7 +1490,62 @@ class TopologyState:
             ))
             tokens = list(set(r.token for r in cluster_regions))
 
+            # Build region_id tuple for continuity tracking
+            rid_tuple = tuple(sorted([r.region_id for r in cluster_regions]))
+            prev = prev_map.get(rid_tuple, {})
+
+            # Compute active entity properties
+            # Entropy: diversity of instability within cluster
+            instabilities = [r.instability for r in cluster_regions]
+            if len(instabilities) > 1:
+                mean_inst = sum(instabilities) / len(instabilities)
+                entropy = sum(abs(i - mean_inst) for i in instabilities) / len(instabilities)
+            else:
+                entropy = 0.0
+
+            # Drift: how much avg_instability changed from previous
+            prev_instability = prev.get("avg_instability", avg_instability)
+            drift = abs(avg_instability - prev_instability)
+
+            # Stability: smoothed inverse of instability
+            prev_stability = prev.get("stability", 0.5)
+            raw_stability = 1.0 - avg_instability
+            stability = prev_stability * 0.7 + raw_stability * 0.3
+
+            # Boundary strength: how tightly coupled the regions are
+            # High shared_role_count / total_role_count = tight boundary
+            if all_roles:
+                boundary_strength = len(shared_roles) / len(all_roles) if len(all_roles) > 0 else 0.0
+            else:
+                boundary_strength = 0.0
+            # Carry forward previous boundary strength with momentum
+            prev_boundary = prev.get("boundary_strength", boundary_strength)
+            boundary_strength = prev_boundary * 0.8 + boundary_strength * 0.2
+
+            # Interaction policy: derived from cluster-level properties
+            prev_policy = prev.get("interaction_policy", "neutral")
+            if avg_instability > 0.7 and avg_convergence < 0.3:
+                interaction_policy = "competitive"
+            elif avg_convergence > 0.7 and avg_instability < 0.3:
+                interaction_policy = "cooperative"
+            elif boundary_strength > 0.8:
+                interaction_policy = "isolated"
+            else:
+                interaction_policy = "neutral"
+            # Smooth policy transitions: only change if properties are decisive
+            if interaction_policy != prev_policy:
+                if abs(avg_instability - 0.5) < 0.2:
+                    interaction_policy = prev_policy  # Keep previous in ambiguous zones
+
+            # Centroid: average of all competing role vectors (simulated from role names)
+            # In a full implementation this would use actual manifold vectors
+            role_hash = sum(hash(r) for r in all_roles) if all_roles else 0
+            centroid = (role_hash / 1e10 % 1.0, sum(hash(r) * 7 for r in all_roles) / 1e10 % 1.0) if all_roles else (0.0, 0.0)
+
+            cluster_id = prev.get("cluster_id", f"meso_{uuid.uuid4().hex[:8]}")
+
             clusters.append({
+                "cluster_id": cluster_id,
                 "size": len(cluster_regions),
                 "region_ids": [r.region_id for r in cluster_regions],
                 "tokens": tokens,
@@ -1351,6 +1554,13 @@ class TopologyState:
                 "avg_instability": round(avg_instability, 3),
                 "avg_convergence": round(avg_convergence, 3),
                 "avg_pressure": round(avg_pressure, 3),
+                # Active entity properties
+                "entropy": round(entropy, 3),
+                "drift": round(drift, 3),
+                "stability": round(stability, 3),
+                "boundary_strength": round(boundary_strength, 3),
+                "interaction_policy": interaction_policy,
+                "centroid": centroid,
             })
 
         self._set_struct("meso_clusters", clusters)
@@ -1419,12 +1629,135 @@ class TopologyState:
             "pressure": round(weighted_pressure, 3),
         }
 
+    def compute_macro_continents(self):
+        """Compute macro-scale semantic continents from meso clusters.
+
+        Macro continents group related meso clusters into the largest scale of
+        semantic organization. They provide long-range stabilization, preserve
+        diversity, and prevent monopolistic attractors from dominating.
+
+        Continents are computed from cluster proximity (shared roles) and
+        carry their own dynamic properties: pressure, entropy, stability,
+        convergence, guidance_strength, and diversity_pressure.
+
+        LAW: Macro organization emerges from meso cluster interaction,
+        not from global partitioning. Continents are field-derived.
+        """
+        clusters = self._get_struct("meso_clusters")
+        if not clusters:
+            self._set_struct("macro_continents", [])
+            self._record("compute_macro_continents", {"count": 0})
+            return
+
+        prev_continents = self._get_struct("macro_continents")
+        prev_map = {}
+        for pc in prev_continents:
+            cid_tuple = tuple(sorted(pc.get("meso_cluster_ids", [])))
+            prev_map[cid_tuple] = pc
+
+        # Group clusters that share roles
+        import uuid
+        continents = []
+        assigned = set()
+        for i in range(len(clusters)):
+            if i in assigned:
+                continue
+            continent_indices = [i]
+            for j in range(i + 1, len(clusters)):
+                if j in assigned:
+                    continue
+                # Two clusters belong to the same continent if they share roles
+                a_roles = set(clusters[i].get("all_roles", []))
+                b_roles = set(clusters[j].get("all_roles", []))
+                if a_roles & b_roles:
+                    continent_indices.append(j)
+                    assigned.add(j)
+            assigned.add(i)
+
+            if len(continent_indices) == 1:
+                # Single cluster can still form its own micro-continent
+                pass
+
+            continent_clusters = [clusters[k] for k in continent_indices]
+            all_meso_ids = tuple(sorted([c["cluster_id"] for c in continent_clusters]))
+
+            # Compute continental properties from constituent clusters
+            total_regions = sum(c["size"] for c in continent_clusters)
+            all_roles = list(set.union(*[set(c.get("all_roles", [])) for c in continent_clusters]))
+
+            # Pressure: weighted by cluster size
+            total_size = sum(c["size"] for c in continent_clusters)
+            pressure = sum(c["avg_pressure"] * c["size"] for c in continent_clusters) / max(total_size, 1)
+
+            # Entropy: diversity across constituent clusters
+            if len(continent_clusters) > 1:
+                instabilities = [c["avg_instability"] for c in continent_clusters]
+                mean_inst = sum(instabilities) / len(instabilities)
+                entropy = sum(abs(i - mean_inst) for i in instabilities) / len(instabilities)
+            else:
+                entropy = 0.0
+
+            # Stability: weighted average of cluster stabilities
+            stability = sum(c.get("stability", 0.5) * c["size"] for c in continent_clusters) / max(total_size, 1)
+
+            # Convergence: weighted average
+            convergence = sum(c["avg_convergence"] * c["size"] for c in continent_clusters) / max(total_size, 1)
+
+            # Guidance strength: how strongly this continent influences its clusters
+            # Derived from entropy + stability: stable diverse continents guide strongly
+            prev = prev_map.get(all_meso_ids, {})
+            prev_guidance = prev.get("guidance_strength", 0.5)
+            raw_guidance = min(1.0, stability * (1.0 + entropy) * 0.7)
+            guidance_strength = prev_guidance * 0.85 + raw_guidance * 0.15
+
+            # Diversity pressure: mechanism to prevent monoculture
+            # High when clusters within the continent have varied instability
+            if len(continent_clusters) > 1:
+                instabilities = [c["avg_instability"] for c in continent_clusters]
+                variance = sum((i - sum(instabilities)/len(instabilities))**2 for i in instabilities) / len(instabilities)
+                diversity_pressure = min(1.0, variance * 5.0)  # Scale up variance
+            else:
+                diversity_pressure = 0.0  # Single cluster: no internal diversity
+
+            # Centroid: simplified from cluster centroids
+            centroids = [c.get("centroid", (0.0, 0.0)) for c in continent_clusters]
+            if centroids:
+                cx = sum(c[0] for c in centroids) / len(centroids)
+                cy = sum(c[1] for c in centroids) / len(centroids)
+                centroid = (cx, cy)
+            else:
+                centroid = (0.0, 0.0)
+
+            continent_id = prev.get("continent_id", f"macro_{uuid.uuid4().hex[:8]}")
+
+            continents.append({
+                "continent_id": continent_id,
+                "size": total_regions,
+                "meso_cluster_ids": list(all_meso_ids),
+                "all_roles": all_roles,
+                "pressure": round(pressure, 3),
+                "entropy": round(entropy, 3),
+                "stability": round(stability, 3),
+                "convergence": round(convergence, 3),
+                "guidance_strength": round(guidance_strength, 3),
+                "diversity_pressure": round(diversity_pressure, 3),
+                "centroid": centroid,
+            })
+
+        self._set_struct("macro_continents", continents)
+        self._record("compute_macro_continents", {"count": len(continents)})
+
     def _evolve_meso_clusters(self):
         """Evolve meso clusters — apply cluster-level feedback to constituent regions.
 
         Meso clusters exert pressure on their regions based on cluster-level
         instability and convergence. This creates a top-down coupling:
         stable clusters stabilize their regions; unstable clusters destabilize them.
+
+        The interaction is now modulated by the cluster's active entity properties:
+        - boundary_strength: tightly bounded clusters shield regions from feedback
+        - interaction_policy: cooperative clusters stabilize; competitive destabilize
+        - entropy: high-entropy clusters apply uneven feedback
 
         This is the core multi-scale interaction: micro (region) affects meso (cluster)
         which then feeds back to micro. The field restructures itself through
@@ -1438,37 +1771,197 @@ class TopologyState:
         reg_map = {r.region_id: r for r in regs}
         affected = 0
 
+        # Compute macro pressure for top-down influence (meso gets guidance from macro)
+        continents = self._get_struct("macro_continents")
+        macro_pressure_map = {}
+        for cont in continents:
+            for cid in cont.get("meso_cluster_ids", []):
+                macro_pressure_map[cid] = cont.get("pressure", 0.0)
+
         for cluster in clusters:
+            cid = cluster["cluster_id"]
+            # Active entity properties
+            boundary = cluster.get("boundary_strength", 0.5)
+            policy = cluster.get("interaction_policy", "neutral")
+            cluster_entropy = cluster.get("entropy", 0.0)
+            cluster_stability = cluster.get("stability", 0.5)
+
+            # Macro top-down pressure
+            macro_pressure = macro_pressure_map.get(cid, 0.0)
+
             # Cluster-level properties determine the feedback direction
-            # High instability cluster -> regions get destabilized
-            # High convergence cluster -> regions get stabilized
             feedback_strength = cluster["avg_instability"] * (1.0 - cluster["avg_convergence"])
-            if feedback_strength < 0.01:
+            if feedback_strength < 0.001:
                 continue
+
+            # Modulate by policy
+            if policy == "isolated":
+                # Isolated clusters have very weak feedback — regions are loosely coupled
+                boundary_factor = boundary * 3.0  # Strong boundary = very isolated
+                feedback_strength *= max(0.0, 1.0 - boundary_factor * 0.3)
+            elif policy == "cooperative":
+                # Cooperative clusters stabilize more uniformly
+                pass  # Use standard feedback
+            elif policy == "competitive":
+                # Competitive clusters amplify feedback — more chaotic
+                feedback_strength *= 1.3
+
+            # Entropy modulation: high-entropy clusters apply uneven feedback
+            entropy_noise = 1.0 + (cluster_entropy - 0.5) * 0.5  # 0.75–1.25 range
+            feedback_strength *= entropy_noise
 
             for rid in cluster["region_ids"]:
                 r = reg_map.get(rid)
                 if not r:
                     continue
 
-                # Apply meso feedback to region instability
-                # Strong clusters stabilize; weak clusters destabilize
-                if cluster["avg_convergence"] > 0.6:
+                # Meso feedback to region instability
+                if cluster_stability > 0.6:
                     # Stable cluster: pull region toward stability
-                    pull = cluster["avg_convergence"] * 0.05 * feedback_strength
+                    # Pull strength is higher for cooperative clusters
+                    pull_mod = 1.2 if policy == "cooperative" else 1.0
+                    pull = cluster_stability * 0.05 * feedback_strength * pull_mod
                     r.instability = max(0.01, r.instability - pull)
                 else:
                     # Unstable cluster: push region toward exploration
-                    push = (1.0 - cluster["avg_convergence"]) * 0.05 * feedback_strength
+                    # Push is amplified for competitive clusters
+                    push_mod = 1.4 if policy == "competitive" else 1.0
+                    push = (1.0 - cluster_stability) * 0.05 * feedback_strength * push_mod
                     r.instability = min(1.0, r.instability + push)
 
-                # Temperature coupling: cluster instability heats up regions
-                r.local_temperature = r.local_temperature * 0.95 + cluster["avg_instability"] * 0.05
+                # Macro top-down guidance: high macro pressure regions get extra push
+                if macro_pressure > 0.5:
+                    r.instability = min(1.0, r.instability + macro_pressure * 0.01)
+
+                # Temperature coupling
+                base_temp_influence = cluster["avg_instability"] * 0.05
+                # Isolated clusters heat up less
+                if policy == "isolated":
+                    base_temp_influence *= (1.0 - boundary * 0.5)
+                r.local_temperature = r.local_temperature * 0.95 + base_temp_influence
+
+                # Boundary modulates pressure propagation
+                if boundary > 0.6 and policy == "isolated":
+                    # Tight boundary: less external influence reaches regions
+                    pass  # Already handled through reduced feedback
+
                 affected += 1
 
         if affected:
             self._record("evolve_meso_clusters", {"affected_regions": affected, "cluster_count": len(clusters)})
         return affected
+
+    def _evolve_macro_continents(self):
+        """Evolve macro continents — apply continent-level guidance to meso clusters.
+
+        Macro continents provide top-down ecological governance:
+        - Stable continents guide their clusters toward convergence
+        - Unstable continents release clusters to explore
+        - Diversity pressure prevents any single cluster from dominating
+        - Guidance strength modulates the influence
+
+        LAW: Macro governance is emergent from meso cluster dynamics,
+        not procedural orchestration. Continents do not override;
+        they modulate.
+        """
+        continents = self._get_struct("macro_continents")
+        if not continents:
+            return 0
+
+        clusters = self._get_struct("meso_clusters")
+        cluster_map = {c["cluster_id"]: c for c in clusters}
+        affected = 0
+
+        for continent in continents:
+            guidance = continent.get("guidance_strength", 0.5)
+            c_stability = continent.get("stability", 0.5)
+            c_pressure = continent.get("pressure", 0.0)
+            d_pressure = continent.get("diversity_pressure", 0.0)
+            conv = continent.get("convergence", 0.5)
+
+            if guidance < 0.05:
+                continue  # Negligible influence
+
+            for cid in continent.get("meso_cluster_ids", []):
+                cluster = cluster_map.get(cid)
+                if not cluster:
+                    continue
+
+                # 1. Stability guidance: stable continents pull clusters toward stability
+                if c_stability > 0.6:
+                    pull = (c_stability - 0.5) * guidance * 0.02
+                    cluster["avg_instability"] = max(0.01, cluster["avg_instability"] - pull)
+                    # Also nudge convergence upward
+                    cluster["avg_convergence"] = min(1.0, cluster["avg_convergence"] + pull * 0.5)
+
+                # 2. Pressure diffusion: continent pressure shapes cluster pressure
+                pressure_diff = c_pressure - cluster["avg_pressure"]
+                cluster["avg_pressure"] = cluster["avg_pressure"] + pressure_diff * guidance * 0.05
+
+                # 3. Diversity pressure: prevent monopolistic clusters
+                # If one cluster dominates (large size, low instability), diversity pushes
+                # it to release some tension
+                if d_pressure > 0.4:
+                    release = d_pressure * guidance * 0.01
+                    cluster["avg_instability"] = min(1.0, cluster["avg_instability"] + release)
+
+                # 4. Convergence guidance: continents channel toward convergence
+                if conv > 0.7:
+                    # High convergence continent: pull all clusters toward convergence
+                    gap = conv - cluster["avg_convergence"]
+                    cluster["avg_convergence"] = min(1.0, cluster["avg_convergence"] + gap * guidance * 0.03)
+
+                affected += 1
+
+        # After evolving cluster properties, re-compute continent-level properties
+        # from the updated clusters
+        self.compute_macro_continents()
+
+        if affected:
+            self._record("evolve_macro_continents", {"affected_clusters": affected, "continent_count": len(continents)})
+        return affected
+
+    def cross_scale_pressure_flow(self):
+        """Orchestrate bidirectional pressure flow across all three scales.
+
+        Flow path:
+        1. Micro → Meso: Region instabilities aggregate into cluster-level pressure
+        2. Meso → Micro: Cluster-level dynamics feed back to constituent regions
+        3. Meso → Macro: Cluster properties aggregate into continent-level dynamics
+        4. Macro → Meso: Continent-level governance shapes cluster behavior
+        5. Macro → Micro: Continental stability provides long-range attractor field
+
+        The flow is temporal (continuous, not step-based) with damping
+        to prevent oscillations.
+
+        LAW: Cross-scale pressure flow is the canonical mechanism for
+        multi-scale interaction. No scale bypass or procedural override.
+        """
+        import time
+        now = time.time()
+
+        # 1. Micro → Meso: Recompute clusters from evolved regions
+        self.compute_meso_clusters()
+
+        # 2. Meso → Micro: Apply meso feedback to regions
+        meso_affected = self._evolve_meso_clusters()
+
+        # 3. Meso → Macro: Build/update continents from evolved clusters
+        self.compute_macro_continents()
+
+        # 4. Macro → Meso: Apply continent guidance to clusters
+        macro_affected = self._evolve_macro_continents()
+
+        # 5. Re-sync: after macro guidance, recompute clusters with updated properties
+        #    This ensures the macro → meso flow is reflected in cluster state
+        if macro_affected > 0:
+            self.compute_meso_clusters()
+
+        self._last_pressure_flow_time = now
+        self._record("cross_scale_pressure_flow", {
+            "meso_feedback": meso_affected,
+            "macro_guidance": macro_affected,
+        })
 
     # ─── Serialization ───────────────────────────────────────────────────
 
@@ -1490,6 +1983,7 @@ class TopologyState:
             "restructuring_queue": [list(r) for r in self.restructuring_queue],
             "crystalline_atoms": list(self._get_struct("crystalline_atoms")),
             "meso_clusters": list(self._get_struct("meso_clusters")),
+            "macro_continents": list(self._get_struct("macro_continents")),
             "topology_epoch": self._topology_epoch,
             "tombstones": list(self._tombstones),
         }
@@ -1543,6 +2037,7 @@ class TopologyState:
         self._set_struct("anchors", {tuple(a) for a in data.get("anchors", []) if len(a) == 2})
         self._set_struct("crystalline_atoms", list(data.get("crystalline_atoms", [])))
         self._set_struct("meso_clusters", list(data.get("meso_clusters", [])))
+        self._set_struct("macro_continents", list(data.get("macro_continents", [])))
 
     def merge(self, other_data: dict, alpha: float = 0.5):
         """Merge remote topology state into local (Phase 32/60)."""

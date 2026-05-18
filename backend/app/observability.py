@@ -10,6 +10,50 @@ from typing import Dict, List, Optional, Callable, Any
 from app.transaction_context import active_transaction
 
 from collections import deque
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class GovernanceSnapshot:
+    """Pure data snapshot for governance reads — no live state references.
+
+    Captured BEFORE governance logic runs to ensure:
+    1. Governance decisions are based on a consistent, frozen field state
+    2. Observability reads do NOT causally couple to runtime mutation
+    3. Deterministic replay of governance decisions is possible
+
+    Governance methods that previously took `ws` (SemanticWorldState) now
+    accept this snapshot, breaking the causal chain between governance
+    decisions and live state access during field evolution.
+    """
+    # Role manifold data
+    role_names: tuple
+    role_certainties: dict
+
+    # Topology history
+    topology_snapshots: tuple
+
+    # Energy metrics
+    global_energy: float
+    total_records_processed: int
+
+    # Drift data
+    drift_log_data: dict
+
+    # Serialized states for memory estimation (to_dict for size)
+    topology_dict: dict
+    manifold_dict: dict
+    motif_dict: dict
+    history_dict: dict
+
+    # Telemetry
+    telemetry_stream: tuple
+
+    # System pressure
+    system_pressure: float
+
+    # Topology centrality for importance calculation
+    topology_centrality: dict
 
 class ObservabilityState:
     """Sole owner of the semantic field's telemetry and activity heatmaps."""
@@ -216,17 +260,16 @@ class ObservabilityState:
 
         return oscillations
 
-    def calculate_attractor_diversity(self, ws) -> float:
+    def calculate_attractor_diversity(self, snapshot: GovernanceSnapshot) -> float:
         """Quantify the semantic field plasticity using Shannon entropy (Phase 56).
 
         High Diversity = Many active basins with varied stability.
         Low Diversity = Dominant basins suppressing exploration (Freezing).
         """
-        manifold = ws.role_manifold
-        if not manifold:
+        if not snapshot.role_names:
             return 1.0
 
-        stabilities = [ws._manifold.get_role_certainty(r) for r in manifold]
+        stabilities = [snapshot.role_certainties.get(r, 0.0) for r in snapshot.role_names]
         if not stabilities:
             return 1.0
 
@@ -241,22 +284,26 @@ class ObservabilityState:
         entropy = -sum(p * math.log2(p) for p in probs if p > 0)
 
         # Scale by log of number of roles to get [0, 1] range
-        max_entropy = math.log2(len(manifold)) if len(manifold) > 1 else 1.0
+        max_entropy = math.log2(len(snapshot.role_names)) if len(snapshot.role_names) > 1 else 1.0
         return entropy / max_entropy
 
-    def get_governance_report(self, ws) -> dict:
+    def get_governance_report(self, snapshot: GovernanceSnapshot) -> dict:
         """Summary of emergent systems health and governance status (Phase 56)."""
-        snapshots = ws._history.topology_snapshots
-        manifold_history = {r: self.get_role_drift(r) for r in ws.role_manifold}
+        # Build manifold_history from snapshot drift data
+        manifold_history = {}
+        for r in snapshot.role_names:
+            history = list(snapshot.drift_log_data.get(r, ()))
+            if history:
+                manifold_history[r] = history
 
         report = {
-            "diversity": round(self.calculate_attractor_diversity(ws), 3),
-            "oscillations": self.detect_oscillations(snapshots),
+            "diversity": round(self.calculate_attractor_diversity(snapshot), 3),
+            "oscillations": self.detect_oscillations(list(snapshot.topology_snapshots)),
             "runaways": self.detect_runaway_attractors(manifold_history),
-            "memory_usage": self.get_memory_profile(ws),
+            "memory_usage": self.get_memory_profile(snapshot),
             "is_locked": self.detect_metastable_locks(
-                [s.get("energy", 0.0) for s in snapshots],
-                [s.get("entropy", 0.0) for s in snapshots]
+                [s.get("energy", 0.0) for s in snapshot.topology_snapshots],
+                [s.get("entropy", 0.0) for s in snapshot.topology_snapshots]
             )
         }
         return report
@@ -275,18 +322,22 @@ class ObservabilityState:
         max_conf = max(o["confidence"] for o in oscillations)
         return max(0.2, 1.0 - max_conf * 0.8)
 
-    def get_stability_policy(self, ws) -> dict:
+    def get_stability_policy(self, snapshot: GovernanceSnapshot) -> dict:
         """Return a dynamic stabilization policy for the current field state (Phase 49)."""
-        snapshots = ws._history.topology_snapshots
+        snapshots = list(snapshot.topology_snapshots)
         damping = self.calculate_damping_factor(snapshots)
 
         # Check for runaways
-        manifold_history = {r: self.get_role_drift(r) for r in ws.role_manifold}
+        manifold_history = {}
+        for r in snapshot.role_names:
+            history = list(snapshot.drift_log_data.get(r, ()))
+            if history:
+                manifold_history[r] = history
         runaways = self.detect_runaway_attractors(manifold_history)
 
         policy = {
             "propagation_damping": damping,
-            "force_decay": ws.metrics.global_energy > 8.0,
+            "force_decay": snapshot.global_energy > 8.0,
             "attractor_scaling": 0.5 if runaways else 1.0,
             "lock_escape_required": self.detect_metastable_locks(
                 [s.get("energy", 0.0) for s in snapshots],
@@ -450,38 +501,35 @@ class ObservabilityState:
         self._set_struct("activity_heatmap", {})
         self._set_struct("drift_log", {})
 
-    def get_memory_profile(self, ws) -> dict:
-        """Estimate subsystem memory pressure without mutating semantic state."""
+    def get_memory_profile(self, snapshot: GovernanceSnapshot) -> dict:
+        """Estimate subsystem memory pressure from snapshot data.
+
+        Uses pre-serialized dicts from the snapshot instead of live state,
+        breaking the causal chain between governance reads and runtime mutation.
+        """
         import json
-        import sys
 
-        def estimate(obj) -> int:
-            if hasattr(obj, "to_dict"):
-                try:
-                    return len(json.dumps(obj.to_dict(), sort_keys=True, default=str))
-                except Exception:
-                    logging.getLogger(__name__).debug(
-                        "Falling back to shallow memory estimate for %s",
-                        type(obj).__name__,
-                        exc_info=True,
-                    )
-            return sys.getsizeof(obj)
+        def estimate_dict(d: dict) -> int:
+            try:
+                return len(json.dumps(d, sort_keys=True, default=str))
+            except Exception:
+                return 0
 
-        telemetry_size = len(json.dumps(list(self._telemetry_stream), sort_keys=True, default=str))
+        telemetry_size = len(json.dumps(list(snapshot.telemetry_stream), sort_keys=True, default=str))
         profile = {
-            "topology": estimate(ws._topology),
-            "manifold": estimate(ws._manifold),
-            "motif": estimate(ws._motif),
-            "history": estimate(ws._history),
+            "topology": estimate_dict(snapshot.topology_dict),
+            "manifold": estimate_dict(snapshot.manifold_dict),
+            "motif": estimate_dict(snapshot.motif_dict),
+            "history": estimate_dict(snapshot.history_dict),
             "telemetry": telemetry_size,
-            "total_records": ws.metrics.total_records_processed,
+            "total_records": snapshot.total_records_processed,
         }
         profile["total_estimated_bytes"] = sum(
             value for key, value in profile.items() if key != "total_records"
         )
         return profile
 
-    def get_semantic_health_index(self, ws) -> dict:
+    def get_semantic_health_index(self, snapshot: GovernanceSnapshot) -> dict:
         """Compute the multi-dimensional Semantic Health Index (Phase 64).
 
         Laws of Health:
@@ -489,38 +537,42 @@ class ObservabilityState:
         2. Diversity: Attractor plasticity (Shannon entropy).
         3. Tension: Thermodynamic equilibrium state.
         4. Reliability: Transaction success rate.
+
+        Pure snapshot-based: no live state access.
         """
-        diversity = self.calculate_attractor_diversity(ws)
+        diversity = self.calculate_attractor_diversity(snapshot)
 
-        # 1. Stability (Drift Velocity)
+        # 1. Stability (Drift Velocity) — from snapshot drift data
         mean_drift = 0.0
-        drift_logs = [list(log) for log in self._drift_log.values() if log]
-        if drift_logs:
-            last_drifts = [log[-1] for log in drift_logs if log]
-            mean_drift = sum(last_drifts) / len(last_drifts) if last_drifts else 0.0
-        stability_score = max(0.0, 1.0 - mean_drift * 5.0) # Penalty for high velocity
+        all_drifts = []
+        for role_drifts in snapshot.drift_log_data.values():
+            if role_drifts:
+                all_drifts.append(role_drifts[-1])
+        if all_drifts:
+            mean_drift = sum(all_drifts) / len(all_drifts)
+        stability_score = max(0.0, 1.0 - mean_drift * 5.0)  # Penalty for high velocity
 
-        # 2. Tension (Energetic stress)
-        pressure = ws.get_system_pressure()
+        # 2. Tension (Energetic stress) — from snapshot
+        pressure = snapshot.system_pressure
         tension_score = max(0.0, 1.0 - pressure)
 
-        # 3. Reliability (Causal Integrity)
-        tx_history = [t for t in self.telemetry if t["type"] == "transaction"]
+        # 3. Reliability (Causal Integrity) — from snapshot telemetry
+        tx_list = list(snapshot.telemetry_stream)
+        tx_history = [t for t in tx_list if t.get("type") == "transaction"]
         success_rate = 1.0
         if tx_history:
-            # We assume a 'transaction' event implies success, while 'degradation' or lack of 'transaction' for an operation implies failure/conflict
-            # For now, we use a heuristic based on degradation vs transaction density
-            degrads = [t for t in self.telemetry if t["type"] == "degradation" and t["details"].get("severity") == "critical"]
+            degrads = [t for t in tx_list if t.get("type") == "degradation"
+                       and t.get("details", {}).get("severity") == "critical"]
             success_rate = max(0.0, 1.0 - (len(degrads) / (len(tx_history) + 1)))
 
         # 4. Diversity & Monoculture Risk (Phase 65)
         # Using Herfindahl-Hirschman Index (HHI) for attractor concentration
         hhi = 0.0
-        if ws.role_manifold:
-            stabilities = [ws._manifold.get_role_certainty(r) for r in ws.role_manifold]
+        if snapshot.role_names:
+            stabilities = [snapshot.role_certainties.get(r, 0.0) for r in snapshot.role_names]
             total_s = sum(stabilities)
             if total_s > 0:
-                hhi = sum((s / total_s)**2 for s in stabilities)
+                hhi = sum((s / total_s) ** 2 for s in stabilities)
 
         # Monoculture penalty (HHI > 0.4 indicates high concentration)
         monoculture_risk = max(0.0, (hhi - 0.1) / 0.9)
@@ -541,13 +593,15 @@ class ObservabilityState:
             "status": "optimal" if health_score > 0.8 else "degraded" if health_score > 0.4 else "critical"
         }
 
-    def calculate_semantic_importance(self, region, ws) -> float:
+    def calculate_semantic_importance(self, region, centrality: dict) -> float:
         """Compute the topological importance of a region (Phase 50).
 
         High Importance = high centrality, low instability, and participation in stable motifs.
+
+        Uses a pre-captured centrality dict instead of live ws._topology access.
         """
-        # 1. Centrality (if available in topology state)
-        centrality = ws._topology._centrality.get(region.region_id, 0.5)
+        # 1. Centrality (from snapshot)
+        c = centrality.get(region.region_id, 0.5)
 
         # 2. Stability boost
         stability = 1.0 - region.instability
@@ -555,14 +609,15 @@ class ObservabilityState:
         # 3. Persistence factor
         persistence = region.persistence
 
-        return (centrality * 0.4) + (stability * 0.3) + (persistence * 0.3)
+        return (c * 0.4) + (stability * 0.3) + (persistence * 0.3)
 
-    def apply_resource_shedding(self, ws, max_bytes: int = 10000000):
+    def apply_resource_shedding(self, ws, snapshot: GovernanceSnapshot, max_bytes: int = 10000000):
         """Prune non-essential state if memory footprint exceeds threshold (Phase 47/50).
 
         Enhanced with Value-Aware Pruning to preserve semantic continuity.
+        Uses snapshot for memory estimation, then mutates live state for pruning.
         """
-        profile = self.get_memory_profile(ws)
+        profile = self.get_memory_profile(snapshot)
         if profile["total_estimated_bytes"] < max_bytes:
             return False
 
@@ -581,8 +636,8 @@ class ObservabilityState:
         # Instead of just trimming from end, we sort by importance
         regs = ws._topology._get_regions()
         if len(regs) > 50:
-            # Rank by importance
-            scored_regs = [(self.calculate_semantic_importance(r, ws), r) for r in regs]
+            # Rank by importance using snapshot centrality
+            scored_regs = [(self.calculate_semantic_importance(r, snapshot.topology_centrality), r) for r in regs]
             scored_regs.sort(key=lambda x: x[0], reverse=True) # highest importance first
 
             # Keep top 50

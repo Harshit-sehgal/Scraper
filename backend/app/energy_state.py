@@ -32,6 +32,10 @@ class EnergyState:
         self._cumulative_uncertainty: float = 0.0
         self._dataset_coherence: float = 0.5
         self._schema_instability: dict = {}
+        # ─── Energy Conservation Tracking ───────────────────────────────
+        self._total_energy_source: float = 0.0  # Cumulative energy flowing out (source regions)
+        self._total_energy_sink: float = 0.0    # Cumulative energy flowing in (sink regions)
+        
         # ─── Internal Smoothed/Cached State ───────────────────────────
         self._convergence: float = 0.5
         self._temperature: float = 0.5
@@ -72,6 +76,8 @@ class EnergyState:
             "_cumulative_uncertainty": self._cumulative_uncertainty,
             "_dataset_coherence": self._dataset_coherence,
             "_schema_instability": dict(self._schema_instability),
+            "_total_energy_source": self._total_energy_source,
+            "_total_energy_sink": self._total_energy_sink,
             "_convergence": self._convergence,
             "_temperature": self._temperature,
             "_integrity": self._integrity,
@@ -92,6 +98,8 @@ class EnergyState:
             self._cumulative_uncertainty = self._staging["_cumulative_uncertainty"]
             self._dataset_coherence = self._staging["_dataset_coherence"]
             self._schema_instability = self._staging["_schema_instability"]
+            self._total_energy_source = self._staging["_total_energy_source"]
+            self._total_energy_sink = self._staging["_total_energy_sink"]
             self._convergence = self._staging["_convergence"]
             self._temperature = self._staging["_temperature"]
             self._integrity = self._staging["_integrity"]
@@ -224,6 +232,36 @@ class EnergyState:
     @property
     def integrity(self) -> float:
         return self._get_val("_integrity")
+
+    @property
+    def energy_balance(self) -> float:
+        """Net energy conservation balance.
+        
+        energy_balance = total_source - total_sink.
+        In a perfectly conserved field, this should approach 0 over time.
+        Positive = more energy flowing out than in (net relaxation).
+        Negative = more energy flowing in than out (net accumulation).
+        """
+        source = self._get_val("_total_energy_source")
+        sink = self._get_val("_total_energy_sink")
+        return round(source - sink, 4)
+
+    def record_energy_flow(self, source_delta: float, sink_delta: float):
+        """Record a redistribution flow for energy conservation tracking.
+        
+        source_delta: amount of energy that flowed OUT of source regions
+        sink_delta: amount of energy that flowed INTO sink regions
+        
+        In a conserved system: sum(source_delta) ≈ sum(sink_delta)
+        """
+        cur_source = self._get_val("_total_energy_source")
+        cur_sink = self._get_val("_total_energy_sink")
+        self._set_val("_total_energy_source", cur_source + abs(source_delta))
+        self._set_val("_total_energy_sink", cur_sink + abs(sink_delta))
+        self._record("record_energy_flow", {
+            "source_delta": round(source_delta, 4),
+            "sink_delta": round(sink_delta, 4),
+        })
 
     @property
     def field_pressure(self) -> float:
@@ -395,6 +433,8 @@ class EnergyState:
         self._set_val("cumulative_density", data.get("cumulative_density", 0.0))
         self._set_val("cumulative_uncertainty", data.get("cumulative_uncertainty", 0.0))
         self._set_val("dataset_coherence", data.get("dataset_coherence", 0.5))
+        self._set_val("_total_energy_source", data.get("_total_energy_source", 0.0))
+        self._set_val("_total_energy_sink", data.get("_total_energy_sink", 0.0))
         self._set_val("_convergence", data.get("_convergence", 0.5))
         self._set_val("_temperature", data.get("_temperature", 0.5))
         self._set_val("_integrity", data.get("_integrity", 0.5))
@@ -413,6 +453,8 @@ class EnergyState:
             "cumulative_density": self.cumulative_density,
             "cumulative_uncertainty": self.cumulative_uncertainty,
             "dataset_coherence": self.dataset_coherence,
+            "_total_energy_source": self._get_val("_total_energy_source"),
+            "_total_energy_sink": self._get_val("_total_energy_sink"),
             "_convergence": self.convergence,
             "_temperature": self.temperature,
             "_integrity": self.integrity,
@@ -431,6 +473,8 @@ class EnergyState:
         self._set_val("cumulative_density", 0.0)
         self._set_val("cumulative_uncertainty", 0.0)
         self._set_val("dataset_coherence", 0.5)
+        self._set_val("_total_energy_source", 0.0)
+        self._set_val("_total_energy_sink", 0.0)
         self._set_val("_convergence", 0.5)
         self._set_val("_temperature", 0.5)
         self._set_val("_integrity", 0.5)
@@ -464,6 +508,8 @@ class EnergyState:
         merge_field("dataset_coherence", other_data.get("dataset_coherence", 0.5))
         
         # Merge derived metrics
+        merge_field("_total_energy_source", other_data.get("_total_energy_source", 0.0), mode="max")
+        merge_field("_total_energy_sink", other_data.get("_total_energy_sink", 0.0), mode="max")
         merge_field("_convergence", other_data.get("_convergence", 0.5))
         merge_field("_temperature", other_data.get("_temperature", 0.5))
         merge_field("_integrity", other_data.get("_integrity", 0.5))

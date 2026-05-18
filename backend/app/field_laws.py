@@ -21,6 +21,17 @@ MAX_INSTABILITY_FLUX = 0.2
 # Attractor pull: max convergence-driven energy reduction
 MAX_ATTRACTOR_PULL = 2.0
 
+# ─── Thermodynamic Constants ─────────────────────────────────────────────
+
+# Coupling coefficient for free-energy-gradient-driven redistribution.
+# Scales the flow = conductance * free_energy_gradient * COUPLING_COEFFICIENT.
+# Higher values = faster equilibration; lower = more conservative.
+COUPLING_COEFFICIENT = 0.05
+
+# Maximum free energy gradient per redistribution step (clamp to prevent
+# chaotic oscillations from extreme gradient differentials).
+FREE_ENERGY_CLAMP = 2.0
+
 # Exclusivity constraints (bootstrap seeds, others learned dynamically)
 # Moved here from semantic_allocation_engine.py to prevent upward dependency
 # from core_types.py (the foundational type layer) to the allocation engine.

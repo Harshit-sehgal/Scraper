@@ -40,7 +40,6 @@ class FieldConflictRegion:
     version: int = 1 # MVCC monotonic version counter
     semantic_pressure: float = 0.5
     topology_neighbors: List[str] = field(default_factory=list)
-    _interaction_count: int = 0 # Phase 58: Dynamic flow tracking
 
     def __post_init__(self):
         if not hasattr(self, '_propagation_count'):

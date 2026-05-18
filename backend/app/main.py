@@ -173,6 +173,7 @@ async def system_topology():
         "metrics": {
             "field_pressure": round(ws.metrics.field_pressure, 3),
             "global_energy": round(ws.metrics.global_energy, 3),
+            "energy_balance": round(ws.metrics.energy_balance, 4),
             "semantic_temperature": round(ws.metrics.semantic_temperature, 3),
             "global_entropy": round(ws.metrics.global_entropy, 3),
             "exclusion_count": len(ws.learned_exclusions),
@@ -188,7 +189,9 @@ async def system_topology():
         "topology_edges": view.get_topology_edges(),
         "edge_fields": [edge.__dict__ for edge in view.get_edge_fields()],
         "role_compatibility": [{"role": k[0], "type": k[1], "score": round(v, 3)} for k, v in ws.role_compatibility.items()],
-        "drift_logs": {role: ws._observability.get_role_drift(role) for role in ws.get_manifold_roles()}
+        "drift_logs": {role: ws._observability.get_role_drift(role) for role in ws.get_manifold_roles()},
+        "meso_clusters": ws.meso_clusters,
+        "macro_continents": ws.macro_continents
     }
 
 

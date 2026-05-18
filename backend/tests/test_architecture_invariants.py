@@ -95,9 +95,9 @@ def test_no_orphan_methods():
         "update_scale_coupling", "redistribute_instability",
         "observe_field_perturbation",
         "field_regions", "learned_exclusions",
-        "decay_field_regions",
-        "meso_clusters",
-        "trace_causality", "replay_transaction",
+        "decay_field_regions",                "meso_clusters",
+                "macro_continents", "compute_macro_continents",
+                "trace_causality", "replay_transaction",
         "evolved_schema", "export_manifold", "import_federated_manifold",
         "export_topology_laws", "import_federated_laws",
         "get_cognitive_health",
@@ -235,3 +235,38 @@ def test_no_dead_imports():
     # If we got here, no dead imports found at the heuristic level
     # Verify at least some imports were checked (no-empty heuristic guard)
     assert isinstance(imports, dict), "imports should be a dict"
+
+
+def test_coupling_coefficient_exists():
+    """COUPLING_COEFFICIENT and FREE_ENERGY_CLAMP must be defined in field_laws.
+
+    These constants are required for the thermodynamic free-energy-gradient-driven
+    redistribution to function. Their existence anchors the architecture's
+    transition from heuristic coupling to thermodynamic coupling.
+    """
+    import importlib
+    fl = importlib.import_module("app.field_laws")
+    assert hasattr(fl, "COUPLING_COEFFICIENT"), "COUPLING_COEFFICIENT must be defined in field_laws.py"
+    assert hasattr(fl, "FREE_ENERGY_CLAMP"), "FREE_ENERGY_CLAMP must be defined in field_laws.py"
+    assert 0.0 < fl.COUPLING_COEFFICIENT <= 1.0, "COUPLING_COEFFICIENT must be in (0, 1]"
+    assert 0.0 < fl.FREE_ENERGY_CLAMP <= 10.0, "FREE_ENERGY_CLAMP must be in (0, 10]"
+
+
+def test_energy_conservation_tracking():
+    """EnergyState must have energy_balance property and record_energy_flow method.
+
+    These are required for energy conservation enforcement and tracking.
+    Without them, energy flows are invisible/unaccounted, violating
+    the conservation law.
+    """
+    from app.energy_state import EnergyState
+    es = EnergyState()
+    assert hasattr(es, "energy_balance"), "EnergyState must have energy_balance property"
+    assert hasattr(es, "record_energy_flow"), "EnergyState must have record_energy_flow method"
+    # Verify initial state
+    assert es.energy_balance == 0.0, "Initial energy balance should be 0.0"
+    # Verify recording works
+    es.record_energy_flow(1.0, 1.0)
+    assert es.energy_balance == 0.0, "Balanced flow should give 0.0"
+    es.record_energy_flow(2.0, 1.0)
+    assert abs(es.energy_balance - 1.0) < 0.001, "Imbalanced flow should reflect in balance"
