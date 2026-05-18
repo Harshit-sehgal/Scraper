@@ -277,7 +277,7 @@ class RoleEmbeddingEngine:
         # Phase 34: Cognitive Elasticity — scale rate by system pressure
         try:
             pressure = self.ws.get_system_pressure()
-            policy = self.ws._observability.get_stability_policy(self.ws)
+            policy = self.ws._observability.get_stability_policy(self.ws.capture_governance_snapshot())
         except AttributeError:
             pressure = 1.0 # Fallback
             policy = {"propagation_damping": 1.0}

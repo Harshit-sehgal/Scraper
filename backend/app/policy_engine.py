@@ -42,8 +42,9 @@ class SubstratePolicy:
                 "details": f"Field pressure {pressure:.3f} exceeds stability threshold"
             })
 
-        # 3. Attractor Plasticity
-        health = ws._observability.get_semantic_health_index(ws)
+        # 3. Attractor Plasticity — capture snapshot for governance reads
+        snapshot = ws.capture_governance_snapshot()
+        health = ws._observability.get_semantic_health_index(snapshot)
         diversity = health["metrics"]["diversity"]
         if diversity < self.min_attractor_plasticity:
             issues.append({

@@ -45,7 +45,7 @@ def test_value_aware_pruning_priority(ws):
     assert ws._topology.region_count() == 60
     
     # 2. Trigger Shedding (max_bytes=1 to force it)
-    ws._observability.apply_resource_shedding(ws, max_bytes=1)
+    ws._observability.apply_resource_shedding(ws, ws.capture_governance_snapshot(), max_bytes=1)
     
     # 3. Verify top regions (kept top 50)
     current_regions = ws._topology._get_regions()
@@ -58,7 +58,7 @@ def test_value_aware_pruning_priority(ws):
 
 def test_stability_policy_generation(ws):
     """Verify that the engine generates a valid stabilization policy."""
-    policy = ws._observability.get_stability_policy(ws)
+    policy = ws._observability.get_stability_policy(ws.capture_governance_snapshot())
     assert "propagation_damping" in policy
     assert "attractor_scaling" in policy
     assert "force_decay" in policy

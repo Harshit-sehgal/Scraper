@@ -151,13 +151,14 @@ def test_emergent_risk_detection(ws):
     assert is_locked == True
     
     # 3. Memory Profile
-    profile = ws._observability.get_memory_profile(ws)
+    snapshot = ws.capture_governance_snapshot()
+    profile = ws._observability.get_memory_profile(snapshot)
     assert profile["total_estimated_bytes"] > 0
     print(f"\nMemory Profile: {profile}")
     
     # 4. Resource Shedding
     # Trigger with a very low threshold
-    did_shed = ws._observability.apply_resource_shedding(ws, max_bytes=10)
+    did_shed = ws._observability.apply_resource_shedding(ws, ws.capture_governance_snapshot(), max_bytes=10)
     assert did_shed == True
     print("\nResource shedding successfully triggered and executed.")
 

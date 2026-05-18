@@ -58,23 +58,24 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
         # 4. Resource Shedding (Phase 50)
         if i % 500 == 0:
             # Memory profiler check
-            profile = ws._observability.get_memory_profile(ws)
+            snapshot = ws.capture_governance_snapshot()
+            profile = ws._observability.get_memory_profile(snapshot)
             if profile["total_estimated_bytes"] > 100000:
-                ws._observability.apply_resource_shedding(ws, max_bytes=80000)
+                ws._observability.apply_resource_shedding(ws, ws.capture_governance_snapshot(), max_bytes=80000)
                 
         # 5. Diagnostic Tracking
         if i % 50 == 0:
-            diversity = ws._observability.calculate_attractor_diversity(ws)
+            diversity = ws._observability.calculate_attractor_diversity(ws.capture_governance_snapshot())
             history_diversity.append(diversity)
             
         if i % checkpoint_interval == 0 and i > 0:
             elapsed = time.time() - start_time
-            report = ws._observability.get_governance_report(ws)
+            report = ws._observability.get_governance_report(ws.capture_governance_snapshot())
             print(f"  [{i}] Energy: {ws.metrics.global_energy:.2f}, Entropy: {ws.metrics.global_entropy:.2f}, "
                   f"Diversity: {report['diversity']:.2f}, Elapsed: {elapsed:.1f}s")
             
     total_duration = time.time() - start_time
-    final_report = ws._observability.get_governance_report(ws)
+    final_report = ws._observability.get_governance_report(ws.capture_governance_snapshot())
     
     print("\n--- Longevity Validation Completed ---")
     print(f"Total Duration: {total_duration:.2f}s")

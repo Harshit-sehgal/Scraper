@@ -29,7 +29,7 @@ class EcologyAnalyzer:
         """Record a pulse of ecological metrics."""
         # Force community detection for accurate fragmentation stats
         ws._topology.detect_communities()
-        report = ws._observability.get_governance_report(ws)
+        report = ws._observability.get_governance_report(ws.capture_governance_snapshot())
         
         # 1. Diversity (Shannon Entropy)
         self.diversity_history.append(report["diversity"])
@@ -109,7 +109,7 @@ def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.
             
         # 4. Resource Governance (Phase 50)
         if i % 500 == 0:
-            ws._observability.apply_resource_shedding(ws, max_bytes=100000)
+            ws._observability.apply_resource_shedding(ws, ws.capture_governance_snapshot(), max_bytes=100000)
             
         # 5. Ecological Pulse
         if i % 100 == 0:
@@ -127,7 +127,7 @@ def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.
         ws.aggregate_from_regions()
         if i % 100 == 0:
             ws.apply_memory_decay()
-            ws._observability.apply_resource_shedding(ws, max_bytes=80000)
+            ws._observability.apply_resource_shedding(ws, ws.capture_governance_snapshot(), max_bytes=80000)
             analyzer.record_pulse(ws)
 
     final_stats = analyzer.summarize()

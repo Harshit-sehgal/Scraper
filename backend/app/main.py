@@ -269,7 +269,7 @@ async def system_observability():
         "telemetry": ws.observability_telemetry[-50:],
         "heatmap": ws.observability_heatmap,
         "causal_trace": ws.get_causal_telemetry()[-20:],
-        "health_index": ws._observability.get_semantic_health_index(ws),
+        "health_index": ws._observability.get_semantic_health_index(ws.capture_governance_snapshot()),
         "hierarchy": {
             "envelopes": list(ws.abstraction_envelopes.keys()),
             "levels": {r: ws.get_role_level(r) for r in ws.role_manifold}
