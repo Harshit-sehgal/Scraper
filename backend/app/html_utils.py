@@ -233,7 +233,14 @@ def _boost_contacts_with_page_html(
     return _apply_page_level_contact_fallback(results, schema_fields, e, p)
 
 async def fetch_page_content(url: str) -> str:
-    """Load a URL in a headless browser and fallback to plain HTTP when needed."""
+    """Load a URL in a headless browser and fallback to plain HTTP when needed.
+
+    Strategy:
+    1. Use `networkidle` to wait for all network requests to settle (important for
+       sites that load data via XHR/AJAX after initial DOM).
+    2. If networkidle fails, fall back to `domcontentloaded` + extra wait.
+    3. Final fallback: plain requests (no JS).
+    """
     browser = None
     context = None
     try:
@@ -254,8 +261,24 @@ async def fetch_page_content(url: str) -> str:
                     await route.continue_()
 
             await page.route("**/*", _route_filter)
-            await page.goto(url, wait_until="domcontentloaded", timeout=35000)
-            await asyncio.sleep(1.5)
+
+            # Phase 1: Try networkidle — waits for ALL network requests to settle
+            # This is critical for sites that populate flight/travel/listing
+            # results via XHR/fetch after the initial DOM content loads.
+            try:
+                await page.goto(url, wait_until="networkidle", timeout=45000)
+                # Extra buffer for any delayed rendering after network settles
+                await asyncio.sleep(2.0)
+            except Exception as e:
+                logging.warning(
+                    "[Scraper] networkidle timeout for %s: %s. Waiting longer with domcontentloaded",
+                    url, e,
+                )
+                # Page is already loaded (goto succeeded), but networkidle timed out.
+                # Don't re-navigate — just wait for DOM and add extra render time.
+                await page.wait_for_load_state("domcontentloaded")
+                await asyncio.sleep(5.0)
+
             html = await page.content()
             return html
     except Exception as e:
@@ -265,12 +288,12 @@ async def fetch_page_content(url: str) -> str:
             try:
                 await context.close()
             except Exception as e:
-                logging.error(f"[Scraper] Error closing playwright context: {e}")
+                logging.debug(f"[Scraper] Ignoring context close error: {e}")
         if browser is not None:
             try:
                 await browser.close()
             except Exception as e:
-                logging.error(f"[Scraper] Error closing playwright browser: {e}")
+                logging.debug(f"[Scraper] Ignoring browser close error: {e}")
 
     resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
     resp.raise_for_status()

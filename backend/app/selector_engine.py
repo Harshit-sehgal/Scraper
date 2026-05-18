@@ -153,6 +153,9 @@ def build_selector_prompt(html_snippet: str, schema_fields: list[SchemaField], p
 PAGE STRUCTURE DETECTED: {structure_type.upper()} (confidence: {structure_confidence:.2f})
 - This could be a table, card layout, list, or mixed structure
 - Target the DATA CONTAINER, not header/footer/navigation
+- For card-based layouts: look for repeating divs with classes like card, item, result, flight-result, product, listing
+- For tables: target <tr> rows inside <tbody>, skip the <thead> header rows
+- The data container should contain MULTIPLE repeating items, each with the same structure
 """
     
     if patterns:
@@ -320,7 +323,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
     """Fallback extraction path when selector generation fails."""
     soup = BeautifulSoup(html, "html.parser")
     page_email, page_phone = _extract_contacts_from_node(soup)
-    containers = list(soup.find_all(["article", "li", "tr", "div"], class_=re.compile(r"product|item|card|listing|row", re.I)))
+    containers = list(soup.find_all(["article", "li", "tr", "div"], class_=re.compile(r"product|item|card|listing|row|flight-result|result-item|search-result|itinerary", re.I)))
     if not containers:
         headers = soup.find_all(["h2", "h3", "h4"])
         containers = [h.parent for h in headers if h.parent]

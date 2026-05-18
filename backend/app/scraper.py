@@ -88,9 +88,29 @@ async def scrape_url(
         selectors = {}
 
     # 3. Apply selectors or fallback to regex
+    #
+    # Quality gating: even if LLM selectors return results, check if the
+    # average record_score is above a minimum threshold. If the LLM
+    # misidentified page furniture (nav, labels, etc.) as data containers,
+    # the resulting records will have very low scores. In that case, fall
+    # through to the regex path which may be more conservative but accurate.
+    #
+    # The gate threshold is min_record_score * 0.5, with a minimum floor
+    # of 0.1 to ensure the gate always works even for testing with score=0.
     results = []
     if selectors and selectors.get("item_container"):
         results = apply_selectors(html, selectors, schema_fields, base_url=url)
+        if results:
+            scores = [r.get("record_score", 0.0) for r in results]
+            avg_score = sum(scores) / len(scores) if scores else 0.0
+            gate_threshold = max(min_record_score * 0.5, 0.1)
+            if avg_score < gate_threshold:
+                logging.info(
+                    "LLM selectors for %s produced low-quality results "
+                    "(avg score=%.2f, threshold=%.2f). Falling back to regex.",
+                    url, avg_score, gate_threshold,
+                )
+                results = []
     
     if not results:
         logging.info("Selectors failed or no results for %s, falling back to regex", url)
