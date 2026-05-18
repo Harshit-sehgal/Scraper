@@ -37,6 +37,7 @@ from app.data_utils import (
     _prepare_records_for_ai, normalize_scraped_record
 )
 from app.utils.quality import score_record_quality
+from app.selector_profiles.loader import try_profile_extraction
 
 
 def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
@@ -66,8 +67,46 @@ async def scrape_url(
     min_record_score: float = 0.35,
     user_intent: str = "",
 ) -> list[dict]:
-    """Orchestrate the full extraction flow for a single URL."""
+    """Orchestrate the full extraction flow for a single URL.
+    
+    Extraction priority:
+      1. Site-specific selector profile (JSON config in selector_profiles/profiles/)
+         — precise CSS selectors hand-tuned for the domain. No code changes needed
+         to add support for a new site; just drop a .json file in profiles/.
+      2. Generic LLM-guided CSS selector pipeline
+      3. Regex fallback extraction
+    """
     logging.info("Fetching: %s", url)
+
+    # ── Step 0: Try profile-based extraction first ──────────────────
+    # If a matching JSON profile exists for this domain, use Playwright
+    # with site-specific CSS selectors. Much more accurate than the
+    # generic pipeline for complex pages (flight search results, etc.).
+    profile_results = await try_profile_extraction(url, max_wait=30)
+    if profile_results is not None:
+        logging.info(
+            "Profile-based extraction returned %d records for %s",
+            len(profile_results), url,
+        )
+        if profile_results:
+            # Normalize profile results to match schema fields
+            results = []
+            for r in profile_results:
+                norm = normalize_scraped_record(r, schema_fields)
+                norm["record_score"] = score_record_quality(norm, schema_fields)
+                results.append(norm)
+
+            # Apply scoring threshold and dedup
+            results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * 0.8)]
+            results = _dedupe_records(results, schema_fields)
+            results = _limit_source_records(results, schema_fields)
+            results = run_pipeline(results, [f.name for f in schema_fields])
+            return results
+
+        # Profile matched but returned no records — fall through to generic
+        logging.info("Profile matched but returned 0 records, falling through to generic pipeline")
+
+    # ── Generic extraction pipeline (no profile match) ────────────────
     try:
         html = await fetch_page_content(url)
     except Exception as e:
