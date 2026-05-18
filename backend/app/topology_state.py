@@ -352,6 +352,9 @@ class TopologyState:
         self._anchors: Set[Tuple[str, str]] = set()
         self._crystalline_atoms: List[dict] = []
         
+        # ─── Meso Clusters (Multi-Scale Topology) ────────────────────
+        self._meso_clusters: List[dict] = []
+
         # ─── Distributed Recovery (Phase 60) ──────────────────────────
         self._topology_epoch: int = 1
         self._tombstones_real: Set[str] = set() # Final storage for tombstones
@@ -408,6 +411,7 @@ class TopologyState:
             "centrality": dict(self._centrality),
             "anchors": set(self._anchors),
             "crystalline_atoms": list(self._crystalline_atoms),
+            "meso_clusters": list(self._meso_clusters),
             "tombstones": set(self._tombstones),
             "structural_change": False,
         }
@@ -447,6 +451,7 @@ class TopologyState:
             self._centrality = self._staging["centrality"]
             self._anchors = self._staging["anchors"]
             self._crystalline_atoms = self._staging["crystalline_atoms"]
+            self._meso_clusters = self._staging["meso_clusters"]
             self._tombstones_real = self._staging["tombstones"]
             
             self._staging = None
@@ -525,6 +530,7 @@ class TopologyState:
             "centrality": "_centrality",
             "anchors": "_anchors",
             "crystalline_atoms": "_crystalline_atoms",
+            "meso_clusters": "_meso_clusters",
         }
         return getattr(self, attr_map[key])
 
@@ -544,9 +550,10 @@ class TopologyState:
                 "split_success": "_cohesion_split_success",
                 "split_attempts": "_cohesion_split_attempts",
                 "centrality": "_centrality",
-                "anchors": "_anchors",
-                "crystalline_atoms": "_crystalline_atoms",
-            }
+            "anchors": "_anchors",
+            "crystalline_atoms": "_crystalline_atoms",
+            "meso_clusters": "_meso_clusters",
+        }
             setattr(self, attr_map[key], val)
 
     # ─── Read-Only View — Regions ──────────────────────────────────────
@@ -952,6 +959,7 @@ class TopologyState:
             self._staging["centrality"].clear()
             self._staging["anchors"].clear()
             self._staging["crystalline_atoms"].clear()
+            self._staging["meso_clusters"].clear()
         else:
             self._regions.clear()
             self._communities.clear()
@@ -967,6 +975,7 @@ class TopologyState:
             self._centrality.clear()
             self._anchors.clear()
             self._crystalline_atoms.clear()
+            self._meso_clusters.clear()
 
 
     # ─── Controlled Mutations — Region Attributes ──────────────────────
@@ -1095,15 +1104,25 @@ class TopologyState:
     # ─── Bulk Operations ───────────────────────────────────────────────
 
     def evolve_all(self, force: bool = False):
-        """Evolve all basins modulated by edge field forces.
+        """Evolve all basins modulated by edge field forces and meso feedback.
 
         Returns list of (exclusion_key, delta) effects for the caller to
         apply through InstabilityState APIs.
 
+        Multi-scale evolution:
+        1. Micro: edge field forces (pressure, affinity) modulate per-region evolution
+        2. Meso: clusters of related regions exert top-down feedback
+        3. All scales interact — no procedural overrides
+
         LAW: Edge field forces (pressure, affinity) modulate evolution speed.
         High pressure regions evolve faster; high affinity regions stabilize.
+        Meso clusters provide field-derived top-down coupling.
         """
         forces = self._compute_edge_field_forces()
+
+        # 1. Compute meso clusters BEFORE evolving (so feedback is from previous cycle)
+        self.compute_meso_clusters()
+
         survivors = []
         all_effects = []
         for r in self._get_regions():
@@ -1131,7 +1150,15 @@ class TopologyState:
             # Survival: high affinity keeps regions alive even at low instability
             if r.instability > 0.001 or r.idle_cycles < 20 or region_affinity > 0.4:
                 survivors.append(r)
+
         self._set_regions(survivors)
+
+        # 2. Apply meso cluster feedback AFTER micro evolution
+        self._evolve_meso_clusters()
+
+        # 3. Recompute meso clusters with evolved state
+        self.compute_meso_clusters()
+
         return all_effects
 
     def propagate_all(self):
@@ -1265,6 +1292,184 @@ class TopologyState:
         target_energy = max(0.0, avg_energy - attractor_pull)
         return target_energy
 
+    # ─── Multi-Scale Topology (Micro / Meso / Macro) ────────────────────
+
+    @property
+    def meso_clusters(self) -> List[dict]:
+        """Read-only access to meso cluster data."""
+        return list(self._get_struct("meso_clusters"))
+
+    def compute_meso_clusters(self):
+        """Compute meso-scale clusters from current field regions.
+
+        Meso clusters group regions that share competing roles, forming
+        intermediate-scale structures between micro (single region) and
+        macro (global aggregate). These clusters are first-class field
+        structures that exert feedback on their constituent regions.
+
+        LAW: Meso clustering is derived from topology itself, not from
+        any external partitioning scheme.
+        """
+        regs = self._get_regions()
+        clusters = []
+        assigned = set()
+        for i in range(len(regs)):
+            if i in assigned:
+                continue
+            cluster_indices = [i]
+            for j in range(i + 1, len(regs)):
+                if j in assigned:
+                    continue
+                shared = set(regs[i].competing_roles) & set(regs[j].competing_roles)
+                if shared:
+                    cluster_indices.append(j)
+                    assigned.add(j)
+            assigned.add(i)
+
+            cluster_regions = [regs[k] for k in cluster_indices]
+            if len(cluster_regions) == 1:
+                continue  # Single regions are micro-scale, not meso
+
+            # Compute meso cluster properties
+            avg_instability = sum(r.instability for r in cluster_regions) / len(cluster_regions)
+            avg_convergence = sum(r.local_convergence for r in cluster_regions) / len(cluster_regions)
+            avg_pressure = sum(r.semantic_pressure for r in cluster_regions) / len(cluster_regions)
+            shared_roles = list(set.intersection(
+                *[set(r.competing_roles) for r in cluster_regions]
+            )) if len(cluster_regions) > 0 else []
+            all_roles = list(set.union(
+                *[set(r.competing_roles) for r in cluster_regions]
+            ))
+            tokens = list(set(r.token for r in cluster_regions))
+
+            clusters.append({
+                "size": len(cluster_regions),
+                "region_ids": [r.region_id for r in cluster_regions],
+                "tokens": tokens,
+                "shared_roles": shared_roles,
+                "all_roles": all_roles,
+                "avg_instability": round(avg_instability, 3),
+                "avg_convergence": round(avg_convergence, 3),
+                "avg_pressure": round(avg_pressure, 3),
+            })
+
+        self._set_struct("meso_clusters", clusters)
+        self._record("compute_meso_clusters", {"count": len(clusters)})
+
+    def compute_macro_from_meso(self) -> dict:
+        """Compute macro-scale properties from meso clusters.
+
+        Macro properties are field-derived from meso clusters, not hardcoded
+        thresholds. This replaces fixed procedural thresholds with emergent
+        field behavior.
+
+        Returns a dict with:
+        - avg_convergence: weighted by cluster size
+        - avg_instability: weighted by cluster size
+        - fragmentation: how many distinct meso clusters exist
+        - cluster_diversity: std dev of cluster instabilities
+        - macro_pressure: average pressure weighted by cluster size
+        """
+        clusters = self._get_struct("meso_clusters")
+        if not clusters:
+            regs = self._get_regions()
+            if not regs:
+                return {
+                    "avg_convergence": 0.5,
+                    "avg_instability": 0.5,
+                    "fragmentation": 0.0,
+                    "cluster_diversity": 0.0,
+                    "macro_pressure": 0.3,
+                }
+            return {
+                "avg_convergence": sum(r.local_convergence for r in regs) / len(regs),
+                "avg_instability": sum(r.instability for r in regs) / len(regs),
+                "fragmentation": 0.0,
+    "cluster_diversity": 0.0,
+    "pressure": sum(r.semantic_pressure for r in regs) / len(regs),
+            }
+
+        total_size = sum(c["size"] for c in clusters)
+        if total_size == 0:
+            return {
+                "avg_convergence": 0.5, "avg_instability": 0.5,
+                "fragmentation": 0.0, "cluster_diversity": 0.0, "macro_pressure": 0.3,
+            }
+
+        weighted_convergence = sum(c["avg_convergence"] * c["size"] for c in clusters) / total_size
+        weighted_instability = sum(c["avg_instability"] * c["size"] for c in clusters) / total_size
+        weighted_pressure = sum(c["avg_pressure"] * c["size"] for c in clusters) / total_size
+
+        # Fragmentation: more clusters = more fragmented
+        fragmentation = len(clusters) / max(total_size, 1)
+
+        # Cluster diversity: std dev of cluster avg instabilities
+        mean_inst = weighted_instability
+        if len(clusters) > 1:
+            variance = sum((c["avg_instability"] - mean_inst) ** 2 for c in clusters) / len(clusters)
+            diversity = variance ** 0.5
+        else:
+            diversity = 0.0
+
+        return {
+            "avg_convergence": round(weighted_convergence, 3),
+            "avg_instability": round(weighted_instability, 3),
+            "fragmentation": round(fragmentation, 3),
+            "cluster_diversity": round(diversity, 3),
+            "pressure": round(weighted_pressure, 3),
+        }
+
+    def _evolve_meso_clusters(self):
+        """Evolve meso clusters — apply cluster-level feedback to constituent regions.
+
+        Meso clusters exert pressure on their regions based on cluster-level
+        instability and convergence. This creates a top-down coupling:
+        stable clusters stabilize their regions; unstable clusters destabilize them.
+
+        This is the core multi-scale interaction: micro (region) affects meso (cluster)
+        which then feeds back to micro. The field restructures itself through
+        this reciprocal interaction rather than through procedural overrides.
+        """
+        clusters = self._get_struct("meso_clusters")
+        if not clusters:
+            return 0
+
+        regs = self._get_regions()
+        reg_map = {r.region_id: r for r in regs}
+        affected = 0
+
+        for cluster in clusters:
+            # Cluster-level properties determine the feedback direction
+            # High instability cluster -> regions get destabilized
+            # High convergence cluster -> regions get stabilized
+            feedback_strength = cluster["avg_instability"] * (1.0 - cluster["avg_convergence"])
+            if feedback_strength < 0.01:
+                continue
+
+            for rid in cluster["region_ids"]:
+                r = reg_map.get(rid)
+                if not r:
+                    continue
+
+                # Apply meso feedback to region instability
+                # Strong clusters stabilize; weak clusters destabilize
+                if cluster["avg_convergence"] > 0.6:
+                    # Stable cluster: pull region toward stability
+                    pull = cluster["avg_convergence"] * 0.05 * feedback_strength
+                    r.instability = max(0.01, r.instability - pull)
+                else:
+                    # Unstable cluster: push region toward exploration
+                    push = (1.0 - cluster["avg_convergence"]) * 0.05 * feedback_strength
+                    r.instability = min(1.0, r.instability + push)
+
+                # Temperature coupling: cluster instability heats up regions
+                r.local_temperature = r.local_temperature * 0.95 + cluster["avg_instability"] * 0.05
+                affected += 1
+
+        if affected:
+            self._record("evolve_meso_clusters", {"affected_regions": affected, "cluster_count": len(clusters)})
+        return affected
+
     # ─── Serialization ───────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
@@ -1284,6 +1489,7 @@ class TopologyState:
             "impossible_neighborhoods": [list(n) for n in self.impossible_neighborhoods],
             "restructuring_queue": [list(r) for r in self.restructuring_queue],
             "crystalline_atoms": list(self._get_struct("crystalline_atoms")),
+            "meso_clusters": list(self._get_struct("meso_clusters")),
             "topology_epoch": self._topology_epoch,
             "tombstones": list(self._tombstones),
         }
@@ -1336,6 +1542,7 @@ class TopologyState:
         self._set_struct("restructuring_queue", {tuple(r) for r in data.get("restructuring_queue", [])})
         self._set_struct("anchors", {tuple(a) for a in data.get("anchors", []) if len(a) == 2})
         self._set_struct("crystalline_atoms", list(data.get("crystalline_atoms", [])))
+        self._set_struct("meso_clusters", list(data.get("meso_clusters", [])))
 
     def merge(self, other_data: dict, alpha: float = 0.5):
         """Merge remote topology state into local (Phase 32/60)."""

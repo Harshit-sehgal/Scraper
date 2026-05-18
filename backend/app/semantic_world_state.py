@@ -788,6 +788,23 @@ class SemanticWorldState:
     def topology_anchors(self) -> set:
         return self._topology.anchors
 
+    @property
+    def meso_clusters(self) -> list:
+        """Read-only access to meso-scale cluster data."""
+        return self._topology.meso_clusters
+
+    def compute_meso_clusters(self):
+        """Compute meso-scale clusters from current field regions."""
+        self._topology.compute_meso_clusters()
+
+    def compute_macro_from_meso(self) -> dict:
+        """Compute macro-scale properties from meso clusters.
+
+        Returns field-derived macro properties (convergence, instability,
+        fragmentation, diversity, pressure) instead of hardcoded thresholds.
+        """
+        return self._topology.compute_macro_from_meso()
+
     # ─── Authority Delegation Properties ─────────────────────────────────
     # These delegate to state objects. Direct self.field_regions / self.learned_exclusions
     # references in this class work transparently through these properties.
@@ -1349,11 +1366,14 @@ class SemanticWorldState:
         """Group field regions into larger-scale meta-basins.
 
         Micro: individual field regions (existing)
-        Meso: regions that share competing roles (clusters)
-        Macro: all regions aggregated (global summary)
+        Meso: topology-derived cluster data (first-class field structures)
+        Macro: aggregated from meso clusters via compute_macro_from_meso()
 
         This enables cross-scale emergence — behavior at one scale
         can influence structure at adjacent scales.
+
+        LAW: Meso clusters are computed by TopologyState and stored as
+        first-class field structures. They are NOT recomputed here.
         """
         view = self._topology.get_view()
         regions = view.all_regions()
@@ -1363,42 +1383,27 @@ class SemanticWorldState:
                    "convergence": round(r.local_convergence, 3)}
                   for r in regions]
 
-        # Meso: cluster regions by shared roles
+        # Meso: use topology-stored meso clusters (first-class field structures)
         meso = []
-        assigned = set()
-        for i in range(len(regions)):
-            if i in assigned:
-                continue
-            cluster = [i]
-            for j in range(i + 1, len(regions)):
-                if j in assigned:
-                    continue
-                shared = set(regions[i].competing_roles) & set(regions[j].competing_roles)
-                if shared:
-                    cluster.append(j)
-                    assigned.add(j)
-            assigned.add(i)
-            if len(cluster) > 1:
-                cluster_regions = [regions[k] for k in cluster]
+        for cluster in self.meso_clusters:
+            meso.append({
+                "size": cluster["size"],
+                "avg_instability": cluster["avg_instability"],
+                "avg_convergence": cluster["avg_convergence"],
+                "avg_pressure": cluster["avg_pressure"],
+                "tokens": cluster["tokens"],
+                "shared_roles": cluster["shared_roles"],
+                "all_roles": cluster["all_roles"],
+            })
 
-                # Phase 47: Explicitly verify types for meso-scale aggregation
-                valid_cluster = [r for r in cluster_regions if hasattr(r, 'instability')]
-                if not valid_cluster:
-                    continue
-
-                meso.append({
-                    "size": len(valid_cluster),
-                    "avg_instability": round(sum(r.instability for r in valid_cluster) / len(valid_cluster), 3),
-                    "avg_convergence": round(sum(getattr(r, 'local_convergence', 0.3) for r in valid_cluster) / len(valid_cluster), 3),
-                    "tokens": list(set(getattr(r, 'token', 'unknown') for r in valid_cluster)),
-                })
-
-        # Macro: global aggregate
+        # Macro: use field-derived macro from meso clusters
+        macro_props = self.compute_macro_from_meso() if meso else {}
         macro = {
             "total_regions": view.region_count(),
             "meso_clusters": len(meso),
             "field_pressure": round(self.metrics.field_pressure, 3),
             "convergence": round(self.metrics.convergence_score, 3),
+            **macro_props,
         }
 
         return {"micro": micro, "meso": meso, "macro": macro}
@@ -1577,16 +1582,40 @@ class SemanticWorldState:
     @requires_invariants
     def evolve_macro_state(self):
         with self.transaction("macro_evolution"):
+            # Compute field-derived macro properties from meso clusters
+            # This provides emergent thresholds instead of hardcoded ones
+            macro = self.compute_macro_from_meso()
+
+            macro_pressure = 0.0  # Default — updated below if regions exist
+
             if self._topology.region_count() > 0:
                 regions = list(self._topology.iterate_regions())
                 self._energy.evolve_from_regions(regions, len(regions))
                 self._energy.set_exclusion_count(len(self.learned_exclusions))
-                prune_threshold = 0.05 + self._energy.global_entropy * 0.3
+
+                # Use field-derived instability threshold instead of hardcoded
+                # macro.avg_instability reflects the field's own sense of disorder
+            if self.meso_clusters:
+                # Meso clusters exist — use field-derived properties
+                macro_instability = macro.get("avg_instability", 0.5)
+                fragmentation = macro.get("fragmentation", 0.0)
+                macro_pressure = macro.get("pressure", 0.0)
+            else:
+                # No meso clusters yet (too few regions) — fall back to
+                # energy-based computation for basic field governance.
+                # macro_pressure stays 0 — phase transitions for simple fields
+                # rely on stability_debt threshold to avoid premature resets.
+                macro_instability = self._topology.compute_macro_energy(self._energy.convergence)
+                fragmentation = min(1.0, self._energy.global_energy / 10.0)
+                macro_pressure = 0.0
+
+                prune_threshold = macro_instability * 0.3 + self._energy.global_entropy * 0.2
                 self._topology.filter_regions(lambda r: r.instability > prune_threshold or r.local_energy > 0.1)
 
-                # Accumulate Stability Debt if energy is trapped (Law 4)
-                if self.metrics.global_energy > 7.0 and self.metrics.convergence_score < 0.4:
-                    self._energy.adjust_stability_debt(0.1)
+                # Accumulate Stability Debt using field-derived thresholds
+                # Fragmentation + high instability = trapped energy
+                if fragmentation > 0.5 and macro_instability > 0.6:
+                    self._energy.adjust_stability_debt(fragmentation * 0.1)
 
             self._topology.decay_topological_laws()
             for (r1, r2), val in self.learned_exclusions.items():
@@ -1644,8 +1673,9 @@ class SemanticWorldState:
                     })
                     logging.getLogger(__name__).info(f"IMMUNE RESPONSE: Recovered corrupted anchor role [{role}]")
 
-            # Trigger Phase Transition if debt threshold reached
-            if self.metrics.stability_debt > 1.0:
+            # Trigger Phase Transition if field-derived pressure indicates trapped energy
+            # macro_pressure from meso clusters replaces the fixed stability_debt > 1.0 threshold
+            if macro_pressure > 0.8 or self.metrics.stability_debt > 1.0:
                 self.trigger_phase_transition()
 
     def _promote_stable_hypotheses(self):
