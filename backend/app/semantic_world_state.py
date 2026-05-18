@@ -1084,7 +1084,13 @@ class SemanticWorldState:
 
     @requires_invariants
     def propagate_field_regions(self) -> int:
-        """Propagate instability through the unified edge field — topology canonical."""
+        """Propagate instability through the unified edge field — topology canonical.
+
+        Repulsive edges redirect pressure waves through alternative high-affinity
+        routes in the edge field instead of only mutating scalar exclusions.
+        The redirected pressure directly updates region-level state (instability,
+        semantic_pressure, temperature) via _redirect_repulsive_pressure().
+        """
         with self.transaction("propagation"):
             from app.failure_injector import get_injector
             get_injector().inject("propagate_field_regions")
@@ -1095,7 +1101,10 @@ class SemanticWorldState:
                     current = self._instability.get_exclusion_by_key(key)
                     self._instability.set_exclusion(key, current + delta)
             count = self._topology.region_count()
-            self.record_delta("topology", "propagate_all", {"regions": count})
+            self.record_delta("topology", "propagate_all", {
+                "regions": count,
+                "exclusion_effects": len(effects),
+            })
             return count
 
     @requires_invariants
@@ -1623,6 +1632,11 @@ class SemanticWorldState:
             self._observability.emit_telemetry("immunity_block", {"source": source})
             return
 
+        # ─── Route Contradictions Through Unified Edge Field ───
+        # Instead of only incrementing scalar exclusion values, contradiction
+        # pressure is routed through the edge field model. Repulsive edges
+        # redirect uncertainty and pressure waves via alternative high-affinity
+        # routes, updating region-level state directly.
         for fc in alloc_conflicts:
             role = fc.get("role", "")
             candidate = fc.get("candidate", "")
@@ -1635,15 +1649,24 @@ class SemanticWorldState:
                     continue
                 if candidate:
                     key = tuple(sorted([role, peer]))
-                    current = self._instability.get_exclusion(role, peer)
-                    self._instability.set_exclusion(key, current + 0.1)
 
-                    # Emit Telemetry (Phase 41)
+                    # Route contradiction through the unified edge field
+                    result = self._topology.route_contradiction(role, peer, strength=0.1)
+
+                    # Apply the residual exclusion effect (smaller now since
+                    # most pressure is redirected through edge field routes)
+                    if result["excluded"] > 0:
+                        current = self._instability.get_exclusion(role, peer)
+                        self._instability.set_exclusion(key, current + result["excluded"])
+
+                    # Emit Telemetry (Phase 41) — includes redirect info
                     self._observability.emit_telemetry("allocation_conflict", {
                         "role": role,
                         "peer": peer,
                         "candidate": candidate,
-                        "new_exclusion": current + 0.1
+                        "excluded": result["excluded"],
+                        "redirected": result["redirected"],
+                        "through_edge_field": result["through_edge_field"],
                     })
         # Inlined from the former instability_state.observe_field_perturbation
         all_exclusions = set(ROLE_EXCLUSIVITY)
