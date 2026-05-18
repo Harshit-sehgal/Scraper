@@ -25,5 +25,6 @@ echo "Running unit tests..."
 $PYTHON_EXEC -m pytest backend/tests/test_field_waves.py
 $PYTHON_EXEC -m pytest backend/tests/test_field_validator.py
 $PYTHON_EXEC -m pytest backend/tests/test_extraction_precision.py
+$PYTHON_EXEC -m pytest backend/tests/test_accuracy.py
 
 echo "=== All checks PASSED ==="

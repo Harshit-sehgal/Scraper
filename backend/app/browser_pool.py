@@ -65,6 +65,16 @@ class BrowserPool:
                 user_agent=settings.USER_AGENT,
                 viewport={"width": settings.BROWSER_VIEWPORT_WIDTH, "height": settings.BROWSER_VIEWPORT_HEIGHT},
             )
+            
+            if settings.PLAYWRIGHT_STEALTH:
+                stealth_js = """
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                window.chrome = { runtime: {} };
+                Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+                Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+                """
+                await context.add_init_script(stealth_js)
+                
             self._contexts[domain] = context
             self._context_use_count[domain] = 1
             

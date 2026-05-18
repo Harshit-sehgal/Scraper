@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     """Ms to wait for each common loading indicator to disappear."""
     PAGE_SCROLL_DELAY: float = 0.5
     """Seconds to wait after auto-scrolling to trigger lazy loaders."""
+    MAX_SCROLL_ATTEMPTS: int = 3
+    """Maximum number of sequential scrolls for infinite-scroll pages."""
+    PLAYWRIGHT_STEALTH: bool = True
+    """Enable basic stealth evasions for anti-bot resilience."""
     DOM_STABILIZATION_INTERVAL: int = 200
     """Ms between DOM change checks."""
     DOM_STABILIZATION_MIN_STABLE_CHECKS: int = 5

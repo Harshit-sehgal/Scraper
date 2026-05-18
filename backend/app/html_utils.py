@@ -316,10 +316,22 @@ async def fetch_page_content(url: str) -> tuple[str, float, str, int]:
                 pass
             js_render_delay_ms = (time.time() - stabilization_start) * 1000
 
-            # Optional: Auto-scroll to trigger lazy-loaders
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
-            await asyncio.sleep(settings.PAGE_SCROLL_DELAY)
+            # Robust Infinite-Scroll and Lazy-Load Handling
+            scroll_attempts = 0
+            max_scrolls = getattr(settings, 'MAX_SCROLL_ATTEMPTS', 3)
+            last_height = await page.evaluate("document.body.scrollHeight")
+            while scroll_attempts < max_scrolls:
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(settings.PAGE_SCROLL_DELAY)
+                new_height = await page.evaluate("document.body.scrollHeight")
+                if new_height == last_height:
+                    break
+                last_height = new_height
+                scroll_attempts += 1
+            
+            # Scroll back to top to ensure all fixed/lazy elements render properly before capture
             await page.evaluate("window.scrollTo(0, 0)")
+            await asyncio.sleep(0.2)
 
         except Exception as e:
             logging.warning(
