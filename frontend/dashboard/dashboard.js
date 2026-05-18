@@ -163,6 +163,7 @@ function updateMetrics(m, health, mesoClusters, macroContinents) {
         balanceEl.className = 'metric-value text-yellow-500';  // slight drift
     } else {
         balanceEl.className = 'metric-value text-red-500';     // conservation violation
+    }
 
     if (health) {
         document.getElementById('metric-health').innerText = Number(health.score || 0).toFixed(2);
