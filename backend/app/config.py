@@ -128,6 +128,32 @@ class Settings(BaseSettings):
     # ─── API Security ──────────────────────────────────────────────────────
     API_KEY: str = ""
     """If set, all /api/* endpoints require X-API-Key header."""
+    RATE_LIMIT_GLOBAL: str = "100/minute"
+    """Global rate limit for /api/* endpoints (slowapi format). Empty = disabled."""
+    RATE_LIMIT_JOB_CREATE: str = "10/minute"
+    """Stricter rate limit for job creation (POST /api/jobs)."""
+    RATE_LIMIT_DISCOVER: str = "20/minute"
+    """Rate limit for discovery endpoint."""
+
+    # ─── Crawl Policy (operational governance) ─────────────────────────────
+    CRAWL_PER_DOMAIN_CONCURRENCY: int = 2
+    """Max concurrent fetches per domain."""
+    CRAWL_DEFAULT_DELAY_SECONDS: float = 1.0
+    """Base delay between requests to the same domain."""
+    CRAWL_MAX_RETRIES_PER_DOMAIN: int = 3
+    """Max consecutive failures before domain cooldown."""
+    CRAWL_COOLDOWN_SECONDS: int = 60
+    """Seconds to cool down a domain after max retries."""
+    CRAWL_RESPECT_ROBOTS: bool = True
+    """Whether to check robots.txt before fetching (best-effort)."""
+    CRAWL_MAX_PAGES_PER_DOMAIN: int = 50
+    """Max pages scraped from a single domain per job."""
+
+    # ─── LLM Output Validation ─────────────────────────────────────────────
+    LLM_VALIDATE_JSON: bool = True
+    """Validate LLM JSON output against expected schema."""
+    LLM_VALIDATION_MAX_RETRIES: int = 2
+    """Max retries for malformed LLM JSON."""
 
     # ─── Scrape Telemetry defaults (overridable) ───────────────────────────
     TELEMETRY_RECORD_EXTRACTION: bool = True

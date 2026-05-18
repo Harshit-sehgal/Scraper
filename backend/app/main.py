@@ -17,6 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
 from app.routers.jobs import create_jobs_router
@@ -24,6 +25,7 @@ from app.routers.exports import create_exports_router
 from app.services.job_runner import run_job
 from app.services.state import persist_state
 from app.state_store import load_state, get_state_file_path
+from app.rate_limiter import RateLimiterMiddleware
 # Initialize event cascade (safe: scheduler is lazy-created, no circular import)
 from app.graph_update_scheduler import get_scheduler
 from app.topology_state import ConflictError
@@ -36,7 +38,7 @@ app = FastAPI(
 )
 
 
-# ─── Minimal API Key Auth Middleware ─────────────────────────────────────
+# ─── API Key Auth + Rate Limit Middleware ────────────────────────────────
 # If settings.API_KEY is set, all /api/* endpoints require X-API-Key header.
 
 
@@ -54,19 +56,11 @@ async def api_key_middleware(request: Request, call_next):
     return response
 
 
-@app.exception_handler(ConflictError)
-async def conflict_error_handler(request: Request, exc: ConflictError):
-    return JSONResponse(
-        status_code=409,
-        content={"message": str(exc), "retry_recommended": True},
-    )
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# ─── Rate Limiting Middleware ────────────────────────────────────────
+# Applies per-IP sliding window rate limits to all /api/ endpoints.
+# Configured via settings.RATE_LIMIT_GLOBAL (e.g. "100/minute").
+rate_limiter = RateLimiterMiddleware(
+    global_limit=settings.RATE_LIMIT_GLOBAL,
 )
 
 # Runtime safety rails — driven by centralized config

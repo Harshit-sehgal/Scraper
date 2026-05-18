@@ -41,6 +41,7 @@ from app.selector_profiles.loader import try_profile_extraction
 from app.scrape_telemetry import (
     get_scrape_telemetry, detect_anti_bot, estimate_dom_nodes,
 )
+from app.crawl_policy import get_crawl_policy
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,19 @@ async def scrape_url(
     telemetry = get_scrape_telemetry()
     start_time = time.time()
 
-    # ── Step 0: Try profile-based extraction first ──────────────────
+    # ── Step 0: Check crawl policy ────────────────────────────────
+    policy = get_crawl_policy()
+    blocked_reason = await policy.check_domain(url)
+    if blocked_reason:
+        logger.warning("Crawl policy blocked %s: %s", url, blocked_reason)
+        telemetry.record(
+            url=url,
+            error=blocked_reason,
+            fetch_ms=(time.time() - start_time) * 1000,
+        )
+        return []
+
+    # ── Step 1: Try profile-based extraction first ──────────────────
     profile_results = await try_profile_extraction(url, max_wait=settings.PROFILE_MAX_WAIT)
     if profile_results is not None:
         logger.info(
@@ -92,14 +105,20 @@ async def scrape_url(
         logger.info("Profile matched but returned 0 records, falling through to generic pipeline")
 
     # ── Generic extraction pipeline ────────────────────────────────
+    fetch_success = False
     try:
         fetch_start = time.time()
         html = await fetch_page_content(url)
         fetch_ms = (time.time() - fetch_start) * 1000
+        fetch_success = True
     except Exception as e:
+        fetch_ms = (time.time() - start_time) * 1000
         logger.error("Failed to fetch %s: %s", url, e)
-        telemetry.record(url=url, error=str(e), fetch_ms=(time.time() - start_time) * 1000)
+        telemetry.record(url=url, error=str(e), fetch_ms=fetch_ms)
+        policy.record_result(url, success=False)
         return []
+    finally:
+        policy.record_result(url, success=fetch_success)
 
     anti_bot = detect_anti_bot(html)
     dom_nodes = estimate_dom_nodes(html)

@@ -28,6 +28,9 @@ numpy>=1.24.0
 # ─── Geocoding ──────────────────────────────────────────────────────────────
 geopy>=2.4.0
 
+# ─── Rate Limiting (custom in-memory sliding window) ──────────────────────
+# No external dependency — implemented in app/rate_limiter.py
+
 # ─── Testing ────────────────────────────────────────────────────────────────
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
