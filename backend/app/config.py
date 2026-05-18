@@ -79,6 +79,12 @@ class Settings(BaseSettings):
     """Max records kept from a single URL after scoring/dedup."""
     DEFAULT_MIN_RECORD_SCORE: float = 0.35
     """Default minimum quality score for a record to be accepted."""
+    RECORD_ACCEPTANCE_FACTOR: float = 0.8
+    """Factor applied to min_record_score for final record acceptance."""
+    CONTACT_BOOST_MIN_RECORDS: int = 2
+    """Minimum records required to trigger page-level contact boosting."""
+    CONTACT_BOOST_THRESHOLD: float = 0.2
+    """Percentage of records with contacts below which boosting is triggered."""
     AI_STRUCTURING_CHUNK_SIZE: int = 15
     """Records per chunk when batch-cleaning via LLM."""
     AI_STRUCTURING_MAX_CONSECUTIVE_MODEL_FAILURES: int = 5

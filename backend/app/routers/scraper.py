@@ -12,6 +12,8 @@ from fastapi import APIRouter, HTTPException
 from app.config import settings
 from app.scrape_telemetry import get_scrape_telemetry
 from app.selector_memory import get_selector_memory
+from app.scraper_diagnostics import run_diagnostics
+from app.models import SchemaField
 
 router = APIRouter(prefix="/api/scraper", tags=["scraper"])
 logger = logging.getLogger(__name__)
@@ -58,3 +60,14 @@ async def clear_telemetry():
     """Clear all scrape telemetry history."""
     get_scrape_telemetry().clear()
     return {"status": "ok"}
+
+
+@router.post("/diagnostics")
+async def get_scraper_diagnostics(
+    url: str,
+    fields: list[SchemaField],
+    min_score: float = 0.3
+):
+    """Run a deep diagnostic scrape for a URL."""
+    report = await run_diagnostics(url, fields, min_record_score=min_score)
+    return report.to_dict()

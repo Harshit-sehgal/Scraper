@@ -77,7 +77,8 @@ def apply_selectors(html: str, selectors_map: dict, schema_fields: list[SchemaFi
 
         from app.utils.quality import score_record_quality
         record["record_score"] = score_record_quality(record, schema_fields)
-        results.append(record)
+        if record["record_score"] > 0:
+            results.append(record)
 
     return _apply_page_level_contact_fallback(results, schema_fields, page_email, page_phone)
 
@@ -85,25 +86,42 @@ def apply_selectors(html: str, selectors_map: dict, schema_fields: list[SchemaFi
 def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: str = "") -> list[dict]:
     """Fallback extraction path when selector generation fails."""
     soup = BeautifulSoup(html, "html.parser")
+    
+    # Remove obvious noise before searching for containers
+    for noise in soup.select("header, footer, nav, aside, .ads, .sidebar"):
+        noise.decompose()
+        
     page_email, page_phone = _extract_contacts_from_node(soup)
+    
+    # Priority 1: Common data container classes
     containers = list(soup.find_all(["article", "li", "tr", "div"], class_=re.compile(r"product|item|card|listing|row|flight-result|result-item|search-result|itinerary", re.I)))
+    
+    # Priority 2: Headings and their parents
     if not containers:
         headers = soup.find_all(["h2", "h3", "h4"])
         containers = [h.parent for h in headers if h.parent]
+        
+    # Priority 3: All table rows (skipping header)
     if not containers:
         containers = list(soup.find_all("tr")[1:])
         
-    if soup.body:
-        containers.append(soup.body)
+    # Priority 4: Final body fallback (ONLY if nothing else found)
+    if not containers and soup.body:
+        containers = [soup.body]
 
     results = []
+    seen_texts = set() # Local dedup for regex path
+    
     for container in containers[:settings.REGEX_MAX_CONTAINERS]:
         text = _compact_text(container.get_text(separator=" ", strip=True))
-        if len(text) < settings.SELECTOR_MIN_TEXT_LEN:
+        if len(text) < settings.SELECTOR_MIN_TEXT_LEN or text in seen_texts:
             continue
+        seen_texts.add(text)
 
         record: dict = {}
-        text_field = schema_fields[0].name if schema_fields else "text"
+        # Identify the most "descriptive" field to hold full text if needed
+        desc_field = next((f.name for f in schema_fields if any(k in f.name.lower() for k in ["title", "name", "company", "description"])), schema_fields[0].name if schema_fields else "text")
+        
         for field in schema_fields:
             field_name = field.name.lower()
 
@@ -120,13 +138,35 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 href = link.get("href") if link else None
                 val = href.split("tel:", 1)[1].split("?")[0] if href else text
                 record[field.name] = _sanitize_field_value(field, val)
-            elif any(k in field_name for k in ["title", "name", "company"]):
-                heading = container.find(["h1", "h2", "h3", "h4", "a", "strong"])
+            elif field.field_type == FieldType.CURRENCY or "price" in field_name:
+                # Find elements with price-like classes or text containing currency symbols
+                price_node = container.find(True, class_=re.compile(r"price|amount|cost|amt|fare", re.I))
+                if price_node:
+                    val = price_node.get_text()
+                else:
+                    # Search text for currency-like pattern
+                    match = re.search(r"([$£€¥₹]\s*\d+[\d,.]*|\d+[\d,.]*\s*[$£€¥₹])", text)
+                    val = match.group(1) if match else None
+                record[field.name] = _sanitize_field_value(field, val)
+            elif any(k in field_name for k in ["title", "name", "company", "airline", "product"]):
+                # Try to find a heading or a strong/a element with relevant class
+                heading = container.find(["h1", "h2", "h3", "h4", "strong", "a", "span", "div"], class_=re.compile(r"title|name|company|heading|airline|product", re.I))
+                if not heading and container.name == "tr":
+                    # For table rows, try the first cell
+                    heading = container.find("td")
+                if not heading:
+                    heading = container.find(["h1", "h2", "h3", "h4", "strong"])
+                if not heading:
+                    # If it's an <a> tag, make sure it doesn't just say 'Visit' or 'Click'
+                    link = container.find("a")
+                    if link and not re.search(r"visit|click|more|details|select", link.get_text(), re.I):
+                        heading = link
+                
                 candidate = heading.get_text(" ", strip=True) if heading else text[:settings.SELECTOR_HEADING_FALLBACK_LEN]
                 record[field.name] = _sanitize_field_value(field, candidate)
-            elif field.name == text_field:
-                # First non-special field gets full composite text for segmentation
-                record[field.name] = _sanitize_field_value(field, text)
+            elif field.name == desc_field:
+                # descriptive field gets full composite text if nothing better was found
+                record[field.name] = _sanitize_field_value(field, text[:200]) # Limit length for regex path
             else:
                 record[field.name] = None
 
@@ -138,7 +178,8 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
         
         from app.utils.quality import score_record_quality
         record["record_score"] = score_record_quality(record, schema_fields)
-        results.append(record)
+        if record["record_score"] > 0:
+            results.append(record)
 
     return _apply_page_level_contact_fallback(results, schema_fields, page_email, page_phone)
 

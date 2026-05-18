@@ -129,13 +129,13 @@ async def scrape_url(
         1 for r in results
         if not _is_empty_value(r.get("email")) or not _is_empty_value(r.get("phone"))
     )
-    if len(results) > 2 and contact_counts / len(results) < 0.2:
+    if len(results) > settings.CONTACT_BOOST_MIN_RECORDS and contact_counts / len(results) < settings.CONTACT_BOOST_THRESHOLD:
         results = _boost_contacts_with_page_html(results, html, schema_fields)
 
     records_before_scoring = len(results)
 
     # Local filtering and limiting
-    results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * 0.8)]
+    results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * settings.RECORD_ACCEPTANCE_FACTOR)]
     results = _dedupe_records(results, schema_fields)
     records_after_dedup = len(results)
     results = _limit_source_records(results, schema_fields)

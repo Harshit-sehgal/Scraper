@@ -104,6 +104,7 @@ def process_raw_records(
     """Normalize, score, dedup, limit, and run pipeline on raw extracted records."""
     from app.utils.quality import score_record_quality
     from app.semantic_pipeline import run_pipeline
+    from app.config import settings
 
     results = []
     for r in raw_records:
@@ -111,7 +112,7 @@ def process_raw_records(
         norm["record_score"] = score_record_quality(norm, schema_fields)
         results.append(norm)
 
-    results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * 0.8)]
+    results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * settings.RECORD_ACCEPTANCE_FACTOR)]
     results = _dedupe_records(results, schema_fields)
     results = _limit_source_records(results, schema_fields)
     results = run_pipeline(results, [f.name for f in schema_fields])

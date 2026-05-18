@@ -438,6 +438,14 @@ def _sanitize_field_value(field: SchemaField, value, base_url: str = ""):
         return _valid_email(text)
     if field.field_type == FieldType.PHONE:
         return _valid_phone(text)
+    if field.field_type == FieldType.CURRENCY:
+        # Extract amount and optional symbol
+        match = re.search(r"([$£€¥₹]\s*\d+[\d,.]*|\d+[\d,.]*\s*[$£€¥₹])", text)
+        if match:
+            return match.group(1).replace(" ", "")
+        # Fallback to finding just the number if no symbol found
+        match_num = re.search(r"\d+[\d,.]*", text)
+        return match_num.group(0) if match_num else None
     if field.field_type == FieldType.URL:
         if not text.startswith("http"):
             from urllib.parse import urljoin
