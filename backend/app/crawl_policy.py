@@ -3,6 +3,7 @@ Crawl Policy Engine — operational governance for the scraper.
 
 Provides:
   - Per-domain concurrency budgets
+  - Global concurrency cap
   - Request pacing (min delay between requests to same domain)
   - Retry ceilings per domain with cooldown
   - Best-effort robots.txt awareness
@@ -51,7 +52,9 @@ class CrawlPolicyEngine:
 
     def __init__(self) -> None:
         self._domains: dict[str, DomainState] = defaultdict(lambda: DomainState(domain=""))
+        self._global_active_fetches = 0
         self._max_concurrency = settings.CRAWL_PER_DOMAIN_CONCURRENCY
+        self._max_global_concurrency = settings.CRAWL_MAX_TOTAL_CONCURRENCY
         self._default_delay = settings.CRAWL_DEFAULT_DELAY_SECONDS
         self._max_retries = settings.CRAWL_MAX_RETRIES_PER_DOMAIN
         self._cooldown_seconds = settings.CRAWL_COOLDOWN_SECONDS
@@ -69,6 +72,10 @@ class CrawlPolicyEngine:
         domain = self._extract_domain(url)
         if not domain:
             return "Invalid URL"
+
+        # Global concurrency check
+        if self._global_active_fetches >= self._max_global_concurrency:
+            return f"Global concurrency limit reached ({self._max_global_concurrency})"
 
         state = self._get_state(domain)
 
@@ -106,6 +113,7 @@ class CrawlPolicyEngine:
 
         # All checks passed — increment active fetches
         state.active_fetches += 1
+        self._global_active_fetches += 1
         return None
 
     def record_result(self, url: str, success: bool) -> None:
@@ -116,6 +124,7 @@ class CrawlPolicyEngine:
 
         state = self._get_state(domain)
         state.active_fetches = max(0, state.active_fetches - 1)
+        self._global_active_fetches = max(0, self._global_active_fetches - 1)
         state.last_fetch_time = time.time()
         state.total_fetches += 1
 
@@ -146,11 +155,18 @@ class CrawlPolicyEngine:
 
     def get_all_domain_states(self) -> dict[str, dict]:
         """Get states for all tracked domains."""
-        return {
+        states = {
             d: s
             for d in sorted(self._domains.keys())
             if (s := self.get_domain_state(d))
         }
+        # Add global summary
+        states["_global"] = {
+            "active_fetches": self._global_active_fetches,
+            "max_concurrency": self._max_global_concurrency,
+            "tracked_domains": len(self._domains)
+        }
+        return states
 
     def reset_domain(self, url_or_domain: str) -> None:
         """Reset a domain's state (e.g. after manual override)."""

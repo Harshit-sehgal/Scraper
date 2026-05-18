@@ -9,6 +9,7 @@ import httpx
 from app.config import settings
 from app.models import SchemaField, FieldType
 from app.semantic_segmentation import segment_single_text, is_likely_noise_field
+from app.browser_pool import get_browser_pool
 
 EMPTY_TOKENS = {"-", "n/a", "na", "null", "none", "", "not available", "empty", "0", "false", "undefined"}
 PLACEHOLDER_PHRASES = {"no data", "not specified", "coming soon", "tbd", "unknown"}
@@ -235,116 +236,111 @@ def _boost_contacts_with_page_html(
     return _apply_page_level_contact_fallback(results, schema_fields, e, p)
 
 async def fetch_page_content(url: str) -> tuple[str, float, str, int]:
-    """Load a URL in a headless browser and fallback to plain HTTP when needed.
+    """Load a URL in a pooled headless browser context and fallback to plain HTTP when needed.
 
     Returns:
         tuple of (html_content, js_render_delay_ms, method_used, retry_count)
     """
-    browser = None
-    context = None
+    from urllib.parse import urlparse
+    domain = urlparse(url).netloc.lower() or "default"
+    
+    page = None
     js_render_delay_ms = 0.0
     retry_count = 0
     method_used = "playwright"
+    
     try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                user_agent=settings.USER_AGENT
-            )
-            page = await context.new_page()
+        pool = get_browser_pool()
+        context = await pool.get_context(domain)
+        page = await context.new_page()
 
-            async def _route_filter(route):
-                if route.request.resource_type in {"image", "media", "font"}:
-                    await route.abort()
-                else:
-                    await route.continue_()
+        async def _route_filter(route):
+            if route.request.resource_type in {"image", "media", "font"}:
+                await route.abort()
+            else:
+                await route.continue_()
 
-            await page.route("**/*", _route_filter)
+        await page.route("**/*", _route_filter)
 
-            # Phase 1: Try networkidle
-            try:
-                await page.goto(url, wait_until="networkidle", timeout=settings.PLAYWRIGHT_TIMEOUT)
-                
-                # Wait for common loading indicators to disappear
-                loading_selectors = [
-                    ".loading", ".spinner", ".loader", "#loading", "#spinner",
-                    "[class*='Loading']", "[class*='Spinner']", "[class*='Loader']",
-                    ".sk-cube-grid", ".lds-ripple", ".bouncing-loader"
-                ]
-                for sel in loading_selectors:
-                    try:
-                        # Wait for it to be hidden, but don't block if it never appears
-                        await page.wait_for_selector(sel, state="hidden", timeout=settings.PAGE_LOADING_INDICATOR_TIMEOUT)
-                    except Exception:
-                        pass
-
-                # Adaptive post-network buffer: check DOM stabilization
-                stabilization_start = time.time()
+        # Phase 1: Try networkidle
+        try:
+            await page.goto(url, wait_until="networkidle", timeout=settings.PLAYWRIGHT_TIMEOUT)
+            
+            # Wait for common loading indicators to disappear
+            loading_selectors = [
+                ".loading", ".spinner", ".loader", "#loading", "#spinner",
+                "[class*='Loading']", "[class*='Spinner']", "[class*='Loader']",
+                ".sk-cube-grid", ".lds-ripple", ".bouncing-loader"
+            ]
+            for sel in loading_selectors:
                 try:
-                    await page.wait_for_function(
-                        f"""() => {{
-                            const body = document.body;
-                            if (!body) return true;
-                            const html = body.innerHTML;
-                            return new Promise(resolve => {{
-                                let lastHtml = html;
-                                let stableChecks = 0;
-                                let totalChecks = 0;
-                                const interval = setInterval(() => {{
-                                    const current = document.body ? document.body.innerHTML : lastHtml;
-                                    if (current === lastHtml) {{
-                                        stableChecks++;
-                                    }} else {{
-                                        stableChecks = 0;
-                                    }}
-                                    
-                                    // Resolve if stable for N checks AND we've waited at least M checks
-                                    // or if we hit the absolute check limit.
-                                    if ((stableChecks >= {settings.DOM_STABILIZATION_MIN_STABLE_CHECKS} && totalChecks > {settings.DOM_STABILIZATION_MIN_TOTAL_CHECKS}) || totalChecks > {settings.DOM_STABILIZATION_MAX_CHECKS}) {{
-                                        clearInterval(interval);
-                                        resolve(true);
-                                    }}
-                                    lastHtml = current;
-                                    totalChecks++;
-                                }}, {settings.DOM_STABILIZATION_INTERVAL});
-                            }});
-                        }}""",
-                        timeout=settings.PAGE_SETTLE_DELAY * 1000,
-                    )
+                    # Wait for it to be hidden, but don't block if it never appears
+                    await page.wait_for_selector(sel, state="hidden", timeout=settings.PAGE_LOADING_INDICATOR_TIMEOUT)
                 except Exception:
                     pass
-                js_render_delay_ms = (time.time() - stabilization_start) * 1000
 
-                # Optional: Auto-scroll to trigger lazy-loaders
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
-                await asyncio.sleep(settings.PAGE_SCROLL_DELAY)
-                await page.evaluate("window.scrollTo(0, 0)")
-
-            except Exception as e:
-                logging.warning(
-                    "[Scraper] networkidle timeout for %s: %s. Waiting longer with domcontentloaded",
-                    url, e,
+            # Adaptive post-network buffer: check DOM stabilization
+            stabilization_start = time.time()
+            try:
+                await page.wait_for_function(
+                    f"""() => {{
+                        const body = document.body;
+                        if (!body) return true;
+                        const html = body.innerHTML;
+                        return new Promise(resolve => {{
+                            let lastHtml = html;
+                            let stableChecks = 0;
+                            let totalChecks = 0;
+                            const interval = setInterval(() => {{
+                                const current = document.body ? document.body.innerHTML : lastHtml;
+                                if (current === lastHtml) {{
+                                    stableChecks++;
+                                }} else {{
+                                    stableChecks = 0;
+                                }}
+                                
+                                // Resolve if stable for N checks AND we've waited at least M checks
+                                // or if we hit the absolute check limit.
+                                if ((stableChecks >= {settings.DOM_STABILIZATION_MIN_STABLE_CHECKS} && totalChecks > {settings.DOM_STABILIZATION_MIN_TOTAL_CHECKS}) || totalChecks > {settings.DOM_STABILIZATION_MAX_CHECKS}) {{
+                                    clearInterval(interval);
+                                    resolve(true);
+                                }}
+                                lastHtml = current;
+                                totalChecks++;
+                            }}, {settings.DOM_STABILIZATION_INTERVAL});
+                        }});
+                    }}""",
+                    timeout=settings.PAGE_SETTLE_DELAY * 1000,
                 )
-                await page.wait_for_load_state("domcontentloaded")
-                fallback_start = time.time()
-                await asyncio.sleep(settings.PAGE_FALLBACK_EXTRA_WAIT)
-                js_render_delay_ms = (time.time() - fallback_start) * 1000
+            except Exception:
+                pass
+            js_render_delay_ms = (time.time() - stabilization_start) * 1000
 
-            html = await page.content()
-            return html, js_render_delay_ms, method_used, 0
+            # Optional: Auto-scroll to trigger lazy-loaders
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+            await asyncio.sleep(settings.PAGE_SCROLL_DELAY)
+            await page.evaluate("window.scrollTo(0, 0)")
+
+        except Exception as e:
+            logging.warning(
+                "[Scraper] networkidle timeout for %s: %s. Waiting longer with domcontentloaded",
+                url, e,
+            )
+            await page.wait_for_load_state("domcontentloaded")
+            fallback_start = time.time()
+            await asyncio.sleep(settings.PAGE_FALLBACK_EXTRA_WAIT)
+            js_render_delay_ms = (time.time() - fallback_start) * 1000
+
+        html = await page.content()
+        return html, js_render_delay_ms, method_used, 0
     except Exception as e:
         logging.error(f"[Scraper] Playwright failed for {url}: {e}. Falling back to httpx")
     finally:
-        if context is not None:
+        if page:
             try:
-                await context.close()
-            except Exception as e:
-                logging.debug(f"[Scraper] Ignoring context close error: {e}")
-        if browser is not None:
-            try:
-                await browser.close()
-            except Exception as e:
-                logging.debug(f"[Scraper] Ignoring browser close error: {e}")
+                await page.close()
+            except Exception:
+                pass
 
     # httpx fallback
     method_used = "httpx"
@@ -368,7 +364,7 @@ async def fetch_page_content(url: str) -> tuple[str, float, str, int]:
                     await asyncio.sleep(wait)
                 else:
                     logging.error(
-                        "[Scraper] httpx failed after %d attempts for %s: %s",
+                        "[Scraper_diagnostics] httpx failed after %d attempts for %s: %s",
                         settings.MAX_RETRIES, url, e,
                     )
                     raise

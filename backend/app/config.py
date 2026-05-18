@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     """Width of browser viewport."""
     BROWSER_VIEWPORT_HEIGHT: int = 900
     """Height of browser viewport."""
+    BROWSER_MAX_CONTEXTS: int = 10
+    """Maximum number of browser contexts before restarting the browser."""
+    BROWSER_CONTEXT_LIFETIME: int = 50
+    """Number of pages a single context can fetch before being replaced."""
+    BROWSER_IDLE_TIMEOUT: int = 300
+    """Seconds a browser instance can stay idle before closing."""
     PAGE_SETTLE_DELAY: float = 2.0
     """Seconds to wait after networkidle for JS rendering to finish."""
     PAGE_FALLBACK_EXTRA_WAIT: float = 5.0
@@ -212,6 +218,8 @@ class Settings(BaseSettings):
     """Rate limit for discovery endpoint."""
 
     # ─── Crawl Policy (operational governance) ─────────────────────────────
+    CRAWL_MAX_TOTAL_CONCURRENCY: int = 10
+    """Absolute cap on global parallel fetches."""
     CRAWL_PER_DOMAIN_CONCURRENCY: int = 2
     """Max concurrent fetches per domain."""
     CRAWL_DEFAULT_DELAY_SECONDS: float = 1.0
