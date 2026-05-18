@@ -15,6 +15,14 @@ class ConflictError(Exception):
     pass
 
 
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _clamp_signed(value: float) -> float:
+    return max(-1.0, min(1.0, float(value)))
+
+
 # ─── RegionSnapshot: Immutable Read-Only View ──────────────────────────────
 
 @dataclass(frozen=True)
@@ -39,6 +47,27 @@ class RegionSnapshot:
     source_record: str
     domain: str
     version: int # For validation
+
+
+@dataclass(frozen=True)
+class EdgeFieldSnapshot:
+    """Unified read model for role-pair topology forces.
+
+    This is derived from topology-owned structures only. It does not create a
+    second edge authority; it makes existing cohesion/law/region pressure
+    observable through one bounded field representation.
+    """
+    source: str
+    target: str
+    affinity: float
+    repulsion: float
+    uncertainty: float
+    route_strength: float
+    pressure: float
+    law: float
+    cohesion: float
+    impossible: bool
+    semantics: str
 
 
 class TopologyView:
@@ -115,15 +144,75 @@ class TopologyView:
         return [self._snapshot(r) for r in self._regions]
 
     def get_topology_edges(self) -> List[dict]:
-        """Return a list of relational edges based on neighborhood cohesion (Phase 65)."""
+        """Return dashboard-compatible topology edges from the unified edge field."""
         edges = []
-        for (ra, rb), val in self._cohesion.items():
-            if val > 0.05: # Only show meaningful links
+        for edge in self.get_edge_fields():
+            if edge.route_strength > 0.05:
                 edges.append({
-                    "source": ra,
-                    "target": rb,
-                    "weight": round(val, 3)
+                    "source": edge.source,
+                    "target": edge.target,
+                    "weight": edge.route_strength,
+                    "affinity": edge.affinity,
+                    "repulsion": edge.repulsion,
+                    "uncertainty": edge.uncertainty,
+                    "pressure": edge.pressure,
+                    "semantics": edge.semantics,
                 })
+        return edges
+
+    def get_edge_fields(self) -> List[EdgeFieldSnapshot]:
+        """Return one bounded edge field model for all topology-owned edges."""
+        pairs = set(self._cohesion) | set(self._laws)
+        impossible_pairs = set()
+        for item in self._impossible:
+            if len(item) == 2:
+                impossible_pairs.add(tuple(sorted(item)))
+        pairs |= impossible_pairs
+
+        region_instability: Dict[Tuple[str, str], List[float]] = {}
+        for region in self._regions:
+            roles = sorted(set(region.competing_roles))
+            for i, ra in enumerate(roles):
+                for rb in roles[i + 1:]:
+                    pair = tuple(sorted((ra, rb)))
+                    pairs.add(pair)
+                    region_instability.setdefault(pair, []).append(region.instability)
+
+        edges = []
+        for source, target in sorted(pairs):
+            pair = tuple(sorted((source, target)))
+            cohesion = _clamp01(self._cohesion.get(pair, 0.0))
+            law = _clamp_signed(self._laws.get(pair, 0.0))
+            impossible = pair in impossible_pairs
+            instabilities = region_instability.get(pair, [])
+            uncertainty = _clamp01(sum(instabilities) / len(instabilities)) if instabilities else 0.0
+
+            affinity = _clamp01(cohesion + max(law, 0.0) * (1.0 - cohesion))
+            repulsion = _clamp01(max(-law, 1.0 if impossible else 0.0))
+            route_strength = _clamp01(affinity * (1.0 - repulsion) * (1.0 - uncertainty * 0.5))
+            pressure = _clamp01(uncertainty + repulsion * 0.5 - affinity * 0.25)
+            if repulsion > affinity and repulsion >= 0.2:
+                semantics = "repulsive"
+            elif affinity > 0.2:
+                semantics = "attractive"
+            elif uncertainty > 0.2:
+                semantics = "uncertain"
+            else:
+                semantics = "latent"
+
+            edges.append(EdgeFieldSnapshot(
+                source=source,
+                target=target,
+                affinity=round(affinity, 3),
+                repulsion=round(repulsion, 3),
+                uncertainty=round(uncertainty, 3),
+                route_strength=round(route_strength, 3),
+                pressure=round(pressure, 3),
+                law=round(law, 3),
+                cohesion=round(cohesion, 3),
+                impossible=impossible,
+                semantics=semantics,
+            ))
         return edges
 
     def all_region_dicts(self) -> List[dict]:
@@ -677,14 +766,14 @@ class TopologyState:
     def decay_topological_laws(self):
         struct = self._get_struct("topological_laws")
         for key in list(struct.keys()):
-            struct[key] = max(0.0, struct[key] * 0.95)
-            if struct[key] <= 0.005:
+            struct[key] = _clamp_signed(struct[key] * 0.95)
+            if abs(struct[key]) <= 0.005:
                 del struct[key]
         self._set_struct("topological_laws", struct)
 
     def set_topological_law(self, pair: tuple, value: float):
         laws = self._get_struct("topological_laws")
-        laws[tuple(sorted(pair))] = max(0.0, min(1.0, value))
+        laws[tuple(sorted(pair))] = _clamp_signed(value)
         self._set_struct("topological_laws", laws)
         self._record("set_topological_law", {"pair": pair, "value": value})
 
@@ -1200,7 +1289,9 @@ class TopologyState:
             parts = key_str.split("|")
             if len(parts) == 2:
                 pair = tuple(parts)
-                self.set_topological_law(pair, max(self.topological_laws.get(pair, 0.0), r_val))
+                local = self.topological_laws.get(pair, 0.0)
+                merged = r_val if abs(r_val) > abs(local) else local
+                self.set_topological_law(pair, merged)
 
         # Merge anchors
         remote_anchors = other_data.get("anchors", [])

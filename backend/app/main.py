@@ -175,6 +175,7 @@ async def system_topology():
         "learned_exclusions": [{"roles": list(k), "strength": round(v, 3)} for k, v in ws.learned_exclusions.items()],
         "field_regions": view.all_region_dicts(),
         "topology_edges": view.get_topology_edges(),
+        "edge_fields": [edge.__dict__ for edge in view.get_edge_fields()],
         "role_compatibility": [{"role": k[0], "type": k[1], "score": round(v, 3)} for k, v in ws.role_compatibility.items()],
         "drift_logs": {role: ws._observability.get_role_drift(role) for role in ws.get_manifold_roles()}
     }

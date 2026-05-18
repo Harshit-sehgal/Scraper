@@ -357,6 +357,14 @@
 - [x] Harden dashboard rendering against malformed or scraped HTML-bearing tokens via escaped telemetry and region details.
 - [x] Verify JSON API observability/topology endpoints return successfully under ASGI transport.
 
+## Phase 70: Unified Topology Edge Field [VERIFIED]
+- [x] Add a topology-derived `EdgeFieldSnapshot` read model for bounded affinity, repulsion, uncertainty, route strength, and edge pressure.
+- [x] Convert dashboard topology edges to use the unified edge field instead of raw cohesion-only weights.
+- [x] Expose `edge_fields` through `/api/system/topology` for observability and replay tooling.
+- [x] Fix signed topological law handling so induced repulsion laws are no longer clamped to zero.
+- [x] Preserve negative repulsion laws through decay and distributed topology merge.
+- [x] Add invariant tests for attractive, repulsive, impossible, and signed-law edge behavior.
+
 ## Current Architectural Weaknesses
 - [ ] Contradiction pressure still needs stronger global topology restructuring; current propagation and pressure dynamics are verified but not yet sufficient as the primary cognition substrate.
 - [ ] `learned_exclusions` remains a secondary symbolic bridge and should continue migrating toward topology-native memory.
@@ -366,7 +374,7 @@
 - [ ] Large-scale replay buffer remains unimplemented; historical replay is validated in-memory, not yet streamed from persistent storage.
 
 ## Smallest Coherent Next Step
-- [ ] Build a unified edge field model that makes cohesion, repulsion, compatibility, uncertainty flow, and propagation route strength one canonical topology edge representation.
+- [ ] Route contradiction propagation through unified edge fields so repulsive edges redirect uncertainty and pressure waves instead of only mutating scalar exclusions.
 
 ## Project Status: Verified But Still Partial Semantic Field Substrate
 The engine currently passes architecture validation and the full invariant/test suite, with deterministic replay, governance, resource shedding, failure injection isolation, and pressure-triggered enforcement reverified. It is not complete: topology still needs to become more causally dominant than scalar metrics and symbolic exclusion memory.
