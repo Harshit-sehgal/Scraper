@@ -2,13 +2,11 @@
 Scraping Engine — Thin orchestration layer.
 
 Delegates to specialised sub-engines:
-  - selector_discovery: LLM-guided selector generation & page analysis
-  - selector_engine:     CSS selector mapping & execution
-  - html_utils:          DOM fetching, cleaning, contact extraction
-  - scrape_telemetry:    Per-URL observability
-  - selector_memory:     Persistent extraction learning
-  - cleaning_engine:     AI cleaning & schema alignment
-  - insight_engine:      Data insight generation & schema suggestion
+  - extraction_orchestrator: Manages fallback cascade (profile -> memory -> discovery -> regex)
+  - html_utils:              DOM fetching, cleaning, contact extraction
+  - scrape_telemetry:        Per-URL observability
+  - cleaning_engine:         AI cleaning & schema alignment
+  - insight_engine:          Data insight generation & schema suggestion
 """
 
 from __future__ import annotations
@@ -24,18 +22,16 @@ from app.html_utils import (
 )
 from app.models import SchemaField
 from app.semantic_pipeline import run_pipeline
-from app.selector_engine import apply_selectors, extract_with_regex
-from app.selector_discovery import discover_selectors
 from app.data_utils import (
     _dedupe_records, _limit_source_records as _base_limit_source_records,
-    normalize_scraped_record, process_raw_records,
+    process_raw_records,
 )
 from app.selector_profiles.loader import try_profile_extraction
 from app.scrape_telemetry import (
     get_scrape_telemetry, detect_anti_bot, estimate_dom_nodes,
 )
 from app.crawl_policy import get_crawl_policy
-from app.selector_memory import get_selector_memory
+from app.extraction_orchestrator import orchestrate_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -52,16 +48,15 @@ def _limit_source_records(records: list[dict], schema_fields: list[SchemaField])
 async def scrape_url(
     url: str,
     schema_fields: list[SchemaField],
-    min_record_score: float = 0.35,
+    min_record_score: float | None = None,
     user_intent: str = "",
 ) -> list[dict]:
-    """Orchestrate the full extraction flow for a single URL.
-
-    Priority: profile → memory → LLM selectors → regex fallback.
-    """
+    """Orchestrate the full extraction flow for a single URL."""
+    if min_record_score is None:
+        min_record_score = settings.DEFAULT_MIN_RECORD_SCORE
+        
     logger.info("Fetching: %s", url)
     telemetry = get_scrape_telemetry()
-    memory = get_selector_memory()
     start_time = time.time()
 
     # ── Step 0: Check crawl policy ────────────────────────────────
@@ -123,63 +118,13 @@ async def scrape_url(
     page_text = soup_for_density.get_text()
     token_density = len(page_text) / max(1, dom_nodes)
 
-    # ── Step 2: Try remembered selectors ──────────────────────────
-    remembered_selectors = memory.get_selectors(url)
-    results = []
-    selector_success = False
-    fallback_triggered = False
-    selectors = {}
-    gate_threshold = max(min_record_score * settings.SCORE_GATE_THRESHOLD_FACTOR, settings.SCORE_GATE_ABSOLUTE_MIN)
+    # ── Step 2-4: Extraction Cascade ──────────────────────────────
+    ext_result = await orchestrate_extraction(url, html, schema_fields, min_record_score)
+    results = ext_result.records
+    
+    # ── Post-Extraction Processing ────────────────────────────────
 
-    if remembered_selectors:
-        logger.info("Trying remembered selectors for %s", url)
-        results = apply_selectors(html, remembered_selectors, schema_fields, base_url=url)
-        if results:
-            scores = [r.get("record_score", 0.0) for r in results]
-            avg_score = sum(scores) / len(scores) if scores else 0.0
-            if avg_score >= gate_threshold:
-                logger.info("Remembered selectors SUCCEEDED for %s (avg score: %.2f)", url, avg_score)
-                selector_success = True
-                selectors = remembered_selectors
-                memory.record_success(url, selectors)
-            else:
-                logger.info("Remembered selectors FAILED for %s (avg score: %.2f)", url, avg_score)
-                memory.record_failure(url)
-                results = []
-
-    # ── Step 3: Generic LLM-guided selectors ──────────────────────
-    if not selector_success:
-        selectors = await discover_selectors(html, schema_fields)
-
-        if selectors and selectors.get("item_container"):
-            results = apply_selectors(html, selectors, schema_fields, base_url=url)
-            if results:
-                scores = [r.get("record_score", 0.0) for r in results]
-                avg_score = sum(scores) / len(scores) if scores else 0.0
-                if avg_score >= gate_threshold:
-                    selector_success = True
-                    # Record newly discovered selectors in memory
-                    memory.record_success(url, selectors)
-
-            if not selector_success:
-                logger.info(
-                    "LLM selectors for %s produced low-quality results "
-                    "(avg score=%.2f, threshold=%.2f). Falling back to regex.",
-                    url, (sum([r.get("record_score", 0.0) for r in results])/len(results)) if results else 0, gate_threshold,
-                )
-                results = []
-
-    # ── Step 4: Regex fallback ────────────────────────────────────
-    fallback_usage = "none"
-    if not results:
-        logger.info("Selectors failed or no results for %s, falling back to regex", url)
-        results = extract_with_regex(html, schema_fields, base_url=url)
-        fallback_triggered = True
-        fallback_usage = "regex"
-    elif fetch_method == "httpx":
-        fallback_usage = "httpx"
-
-    # 4. Global page-level contact boosting
+    # Global page-level contact boosting
     contact_counts = sum(
         1 for r in results
         if not _is_empty_value(r.get("email")) or not _is_empty_value(r.get("phone"))
@@ -189,13 +134,13 @@ async def scrape_url(
 
     records_before_scoring = len(results)
 
-    # 5. Local filtering and limiting
+    # Local filtering and limiting
     results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * 0.8)]
     results = _dedupe_records(results, schema_fields)
     records_after_dedup = len(results)
     results = _limit_source_records(results, schema_fields)
 
-    # 6. Final semantic pipeline orchestration
+    # Final semantic pipeline orchestration
     results = run_pipeline(results, [f.name for f in schema_fields])
 
     # Calculate selector hit rate and confidence map
@@ -218,12 +163,12 @@ async def scrape_url(
         fetch_method=fetch_method,
         fetch_ms=fetch_ms,
         dom_nodes=dom_nodes,
-        selector_success=selector_success,
-        selector_count=len(selectors.get("fields", {})) if selectors else 0,
-        fallback_triggered=fallback_triggered,
-        fallback_usage=fallback_usage,
+        selector_success=ext_result.selector_success,
+        selector_count=len(ext_result.selectors.get("fields", {})) if ext_result.selectors else 0,
+        fallback_triggered=(ext_result.method == "regex"),
+        fallback_usage=ext_result.method,
         retry_count=retry_count,
-        records_extracted=len(results) if not fallback_triggered else 0,
+        records_extracted=len(results) if ext_result.method != "regex" else 0,
         records_after_scoring=records_before_scoring,
         records_after_dedup=records_after_dedup,
         records_final=len(results),

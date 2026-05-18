@@ -373,11 +373,11 @@
 - [x] Large-scale replay buffer implemented with JSON-Lines persistent storage, O(log N) checkpoint seeks, streaming reads, and causal chain reconstruction.
 - [x] **Decentralized Field Waves** (Phase 71): Transitioned event propagation from centralized scheduler orchestration to distributed "field waves" that ripple through the topology.
 - [x] **Observability pressure heatmaps** (Phase 72): Implemented real-time visualization of edge field pressure and wave propagation ripples in the frontend dashboard.
+- [x] **Scraper Hardening & Decomposition** (Phase 73): Achieved 100% configuration coverage, modularized extraction orchestration, and implemented persistent selector memory.
 
 ## Smallest Coherent Next Step
-- [x] **Real-time pressure visualization**: Enhanced the reliability dashboard with a live graph of edge field pressure flows and wave propagation traces.
 - [ ] **Multi-shard federation**: Test and harden state merging across geographically distributed substrate nodes.
-- [x] Add contradiction-driven topology restructuring trigger in `observe_field_perturbation()`.
+- [ ] **Automated Benchmark Reporting**: Integrate hostile benchmarks into a visual reporting dashboard for regression tracking.
 
 ## Project Status: Complete — All Phases Verified
 The engine passes architecture validation and the full invariant/test suite, with deterministic replay, governance, resource shedding, failure injection isolation, snapshot desync detection, transactional priority queuing, large-scale replay buffer, and pressure-triggered enforcement all implemented and verified.

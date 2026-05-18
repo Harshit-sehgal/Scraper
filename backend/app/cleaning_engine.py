@@ -37,13 +37,11 @@ def _extract_list_from_json(data: Any) -> Optional[List[dict]]:
 async def ai_clean_and_align_records(
     records: list[dict],
     schema_fields: list[SchemaField],
-    min_record_score: float = 0.35,
+    min_record_score: float | None = None,
 ) -> Tuple[list[dict], dict]:
-    """Use AI to clean, structure and align records to the schema.
-
-    This was extracted from scraper.py to keep the orchestrator lean.
-    """
-    from app.config import settings
+    """Use AI to clean, structure and align records to the schema."""
+    if min_record_score is None:
+        min_record_score = settings.DEFAULT_MIN_RECORD_SCORE
 
     if not records:
         return [], {"applied": False, "reason": "no_records", "ai_chunks": 0, "fallback_chunks": 0}

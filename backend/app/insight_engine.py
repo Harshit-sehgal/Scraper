@@ -20,7 +20,7 @@ async def generate_data_insight(results: list[dict]) -> str:
     if not results:
         return "No data available for analysis."
 
-    sample = results[:20]
+    sample = results[:settings.INSIGHT_SAMPLE_SIZE]
     prompt = f"Analyze these {len(results)} scraped records and provide 3 key insights or patterns found:\n\n{sample}"
 
     def _sync_call():
@@ -28,21 +28,27 @@ async def generate_data_insight(results: list[dict]) -> str:
             {"role": "system", "content": "You are a data analyst. Provide concise, valuable insights."},
             {"role": "user", "content": prompt},
         ]
-        response = _llm_text(messages, temperature=0.5, timeout=settings.INSIGHT_TIMEOUT)
+        response = _llm_text(messages, temperature=settings.INSIGHT_TEMPERATURE, timeout=settings.INSIGHT_TIMEOUT)
         return response or "Analysis generation encountered an upstream model error."
 
     return await run_sync_in_thread(_sync_call)
 
 
-async def suggest_schema_from_intent(intent: str, max_fields: int = 8) -> dict:
+async def suggest_schema_from_intent(intent: str, max_fields: int | None = None) -> dict:
     """Convert a natural language intent into a structured SchemaField list."""
+    if max_fields is None:
+        max_fields = settings.INSIGHT_MAX_FIELDS
+
     def _sync_call() -> dict:
         return suggest_schema_from_intent_sync(intent, max_fields=max_fields)
     return await run_sync_in_thread(_sync_call)
 
 
-def suggest_schema_from_intent_sync(intent: str, max_fields: int = 8) -> dict:
+def suggest_schema_from_intent_sync(intent: str, max_fields: int | None = None) -> dict:
     """Sync version of suggest_schema_from_intent."""
+    if max_fields is None:
+        max_fields = settings.INSIGHT_MAX_FIELDS
+
     prompt = f"""Convert this scraping intent into a JSON plan.
 
 Intent:
@@ -62,4 +68,4 @@ Maximum number of fields: {max_fields}
         {"role": "system", "content": "You are a schema architect. Return only JSON."},
         {"role": "user", "content": prompt},
     ]
-    return _llm_json(messages)
+    return _llm_json(messages, temperature=settings.LLM_TEMPERATURE, timeout=settings.LLM_TIMEOUT)

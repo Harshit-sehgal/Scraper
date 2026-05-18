@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     """Max ms to wait for page navigation / networkidle."""
     PLAYWRIGHT_FALLBACK_TIMEOUT: int = 35000
     """Max ms for domcontentloaded fallback if networkidle fails."""
+    PLAYWRIGHT_HEADLESS: bool = True
+    """Whether to run browser in headless mode."""
+    BROWSER_VIEWPORT_WIDTH: int = 1280
+    """Width of browser viewport."""
+    BROWSER_VIEWPORT_HEIGHT: int = 900
+    """Height of browser viewport."""
     PAGE_SETTLE_DELAY: float = 2.0
     """Seconds to wait after networkidle for JS rendering to finish."""
     PAGE_FALLBACK_EXTRA_WAIT: float = 5.0
@@ -71,6 +77,8 @@ class Settings(BaseSettings):
     # ─── Extraction & AI Structuring ───────────────────────────────────────
     MAX_RECORDS_PER_SOURCE: int = 25
     """Max records kept from a single URL after scoring/dedup."""
+    DEFAULT_MIN_RECORD_SCORE: float = 0.35
+    """Default minimum quality score for a record to be accepted."""
     AI_STRUCTURING_CHUNK_SIZE: int = 15
     """Records per chunk when batch-cleaning via LLM."""
     AI_STRUCTURING_MAX_CONSECUTIVE_MODEL_FAILURES: int = 5
@@ -81,6 +89,14 @@ class Settings(BaseSettings):
     """Factor of min_record_score used as the selector quality gate floor."""
     SCORE_GATE_ABSOLUTE_MIN: float = 0.1
     """Absolute floor for the quality gate threshold."""
+
+    # ─── Insight Engine ───────────────────────────────────────────────────
+    INSIGHT_MAX_FIELDS: int = 8
+    """Max fields suggested by intent parser."""
+    INSIGHT_SAMPLE_SIZE: int = 20
+    """Number of records used for dataset insight generation."""
+    INSIGHT_TEMPERATURE: float = 0.5
+    """Temperature for insight generation LLM calls."""
 
     # ─── Scraper Heuristics (Grounding abstractions) ───────────────────────
     SELECTOR_SNIPPET_MAX_CHARS: int = 16000

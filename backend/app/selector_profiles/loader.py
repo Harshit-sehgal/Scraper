@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Optional
 
 from playwright.async_api import async_playwright
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +49,6 @@ _PROFILES_DIR = Path(__file__).resolve().parent / "profiles"
 
 # Cache loaded profiles to avoid repeated disk I/O
 _profile_cache: dict[str, dict] | None = None
-
-from app.config import settings
 
 USER_AGENT = settings.USER_AGENT
 
@@ -158,7 +157,7 @@ def _postprocess_field(value, field_config: dict) -> str | None:
 async def extract_with_profile(
     url: str,
     profile: dict,
-    max_wait: int = 30,
+    max_wait: int | None = None,
 ) -> list[dict]:
     """Extract structured data from a URL using a selector profile.
     
@@ -173,6 +172,9 @@ async def extract_with_profile(
     Returns:
         List of dicts with keys matching the profile's field definitions.
     """
+    if max_wait is None:
+        max_wait = settings.PROFILE_MAX_WAIT
+
     container_sel = profile.get("item_container")
     wait_for_sel = profile.get("wait_for", container_sel)
     field_defs = profile.get("fields", {})
@@ -190,10 +192,10 @@ async def extract_with_profile(
     context = None
     try:
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            browser = await p.chromium.launch(headless=settings.PLAYWRIGHT_HEADLESS)
             context = await browser.new_context(
                 user_agent=USER_AGENT,
-                viewport={"width": 1280, "height": 900},
+                viewport={"width": settings.BROWSER_VIEWPORT_WIDTH, "height": settings.BROWSER_VIEWPORT_HEIGHT},
             )
             page = await context.new_page()
 
@@ -287,7 +289,7 @@ async def extract_with_profile(
                 pass
 
 
-async def try_profile_extraction(url: str, max_wait: int = 30) -> Optional[list[dict]]:
+async def try_profile_extraction(url: str, max_wait: int | None = None) -> Optional[list[dict]]:
     """Try to extract data from a URL using a matching selector profile.
     
     Returns extracted records if a matching profile is found, or None if no
@@ -301,6 +303,9 @@ async def try_profile_extraction(url: str, max_wait: int = 30) -> Optional[list[
         List of records if a profile matched and extraction succeeded.
         None if no profile matches the URL domain.
     """
+    if max_wait is None:
+        max_wait = settings.PROFILE_MAX_WAIT
+        
     profile = _match_domain(url)
     if profile is None:
         logger.debug("No selector profile found for URL: %s", url)
