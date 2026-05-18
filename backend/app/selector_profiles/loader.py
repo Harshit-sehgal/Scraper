@@ -49,10 +49,9 @@ _PROFILES_DIR = Path(__file__).resolve().parent / "profiles"
 # Cache loaded profiles to avoid repeated disk I/O
 _profile_cache: dict[str, dict] | None = None
 
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-)
+from app.config import settings
+
+USER_AGENT = settings.USER_AGENT
 
 
 # ── Profile Loading ──────────────────────────────────────────────────────
@@ -208,16 +207,16 @@ async def extract_with_profile(
             await page.route("**/*", _route_filter)
 
             try:
-                await page.goto(url, wait_until="networkidle", timeout=45000)
+                await page.goto(url, wait_until="networkidle", timeout=settings.PLAYWRIGHT_TIMEOUT)
             except Exception:
                 logger.warning("[ProfileExtractor] networkidle timeout, trying domcontentloaded")
-                await page.goto(url, wait_until="domcontentloaded", timeout=35000)
+                await page.goto(url, wait_until="domcontentloaded", timeout=settings.PLAYWRIGHT_TIMEOUT - 10000)
 
             # Wait for the target container to appear
             if wait_for_sel:
                 try:
                     await page.wait_for_selector(wait_for_sel, timeout=max_wait * 1000)
-                    await asyncio.sleep(1.5)  # buffer for remaining JS rendering
+                    await asyncio.sleep(settings.PAGE_SETTLE_DELAY)  # buffer for remaining JS rendering
                 except Exception:
                     logger.warning(
                         "[ProfileExtractor] Selector '%s' not found within %ds",

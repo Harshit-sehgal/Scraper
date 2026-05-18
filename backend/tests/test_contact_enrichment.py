@@ -64,7 +64,8 @@ def test_extract_with_regex_enriches_contacts_from_mailto_tel_links():
 
 
 def test_limit_source_records_prioritizes_contact_rows(monkeypatch):
-    monkeypatch.setattr(scraper_mod, "MAX_RECORDS_PER_SOURCE", 2)
+    from app.config import settings
+    monkeypatch.setattr(settings, "MAX_RECORDS_PER_SOURCE", 2)
     schema = _lead_schema()
 
     records = [

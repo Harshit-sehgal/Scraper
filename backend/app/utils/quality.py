@@ -129,13 +129,15 @@ def build_quality_report(
     mismatch_count = int((type_integrity_report or {}).get("total_type_mismatches") or 0)
     mismatch_ratio = mismatch_count / max(1, len(final_results))
 
+    from app.config import settings
+
     # Weighted blend of quality score, retention, source trust, and type integrity.
     overall_score = round(
         clamp01(
-            (avg_final_score * 0.55)
-            + (coverage_ratio * 0.2)
-            + (avg_source_trust * 0.15)
-            + ((1.0 - clamp01(mismatch_ratio)) * 0.1)
+            (avg_final_score * settings.SCORE_QUALITY_WEIGHT)
+            + (coverage_ratio * settings.SCORE_COVERAGE_WEIGHT)
+            + (avg_source_trust * settings.SCORE_SOURCE_TRUST_WEIGHT)
+            + ((1.0 - clamp01(mismatch_ratio)) * settings.SCORE_TYPE_INTEGRITY_WEIGHT)
         ),
         3,
     )

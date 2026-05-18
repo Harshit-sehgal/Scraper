@@ -57,8 +57,8 @@ def _dedupe_records(records: list[dict], schema_fields: list[SchemaField]) -> li
 def _limit_source_records(records: list[dict], schema_fields: list[SchemaField], max_records: Optional[int] = None) -> list[dict]:
     """Limit the number of records from a single source, prioritizing those with contacts."""
     if max_records is None:
-        from app.utils.env import env_int
-        max_records = env_int("DATAFORGE_MAX_RECORDS_PER_SOURCE", 25, 5, 250)
+        from app.config import settings
+        max_records = settings.MAX_RECORDS_PER_SOURCE
     
     if len(records) <= max_records:
         return records

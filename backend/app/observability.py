@@ -59,9 +59,10 @@ class ObservabilityState:
     """Sole owner of the semantic field's telemetry and activity heatmaps."""
 
     def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
+        from app.config import settings
         self._delta_callback = delta_callback
         # Telemetry Stream: recent cognitive events (Ring buffer)
-        self._telemetry_stream: deque = deque(maxlen=1000)
+        self._telemetry_stream: deque = deque(maxlen=settings.TELEMETRY_STREAM_MAXLEN)
         # Regional Heatmaps: region_id -> activity_score
         self._activity_heatmap: Dict[str, float] = {}
         # Manifold Drift Log: role -> [drift_values]

@@ -1,6 +1,7 @@
 import asyncio
 
 from app import scraper as scraper_mod
+from app import cleaning_engine as cleaning_mod
 from app.models import FieldType, SchemaField
 
 
@@ -11,9 +12,10 @@ def test_ai_clean_and_align_records_recovers_after_fast_empty(monkeypatch):
     ]
     records = [{"company_name": "Acme Interiors", "phone": None}]
 
-    monkeypatch.setattr(scraper_mod, "_llm_json_fast", lambda *args, **kwargs: {})
+    # Patch on cleaning_engine where the functions now live
+    monkeypatch.setattr(cleaning_mod, "_llm_json_fast", lambda *args, **kwargs: {})
     monkeypatch.setattr(
-        scraper_mod,
+        cleaning_mod,
         "_llm_json",
         lambda *args, **kwargs: {"records": [{"company_name": "Acme Interiors", "phone": "+91 90000 11111"}]},
     )
@@ -36,10 +38,12 @@ def test_ai_clean_and_align_records_honors_consecutive_failure_threshold(monkeyp
         {"company_name": "C"},
     ]
 
-    monkeypatch.setattr(scraper_mod, "AI_STRUCTURING_CHUNK_SIZE", 1)
-    monkeypatch.setattr(scraper_mod, "AI_STRUCTURING_MAX_CONSECUTIVE_MODEL_FAILURES", 2)
-    monkeypatch.setattr(scraper_mod, "_llm_json_fast", lambda *args, **kwargs: {})
-    monkeypatch.setattr(scraper_mod, "_llm_json", lambda *args, **kwargs: {})
+    # Patch settings on the config module rather than module-level constants
+    from app.config import settings
+    monkeypatch.setattr(settings, "AI_STRUCTURING_CHUNK_SIZE", 1)
+    monkeypatch.setattr(settings, "AI_STRUCTURING_MAX_CONSECUTIVE_MODEL_FAILURES", 2)
+    monkeypatch.setattr(cleaning_mod, "_llm_json_fast", lambda *args, **kwargs: {})
+    monkeypatch.setattr(cleaning_mod, "_llm_json", lambda *args, **kwargs: {})
 
     output, report = asyncio.run(
         scraper_mod.ai_clean_and_align_records(records, schema_fields=schema, min_record_score=0.0)
@@ -69,7 +73,7 @@ def test_llm_json_fast_uses_groq_fallback_model(monkeypatch):
     import app.llm_bridge
     monkeypatch.setattr(app.llm_bridge, "_call_openai_compatible_json", fake_openai_json)
 
-    out = scraper_mod._llm_json_fast(
+    out = app.llm_bridge.llm_json_fast(
         messages=[{"role": "user", "content": "test"}],
         temperature=0.0,
         timeout=3,

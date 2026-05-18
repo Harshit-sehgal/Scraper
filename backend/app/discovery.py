@@ -82,11 +82,16 @@ SOURCE_TRUST_SCORE = {
 }
 
 # Domains that repeatedly fail to resolve/connect can be excluded from discovery.
-BLOCKED_DISCOVERY_ROOT_DOMAINS = {
-    token.strip().lower()
-    for token in (os.getenv("DATAFORGE_BLOCKED_DISCOVERY_DOMAINS", "quickfinds.org") or "").split(",")
-    if token.strip()
-}
+def _get_blocked_domains() -> set[str]:
+    from app.config import settings
+    return {
+        token.strip().lower()
+        for token in (settings.BLOCKED_DISCOVERY_DOMAINS or "").split(",")
+        if token.strip()
+    }
+
+
+BLOCKED_DISCOVERY_ROOT_DOMAINS = _get_blocked_domains()
 
 
 def _root_domain(domain: str) -> str:

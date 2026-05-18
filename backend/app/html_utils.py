@@ -3,8 +3,9 @@ import logging
 import asyncio
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
-import requests
+import httpx
 
+from app.config import settings
 from app.models import SchemaField, FieldType
 from app.semantic_segmentation import segment_single_text, is_likely_noise_field
 
@@ -247,10 +248,7 @@ async def fetch_page_content(url: str) -> str:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-                )
+                user_agent=settings.USER_AGENT
             )
             page = await context.new_page()
 
@@ -266,23 +264,46 @@ async def fetch_page_content(url: str) -> str:
             # This is critical for sites that populate flight/travel/listing
             # results via XHR/fetch after the initial DOM content loads.
             try:
-                await page.goto(url, wait_until="networkidle", timeout=45000)
-                # Extra buffer for any delayed rendering after network settles
-                await asyncio.sleep(2.0)
+                await page.goto(url, wait_until="networkidle", timeout=settings.PLAYWRIGHT_TIMEOUT)
+                # Adaptive post-network buffer: check DOM stabilization instead of fixed sleep
+                try:
+                    await page.wait_for_function(
+                        """() => {
+                            const body = document.body;
+                            if (!body) return true;
+                            const html = body.innerHTML;
+                            // Wait until DOM stops changing (500ms quiescence)
+                            return new Promise(resolve => {
+                                let lastHtml = html;
+                                let checks = 0;
+                                const interval = setInterval(() => {
+                                    const current = document.body ? document.body.innerHTML : lastHtml;
+                                    if (current === lastHtml || checks > 5) {
+                                        clearInterval(interval);
+                                        resolve(true);
+                                    }
+                                    lastHtml = current;
+                                    checks++;
+                                }, 100);
+                            });
+                        }""",
+                        timeout=settings.PAGE_SETTLE_DELAY * 1000,
+                    )
+                except Exception:
+                    # DOM stabilization check is best-effort; proceed with content
+                    pass
             except Exception as e:
                 logging.warning(
                     "[Scraper] networkidle timeout for %s: %s. Waiting longer with domcontentloaded",
                     url, e,
                 )
-                # Page is already loaded (goto succeeded), but networkidle timed out.
-                # Don't re-navigate — just wait for DOM and add extra render time.
                 await page.wait_for_load_state("domcontentloaded")
-                await asyncio.sleep(5.0)
+                await asyncio.sleep(settings.PAGE_FALLBACK_EXTRA_WAIT)
 
             html = await page.content()
             return html
     except Exception as e:
-        logging.error(f"[Scraper] Playwright failed for {url}: {e}. Falling back to requests")
+        logging.error(f"[Scraper] Playwright failed for {url}: {e}. Falling back to httpx")
     finally:
         if context is not None:
             try:
@@ -295,9 +316,30 @@ async def fetch_page_content(url: str) -> str:
             except Exception as e:
                 logging.debug(f"[Scraper] Ignoring browser close error: {e}")
 
-    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
-    resp.raise_for_status()
-    return resp.text
+    # httpx fallback with connection pooling and retry
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(settings.REQUEST_TIMEOUT),
+        headers={"User-Agent": settings.USER_AGENT},
+    ) as client:
+        for attempt in range(max(1, settings.MAX_RETRIES)):
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                return resp.text
+            except (httpx.HTTPError, httpx.TimeoutException) as e:
+                if attempt < settings.MAX_RETRIES - 1:
+                    wait = 0.5 * (attempt + 1)
+                    logging.warning(
+                        "[Scraper] httpx attempt %d/%d failed for %s: %s. Retrying in %.1fs",
+                        attempt + 1, settings.MAX_RETRIES, url, e, wait,
+                    )
+                    await asyncio.sleep(wait)
+                else:
+                    logging.error(
+                        "[Scraper] httpx failed after %d attempts for %s: %s",
+                        settings.MAX_RETRIES, url, e,
+                    )
+                    raise
 
 def clean_html_for_selectors(html: str, max_chars: int = 16000) -> str:
     """Remove known-noise tags while preserving structure useful for selector discovery."""

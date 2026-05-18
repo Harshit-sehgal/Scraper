@@ -5,6 +5,7 @@ FastAPI Main Server — DataForge General-Purpose Web Scraper API.
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 
 # Load .env before any app imports that read env vars at module level
@@ -12,21 +13,20 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ruff: noqa: E402
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 
+from app.config import settings
 from app.routers.jobs import create_jobs_router
 from app.routers.exports import create_exports_router
 from app.services.job_runner import run_job
 from app.services.state import persist_state
 from app.state_store import load_state, get_state_file_path
-from app.utils.env import env_int
 # Initialize event cascade (safe: scheduler is lazy-created, no circular import)
 from app.graph_update_scheduler import get_scheduler
 from app.topology_state import ConflictError
-from fastapi import Request
-from fastapi.responses import JSONResponse
 get_scheduler()
 
 app = FastAPI(
@@ -34,6 +34,25 @@ app = FastAPI(
     description="AI-powered scraper that extracts structured data from any website",
     version="2.0.0"
 )
+
+
+# ─── Minimal API Key Auth Middleware ─────────────────────────────────────
+# If settings.API_KEY is set, all /api/* endpoints require X-API-Key header.
+
+
+@app.middleware("http")
+async def api_key_middleware(request: Request, call_next):
+    if settings.API_KEY and request.url.path.startswith("/api/"):
+        if "/docs" not in request.url.path and "/openapi" not in request.url.path:
+            api_key = request.headers.get("X-API-Key", "")
+            if api_key != settings.API_KEY:
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Invalid or missing API key. Provide X-API-Key header."},
+                )
+    response = await call_next(request)
+    return response
+
 
 @app.exception_handler(ConflictError)
 async def conflict_error_handler(request: Request, exc: ConflictError):
@@ -50,15 +69,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Runtime safety rails
+# Runtime safety rails — driven by centralized config
 CONFIG = {
-    "max_discovery_urls": env_int("DATAFORGE_MAX_DISCOVERY_URLS", 20, minimum=1, maximum=100),
-    "per_url_timeout_seconds": env_int("DATAFORGE_PER_URL_TIMEOUT_SECONDS", 120, minimum=10, maximum=900),
-    "max_job_runtime_seconds": env_int("DATAFORGE_MAX_JOB_RUNTIME_SECONDS", 1800, minimum=60, maximum=14400),
-    "ai_structuring_timeout_seconds": env_int("DATAFORGE_AI_STRUCTURING_TIMEOUT_SECONDS", 240, minimum=15, maximum=1800),
-    "insight_timeout_seconds": env_int("DATAFORGE_INSIGHT_TIMEOUT_SECONDS", 25, minimum=5, maximum=300),
-    "max_job_history": env_int("DATAFORGE_MAX_JOB_HISTORY", 300, minimum=25, maximum=5000),
-    "max_recycle_bin_history": env_int("DATAFORGE_MAX_RECYCLE_BIN_HISTORY", 300, minimum=25, maximum=5000),
+    "max_discovery_urls": settings.MAX_DISCOVERY_URLS,
+    "per_url_timeout_seconds": settings.PER_URL_TIMEOUT_SECONDS,
+    "max_job_runtime_seconds": settings.MAX_JOB_RUNTIME_SECONDS,
+    "ai_structuring_timeout_seconds": settings.AI_STRUCTURING_TIMEOUT_SECONDS,
+    "insight_timeout_seconds": settings.INSIGHT_TIMEOUT_SECONDS,
+    "max_job_history": settings.MAX_JOB_HISTORY,
+    "max_recycle_bin_history": settings.MAX_RECYCLE_BIN_HISTORY,
 }
 
 # Durable job store & semantic field state

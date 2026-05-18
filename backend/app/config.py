@@ -1,0 +1,137 @@
+"""
+Centralized Configuration for DataForge Scraper.
+
+All hardcoded values, timeouts, thresholds, paths, and tunables
+live here — not scattered across modules. Import via:
+
+    from app.config import settings
+
+To override, set the corresponding env var (e.g. PLAYWRIGHT_TIMEOUT=45000).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Optional
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="DATAFORGE_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # ─── Browser / Playwright ──────────────────────────────────────────────
+    PLAYWRIGHT_TIMEOUT: int = 45000
+    """Max ms to wait for page navigation / networkidle."""
+    PAGE_SETTLE_DELAY: float = 2.0
+    """Seconds to wait after networkidle for JS rendering to finish."""
+    PAGE_FALLBACK_EXTRA_WAIT: float = 5.0
+    """Extra seconds when networkidle times out and we fall back to domcontentloaded."""
+    PROFILE_MAX_WAIT: int = 30
+    """Max seconds for a selector profile to find its wait_for selector."""
+
+    # ─── HTTP Fetching ─────────────────────────────────────────────────────
+    REQUEST_TIMEOUT: int = 20
+    """Seconds before plain-HTTP fallback request times out."""
+    USER_AGENT: str = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    )
+    MAX_RETRIES: int = 2
+    """Number of retries for HTTP requests (httpx)."""
+
+    # ─── Extraction & AI Structuring ───────────────────────────────────────
+    MAX_RECORDS_PER_SOURCE: int = 25
+    """Max records kept from a single URL after scoring/dedup."""
+    AI_STRUCTURING_CHUNK_SIZE: int = 15
+    """Records per chunk when batch-cleaning via LLM."""
+    AI_STRUCTURING_MAX_CONSECUTIVE_MODEL_FAILURES: int = 5
+    """Stop trying AI cleaning after this many consecutive failures."""
+    AI_CLEAN_TARGET_RECORDS: int = 30
+    """Max top-scored records sent to AI cleaning (to save tokens)."""
+    SCORE_GATE_THRESHOLD_FACTOR: float = 0.5
+    """Factor of min_record_score used as the selector quality gate floor."""
+    SCORE_GATE_ABSOLUTE_MIN: float = 0.1
+    """Absolute floor for the quality gate threshold."""
+
+    # ─── LLM Provider Timeouts ─────────────────────────────────────────────
+    LLM_TIMEOUT: int = 45
+    """Default timeout for LLM JSON/text calls (seconds)."""
+    LLM_FAST_TIMEOUT: int = 12
+    """Fast-path timeout for throughput-sensitive LLM calls."""
+    INSIGHT_TIMEOUT: int = 25
+    """Timeout for insight generation calls."""
+    LLM_TEMPERATURE: float = 0.1
+    """Default LLM temperature for JSON calls."""
+
+    # ─── Job Runner ────────────────────────────────────────────────────────
+    PER_URL_TIMEOUT_SECONDS: int = 120
+    """Max seconds to spend scraping a single URL."""
+    MAX_JOB_RUNTIME_SECONDS: int = 1800
+    """Max total wall-clock seconds for one job."""
+    AI_STRUCTURING_TIMEOUT_SECONDS: int = 240
+    """Max seconds for the global AI structuring pass."""
+    INSIGHT_TIMEOUT_SECONDS: int = 25
+    """Max seconds for AI insight generation."""
+    MAX_DISCOVERY_URLS: int = 20
+    """Max URLs discovered per auto-discovery."""
+    MAX_JOB_HISTORY: int = 300
+    """Max completed/canceled jobs retained before pruning."""
+    MAX_RECYCLE_BIN_HISTORY: int = 300
+    """Max deleted jobs retained before pruning."""
+
+    # ─── Scorer Heuristics ─────────────────────────────────────────────────
+    SCORE_QUALITY_WEIGHT: float = 0.55
+    SCORE_COVERAGE_WEIGHT: float = 0.20
+    SCORE_SOURCE_TRUST_WEIGHT: float = 0.15
+    SCORE_TYPE_INTEGRITY_WEIGHT: float = 0.10
+
+    # ─── Discovery / Search ────────────────────────────────────────────────
+    DDG_MAX_RESULTS_MULTIPLIER: int = 3
+    """Multiply num_results to get raw DDG fetch size."""
+    DDG_ABSOLUTE_MAX: int = 80
+    """Hard cap on raw DDG results."""
+    BLOCKED_DISCOVERY_DOMAINS: str = "quickfinds.org"
+    """Comma-separated root domains excluded from discovery."""
+
+    # ─── Semantic Pipeline Thresholds (field-derived ceilings) ─────────────
+    # These are UPPER bounds — actual thresholds emerge from field pressure.
+    PIPELINE_INSTABILITY_THRESHOLD_MAX: float = 0.9
+    PIPELINE_CONTRADICTION_PENALTY_MAX: float = 0.8
+    PIPELINE_COHERENCE_THRESHOLD_MAX: float = 0.7
+    PIPELINE_INSTABILITY_DELTA_MAX: float = 0.4
+    PIPELINE_CONTRADICTION_DELTA_MAX: float = 0.6
+    PIPELINE_TOPOLOGY_DELTA_MAX: float = 0.15
+
+    # ─── Observability ─────────────────────────────────────────────────────
+    TELEMETRY_STREAM_MAXLEN: int = 1000
+    DRIFT_LOG_MAXLEN: int = 100
+    HEATMAP_MAX_SCORE: float = 10.0
+    HEATMAP_DECAY_RATE: float = 0.9
+
+    # ─── Memory / GC ───────────────────────────────────────────────────────
+    RESOURCE_SHEDDING_MAX_BYTES: int = 10_000_000
+    TOPOLOGY_MAX_REGIONS: int = 50
+    MOTIF_PRUNE_THRESHOLD: float = 0.2
+
+    # ─── Paths ─────────────────────────────────────────────────────────────
+    SEMANTIC_STATE_PATH: str = "./backend/data/semantic_state.json"
+    STATE_FILE_PATH: str = ""
+    """Override for jobs_state.json path. Empty = use default ./backend/data/jobs_state.json"""
+
+    # ─── API Security ──────────────────────────────────────────────────────
+    API_KEY: str = ""
+    """If set, all /api/* endpoints require X-API-Key header."""
+
+    # ─── Scrape Telemetry defaults (overridable) ───────────────────────────
+    TELEMETRY_RECORD_EXTRACTION: bool = True
+    """Emit per-URL scrape telemetry events."""
+
+
+settings = Settings()
