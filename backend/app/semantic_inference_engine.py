@@ -88,7 +88,7 @@ class RoleEmbeddingEngine:
             # Cold start: fallback to legacy cache or default
             type_str = stype.value if hasattr(stype, 'value') else str(stype)
             return self.compatibility_cache.get((role, type_str), 0.5)
-        
+
         # Use token embedding if available and sufficiently differentiated
         if token and hasattr(token, 'embedding') and any(v != 0.5 for v in token.embedding):
             type_vec = token.embedding
@@ -97,11 +97,11 @@ class RoleEmbeddingEngine:
 
         # Similarity = dot product
         sim = sum(rv * tv for rv, tv in zip(role_vec, type_vec))
-        
+
         # Theoretical max sim for this specific role-type combination
         is_role_core = role_vec[-1] > 0.7
         is_type_core = type_vec[-1] > 0.7
-        
+
         # Phase 34: Dynamic normalization based on dimensionality
         dim = self.dimension
         neutral = dim * 0.25
@@ -110,14 +110,14 @@ class RoleEmbeddingEngine:
         # Core max contribution: 1.0 (both), 0.5 (one), 0.25 (neither)
         core_max = 1.0 if (is_role_core and is_type_core) else (0.25 if not is_role_core and not is_type_core else 0.5)
         theoretical_max = baseline + core_max
-        
-        if sim >= theoretical_max: 
+
+        if sim >= theoretical_max:
             result = 1.0
-        elif sim <= baseline: 
+        elif sim <= baseline:
             result = 0.0
         else:
             result = (sim - baseline) / (theoretical_max - baseline)
-        
+
         # 3. Structural Bridges (Law 1 - Meaning from Topology)
         # Codes are often used as abbreviations for Locations or Organizations.
         # This provides a cold-start bridge for structural roles.
@@ -141,9 +141,9 @@ class RoleEmbeddingEngine:
         vb = self.manifold.get(role_b)
         if not va or not vb:
             return 0.0
-        
+
         sim = sum(a * b for a, b in zip(va, vb))
-        
+
         # Calibration (Phase 34): scale by dimensionality
         dim = self.dimension
         neutral = dim * 0.25
@@ -172,19 +172,19 @@ class RoleEmbeddingEngine:
         # Topological Neutrality: dimension dim-2 (centrality) is 0.0 for seeds
         if dim >= 2:
             vec[-2] = 0.0
-            
+
         # Core Entity Bias: seeds for structural types are anchored in the last dimension
         is_core = 1.0 if stype in [
-            SemanticType.PRICE, SemanticType.DATE, 
+            SemanticType.PRICE, SemanticType.DATE,
             SemanticType.LOCATION, SemanticType.ORGANIZATION
         ] else 0.5
         vec[-1] = is_core
-            
+
         return vec
 
     def get_adaptive_rate(self, base_rate: float = 0.1) -> float:
         """Compute learning rate modulated by field pressure (Phase 62).
-        
+
         High Pressure = Faster learning (search).
         Low Pressure = Slower learning (precision).
         """
@@ -193,7 +193,7 @@ class RoleEmbeddingEngine:
             pressure = self.ws.get_system_pressure()
         except AttributeError:
             pass
-            
+
         certainty = self.get_certainty()
         # Scale by pressure [0.5, 2.0] and stability (1.0 - certainty)
         return base_rate * (0.5 + pressure * 1.5) * (1.0 - certainty)
@@ -210,7 +210,7 @@ class RoleEmbeddingEngine:
                         (token_type == SemanticType.TEXT) or \
                         (ideal_type == SemanticType.TEXT) or \
                         (token_type == SemanticType.CODE)
-        
+
         if success and not is_compatible:
             return
 
@@ -221,18 +221,26 @@ class RoleEmbeddingEngine:
         if not self.ws.has_manifold_role(role):
             self.ws.set_manifold_vector(role, self._get_type_vector(ideal_type))
 
+        # Phase 66: Semantic Saturation (Attractor Skeletonization)
+        # Skip learning if role is extremely stable to reduce churn and journal bloat
+        certainty = self.ws._manifold.get_role_certainty(role)
+        if success and certainty > 0.98:
+            # High certainty role: only learn if the new signal is very strong
+            if delta < 0.1: # Increased breakthrough threshold
+                return
+
         role_vec = self.ws.get_manifold_vector(role)
         type_vec = self._get_type_vector(token_type)
-        
+
         effective_delta = delta if success else -delta
         # Dynamic Learning Rate (Phase 62): now adaptive to field pressure
         rate = self.get_adaptive_rate()
-        
+
         # Apply learning force directly to the manifold
         dim = self.dimension
         for i in range(dim):
             role_vec[i] = max(0.0, min(1.0, role_vec[i] + (type_vec[i] - role_vec[i]) * effective_delta * rate))
-        
+
         self.ws.set_manifold_vector(role, role_vec)
         self.learning_count += 1
 
@@ -240,17 +248,17 @@ class RoleEmbeddingEngine:
         """Accumulate gravity force from stable motifs."""
         if stability < 0.1:
             return
-            
+
         if not self.ws.has_manifold_role(role_name):
             from app.semantic_allocation_engine import _infer_role_type
             self.ws.set_manifold_vector(role_name, self._get_type_vector(_infer_role_type(role_name)))
-            
+
         role_vec = self.ws.get_manifold_vector(role_name)
         type_vec = self._get_type_vector(primary_type)
-        
+
         # Gravity Strength: proportional to motif stability
         gravity = 0.05 * stability * (1.0 - self.get_certainty())
-        
+
         # Accumulate force vector
         dim = self.dimension
         force = self.force_buffer.setdefault(role_name, [0.0] * dim)
@@ -265,7 +273,7 @@ class RoleEmbeddingEngine:
 
         all_roles = list(manifold_copy.keys())
         shards = self.ws.get_shards()
-        
+
         # Phase 34: Cognitive Elasticity — scale rate by system pressure
         try:
             pressure = self.ws.get_system_pressure()
@@ -273,7 +281,7 @@ class RoleEmbeddingEngine:
         except AttributeError:
             pressure = 1.0 # Fallback
             policy = {"propagation_damping": 1.0}
-            
+
         damping = policy.get("propagation_damping", 1.0)
         base_rate = 0.02 * (1.0 - self.get_certainty()) * (0.5 + pressure) * damping
 
@@ -295,10 +303,10 @@ class RoleEmbeddingEngine:
                     futures.append(executor.submit(_relax_roles_safe, shard_roles, manifold_copy, base_rate))
                 # Wait for all shards to complete
                 concurrent.futures.wait(futures)
-                
+
         # Clear buffer after integration (Phase 1 across all shards)
         self.force_buffer.clear()
-        
+
         # Save mutated copies back
         for role, vec in manifold_copy.items():
             self.ws.set_manifold_vector(role, vec)
@@ -324,7 +332,7 @@ class RoleEmbeddingEngine:
             instability = self.ws.metrics.schema_instability.get(r, 0.5)
             stability = max(0.0, 1.0 - instability)
             hysteresis[r] = 1.0 - (stability ** 2) * 0.9
-            
+
         # Phase 1: Apply accumulated forces
         for role in roles:
             force = self.force_buffer.get(role)
@@ -333,7 +341,7 @@ class RoleEmbeddingEngine:
                 vec = manifold_full[role]
                 for k in range(self.dimension):
                     vec[k] = max(0.0, min(1.0, vec[k] + force[k] * h))
-        
+
         # Phase 2: Repulsion (Contrastive Repulsion Law)
         if len(roles) >= 2:
             for i in range(len(roles)):
@@ -371,7 +379,7 @@ class RoleEmbeddingEngine:
             seed_vec = self._get_type_vector(seed_type)
             role_vec = manifold_full[role]
             h = hysteresis.get(role, 1.0)
-            
+
             for k in range(self.dimension):
                 diff = seed_vec[k] - role_vec[k]
                 force = 0.005 * (1.0 - h) * base_rate
@@ -384,11 +392,11 @@ class RoleEmbeddingEngine:
             target_vec = details["target_vec"]
             strength = details["strength"]
             target_roles = details.get("target_roles", [])
-            
+
             # Pad target_vec if dimensionality has expanded
             if len(target_vec) < self.dimension:
                 target_vec = target_vec + [0.5] * (self.dimension - len(target_vec))
-            
+
             for role in roles:
                 # Apply intent if either:
                 # 1. target_roles is empty (global intent)
@@ -460,9 +468,9 @@ class RoleEmbeddingEngine:
         """Analyze if current semantic resolution is sufficient (Phase 34)."""
         if self.learning_count < 200:
             return
-            
+
         certainty = self.get_certainty()
-        # If certainty remains very low despite significant learning, 
+        # If certainty remains very low despite significant learning,
         # it indicates a crowded manifold (Semantic Collision).
         if certainty < 0.2 and self.dimension < 64:
             new_dim = self.dimension + 8
@@ -470,7 +478,7 @@ class RoleEmbeddingEngine:
                 f"DIMENSIONALITY INDUCTION: Expanding manifold resolution to {new_dim}."
             )
             self.ws.expand_dimensions(new_dim)
-    
+
     def save_cache(self) -> dict:
         cache: dict = {}
         for (r, t), v in self.compatibility_cache.items():
@@ -495,7 +503,7 @@ class RelationshipEmbeddingSpace:
     def compute_embedding(self, node_idx: int, graph: SemanticGraph) -> List[float]:
         ws = get_world_state()
         dim = ws.manifold_dimension
-        
+
         if node_idx < len(graph.tokens):
             token = graph.tokens[node_idx]
             vec = [0.5] * dim
@@ -508,10 +516,10 @@ class RelationshipEmbeddingSpace:
                 SemanticType.CODE: 10, SemanticType.NAME: 11,
                 SemanticType.TEXT: 12, SemanticType.IDENTIFIER: 13,
             }.get(token.primary_type)
-            
+
             if type_idx is not None and type_idx < dim:
                 vec[type_idx] = 1.0
-            
+
             if token.span and graph.tokens:
                 node_edges = [e for e in graph.relationships if e.source_idx == node_idx or e.target_idx == node_idx]
                 centrality = len(node_edges) / max(len(graph.relationships), 1)
@@ -519,7 +527,7 @@ class RelationshipEmbeddingSpace:
                     vec[-2] = centrality
                 # Core Entity Bias: stable structural types have higher manifold priority
                 is_core = 1.0 if token.primary_type in [
-                    SemanticType.PRICE, SemanticType.DATE, 
+                    SemanticType.PRICE, SemanticType.DATE,
                     SemanticType.LOCATION, SemanticType.ORGANIZATION
                 ] else 0.5
                 vec[-1] = is_core

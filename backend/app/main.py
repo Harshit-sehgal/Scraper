@@ -81,7 +81,7 @@ def _schedule_background_task(coro):
             pass
         except Exception as e:
             logging.getLogger(__name__).error(f"Background task failed: {e}", exc_info=True)
-            
+
     task.add_done_callback(_handle_task_result)
     return task
 
@@ -117,6 +117,10 @@ app.include_router(
 FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
 if FRONTEND_DIR.exists():
     app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+    # Phase 63: Semantic Reliability Dashboard
+    DASHBOARD_DIR = FRONTEND_DIR / "dashboard"
+    if DASHBOARD_DIR.exists():
+        app.mount("/dashboard", StaticFiles(directory=str(DASHBOARD_DIR), html=True), name="dashboard")
 
 @app.get("/")
 async def root():
@@ -162,6 +166,7 @@ async def system_topology():
             "global_entropy": round(ws.metrics.global_entropy, 3),
             "exclusion_count": len(ws.learned_exclusions),
             "learning_count": ws.learning_count,
+            "region_count": view.region_count(),
             "integrity_score": round(ws.metrics.integrity_score, 3),
             "crystalline_count": len(ws.crystalline_records),
         },
@@ -169,7 +174,9 @@ async def system_topology():
         "schema_patterns": [{"roles": list(k), "count": v} for k, v in ws.schema_patterns.items()],
         "learned_exclusions": [{"roles": list(k), "strength": round(v, 3)} for k, v in ws.learned_exclusions.items()],
         "field_regions": view.all_region_dicts(),
-        "role_compatibility": [{"role": k[0], "type": k[1], "score": round(v, 3)} for k, v in ws.role_compatibility.items()]
+        "topology_edges": view.get_topology_edges(),
+        "role_compatibility": [{"role": k[0], "type": k[1], "score": round(v, 3)} for k, v in ws.role_compatibility.items()],
+        "drift_logs": {role: ws._observability.get_role_drift(role) for role in ws.get_manifold_roles()}
     }
 
 
@@ -205,7 +212,7 @@ async def merge_knowledge(data: dict):
     """Merge an external knowledge manifold into the current field (Phase 23)."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
-    
+
     # 1. Merge Manifold (Geometric Beliefs)
     remote_manifold = data.get("role_manifold", {})
     merged_roles = 0
@@ -216,7 +223,7 @@ async def merge_knowledge(data: dict):
         else:
             ws.set_manifold_vector(role, list(vec))
         merged_roles += 1
-            
+
     # 2. Merge Exclusions (Topological Constraints)
     remote_exc = data.get("learned_exclusions", {})
     for k_str, val in remote_exc.items():
@@ -227,7 +234,7 @@ async def merge_knowledge(data: dict):
             inst_api = InstabilityAPI(ws=ws)
             current = inst_api.get_learned_exclusion(key[0], key[1])
             inst_api.set_exclusion(key[0], key[1], max(current, val))
-            
+
     return {"status": "merged", "roles_merged": merged_roles, "total_manifold": len(ws.role_manifold)}
 
 @app.get("/api/system/search")
@@ -247,11 +254,37 @@ async def system_observability():
         "telemetry": ws.observability_telemetry[-50:],
         "heatmap": ws.observability_heatmap,
         "causal_trace": ws.get_causal_telemetry()[-20:],
+        "health_index": ws._observability.get_semantic_health_index(ws),
         "hierarchy": {
             "envelopes": list(ws.abstraction_envelopes.keys()),
             "levels": {r: ws.get_role_level(r) for r in ws.role_manifold}
         }
     }
+
+@app.get("/api/system/history/topology")
+async def system_topology_history(limit: int = 20):
+    """Returns a timeline of historical topology states for replay (Phase 64)."""
+    # Leveraging the EventJournal for state reconstruction
+    from app.event_journal import get_journal
+    journal = get_journal()
+
+    history = []
+    # Get structural event indices
+    structural_entries = [e for e in journal._entries if e["type"] in ["restructure_topology", "merge_state", "add", "remove"]]
+    target_entries = structural_entries[-limit:]
+
+    for entry in target_entries:
+        idx = entry["idx"]
+        snapshot = journal.get_snapshot_at(idx)
+        if snapshot and "topology" in snapshot:
+            history.append({
+                "idx": idx,
+                "timestamp": entry["timestamp"],
+                "type": entry["type"],
+                "topology": snapshot["topology"]
+            })
+
+    return {"history": history}
 
 @app.post("/api/system/scheduler/step")
 async def process_cognitive_tasks(budget_ms: float = 100.0):

@@ -1,0 +1,342 @@
+/**
+ * Semantic Reliability Dashboard JS
+ * Phase 63: Real-time Topology Visualization & Drift Monitoring
+ */
+
+const API_BASE = '/api/system';
+const UPDATE_INTERVAL = 2000; // 2 seconds
+
+let energyChart, communityChart, driftChart;
+let historyData = {
+    energy: [],
+    entropy: [],
+    labels: []
+};
+
+let topologyHistory = [];
+let isLiveMode = true;
+let currentReplayIdx = -1;
+
+function chartDefaults() {
+    return {
+        responsive: true,
+        animation: false,
+        plugins: {
+            legend: {
+                labels: { color: '#9ca3af', boxWidth: 8, font: { size: 10 } }
+            }
+        },
+        scales: {
+            x: { ticks: { color: '#4b5563', maxTicksLimit: 6 }, grid: { color: '#111827' } },
+            y: { ticks: { color: '#4b5563' }, grid: { color: '#111827' }, beginAtZero: true }
+        }
+    };
+}
+
+function initCharts() {
+    const energyCtx = document.getElementById('energy-chart');
+    const driftCtx = document.getElementById('drift-chart');
+    const communityCtx = document.getElementById('community-chart');
+
+    energyChart = new Chart(energyCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                { label: 'Energy', data: [], borderColor: '#facc15', backgroundColor: 'rgba(250,204,21,0.1)', tension: 0.25 },
+                { label: 'Entropy', data: [], borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,0.1)', tension: 0.25 }
+            ]
+        },
+        options: chartDefaults()
+    });
+
+    driftChart = new Chart(driftCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                { label: 'Mean Drift', data: [], borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)', tension: 0.25 }
+            ]
+        },
+        options: chartDefaults()
+    });
+
+    communityChart = new Chart(communityCtx, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [
+                { label: 'Roles', data: [], backgroundColor: '#22c55e' }
+            ]
+        },
+        options: chartDefaults()
+    });
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[ch]);
+}
+
+// Initialize Dashboard
+async function init() {
+    initCharts();
+    setupControls();
+    updateLoop();
+    setInterval(updateLoop, UPDATE_INTERVAL);
+}
+
+function setupControls() {
+    const scrubber = document.getElementById('timeline-scrubber');
+    const liveBtn = document.getElementById('live-mode-btn');
+
+    scrubber.oninput = (e) => {
+        isLiveMode = false;
+        liveBtn.classList.remove('bg-green-500/10', 'text-green-500', 'border-green-500');
+        liveBtn.classList.add('bg-gray-800', 'text-gray-500', 'border-gray-700');
+        liveBtn.innerText = "REPLAY";
+        
+        currentReplayIdx = parseInt(e.target.value);
+        if (topologyHistory[currentReplayIdx]) {
+            const topology = topologyHistory[currentReplayIdx].topology || {};
+            renderTopology(topology.regions || [], topology.communities || [], []); // Hide edges in replay for now
+        }
+    };
+
+    liveBtn.onclick = () => {
+        isLiveMode = true;
+        liveBtn.className = "px-2 py-0.5 border border-green-500 text-[8px] rounded text-green-500 font-bold bg-green-500/10";
+        liveBtn.innerText = "LIVE";
+        updateLoop(); // Trigger immediate update
+    };
+}
+
+async function updateLoop() {
+    try {
+        const [topology, observability, history] = await Promise.all([
+            fetch(`${API_BASE}/topology`).then(r => r.json()),
+            fetch(`${API_BASE}/observability`).then(r => r.json()),
+            fetch(`${API_BASE}/history/topology`).then(r => r.json())
+        ]);
+
+        // Update Timeline
+        topologyHistory = history.history || [];
+        const scrubber = document.getElementById('timeline-scrubber');
+        scrubber.max = Math.max(0, topologyHistory.length - 1);
+        
+        if (isLiveMode) {
+            updateMetrics(topology.metrics, observability.health_index);
+            renderTopology(topology.field_regions, topology.global_communities, topology.topology_edges);
+            updateTelemetry(observability.telemetry);
+            updateCharts(topology.metrics, topology.global_communities, topology.drift_logs);
+            scrubber.value = scrubber.max;
+        }
+        
+        document.getElementById('last-update').innerText = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
+    } catch (err) {
+        console.error("Dashboard Sync Failed:", err);
+        document.getElementById('status-badge').innerText = "SYNC OFFLINE";
+        document.getElementById('status-badge').className = "px-3 py-1 bg-red-900/30 text-red-400 border border-red-800 rounded-full text-xs font-bold";
+    }
+}
+
+function updateMetrics(m, health) {
+    document.getElementById('metric-pressure').innerText = Number(m.field_pressure || 0).toFixed(3);
+    document.getElementById('metric-energy').innerText = Number(m.global_energy || 0).toFixed(3);
+    document.getElementById('metric-entropy').innerText = Number(m.global_entropy || 0).toFixed(3);
+    document.getElementById('metric-regions').innerText = Number(m.region_count || 0);
+
+    if (health) {
+        document.getElementById('metric-health').innerText = Number(health.score || 0).toFixed(2);
+        const statusEl = document.getElementById('health-status');
+        const metrics = health.metrics || {};
+        const monocultureRisk = Number(metrics.monoculture_risk || 0);
+        const diversity = Number(metrics.diversity || 0);
+        const alert = monocultureRisk > 0.5 ? "MONOCULTURE RISK" : (health.status || 'unknown');
+        statusEl.innerText = `${alert} // DR: ${diversity.toFixed(2)}`;
+        statusEl.className = (health.status === 'optimal' && monocultureRisk < 0.5) ? 'text-[10px] text-green-500 mt-1 uppercase' :
+                             (health.status === 'degraded' || monocultureRisk >= 0.5) ? 'text-[10px] text-yellow-500 mt-1 uppercase' :
+                             'text-[10px] text-red-500 mt-1 uppercase';
+    }
+}
+
+function renderTopology(regions, communities, edges) {
+    const svg = document.getElementById('field-svg');
+    svg.innerHTML = ''; // Clear
+    
+    _renderTopologyInternal(regions, communities, edges);
+}
+
+function _renderTopologyInternal(regions, communities, edges) {
+    const svg = document.getElementById('field-svg');
+    if (!regions || regions.length === 0) {
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", "50%");
+        text.setAttribute("y", "50%");
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("fill", "#333");
+        text.textContent = "FIELD VOID — NO ACTIVE BASINS";
+        svg.appendChild(text);
+        return;
+    }
+    
+    const width = 800;
+    const height = 450;
+    const colors = ['#00ff41', '#007fff', '#ff003c', '#ffbf00', '#9d00ff', '#00ffd0'];
+
+    const getPos = (id) => {
+        const hash = id.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
+        return {
+            x: 100 + (Math.abs(hash) % (width - 200)),
+            y: 100 + (Math.abs(hash * 7) % (height - 200))
+        };
+    };
+
+    // 1. Draw Cohesion Edges (Relational Web)
+    if (edges) {
+        edges.forEach(e => {
+            // Find regions representing these roles
+            const r1 = regions.find(r => (r.competing_roles || []).includes(e.source));
+            const r2 = regions.find(r => (r.competing_roles || []).includes(e.target));
+            if (r1 && r2) {
+                const p1 = getPos(r1.region_id);
+                const p2 = getPos(r2.region_id);
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", p1.x);
+                line.setAttribute("y1", p1.y);
+                line.setAttribute("x2", p2.x);
+                line.setAttribute("y2", p2.y);
+                line.setAttribute("stroke", "#111");
+                line.setAttribute("stroke-width", e.weight * 5);
+                line.setAttribute("stroke-opacity", e.weight * 0.5);
+                svg.appendChild(line);
+            }
+        });
+    }
+
+    // 2. Draw Regions (Attractor Nodes)
+    regions.forEach((r, i) => {
+        const radius = 5 + (Number(r.local_energy || 0) * 20);
+        const opacity = 0.2 + (Number(r.integrity || 0) * 0.8);
+        const {x: cx, y: cy} = getPos(r.region_id);
+        
+        let color = '#555';
+        if (communities && communities.length > 0) {
+            communities.forEach((c, idx) => {
+                if (c.some(role => (r.competing_roles || []).includes(role))) {
+                    color = colors[idx % colors.length];
+                }
+            });
+        }
+
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", cx);
+        circle.setAttribute("cy", cy);
+        circle.setAttribute("r", radius);
+        circle.setAttribute("fill", color);
+        circle.setAttribute("fill-opacity", opacity);
+        circle.setAttribute("stroke", color);
+        circle.setAttribute("stroke-width", Number(r.instability || 0) > 0.5 ? "2" : "0.5");
+        circle.setAttribute("class", "topology-node");
+        
+        if (Number(r.instability || 0) > 0.8) {
+            const animate = document.createElementNS("http://www.w3.org/2000/svg", "animate");
+            animate.setAttribute("attributeName", "r");
+            animate.setAttribute("values", `${radius};${radius * 1.5};${radius}`);
+            animate.setAttribute("dur", "1s");
+            animate.setAttribute("repeatCount", "indefinite");
+            circle.appendChild(animate);
+        }
+
+        circle.onmouseover = () => showRegionDetails(r);
+        svg.appendChild(circle);
+        
+        if (Number(r.integrity || 0) > 0.7) {
+            const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            label.setAttribute("x", cx);
+            label.setAttribute("y", cy + radius + 12);
+            label.setAttribute("text-anchor", "middle");
+            label.setAttribute("fill", "#999");
+            label.setAttribute("font-size", "8");
+            label.textContent = (r.competing_roles || [])[0] || 'anon';
+            svg.appendChild(label);
+        }
+    });
+}
+
+function showRegionDetails(r) {
+    const el = document.getElementById('region-details');
+    const content = document.getElementById('region-info-content');
+    el.classList.remove('hidden');
+
+    content.innerHTML = `
+        <div class="flex justify-between mb-1"><span>ID:</span> <span class="text-white">${escapeHtml(r.region_id)}</span></div>
+        <div class="flex justify-between mb-1"><span>ROLES:</span> <span class="text-white">${escapeHtml((r.competing_roles || []).join(', '))}</span></div>
+        <div class="flex justify-between mb-1"><span>TOKEN:</span> <span class="text-white truncate" style="max-width: 100px;">"${escapeHtml(r.token)}"</span></div>
+        <div class="flex justify-between mb-1"><span>INSTABILITY:</span> <span class="text-red-400">${Number(r.instability || 0).toFixed(3)}</span></div>
+        <div class="flex justify-between mb-1"><span>ENERGY:</span> <span class="text-yellow-400">${Number(r.local_energy || 0).toFixed(3)}</span></div>
+        <div class="flex justify-between mb-1"><span>INTEGRITY:</span> <span class="text-green-400">${Number(r.integrity || 0).toFixed(3)}</span></div>
+    `;
+}
+
+function updateTelemetry(events) {
+    const log = document.getElementById('telemetry-log');
+    if (!events) return;
+    
+    log.innerHTML = events.map(e => {
+        const color = e.type === 'degradation' ? 'text-red-500' : 
+                      e.type === 'transaction' ? 'text-blue-400' : 'text-gray-500';
+        const icon = e.type === 'degradation' ? '⚠' : '◈';
+        return `<div class="border-l border-gray-800 pl-2 py-1">
+            <span class="${color} font-bold mr-2">${icon} [${escapeHtml(e.subsystem || e.type)}]</span>
+            <span class="text-gray-400">${escapeHtml(e.action || e.label || '')}</span>
+            <div class="text-[8px] text-gray-700 mt-1">${escapeHtml(JSON.stringify(e.details || {}).substring(0, 80))}...</div>
+        </div>`;
+    }).reverse().join('');
+}
+
+function updateCharts(m, communities, driftLogs) {
+    communities = communities || [];
+    // Energy Chart
+    energyChart.data.labels.push("");
+    energyChart.data.datasets[0].data.push(m.global_energy);
+    energyChart.data.datasets[1].data.push(m.global_entropy);
+    
+    if (energyChart.data.labels.length > 50) {
+        energyChart.data.labels.shift();
+        energyChart.data.datasets[0].data.shift();
+        energyChart.data.datasets[1].data.shift();
+    }
+    energyChart.update('none');
+
+    // Drift Chart
+    let totalDrift = 0;
+    let driftCount = 0;
+    Object.values(driftLogs || {}).forEach(log => {
+        if (log && log.length > 0) {
+            totalDrift += log[log.length - 1];
+            driftCount++;
+        }
+    });
+    const meanDrift = driftCount > 0 ? totalDrift / driftCount : 0;
+    
+    driftChart.data.labels.push("");
+    driftChart.data.datasets[0].data.push(meanDrift);
+    if (driftChart.data.labels.length > 50) {
+        driftChart.data.labels.shift();
+        driftChart.data.datasets[0].data.shift();
+    }
+    driftChart.update('none');
+
+    // Community Chart
+    communityChart.data.labels = communities.map((c, i) => `C-${i}`);
+    communityChart.data.datasets[0].data = communities.map(c => c.length);
+    communityChart.update('none');
+}
+
+document.addEventListener('DOMContentLoaded', init);

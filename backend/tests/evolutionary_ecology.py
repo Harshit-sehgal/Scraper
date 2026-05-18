@@ -11,9 +11,7 @@ metrics: diversity, fragmentation, drift, and oscillation frequency.
 import time
 import random
 import json
-import logging
-import math
-from typing import List, Dict, Set, Tuple
+from typing import List, Set
 from app.semantic_world_state import SemanticWorldState
 from app.semantic_ir import SemanticType, SemanticToken, Span
 
@@ -67,7 +65,7 @@ def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.
     ws = SemanticWorldState()
     ws.clear()
     # Ensure journal capacity for long-horizon causal audits
-    ws._journal_capacity = 2000 
+    ws._journal_capacity = 2000
     
     analyzer = EcologyAnalyzer()
     roles = [f"role_{i}" for i in range(30)]
@@ -133,7 +131,7 @@ def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.
             analyzer.record_pulse(ws)
 
     final_stats = analyzer.summarize()
-    print(f"\n--- Ecology Simulation Completed ---")
+    print("\n--- Ecology Simulation Completed ---")
     print(json.dumps(final_stats, indent=2))
     
     # 6. Success Invariants

@@ -56,7 +56,15 @@ class GlobalCognitiveScheduler:
         )
 
     def step(self, budget_ms: float = 100.0) -> int:
-        if self._is_paused or not self._task_queue:
+        if self._is_paused:
+            return 0
+
+        # Phase 68: Active Governance Enforcement (Even if queue is empty)
+        from app.policy_engine import get_policy_engine
+        policy = get_policy_engine(ws=self.ws)
+        policy.enforce_guardrails()
+
+        if not self._task_queue:
             return 0
 
         start_time = time.time()

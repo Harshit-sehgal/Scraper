@@ -114,6 +114,18 @@ class TopologyView:
         """Return immutable snapshots of all regions."""
         return [self._snapshot(r) for r in self._regions]
 
+    def get_topology_edges(self) -> List[dict]:
+        """Return a list of relational edges based on neighborhood cohesion (Phase 65)."""
+        edges = []
+        for (ra, rb), val in self._cohesion.items():
+            if val > 0.05: # Only show meaningful links
+                edges.append({
+                    "source": ra,
+                    "target": rb,
+                    "weight": round(val, 3)
+                })
+        return edges
+
     def all_region_dicts(self) -> List[dict]:
         """Return all regions as plain dicts (for serialization/display)."""
         return [self._snapshot_dict(r) for r in self._regions]
@@ -599,6 +611,13 @@ class TopologyState:
         struct = self._get_struct("merge_success")
         struct[pair] = struct.get(pair, 0.0) + 1.0
         self._set_struct("merge_success", struct)
+
+    def set_neighborhood_cohesion(self, pair: tuple, value: float):
+        """Formally set a neighborhood cohesion value (Phase 68)."""
+        struct = self._get_struct("neighborhood_cohesion")
+        struct[tuple(sorted(pair))] = max(0.0, min(1.0, value))
+        self._set_struct("neighborhood_cohesion", struct)
+        self._record("set_neighborhood_cohesion", {"pair": pair, "value": value})
 
     def record_cohesion_split_attempt(self, pair: tuple):
         struct = self._get_struct("split_attempts")

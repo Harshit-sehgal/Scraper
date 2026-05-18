@@ -7,7 +7,6 @@ via topological partitioning.
 
 import pytest
 from app.semantic_world_state import SemanticWorldState
-from app.semantic_ir import SemanticType
 
 @pytest.fixture
 def ws():

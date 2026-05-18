@@ -9,9 +9,6 @@ causal graph growth, and topology fragmentation.
 
 import time
 import random
-import json
-import logging
-from typing import List, Dict
 from app.semantic_world_state import SemanticWorldState
 from app.semantic_ir import SemanticType, SemanticToken, Span
 
@@ -79,7 +76,7 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
     total_duration = time.time() - start_time
     final_report = ws._observability.get_governance_report(ws)
     
-    print(f"\n--- Longevity Validation Completed ---")
+    print("\n--- Longevity Validation Completed ---")
     print(f"Total Duration: {total_duration:.2f}s")
     print(f"Final Global Energy: {ws.metrics.global_energy:.2f}")
     print(f"Final Global Entropy: {ws.metrics.global_entropy:.2f}")

@@ -98,7 +98,7 @@ class ObservabilityState:
         # Heatmap update for regional activity
         if "region_id" in details:
             self.pulse_heatmap(details["region_id"], 1.0)
-            
+
         self._record("emit_telemetry", {"type": event_type, "details": details, "trace_id": trace_id})
 
     def record_degradation(self, subsystem: str, severity: str, cause: str,
@@ -160,6 +160,26 @@ class ObservabilityState:
         self._set_struct("activity_heatmap", heatmap)
         self._record("decay_heatmap", {"rate": rate})
 
+    def analyze_causal_divergence(self, local_clock: dict, remote_clock: dict) -> dict:
+        """Quantify the causal distance between two substrate nodes (Phase 67)."""
+        all_nodes = set(local_clock.keys()) | set(remote_clock.keys())
+
+        deltas = []
+        for node in all_nodes:
+            lv = local_clock.get(node, 0)
+            rv = remote_clock.get(node, 0)
+            deltas.append(abs(lv - rv))
+
+        total_divergence = sum(deltas)
+        max_delta = max(deltas) if deltas else 0
+
+        return {
+            "total_divergence": total_divergence,
+            "max_causal_skew": max_delta,
+            "drift_risk": "high" if max_delta > 50 else "moderate" if max_delta > 10 else "low",
+            "action_recommendation": "branch" if max_delta > 100 else "merge"
+        }
+
     # ─── Read-Only Accessors ─────────────────────────────────────────────
 
     @property
@@ -184,7 +204,7 @@ class ObservabilityState:
         """Analyze state history for cyclic instability or energy patterns (Phase 46)."""
         if len(snapshots) < window:
             return []
-            
+
         oscillations = []
         energies = [s.get("energy", 0.0) for s in snapshots[-window:]]
         if self._is_cyclic(energies):
@@ -193,33 +213,33 @@ class ObservabilityState:
                 "confidence": 0.8,
                 "period": self._estimate_period(energies)
             })
-            
+
         return oscillations
 
     def calculate_attractor_diversity(self, ws) -> float:
         """Quantify the semantic field plasticity using Shannon entropy (Phase 56).
-        
+
         High Diversity = Many active basins with varied stability.
         Low Diversity = Dominant basins suppressing exploration (Freezing).
         """
         manifold = ws.role_manifold
         if not manifold:
             return 1.0
-            
+
         stabilities = [ws._manifold.get_role_certainty(r) for r in manifold]
         if not stabilities:
             return 1.0
-            
+
         # Normalize to probability-like distribution
         total = sum(stabilities)
         if total == 0:
             return 0.0
-            
+
         probs = [s / total for s in stabilities]
-        
+
         import math
         entropy = -sum(p * math.log2(p) for p in probs if p > 0)
-        
+
         # Scale by log of number of roles to get [0, 1] range
         max_entropy = math.log2(len(manifold)) if len(manifold) > 1 else 1.0
         return entropy / max_entropy
@@ -228,7 +248,7 @@ class ObservabilityState:
         """Summary of emergent systems health and governance status (Phase 56)."""
         snapshots = ws._history.topology_snapshots
         manifold_history = {r: self.get_role_drift(r) for r in ws.role_manifold}
-        
+
         report = {
             "diversity": round(self.calculate_attractor_diversity(ws), 3),
             "oscillations": self.detect_oscillations(snapshots),
@@ -243,14 +263,14 @@ class ObservabilityState:
 
     def calculate_damping_factor(self, snapshots: List[dict]) -> float:
         """Compute a global damping factor based on detected instability patterns (Phase 49).
-        
+
         Factor 1.0 = No damping.
         Factor < 1.0 = Suppress propagation gain to prevent divergence.
         """
         oscillations = self.detect_oscillations(snapshots)
         if not oscillations:
             return 1.0
-            
+
         # Maximum damping for strong oscillations
         max_conf = max(o["confidence"] for o in oscillations)
         return max(0.2, 1.0 - max_conf * 0.8)
@@ -259,11 +279,11 @@ class ObservabilityState:
         """Return a dynamic stabilization policy for the current field state (Phase 49)."""
         snapshots = ws._history.topology_snapshots
         damping = self.calculate_damping_factor(snapshots)
-        
+
         # Check for runaways
         manifold_history = {r: self.get_role_drift(r) for r in ws.role_manifold}
         runaways = self.detect_runaway_attractors(manifold_history)
-        
+
         policy = {
             "propagation_damping": damping,
             "force_decay": ws.metrics.global_energy > 8.0,
@@ -277,7 +297,7 @@ class ObservabilityState:
 
     def detect_runaway_attractors(self, manifold_history: Dict[str, List[float]], threshold: float = 0.95) -> List[dict]:
         """Identify roles that have become 'too stable' or dominant (Phase 48).
-        
+
         Runaway attractors can freeze the field and prevent new learning.
         """
         runaways = []
@@ -296,39 +316,39 @@ class ObservabilityState:
         """Identify if the system is stuck in a local minimum (Phase 48)."""
         if len(energy_history) < 50:
             return False
-        
+
         recent_e = energy_history[-50:]
         recent_s = entropy_history[-50:]
-        
+
         e_stable = (max(recent_e) - min(recent_e)) < 0.02
         s_stable = (max(recent_s) - min(recent_s)) < 0.02
-        
+
         # High stable energy + low stable entropy = likely stuck
         # (Threshold 8.0 prevents baseline thrashing at default 5.0)
         return e_stable and s_stable and recent_e[0] > 8.0 and recent_s[0] < 0.2
 
     def compress_causal_history(self, threshold_age_sec: float = 3600):
         """Compress old telemetry events into causal summaries (Phase 48).
-        
+
         Prevents causal graph explosion while maintaining long-term traceability.
         """
         now = time.time()
         stream = list(self._telemetry_stream)
         if not stream:
             return
-            
+
         to_keep = []
         to_compress = []
-        
+
         for entry in stream:
             if now - entry["timestamp"] < threshold_age_sec:
                 to_keep.append(entry)
             else:
                 to_compress.append(entry)
-                
+
         if not to_compress:
             return
-            
+
         # Summarize compressed events by type
         summary = {
             "type": "causal_summary",
@@ -351,7 +371,7 @@ class ObservabilityState:
                 energies.append(entry["details"]["energy"])
             if "entropy" in entry.get("details", {}):
                 entropies.append(entry["details"]["entropy"])
-                
+
         if energies:
             summary["details"]["energy_stats"] = {
                 "min": min(energies), "max": max(energies), "avg": sum(energies)/len(energies)
@@ -360,13 +380,13 @@ class ObservabilityState:
             summary["details"]["entropy_stats"] = {
                 "min": min(entropies), "max": max(entropies), "avg": sum(entropies)/len(entropies)
             }
-            
+
         new_stream = [summary] + to_keep
         if self._staging is not None:
             self._staging["telemetry_stream"] = new_stream
         else:
             self._telemetry_stream = deque(new_stream, maxlen=1000)
-        
+
         self._record("compress_history", {"compressed": len(to_compress)})
 
     def _is_cyclic(self, values: List[float]) -> bool:
@@ -376,14 +396,14 @@ class ObservabilityState:
         # Mean-center
         avg = sum(values) / len(values)
         centered = [v - avg for v in values]
-        
+
         # Check for sign-flip frequency
         flips = 0
         for i in range(1, len(centered)):
             if (centered[i-1] > 0 and centered[i] < 0) or \
                (centered[i-1] < 0 and centered[i] > 0):
                 flips += 1
-        
+
         # High number of flips relative to window size indicates oscillation
         n = len(values)
         return flips >= (n // 4) if n > 0 else False
@@ -431,63 +451,132 @@ class ObservabilityState:
         self._set_struct("drift_log", {})
 
     def get_memory_profile(self, ws) -> dict:
-        """Measure the size of the semantic world state subsystems (Phase 47)."""
+        """Estimate subsystem memory pressure without mutating semantic state."""
+        import json
         import sys
-        
-        def get_size(obj):
-            if hasattr(obj, 'to_dict'):
-                # Approximating size via serialized dictionary
-                import json
-                return len(json.dumps(obj.to_dict()))
+
+        def estimate(obj) -> int:
+            if hasattr(obj, "to_dict"):
+                try:
+                    return len(json.dumps(obj.to_dict(), sort_keys=True, default=str))
+                except Exception:
+                    logging.getLogger(__name__).debug(
+                        "Falling back to shallow memory estimate for %s",
+                        type(obj).__name__,
+                        exc_info=True,
+                    )
             return sys.getsizeof(obj)
-            
+
+        telemetry_size = len(json.dumps(list(self._telemetry_stream), sort_keys=True, default=str))
         profile = {
-            "topology": get_size(ws._topology),
-            "manifold": get_size(ws._manifold),
-            "motif": get_size(ws._motif),
-            "history": get_size(ws._history),
-            "telemetry": get_size(self._telemetry_stream),
-            "total_records": ws.metrics.total_records_processed
+            "topology": estimate(ws._topology),
+            "manifold": estimate(ws._manifold),
+            "motif": estimate(ws._motif),
+            "history": estimate(ws._history),
+            "telemetry": telemetry_size,
+            "total_records": ws.metrics.total_records_processed,
         }
-        profile["total_estimated_bytes"] = sum(v for k, v in profile.items() if k != "total_records")
+        profile["total_estimated_bytes"] = sum(
+            value for key, value in profile.items() if key != "total_records"
+        )
         return profile
+
+    def get_semantic_health_index(self, ws) -> dict:
+        """Compute the multi-dimensional Semantic Health Index (Phase 64).
+
+        Laws of Health:
+        1. Stability: Inverse of mean drift velocity.
+        2. Diversity: Attractor plasticity (Shannon entropy).
+        3. Tension: Thermodynamic equilibrium state.
+        4. Reliability: Transaction success rate.
+        """
+        diversity = self.calculate_attractor_diversity(ws)
+
+        # 1. Stability (Drift Velocity)
+        mean_drift = 0.0
+        drift_logs = [list(log) for log in self._drift_log.values() if log]
+        if drift_logs:
+            last_drifts = [log[-1] for log in drift_logs if log]
+            mean_drift = sum(last_drifts) / len(last_drifts) if last_drifts else 0.0
+        stability_score = max(0.0, 1.0 - mean_drift * 5.0) # Penalty for high velocity
+
+        # 2. Tension (Energetic stress)
+        pressure = ws.get_system_pressure()
+        tension_score = max(0.0, 1.0 - pressure)
+
+        # 3. Reliability (Causal Integrity)
+        tx_history = [t for t in self.telemetry if t["type"] == "transaction"]
+        success_rate = 1.0
+        if tx_history:
+            # We assume a 'transaction' event implies success, while 'degradation' or lack of 'transaction' for an operation implies failure/conflict
+            # For now, we use a heuristic based on degradation vs transaction density
+            degrads = [t for t in self.telemetry if t["type"] == "degradation" and t["details"].get("severity") == "critical"]
+            success_rate = max(0.0, 1.0 - (len(degrads) / (len(tx_history) + 1)))
+
+        # 4. Diversity & Monoculture Risk (Phase 65)
+        # Using Herfindahl-Hirschman Index (HHI) for attractor concentration
+        hhi = 0.0
+        if ws.role_manifold:
+            stabilities = [ws._manifold.get_role_certainty(r) for r in ws.role_manifold]
+            total_s = sum(stabilities)
+            if total_s > 0:
+                hhi = sum((s / total_s)**2 for s in stabilities)
+
+        # Monoculture penalty (HHI > 0.4 indicates high concentration)
+        monoculture_risk = max(0.0, (hhi - 0.1) / 0.9)
+        diversity_score = diversity * (1.0 - monoculture_risk * 0.5)
+
+        health_score = (stability_score * 0.25) + (diversity_score * 0.25) + (tension_score * 0.2) + (success_rate * 0.2) + (max(0, 1.0 - monoculture_risk) * 0.1)
+
+        return {
+            "score": round(health_score, 3),
+            "metrics": {
+                "stability": round(stability_score, 3),
+                "diversity": round(diversity_score, 3),
+                "tension": round(tension_score, 3),
+                "reliability": round(success_rate, 3),
+                "monoculture_risk": round(monoculture_risk, 3),
+                "mean_drift": round(mean_drift, 5)
+            },
+            "status": "optimal" if health_score > 0.8 else "degraded" if health_score > 0.4 else "critical"
+        }
 
     def calculate_semantic_importance(self, region, ws) -> float:
         """Compute the topological importance of a region (Phase 50).
-        
+
         High Importance = high centrality, low instability, and participation in stable motifs.
         """
         # 1. Centrality (if available in topology state)
         centrality = ws._topology._centrality.get(region.region_id, 0.5)
-        
+
         # 2. Stability boost
         stability = 1.0 - region.instability
-        
+
         # 3. Persistence factor
         persistence = region.persistence
-        
+
         return (centrality * 0.4) + (stability * 0.3) + (persistence * 0.3)
 
     def apply_resource_shedding(self, ws, max_bytes: int = 10000000):
         """Prune non-essential state if memory footprint exceeds threshold (Phase 47/50).
-        
+
         Enhanced with Value-Aware Pruning to preserve semantic continuity.
         """
         profile = self.get_memory_profile(ws)
         if profile["total_estimated_bytes"] < max_bytes:
             return False
-            
-        logging.warning("RESOURCE SHEDDING TRIGGERED: Substrate memory [%d] exceeds threshold [%d]", 
+
+        logging.warning("RESOURCE SHEDDING TRIGGERED: Substrate memory [%d] exceeds threshold [%d]",
                         profile["total_estimated_bytes"], max_bytes)
-        
+
         # 1. Prune Telemetry (tail-heavy)
         old_telemetry = len(self._telemetry_stream)
         self._telemetry_stream = deque(list(self._telemetry_stream)[-100:], maxlen=1000)
-        
+
         # 2. Prune History
         ws._history.trim_journal(200)
         ws._history.trim_snapshots(50)
-        
+
         # 3. Value-Aware Region Pruning (Phase 50)
         # Instead of just trimming from end, we sort by importance
         regs = ws._topology._get_regions()
@@ -495,14 +584,14 @@ class ObservabilityState:
             # Rank by importance
             scored_regs = [(self.calculate_semantic_importance(r, ws), r) for r in regs]
             scored_regs.sort(key=lambda x: x[0], reverse=True) # highest importance first
-            
+
             # Keep top 50
             kept_regs = [r for score, r in scored_regs[:50]]
             ws._topology.replace_all(kept_regs)
-        
+
         # 4. Prune Weak Motifs
         ws._motif.prune_weak(threshold=0.2)
-        
+
         self.emit_telemetry("resource_shedding", {
             "old_bytes": profile["total_estimated_bytes"],
             "telemetry_pruned": old_telemetry - len(self._telemetry_stream),

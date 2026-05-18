@@ -7,7 +7,6 @@ Tombstones and Epochs ensure that deleted semantic regions stay deleted.
 
 import pytest
 from app.semantic_world_state import SemanticWorldState
-from app.semantic_ir import SemanticType
 
 @pytest.fixture
 def nodes():

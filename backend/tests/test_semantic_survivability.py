@@ -11,7 +11,6 @@ to detect emergent causality drift and attractor collapse.
 import pytest
 import random
 import time
-from typing import List, Tuple
 from app.semantic_world_state import SemanticWorldState
 from app.semantic_ir import SemanticType, SemanticToken, Span
 from app.failure_injector import set_injection_probability

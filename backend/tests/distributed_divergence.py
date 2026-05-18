@@ -10,7 +10,6 @@ transactional mutation vs deterministic replay result in 0% divergence.
 
 import random
 from app.semantic_world_state import SemanticWorldState
-from app.semantic_ir import SemanticType
 
 def test_distributed_divergence(event_count: int = 1000):
     # Node A: The primary evolver

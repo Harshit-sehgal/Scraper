@@ -10,9 +10,7 @@ the time to perfectly reconstruct the state via deterministic replay.
 
 import time
 import random
-from typing import List
 from app.semantic_world_state import SemanticWorldState
-from app.semantic_ir import SemanticType
 
 def benchmark_replay(transaction_count: int = 10000):
     ws = SemanticWorldState()
@@ -56,7 +54,7 @@ def benchmark_replay(transaction_count: int = 10000):
         print(f"  [ERROR] Checksum mismatch! {original_checksum} != {final_checksum}")
         return False
         
-    print(f"  Verification: SUCCESS (Bit-for-bit parity confirmed)")
+    print("  Verification: SUCCESS (Bit-for-bit parity confirmed)")
     print(f"  Replay Efficiency: {duration_replay / duration_gen:.2f}x generation speed")
     return True
 

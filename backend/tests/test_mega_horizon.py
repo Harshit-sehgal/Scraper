@@ -40,12 +40,10 @@ class DynamicalAnalyzer:
         results = {}
         
         # 1. Detect Lock States (Zero manifold movement over long horizon)
-        lock_detected = False
         for role, history in self.role_stabilities.items():
             if len(history) > 100:
                 recent = history[-50:]
                 if max(recent) - min(recent) < 1e-9:
-                    lock_detected = True
                     results["lock_state_detected"] = role
                     
         # 2. Detect Runaway Reinforcement (Stability fixed at ceiling)

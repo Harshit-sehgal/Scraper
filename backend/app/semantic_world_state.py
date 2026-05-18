@@ -13,7 +13,7 @@ from app.invariant_firewall import requires_invariants
 class SemanticWorldState:
     """
     Canonical Semantic World State — now a true orchestrator.
-    
+
     Meaning emerges from the relational topology of this state.
     No subsystem may maintain isolated semantic truth.
     """
@@ -32,11 +32,11 @@ class SemanticWorldState:
         from app.graph_update_scheduler import GlobalCognitiveScheduler
         from app.observability import ObservabilityState
         import uuid
-        
+
         self._node_id = node_id or str(uuid.uuid4())[:8]
         self._vector_clock = VectorClock(self._node_id)
         self._lock = threading.RLock() # Reentrant lock for nested transactions
-        
+
         self._topology = TopologyState(delta_callback=self.record_delta,
                                       read_callback=self.record_read)
         self._energy = EnergyState(delta_callback=self.record_delta)
@@ -49,12 +49,13 @@ class SemanticWorldState:
         self._abstraction = AbstractionState(delta_callback=self.record_delta)
         self._observability = ObservabilityState(delta_callback=self.record_delta)
         self._history = HistoryState(delta_callback=self.record_delta)
-        
-        # Phase 60: Stability-aware Conflict Arbitration
+
+        # Phase 60/63: Stability-aware Conflict Arbitration & Drift Tracking
         self._manifold._energy_ref = self._energy
-        
+        self._manifold._obs_ref = self._observability
+
         self._scheduler = GlobalCognitiveScheduler(ws=self)
-        
+
         self.metrics = self._energy
         self.last_update_time: float = time.time()
         self._transaction_depth = 0
@@ -63,7 +64,7 @@ class SemanticWorldState:
         self._current_journal: List[dict] = []
         self._journal_capacity: int = 1000 # Default (Phase 55)
         self._evolved_schema: Set[str] = set()
-        
+
         # Substrate Branching (Phase 39)
         self._parent_node_id: Optional[str] = None
         self._branch_label: Optional[str] = None
@@ -117,19 +118,19 @@ class SemanticWorldState:
         import uuid
         child_id = f"{self._node_id}-br-{str(uuid.uuid4())[:4]}"
         child = SemanticWorldState(node_id=child_id)
-        
+
         # Clone state via serialization
         state_snapshot = self.to_dict()
         child.from_dict(state_snapshot)
-        
+
         # RESTORE the unique child ID and parent lineage
         child.node_id = child_id
         child._parent_node_id = self._node_id
         child._branch_label = label
-        
+
         # Initialize child's vector clock as a descendant of parent
         child._vector_clock.update(self._vector_clock.get_clock())
-        
+
         logging.getLogger(__name__).info(
             f"SUBSTRATE BRANCHED: [{self.node_id}] -> [{child_id}] (Label: {label})"
         )
@@ -138,7 +139,7 @@ class SemanticWorldState:
     @contextmanager
     def transaction(self, label: str = "anonymous", trace_id: Optional[str] = None):
         """Context manager for atomic state transactions. Supports true concurrency with MVCC."""
-        
+
         # 1. Nested Transaction Check
         if active_transaction.get() is not None:
             yield self
@@ -146,11 +147,11 @@ class SemanticWorldState:
 
         from app.failure_injector import get_injector
         injector = get_injector()
-        
-        states = [self._topology, self._energy, self._instability, 
+
+        states = [self._topology, self._energy, self._instability,
                   self._manifold, self._motif, self._transition,                    self._intent, self._action, self._abstraction, self._observability,
                   self._history]
-        
+
         import uuid
         # Phase 51: Initialize local transaction context for MVCC
         tx_ctx: Dict[str, Any] = {
@@ -160,7 +161,7 @@ class SemanticWorldState:
             "journal": [], # Thread-local journal
         }
         token = active_transaction.set(tx_ctx)
-        
+
         # Initialize staging areas (no lock needed, each thread has its own)
         for s in states:
             if hasattr(s, 'begin_transaction'):
@@ -169,19 +170,19 @@ class SemanticWorldState:
         start_time = time.time()
         try:
             yield self
-            
+
             # 2. Commit Phase (Requires Global Lock)
             with self._lock:
                 # Phase 46: Injected failure before commit
                 injector.inject(f"pre_commit:{label}")
-                
+
                 # Increment vector clock on commit
                 self._vector_clock.increment()
-                
+
                 # Phase 51: Perform MVCC Validation
                 expected_versions: Dict[str, int] = tx_ctx["base_versions"]
                 val_start = time.time()
-                
+
                 from app.topology_state import TopologyState, ConflictError
                 try:
                     for s in states:
@@ -204,7 +205,7 @@ class SemanticWorldState:
 
                 val_end = time.time()
                 self.last_update_time = val_end
-                
+
                 # Record transaction in global journal
                 tx = {
                     "label": label,
@@ -217,7 +218,7 @@ class SemanticWorldState:
                     "entries": list(tx_ctx["journal"])
                 }
                 self._history.record_transaction(tx, capacity=self._journal_capacity)
-                
+
                 # Phase 46/55: Emit enhanced telemetry for the transaction itself
                 self.emit_telemetry("transaction", {
                     "label": label,
@@ -228,7 +229,7 @@ class SemanticWorldState:
                     "trace_id": tx["trace_id"],
                     "node_id": self.node_id
                 })
-                    
+
         except Exception as e:
             # Rollback staged changes (no lock needed for local staging)
             for s in states:
@@ -241,7 +242,7 @@ class SemanticWorldState:
 
     def replay_transaction(self, tx: dict):
         """Replay a transaction by executing its recorded entries.
-        
+
         This enables deterministic replay of field dynamics.
         """
         label = tx.get("label", "replayed")
@@ -252,7 +253,7 @@ class SemanticWorldState:
                     subsystem = entry.get("subsystem")
                     action = entry.get("action")
                     details = entry.get("details", {})
-                    
+
                     # Automated Exhaustive Dispatching (Phase 28)
                     target: Any = None
                     if subsystem == "topology": target = self._topology
@@ -272,31 +273,56 @@ class SemanticWorldState:
                         # They are replayed by re-executing the transaction's other
                         # subsystem entries. Skip gracefully.
                         continue
-                    
+
                     if target and hasattr(target, action):
                         method = getattr(target, action)
                         try:
+                            details = dict(details)
                             # Fix for json-serialized tuple keys
                             if subsystem == "instability" and "key" in details:
                                 details["key"] = tuple(details["key"])
                             if subsystem == "manifold" and "key" in details:
                                 details["key"] = tuple(details["key"])
-                                
+                            if subsystem == "observability" and action == "emit_telemetry":
+                                details["event_type"] = details.pop("type", None)
+                            details = self._filter_replay_details(method, details)
+
                             method(**details)
                         except Exception as e:
                             logging.getLogger(__name__).warning(
                                 f"Replay failed for {subsystem}.{action}: {e}"
                             )
-                    
+
                     logging.getLogger(__name__).debug(f"Replayed: {subsystem}.{action}({details})")
         finally:
             self._replaying = False
 
+    def _filter_replay_details(self, method: Any, details: dict) -> dict:
+        """Drop journal-only metadata that is not part of a mutation API."""
+        import inspect
+
+        try:
+            signature = inspect.signature(method)
+        except (TypeError, ValueError):
+            return details
+
+        if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in signature.parameters.values()):
+            return details
+
+        allowed = {
+            name for name, param in signature.parameters.items()
+            if param.kind in (
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                inspect.Parameter.KEYWORD_ONLY,
+            )
+        }
+        return {key: value for key, value in details.items() if key in allowed}
+
     def record_delta(self, subsystem: str, action: str, details: dict):
-        """Record a state delta in the current transaction journal."""
+        """Record a state delta in the current transaction journal and global EventJournal."""
         if self._replaying:
             return
-            
+
         tx = active_transaction.get()
         entry = {
             "subsystem": subsystem,
@@ -305,7 +331,22 @@ class SemanticWorldState:
             "timestamp": time.time(),
             "trace_id": tx["trace_id"] if tx else None
         }
-        
+
+        # Phase 66: Push to global EventJournal
+        from app.event_journal import get_journal
+        # We pass before={} after={} for now as we use the action/details pattern
+        # The journal will compute deltas if snapshots are provided,
+        # but here we use it for structured event logging.
+        # Re-evaluating: Journal.record expects snapshots.
+        # For now, we manually push the structured entry to the journal's entries.
+        get_journal().record(
+            source=subsystem,
+            mutation_type=action,
+            before={},
+            after=details, # Use details as the 'after' state for structured logging
+            metadata={"trace_id": entry["trace_id"]}
+        )
+
         if tx is not None:
             tx["journal"].append(entry)
         else:
@@ -341,39 +382,43 @@ class SemanticWorldState:
         """Merge a remote world state into the local state using vector clocks (Phase 32)."""
         remote_node = remote_data.get("node_id")
         remote_clock = remote_data.get("clock", {})
-        
+
         # Use provided trace_id or fallback to remote's last_trace_id
         active_trace = trace_id or remote_data.get("last_trace_id")
-        
+
         # 1. Compare Clocks to determine causality
         # We perform the comparison OUTSIDE the transaction to avoid lock contention
         relation = self._vector_clock.compare(remote_clock)
-        
+
         if relation == "ancestor" or relation == "equal":
             # Remote is behind or identical; ignore
             logging.getLogger(__name__).info(f"CONSENSUS: Ignoring remote state from [{remote_node}] (Ancestor/Equal)")
             return
-            
+
         # 2. Speculative Reconciliation
         # Blending factors:
         # If concurrent (conflict), use conservative blending (0.3)
         # If descendant (remote is newer), use aggressive blending (0.7)
         alpha = 0.7 if relation == "descendant" else 0.3
-        
+
         with self.transaction(f"merge:{remote_node}", trace_id=active_trace):
             # Update local clock with remote knowledge
             self._vector_clock.update(remote_clock)
-            
+
             # Merge Sub-States using the calculated alpha
             self._energy.merge(remote_data, alpha=alpha)
             self._manifold.merge(remote_data, alpha=alpha)
             self._instability.merge(remote_data)
             self._topology.merge(remote_data.get("topology", {}), alpha=alpha)
-            
+
+            # Merge sub-history (Causal Stitching Phase 67)
+            remote_history = remote_data.get("history", {})
+            self._history.merge_journal(remote_history.get("transaction_journal", []))
+
             # Merge evolved schema
             remote_schema = set(remote_data.get("evolved_schema", []))
             self._evolved_schema.update(remote_schema)
-            
+
             logging.getLogger(__name__).info(
                 f"CONSENSUS: Merged state from [{remote_node}]. Relation: {relation}, Alpha: {alpha} (Trace: {active_trace})"
             )
@@ -390,7 +435,7 @@ class SemanticWorldState:
         """Export learned role embeddings with Differential Noise (Phase 30)."""
         import random
         manifold = self.role_manifold
-        
+
         # Apply Differential Noise to protect local training data privacy
         for role in manifold:
             vec = manifold[role]
@@ -421,14 +466,14 @@ class SemanticWorldState:
                 if entropy > 0.9: # Too much uncertainty in remote data
                     filtered_count += 1
                     continue
-                
+
                 if self._manifold.has_manifold_role(role):
                     # 2. Contradiction Filter: if local is anchored or very stable,
                     # and remote is extremely far away, ignore it.
                     if self._manifold.is_role_anchored(role):
                         filtered_count += 1
                         continue
-                    
+
                     local_vec = self._manifold.get_manifold_vector(role)
                     # Euclidean distance
                     dist = sum((a - b)**2 for a, b in zip(local_vec, remote_vec))**0.5
@@ -442,7 +487,7 @@ class SemanticWorldState:
                     # Knowledge Acquisition
                     self._manifold.set_manifold_vector(role, remote_vec)
                     self._energy.set_schema_instability(role, 0.3)
-            
+
             logging.getLogger(__name__).info(
                 f"FEDERATION: Merged {len(remote_manifold) - filtered_count} roles. "
                 f"Firewall filtered {filtered_count} high-entropy/contradictory roles."
@@ -473,7 +518,7 @@ class SemanticWorldState:
                     # Local(0.7) + Remote(0.3)
                     new_val = local_val * 0.7 + remote_val * 0.3
                     self._topology.set_topological_law(pair, new_val)
-            
+
             logging.getLogger(__name__).info(f"FEDERATION: Merged {len(remote_laws)} topological laws.")
             self.record_delta("global", "federated_laws", {"remote_laws": len(remote_laws)})
 
@@ -481,16 +526,16 @@ class SemanticWorldState:
         """Provide a summary of the engine's cognitive health (Phase 30)."""
         from app.semantic_inference_engine import RoleEmbeddingEngine
         reng = RoleEmbeddingEngine()
-        
+
         certainty = reng.get_certainty()
         roles = self._manifold.get_manifold_roles()
         active_roles = [r for r in roles if not r.startswith("hypo_")]
         hypo_roles = [r for r in roles if r.startswith("hypo_")]
-        
+
         # Fragmentation: how many disjoint communities exist relative to role count
         communities = self.global_communities
         fragmentation = len(communities) / max(len(active_roles), 1)
-        
+
         # Alignment: how close roles are to their seed types on average
         from app.semantic_allocation_engine import _infer_role_type
         alignment_total = 0.0
@@ -501,9 +546,9 @@ class SemanticWorldState:
             # Cosine similarity-like dot product
             alignment = sum(a * b for a, b in zip(seed_vec, role_vec)) / 16.0
             alignment_total += alignment
-        
+
         avg_alignment = alignment_total / max(len(active_roles), 1)
-        
+
         return {
             "overall_health": round(avg_alignment * (1.0 - fragmentation * 0.5), 3),
             "certainty": round(certainty, 3),
@@ -930,9 +975,9 @@ class SemanticWorldState:
         return self._motif.compute_stability(motif, self.metrics.total_records_processed)
 
     @requires_invariants
-    def apply_memory_decay(self):
+    def apply_memory_decay(self, rate: float = 0.01):
         """Globally decay old or weak semantic structures to reduce entropy.
-        
+
         LAW 5: No fixed evolution cadence. Decay is triggered by field demand
         (entropy disorder or field pressure), not a procedural record counter.
         """
@@ -945,7 +990,7 @@ class SemanticWorldState:
                                         self.metrics.field_pressure > 0.3)
         if not should_decay:
             return
-        self._manifold.decay_compatibilities(rate=0.01)
+        self._manifold.decay_compatibilities(rate=rate)
         self._motif.prune_aged(max_stability=0.01)
 
     def get_derived_exclusion(self, role_a: str, role_b: str) -> float:
@@ -1017,7 +1062,7 @@ class SemanticWorldState:
         with self.transaction("propagation"):
             from app.failure_injector import get_injector
             get_injector().inject("propagate_field_regions")
-            
+
             # Use TopologyState's bulk propagation instead of manual iteration
             effects = self._topology.propagate_all()
             # Apply exclusion effects through formal InstabilityState API
@@ -1035,7 +1080,7 @@ class SemanticWorldState:
         with self.transaction("pre_allocation_capture"):
             from app.failure_injector import get_injector
             get_injector().inject("capture_pre_allocation_field")
-            
+
             from app.field_laws import ROLE_EXCLUSIVITY
             captured = 0
             value_roles: Dict[str, List[str]] = {}
@@ -1090,7 +1135,7 @@ class SemanticWorldState:
                             if existing_region:
                                 tokens_with_basins.add(t.raw)
                                 continue
-                            
+
                             # Apply Relational Recall boost
                             initial_u = 0.2 - knowledge_boost.get(t.raw, 0.0)
                             region = FieldConflictRegion(
@@ -1145,7 +1190,7 @@ class SemanticWorldState:
                     continue
                 if t.raw in value_roles and len(value_roles[t.raw]) >= 2:
                     continue
-                
+
                 # ONLY if this token hasn't been captured by any formal schema logic
                 if t.raw not in tokens_with_basins:
                     # ─── Predictive Basin Pre-Heating (Phase 34) ───
@@ -1153,16 +1198,16 @@ class SemanticWorldState:
                     hypo_roles = ["_unidentified"]
                     from app.topological_query import get_tql_engine
                     tql = get_tql_engine(ws=self)
-                    
+
                     # Find roles geometrically near this token's type
                     nearby = tql.find_roles_near_type(t.primary_type, radius=0.4)
                     if nearby:
                         schema_set = set(schema_fields)
                         # Add top candidates that are NOT in the active schema
-                        candidates = [r["role"] for r in nearby 
+                        candidates = [r["role"] for r in nearby
                                      if r["role"] not in schema_set]
                         hypo_roles.extend(candidates[:2])
-                    
+
                     sorted_roles = tuple(sorted(hypo_roles))
                     region_id = self._topology.find_region_for_mutation(t.raw, sorted_roles)
                     if region_id:
@@ -1187,26 +1232,26 @@ class SemanticWorldState:
         """Govern the semantic field dynamics using adaptive policies (Phase 56)."""
         report = self._observability.get_governance_report(self)
         policy = self._observability.get_stability_policy(self)
-        
+
         # 1. Propagation Damping (Active Stability Control)
         damping = policy.get("propagation_damping", 1.0)
-        
+
         # Phase 56: Adaptive Damping — increase damping if diversity is low (Freezing risk)
         diversity = report.get("diversity", 1.0)
         if diversity < 0.4:
             damping *= 0.7 # Suppress propagation to force focus on new learning
-            
+
         self._topology.redistribute_instability(damping=damping)
-        
+
         # 2. Attractor Governance
         # Attractor Rebalancing (Energy Dissipation)
         role_stabilities = {r: self._manifold.get_role_certainty(r) for r in self.role_manifold}
         self._energy.rebalance_attractors(role_stabilities)
-        
+
         # 3. Entropy Economy (Phase 56)
         # Dynamic management of noise injection vs stabilization
         global_certainty = self._manifold.get_certainty()
-        
+
         # If certainty is high AND diversity is low, inject entropy aggressively
         if global_certainty > 0.85 and diversity < 0.5:
             # High freezing risk: inject directed noise
@@ -1214,14 +1259,14 @@ class SemanticWorldState:
         elif global_certainty > 0.7 and diversity < 0.7:
             # Maintenance noise only if diversity is low (Phase 56)
             self._energy.inject_diversification_entropy(scale=0.01)
-        
+
         # 4. Metastable Lock Escape (Restructuring)
         if policy.get("lock_escape_required", False):
             logging.warning("METASTABLE LOCK DETECTED: Forcing topology restructuring on node [%s]", self.node_id)
             self._topology.restructure_topology()
             # Entropy dissipation boost
             self._energy.set_entropy(min(1.0, self.metrics.global_entropy + 0.2))
-            
+
         self.emit_telemetry("governance_pulse", report)
 
     @requires_invariants
@@ -1234,7 +1279,7 @@ class SemanticWorldState:
     @requires_invariants
     def decay_field_regions(self):
         """Each basin evolves autonomously.
-        
+
         Exclusion effects returned by evolve() are applied through formal state APIs.
         """
         effects = self._topology.evolve_all(force=True)
@@ -1304,12 +1349,12 @@ class SemanticWorldState:
             assigned.add(i)
             if len(cluster) > 1:
                 cluster_regions = [regions[k] for k in cluster]
-                
+
                 # Phase 47: Explicitly verify types for meso-scale aggregation
                 valid_cluster = [r for r in cluster_regions if hasattr(r, 'instability')]
                 if not valid_cluster:
                     continue
-                    
+
                 meso.append({
                     "size": len(valid_cluster),
                     "avg_instability": round(sum(r.instability for r in valid_cluster) / len(valid_cluster), 3),
@@ -1416,20 +1461,20 @@ class SemanticWorldState:
     def observe_field_perturbation(self, output: dict, tokens: list):
         from app.instability_api import get_immune_system
         immune = get_immune_system(ws=self)
-        
+
         # Source identification
         source = output.get("source_url", "unknown_source")
-        
+
         from app.field_laws import ROLE_EXCLUSIVITY
         alloc_conflicts = output.get("_allocation_conflicts", [])
-        
+
         # ─── Semantic Immunity (Phase 42) ───
         # Check if source is allowed to perturb the field
         contested_roles = [fc.get("role", "") for fc in alloc_conflicts]
         if not immune.validate_perturbation(source, "various", contested_roles):
             self._observability.emit_telemetry("immunity_block", {"source": source})
             return
-            
+
         for fc in alloc_conflicts:
             role = fc.get("role", "")
             candidate = fc.get("candidate", "")
@@ -1507,29 +1552,29 @@ class SemanticWorldState:
                 self._energy.set_exclusion_count(len(self.learned_exclusions))
                 prune_threshold = 0.05 + self._energy.global_entropy * 0.3
                 self._topology.filter_regions(lambda r: r.instability > prune_threshold or r.local_energy > 0.1)
-                
+
                 # Accumulate Stability Debt if energy is trapped (Law 4)
                 if self.metrics.global_energy > 7.0 and self.metrics.convergence_score < 0.4:
                     self._energy.adjust_stability_debt(0.1)
-                    
+
             self._topology.decay_topological_laws()
             for (r1, r2), val in self.learned_exclusions.items():
                 self._topology.update_schema_patterns((r1, r2), val)
                 # Promote extremely stable exclusions to Anchors
                 if val > 0.9 and self._topology.topological_laws.get((r1, r2), 0) > 0.8:
                     self._topology.record_anchor((r1, r2))
-                    
+
             self._topology.detect_communities()
             # ─── Semantic Sharding (Phase 35) ───
             self._manifold.shard_manifold(self._topology.global_communities)
             self._manifold.rebalance_shards(max_shard_size=50)
-            
+
             self._self_heal_topology()
             self._re_seed_unstable_roles()
             self._spawn_hypo_roles()
             self._promote_stable_hypotheses()
             self._forecast_causal_needs()
-            
+
             # ─── Health Guardians (Phase 41) ───
             health = self.get_cognitive_health()
             if health["system_energy"] > 8.0:
@@ -1538,7 +1583,7 @@ class SemanticWorldState:
                     "value": health["system_energy"]
                 })
                 logging.getLogger(__name__).warning("COGNITIVE HEALTH ALERT: Critical Energy Level Detected")
-                
+
             if health["certainty"] < 0.1:
                 self._observability.emit_telemetry("health_alert", {
                     "reason": "manifold_collapse",
@@ -1555,19 +1600,19 @@ class SemanticWorldState:
                     from app.semantic_allocation_engine import _infer_role_type
                     from app.semantic_inference_engine import RoleEmbeddingEngine
                     reng = RoleEmbeddingEngine()
-                    
+
                     seed_type = _infer_role_type(role)
                     seed_vec = reng._get_type_vector(seed_type)
-                    
+
                     self._manifold.set_manifold_vector(role, seed_vec)
                     self._energy.set_schema_instability(role, 0.5) # Reset to neutral
-                    
+
                     self._observability.emit_telemetry("immune_recovery", {
                         "role": role,
                         "reason": "high_instability_anchor"
                     })
                     logging.getLogger(__name__).info(f"IMMUNE RESPONSE: Recovered corrupted anchor role [{role}]")
-            
+
             # Trigger Phase Transition if debt threshold reached
             if self.metrics.stability_debt > 1.0:
                 self.trigger_phase_transition()
@@ -1604,7 +1649,7 @@ class SemanticWorldState:
                 if key not in anchors:
                     current = self._instability.get_exclusion_by_key(key)
                     self._instability.set_exclusion(key, current * 0.2)
-            
+
             # 2. Perturb manifold positions for non-anchored roles
             try:
                 from app.semantic_inference_engine import RoleEmbeddingEngine
@@ -1612,7 +1657,7 @@ class SemanticWorldState:
                 anchored_roles = set()
                 for a, b in anchors:
                     anchored_roles.add(a); anchored_roles.add(b)
-                    
+
                 import random
                 for role in reng.manifold.keys():
                     if role not in anchored_roles:
@@ -1620,7 +1665,7 @@ class SemanticWorldState:
                         self._manifold.apply_force_to_manifold(role, noise)
             except Exception as e:
                 logging.getLogger(__name__).warning("Manifold perturbation failed: %s", e)
-                
+
             # 3. Reset debt
             self._energy.stability_debt = 0.0
             self.record_delta("global", "phase_transition", {
@@ -1646,7 +1691,7 @@ class SemanticWorldState:
             # Structural Contradiction: Strong proximity law vs Strong exclusion
             if law_val > 0.4 and exclusion_val > 0.4:
                 self._topology.add_impossible_neighborhood(set(key))
-                
+
                 # Thermodynamic Resolution: the stronger signal wins, the weaker is eroded
                 if law_val >= exclusion_val:
                     # Law is stronger: erode exclusion
@@ -1670,7 +1715,7 @@ class SemanticWorldState:
             unstable_members = [m for m in community if self._energy.get_schema_instability(m) >= 0.5]
             if not stable_members or not unstable_members:
                 continue
-            
+
             # Community Consensus: Average of all stable members
             consensus_vec = [0.0] * 16
             for stable in stable_members:
@@ -1708,9 +1753,14 @@ class SemanticWorldState:
     def get_system_pressure(self) -> float:
         """Composite pressure metric for adaptive throttling (Phase 33)."""
         health = self.get_cognitive_health()
-        # High fragmentation or high energy increases pressure
+        # High fragmentation, energy, or topology-native entropy increases pressure.
         # High certainty decreases pressure
-        pressure = (health["system_energy"] / 10.0 + health["fragmentation"]) - health["certainty"] * 0.5
+        entropy_pressure = self.metrics.global_entropy * 0.15
+        pressure = (
+            health["system_energy"] / 10.0
+            + health["fragmentation"]
+            + entropy_pressure
+        ) - health["certainty"] * 0.5
         return max(0.1, min(2.0, pressure))
 
     @requires_invariants
@@ -1718,7 +1768,7 @@ class SemanticWorldState:
         """Gradual erosion of weak structures."""
         from app.runtime_budget import get_default_budget
         b = budget or get_default_budget()
-        
+
         with self.transaction("relaxation"):
             self._instability.decay(rate=0.05)
             self._topology.decay_topological_laws()
@@ -1776,17 +1826,17 @@ class SemanticWorldState:
     def dream(self, cycles: int = 1, budget: Optional[Any] = None) -> dict:
         dreams = []
         from app.runtime_budget import CognitiveBudget
-        
+
         pressure = self.get_system_pressure()
         # High pressure reduces time budget to ensure node responsiveness (Phase 33)
         max_time = 500.0 / pressure
         b = budget or CognitiveBudget(max_cycles=cycles * 10, max_time_ms=max_time)
-        
+
         with self.transaction("dreaming"):
             for _ in range(cycles):
                 if not b.increment_cycle():
                     break
-                    
+
                 effects = self._topology.evolve_all()
                 for key, delta in effects:
                     if delta > 0:
@@ -1806,13 +1856,13 @@ class SemanticWorldState:
                         })
             self._topology.update_local_memory_from_instability()
             self.record_delta("global", "dream", {
-                "requested_cycles": cycles, 
+                "requested_cycles": cycles,
                 "actual_cycles": b.cycle_count,
                 "dreams_count": len(dreams),
                 "budget": b.usage_report
             })
         return {
-            "dreams": dreams, 
+            "dreams": dreams,
             "status": "converging" if not dreams else "learning",
             "budget_exhausted": b.is_exhausted
         }
@@ -1871,13 +1921,13 @@ class SemanticWorldState:
         active_actions = self._action.active_actions
         if not active_actions:
             return 0
-            
+
         from app.policy_engine import get_policy_engine
         from app.llm_bridge import get_plugin_manager
         policy = get_policy_engine(ws=self)
         plugins = get_plugin_manager(ws=self)
         pressure = self.get_system_pressure()
-        
+
         with self.transaction("action_dispatch"):
             for region in self._topology.iterate_regions():
                 # Only check stable basins (low instability)
@@ -1885,25 +1935,25 @@ class SemanticWorldState:
                     for role in region.competing_roles:
                         if not policy.can_dispatch_action(role, pressure):
                             continue
-                            
+
                         role_vec = self._manifold.get_manifold_vector(role)
                         if not role_vec:
                             continue
-                            
+
                         for aid, details in active_actions.items():
                             target_vec = details["target_vec"]
                             threshold = details["threshold"]
                             handler_name = details["handler_name"]
-                            
+
                             # Euclidean distance in manifold
                             dist = sum((a - b)**2 for a, b in zip(role_vec, target_vec))**0.5
-                            
+
                             if dist < threshold:
                                 # ACTION TRIGGERED
                                 logging.getLogger(__name__).info(
                                     f"AGENCY TRIGGERED: Role [{role}] activated Action [{aid}] (Dist: {dist:.4f})"
                                 )
-                                
+
                                 # ─── Tool Calling (Phase 43) ───
                                 # Attempt to call actual plugin handler
                                 success = True
@@ -1924,10 +1974,10 @@ class SemanticWorldState:
                                 # Reinforce this role's alignment as a reward
                                 if success:
                                     self._manifold.blend_manifold_vector(role, target_vec, alpha=0.95, beta=0.05)
-            
+
             if triggered > 0:
                 self.record_delta("global", "dispatch_actions", {"count": triggered})
-                
+
         return triggered
 
     def synthesize_hierarchical_envelopes(self):
@@ -1935,30 +1985,30 @@ class SemanticWorldState:
         communities = self._topology.global_communities
         if not communities:
             return
-            
+
         with self.transaction("hierarchical_synthesis"):
             for idx, community in enumerate(communities):
                 if len(community) < 2:
                     continue
-                    
+
                 # Check stability of the community (mean instability)
                 total_instability = 0.0
                 for role in community:
                     total_instability += self.metrics.schema_instability.get(role, 0.5)
                 n_comm = len(community)
                 avg_instability = total_instability / n_comm if n_comm > 0 else 1.0
-                
+
                 # Only distill stable clusters (Phase 38 threshold: < 0.2)
                 if avg_instability < 0.2:
                     envelope_id = f"env_{idx}_{int(time.time())}"
-                    
+
                     # Compute centroid vector for the envelope
                     constituents = list(community)
                     vectors = [self._manifold.get_manifold_vector(r) for r in constituents]
                     vectors = [v for v in vectors if v]
                     if not vectors:
                         continue
-                        
+
                     n_vectors = len(vectors)
                     dim = len(vectors[0])
                     centroid = [0.0] * dim
@@ -1966,13 +2016,13 @@ class SemanticWorldState:
                         for k in range(dim):
                             centroid[k] += v[k]
                     centroid = [c / n_vectors for c in centroid]
-                    
+
                     # Create the envelope
                     self._abstraction.create_envelope(envelope_id, constituents, centroid, level=1)
                     # Register the envelope itself in the manifold
                     self._manifold.set_manifold_vector(envelope_id, centroid)
                     self._manifold.anchor_role(envelope_id) # Protect higher-order concepts
-                    
+
                     logging.getLogger(__name__).info(
                         f"HIERARCHICAL SYNTHESIS: Distilled community {constituents} into Envelope [{envelope_id}]"
                     )
@@ -1981,18 +2031,18 @@ class SemanticWorldState:
         """Evaluate the manifold's logical consistency (Meta-Reasoning - Phase 38)."""
         envelopes = self._abstraction.envelopes
         contradictions = []
-        
+
         for eid, details in envelopes.items():
             constituents = list(details["constituents"])
             if len(constituents) < 2:
                 continue
-                
+
             # Check for mutual repulsion within the envelope
             for i in range(len(constituents)):
                 for j in range(i + 1, len(constituents)):
                     r1, r2 = constituents[i], constituents[j]
                     exclusion = self._instability.get_exclusion(r1, r2)
-                    
+
                     # If constituents strongly repel each other, the envelope is contradictory
                     if exclusion > 0.7:
                         contradictions.append({
@@ -2001,15 +2051,15 @@ class SemanticWorldState:
                             "exclusion": exclusion,
                             "type": "internal_repulsion"
                         })
-        
+
         consistency_score = 1.0 - (len(contradictions) / max(len(envelopes), 1))
-        
+
         if contradictions:
             self.record_delta("global", "meta_reasoning", {
                 "consistency_score": consistency_score,
                 "contradiction_count": len(contradictions)
             })
-            
+
         return {
             "score": consistency_score,
             "contradictions": contradictions
@@ -2020,36 +2070,36 @@ class SemanticWorldState:
         remote_envelopes = other_abstraction.get("envelopes", {})
         if not remote_envelopes:
             return
-            
+
         with self.transaction("hierarchical_merge"):
             local_envelopes = self._abstraction.envelopes
-            
+
             for rid, r_details in remote_envelopes.items():
                 r_vec = r_details["manifold_vec"]
-                
+
                 # Search for a similar local envelope
                 merged = False
                 for lid, l_details in local_envelopes.items():
                     l_vec = l_details["manifold_vec"]
-                    
+
                     # Manifold distance
                     dist = sum((a - b)**2 for a, b in zip(l_vec, r_vec))**0.5
-                    
+
                     if dist < 0.15:
                         # Similar concept; merge constituents
                         new_constituents = set(l_details["constituents"]) | set(r_details["constituents"])
                         # Blend vectors
                         new_vec = [(a + b) / 2 for a, b in zip(l_vec, r_vec)]
-                        
+
                         self._abstraction.create_envelope(lid, list(new_constituents), new_vec, level=max(l_details["level"], r_details["level"]))
                         self._manifold.set_manifold_vector(lid, new_vec)
-                        
+
                         logging.getLogger(__name__).info(
                             f"HIERARCHICAL MERGE: Merged remote concept {rid} into local [{lid}] (Dist: {dist:.4f})"
                         )
                         merged = True
                         break
-                
+
                 if not merged:
                     # New concept; import it
                     self._abstraction.create_envelope(rid, r_details["constituents"], r_vec, level=r_details["level"])
@@ -2119,7 +2169,7 @@ class SemanticWorldState:
             "snapshots": self.gc_trim_snapshots(),
         }
 
-    def schedule_cognitive_task(self, task_id: str, priority: Any, 
+    def schedule_cognitive_task(self, task_id: str, priority: Any,
                                 handler: Callable, *args, **kwargs):
         """Register a task with the cognitive scheduler (Phase 40)."""
         self._scheduler.schedule(task_id, priority, handler, *args, **kwargs)
@@ -2146,7 +2196,7 @@ class SemanticWorldState:
             result.update(self._manifold.to_dict())
             result.update(self._motif.to_dict())
             result.update(self._transition.to_dict())
-            result.update(self._history.to_dict())
+            result["history"] = self._history.to_dict()
             result.update(self._instability.to_dict())
             result.update(self._intent.to_dict())
             result.update(self._action.to_dict())
@@ -2160,12 +2210,12 @@ class SemanticWorldState:
     def from_dict(self, data: dict):
         """Load state from a dictionary."""
         self.clear()
-        
+
         # Load identity
         self.node_id = data.get("node_id", self.node_id)
         self._parent_node_id = data.get("parent_node_id")
         self._branch_label = data.get("branch_label")
-        
+
         if "clock" in data:
             from app.vector_clock import VectorClock
             self._vector_clock = VectorClock.from_dict(self.node_id, data["clock"])
@@ -2176,14 +2226,14 @@ class SemanticWorldState:
             self._energy.from_dict(metrics_data)
         else:
             metric_keys = {"global_energy", "global_entropy", "exclusion_count",
-                          "total_records_processed", "cumulative_density", 
-                          "cumulative_uncertainty", "dataset_coherence", 
-                          "_convergence", "_temperature", "_integrity", 
+                          "total_records_processed", "cumulative_density",
+                          "cumulative_uncertainty", "dataset_coherence",
+                          "_convergence", "_temperature", "_integrity",
                           "stability_debt", "schema_instability"}
             flat_metrics = {k: v for k, v in data.items() if k in metric_keys}
             if flat_metrics:
                 self._energy.from_dict(flat_metrics)
-                
+
         self._manifold.from_dict(data)
         self._motif.from_dict(data)
         self._transition.from_dict(data)
@@ -2192,17 +2242,17 @@ class SemanticWorldState:
         self._action.from_dict(data)
         self._abstraction.from_dict(data)
         self._observability.from_dict(data)
-        
+
         # Load InstabilityState (learned_exclusions)
         excl_data = data.get("learned_exclusions")
         if excl_data:
             self._instability.from_dict(excl_data)
-            
+
         # Load TopologyState
         topo_data = data.get("topology")
         if topo_data:
             self._topology.from_dict(topo_data)
-        
+
         self._evolved_schema = set(data.get("evolved_schema", []))
         self.last_update_time = data.get("last_update", time.time())
         self._last_trace_id = data.get("last_trace_id")
@@ -2241,11 +2291,11 @@ class SemanticWorldState:
             "missing_roles": [],
             "tension_delta": 0.0,
         }
-        
+
         # 1. Manifold Drift (Mean Euclidean distance)
         local_m = self._manifold.role_manifold
         other_m = other._manifold.role_manifold
-        
+
         common_roles = set(local_m.keys()) & set(other_m.keys())
         if common_roles:
             n_common = len(common_roles)
@@ -2255,13 +2305,13 @@ class SemanticWorldState:
                 dist = sum((a - b)**2 for a, b in zip(v1, v2))**0.5
                 total_dist += dist
             divergence["manifold_drift"] = total_dist / n_common if n_common > 0 else 0.0
-            
+
         divergence["new_roles"] = list(set(other_m.keys()) - set(local_m.keys()))
         divergence["missing_roles"] = list(set(local_m.keys()) - set(other_m.keys()))
-        
+
         # 2. Tension Delta
         divergence["tension_delta"] = abs(other.metrics.global_energy - self.metrics.global_energy)
-        
+
         return divergence
 
     def merge_branch(self, branch: "SemanticWorldState", alpha: float = 0.5):
@@ -2269,19 +2319,19 @@ class SemanticWorldState:
         with self.transaction(f"merge_branch:{branch.node_id}"):
             # 1. Manifold Merge (Linear blending of vectors)
             self._manifold.merge(branch._manifold.to_dict(), alpha=alpha)
-            
+
             # 2. Instability Merge (Tension reconciliation)
             self._instability.merge(branch._instability.to_dict())
-            
+
             # 3. Motif Merge
             self._motif.merge(branch._motif.to_dict())
-            
+
             # 4. Abstraction Merge
             self.merge_hierarchical_knowledge(branch._abstraction.to_dict())
-            
+
             # 5. Causal Lineage: update vector clock
             self._vector_clock.update(branch._vector_clock.get_clock())
-            
+
             logging.getLogger(__name__).info(
                 f"SUBSTRATE MERGED: [{branch.node_id}] -> [{self.node_id}] (Alpha: {alpha})"
             )

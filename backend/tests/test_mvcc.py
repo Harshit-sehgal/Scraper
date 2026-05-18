@@ -10,7 +10,6 @@ import threading
 import time
 from app.semantic_world_state import SemanticWorldState
 from app.topology_state import ConflictError
-from app.semantic_ir import SemanticType
 
 @pytest.fixture
 def ws():
@@ -25,7 +24,6 @@ def test_mvcc_conflict_detection(ws):
     with ws.transaction("setup"):
         r = ws._topology.add(["role_a"], "token", instability=0.5)
         region_id = r.region_id
-        initial_version = r.version
 
     results = []
 

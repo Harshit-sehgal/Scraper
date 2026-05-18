@@ -165,6 +165,30 @@ class HistoryState:
             self._set_val("topology_snapshots", snapshots[-keep:])
             self._record("trim_snapshots", {"max_size": max_size, "keep": keep})
 
+    def merge_journal(self, remote_journal: list):
+        """Merge a remote transaction journal into local history (Phase 67).
+
+        Identifies missing transactions using trace_id and inserts them in
+        temporal order.
+        """
+        local_journal = self._get_val("transaction_journal")
+        local_traces = {tx.get("trace_id") for tx in local_journal if tx.get("trace_id")}
+
+        added = 0
+        for remote_tx in remote_journal:
+            tid = remote_tx.get("trace_id")
+            if tid and tid not in local_traces:
+                # Missing transaction: insert in local journal
+                local_journal.append(dict(remote_tx))
+                added += 1
+                local_traces.add(tid)
+
+        if added > 0:
+            # Re-sort journal by timestamp to maintain causal order
+            local_journal.sort(key=lambda x: x.get("timestamp", 0))
+            self._set_val("transaction_journal", local_journal)
+            self._record("merge_journal", {"added": added, "count": len(local_journal)})
+
     # ─── Controlled Mutations: Decision History ─────────────────────────
 
     def _record(self, action: str, details: dict):
@@ -196,7 +220,7 @@ class HistoryState:
 
     def update_recent_decision_metadata(self, recent_copy: list, coherence: float, threshold: float):
         """Update matching recent decisions in the real history.
-        
+
         Takes a COPY previously returned by get_recent_decisions, updates
         metadata on it, and writes the updated entries back by index.
         This prevents in-place alias mutation of list element dicts.
@@ -294,7 +318,7 @@ class HistoryState:
         if len(tj) > capacity:
             tj = tj[-(capacity // 2):]
         self._set_val("transaction_journal", tj)
-        # Phase 57/58: DO NOT call self._record here! 
+        # Phase 57/58: DO NOT call self._record here!
         # Causal journaling already captures this; recording the recording causes infinite recursion.
 
     def get_transaction_journal(self) -> list:
@@ -310,10 +334,10 @@ class HistoryState:
         ds = self._get_val("dataset_consensus")
         sm = self._get_val("solidified_motifs")
         return {
-            "decision_history": dh[-500:] if len(dh) > 500 else dh,
-            "topology_snapshots": ts[-250:] if len(ts) > 250 else ts,
-            "transaction_journal": tj[-250:] if len(tj) > 250 else tj,
-            "crystalline_records": list(cr),
+            "decision_history": list(dh[-500:]),
+            "topology_snapshots": [dict(s) for s in ts[-250:]],
+            "transaction_journal": [dict(tx) for tx in tj[-250:]],
+            "crystalline_records": [dict(r) for r in cr],
             "dataset_consensus": dict(ds),
             "solidified_motifs": list(sm),
             "field_activation_count": self.field_activation_count,

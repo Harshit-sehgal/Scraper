@@ -7,7 +7,6 @@ round-trips to ensure deterministic replay and distributed consistency.
 
 import json
 from app.semantic_world_state import SemanticWorldState
-from app.semantic_ir import SemanticType
 
 def verify_symmetry(subsystem_name, state_obj):
     """Verify that a subsystem's to_dict/from_dict is perfectly symmetrical."""

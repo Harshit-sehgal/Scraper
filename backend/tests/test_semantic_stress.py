@@ -6,7 +6,6 @@ semantic streams (noise, contradictions, and recursive hallucinations).
 """
 
 import pytest
-import random
 from app.semantic_pipeline import run_pipeline
 from app.semantic_world_state import get_world_state
 from app.semantic_ir import SemanticType
@@ -93,7 +92,6 @@ def test_massive_topology_scaling(ws):
     import time
     from app.semantic_ir import SemanticToken, Span
     
-    schema = ["r1", "r2"]
     start_time = time.time()
     
     with ws.transaction("scaling_test"):

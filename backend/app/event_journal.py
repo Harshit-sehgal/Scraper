@@ -38,6 +38,11 @@ class EventJournal:
         if not delta and mutation_type != "checkpoint":
             return # No change
             
+        # Phase 66: Hierarchical Causal Pruning - ignore high-frequency noise in stable epochs
+        if mutation_type == "apply_force_to_manifold" and metadata and metadata.get("displacement", 0) < 1e-3:
+            # Trivial manifold shift, skip if not structural
+            return
+
         entry = {
             "timestamp": time.time(),
             "source": source,
@@ -58,24 +63,25 @@ class EventJournal:
         self._current_idx += 1
         
         if len(self._entries) > self._max:
-            # Phase 57/58/61: Semantic Retention Prioritization
-            # We keep recent entries AND historical structural transitions
+            # Phase 57/58/61/66: Semantic Retention Prioritization
+            # We keep recent entries AND historical structural transitions (Skeletonization)
             keep_count = self._max // 2
             
             recent = self._entries[-keep_count:]
             historical = self._entries[:-keep_count]
             
-            # Keep structural events even if they are old
-            structural_types = {"restructure_topology", "merge_state", "promote_hypo", "crystallize"}
-            to_retain = [e for e in historical if e["type"] in structural_types]
+            # Skeletonization: preserve ONLY structural events or high-value checkpoints
+            structural_types = {"restructure_topology", "merge_state", "promote_hypo", "crystallize", "add", "remove"}
+            to_retain = [e for e in historical if e["type"] in structural_types or e.get("checkpoint")]
             
-            # Limit retained historical events to 10% of max
+            # Further compress historical structural events if they exceed 10%
             if len(to_retain) > self._max // 10:
+                # Keep only the most recent structural transitions from history
                 to_retain = to_retain[-(self._max // 10):]
                 
             self._entries = to_retain + recent
             
-            # Prune checkpoints that are no longer reachable
+            # Prune checkpoints that are no longer reachable by any retained entries
             if self._entries:
                 first_remaining_idx = self._entries[0]["idx"]
                 latest_valid_checkpoint = max((k for k in self._checkpoints if k <= first_remaining_idx), default=-1)
@@ -131,6 +137,8 @@ class EventJournal:
     def clear(self):
         """Clear all journal entries."""
         self._entries.clear()
+        self._checkpoints.clear()
+        self._current_idx = 0
 
     @property
     def count(self) -> int:

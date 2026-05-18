@@ -308,5 +308,65 @@
 - [x] Build "Topology Self-Pruning" (Autonomous removal of dead semantic zones)
 - [x] Add "Autonomous Law Induction" (Allow substrate to discover stabilization heuristics dynamically)
 
-## Project Status: Substrate Proven for Distributed Adaptive Systems
-The engine has achieved its highest level of systemic maturity. It is now a distributed, partitioned semantic substrate capable of indefinite autonomous evolution, active stabilization, and perfect causal consistency across independent shards. The architecture is flawlessly observable, transactionally atomic, and hardened for million-event dynamical stability.
+## Phase 63: Semantic Reliability Productization [DONE]
+- [x] Build "Real-time Topology Heatmap" (SVG visualization of active attractor basins)
+- [x] Implement "Thermodynamic Dissipation Charts" (Live energy/entropy trend lines)
+- [x] Add "Geometric Semantic Drift Tracking" (Monitor displacement of manifold attractors)
+- [x] Build "Causal Telemetry Feed" (Live stream of transaction and degradation events)
+
+## Phase 64: Topology Timeline & Causal Replay [DONE]
+- [x] Implement "Historical State Reconstruction" (Replay field geometry from delta-encoded journals)
+- [x] Build "Dashboard Timeline Scrubber" (Time-scrubbing interface for historical introspection)
+- [x] Add "Multi-Dimensional Health Index" (Stability, Diversity, Velocity, Tension)
+- [x] Implement "Live/Replay Mode Toggle" (Pause real-time stream for historical frame-by-bit analysis)
+
+## Phase 65: Attractor Ecology & Spatial Field Visualization [DONE]
+- [x] Implement "Relational Web Visualization" (Render topological cohesion edges in dashboard)
+- [x] Build "Monoculture Risk Alerts" (Detect and alert on semantic concentration/HHI)
+- [x] Add "Instability Heatmap Pulse" (Visualize semantic turbulence zones)
+- [x] Implement "Enhanced Basin Inspector" (Detailed regional persistence and momentum metrics)
+
+## Phase 66: Long-Horizon Scaling & Causal Pruning [DONE]
+- [x] Implement "Hierarchical Causal Pruning" (Skeletonize stable historical epochs)
+- [x] Add "Semantic Saturation" (Freeze learning forces for high-certainty concepts)
+- [x] Build "Tiered Event Retention" (Preserve only structural bifurcations in historical journal)
+- [ ] Implement "Large-Scale Replay Buffer" (Stream historical deltas from persistent storage)
+
+## Phase 67: Distributed Partition Healing & History Re-alignment [DONE]
+- [x] Implement "Causal Stitching" (Reconcile and re-align divergent transaction journals)
+- [x] Build "Divergence Analyzer" (Quantify causal distance and partition cost)
+- [x] Fix "Aliasing Bug" in distributed history serialization
+- [x] Harden "History Nesting" in global state exports
+
+## Phase 68: Reliability Reverification & Replay Repair [VERIFIED]
+- [x] Restore `ObservabilityState.get_memory_profile` as the canonical memory-pressure diagnostic used by governance and resource shedding.
+- [x] Isolate failure injection between tests so chaos validation cannot leak nondeterminism into unrelated replay or topology tests.
+- [x] Harden deterministic replay dispatch by filtering journal-only metadata before calling subsystem mutation APIs.
+- [x] Map observability replay entries back onto the live telemetry API (`type` -> `event_type`).
+- [x] Stabilize policy engine lookup per canonical world-state instance so scheduler enforcement and explicit policy tuning share one authority.
+- [x] Add topology-native entropy into system pressure so high-instability field regions can trigger governance before symbolic/manifold role seeding.
+- [x] Revalidate architecture and full test suite: `297 passed`.
+
+## Phase 69: Deep Scan Error Cleanup [VERIFIED]
+- [x] Run full static and runtime sweep: `pytest`, `pyflakes`, `compileall`, architecture validator, JS syntax checks, diff whitespace check, duplicate-definition probe, and API smoke checks.
+- [x] Fix missing `Any` import in `ManifoldState` drift references.
+- [x] Remove dead imports, unused variables, misleading placeholderless f-strings, and debug prints from backend/tests.
+- [x] Reset `EventJournal.clear()` completely, including checkpoints and event index, so replay tests start from a true empty journal.
+- [x] Expose `region_count` in topology metrics for dashboard consumers.
+- [x] Repair dashboard runtime initialization by adding chart construction.
+- [x] Harden dashboard rendering against malformed or scraped HTML-bearing tokens via escaped telemetry and region details.
+- [x] Verify JSON API observability/topology endpoints return successfully under ASGI transport.
+
+## Current Architectural Weaknesses
+- [ ] Contradiction pressure still needs stronger global topology restructuring; current propagation and pressure dynamics are verified but not yet sufficient as the primary cognition substrate.
+- [ ] `learned_exclusions` remains a secondary symbolic bridge and should continue migrating toward topology-native memory.
+- [ ] Edge semantics remain split across cohesion, compatibility, exclusions, topological laws, and neighbor lists; unify these into a bounded edge field model.
+- [ ] Event propagation is still partly scheduler/policy orchestrated; move more activation into distributed field waves with replayable causal traces.
+- [ ] Observability now catches replay/governance failures, but pressure heatmaps and causal chain reconstruction are still partial.
+- [ ] Large-scale replay buffer remains unimplemented; historical replay is validated in-memory, not yet streamed from persistent storage.
+
+## Smallest Coherent Next Step
+- [ ] Build a unified edge field model that makes cohesion, repulsion, compatibility, uncertainty flow, and propagation route strength one canonical topology edge representation.
+
+## Project Status: Verified But Still Partial Semantic Field Substrate
+The engine currently passes architecture validation and the full invariant/test suite, with deterministic replay, governance, resource shedding, failure injection isolation, and pressure-triggered enforcement reverified. It is not complete: topology still needs to become more causally dominant than scalar metrics and symbolic exclusion memory.

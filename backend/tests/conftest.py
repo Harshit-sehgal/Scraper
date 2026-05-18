@@ -22,6 +22,15 @@ except ImportError as e:
     main_mod = None  # type: ignore[assignment]
 
 
+@pytest.fixture(autouse=True)
+def reset_failure_injection():
+    from app.failure_injector import set_injection_probability
+
+    set_injection_probability(0.0)
+    yield
+    set_injection_probability(0.0)
+
+
 class LocalASGIClient:
     """Small sync wrapper around httpx ASGITransport that avoids TestClient threads."""
 

@@ -594,8 +594,7 @@ def test_long_horizon_replay_parity():
     """Execute 500 random transactions, capture the journal, and verify
     that full replay results in identical metrics and manifold checksum."""
     import random
-    from app.semantic_ir import SemanticType
-    
+
     ws = get_world_state()
     ws.clear()
     
