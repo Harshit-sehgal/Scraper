@@ -41,6 +41,8 @@ class ScrapeTelemetry:
     profile_match: bool = False            # Whether a selector profile was found
     profile_records: int = 0               # Records from profile extraction
     anti_bot_score: float = 0.0            # 0.0 = none, 1.0 = certain anti-bot detected
+    retry_count: int = 0                   # Number of fetch retries
+    fallback_usage: str = "none"           # "none" | "regex" | "httpx"
     
     # Granular Metrics (Grounding abstractions)
     selector_hit_rate: float = 0.0          # Percentage of fields successfully matched
@@ -82,10 +84,14 @@ class ScrapeTelemetryCollector:
                 "url": url,
                 "records": telemetry.records_final,
                 "fetch_ms": telemetry.fetch_ms,
+                "render_delay_ms": telemetry.js_render_delay_ms,
+                "selector_hit_rate": telemetry.selector_hit_rate,
                 "selector_ok": telemetry.selector_success,
                 "fallback": telemetry.fallback_triggered,
+                "fallback_type": telemetry.fallback_usage,
                 "profile": telemetry.profile_match,
                 "anti_bot": telemetry.anti_bot_score,
+                "retries": telemetry.retry_count,
             })
         except Exception:
             pass

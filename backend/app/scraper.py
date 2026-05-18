@@ -2,18 +2,13 @@
 Scraping Engine — Thin orchestration layer.
 
 Delegates to specialised sub-engines:
-  - cleaning_engine:     AI cleaning & schema alignment
-  - insight_engine:      Data insight generation & schema suggestion
+  - selector_discovery: LLM-guided selector generation & page analysis
   - selector_engine:     CSS selector mapping & execution
   - html_utils:          DOM fetching, cleaning, contact extraction
   - scrape_telemetry:    Per-URL observability
   - selector_memory:     Persistent extraction learning
-
-Extraction priority:
-  1. Site-specific selector profile (JSON config in selector_profiles/profiles/)
-  2. Remembered selectors from selector_memory
-  3. Generic LLM-guided CSS selector pipeline
-  4. Regex fallback extraction
+  - cleaning_engine:     AI cleaning & schema alignment
+  - insight_engine:      Data insight generation & schema suggestion
 """
 
 from __future__ import annotations
@@ -24,22 +19,17 @@ from typing import List
 from bs4 import BeautifulSoup
 
 from app.config import settings
-from app.async_utils import run_sync_in_thread
 from app.html_utils import (
-    _is_empty_value, fetch_page_content, clean_html_for_selectors,
-    _boost_contacts_with_page_html,
+    _is_empty_value, fetch_page_content, _boost_contacts_with_page_html,
 )
 from app.models import SchemaField
 from app.semantic_pipeline import run_pipeline
-from app.selector_engine import (
-    _analyze_page_data_type, build_selector_prompt, extract_css_selectors,
-    apply_selectors, extract_with_regex,
-)
+from app.selector_engine import apply_selectors, extract_with_regex
+from app.selector_discovery import discover_selectors
 from app.data_utils import (
     _dedupe_records, _limit_source_records as _base_limit_source_records,
-    normalize_scraped_record,
+    normalize_scraped_record, process_raw_records,
 )
-from app.utils.quality import score_record_quality
 from app.selector_profiles.loader import try_profile_extraction
 from app.scrape_telemetry import (
     get_scrape_telemetry, detect_anti_bot, estimate_dom_nodes,
@@ -52,9 +42,6 @@ logger = logging.getLogger(__name__)
 # Re-export for backwards compatibility
 from app.cleaning_engine import ai_clean_and_align_records  # noqa: F401
 from app.insight_engine import generate_data_insight, suggest_schema_from_intent, suggest_schema_from_intent_sync  # noqa: F401
-
-
-AI_STRUCTURING_MAX_CONSECUTIVE_MODEL_FAILURES = settings.AI_STRUCTURING_MAX_CONSECUTIVE_MODEL_FAILURES
 
 
 def _limit_source_records(records: list[dict], schema_fields: list[SchemaField]) -> list[dict]:
@@ -97,7 +84,7 @@ async def scrape_url(
             len(profile_results), url,
         )
         if profile_results:
-            results = _process_raw_records(profile_results, schema_fields, min_record_score)
+            results = process_raw_records(profile_results, schema_fields, min_record_score)
             telemetry.record(
                 url=url,
                 profile_match=True,
@@ -112,9 +99,11 @@ async def scrape_url(
     # ── Generic extraction pipeline ────────────────────────────────
     fetch_success = False
     js_render_delay = 0.0
+    fetch_method = "playwright"
+    retry_count = 0
     try:
         fetch_start = time.time()
-        html, js_render_delay = await fetch_page_content(url)
+        html, js_render_delay, fetch_method, retry_count = await fetch_page_content(url)
         fetch_ms = (time.time() - fetch_start) * 1000
         fetch_success = True
     except Exception as e:
@@ -129,7 +118,7 @@ async def scrape_url(
     anti_bot = detect_anti_bot(html)
     dom_nodes = estimate_dom_nodes(html)
 
-    # Calculate token density (grounding abstraction)
+    # Calculate token density
     soup_for_density = BeautifulSoup(html, "html.parser")
     page_text = soup_for_density.get_text()
     token_density = len(page_text) / max(1, dom_nodes)
@@ -160,18 +149,7 @@ async def scrape_url(
 
     # ── Step 3: Generic LLM-guided selectors ──────────────────────
     if not selector_success:
-        # 1. Analyze page structure
-        page_analysis = _analyze_page_data_type(html, schema_fields)
-
-        # 2. Map schema to CSS selectors via LLM
-        html_snippet = clean_html_for_selectors(html)
-        prompt = build_selector_prompt(html_snippet, schema_fields, page_analysis)
-
-        try:
-            selectors = await extract_css_selectors(prompt)
-        except Exception as e:
-            logger.exception(e)
-            selectors = {}
+        selectors = await discover_selectors(html, schema_fields)
 
         if selectors and selectors.get("item_container"):
             results = apply_selectors(html, selectors, schema_fields, base_url=url)
@@ -187,15 +165,19 @@ async def scrape_url(
                 logger.info(
                     "LLM selectors for %s produced low-quality results "
                     "(avg score=%.2f, threshold=%.2f). Falling back to regex.",
-                    url, avg_score if results else 0, gate_threshold,
+                    url, (sum([r.get("record_score", 0.0) for r in results])/len(results)) if results else 0, gate_threshold,
                 )
                 results = []
 
     # ── Step 4: Regex fallback ────────────────────────────────────
+    fallback_usage = "none"
     if not results:
         logger.info("Selectors failed or no results for %s, falling back to regex", url)
         results = extract_with_regex(html, schema_fields, base_url=url)
         fallback_triggered = True
+        fallback_usage = "regex"
+    elif fetch_method == "httpx":
+        fallback_usage = "httpx"
 
     # 4. Global page-level contact boosting
     contact_counts = sum(
@@ -233,12 +215,14 @@ async def scrape_url(
 
     telemetry.record(
         url=url,
-        fetch_method="playwright",
+        fetch_method=fetch_method,
         fetch_ms=fetch_ms,
         dom_nodes=dom_nodes,
         selector_success=selector_success,
         selector_count=len(selectors.get("fields", {})) if selectors else 0,
         fallback_triggered=fallback_triggered,
+        fallback_usage=fallback_usage,
+        retry_count=retry_count,
         records_extracted=len(results) if not fallback_triggered else 0,
         records_after_scoring=records_before_scoring,
         records_after_dedup=records_after_dedup,
@@ -250,23 +234,4 @@ async def scrape_url(
         confidence_map=confidence_map,
     )
 
-    return results
-
-
-def _process_raw_records(
-    raw_records: list[dict],
-    schema_fields: list[SchemaField],
-    min_record_score: float,
-) -> list[dict]:
-    """Normalize, score, dedup, limit, and run pipeline on raw extracted records."""
-    results = []
-    for r in raw_records:
-        norm = normalize_scraped_record(r, schema_fields)
-        norm["record_score"] = score_record_quality(norm, schema_fields)
-        results.append(norm)
-
-    results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * 0.8)]
-    results = _dedupe_records(results, schema_fields)
-    results = _limit_source_records(results, schema_fields)
-    results = run_pipeline(results, [f.name for f in schema_fields])
     return results

@@ -210,7 +210,7 @@ async def extract_with_profile(
                 await page.goto(url, wait_until="networkidle", timeout=settings.PLAYWRIGHT_TIMEOUT)
             except Exception:
                 logger.warning("[ProfileExtractor] networkidle timeout, trying domcontentloaded")
-                await page.goto(url, wait_until="domcontentloaded", timeout=settings.PLAYWRIGHT_TIMEOUT - 10000)
+                await page.goto(url, wait_until="domcontentloaded", timeout=settings.PLAYWRIGHT_FALLBACK_TIMEOUT)
 
             # Wait for the target container to appear
             if wait_for_sel:

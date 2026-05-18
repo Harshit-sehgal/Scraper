@@ -29,22 +29,44 @@ class Settings(BaseSettings):
     # ─── Browser / Playwright ──────────────────────────────────────────────
     PLAYWRIGHT_TIMEOUT: int = 45000
     """Max ms to wait for page navigation / networkidle."""
+    PLAYWRIGHT_FALLBACK_TIMEOUT: int = 35000
+    """Max ms for domcontentloaded fallback if networkidle fails."""
     PAGE_SETTLE_DELAY: float = 2.0
     """Seconds to wait after networkidle for JS rendering to finish."""
     PAGE_FALLBACK_EXTRA_WAIT: float = 5.0
     """Extra seconds when networkidle times out and we fall back to domcontentloaded."""
     PROFILE_MAX_WAIT: int = 30
     """Max seconds for a selector profile to find its wait_for selector."""
+    PAGE_LOADING_INDICATOR_TIMEOUT: int = 2000
+    """Ms to wait for each common loading indicator to disappear."""
+    PAGE_SCROLL_DELAY: float = 0.5
+    """Seconds to wait after auto-scrolling to trigger lazy loaders."""
+    DOM_STABILIZATION_INTERVAL: int = 200
+    """Ms between DOM change checks."""
+    DOM_STABILIZATION_MIN_STABLE_CHECKS: int = 5
+    """Consecutive stable checks required for quiescence."""
+    DOM_STABILIZATION_MIN_TOTAL_CHECKS: int = 15
+    """Minimum checks to perform before allowing early exit."""
+    DOM_STABILIZATION_MAX_CHECKS: int = 60
+    """Absolute limit on DOM stabilization checks."""
 
     # ─── HTTP Fetching ─────────────────────────────────────────────────────
     REQUEST_TIMEOUT: int = 20
     """Seconds before plain-HTTP fallback request times out."""
+    ROBOTS_TIMEOUT: float = 10.0
+    """Timeout for robots.txt fetching."""
+    GEOCODER_TIMEOUT: int = 10
+    """Timeout for reverse geocoding lookups."""
     USER_AGENT: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     )
+    GEOCODER_USER_AGENT: str = "DataForge-Scraper/2.0 (geocoder)"
+    """User-agent for geocoding services."""
     MAX_RETRIES: int = 2
     """Number of retries for HTTP requests (httpx)."""
+    HTTP_BACKOFF_FACTOR: float = 0.5
+    """Backoff multiplier for HTTP retries."""
 
     # ─── Extraction & AI Structuring ───────────────────────────────────────
     MAX_RECORDS_PER_SOURCE: int = 25
@@ -87,10 +109,20 @@ class Settings(BaseSettings):
     """Default timeout for LLM JSON/text calls (seconds)."""
     LLM_FAST_TIMEOUT: int = 12
     """Fast-path timeout for throughput-sensitive LLM calls."""
+    LLM_SELECTOR_TIMEOUT: int = 30
+    """Timeout for selector discovery LLM calls."""
     INSIGHT_TIMEOUT: int = 25
     """Timeout for insight generation calls."""
     LLM_TEMPERATURE: float = 0.1
     """Default LLM temperature for JSON calls."""
+    LLM_FAST_TEMPERATURE: float = 0.0
+    """Temperature for fast-path JSON calls."""
+    LLM_TEXT_TEMPERATURE: float = 0.4
+    """Temperature for free-form text calls."""
+    LLM_MAX_ATTEMPTS: int = 2
+    """Retries for LLM API calls."""
+    LLM_BACKOFF_SECONDS: float = 0.8
+    """Base backoff for LLM retries."""
 
     # ─── Job Runner ────────────────────────────────────────────────────────
     PER_URL_TIMEOUT_SECONDS: int = 120

@@ -11,13 +11,14 @@ from typing import Optional
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 
+from app.config import settings
 from app.models import FieldType, FilterOperator, FilterRule, SchemaField
 
 # ──────────────────────────────────────────────
 # Geocoding & Distance (100% Free via Nominatim)
 # ──────────────────────────────────────────────
 
-_geocoder = Nominatim(user_agent="general-scraper-v1", timeout=10)
+_geocoder = Nominatim(user_agent=settings.GEOCODER_USER_AGENT, timeout=settings.GEOCODER_TIMEOUT)
 _geocode_cache: dict[str, Optional[tuple[float, float]]] = {}
 _LOCATION_NAME_HINTS = ("location", "address", "city", "area", "region", "zip", "pincode")
 

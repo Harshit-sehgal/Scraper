@@ -1,17 +1,14 @@
 import re
 import logging
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
 from app.models import SchemaField, FieldType
-from app.page_profiler import detect_page_structure, detect_value_patterns
 from app.html_utils import (
     _compact_text, _is_empty_value, _is_likely_noise_row,
     _extract_contacts_from_node, _sanitize_field_value,
     _enrich_record_contacts, _apply_page_level_contact_fallback
 )
-from app.llm_bridge import llm_json
-from app.async_utils import run_sync_in_thread
-from app.utils.quality import score_record_quality
-from app.data_utils import normalize_scraped_record
 from app.config import settings
 
 def _detect_table_headers(html: str) -> list[dict]:
@@ -38,189 +35,6 @@ def _detect_table_headers(html: str) -> list[dict]:
 
     return headers_info
 
-def _analyze_page_data_type(html: str, schema_fields: list[SchemaField]) -> dict:
-    profile = detect_page_structure(html)
-    patterns = detect_value_patterns(html)
-    
-    return {
-        "structure_type": profile.structure_type,
-        "structure_confidence": profile.structure_confidence,
-        "headers": profile.headers,
-        "patterns_detected": {
-            "currencies": bool(patterns.currencies),
-            "dates": bool(patterns.dates),
-            "ratings": bool(patterns.ratings),
-            "codes": bool(patterns.codes_3letter),
-            "phones": bool(patterns.phones),
-            "emails": bool(patterns.emails),
-        }
-    }
-
-def _intelligent_column_mapping(html: str, schema_fields: list[SchemaField]) -> dict:
-    soup = BeautifulSoup(html, "html.parser")
-    mapping_hints: dict = {}
-
-    table = soup.find("table") or soup.find("div", class_=lambda x: x and ("table" in x or "grid" in x))
-    if not table:
-        return mapping_hints
-
-    headers = []
-    for th in table.find_all(["th", "thead"]):
-        headers.append(_compact_text(th.get_text()).lower())
-
-    for field in schema_fields:
-        field_keywords = _get_field_keywords(field.name)
-        for i, header in enumerate(headers):
-            for keyword in field_keywords:
-                if keyword in header:
-                    mapping_hints[field.name] = {"column_index": i, "matched_header": header}
-                    break
-
-    return mapping_hints
-
-def _get_field_keywords(field_name: str) -> list[str]:
-    name_lower = field_name.lower().replace("_", " ")
-    base = [name_lower]
-
-    keywords_map = {
-        "price": ["price", "cost", "amount", "rate", "fee", "fare"],
-        "date": ["date", "day", "time", "start", "end", "begin", "schedule"],
-        "time": ["time", "duration", "start", "end", "schedule"],
-        "name": ["name", "title", "title", "company"],
-        "phone": ["phone", "contact", "mobile", "call"],
-        "email": ["email", "mail", "contact"],
-        "address": ["address", "location", "place"],
-        "rating": ["rating", "review", "star", "score"],
-        "description": ["description", "about", "detail", "info"],
-    }
-
-    for key, synonyms in keywords_map.items():
-        if key in name_lower:
-            base.extend(synonyms)
-
-    return base
-
-def _infer_field_type_from_examples(examples: list[str], field_name: str) -> str:
-    if not examples:
-        return "string"
-
-    name_lower = field_name.lower()
-
-    if any(k in name_lower for k in ["price", "cost", "amount"]):
-        return "currency"
-    if any(k in name_lower for k in ["date", "time", "start", "end", "schedule"]):
-        return "date"
-    if any(k in name_lower for k in ["duration", "hours"]):
-        return "duration"
-    if any(k in name_lower for k in ["from", "origin", "source"]):
-        return "location"
-    if any(k in name_lower for k in ["to", "destination", "dst"]):
-        return "location"
-
-    sample = examples[0].lower().strip()
-
-    if re.search(r"^\d+h\s*\d+m$", sample):
-        return "duration"
-    if re.search(r"\d+h$", sample):
-        return "duration"
-    if re.search(r"^\d+:\d{2}$", sample):
-        return "duration"
-    if re.search(r"\d+\s*hours?", sample):
-        return "duration"
-
-    if re.search(r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)", sample, re.IGNORECASE):
-        return "date"
-    if re.search(r"\d{1,2}[/-]\d{1,2}[/-](\d{2}|\d{4})", sample):
-        return "date"
-    if re.search(r"\d{4}[-]\d{2}[-]\d{2}", sample):
-        return "date"
-
-    if re.search(r"^[\$\u20a8\u20ac\u00a3\u00a5]\s*\d+[\d,]*\.?\d*$", sample):
-        return "currency"
-    if re.search(r"\d+[\d,]*\s*(inr|usd|eur|gbp)$", sample, re.IGNORECASE):
-        return "currency"
-
-    return "string"
-
-def build_selector_prompt(html_snippet: str, schema_fields: list[SchemaField], page_analysis: dict | None = None) -> str:
-    page_analysis = page_analysis or {}
-    
-    structure_type = page_analysis.get("structure_type", "unknown")
-    structure_confidence = page_analysis.get("structure_confidence", 0.0)
-    headers = page_analysis.get("headers", [])
-    patterns = page_analysis.get("patterns_detected", {})
-    
-    structure_context = f"""
-PAGE STRUCTURE DETECTED: {structure_type.upper()} (confidence: {structure_confidence:.2f})
-- This could be a table, card layout, list, or mixed structure
-- Target the DATA CONTAINER, not header/footer/navigation
-- For card-based layouts: look for repeating divs with classes like card, item, result, flight-result, product, listing
-- For tables: target <tr> rows inside <tbody>, skip the <thead> header rows
-- The data container should contain MULTIPLE repeating items, each with the same structure
-"""
-    
-    if patterns:
-        detected = [k for k, v in patterns.items() if v]
-        if detected:
-            structure_context += f"\nVALUE PATTERNS DETECTED: {', '.join(detected)}"
-    
-    header_context = ""
-    if headers:
-        header_context = f"\nDETECTED HEADERS: {headers[:8]}"
-    
-    field_hints = []
-    for f in schema_fields:
-        hint = f'  - "{f.name}"'
-        hint += f' (type: {f.field_type.value})'
-        if f.description:
-            hint += f': {f.description}'
-        field_hints.append(hint)
-
-    schema_str = "\n".join(field_hints)
-
-    return f"""You are an expert data extraction engineer.
-Extract structured data from this HTML snippet.
-
-{structure_context}
-{header_context}
-
-USER SCHEMA:
-{schema_str}
-
-CRITICAL EXCLUSIONS (apply to ANY page type):
-- Navigation menus, header, footer
-- Filter/sort options, sidebar content
-- Login/signup forms, social media links
-- Copyright/terms/privacy pages
-
-EXTRACTION RULES:
-1. Return ONLY JSON: {{"item_container": "selector", "fields": {{"field_name": "selector"}}}}
-2. Target the repeating DATA CONTAINER (rows, cards, items) - NOT navigation
-3. Use relative selectors (descendant or child)
-4. Each schema field needs a selector or null
-
-HTML SNIPPET:
-```html
-{html_snippet}
-```"""
-
-async def extract_css_selectors(prompt: str) -> dict:
-    def _sync_call():
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You output valid JSON objects for CSS selector extraction. "
-                    "No markdown, no commentary."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ]
-        response = llm_json(messages, temperature=0.1)
-        return response if isinstance(response, dict) else {}
-
-    return await run_sync_in_thread(_sync_call)
-
 
 def apply_selectors(html: str, selectors_map: dict, schema_fields: list[SchemaField], base_url: str = "") -> list[dict]:
     """Execute generated CSS selectors on full HTML and score extracted records."""
@@ -228,94 +42,42 @@ def apply_selectors(html: str, selectors_map: dict, schema_fields: list[SchemaFi
     field_sels = selectors_map.get("fields", {}) or {}
 
     if not container_sel:
-        logging.warning("No item_container selector generated")
         return []
 
     soup = BeautifulSoup(html, "html.parser")
-    if str(container_sel).lower() in ("body", "html", "main"):
-        containers = [soup]
-    else:
-        try:
-            containers = soup.select(container_sel)
-        except Exception as e:
-            logging.error(f"[Scraper] Invalid container selector '{container_sel}': {e}")
-            return []
-
-    logging.info("Containers found with '%s': %d", container_sel, len(containers))
     page_email, page_phone = _extract_contacts_from_node(soup)
-    allow_page_contact_fallback = len(containers) == 1
+    containers = soup.select(container_sel)
+    
     results = []
-
-    for container in containers:
+    for node in containers:
         record: dict = {}
         for field in schema_fields:
-            selector = field_sels.get(field.name)
-            if not selector:
-                record[field.name] = None
-                continue
+            sel = field_sels.get(field.name)
+            val = None
+            if sel:
+                try:
+                    target = node.select_one(sel)
+                    if target:
+                        if field.field_type == FieldType.URL:
+                            val = target.get("href")
+                        else:
+                            val = target.get_text(separator=" ", strip=True)
+                except Exception as e:
+                    logger.debug("[SelectorEngine] Invalid selector '%s': %s", sel, e)
+                    val = None
 
-            try:
-                nodes = container.select(selector)
-            except Exception as e:
-                logging.debug(f"[Scraper] Invalid field selector '{selector}' for {field.name}: {e}")
-                record[field.name] = None
-                continue
+            record[field.name] = _sanitize_field_value(field, val, base_url=base_url)
 
-            if not nodes:
-                record[field.name] = None
-                continue
-
-            if field.field_type == FieldType.LIST_STRING:
-                values = [_sanitize_field_value(field, n.get_text(" ", strip=True), base_url=base_url) for n in nodes]
-                values = [v for v in values if v is not None]
-                record[field.name] = values or None
-                continue
-
-            node = nodes[0]
-            raw_text = node.get_text(separator=" ", strip=True)
-
-            if field.field_type == FieldType.URL:
-                href = None
-                if node.name == "a":
-                    href = node.get("href")
-                else:
-                    link = node.find("a")
-                    href = link.get("href") if link else None
-                record[field.name] = _sanitize_field_value(field, href, base_url=base_url)
-                continue
-            
-            # Special handling for contacts in links
-            if field.field_type in (FieldType.EMAIL, FieldType.PHONE):
-                href = node.get("href") if node.name == "a" else (node.find("a").get("href") if node.find("a") else None)
-                if href:
-                    if field.field_type == FieldType.EMAIL and "mailto:" in href.lower():
-                        raw_text = href.split("mailto:", 1)[1].split("?")[0]
-                    elif field.field_type == FieldType.PHONE and "tel:" in href.lower():
-                        raw_text = href.split("tel:", 1)[1].split("?")[0]
-
-            if "rating" in field.name.lower() or "star" in field.name.lower():
-                classes = node.get("class", [])
-                rating_words = [c for c in classes if c in ["One", "Two", "Three", "Four", "Five"]]
-                if rating_words:
-                    raw_text = rating_words[0]
-
-            record[field.name] = _sanitize_field_value(field, raw_text, base_url=base_url)
-
-        normalized = normalize_scraped_record(record, schema_fields)
-        if not any(not _is_empty_value(normalized.get(f.name)) for f in schema_fields):
-            continue
-
-        normalized = _enrich_record_contacts(
-            normalized,
-            schema_fields=schema_fields,
-            node=container,
-            page_email=page_email,
-            page_phone=page_phone,
-            allow_page_fallback=allow_page_contact_fallback,
+        # Post-extraction enrichment
+        record = _enrich_record_contacts(
+            record, schema_fields, node, 
+            page_email=page_email, page_phone=page_phone,
+            allow_page_fallback=False,
         )
 
-        normalized["record_score"] = score_record_quality(normalized, schema_fields)
-        results.append(normalized)
+        from app.utils.quality import score_record_quality
+        record["record_score"] = score_record_quality(record, schema_fields)
+        results.append(record)
 
     return _apply_page_level_contact_fallback(results, schema_fields, page_email, page_phone)
 
@@ -366,26 +128,30 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 # First non-special field gets full composite text for segmentation
                 record[field.name] = _sanitize_field_value(field, text)
             else:
-                # Extra fields left empty; mapper fills from segmented candidates
                 record[field.name] = None
 
-        normalized = normalize_scraped_record(record, schema_fields)
-        if not any(not _is_empty_value(normalized.get(f.name)) for f in schema_fields):
-            continue
-
-        if _is_likely_noise_row(normalized, schema_fields):
-            continue
-
-        normalized = _enrich_record_contacts(
-            normalized,
-            schema_fields=schema_fields,
-            node=container,
-            page_email=page_email,
-            page_phone=page_phone,
-            allow_page_fallback=False,
+        record = _enrich_record_contacts(
+            record, schema_fields, container,
+            page_email=page_email, page_phone=page_phone,
+            allow_page_fallback=True,
         )
-
-        normalized["record_score"] = score_record_quality(normalized, schema_fields)
-        results.append(normalized)
+        
+        from app.utils.quality import score_record_quality
+        record["record_score"] = score_record_quality(record, schema_fields)
+        results.append(record)
 
     return _apply_page_level_contact_fallback(results, schema_fields, page_email, page_phone)
+
+
+def _get_field_keywords(field_name: str) -> list[str]:
+    """Get common alternative names for a field to help header matching."""
+    name = field_name.lower()
+    if any(k in name for k in ["company", "name", "title"]):
+        return ["name", "company", "title", "business", "firm"]
+    if any(k in name for k in ["price", "cost", "amt"]):
+        return ["price", "cost", "amount", "total", "fare"]
+    if any(k in name for k in ["date", "time"]):
+        return ["date", "time", "when", "departure", "arrival"]
+    if any(k in name for k in ["location", "address", "city"]):
+        return ["location", "address", "city", "destination", "origin"]
+    return [name]

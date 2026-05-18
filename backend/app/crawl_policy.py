@@ -189,7 +189,7 @@ class CrawlPolicyEngine:
             import httpx
             url = f"https://{domain}/robots.txt"
             async with httpx.AsyncClient(
-                timeout=10.0,
+                timeout=settings.ROBOTS_TIMEOUT,
                 headers={"User-Agent": settings.USER_AGENT},
             ) as client:
                 resp = await client.get(url)

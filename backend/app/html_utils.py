@@ -234,15 +234,17 @@ def _boost_contacts_with_page_html(
     e, p = _extract_page_contacts(html)
     return _apply_page_level_contact_fallback(results, schema_fields, e, p)
 
-async def fetch_page_content(url: str) -> tuple[str, float]:
+async def fetch_page_content(url: str) -> tuple[str, float, str, int]:
     """Load a URL in a headless browser and fallback to plain HTTP when needed.
 
     Returns:
-        tuple of (html_content, js_render_delay_ms)
+        tuple of (html_content, js_render_delay_ms, method_used, retry_count)
     """
     browser = None
     context = None
     js_render_delay_ms = 0.0
+    retry_count = 0
+    method_used = "playwright"
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
@@ -272,7 +274,7 @@ async def fetch_page_content(url: str) -> tuple[str, float]:
                 for sel in loading_selectors:
                     try:
                         # Wait for it to be hidden, but don't block if it never appears
-                        await page.wait_for_selector(sel, state="hidden", timeout=2000)
+                        await page.wait_for_selector(sel, state="hidden", timeout=settings.PAGE_LOADING_INDICATOR_TIMEOUT)
                     except Exception:
                         pass
 
@@ -280,33 +282,33 @@ async def fetch_page_content(url: str) -> tuple[str, float]:
                 stabilization_start = time.time()
                 try:
                     await page.wait_for_function(
-                        """() => {
+                        f"""() => {{
                             const body = document.body;
                             if (!body) return true;
                             const html = body.innerHTML;
-                            return new Promise(resolve => {
+                            return new Promise(resolve => {{
                                 let lastHtml = html;
                                 let stableChecks = 0;
                                 let totalChecks = 0;
-                                const interval = setInterval(() => {
+                                const interval = setInterval(() => {{
                                     const current = document.body ? document.body.innerHTML : lastHtml;
-                                    if (current === lastHtml) {
+                                    if (current === lastHtml) {{
                                         stableChecks++;
-                                    } else {
+                                    }} else {{
                                         stableChecks = 0;
-                                    }
+                                    }}
                                     
-                                    // Resolve if stable for 5 checks (1s) AND we've waited at least some time
+                                    // Resolve if stable for N checks AND we've waited at least M checks
                                     // or if we hit the absolute check limit.
-                                    if ((stableChecks >= 5 && totalChecks > 15) || totalChecks > 60) {
+                                    if ((stableChecks >= {settings.DOM_STABILIZATION_MIN_STABLE_CHECKS} && totalChecks > {settings.DOM_STABILIZATION_MIN_TOTAL_CHECKS}) || totalChecks > {settings.DOM_STABILIZATION_MAX_CHECKS}) {{
                                         clearInterval(interval);
                                         resolve(true);
-                                    }
+                                    }}
                                     lastHtml = current;
                                     totalChecks++;
-                                }, 200);
-                            });
-                        }""",
+                                }}, {settings.DOM_STABILIZATION_INTERVAL});
+                            }});
+                        }}""",
                         timeout=settings.PAGE_SETTLE_DELAY * 1000,
                     )
                 except Exception:
@@ -315,7 +317,7 @@ async def fetch_page_content(url: str) -> tuple[str, float]:
 
                 # Optional: Auto-scroll to trigger lazy-loaders
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(settings.PAGE_SCROLL_DELAY)
                 await page.evaluate("window.scrollTo(0, 0)")
 
             except Exception as e:
@@ -329,7 +331,7 @@ async def fetch_page_content(url: str) -> tuple[str, float]:
                 js_render_delay_ms = (time.time() - fallback_start) * 1000
 
             html = await page.content()
-            return html, js_render_delay_ms
+            return html, js_render_delay_ms, method_used, 0
     except Exception as e:
         logging.error(f"[Scraper] Playwright failed for {url}: {e}. Falling back to httpx")
     finally:
@@ -345,18 +347,20 @@ async def fetch_page_content(url: str) -> tuple[str, float]:
                 logging.debug(f"[Scraper] Ignoring browser close error: {e}")
 
     # httpx fallback
+    method_used = "httpx"
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(settings.REQUEST_TIMEOUT),
         headers={"User-Agent": settings.USER_AGENT},
     ) as client:
         for attempt in range(max(1, settings.MAX_RETRIES)):
+            retry_count = attempt
             try:
                 resp = await client.get(url)
                 resp.raise_for_status()
-                return resp.text, 0.0
+                return resp.text, 0.0, method_used, retry_count
             except (httpx.HTTPError, httpx.TimeoutException) as e:
                 if attempt < settings.MAX_RETRIES - 1:
-                    wait = 0.5 * (attempt + 1)
+                    wait = settings.HTTP_BACKOFF_FACTOR * (attempt + 1)
                     logging.warning(
                         "[Scraper] httpx attempt %d/%d failed for %s: %s. Retrying in %.1fs",
                         attempt + 1, settings.MAX_RETRIES, url, e, wait,
@@ -368,7 +372,7 @@ async def fetch_page_content(url: str) -> tuple[str, float]:
                         settings.MAX_RETRIES, url, e,
                     )
                     raise
-    return "", 0.0
+    return "", 0.0, method_used, retry_count
 
 def clean_html_for_selectors(html: str, max_chars: int | None = None) -> str:
     """Remove known-noise tags while preserving structure useful for selector discovery."""

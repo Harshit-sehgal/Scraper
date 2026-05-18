@@ -68,14 +68,20 @@ def _should_retry_http_error(error: Exception) -> bool:
     return any(token in text for token in ["429", "timed out", "connection", "temporary"])
 
 
+from app.config import settings
+
 def _call_openai_compatible_json(
     endpoint: str,
     payload: dict,
     headers: dict | None = None,
-    timeout: int = 45,
-    max_attempts: int = 2,
-    backoff_seconds: float = 0.8,
+    timeout: int | None = None,
+    max_attempts: int | None = None,
+    backoff_seconds: float | None = None,
 ):
+    if timeout is None: timeout = settings.LLM_TIMEOUT
+    if max_attempts is None: max_attempts = settings.LLM_MAX_ATTEMPTS
+    if backoff_seconds is None: backoff_seconds = settings.LLM_BACKOFF_SECONDS
+    
     last_error: Exception | None = None
     for attempt in range(1, max(1, max_attempts) + 1):
         try:
@@ -100,10 +106,14 @@ def _call_openai_compatible_text(
     endpoint: str,
     payload: dict,
     headers: dict | None = None,
-    timeout: int = 45,
-    max_attempts: int = 2,
-    backoff_seconds: float = 0.8,
+    timeout: int | None = None,
+    max_attempts: int | None = None,
+    backoff_seconds: float | None = None,
 ) -> str:
+    if timeout is None: timeout = settings.LLM_TIMEOUT
+    if max_attempts is None: max_attempts = settings.LLM_MAX_ATTEMPTS
+    if backoff_seconds is None: backoff_seconds = settings.LLM_BACKOFF_SECONDS
+
     last_error: Exception | None = None
     for attempt in range(1, max(1, max_attempts) + 1):
         try:
@@ -144,7 +154,9 @@ def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning
         logging.getLogger(__name__).debug("Telemetry skipped (WS unavailable): %s", e)
 
 
-def llm_json(messages: list[dict], temperature: float = 0.1, timeout: int = 45):
+def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
+    if temperature is None: temperature = settings.LLM_TEMPERATURE
+    if timeout is None: timeout = settings.LLM_TIMEOUT
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
@@ -203,8 +215,10 @@ def llm_json(messages: list[dict], temperature: float = 0.1, timeout: int = 45):
     return {}
 
 
-def llm_json_fast(messages: list[dict], temperature: float = 0.0, timeout: int = 12):
+def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     """Fast-path JSON call for throughput-sensitive cleaning tasks."""
+    if temperature is None: temperature = settings.LLM_FAST_TEMPERATURE
+    if timeout is None: timeout = settings.LLM_FAST_TIMEOUT
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
@@ -251,7 +265,9 @@ def llm_json_fast(messages: list[dict], temperature: float = 0.0, timeout: int =
     return {}
 
 
-def llm_text(messages: list[dict], temperature: float = 0.4, timeout: int = 45) -> str:
+def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:
+    if temperature is None: temperature = settings.LLM_TEXT_TEMPERATURE
+    if timeout is None: timeout = settings.LLM_TIMEOUT
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):

@@ -63,6 +63,7 @@ async def api_key_middleware(request: Request, call_next):
 rate_limiter = RateLimiterMiddleware(
     global_limit=settings.RATE_LIMIT_GLOBAL,
 )
+app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limiter.middleware)
 
 # Runtime safety rails — driven by centralized config
 CONFIG = {

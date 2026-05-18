@@ -95,3 +95,24 @@ def _prepare_records_for_ai(records: list[dict], schema_fields: list[SchemaField
         if item:
             prepared.append(item)
     return prepared
+
+def process_raw_records(
+    raw_records: list[dict],
+    schema_fields: list[SchemaField],
+    min_record_score: float,
+) -> list[dict]:
+    """Normalize, score, dedup, limit, and run pipeline on raw extracted records."""
+    from app.utils.quality import score_record_quality
+    from app.semantic_pipeline import run_pipeline
+
+    results = []
+    for r in raw_records:
+        norm = normalize_scraped_record(r, schema_fields)
+        norm["record_score"] = score_record_quality(norm, schema_fields)
+        results.append(norm)
+
+    results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * 0.8)]
+    results = _dedupe_records(results, schema_fields)
+    results = _limit_source_records(results, schema_fields)
+    results = run_pipeline(results, [f.name for f in schema_fields])
+    return results

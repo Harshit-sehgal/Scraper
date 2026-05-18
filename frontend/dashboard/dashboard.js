@@ -515,13 +515,25 @@ function updateTelemetry(events) {
     log.innerHTML = events.map(e => {
         const color = e.type === 'degradation' ? 'text-red-500' : 
                       e.type === 'transaction' ? 'text-blue-400' :
-                      e.type === 'wave_absorption' ? 'text-green-400' : 'text-gray-500';
+                      e.type === 'wave_absorption' ? 'text-green-400' : 
+                      e.type === 'scrape' ? 'text-cyan-400' : 'text-gray-500';
         const icon = e.type === 'degradation' ? '⚠' : 
-                     e.type === 'wave_absorption' ? '⌇' : '◈';
+                     e.type === 'wave_absorption' ? '⌇' :
+                     e.type === 'scrape' ? '⚓' : '◈';
+        
+        let detailsStr = '';
+        if (e.type === 'scrape') {
+            const d = e.details || {};
+            detailsStr = `Records: ${d.records} | Fetch: ${d.fetch_ms?.toFixed(0)}ms (${d.fallback_type || 'none'}) | HR: ${(d.selector_hit_rate*100)?.toFixed(0)}% | R: ${d.retries} | AB: ${d.anti_bot.toFixed(2)}`;
+        }
+ else {
+            detailsStr = JSON.stringify(e.details || {}).substring(0, 80);
+        }
+
         return `<div class="border-l border-gray-800 pl-2 py-1">
             <span class="${color} font-bold mr-2">${icon} [${escapeHtml(e.subsystem || e.type)}]</span>
             <span class="text-gray-400">${escapeHtml(e.action || e.label || '')}</span>
-            <div class="text-[8px] text-gray-700 mt-1">${escapeHtml(JSON.stringify(e.details || {}).substring(0, 80))}...</div>
+            <div class="text-[8px] text-gray-700 mt-1">${escapeHtml(detailsStr)}...</div>
         </div>`;
     }).reverse().join('');
 }

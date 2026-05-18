@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 
+from app.config import settings
 from app.async_utils import run_sync_in_thread
 from app.llm_bridge import llm_json as _llm_json, llm_text as _llm_text
 
@@ -27,7 +28,7 @@ async def generate_data_insight(results: list[dict]) -> str:
             {"role": "system", "content": "You are a data analyst. Provide concise, valuable insights."},
             {"role": "user", "content": prompt},
         ]
-        response = _llm_text(messages, temperature=0.5, timeout=20)
+        response = _llm_text(messages, temperature=0.5, timeout=settings.INSIGHT_TIMEOUT)
         return response or "Analysis generation encountered an upstream model error."
 
     return await run_sync_in_thread(_sync_call)

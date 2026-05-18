@@ -101,6 +101,51 @@ async def lazy_load():
     </body></html>
     """
 
+@app.get("/infinite", response_class=HTMLResponse)
+async def infinite_scroll():
+    return """
+    <html><body style="min-height: 200vh;">
+    <div id="content">
+        <div class="item">Initial Item 1</div>
+        <div class="item">Initial Item 2</div>
+    </div>
+    <script>
+        let count = 2;
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 200) {
+                const content = document.getElementById('content');
+                if (count < 5) {
+                    for(let i=0; i<3; i++) {
+                        count++;
+                        const div = document.createElement('div');
+                        div.className = 'item';
+                        div.textContent = 'Scrolled Item ' + count;
+                        content.appendChild(div);
+                    }
+                }
+            }
+        });
+    </script>
+    </body></html>
+    """
+
+@app.get("/malformed", response_class=HTMLResponse)
+async def malformed_dom():
+    return """
+    <html><body>
+    <div class="container">
+        <div class="item">
+            <h2 class="title">Malformed Nesting 1
+            <p class="desc">Description 1
+        </div>
+        <div class="item">
+            <h2 class="title">Malformed Nesting 2
+            <p class="desc">Description 2
+            <div><span><span>Nested deep without closure
+        </div>
+    </body></html>
+    """
+
 # ─── Benchmark Runner ───────────────────────────────────────────────────
 
 def start_server():
@@ -118,6 +163,8 @@ async def run_benchmarks():
         ("Dynamic Hydration", f"{base_url}/dynamic", 3),
         ("Anti-Bot Detection", f"{base_url}/anti-bot", 0),
         ("Lazy Loading", f"{base_url}/lazy", 4),
+        ("Infinite Scroll", f"{base_url}/infinite", 5),
+        ("Malformed DOM", f"{base_url}/malformed", 2),
     ]
     
     print("\n" + "="*60)
