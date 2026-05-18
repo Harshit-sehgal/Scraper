@@ -20,7 +20,7 @@ from app.routers.jobs import create_jobs_router
 from app.routers.exports import create_exports_router
 from app.services.job_runner import run_job
 from app.services.state import persist_state
-from app.state_store import load_state
+from app.state_store import load_state, get_state_file_path
 from app.utils.env import env_int
 # Initialize event cascade (safe: scheduler is lazy-created, no circular import)
 from app.graph_update_scheduler import get_scheduler
@@ -61,8 +61,19 @@ CONFIG = {
     "max_recycle_bin_history": env_int("DATAFORGE_MAX_RECYCLE_BIN_HISTORY", 300, minimum=25, maximum=5000),
 }
 
-# Durable job store
-jobs_store, recycle_bin_store = load_state()
+# Durable job store & semantic field state
+jobs_store, recycle_bin_store, world_state_data = load_state()
+
+# Phase 68: Restore semantic world state from persisted data
+if world_state_data:
+    from app.semantic_world_state import get_world_state
+    try:
+        get_world_state().from_dict(world_state_data)
+        logging.getLogger(__name__).info(
+            "Restored semantic world state from %s", get_state_file_path()
+        )
+    except Exception as e:
+        logging.getLogger(__name__).exception("Failed to restore semantic world state: %s", e)
 
 def _persist_state_wrapper():
     persist_state(

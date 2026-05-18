@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 from threading import Lock
 
+from typing import Optional
+
 from app.models import Job, JobStatus
 
 _STATE_LOCK = Lock()
@@ -25,17 +27,17 @@ def get_state_file_path() -> Path:
     return _DEFAULT_STATE_FILE
 
 
-def load_state() -> tuple[dict[str, Job], dict[str, Job]]:
+def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
     path = get_state_file_path()
     if not path.exists():
-        return {}, {}
+        return {}, {}, None
 
     with _STATE_LOCK:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except Exception as e:
             logging.exception("Failed to read state file %s: %s", path, e)
-            return {}, {}
+            return {}, {}, None
 
     jobs_store: dict[str, Job] = {}
     recycle_bin_store: dict[str, Job] = {}
@@ -62,17 +64,30 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job]]:
             job.completed_at = _now_iso()
             job.cancel_requested = False
 
-    return jobs_store, recycle_bin_store
+    # Phase 68: Semantic field state — restore from persisted world_state if present
+    world_state_data: Optional[dict] = payload.get("world_state")
+
+    return jobs_store, recycle_bin_store, world_state_data
 
 
 def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) -> None:
     path = get_state_file_path()
     path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Phase 68: Persist semantic field state alongside jobs
+    world_state_data = None
+    try:
+        from app.semantic_world_state import get_world_state
+        ws = get_world_state()
+        world_state_data = ws.to_dict()
+    except Exception as e:
+        logging.exception("Failed to serialize semantic world state: %s", e)
+
     payload = {
         "saved_at": _now_iso(),
         "jobs": [job.model_dump() for job in jobs_store.values()],
         "recycle_bin": [job.model_dump() for job in recycle_bin_store.values()],
+        "world_state": world_state_data,
     }
 
     temp_path = path.with_suffix(path.suffix + ".tmp")

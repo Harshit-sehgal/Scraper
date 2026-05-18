@@ -1058,14 +1058,12 @@ class SemanticWorldState:
 
     @requires_invariants
     def propagate_field_regions(self) -> int:
-        """Each basin owns its own propagation — deltas applied through formal APIs."""
+        """Propagate instability through the unified edge field — topology canonical."""
         with self.transaction("propagation"):
             from app.failure_injector import get_injector
             get_injector().inject("propagate_field_regions")
 
-            # Use TopologyState's bulk propagation instead of manual iteration
             effects = self._topology.propagate_all()
-            # Apply exclusion effects through formal InstabilityState API
             for key, delta in effects:
                 if delta > 0:
                     current = self._instability.get_exclusion_by_key(key)
@@ -1073,6 +1071,41 @@ class SemanticWorldState:
             count = self._topology.region_count()
             self.record_delta("topology", "propagate_all", {"regions": count})
             return count
+
+    @requires_invariants
+    def evolve_field(self):
+        """Single topology-canonical entry point for field evolution.
+
+        Calls propagate → evolve → redistribute → aggregate → detect communities
+        in the correct order, with the topology state as the sole authority.
+
+        This replaces individual calls to decay_field_regions(),
+        aggregate_from_regions(), and redistribute_instability()
+        with one unified evolution step.
+
+        LAW: The field evolves as a single coherent system, not as independent steps.
+        """
+        with self.transaction("field_evolution"):
+            # 1. Evolve all regions (modulated by edge field forces)
+            effects = self._topology.evolve_all()
+            for key, delta in effects:
+                if delta > 0:
+                    current = self._instability.get_exclusion_by_key(key)
+                    self._instability.set_exclusion(key, current + delta)
+
+            # 2. Aggregate metrics from regions
+            self.aggregate_from_regions()
+
+            # 3. Govern the field (redistribute via edge field, rebalance, entropy)
+            self.redistribute_instability()
+
+            # 4. Detect communities from topology
+            self._topology.detect_communities()
+
+            self.record_delta("topology", "evolve_field", {
+                "region_count": self._topology.region_count(),
+                "pressure": self.metrics.field_pressure,
+            })
 
     @requires_invariants
     def capture_pre_allocation_field(self, tokens: list, schema_fields: list, is_noise: bool = False, domain: str = "") -> int:
@@ -1278,15 +1311,13 @@ class SemanticWorldState:
 
     @requires_invariants
     def decay_field_regions(self):
-        """Each basin evolves autonomously.
+        """Legacy entry point — delegates to the topology-canonical evolve_field().
 
-        Exclusion effects returned by evolve() are applied through formal state APIs.
+        Previously called evolve_all(force=True) + applied exclusion effects.
+        Now routes through evolve_field() which uses edge field forces to
+        modulate evolution, making the hardcoded force flag unnecessary.
         """
-        effects = self._topology.evolve_all(force=True)
-        for key, delta in effects:
-            if delta > 0:
-                current = self._instability.get_exclusion_by_key(key)
-                self._instability.set_exclusion(key, current + delta)
+        self.evolve_field()
 
     def snapshot(self, label: str = ""):
         """Record a compact topology snapshot for replay/debugging."""

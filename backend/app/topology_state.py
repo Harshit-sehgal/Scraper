@@ -7,7 +7,7 @@ structures directly. All topology changes go through this state object.
 
 from typing import Callable, Any, Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass
-from app.core_types import FieldConflictRegion
+from app.core_types import FieldConflictRegion, MAX_COUPLING_TRANSFER
 from app.transaction_context import active_transaction
 
 class ConflictError(Exception):
@@ -1063,76 +1063,179 @@ class TopologyState:
             for role in r.competing_roles:
                 r.local_memory[str(role)] = r.instability
 
+    # ─── Edge Field Forces ──────────────────────────────────────────
+
+    def _compute_edge_field_forces(self) -> Dict[Tuple[str, str], Dict[str, float]]:
+        """Compute force vectors from the unified edge field for each role pair.
+
+        Returns a dict mapping (role_a, role_b) -> {
+            'affinity': float,
+            'repulsion': float,
+            'pressure': float,
+            'route_strength': float,
+            'semantics': str
+        }
+
+        LAW: Edge field forces are the canonical driver of all topology dynamics.
+        No external code should recompute forces from raw cohesion/law data.
+        """
+        view = self.get_view()
+        forces: Dict[Tuple[str, str], Dict[str, float]] = {}
+        for edge in view.get_edge_fields():
+            pair = tuple(sorted([edge.source, edge.target]))
+            forces[pair] = {
+                'affinity': edge.affinity,
+                'repulsion': edge.repulsion,
+                'pressure': edge.pressure,
+                'route_strength': edge.route_strength,
+                'semantics': edge.semantics,
+            }
+        return forces
+
     # ─── Bulk Operations ───────────────────────────────────────────────
 
     def evolve_all(self, force: bool = False):
-        """Evolve all basins. Returns list of (exclusion_key, delta) effects
-        for the caller to apply through InstabilityState APIs.
+        """Evolve all basins modulated by edge field forces.
+
+        Returns list of (exclusion_key, delta) effects for the caller to
+        apply through InstabilityState APIs.
+
+        LAW: Edge field forces (pressure, affinity) modulate evolution speed.
+        High pressure regions evolve faster; high affinity regions stabilize.
         """
+        forces = self._compute_edge_field_forces()
         survivors = []
         all_effects = []
         for r in self._get_regions():
-            effects = r.evolve(force=force)
+            # Compute edge field force on this region
+            region_pressure = 0.0
+            region_affinity = 0.0
+            roles = r.competing_roles
+            for i in range(len(roles)):
+                for j in range(i + 1, len(roles)):
+                    pair = tuple(sorted([roles[i], roles[j]]))
+                    f = forces.get(pair)
+                    if f:
+                        region_pressure = max(region_pressure, f['pressure'])
+                        region_affinity = max(region_affinity, f['affinity'])
+
+            # Edge field modulates evolution
+            # High pressure forces evolution; high affinity adds stability
+            local_force = force or region_pressure > 0.3
+            if region_pressure > 0.3:
+                r.semantic_pressure = region_pressure
+
+            effects = r.evolve(force=local_force)
             all_effects.extend(effects)
-            # Phase 58: Survival logic - keep regions if they are stable OR active
-            # We only prune if it has zero instability AND zero recent activity
-            if r.instability > 0.001 or r.idle_cycles < 20:
+
+            # Survival: high affinity keeps regions alive even at low instability
+            if r.instability > 0.001 or r.idle_cycles < 20 or region_affinity > 0.4:
                 survivors.append(r)
         self._set_regions(survivors)
         return all_effects
 
     def propagate_all(self):
-        """Propagate all regions — returns list of (exclusion_key, delta) effects
-        for the caller to apply through InstabilityState APIs.
+        """Propagate instability through the unified edge field.
+
+        Returns list of (exclusion_key, delta) effects for the caller to
+        apply through InstabilityState APIs.
+
+        LAW: Propagation follows edge field forces, not ROLE_EXCLUSIVITY.
+        Instability flows along edge field connections, modulated by
+        the edge field's pressure, repulsion, and route strength.
         """
+        forces = self._compute_edge_field_forces()
         all_effects = []
         for r in self._get_regions():
-            effects = r.propagate()
+            effects = []
+            for role in r.competing_roles:
+                # Find all edges from this role in the edge field
+                for pair, force in forces.items():
+                    if role not in pair:
+                        continue
+                    peer = pair[0] if pair[1] == role else pair[1]
+                    if peer in r.competing_roles:
+                        continue  # Don't propagate within the same region
+
+                    # Edge-field-modulated propagation
+                    # pressure amplifies spread, affinity dampens
+                    spread_potential = r.instability * force['pressure']
+                    if force['semantics'] == 'repulsive':
+                        spread = spread_potential * MAX_COUPLING_TRANSFER
+                    elif force['semantics'] == 'attractive':
+                        # Attractive edges still propagate but dampened by containment
+                        spread = spread_potential * MAX_COUPLING_TRANSFER * 0.3
+                    else:
+                        spread = spread_potential * MAX_COUPLING_TRANSFER * 0.5
+
+                    spread = min(spread, r.instability * 0.5)
+                    if spread > 0.001:
+                        effects.append((pair, spread))
+
+            if not effects:
+                # Fallback: use legacy propagation when no edge field exists
+                effects = r.propagate()
             all_effects.extend(effects)
         return all_effects
     def redistribute_instability(self, damping: float = 1.0):
-        """Redistribute instability across regions based on pressure gradients.
-        
+        """Redistribute instability across regions using edge field coupling.
+
         LAW 14: Instability is a fluid that flows from high-pressure to low-pressure
-        regions via relational coupling.
+        regions via edge-field-derived coupling, not interaction counts.
         """
         regs = self._get_regions()
         if len(regs) < 2:
             return
-            
-        # 1. Track interactions for coupling depth
+
+        forces = self._compute_edge_field_forces()
+
+        # 1. Track interactions for fallback coupling
         for region in regs:
             region._interaction_count += 1
-            
-        # 2. Compute flows (Phase 58: Use delta map to avoid stale data issues)
+
+        # 2. Compute flows using edge field coupling
         deltas = {r.region_id: 0.0 for r in regs}
         for i in range(len(regs)):
             for j in range(i + 1, len(regs)):
                 ri = regs[i]
                 rj = regs[j]
-                
-                ci = ri._interaction_count
-                cj = rj._interaction_count
-                coupling = min(ci, cj) * 0.01
-                
-                if coupling < 0.01:
+
+                # Compute edge-field coupling between these regions
+                # Higher coupling = more instability flow
+                edge_coupling = 0.0
+                for ra in ri.competing_roles:
+                    for rb in rj.competing_roles:
+                        pair = tuple(sorted([ra, rb]))
+                        force = forces.get(pair)
+                        if force:
+                            # Edge field coupling = pressure + route_strength
+                            coupling = force['pressure'] * 0.5 + force['route_strength'] * 0.5
+                            edge_coupling = max(edge_coupling, coupling)
+
+                if edge_coupling < 0.01:
+                    # Fallback: use interaction count for disconnected pairs
+                    ci = ri._interaction_count
+                    cj = rj._interaction_count
+                    edge_coupling = min(ci, cj) * 0.01
+
+                if edge_coupling < 0.01:
                     continue
-                    
+
                 pressure_gradient = ri.instability - rj.instability
-                flow = coupling * pressure_gradient * damping
+                flow = edge_coupling * pressure_gradient * damping
                 # Clamp flow to prevent oscillations
                 flow = max(-0.1, min(0.1, flow))
-                
+
                 deltas[ri.region_id] -= flow
                 deltas[rj.region_id] += flow
-        
+
         # 3. Apply deltas
         for rid, delta in deltas.items():
             if abs(delta) > 1e-6:
                 r = self.get_region(rid)
                 if r:
                     self.set_region_instability(rid, r.instability + delta)
-        
+
         self._record("redistribute_instability", {"count": len(regs)})
 
     def aggregate_metrics(self):

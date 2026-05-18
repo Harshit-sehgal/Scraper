@@ -95,6 +95,7 @@ def test_no_orphan_methods():
         "update_scale_coupling", "redistribute_instability",
         "observe_field_perturbation",
         "field_regions", "learned_exclusions",
+        "decay_field_regions",
         "trace_causality", "replay_transaction",
         "evolved_schema", "export_manifold", "import_federated_manifold",
         "export_topology_laws", "import_federated_laws",

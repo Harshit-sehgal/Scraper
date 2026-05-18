@@ -454,18 +454,14 @@ def run_pipeline(
             be = get_boundary_engine()
             be.update_recent_decisions(coherence, _field_coherence_threshold())
             
-            # Basin evolution — continuous, both event-triggered (scheduler) and
-            # pipeline-driven (here) to ensure evolution during non-event periods.
-            state.decay_field_regions()
-            state.aggregate_from_regions()
-            state.redistribute_instability()
-            
+            # Field evolution — single topology-canonical entry point.
+            # Replaces individual calls to decay_field_regions(),
+            # aggregate_from_regions(), and redistribute_instability().
+            state.evolve_field()
+
             # Synthesize crystalline records for stable runs
             if output["_confidence"] > 0.7 and tokens:
                 state._synthesize_crystalline_record(output)
-            
-            # Update communities from processed record
-            state.detect_communities()
             
             allocated_records.append(output)
 
