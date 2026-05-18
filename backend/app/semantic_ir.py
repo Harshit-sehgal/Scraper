@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
+from app.models import FieldType
+
 
 class SemanticType(Enum):
     TEXT = "text"
@@ -389,11 +391,8 @@ def compute_type_signature(tokens: List[SemanticToken]) -> Tuple[str, ...]:
     return tuple(t.primary_type.value for t in tokens)
 
 
-# ─── FieldType ↔ SemanticType Mapping (deferred import to avoid cycles) ────
-
 def semantic_to_field_type(st: SemanticType) -> "FieldType":
     """Convert a SemanticType to its nearest FieldType equivalent."""
-    from app.models import FieldType
     _map = {
         SemanticType.PRICE: FieldType.CURRENCY,
         SemanticType.DATE: FieldType.DATE,
@@ -415,7 +414,6 @@ def semantic_to_field_type(st: SemanticType) -> "FieldType":
 
 def field_type_to_semantic(ft: "FieldType") -> SemanticType:
     """Convert a FieldType to its nearest SemanticType equivalent."""
-    from app.models import FieldType
     _map = {
         FieldType.STRING: SemanticType.TEXT,
         FieldType.INTEGER: SemanticType.NUMBER,

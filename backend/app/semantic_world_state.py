@@ -1,8 +1,11 @@
 import logging
 import time
+import threading
+from copy import deepcopy
 from collections import Counter
 from typing import Dict, List, Tuple, Optional, Any, Set, Callable
 from contextlib import contextmanager
+from app.transaction_context import active_transaction
 
 from app.core_types import FieldConflictRegion
 from app.invariant_firewall import requires_invariants
@@ -32,8 +35,10 @@ class SemanticWorldState:
         
         self._node_id = node_id or str(uuid.uuid4())[:8]
         self._vector_clock = VectorClock(self._node_id)
+        self._lock = threading.RLock() # Reentrant lock for nested transactions
         
-        self._topology = TopologyState(delta_callback=self.record_delta)
+        self._topology = TopologyState(delta_callback=self.record_delta,
+                                      read_callback=self.record_read)
         self._energy = EnergyState(delta_callback=self.record_delta)
         self._instability = InstabilityState(delta_callback=self.record_delta)
         self._manifold = ManifoldState(delta_callback=self.record_delta)
@@ -43,7 +48,11 @@ class SemanticWorldState:
         self._action = ActionState(delta_callback=self.record_delta)
         self._abstraction = AbstractionState(delta_callback=self.record_delta)
         self._observability = ObservabilityState(delta_callback=self.record_delta)
-        self._history = HistoryState()
+        self._history = HistoryState(delta_callback=self.record_delta)
+        
+        # Phase 60: Stability-aware Conflict Arbitration
+        self._manifold._energy_ref = self._energy
+        
         self._scheduler = GlobalCognitiveScheduler(ws=self)
         
         self.metrics = self._energy
@@ -52,7 +61,7 @@ class SemanticWorldState:
         self._replaying = False
         self._active_trace_id: Optional[str] = None
         self._current_journal: List[dict] = []
-        self._global_journal: List[dict] = []
+        self._journal_capacity: int = 1000 # Default (Phase 55)
         self._evolved_schema: Set[str] = set()
         
         # Substrate Branching (Phase 39)
@@ -128,58 +137,107 @@ class SemanticWorldState:
 
     @contextmanager
     def transaction(self, label: str = "anonymous", trace_id: Optional[str] = None):
-        """Context manager for atomic state transactions. Supports nesting and causality tracing."""
+        """Context manager for atomic state transactions. Supports true concurrency with MVCC."""
+        
+        # 1. Nested Transaction Check
+        if active_transaction.get() is not None:
+            yield self
+            return
+
+        from app.failure_injector import get_injector
+        injector = get_injector()
+        
         states = [self._topology, self._energy, self._instability, 
-                  self._manifold, self._motif, self._transition, 
-                  self._intent, self._action, self._abstraction, self._observability]
+                  self._manifold, self._motif, self._transition,                    self._intent, self._action, self._abstraction, self._observability,
+                  self._history]
         
         import uuid
-        if self._transaction_depth == 0:
-            for s in states:
-                if hasattr(s, 'begin_transaction'):
-                    s.begin_transaction()
-            self._current_journal = []
-            # Start new trace or use provided one
-            self._active_trace_id = trace_id or str(uuid.uuid4())[:8]
+        # Phase 51: Initialize local transaction context for MVCC
+        tx_ctx: Dict[str, Any] = {
+            "label": label,
+            "trace_id": trace_id or str(uuid.uuid4())[:8],
+            "base_versions": {},
+            "journal": [], # Thread-local journal
+        }
+        token = active_transaction.set(tx_ctx)
         
-        self._transaction_depth += 1
+        # Initialize staging areas (no lock needed, each thread has its own)
+        for s in states:
+            if hasattr(s, 'begin_transaction'):
+                s.begin_transaction()
+
         start_time = time.time()
         try:
             yield self
-            if self._transaction_depth == 1:
-                # Increment vector clock on commit (Phase 32)
+            
+            # 2. Commit Phase (Requires Global Lock)
+            with self._lock:
+                # Phase 46: Injected failure before commit
+                injector.inject(f"pre_commit:{label}")
+                
+                # Increment vector clock on commit
                 self._vector_clock.increment()
                 
-                for s in states:
-                    if hasattr(s, 'commit'):
-                        s.commit()
-                self.last_update_time = time.time()
+                # Phase 51: Perform MVCC Validation
+                expected_versions: Dict[str, int] = tx_ctx["base_versions"]
+                val_start = time.time()
+                
+                from app.topology_state import TopologyState, ConflictError
+                try:
+                    for s in states:
+                        if hasattr(s, 'commit'):
+                            # Phase 46: Random failure during multi-state commit
+                            injector.inject(f"mid_commit:{label}")
+                            if isinstance(s, TopologyState):
+                                s.commit(expected_versions=expected_versions)
+                            else:
+                                s.commit()
+                except ConflictError as ce:
+                    # Phase 55: Record conflict telemetry before re-raising
+                    self.emit_telemetry("transaction_conflict", {
+                        "label": label,
+                        "trace_id": tx_ctx["trace_id"],
+                        "error": str(ce),
+                        "regions_touched": len(expected_versions)
+                    })
+                    raise
+
+                val_end = time.time()
+                self.last_update_time = val_end
+                
                 # Record transaction in global journal
                 tx = {
                     "label": label,
                     "timestamp": self.last_update_time,
                     "duration": self.last_update_time - start_time,
+                    "validation_time_ms": (val_end - val_start) * 1000,
                     "clock": self._vector_clock.get_clock(),
                     "node_id": self.node_id,
-                    "trace_id": self._active_trace_id,
-                    "entries": list(self._current_journal)
+                    "trace_id": tx_ctx["trace_id"],
+                    "entries": list(tx_ctx["journal"])
                 }
-                self._global_journal.append(tx)
-                self._history.record_transaction(tx)
-                # Trim global journal
-                if len(self._global_journal) > 1000:
-                    self._global_journal = self._global_journal[-500:]
+                self._history.record_transaction(tx, capacity=self._journal_capacity)
+                
+                # Phase 46/55: Emit enhanced telemetry for the transaction itself
+                self.emit_telemetry("transaction", {
+                    "label": label,
+                    "duration": tx["duration"],
+                    "validation_ms": tx["validation_time_ms"],
+                    "entry_count": len(tx["entries"]) if isinstance(tx["entries"], list) else 0,
+                    "regions_touched": len(expected_versions),
+                    "trace_id": tx["trace_id"],
+                    "node_id": self.node_id
+                })
+                    
         except Exception as e:
-            if self._transaction_depth == 1:
-                for s in states:
-                    if hasattr(s, 'rollback'):
-                        s.rollback()
-                logging.getLogger(__name__).error(f"State transaction [{label}] failed on node [{self.node_id}] (Trace: {self._active_trace_id}), rolled back: {e}")
+            # Rollback staged changes (no lock needed for local staging)
+            for s in states:
+                if hasattr(s, 'rollback'):
+                    s.rollback()
+            logging.getLogger(__name__).error(f"State transaction [{label}] failed on node [{self.node_id}] (Trace: {tx_ctx['trace_id']}), rolled back: {e}")
             raise
         finally:
-            self._transaction_depth -= 1
-            if self._transaction_depth == 0:
-                self._active_trace_id = None
+            active_transaction.reset(token)
 
     def replay_transaction(self, tx: dict):
         """Replay a transaction by executing its recorded entries.
@@ -207,6 +265,13 @@ class SemanticWorldState:
                     elif subsystem == "action": target = self._action
                     elif subsystem == "abstraction": target = self._abstraction
                     elif subsystem == "observability": target = self._observability
+                    elif subsystem == "history": target = self._history
+                    elif subsystem == "global":
+                        # Global events (merge, federate, promote, relax, etc.)
+                        # are orchestration-level and don't have direct method targets.
+                        # They are replayed by re-executing the transaction's other
+                        # subsystem entries. Skip gracefully.
+                        continue
                     
                     if target and hasattr(target, action):
                         method = getattr(target, action)
@@ -232,27 +297,43 @@ class SemanticWorldState:
         if self._replaying:
             return
             
+        tx = active_transaction.get()
         entry = {
             "subsystem": subsystem,
             "action": action,
-            "details": details,
+            "details": deepcopy(details),
             "timestamp": time.time(),
-            "trace_id": self._active_trace_id
+            "trace_id": tx["trace_id"] if tx else None
         }
-        if self._transaction_depth > 0:
-            self._current_journal.append(entry)
+        
+        if tx is not None:
+            tx["journal"].append(entry)
         else:
             # Direct mutation outside transaction (less ideal but possible)
-            self._global_journal.append({
-                "label": "direct_mutation",
-                "timestamp": entry["timestamp"],
-                "duration": 0,
-                "entries": [entry]
-            })
+            with self._lock:
+                direct_tx = {
+                    "label": "direct_mutation",
+                    "timestamp": entry["timestamp"],
+                    "duration": 0,
+                    "clock": self._vector_clock.get_clock(),
+                    "node_id": self.node_id,
+                    "entries": [entry],
+                    "trace_id": entry["trace_id"]
+                }
+                self._history.record_transaction(direct_tx, capacity=self._journal_capacity)
+
+    def record_read(self, region_id: str, version: int):
+        """Record that a region was read during the current transaction (Phase 51)."""
+        tx = active_transaction.get()
+        if tx is not None:
+            tx["base_versions"][region_id] = version
+
+    # ─── Public Getters ───────────────────────────────────────────────────
 
     def trace_causality(self, limit: int = 100) -> List[dict]:
-        """Return the causality journal."""
-        return self._global_journal[-limit:]
+        """Return the causality journal from persistent history (Phase 55)."""
+        history_journal = self._history.transaction_journal
+        return history_journal[-limit:] if history_journal else []
 
     # ─── Distributed Consensus (Phase 32) ───────────────────────────────
 
@@ -265,6 +346,7 @@ class SemanticWorldState:
         active_trace = trace_id or remote_data.get("last_trace_id")
         
         # 1. Compare Clocks to determine causality
+        # We perform the comparison OUTSIDE the transaction to avoid lock contention
         relation = self._vector_clock.compare(remote_clock)
         
         if relation == "ancestor" or relation == "equal":
@@ -272,16 +354,17 @@ class SemanticWorldState:
             logging.getLogger(__name__).info(f"CONSENSUS: Ignoring remote state from [{remote_node}] (Ancestor/Equal)")
             return
             
+        # 2. Speculative Reconciliation
+        # Blending factors:
+        # If concurrent (conflict), use conservative blending (0.3)
+        # If descendant (remote is newer), use aggressive blending (0.7)
+        alpha = 0.7 if relation == "descendant" else 0.3
+        
         with self.transaction(f"merge:{remote_node}", trace_id=active_trace):
             # Update local clock with remote knowledge
             self._vector_clock.update(remote_clock)
             
-            # Semantic Reconciliation: determine blending factor (alpha)
-            # If concurrent (conflict), use conservative blending (0.3)
-            # If descendant (remote is newer), use aggressive blending (0.7)
-            alpha = 0.7 if relation == "descendant" else 0.3
-            
-            # 2. Merge Sub-States
+            # Merge Sub-States using the calculated alpha
             self._energy.merge(remote_data, alpha=alpha)
             self._manifold.merge(remote_data, alpha=alpha)
             self._instability.merge(remote_data)
@@ -466,8 +549,16 @@ class SemanticWorldState:
     def clear_compatibility(self):
         self._manifold.clear_compatibility()
 
+    def clear_compatibility_for_key(self, key: tuple):
+        """Clear compatibility for a specific role-type key."""
+        self._manifold.clear_compatibility_for_key(key)
+
     def set_compatibility(self, role: str, type_str: str, value: float):
         self._manifold.set_compatibility(role, type_str, value)
+
+    def get_compatibility(self, role: str, type_str: str) -> float:
+        """Get compatibility between a role and a type string."""
+        return self._manifold.get_compatibility(role, type_str)
 
     def expand_dimensions(self, new_dim: int):
         self._manifold.expand_dimensions(new_dim)
@@ -477,6 +568,15 @@ class SemanticWorldState:
 
     def get_shard_roles(self, shard_id: str) -> list:
         return self._manifold.get_shard_roles(shard_id)
+
+    def shard_substrate(self) -> Dict[str, List[str]]:
+        """Partition the entire semantic field into independent shards (Phase 53)."""
+        # 1. Update communities
+        self._topology.detect_communities()
+        # 2. Assign roles
+        self._manifold.shard_manifold(self._topology.global_communities)
+        # 3. Assign regions
+        return self._topology.shard_topology()
 
     def apply_force_to_manifold(self, role: str, deltas: list, clamp: bool = True):
         self._manifold.apply_force_to_manifold(role, deltas, clamp)
@@ -510,7 +610,26 @@ class SemanticWorldState:
     # ─── Observability Delegation Methods ────────────────────────────────
 
     def emit_telemetry(self, event_type: str, details: dict):
-        self._observability.emit_telemetry(event_type, details)
+        """Record a telemetry event, propagating the current trace_id if available."""
+        self._observability.emit_telemetry(event_type, details, trace_id=self._active_trace_id)
+
+    def record_degradation(
+        self,
+        subsystem: str,
+        severity: str,
+        cause: str,
+        topology_state: Optional[str] = None,
+        semantic_entropy: Optional[float] = None,
+    ):
+        """Record a structured degradation event with automatic trace_id propagation."""
+        self._observability.record_degradation(
+            subsystem=subsystem,
+            severity=severity,
+            cause=cause,
+            trace_id=self._active_trace_id,
+            topology_state=topology_state,
+            semantic_entropy=semantic_entropy,
+        )
 
     @property
     def observability_telemetry(self) -> list:
@@ -568,6 +687,18 @@ class SemanticWorldState:
     def update_seed_transition(self, data: dict):
         self._transition.update_seed(data)
 
+    def get_transition_prob(self, type_a: str, type_b: str) -> float:
+        """Get transition probability between two types."""
+        return self._transition.get_prob(type_a, type_b)
+
+    def observe_transition(self, type_a: str, type_b: str, is_role_boundary: bool):
+        """Observe a transition and reinforce/extinguish the probability."""
+        self._transition.observe(type_a, type_b, is_role_boundary)
+
+    def get_high_transition_types(self, threshold: float = 0.6) -> list:
+        """Get type pairs with high transition probability."""
+        return self._transition.get_high_transition_types(threshold)
+
     # ─── Vector Clock Delegation ─────────────────────────────────────────
 
     def get_vector_clock(self) -> dict:
@@ -583,6 +714,16 @@ class SemanticWorldState:
     def set_exclusion_by_key(self, key: tuple, value: float):
         """Set exclusion by tuple key."""
         self._instability.set_exclusion(key, value)
+
+    # ─── Energy Delegation Methods ────────────────────────────────────────
+
+    def accumulate_density(self, delta: float):
+        """Accumulate relational density into the energy state."""
+        self._energy.accumulate_density(delta)
+
+    def increment_records(self, n: int = 1):
+        """Increment total records processed counter."""
+        self._energy.increment_records(n)
 
     # ─── Energy & Topology API Delegation Properties ───────────────────────
 
@@ -1043,7 +1184,45 @@ class SemanticWorldState:
 
     @requires_invariants
     def redistribute_instability(self):
-        self._topology.redistribute_instability()
+        """Govern the semantic field dynamics using adaptive policies (Phase 56)."""
+        report = self._observability.get_governance_report(self)
+        policy = self._observability.get_stability_policy(self)
+        
+        # 1. Propagation Damping (Active Stability Control)
+        damping = policy.get("propagation_damping", 1.0)
+        
+        # Phase 56: Adaptive Damping — increase damping if diversity is low (Freezing risk)
+        diversity = report.get("diversity", 1.0)
+        if diversity < 0.4:
+            damping *= 0.7 # Suppress propagation to force focus on new learning
+            
+        self._topology.redistribute_instability(damping=damping)
+        
+        # 2. Attractor Governance
+        # Attractor Rebalancing (Energy Dissipation)
+        role_stabilities = {r: self._manifold.get_role_certainty(r) for r in self.role_manifold}
+        self._energy.rebalance_attractors(role_stabilities)
+        
+        # 3. Entropy Economy (Phase 56)
+        # Dynamic management of noise injection vs stabilization
+        global_certainty = self._manifold.get_certainty()
+        
+        # If certainty is high AND diversity is low, inject entropy aggressively
+        if global_certainty > 0.85 and diversity < 0.5:
+            # High freezing risk: inject directed noise
+            self._energy.inject_diversification_entropy(scale=0.04)
+        elif global_certainty > 0.7 and diversity < 0.7:
+            # Maintenance noise only if diversity is low (Phase 56)
+            self._energy.inject_diversification_entropy(scale=0.01)
+        
+        # 4. Metastable Lock Escape (Restructuring)
+        if policy.get("lock_escape_required", False):
+            logging.warning("METASTABLE LOCK DETECTED: Forcing topology restructuring on node [%s]", self.node_id)
+            self._topology.restructure_topology()
+            # Entropy dissipation boost
+            self._energy.set_entropy(min(1.0, self.metrics.global_entropy + 0.2))
+            
+        self.emit_telemetry("governance_pulse", report)
 
     @requires_invariants
     def aggregate_from_regions(self):
@@ -1125,11 +1304,17 @@ class SemanticWorldState:
             assigned.add(i)
             if len(cluster) > 1:
                 cluster_regions = [regions[k] for k in cluster]
+                
+                # Phase 47: Explicitly verify types for meso-scale aggregation
+                valid_cluster = [r for r in cluster_regions if hasattr(r, 'instability')]
+                if not valid_cluster:
+                    continue
+                    
                 meso.append({
-                    "size": len(cluster),
-                    "avg_instability": round(sum(r.instability for r in cluster_regions) / len(cluster_regions), 3),
-                    "avg_convergence": round(sum(r.local_convergence for r in cluster_regions) / len(cluster_regions), 3),
-                    "tokens": list(set(r.token for r in cluster_regions)),
+                    "size": len(valid_cluster),
+                    "avg_instability": round(sum(r.instability for r in valid_cluster) / len(valid_cluster), 3),
+                    "avg_convergence": round(sum(getattr(r, 'local_convergence', 0.3) for r in valid_cluster) / len(valid_cluster), 3),
+                    "tokens": list(set(getattr(r, 'token', 'unknown') for r in valid_cluster)),
                 })
 
         # Macro: global aggregate
@@ -1223,8 +1408,9 @@ class SemanticWorldState:
         self._history.synthesize_crystalline(record, idx)
 
     @requires_invariants
-    def induce_topological_laws(self):
-        self._topology.induce_topological_laws(self.learned_exclusions)
+    def induce_topological_laws(self, min_success_rate: float = 0.8, min_attempts: int = 10):
+        """Discover and formalize new topological laws (Phase 62)."""
+        self._topology.induce_topological_laws(min_success_rate=min_success_rate, min_attempts=min_attempts)
 
     @requires_invariants
     def observe_field_perturbation(self, output: dict, tokens: list):
@@ -1655,14 +1841,15 @@ class SemanticWorldState:
             peers = list(peers_map.values())
             if not peers:
                 continue
-            avg_u = sum(p.instability for p in peers) / len(peers)
-            avg_c = sum(p.integrity for p in peers) / len(peers)
+            n_peers = len(peers)
+            avg_u = sum(p.instability for p in peers) / n_peers
+            avg_c = sum(p.integrity for p in peers) / n_peers
             coupling = 0.05 * (0.5 + pressure)
             self._topology.set_region_temperature(r.region_id, r.local_temperature * 0.98 + (avg_u * 0.4) * 0.02)
             u_gap = avg_u - r.instability
             self._topology.adjust_region_instability(r.region_id, u_gap * coupling * avg_c)
             self._topology.set_region_integrity(r.region_id, r.integrity * 0.9 + avg_c * 0.1)
-            avg_e = sum(p.local_energy for p in peers) / len(peers)
+            avg_e = sum(p.local_energy for p in peers) / n_peers
             e_gap = avg_e - r.local_energy
             transfer = e_gap * coupling * 0.5
             self._topology.adjust_region_energy(r.region_id, transfer)
@@ -1758,7 +1945,8 @@ class SemanticWorldState:
                 total_instability = 0.0
                 for role in community:
                     total_instability += self.metrics.schema_instability.get(role, 0.5)
-                avg_instability = total_instability / len(community)
+                n_comm = len(community)
+                avg_instability = total_instability / n_comm if n_comm > 0 else 1.0
                 
                 # Only distill stable clusters (Phase 38 threshold: < 0.2)
                 if avg_instability < 0.2:
@@ -1771,12 +1959,13 @@ class SemanticWorldState:
                     if not vectors:
                         continue
                         
+                    n_vectors = len(vectors)
                     dim = len(vectors[0])
                     centroid = [0.0] * dim
                     for v in vectors:
                         for k in range(dim):
                             centroid[k] += v[k]
-                    centroid = [c / len(vectors) for c in centroid]
+                    centroid = [c / n_vectors for c in centroid]
                     
                     # Create the envelope
                     self._abstraction.create_envelope(envelope_id, constituents, centroid, level=1)
@@ -1890,7 +2079,6 @@ class SemanticWorldState:
         self._observability.clear()
         self._history.clear()
         self._current_journal = []
-        self._global_journal = []
         self._scheduler.clear()
         self.last_update_time = time.time()
 
@@ -1942,29 +2130,31 @@ class SemanticWorldState:
 
     def to_dict(self) -> dict:
         """Serialize state to a JSON-compatible dictionary."""
-        last_trace = self._global_journal[-1].get("trace_id") if self._global_journal else None
-        result = {
-            "version": "5.0",
-            "last_update": self.last_update_time,
-            "node_id": self.node_id,
-            "clock": self._vector_clock.to_dict(),
-            "last_trace_id": last_trace,
-            "parent_node_id": self._parent_node_id,
-            "branch_label": self._branch_label
-        }
-        result.update(self._energy.to_dict())
-        result.update(self._manifold.to_dict())
-        result.update(self._motif.to_dict())
-        result.update(self._transition.to_dict())
-        result.update(self._history.to_dict())
-        result.update(self._instability.to_dict())
-        result.update(self._intent.to_dict())
-        result.update(self._action.to_dict())
-        result.update(self._abstraction.to_dict())
-        result.update(self._observability.to_dict())
-        result["topology"] = self._topology.to_dict()
-        result["evolved_schema"] = list(self._evolved_schema)
-        return result
+        with self._lock:
+            history_journal = self._history.transaction_journal
+            last_trace = history_journal[-1].get("trace_id") if history_journal else None
+            result = {
+                "version": "5.0",
+                "last_update": self.last_update_time,
+                "node_id": self.node_id,
+                "clock": self._vector_clock.to_dict(),
+                "last_trace_id": last_trace,
+                "parent_node_id": self._parent_node_id,
+                "branch_label": self._branch_label,
+            }
+            result.update(self._energy.to_dict())
+            result.update(self._manifold.to_dict())
+            result.update(self._motif.to_dict())
+            result.update(self._transition.to_dict())
+            result.update(self._history.to_dict())
+            result.update(self._instability.to_dict())
+            result.update(self._intent.to_dict())
+            result.update(self._action.to_dict())
+            result.update(self._abstraction.to_dict())
+            result.update(self._observability.to_dict())
+            result["topology"] = self._topology.to_dict()
+            result["evolved_schema"] = list(self._evolved_schema)
+            return result
 
     @requires_invariants
     def from_dict(self, data: dict):
@@ -1983,7 +2173,7 @@ class SemanticWorldState:
         # Load EnergyState (supports nested and flat)
         metrics_data = data.get("metrics", None)
         if metrics_data is not None:
-            self._energy.load_from_dict(metrics_data)
+            self._energy.from_dict(metrics_data)
         else:
             metric_keys = {"global_energy", "global_entropy", "exclusion_count",
                           "total_records_processed", "cumulative_density", 
@@ -1992,7 +2182,7 @@ class SemanticWorldState:
                           "stability_debt", "schema_instability"}
             flat_metrics = {k: v for k, v in data.items() if k in metric_keys}
             if flat_metrics:
-                self._energy.load_from_dict(flat_metrics)
+                self._energy.from_dict(flat_metrics)
                 
         self._manifold.from_dict(data)
         self._motif.from_dict(data)
@@ -2006,7 +2196,7 @@ class SemanticWorldState:
         # Load InstabilityState (learned_exclusions)
         excl_data = data.get("learned_exclusions")
         if excl_data:
-            self._instability.load_from_dict(excl_data)
+            self._instability.from_dict(excl_data)
             
         # Load TopologyState
         topo_data = data.get("topology")
@@ -2058,12 +2248,13 @@ class SemanticWorldState:
         
         common_roles = set(local_m.keys()) & set(other_m.keys())
         if common_roles:
+            n_common = len(common_roles)
             total_dist = 0.0
             for r in common_roles:
                 v1, v2 = local_m[r], other_m[r]
                 dist = sum((a - b)**2 for a, b in zip(v1, v2))**0.5
                 total_dist += dist
-            divergence["manifold_drift"] = total_dist / len(common_roles)
+            divergence["manifold_drift"] = total_dist / n_common if n_common > 0 else 0.0
             
         divergence["new_roles"] = list(set(other_m.keys()) - set(local_m.keys()))
         divergence["missing_roles"] = list(set(local_m.keys()) - set(other_m.keys()))

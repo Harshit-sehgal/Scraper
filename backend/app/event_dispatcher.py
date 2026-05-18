@@ -35,6 +35,17 @@ class EventDispatcher:
                 callback(event)
             except Exception as e:
                 logging.getLogger(__name__).error("Error in event callback: %s", e)
+                # Record degradation telemetry (best-effort)
+                try:
+                    from app.semantic_world_state import get_world_state
+                    ws = get_world_state()
+                    ws.record_degradation(
+                        subsystem="event_dispatcher",
+                        severity="warning",
+                        cause=f"Event callback failed for {event.event_type.value} from {event.source}: {e}",
+                    )
+                except Exception:
+                    pass
 
 # Global Dispatcher
 _dispatcher = EventDispatcher()

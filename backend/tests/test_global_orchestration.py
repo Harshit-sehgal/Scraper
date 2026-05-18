@@ -9,7 +9,8 @@ def test_cross_node_causality_trace():
         ws_a._energy.set_energy(2.0)
         
     # Journal updated AFTER context manager exits
-    trace_id = ws_a._global_journal[-1]["trace_id"]
+    journal_a = ws_a.trace_causality()
+    trace_id = journal_a[-1]["trace_id"]
     state_a = ws_a.to_dict()
     assert state_a["last_trace_id"] == trace_id
     
@@ -66,6 +67,7 @@ def test_adaptive_pressure_throttling():
     # 3. Verify dream cycle uses budget correctly (indirectly via journal)
     ws.dream(cycles=1)
     # Find the dream entry in the last transaction
-    dream_tx = ws._global_journal[-1]
+    journal = ws.trace_causality()
+    dream_tx = journal[-1]
     dream_entry = next(e for e in dream_tx["entries"] if e["action"] == "dream")
     assert "budget" in dream_entry["details"]

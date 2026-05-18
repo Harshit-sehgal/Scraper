@@ -4,6 +4,7 @@ FastAPI Main Server — DataForge General-Purpose Web Scraper API.
 """
 
 import asyncio
+import logging
 from pathlib import Path
 
 # Load .env before any app imports that read env vars at module level
@@ -23,6 +24,9 @@ from app.state_store import load_state
 from app.utils.env import env_int
 # Initialize event cascade (safe: scheduler is lazy-created, no circular import)
 from app.graph_update_scheduler import get_scheduler
+from app.topology_state import ConflictError
+from fastapi import Request
+from fastapi.responses import JSONResponse
 get_scheduler()
 
 app = FastAPI(
@@ -30,6 +34,13 @@ app = FastAPI(
     description="AI-powered scraper that extracts structured data from any website",
     version="2.0.0"
 )
+
+@app.exception_handler(ConflictError)
+async def conflict_error_handler(request: Request, exc: ConflictError):
+    return JSONResponse(
+        status_code=409,
+        content={"message": str(exc), "retry_recommended": True},
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -62,7 +73,17 @@ def _persist_state_wrapper():
     )
 
 def _schedule_background_task(coro):
-    return asyncio.create_task(coro)
+    task = asyncio.create_task(coro)
+    def _handle_task_result(t: asyncio.Task):
+        try:
+            t.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Background task failed: {e}", exc_info=True)
+            
+    task.add_done_callback(_handle_task_result)
+    return task
 
 async def _run_job_wrapper(job_id: str):
     await run_job(

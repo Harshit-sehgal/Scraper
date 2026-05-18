@@ -5,6 +5,7 @@ All changes go through this state object, which supports transactions.
 """
 
 from typing import Dict, List, Optional, Callable
+from app.transaction_context import active_transaction
 
 import time
 
@@ -17,9 +18,19 @@ class AbstractionState:
         self._envelopes: Dict[str, dict] = {}
         # Abstraction Levels: role -> level (0 = base, 1 = higher-order)
         self._role_levels: Dict[str, int] = {}
-        
-        # ─── Transaction Staging ──────────────────────────────────────
-        self._staging: Optional[dict] = None
+
+    @property
+    def _staging(self) -> Optional[dict]:
+        tx = active_transaction.get()
+        if tx is not None:
+            return tx.get(f"abstraction_staging_{id(self)}")
+        return None
+
+    @_staging.setter
+    def _staging(self, value: Optional[dict]):
+        tx = active_transaction.get()
+        if tx is not None:
+            tx[f"abstraction_staging_{id(self)}"] = value
 
     def _record(self, action: str, details: dict):
         if self._delta_callback:

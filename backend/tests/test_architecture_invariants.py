@@ -100,8 +100,9 @@ def test_no_orphan_methods():
         "export_topology_laws", "import_federated_laws",
         "get_cognitive_health",
         "evaluate_topological_consistency", "merge_hierarchical_knowledge",
-        "synthesize_hierarchical_envelopes",
+        "synthesize_hierarchical_envelopes", "shard_substrate",
         # TopologyState delegate properties (accessed as properties, not method calls)
+
         "neighborhood_cohesion", "cohesion_merge_success",
         "cohesion_merge_attempts", "cohesion_split_success",
         "cohesion_split_attempts", "topological_laws",

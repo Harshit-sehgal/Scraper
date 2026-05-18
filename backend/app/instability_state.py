@@ -5,6 +5,7 @@ All tension changes go through this state object, which validates invariants.
 """
 
 from typing import Callable, Dict, Optional
+from app.transaction_context import active_transaction
 
 
 class InstabilityState:
@@ -13,7 +14,18 @@ class InstabilityState:
     def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
         self._delta_callback = delta_callback
         self._exclusions: Dict[tuple, float] = {}
-        self._staging: Optional[Dict[tuple, float]] = None
+    @property
+    def _staging(self) -> Optional[Dict[tuple, float]]:
+        tx = active_transaction.get()
+        if tx is not None:
+            return tx.get(f"instability_staging_{id(self)}")
+        return None
+    
+    @_staging.setter
+    def _staging(self, value: Optional[Dict[tuple, float]]):
+        tx = active_transaction.get()
+        if tx is not None:
+            tx[f"instability_staging_{id(self)}"] = value
 
     def _record(self, action: str, details: dict):
         if self._delta_callback:
@@ -105,6 +117,7 @@ class InstabilityState:
     def delete_exclusion(self, key: tuple):
         target = self._staging if self._staging is not None else self._exclusions
         target.pop(tuple(sorted(key)), None)
+        self._record("delete_exclusion", {"key": key})
 
     def prune_exclusions_weak(self, threshold: float = 0.01) -> int:
         """Remove all exclusions below threshold. Returns count removed."""
@@ -125,10 +138,14 @@ class InstabilityState:
             "learned_exclusions": {f"{k[0]}|{k[1]}": v for k, v in self._exclusions.items()}
         }
 
-    def load_from_dict(self, data: dict):
+    def from_dict(self, data: dict):
         self.clear()
         target = self._staging if self._staging is not None else self._exclusions
-        for k, v in data.items():
+        
+        # Phase 47: Symmetry fix - extract nested dictionary if present
+        source = data.get("learned_exclusions", data)
+        
+        for k, v in source.items():
             if isinstance(k, str):
                 if "|" in k:
                     parts = k.split("|")

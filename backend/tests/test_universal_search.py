@@ -65,10 +65,12 @@ def test_autonomous_law_induction():
     
     # 1. Establish high cohesion between role_a and role_b
     key = tuple(sorted(["role_a", "role_b"]))
-    ws._topology._neighborhood_cohesion[key] = 0.9
+    for _ in range(10):
+        ws._topology.record_cohesion_merge_attempt(key)
+        ws._topology.record_cohesion_merge_success(key)
     
     # 2. Induce laws
-    ws.induce_topological_laws()
+    ws.induce_topological_laws(min_attempts=5)
     
     # 3. Verify law learned
     assert ws.topological_laws.get(key, 0.0) > 0.0

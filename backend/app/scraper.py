@@ -177,8 +177,22 @@ Rules:
             try:
                 # Try fast-path first
                 raw_response = await run_sync_in_thread(lambda: _llm_json_fast(messages))
-            except Exception:
-                pass
+            except Exception as e:
+                logging.warning(
+                    "Fast-path semantic inference failed for chunk %d/%d: %s",
+                    chunks_processed, len(chunks), e
+                )
+                # Record degradation telemetry
+                try:
+                    from app.semantic_world_state import get_world_state
+                    ws = get_world_state()
+                    ws.record_degradation(
+                        subsystem="llm_fastpath",
+                        severity="warning",
+                        cause=f"Fast-path LLM inference failed for chunk {chunks_processed}: {e}",
+                    )
+                except Exception as telemetry_err:
+                    logging.getLogger(__name__).debug("Telemetry failed: %s", telemetry_err)
 
             cleaned_list = _extract_list_from_json(raw_response)
 

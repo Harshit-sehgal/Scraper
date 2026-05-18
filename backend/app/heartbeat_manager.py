@@ -41,7 +41,7 @@ class HeartbeatManager:
         alignment = 1.0 if unique_checksums == 1 else (1.0 / unique_checksums)
         
         # 3. Aggregate Energy
-        avg_energy = sum(n["energy"] for n in active_nodes) / len(active_nodes)
+        avg_energy = sum(n["energy"] for n in active_nodes) / len(active_nodes) if active_nodes else 0.0
         
         return {
             "status": "synchronized" if alignment == 1.0 else "divergent",

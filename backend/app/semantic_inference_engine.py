@@ -182,6 +182,22 @@ class RoleEmbeddingEngine:
             
         return vec
 
+    def get_adaptive_rate(self, base_rate: float = 0.1) -> float:
+        """Compute learning rate modulated by field pressure (Phase 62).
+        
+        High Pressure = Faster learning (search).
+        Low Pressure = Slower learning (precision).
+        """
+        pressure = 0.5
+        try:
+            pressure = self.ws.get_system_pressure()
+        except AttributeError:
+            pass
+            
+        certainty = self.get_certainty()
+        # Scale by pressure [0.5, 2.0] and stability (1.0 - certainty)
+        return base_rate * (0.5 + pressure * 1.5) * (1.0 - certainty)
+
     def learn_from_allocation(self, role: str, token_type: SemanticType, token_raw: str, success: bool, delta: float = 0.05, coherence: float = 1.0):
         """Apply learning force directly to the manifold."""
         if coherence < 0.6:
@@ -209,8 +225,8 @@ class RoleEmbeddingEngine:
         type_vec = self._get_type_vector(token_type)
         
         effective_delta = delta if success else -delta
-        # Dynamic Learning Rate: slows down as role stabilizes
-        rate = 0.1 * (1.0 - self.get_certainty())
+        # Dynamic Learning Rate (Phase 62): now adaptive to field pressure
+        rate = self.get_adaptive_rate()
         
         # Apply learning force directly to the manifold
         dim = self.dimension
@@ -253,10 +269,13 @@ class RoleEmbeddingEngine:
         # Phase 34: Cognitive Elasticity — scale rate by system pressure
         try:
             pressure = self.ws.get_system_pressure()
+            policy = self.ws._observability.get_stability_policy(self.ws)
         except AttributeError:
             pressure = 1.0 # Fallback
+            policy = {"propagation_damping": 1.0}
             
-        base_rate = 0.02 * (1.0 - self.get_certainty()) * (0.5 + pressure)
+        damping = policy.get("propagation_damping", 1.0)
+        base_rate = 0.02 * (1.0 - self.get_certainty()) * (0.5 + pressure) * damping
 
         # Thread-safety lock for shared manifold_copy mutations across shards — initialized in __init__
         def _relax_roles_safe(roles, manifold_full, rate):
@@ -418,10 +437,16 @@ class RoleEmbeddingEngine:
         if not self.manifold:
             return 0.0
         total_v = 0.0
-        for vec in self.manifold.values():
-            avg = sum(vec) / len(vec)
-            var = sum((x - avg)**2 for x in vec) / len(vec)
+        for role, vec in self.manifold.items():
+            if not vec:
+                continue
+            n_vec = len(vec)
+            avg = sum(vec) / n_vec
+            var = sum((x - avg)**2 for x in vec) / n_vec
             total_v += var
+
+        if not self.manifold:
+            return 0.0
         return min(1.0, (total_v / len(self.manifold)) * 4.0)
 
     def get_calibrated_confidence(self, score: float) -> float:

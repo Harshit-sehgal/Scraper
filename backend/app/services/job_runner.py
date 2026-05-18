@@ -10,6 +10,7 @@ from app.scraper import (
     ai_clean_and_align_records,
     scrape_url,
 )
+from app.semantic_pipeline import run_pipeline
 from app.semantic_persistence import load_semantic_state, save_semantic_state
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
@@ -140,56 +141,59 @@ async def run_job(
             else:
                 job.progress_current = idx
             
-            try:
-                results = await asyncio.wait_for(
-                    scrape_url(url, job.schema_fields, min_record_score=job.min_record_score, user_intent=job.intent),
-                    timeout=per_url_scrape_timeout_seconds,
-                )
-                ai_source_prediction["sources_attempted"] += 1
-                ai_structured_rows_for_source = 0
-                for record in results:
-                    if record.pop("_ai_source_structured", False):
-                        ai_structured_rows_for_source += 1
-                    record["source_url"] = url
-                    source_type = "unknown"
-                    source_trust_score = 0.4
+            from app.semantic_world_state import get_world_state
+            ws = get_world_state()
+            with ws.transaction(f"scrape:{url}"):
+                try:
+                    results = await asyncio.wait_for(
+                        scrape_url(url, job.schema_fields, min_record_score=job.min_record_score, user_intent=job.intent),
+                        timeout=per_url_scrape_timeout_seconds,
+                    )
+                    ai_source_prediction["sources_attempted"] += 1
+                    ai_structured_rows_for_source = 0
+                    for record in results:
+                        if record.pop("_ai_source_structured", False):
+                            ai_structured_rows_for_source += 1
+                        record["source_url"] = url
+                        source_type = "unknown"
+                        source_trust_score = 0.4
 
-                    if job.discovered_urls:
-                        matched = next((d for d in job.discovered_urls if d.get("url") == url), None)
-                        if matched:
-                            source_type = str(matched.get("source_type") or "unknown")
-                            source_trust_score = safe_score(matched.get("source_trust_score") or 0.4)
+                        if job.discovered_urls:
+                            matched = next((d for d in job.discovered_urls if d.get("url") == url), None)
+                            if matched:
+                                source_type = str(matched.get("source_type") or "unknown")
+                                source_trust_score = safe_score(matched.get("source_trust_score") or 0.4)
+                            else:
+                                inferred = infer_source_metadata(url=url)
+                                source_type = str(inferred.get("source_type") or "unknown")
+                                source_trust_score = safe_score(inferred.get("source_trust_score") or 0.4)
                         else:
                             inferred = infer_source_metadata(url=url)
                             source_type = str(inferred.get("source_type") or "unknown")
                             source_trust_score = safe_score(inferred.get("source_trust_score") or 0.4)
-                    else:
-                        inferred = infer_source_metadata(url=url)
-                        source_type = str(inferred.get("source_type") or "unknown")
-                        source_trust_score = safe_score(inferred.get("source_trust_score") or 0.4)
 
-                    record["source_type"] = source_type
-                    record["source_trust_score"] = round(source_trust_score, 3)
+                        record["source_type"] = source_type
+                        record["source_trust_score"] = round(source_trust_score, 3)
 
-                ai_source_prediction["records_processed"] += len(results)
-                ai_source_prediction["records_ai_structured"] += ai_structured_rows_for_source
-                if ai_structured_rows_for_source > 0:
-                    ai_source_prediction["sources_with_ai_structuring"] += 1
+                    ai_source_prediction["records_processed"] += len(results)
+                    ai_source_prediction["records_ai_structured"] += ai_structured_rows_for_source
+                    if ai_structured_rows_for_source > 0:
+                        ai_source_prediction["sources_with_ai_structuring"] += 1
 
-                all_raw_results.extend(results)
-                _add_job_log(job, f"Extracted {len(results)} raw records from {url}")
-                persist_state_fn()
-            except asyncio.TimeoutError:
-                msg = f"URL timeout skipped ({idx}/{len(job.urls)}): {url}"
-                warnings.append(msg)
-                _add_job_log(job, f"Timeout on {url}", level="warning", persist_fn=persist_state_fn)
-                logging.warning("Job %s: %s", job_id, msg)
-            except Exception as e:
-                logging.exception("Job %s: URL scrape failed: %s", job_id, url)
-                msg = f"URL scrape failed ({idx}/{len(job.urls)}): {url}"
-                warnings.append(f"{msg} ({type(e).__name__})")
-                _add_job_log(job, f"Failed to scrape {url}: {type(e).__name__}", level="warning", persist_fn=persist_state_fn)
-                continue
+                    all_raw_results.extend(results)
+                    _add_job_log(job, f"Extracted {len(results)} raw records from {url}")
+                    persist_state_fn()
+                except asyncio.TimeoutError:
+                    msg = f"URL timeout skipped ({idx}/{len(job.urls)}): {url}"
+                    warnings.append(msg)
+                    _add_job_log(job, f"Timeout on {url}", level="warning", persist_fn=persist_state_fn)
+                    logging.warning("Job %s: %s", job_id, msg)
+                except Exception as e:
+                    logging.exception("Job %s: URL scrape failed: %s", job_id, url)
+                    msg = f"URL scrape failed ({idx}/{len(job.urls)}): {url}"
+                    warnings.append(f"{msg} ({type(e).__name__})")
+                    _add_job_log(job, f"Failed to scrape {url}: {type(e).__name__}", level="warning", persist_fn=persist_state_fn)
+                    continue
 
         run_global_ai_structuring = (
             bool(all_raw_results)
@@ -214,6 +218,11 @@ async def run_job(
                     ),
                     timeout=ai_structuring_timeout_seconds,
                 )
+                # Integration Phase: ensure AI-cleaned records are integrated into the world state
+                from app.semantic_world_state import get_world_state
+                with get_world_state().transaction("global_ai_structuring"):
+                    all_raw_results = run_pipeline(all_raw_results, [f.name for f in job.schema_fields])
+                
                 if ai_structuring_report.get("capped_records", 0) > 0:
                     warnings.append(
                         "AI structuring processed a capped subset of rows; "

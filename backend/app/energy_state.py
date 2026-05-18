@@ -14,7 +14,8 @@ _convergence, _temperature, _integrity, _smoothed_* smoothing caches.
 import math
 
 
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict
+from app.transaction_context import active_transaction
 
 
 class EnergyState:
@@ -41,7 +42,18 @@ class EnergyState:
         self._stability_debt: float = 0.0
         
         # ─── Transaction Staging ──────────────────────────────────────
-        self._staging: Optional[dict] = None
+    @property
+    def _staging(self) -> Optional[dict]:
+        tx = active_transaction.get()
+        if tx is not None:
+            return tx.get(f"energy_staging_{id(self)}")
+        return None
+    
+    @_staging.setter
+    def _staging(self, value: Optional[dict]):
+        tx = active_transaction.get()
+        if tx is not None:
+            tx[f"energy_staging_{id(self)}"] = value
 
     def _record(self, action: str, details: dict):
         if self._delta_callback:
@@ -116,6 +128,32 @@ class EnergyState:
 
     def adjust_stability_debt(self, delta: float):
         self.stability_debt = self.stability_debt + delta
+        self._record("adjust_stability_debt", {"delta": delta})
+
+    def rebalance_attractors(self, role_stabilities: Dict[str, float], threshold: float = 0.8):
+        """Dissipate energy from monopolistic semantic basins (Phase 52).
+        
+        If a role becomes too dominant (stability > threshold), we siphons
+        energy into entropy to encourage exploration.
+        """
+        if self.global_entropy > 0.8:
+             return # Already high instability; no need for more dissipation
+             
+        for role, stability in role_stabilities.items():
+            if stability > threshold:
+                dissipation = (stability - threshold) * 2.0
+                # Reduce global energy, increase entropy (potential to kinetic shift)
+                cur_energy = self.global_energy
+                self.set_energy(cur_energy - dissipation * 0.1)
+                self.set_entropy(min(1.0, self.global_entropy + dissipation * 0.05))
+                self._record("rebalance_attractor", {"role": role, "stability": stability, "dissipation": dissipation})
+
+    def inject_diversification_entropy(self, scale: float = 0.05):
+        """Inject directed entropy into the field to prevent freezing (Phase 55)."""
+        cur = self.global_entropy
+        boost = scale * (1.0 - cur)
+        self.set_entropy(cur + boost)
+        self._record("inject_diversification_entropy", {"boost": boost})
 
     @property
     def global_energy(self) -> float:
@@ -214,14 +252,14 @@ class EnergyState:
     @property
     def average_uncertainty(self) -> float:
         total = self._get_val("total_records_processed")
-        if total == 0:
+        if total <= 0:
             return 0.5
         return self._get_val("cumulative_uncertainty") / total
 
     @property
     def average_density(self) -> float:
         total = self._get_val("total_records_processed")
-        if total == 0:
+        if total <= 0:
             return 0.5
         return self._get_val("cumulative_density") / total
 
@@ -243,14 +281,20 @@ class EnergyState:
         self._record("set_entropy", {"value": value})
 
     def set_convergence(self, value: float):
+        if math.isnan(value) or math.isinf(value):
+            return
         self._set_val("_convergence", max(0.0, min(1.0, value)))
         self._record("set_convergence", {"value": value})
 
     def set_temperature(self, value: float):
+        if math.isnan(value) or math.isinf(value):
+            return
         self._set_val("_temperature", max(0.0, min(1.0, value)))
         self._record("set_temperature", {"value": value})
 
     def set_integrity(self, value: float):
+        if math.isnan(value) or math.isinf(value):
+            return
         self._set_val("_integrity", max(0.0, min(1.0, value)))
         self._record("set_integrity", {"value": value})
 
@@ -259,16 +303,24 @@ class EnergyState:
         self._record("set_exclusion_count", {"value": value})
 
     def set_cumulative_uncertainty(self, value: float):
+        if math.isnan(value) or math.isinf(value):
+            return
         self._set_val("cumulative_uncertainty", max(0.0, value))
+        self._record("set_cumulative_uncertainty", {"value": value})
 
     def increment_records(self, n: int = 1):
         self._set_val("total_records_processed", self._get_val("total_records_processed") + n)
+        self._record("increment_records", {"n": n})
 
     def set_cumulative_density(self, value: float):
+        if math.isnan(value) or math.isinf(value):
+            return
         self._set_val("cumulative_density", max(0.0, value))
+        self._record("set_cumulative_density", {"value": value})
 
     def accumulate_density(self, delta: float):
         self._set_val("cumulative_density", max(0.0, self._get_val("cumulative_density") + delta))
+        self._record("accumulate_density", {"delta": delta})
 
     @property
     def schema_instability(self):
@@ -283,6 +335,7 @@ class EnergyState:
         inst = self._get_val("_schema_instability")
         inst[role] = max(0.0, min(1.0, value))
         self._set_val("_schema_instability", inst)
+        self._record("set_schema_instability", {"role": role, "value": value})
 
     # ─── Bulk/Derived Setters ────────────────────────────────────────────
 
@@ -290,24 +343,36 @@ class EnergyState:
         if not regions:
             return
         n = region_count if region_count else len(regions)
+        if n <= 0:
+            return
         avg_convergence = sum(r.local_convergence for r in regions) / n
         avg_temp = sum(getattr(r, 'local_temperature', 0.5) for r in regions) / n
         avg_energy = sum(r.local_energy for r in regions) / n
-        total_uncertainty = sum(r.instability for r in regions)
+        avg_instability = sum(r.instability for r in regions) / n
+        
         self.set_convergence(avg_convergence)
         self.set_temperature(avg_temp)
         self.set_energy(avg_energy)
-        self._set_val("cumulative_uncertainty", total_uncertainty)
+        self.set_entropy(avg_instability)
+        self._set_val("cumulative_uncertainty", sum(r.instability for r in regions))
 
     def evolve_from_regions(self, regions, region_count: Optional[int] = None):
         if not regions:
             return
         n = region_count if region_count else len(regions)
+        if n <= 0:
+            return
         avg_convergence = sum(getattr(r, 'integrity', 0.5) for r in regions) / n
         avg_temp = sum(getattr(r, 'local_temperature', 0.5) for r in regions) / n
         avg_energy = sum(r.local_energy for r in regions) / n
         avg_instability = sum(r.instability for r in regions) / n
-        self._set_val("global_entropy", avg_instability)
+        
+        # Phase 56/58: Entropy Economy — smooth entropy growth but ensure it settled to 0
+        cur_entropy = self._get_val("global_entropy")
+        # Faster decay (0.5 weight) than growth (0.3 weight in previous iterations)
+        # to ensure stabilization is responsive.
+        self._set_val("global_entropy", cur_entropy * 0.5 + avg_instability * 0.5)
+        
         self._set_val("_convergence", avg_convergence)
         self._set_val("_temperature", avg_temp)
         # Update smoothed metrics (EMA-style)
@@ -321,7 +386,7 @@ class EnergyState:
         cur_energy = self._get_val("global_energy")
         self._set_val("global_energy", cur_energy * 0.8 + target_energy * 0.2)
 
-    def load_from_dict(self, data: dict):
+    def from_dict(self, data: dict):
         self.clear()
         self._set_val("global_energy", data.get("global_energy", 5.0))
         self._set_val("global_entropy", data.get("global_entropy", 0.5))

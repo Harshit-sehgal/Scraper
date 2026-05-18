@@ -132,7 +132,6 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
         _STOP_WORDS,
         get_boundary_engine,
     )
-    from app.semantic_ir import SemanticType
     be = get_boundary_engine()
     
     # Entity-relevant types (types that indicate a real data record)
@@ -221,8 +220,8 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
 
         if core_count >= 2 or normalized_density > stability_threshold:
             # Propagate to global state for future equilibrium
-            state._energy.accumulate_density(normalized_density)
-            state._energy.increment_records()
+            state.accumulate_density(normalized_density)
+            state.increment_records()
             filtered.append(record)
         elif core_count == 1:
             # Multi-word entity check
@@ -230,8 +229,8 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
             org_cands = [c for c in cands if sem_type_str(c.primary_type) in ENTITY_TYPES]
             has_named_entity = len(org_cands) >= 2 and any(c.raw.lower() in _STOP_WORDS for c in org_cands)
             if has_suffix or has_named_entity or normalized_density > (stability_threshold * 0.7):
-                 state._energy.accumulate_density(normalized_density)
-                 state._energy.increment_records()
+                 state.accumulate_density(normalized_density)
+                 state.increment_records()
                  filtered.append(record)
             else:
                  logging.getLogger(__name__).debug("Filtered: core_count=1 but low relative density %f", normalized_density)
@@ -267,206 +266,208 @@ def run_pipeline(
     """Run the full semantic pipeline orchestrator."""
     if not records:
         return []
-    
-    reng = _get_role_engine()
-    be = get_boundary_engine()
-    dispatcher = get_dispatcher()
-    
-    # Bootstrap engines
-    if schema_fields:
-        seed_role_engine(schema_fields)
-        warm_start_from_values(records, schema_fields)
-    
-    report = PipelineReport(input_records=len(records))
-    
-    # Layer 1: Strip metadata
-    records = strip_metadata(records)
-    report.after_metadata_strip = len(records)
 
-    # Layer 2: Filter noise
-    noise_count = len(records)
-    records = filter_noise_records(records)
-    report.noise_removed = noise_count - len(records)
-    report.after_noise_filter = len(records)
-    
-    if report.noise_removed > 0:
-        dispatcher.dispatch(SemanticEvent(
-            event_type=SemanticEventType.TOPOLOGY_SHIFT,
-            source="pipeline_filter",
-            payload={"removed": report.noise_removed},
-            instability_delta=_field_topology_delta()
-        ))
+    state = get_world_state()
+    with state.transaction("run_pipeline"):
+        reng = _get_role_engine()
+        be = get_boundary_engine()
+        dispatcher = get_dispatcher()
 
-    if not records:
-        return []
+        # Bootstrap engines
+        if schema_fields:
+            seed_role_engine(schema_fields)
+            warm_start_from_values(records, schema_fields)
 
-    # Layer 3: Semantic segmentation
-    mem = StructuralMemoryTracker()
-    records = expand_composite_records(records, memory=mem)
-    report.after_segmentation = len(records)
-    
-    # Layer 4: Entity grouping (boundary-aware merge)
-    records = group_adjacent_entities(records)
-    
-    # Layer 5: Global semantic allocation
-    allocated_records: list = []
-    for record in records:
-        tokens = []
-        pos = 0
-        seen_values: set[str] = set()
+        report = PipelineReport(input_records=len(records))
         
-        seg_keys = [k for k in record if '_seg_' in k]
-        other_keys = [k for k in record if '_seg_' not in k]
-        ordered_keys = seg_keys + other_keys
+        # Layer 1: Strip metadata
+        records = strip_metadata(records)
+        report.after_metadata_strip = len(records)
+
+        # Layer 2: Filter noise
+        noise_count = len(records)
+        records = filter_noise_records(records)
+        report.noise_removed = noise_count - len(records)
+        report.after_noise_filter = len(records)
         
-        for key in ordered_keys:
-            value = record.get(key)
-            if value and isinstance(value, str):
-                if is_child_fragment(value, seen_values):
-                    continue
-
-                st, conf = detect_semantic_type(value, field_name=key)
-                tokens.append(SemanticToken(
-                    raw=value, normalized=value,
-                    span=Span(pos, pos + len(value)), position=pos,
-                    primary_type=st,
-                    type_distribution={st: conf},
-                    source_field=key,
-                ))
-                seen_values.add(value)
-                pos += len(value) + 1
-
-        from app.semantic_segmentation import resolve_overlaps
-        original_positions = {t.raw: t.position for t in tokens}
-        tokens = resolve_overlaps(tokens)
-        for t in tokens:
-            if t.raw in original_positions:
-                t.position = original_positions[t.raw]
-        
-        if tokens:
-            type_sequence = [t.primary_type.value for t in tokens]
-            record_motif_observation(type_sequence)
-
-        # Phase 4A: Capture pre-allocation conflict topology
-        # Preserves raw instability geometry before allocation resolves it
-        if tokens:
-            get_world_state().capture_pre_allocation_field(tokens, schema_fields)
-
-        # Phase 4C: Propagate field regions before allocation
-        # Instability spreads to neighboring roles, so allocation sees
-        # propagated pressure rather than raw resolved state
-        if tokens:
-            get_world_state().propagate_field_regions()
-
-        sem_record = SemanticRecord(tokens=tokens)
-        _, alloc_graph = allocate_semantic_roles(sem_record, schema_fields)
-
-        # Refinement pass
-        if len(tokens) >= 2:
-            sem_record2 = SemanticRecord(tokens=tokens)
-            _, alloc_graph2 = allocate_semantic_roles(sem_record2, schema_fields, learn=False)
-            if alloc_graph2.coherence_score > alloc_graph.coherence_score:
-                alloc_graph = alloc_graph2
-                
-        # P1: Topology-driven output — allocator is candidate generator only
-        # Output comes from topology state when the allocator detected a conflict
-        # (field_owned_roles). Otherwise the allocator's assignment is used.
-        topo_view = get_world_state()._topology.get_view()
-        output: dict = {}
-        field_owned = {fc["role"] for fc in getattr(alloc_graph, 'field_conflicts', [])}
-        for role_name in schema_fields:
-            role = alloc_graph.roles.get(role_name)
-            allocator_confident = role and role.filled_by and role.fill_confidence > 0.8
-            if role_name in field_owned and not allocator_confident:
-                # Topology decides — find the matching field region
-                top_val = None
-                for region in topo_view.all_regions():
-                    if role_name in region.competing_roles and region.token:
-                        top_val = region.token
-                        break
-                output[role_name] = top_val
-            else:
-                if role and role.filled_by:
-                    output[role_name] = role.filled_by
-                else:
-                    output[role_name] = None
-
-        output["_confidence"] = alloc_graph.coherence_score
-
-        # Preserve conflict geometry from allocation for field arbitration
-        alloc_conflicts = getattr(alloc_graph, 'field_conflicts', [])
-        if alloc_conflicts:
-            output["_allocation_conflicts"] = alloc_conflicts
-            for fc in alloc_conflicts:
-                role = fc["role"]
-                if role not in output or not output[role]:
-                    output[role] = fc["candidate"]
-                    output[f"_{role}_conflict"] = fc["reason"]
-
-        # Stage 6: Continuous Semantic Evolution (Inference)
-        # Decision is driven by graph energy and instability, not a hard threshold.
-        state = get_world_state()
-
-        # Field perturbation: register learned exclusions from conflicts
-        state.observe_field_perturbation(output, tokens)
-        instability = 1.0 - output["_confidence"]
-        relative_instability = instability / max(0.1, state.metrics.average_uncertainty)
-        # Unified field pressure modulates: high pressure amplifies instability
-        pressure = state.metrics.field_pressure
-        relative_instability *= (1.0 + pressure * 0.5)
-        
-        if relative_instability > _field_instability_threshold():
+        if report.noise_removed > 0:
             dispatcher.dispatch(SemanticEvent(
-                event_type=SemanticEventType.UNCERTAINTY_SPIKE,
-                source="allocation_engine",
-                payload={"instability": relative_instability},
-                instability_delta=_field_instability_delta()
+                event_type=SemanticEventType.TOPOLOGY_SHIFT,
+                source="pipeline_filter",
+                payload={"removed": report.noise_removed},
+                instability_delta=_field_topology_delta()
             ))
 
-        output["_certainty"] = reng.get_certainty()
-        output["_learning_speed"] = reng.get_learning_speed()
-        output["_calibrated_confidence"] = reng.get_calibrated_confidence(output["_confidence"])
-        
-        # Stage 7: Field tension is continuous — no explicit contradiction detection.
-        warnings = detect_role_swap_warnings(output, schema_fields, detect_semantic_type, _UNIVERSAL_ROOTS)
-        if warnings:
-            output["_warnings"] = warnings
+        if not records:
+            return []
 
+        # Layer 3: Semantic segmentation
+        mem = StructuralMemoryTracker()
+        records = expand_composite_records(records, memory=mem)
+        report.after_segmentation = len(records)
+        
+        # Layer 4: Entity grouping (boundary-aware merge)
+        records = group_adjacent_entities(records)
+        
+        # Layer 5: Global semantic allocation
+        allocated_records: list = []
+        for record in records:
+            tokens = []
+            pos = 0
+            seen_values: set[str] = set()
             
-        # Phase 7: Topology snapshot for observability + replay
-        state.snapshot(label=f"alloc_{len(allocated_records)}")
-        
-        # Phase 4: Semantic memory as topology pressure
-        # Stable motifs strengthen role-type compatibility — memory becomes gravity
-        if tokens:
-            for size in range(2, min(len(type_sequence) + 1, 4)):
-                for start in range(len(type_sequence) - size + 1):
-                    motif = tuple(type_sequence[start:start + size])
-                    stability = state.get_motif_stability(motif)
-                    if stability > 0.01:
-                        for role_name in schema_fields:
-                            boost = (stability - 0.5) * 0.05
-                            new_val = min(1.0, state._manifold.get_compatibility(role_name, motif[0]) + boost)
-                            state._manifold.set_compatibility(role_name, motif[0], new_val)
+            seg_keys = [k for k in record if '_seg_' in k]
+            other_keys = [k for k in record if '_seg_' not in k]
+            ordered_keys = seg_keys + other_keys
+            
+            for key in ordered_keys:
+                value = record.get(key)
+                if value and isinstance(value, str):
+                    if is_child_fragment(value, seen_values):
+                        continue
 
-        coherence = output["_confidence"]
-        be = get_boundary_engine()
-        be.update_recent_decisions(coherence, _field_coherence_threshold())
-        
-        # Basin evolution — continuous, both event-triggered (scheduler) and
-        # pipeline-driven (here) to ensure evolution during non-event periods.
-        state.decay_field_regions()
-        state.aggregate_from_regions()
-        state.redistribute_instability()
-        
-        # Synthesize crystalline records for stable runs
-        if output["_confidence"] > 0.7 and tokens:
-            state._synthesize_crystalline_record(output)
-        
-        # Update communities from processed record
-        state.detect_communities()
-        
-        allocated_records.append(output)
+                    st, conf = detect_semantic_type(value, field_name=key)
+                    tokens.append(SemanticToken(
+                        raw=value, normalized=value,
+                        span=Span(pos, pos + len(value)), position=pos,
+                        primary_type=st,
+                        type_distribution={st: conf},
+                        source_field=key,
+                    ))
+                    seen_values.add(value)
+                    pos += len(value) + 1
 
-    report.after_allocation = len(allocated_records)
-    return allocated_records
+            from app.semantic_segmentation import resolve_overlaps
+            original_positions = {t.raw: t.position for t in tokens}
+            tokens = resolve_overlaps(tokens)
+            for t in tokens:
+                if t.raw in original_positions:
+                    t.position = original_positions[t.raw]
+            
+            if tokens:
+                type_sequence = [t.primary_type.value for t in tokens]
+                record_motif_observation(type_sequence)
+
+            # Phase 4A: Capture pre-allocation conflict topology
+            # Preserves raw instability geometry before allocation resolves it
+            if tokens:
+                get_world_state().capture_pre_allocation_field(tokens, schema_fields)
+
+            # Phase 4C: Propagate field regions before allocation
+            # Instability spreads to neighboring roles, so allocation sees
+            # propagated pressure rather than raw resolved state
+            if tokens:
+                get_world_state().propagate_field_regions()
+
+            sem_record = SemanticRecord(tokens=tokens)
+            _, alloc_graph = allocate_semantic_roles(sem_record, schema_fields)
+
+            # Refinement pass
+            if len(tokens) >= 2:
+                sem_record2 = SemanticRecord(tokens=tokens)
+                _, alloc_graph2 = allocate_semantic_roles(sem_record2, schema_fields, learn=False)
+                if alloc_graph2.coherence_score > alloc_graph.coherence_score:
+                    alloc_graph = alloc_graph2
+                    
+            # P1: Topology-driven output — allocator is candidate generator only
+            # Output comes from topology state when the allocator detected a conflict
+            # (field_owned_roles). Otherwise the allocator's assignment is used.
+            topo_view = get_world_state().get_topology_view()
+            output: dict = {}
+            field_owned = {fc["role"] for fc in getattr(alloc_graph, 'field_conflicts', [])}
+            for role_name in schema_fields:
+                role = alloc_graph.roles.get(role_name)
+                allocator_confident = role and role.filled_by and role.fill_confidence > 0.8
+                if role_name in field_owned and not allocator_confident:
+                    # Topology decides — find the matching field region
+                    top_val = None
+                    for region in topo_view.all_regions():
+                        if role_name in region.competing_roles and region.token:
+                            top_val = region.token
+                            break
+                    output[role_name] = top_val
+                else:
+                    if role and role.filled_by:
+                        output[role_name] = role.filled_by
+                    else:
+                        output[role_name] = None
+
+            output["_confidence"] = alloc_graph.coherence_score
+
+            # Preserve conflict geometry from allocation for field arbitration
+            alloc_conflicts = getattr(alloc_graph, 'field_conflicts', [])
+            if alloc_conflicts:
+                output["_allocation_conflicts"] = alloc_conflicts
+                for fc in alloc_conflicts:
+                    role = fc["role"]
+                    if role not in output or not output[role]:
+                        output[role] = fc["candidate"]
+                        output[f"_{role}_conflict"] = fc["reason"]
+
+            # Stage 6: Continuous Semantic Evolution (Inference)
+            # Decision is driven by graph energy and instability, not a hard threshold.
+            state = get_world_state()
+
+            # Field perturbation: register learned exclusions from conflicts
+            state.observe_field_perturbation(output, tokens)
+            instability = 1.0 - output["_confidence"]
+            relative_instability = instability / max(0.1, state.metrics.average_uncertainty)
+            # Unified field pressure modulates: high pressure amplifies instability
+            pressure = state.metrics.field_pressure
+            relative_instability *= (1.0 + pressure * 0.5)
+            
+            if relative_instability > _field_instability_threshold():
+                dispatcher.dispatch(SemanticEvent(
+                    event_type=SemanticEventType.UNCERTAINTY_SPIKE,
+                    source="allocation_engine",
+                    payload={"instability": relative_instability},
+                    instability_delta=_field_instability_delta()
+                ))
+
+            output["_certainty"] = reng.get_certainty()
+            output["_learning_speed"] = reng.get_learning_speed()
+            output["_calibrated_confidence"] = reng.get_calibrated_confidence(output["_confidence"])
+            
+            # Stage 7: Field tension is continuous — no explicit contradiction detection.
+            warnings = detect_role_swap_warnings(output, schema_fields, detect_semantic_type, _UNIVERSAL_ROOTS)
+            if warnings:
+                output["_warnings"] = warnings
+
+                
+            # Phase 7: Topology snapshot for observability + replay
+            state.snapshot(label=f"alloc_{len(allocated_records)}")
+            
+            # Phase 4: Semantic memory as topology pressure
+            # Stable motifs strengthen role-type compatibility — memory becomes gravity
+            if tokens:
+                for size in range(2, min(len(type_sequence) + 1, 4)):
+                    for start in range(len(type_sequence) - size + 1):
+                        motif = tuple(type_sequence[start:start + size])
+                        stability = state.get_motif_stability(motif)
+                        if stability > 0.01:
+                            for role_name in schema_fields:
+                                boost = (stability - 0.5) * 0.05
+                                new_val = min(1.0,                            state.get_compatibility(role_name, motif[0]) + boost)
+                                state.set_compatibility(role_name, motif[0], new_val)
+
+            coherence = output["_confidence"]
+            be = get_boundary_engine()
+            be.update_recent_decisions(coherence, _field_coherence_threshold())
+            
+            # Basin evolution — continuous, both event-triggered (scheduler) and
+            # pipeline-driven (here) to ensure evolution during non-event periods.
+            state.decay_field_regions()
+            state.aggregate_from_regions()
+            state.redistribute_instability()
+            
+            # Synthesize crystalline records for stable runs
+            if output["_confidence"] > 0.7 and tokens:
+                state._synthesize_crystalline_record(output)
+            
+            # Update communities from processed record
+            state.detect_communities()
+            
+            allocated_records.append(output)
+
+        report.after_allocation = len(allocated_records)
+        return allocated_records

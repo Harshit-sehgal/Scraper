@@ -90,34 +90,34 @@ class RoleTransitionDetector:
         ws.update_seed_transition(_BOOTSTRAP_TRANSITIONS)
 
     @property
-    def _transition_state(self):
-        """Access the owned TransitionState."""
-        return get_world_state()._transition
+    def _ws(self):
+        """Access the world state through public API."""
+        return get_world_state()
 
     @property
     def transition_probs(self) -> Dict[Tuple[str, str], float]:
-        return self._transition_state.transition_probs
+        return self._ws.transition_probs
 
     @property
     def observation_count(self) -> int:
-        return self._transition_state.transition_observations
+        return self._ws.transition_observations
 
     @observation_count.setter
     def observation_count(self, value: int):
-        self._transition_state.set_transition_observations(value)
+        self._ws.transition_observations = value
 
     def score_transition(self, type_a: str, type_b: str) -> TransitionScore:
         """Score how likely a transition between these types represents a role boundary."""
-        prob = self._transition_state.get_prob(type_a, type_b)
+        prob = self._ws.get_transition_prob(type_a, type_b)
         return TransitionScore(probability=prob, type_pair=f"{type_a}→{type_b}")
 
     def observe_transition(self, type_a: str, type_b: str, is_role_boundary: bool):
         """Observe whether a transition was a role boundary or entity continuation."""
-        self._transition_state.observe(type_a, type_b, is_role_boundary)
+        self._ws.observe_transition(type_a, type_b, is_role_boundary)
 
     def get_high_transition_types(self) -> List[Tuple[str, str]]:
         """Get type pairs with high transition probability."""
-        return self._transition_state.get_high_transition_types()
+        return self._ws.get_high_transition_types()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

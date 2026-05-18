@@ -1,43 +1,31 @@
-"""Core types — shared dataclasses and constants for the semantic field.
-
-All modules depend on this layer, NOT on each other or on SemanticWorldState.
-This prevents reverse dependency entanglement and circular architecture collapse.
+"""
+Foundational Types for the Semantic Substrate
+=============================================
+LAW: Physical truth is a topological property of the field.
+Meaning is a geometric distance in the Role Manifold.
 """
 
 import uuid
-from typing import List
 from dataclasses import dataclass, field
+from typing import List
 
-# ─── Field Laws ───────────────────────────────────────────────────────────────
-
-MAX_PROPAGATION_RADIUS = 1
-PROPAGATION_DECAY_FLOOR = 0.3
-MAX_COUPLING_TRANSFER = 0.3
-MAX_ATTRACTOR_PULL = 2.0
-MAX_INSTABILITY_FLUX = 0.2
-
-# ─── FieldConflictRegion ──────────────────────────────────────────────────────
+# Max instability flux per evolution cycle (Phase 28)
+MAX_INSTABILITY_FLUX = 0.15
+# Coupling transfer cap (Phase 28)
+MAX_COUPLING_TRANSFER = 0.05
+# Minimum attenuation per hop (Phase 28)
+PROPAGATION_DECAY_FLOOR = 0.02
 
 @dataclass
 class FieldConflictRegion:
-    """A persistent, pre-resolution conflict in the semantic field.
-    
-    Contradictions are NOT immediately resolved. They persist as
-    topology structures that propagate, restructure the field,
-    and bias equilibrium before interpretation emerges.
-    
-    Each region is an autonomous basin that self-evolves and propagates
-    instability to neighbors via formal locality laws.
-    """
+    """A metastable region in the semantic field where multiple roles compete."""
     competing_roles: List[str]
     token: str
-    instability: float
-    region_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    semantic_pressure: float = 0.0
-    propagation_radius: int = 1
+    instability: float = 1.0  # [0, 1] entropy/tension level
+    region_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    
+    # Dynamics (Internal)
     recurrence_score: float = 0.0
-    topology_neighbors: List[str] = field(default_factory=list)
-    source_record: str = ""
     persistence: float = 1.0
     stability_momentum: float = 0.0
     local_convergence: float = 0.3
@@ -45,43 +33,45 @@ class FieldConflictRegion:
     local_energy: float = 5.0
     integrity: float = 0.5
     domain: str = ""
+    source_record: str = ""
     local_memory: dict = field(default_factory=dict)
     idle_cycles: int = 0
     energy_reservoir: float = 0.0
+    version: int = 1 # MVCC monotonic version counter
+    semantic_pressure: float = 0.5
+    topology_neighbors: List[str] = field(default_factory=list)
+    _interaction_count: int = 0 # Phase 58: Dynamic flow tracking
 
     def __post_init__(self):
         if not hasattr(self, '_propagation_count'):
             self._propagation_count = 0
+        if not self.region_id:
+            self.region_id = str(uuid.uuid4())[:8]
 
-    def evolve(self, force=False):
-        """Autonomous basin evolution — self-throttled by field demand.
+    def evolve(self, force: bool = False):
+        """Evolve basin state (Instability, Convergence, Persistence).
         
         LAW 5: No fixed evolution cadence. Basins evolve based on field
         demand (tension, pressure, depth), not procedural loops.
-        
-        - High instability + high recurrence = frequent evolution (hot basin)
-        - Low instability + high convergence = rare evolution (settled basin)
-        - The force flag overrides throttling (used by explicit evolution passes)
-        
-        Returns: list of (exclusion_key, delta) tuples for global effects
-        that the caller must apply through formal InstabilityState APIs.
         """
+        # Phase 58: Always apply state decay to ensure convergence
+        attractor = min(1.0, self.local_convergence * 1.5)
+        plasticity = 1.0 - attractor * 0.8
+        self.instability *= 0.95 * plasticity
+        self.recurrence_score *= 0.9
+        
         if not force:
-            # Field-demand throttle: only evolve if basin has significant tension
-            # High instability OR high recurrence indicates a hot basin that needs evolution
+            # Field-demand throttle: skip expensive updates if basin is settled
             demand = self.instability * 0.6 + self.recurrence_score * 0.4
-            # Settled basins (low instability + high convergence) can skip
             if self.local_convergence > 0.7 and self.instability < 0.3:
                 demand *= 0.3
             if demand < 0.15:
                 self.idle_cycles += 1
+                # Still update energy to reflect decay
+                self.local_energy = max(0.0, self.instability * 5.0 + self.semantic_pressure * 5.0)
                 return []
         
         self.idle_cycles = 0
-        attractor = min(1.0, self.local_convergence * 1.5)
-        plasticity = 1.0 - attractor * 0.8
-
-        self.instability *= 0.95 * plasticity
         effect = 1.0 / (1.0 + 2.718 ** (-10 * (self.recurrence_score - 0.3)))
         self.instability = min(1.0, self.instability + min(0.02 * effect, MAX_INSTABILITY_FLUX))
         self.persistence = min(2.0, self.persistence + 0.05)
@@ -104,6 +94,10 @@ class FieldConflictRegion:
             self.energy_reservoir = 0.0
             local_restructure = True
 
+        # Phase 47: Grounding Energy Update
+        # LAW 2: Energy = instability (potential) + pressure (external tension)
+        self.local_energy = max(0.0, self.instability * 5.0 + self.semantic_pressure * 5.0)
+
         # Compute exclusion effects from local instability — no ws mutation
         effects = []
         distort = 1.0 / (1.0 + 2.718 ** (-10 * (self.instability - 0.3)))
@@ -121,16 +115,7 @@ class FieldConflictRegion:
         return effects
 
     def propagate(self) -> list:
-        """Autonomous propagation — governed by formal locality laws.
-        
-        Constraints:
-        - Radius: 1 (direct exclusivity neighbors only)
-        - Attenuation: at least PROPAGATION_DECAY_FLOOR per hop
-        - Transfer cap: MAX_COUPLING_TRANSFER * instability
-        
-        Returns: list of (exclusion_key, delta) tuples for global effects
-        that the caller must apply through formal InstabilityState APIs.
-        """
+        """Autonomous propagation — governed by formal locality laws."""
         from app.field_laws import ROLE_EXCLUSIVITY
         effects = []
         for role in self.competing_roles:
@@ -148,4 +133,3 @@ class FieldConflictRegion:
                     key = tuple(sorted([role, peer]))
                     effects.append((key, spread))
         return effects
-

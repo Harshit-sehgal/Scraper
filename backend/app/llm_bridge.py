@@ -31,22 +31,28 @@ def _extract_json_payload(text: str):
     for candidate in (raw,):
         try:
             return json.loads(candidate)
-        except Exception:
-            pass
+        except json.JSONDecodeError:
+            logging.getLogger(__name__).debug(
+                "_extract_json_payload: direct JSON parse failed (len=%d)", len(candidate)
+            )
 
     match = re.search(r"\{[\s\S]*\}", raw)
     if match:
         try:
             return json.loads(match.group(0))
-        except Exception:
-            pass
+        except json.JSONDecodeError:
+            logging.getLogger(__name__).debug(
+                "_extract_json_payload: object JSON parse failed for match of len %d", len(match.group(0))
+            )
 
     match = re.search(r"\[[\s\S]*\]", raw)
     if match:
         try:
             return json.loads(match.group(0))
-        except Exception:
-            pass
+        except json.JSONDecodeError:
+            logging.getLogger(__name__).debug(
+                "_extract_json_payload: array JSON parse failed for match of len %d", len(match.group(0))
+            )
 
     return None
 
@@ -127,6 +133,17 @@ def _groq_model_candidates() -> list[str]:
     return models
 
 
+def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning"):
+    """Helper to record LLM failures in the semantic world state if available."""
+    try:
+        from app.semantic_world_state import get_world_state
+        ws = get_world_state()
+        ws.record_degradation(subsystem=subsystem, severity=severity, cause=cause)
+    except Exception as e:
+        # Fallback to debug logging if world state is unavailable
+        logging.getLogger(__name__).debug("Telemetry skipped (WS unavailable): %s", e)
+
+
 def llm_json(messages: list[dict], temperature: float = 0.1, timeout: int = 45):
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
@@ -150,6 +167,7 @@ def llm_json(messages: list[dict], temperature: float = 0.1, timeout: int = 45):
                 logging.exception(e)
                 stage = "Groq JSON call" if idx == 0 else "Groq JSON fallback model call"
                 logging.error("%s failed (%s): %s", stage, model, e)
+                _record_llm_degradation(subsystem="groq", cause=f"{stage} ({model}) failed: {e}")
 
     try:
         payload = {
@@ -163,6 +181,7 @@ def llm_json(messages: list[dict], temperature: float = 0.1, timeout: int = 45):
             return parsed
     except Exception as e:
         logging.error("Pollinations JSON call failed (prompt_len=%d): %s", len(messages), e)
+        _record_llm_degradation(subsystem="pollinations", cause=f"JSON call failed: {e}")
 
     try:
         from g4f.client import Client
@@ -179,6 +198,7 @@ def llm_json(messages: list[dict], temperature: float = 0.1, timeout: int = 45):
             return parsed
     except Exception as e:
         logging.error("g4f JSON fallback failed (prompt_len=%d): %s", len(messages), e)
+        _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
 
     return {}
 
@@ -207,6 +227,7 @@ def llm_json_fast(messages: list[dict], temperature: float = 0.0, timeout: int =
                 logging.exception(e)
                 stage = "Groq fast JSON call" if idx == 0 else "Groq fast JSON fallback model call"
                 logging.error("%s failed (%s): %s", stage, model, e)
+                _record_llm_degradation(subsystem="groq_fast", cause=f"{stage} ({model}) failed: {e}")
 
     try:
         payload = {
@@ -225,6 +246,7 @@ def llm_json_fast(messages: list[dict], temperature: float = 0.0, timeout: int =
     except Exception as e:
         logging.exception(e)
         logging.error("Pollinations fast JSON call failed: %s", e)
+        _record_llm_degradation(subsystem="pollinations_fast", cause=f"Fast JSON call failed: {e}")
 
     return {}
 
@@ -334,8 +356,12 @@ class SubstratePluginManager:
         variances = []
         for k in range(dim):
             vals = [v[k] for v in manifold.values()]
-            mean = sum(vals) / len(vals)
-            var = sum((x - mean)**2 for x in vals) / len(vals)
+            if not vals:
+                variances.append(0.0)
+                continue
+            n = len(vals)
+            mean = sum(vals) / n
+            var = sum((x - mean)**2 for x in vals) / n
             variances.append(var)
             
         # Identify lowest variance dimension

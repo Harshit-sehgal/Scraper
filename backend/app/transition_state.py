@@ -9,6 +9,7 @@ Owns:
 """
 
 from typing import Callable, Dict, Tuple, Optional
+from app.transaction_context import active_transaction
 
 
 class TransitionState:
@@ -18,9 +19,19 @@ class TransitionState:
         self._delta_callback = delta_callback
         self._transition_probs: Dict[Tuple[str, str], float] = {}
         self.transition_observations: int = 0
-        
-        # ─── Transaction Staging ──────────────────────────────────────
-        self._staging: Optional[dict] = None
+
+    @property
+    def _staging(self) -> Optional[dict]:
+        tx = active_transaction.get()
+        if tx is not None:
+            return tx.get(f"transition_staging_{id(self)}")
+        return None
+
+    @_staging.setter
+    def _staging(self, value: Optional[dict]):
+        tx = active_transaction.get()
+        if tx is not None:
+            tx[f"transition_staging_{id(self)}"] = value
 
     def _record(self, action: str, details: dict):
         if self._delta_callback:
@@ -116,6 +127,7 @@ class TransitionState:
         if not probs:
             probs.update(data)
             self._set_struct("transition_probs", probs)
+            self._record("update_seed", {"size": len(data)})
 
     # ─── Serialization ───────────────────────────────────────────────────
 

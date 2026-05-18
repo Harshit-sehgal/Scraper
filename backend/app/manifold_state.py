@@ -14,7 +14,8 @@ Owns:
 - total_co_occurrences: total co-occurrence observations
 """
 
-from typing import Callable, Dict, List, Tuple, Set,  Optional
+from typing import Callable, Dict, List, Tuple, Set, Optional
+from app.transaction_context import active_transaction
 
 
 class ManifoldState:
@@ -42,7 +43,18 @@ class ManifoldState:
         self.total_co_occurrences: int = 0
         
         # ─── Transaction Staging ──────────────────────────────────────
-        self._staging: Optional[dict] = None
+    @property
+    def _staging(self) -> Optional[dict]:
+        tx = active_transaction.get()
+        if tx is not None:
+            return tx.get(f"manifold_staging_{id(self)}")
+        return None
+    
+    @_staging.setter
+    def _staging(self, value: Optional[dict]):
+        tx = active_transaction.get()
+        if tx is not None:
+            tx[f"manifold_staging_{id(self)}"] = value
 
     def _record(self, action: str, details: dict):
         if self._delta_callback:
@@ -331,11 +343,13 @@ class ManifoldState:
 
     def clear_compatibility(self):
         self._set_struct("role_compatibility", {})
+        self._record("clear_compatibility", {})
 
     def clear_compatibility_for_key(self, key: tuple):
         compat = self._get_struct("role_compatibility")
         compat.pop(key, None)
         self._set_struct("role_compatibility", compat)
+        self._record("clear_compatibility_for_key", {"key": key})
 
     # ─── Role Position Memory ────────────────────────────────────────────
 
@@ -369,6 +383,7 @@ class ManifoldState:
         struct = self._get_struct("role_co_occurrence")
         struct[key] = struct.get(key, 0) + delta
         self._set_struct("role_co_occurrence", struct)
+        self._record("increment_co_occurrence", {"key": key, "delta": delta})
         if self._staging is not None:
             self._staging["total_co_occurrences"] += delta
         else:
@@ -376,6 +391,25 @@ class ManifoldState:
 
     def get_co_occurrence(self, key: tuple) -> int:
         return self._get_struct("role_co_occurrence").get(key, 0)
+
+    def get_role_certainty(self, role: str) -> float:
+        """Compute the stability of a specific role vector based on variance (Phase 52)."""
+        vec = self.get_manifold_vector(role)
+        if not vec:
+            return 0.0
+        n_vec = len(vec)
+        avg = sum(vec) / n_vec
+        var = sum((x - avg)**2 for x in vec) / n_vec
+        # Scale variance to [0,1] stability. High variance = lower stability.
+        return max(0.0, min(1.0, 1.0 - var * 4.0))
+
+    def get_certainty(self) -> float:
+        """Global manifold certainty score."""
+        manifold = self.role_manifold
+        if not manifold:
+            return 0.0
+        total_c = sum(self.get_role_certainty(r) for r in manifold)
+        return total_c / len(manifold)
 
     # ─── Decay ───────────────────────────────────────────────────────────
 
@@ -386,6 +420,7 @@ class ManifoldState:
             current = compat[key]
             compat[key] = current + (0.5 - current) * rate
         self._set_struct("role_compatibility", compat)
+        self._record("decay_compatibilities", {"rate": rate})
 
     # ─── Serialization ───────────────────────────────────────────────────
 
@@ -435,13 +470,32 @@ class ManifoldState:
             self.dimension = 16
 
     def merge(self, other_data: dict, alpha: float = 0.5):
-        """Merge remote manifold state into local (Phase 32)."""
+        """Merge remote manifold state into local (Phase 32/60)."""
         remote_manifold = other_data.get("role_manifold", {})
+        
+        # Phase 60: Semantic Conflict Arbitration
+        # Use schema instability as a reliability weight
+        remote_inst = other_data.get("schema_instability", {})
+        
         for role, r_vec in remote_manifold.items():
             if self.is_role_anchored(role):
                 continue
+                
             if self.has_manifold_role(role):
-                self.blend_manifold_vector(role, r_vec, alpha=1.0 - alpha, beta=alpha)
+                # Arbitration heuristic: more stable nodes have higher weight
+                l_inst = self.__dict__.get('_energy_ref', {}).get_schema_instability(role) if hasattr(self, '_energy_ref') else 0.5
+                r_inst = remote_inst.get(role, 0.5)
+                
+                # reliability = 1 - instability
+                l_rel = 1.0 - l_inst
+                r_rel = 1.0 - r_inst
+                
+                # Effective alpha is a blend of causal alpha and relative reliability
+                # (If remote is more reliable, increase its weight)
+                rel_ratio = r_rel / (l_rel + r_rel) if (l_rel + r_rel) > 0 else 0.5
+                effective_alpha = alpha * 0.7 + rel_ratio * 0.3
+                
+                self.blend_manifold_vector(role, r_vec, alpha=1.0 - effective_alpha, beta=effective_alpha)
             else:
                 self.set_manifold_vector(role, r_vec)
 

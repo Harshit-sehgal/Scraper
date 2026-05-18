@@ -8,6 +8,11 @@ structures directly. All topology changes go through this state object.
 from typing import Callable, Any, Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass
 from app.core_types import FieldConflictRegion
+from app.transaction_context import active_transaction
+
+class ConflictError(Exception):
+    """Raised when an optimistic concurrency conflict is detected."""
+    pass
 
 
 # ─── RegionSnapshot: Immutable Read-Only View ──────────────────────────────
@@ -33,6 +38,7 @@ class RegionSnapshot:
     local_temperature: float
     source_record: str
     domain: str
+    version: int # For validation
 
 
 class TopologyView:
@@ -47,7 +53,8 @@ class TopologyView:
                  neighborhood_cohesion, global_centrality,
                  impossible_neighborhoods, restructuring_queue,
                  cohesion_merge_success, cohesion_merge_attempts,
-                 cohesion_split_success, cohesion_split_attempts):
+                 cohesion_split_success, cohesion_split_attempts,
+                 read_callback: Optional[Callable[[str, int], None]] = None):
         self._regions = list(regions)
         self._communities = [set(c) for c in global_communities]
         self._schema_patterns = dict(schema_patterns)
@@ -60,8 +67,11 @@ class TopologyView:
         self._merge_attempts = dict(cohesion_merge_attempts)
         self._split_success = dict(cohesion_split_success)
         self._split_attempts = dict(cohesion_split_attempts)
+        self._read_callback = read_callback
 
     def _snapshot(self, r: FieldConflictRegion) -> RegionSnapshot:
+        if self._read_callback:
+            self._read_callback(r.region_id, r.version)
         return RegionSnapshot(
             region_id=r.region_id,
             token=r.token,
@@ -77,6 +87,7 @@ class TopologyView:
             local_temperature=r.local_temperature,
             source_record=r.source_record,
             domain=getattr(r, 'domain', ''),
+            version=r.version,
         )
 
     def _snapshot_dict(self, r: FieldConflictRegion) -> dict:
@@ -94,6 +105,7 @@ class TopologyView:
             "local_convergence": round(r.local_convergence, 3),
             "local_temperature": round(r.local_temperature, 3),
             "source_record": r.source_record,
+            "version": r.version,
         }
 
     # ─── Region Access ────────────────────────────────────────────────
@@ -189,8 +201,38 @@ class TopologyView:
 class TopologyState:
     """Sole owner of the semantic field's topology structure."""
 
-    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
+    @property
+    def _tombstones(self) -> Set[str]:
+        tx = self._staging
+        if tx is not None:
+            return tx["tombstones"]
+        return self.__dict__.get('_tombstones_real', set())
+
+    @_tombstones.setter
+    def _tombstones(self, value: Set[str]):
+        tx = self._staging
+        if tx is not None:
+            tx["tombstones"] = value
+        else:
+            self._tombstones_real = value
+
+    @property
+    def _structural_change(self) -> bool:
+        tx = self._staging
+        if tx is not None:
+            return tx["structural_change"]
+        return False
+
+    @_structural_change.setter
+    def _structural_change(self, value: bool):
+        tx = self._staging
+        if tx is not None:
+            tx["structural_change"] = value
+
+    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None,
+                 read_callback: Optional[Callable[[str, int], None]] = None):
         self._delta_callback = delta_callback
+        self._read_callback = read_callback
         # ─── Region Graph ──────────────────────────────────────────────
         self._regions: List[FieldConflictRegion] = []
 
@@ -199,20 +241,47 @@ class TopologyState:
         self._schema_patterns: Dict[Tuple[str, str], float] = {}
         self._topological_laws: dict = {}
         self._neighborhood_cohesion: Dict[Tuple[str, str], float] = {}
+        self._centrality: Dict[str, float] = {}
         self._impossible_neighborhoods: List[Set[str]] = []
         self._restructuring_queue: Set[Tuple[str, str]] = set()
         self._cohesion_merge_success: Dict[Tuple[str, str], float] = {}
         self._cohesion_merge_attempts: Dict[Tuple[str, str], float] = {}
         self._cohesion_split_success: Dict[Tuple[str, str], float] = {}
         self._cohesion_split_attempts: Dict[Tuple[str, str], float] = {}
-        self._centrality: Dict[str, float] = {}
         self._anchors: Set[Tuple[str, str]] = set()
         self._crystalline_atoms: List[dict] = []
+        
+        # ─── Distributed Recovery (Phase 60) ──────────────────────────
+        self._topology_epoch: int = 1
+        self._tombstones_real: Set[str] = set() # Final storage for tombstones
 
         # ─── Transaction Staging ──────────────────────────────────────
-        self._staging: Optional[dict] = None
+    @property
+    def _staging(self) -> Optional[dict]:
+        tx = active_transaction.get()
+        if tx is not None:
+            return tx.get(f"topology_staging_{id(self)}")
+        return None
+    
+    @_staging.setter
+    def _staging(self, value: Optional[dict]):
+        tx = active_transaction.get()
+        if tx is not None:
+            tx[f"topology_staging_{id(self)}"] = value
+
+    @property
+    def _modified_regions(self) -> Set[str]:
+        tx = active_transaction.get()
+        if tx is not None:
+            key = f"topology_modified_{id(self)}"
+            if key not in tx:
+                tx[key] = set()
+            return tx[key]
+        return set()
 
     def _record(self, action: str, details: dict):
+        if "region_id" in details:
+            self._modified_regions.add(details["region_id"])
         if self._delta_callback:
             self._delta_callback("topology", action, details)
 
@@ -221,6 +290,8 @@ class TopologyState:
     def begin_transaction(self):
         """Start a transaction by snapshotting all topology structures."""
         from dataclasses import replace
+        self._modified_regions.clear()
+        self._structural_change = False
         self._staging = {
             "regions": [replace(r) for r in self._regions],
             "communities": [set(c) for c in self._communities],
@@ -236,11 +307,31 @@ class TopologyState:
             "centrality": dict(self._centrality),
             "anchors": set(self._anchors),
             "crystalline_atoms": list(self._crystalline_atoms),
+            "tombstones": set(self._tombstones),
+            "structural_change": False,
         }
 
-    def commit(self):
-        """Apply staged changes to the active state."""
+    def commit(self, expected_versions: Optional[Dict[str, int]] = None):
+        """Apply staged changes to the active state with MVCC validation."""
         if self._staging is not None:
+            # 1. Optimistic Validation (Phase 51)
+            if expected_versions:
+                for rid, expected in expected_versions.items():
+                    # Find live region
+                    live = next((r for r in self._regions if r.region_id == rid), None)
+                    if live and live.version != expected:
+                        raise ConflictError(f"MVCC CONFLICT: Region [{rid}] version {live.version} != expected {expected}")
+
+            # 2. Increment versions for all modified regions
+            for rid in self._modified_regions:
+                r_staged = next((r for r in self._staging["regions"] if r.region_id == rid), None)
+                if r_staged:
+                    r_staged.version += 1
+
+            # Phase 60: Structural Epoch increment
+            if self._staging["structural_change"]:
+                self._topology_epoch += 1
+
             self._regions = self._staging["regions"]
             self._communities = self._staging["communities"]
             self._schema_patterns = self._staging["schema_patterns"]
@@ -255,11 +346,56 @@ class TopologyState:
             self._centrality = self._staging["centrality"]
             self._anchors = self._staging["anchors"]
             self._crystalline_atoms = self._staging["crystalline_atoms"]
+            self._tombstones_real = self._staging["tombstones"]
+            
             self._staging = None
+            self._modified_regions.clear()
 
     def rollback(self):
         """Discard staged changes."""
         self._staging = None
+        self._modified_regions.clear()
+        self._structural_change = False
+
+    def restructure_topology(self, target_region_ids: Optional[List[str]] = None):
+        """Forcibly rewire the substrate to escape metastable locks (Phase 52).
+        
+        Breaks strong cohesion edges and increases regional temperature to
+        encourage discovery of new topological minima.
+        """
+        regs = self._get_regions()
+        targets = target_region_ids if target_region_ids else [r.region_id for r in regs if r.instability < 0.1]
+        
+        for rid in targets:
+            # 1. Break edges (Clear neighbors)
+            self._record("break_topology_edges", {"region_id": rid})
+            r = self.get_region(rid)
+            if r:
+                r.topology_neighbors = []
+                # 2. Temperature Spike (Phase 48)
+                self.set_region_temperature(rid, 0.9)
+                # 3. Momentum Reset
+                self.set_region_momentum(rid, 0.0)
+                
+        self._record("restructure_topology", {"count": len(targets)})
+
+    def shard_topology(self) -> Dict[str, List[str]]:
+        """Assign every region to a shard based on community membership (Phase 53)."""
+        communities = self._get_struct("communities")
+        role_to_shard = {}
+        for idx, community in enumerate(communities):
+            shard_id = f"shard_{idx}"
+            for role in community:
+                role_to_shard[role] = shard_id
+                
+        shard_assignment: Dict[str, List[str]] = {}
+        for r in self._get_regions():
+            # Assign region to the shard of its first competing role
+            primary_role = r.competing_roles[0] if r.competing_roles else "_unidentified"
+            shard_id = role_to_shard.get(primary_role, "shard_default")
+            shard_assignment.setdefault(shard_id, []).append(r.region_id)
+            
+        return shard_assignment
 
     def _get_regions(self) -> List[FieldConflictRegion]:
         return self._staging["regions"] if self._staging is not None else self._regions
@@ -349,6 +485,7 @@ class TopologyState:
             cohesion_merge_attempts=self._get_struct("merge_attempts"),
             cohesion_split_success=self._get_struct("split_success"),
             cohesion_split_attempts=self._get_struct("split_attempts"),
+            read_callback=self._read_callback
         )
 
     def find_region_for_mutation(self, token: str, sorted_roles: tuple) -> Optional[str]:
@@ -409,6 +546,7 @@ class TopologyState:
         struct = self._get_struct("anchors")
         struct.add(tuple(sorted(pair)))
         self._set_struct("anchors", struct)
+        self._record("record_anchor", {"pair": list(pair)})
 
     def distill_crystalline_atoms(self, integrity_threshold: float = 0.9, instability_threshold: float = 0.1) -> int:
         """Move extremely stable regions into the permanent atom store (Phase 34)."""
@@ -525,21 +663,6 @@ class TopologyState:
                 del struct[key]
         self._set_struct("topological_laws", struct)
 
-    def induce_topological_laws(self, learned_exclusions: dict):
-        laws = self._get_struct("topological_laws")
-        cohesion = self._get_struct("neighborhood_cohesion")
-        for (ra, rb), val in cohesion.items():
-            if val > 0.6:
-                key = tuple(sorted([ra, rb]))
-                current = laws.get(key, 0.0)
-                laws[key] = min(1.0, current + val * 0.1)
-        for (ra, rb), exclusion in learned_exclusions.items():
-            if exclusion > 0.6:
-                key = tuple(sorted([ra, rb]))
-                current = laws.get(key, 0.0)
-                laws[key] = max(current, exclusion * 0.05)
-        self._set_struct("topological_laws", laws)
-
     def set_topological_law(self, pair: tuple, value: float):
         laws = self._get_struct("topological_laws")
         laws[tuple(sorted(pair))] = max(0.0, min(1.0, value))
@@ -572,6 +695,8 @@ class TopologyState:
         regs = self._get_regions()
         regs.append(region)
         self._set_regions(regs)
+        if self._staging is not None:
+            self._staging["structural_change"] = True
         self._record("add", {"competing_roles": competing_roles, "token": token, 
                             "instability": instability, "integrity": integrity, "domain": domain})
         return region
@@ -582,6 +707,8 @@ class TopologyState:
         regs = self._get_regions()
         regs.append(region)
         self._set_regions(regs)
+        if self._staging is not None:
+            self._staging["structural_change"] = True
         # We don't record the full object, just enough to reconstruct if needed, 
         # or use add() for replay.
 
@@ -590,12 +717,21 @@ class TopologyState:
         if region in regs:
             regs.remove(region)
             self._set_regions(regs)
+            if self._staging is not None:
+                self._staging["structural_change"] = True
+                self._staging["tombstones"].add(region.region_id)
+            else:
+                self._tombstones.add(region.region_id)
             self._record("remove", {"region_id": region.region_id})
             return True
         return False
 
     def replace_all(self, new_regions: List[FieldConflictRegion]):
+        """Replace the entire regional manifold (Phase 50)."""
         self._set_regions(list(new_regions))
+        if self._staging is not None:
+            self._staging["structural_change"] = True
+        self._record("replace_all_regions", {"count": len(new_regions)})
 
     def trim(self, max_size: int, keep_from_end: int = 0):
         regs = self._get_regions()
@@ -605,10 +741,14 @@ class TopologyState:
             else:
                 regs = regs[-max_size:]
             self._set_regions(regs)
+            if self._staging is not None:
+                self._staging["structural_change"] = True
 
     def filter_regions(self, predicate: Callable[[FieldConflictRegion], bool]):
         regs = [r for r in self._get_regions() if predicate(r)]
         self._set_regions(regs)
+        if self._staging is not None:
+            self._staging["structural_change"] = True
 
     def prune(self, min_instability: float = 0.02, min_energy: float = 0.5) -> int:
         regs = self._get_regions()
@@ -616,6 +756,8 @@ class TopologyState:
         regs = [r for r in regs
                          if r.instability > min_instability or r.local_energy > min_energy]
         self._set_regions(regs)
+        if len(regs) != before and self._staging is not None:
+            self._staging["structural_change"] = True
         return before - len(regs)
 
     def garbage_collect(self, max_idle: int = 10) -> int:
@@ -625,7 +767,66 @@ class TopologyState:
         # Prune regions that have been idle for too many cycles
         regs = [r for r in regs if r.idle_cycles < max_idle]
         self._set_regions(regs)
+        if len(regs) != before and self._staging is not None:
+            self._staging["structural_change"] = True
         return before - len(regs)
+
+    def self_prune(self, instability_threshold: float = 0.9, community_required: bool = True) -> int:
+        """Autonomous topology pruning (Phase 62).
+        
+        Removes regions that:
+        1. Have very high instability (> threshold)
+        2. Are NOT part of any detected community (isolated noise)
+        """
+        regs = self._get_regions()
+        if not regs:
+            return 0
+            
+        before = len(regs)
+        in_community = set().union(*self.global_communities)
+        
+        new_regs = []
+        for r in regs:
+            # Keep if stable OR in community OR part of the schema
+            is_noise = r.instability > instability_threshold
+            has_community = any(role in in_community for role in r.competing_roles)
+            
+            if is_noise and community_required and not has_community:
+                self._record("prune_dead_zone", {"region_id": r.region_id, "instability": r.instability})
+                self._structural_change = True
+                continue
+                
+            new_regs.append(r)
+            
+        self._set_regions(new_regs)
+        return before - len(new_regs)
+
+    def induce_topological_laws(self, min_success_rate: float = 0.8, min_attempts: int = 10):
+        """Autonomous law discovery (Phase 62).
+        
+        Promotes frequently successful structural patterns into formal laws.
+        """
+        # 1. Analyze successful merges
+        for pair, success in self._cohesion_merge_success.items():
+            attempts = self._cohesion_merge_attempts.get(pair, 0)
+            if attempts >= min_attempts:
+                rate = success / attempts
+                if rate >= min_success_rate:
+                    # Induced affinity law
+                    current = self.topological_laws.get(pair, 0.0)
+                    self.set_topological_law(pair, max(current, 0.5 + (rate - 0.5) * 0.5))
+                    self._record("induce_law", {"pair": pair, "type": "affinity", "rate": rate})
+                    
+        # 2. Analyze successful splits
+        for pair, success in self._cohesion_split_success.items():
+            attempts = self._cohesion_split_attempts.get(pair, 0)
+            if attempts >= min_attempts:
+                rate = success / attempts
+                if rate >= min_success_rate:
+                    # Induced repulsion law
+                    current = self.topological_laws.get(pair, 0.0)
+                    self.set_topological_law(pair, min(current, -0.5 * rate))
+                    self._record("induce_law", {"pair": pair, "type": "repulsion", "rate": rate})
 
     def clear(self):
         if self._staging is not None:
@@ -711,23 +912,33 @@ class TopologyState:
 
     def set_region_momentum(self, region_id: str, value: float):
         r = self.get_region(region_id)
-        if r: r.stability_momentum = max(0.0, min(1.0, value))
+        if r:
+            r.stability_momentum = max(0.0, min(1.0, value))
+            self._record("set_region_momentum", {"region_id": r.region_id, "value": value})
 
     def set_region_persistence(self, region_id: str, value: float):
         r = self.get_region(region_id)
-        if r: r.persistence = max(0.0, min(2.0, value))
+        if r:
+            r.persistence = max(0.0, min(2.0, value))
+            self._record("set_region_persistence", {"region_id": r.region_id, "value": value})
 
     def set_region_pressure(self, region_id: str, value: float):
         r = self.get_region(region_id)
-        if r: r.semantic_pressure = value
+        if r:
+            r.semantic_pressure = value
+            self._record("set_region_pressure", {"region_id": r.region_id, "value": value})
 
     def set_region_temperature(self, region_id: str, value: float):
         r = self.get_region(region_id)
-        if r: r.local_temperature = max(0.0, min(1.0, value))
+        if r:
+            r.local_temperature = max(0.0, min(1.0, value))
+            self._record("set_region_temperature", {"region_id": r.region_id, "value": value})
 
     def set_region_convergence(self, region_id: str, value: float):
         r = self.get_region(region_id)
-        if r: r.local_convergence = max(0.0, min(1.0, value))
+        if r:
+            r.local_convergence = max(0.0, min(1.0, value))
+            self._record("set_region_convergence", {"region_id": r.region_id, "value": value})
 
     def update_region_after_recurrence(self, region_id: str, field_pressure: float):
         r = self.get_region(region_id)
@@ -755,8 +966,9 @@ class TopologyState:
         for r in self._get_regions():
             effects = r.evolve(force=force)
             all_effects.extend(effects)
-            decay_floor = 0.05 / max(r.persistence, 0.5)
-            if r.instability > decay_floor:
+            # Phase 58: Survival logic - keep regions if they are stable OR active
+            # We only prune if it has zero instability AND zero recent activity
+            if r.instability > 0.001 or r.idle_cycles < 20:
                 survivors.append(r)
         self._set_regions(survivors)
         return all_effects
@@ -770,33 +982,50 @@ class TopologyState:
             effects = r.propagate()
             all_effects.extend(effects)
         return all_effects
-    def redistribute_instability(self):
+    def redistribute_instability(self, damping: float = 1.0):
+        """Redistribute instability across regions based on pressure gradients.
+        
+        LAW 14: Instability is a fluid that flows from high-pressure to low-pressure
+        regions via relational coupling.
+        """
         regs = self._get_regions()
         if len(regs) < 2:
             return
-        total_before = sum(r.instability for r in regs)
+            
+        # 1. Track interactions for coupling depth
         for region in regs:
-            region._interaction_count = getattr(region, '_interaction_count', 0) + 1
+            region._interaction_count += 1
+            
+        # 2. Compute flows (Phase 58: Use delta map to avoid stale data issues)
+        deltas = {r.region_id: 0.0 for r in regs}
         for i in range(len(regs)):
             for j in range(i + 1, len(regs)):
                 ri = regs[i]
                 rj = regs[j]
-                ci = getattr(ri, '_interaction_count', 0)
-                cj = getattr(rj, '_interaction_count', 0)
+                
+                ci = ri._interaction_count
+                cj = rj._interaction_count
                 coupling = min(ci, cj) * 0.01
+                
                 if coupling < 0.01:
                     continue
+                    
                 pressure_gradient = ri.instability - rj.instability
-                flow = coupling * pressure_gradient
+                flow = coupling * pressure_gradient * damping
+                # Clamp flow to prevent oscillations
                 flow = max(-0.1, min(0.1, flow))
-                ri.instability -= flow
-                rj.instability += flow
-        total_after = sum(r.instability for r in regs)
-        if abs(total_after - total_before) > 0.001 and total_after > 0:
-            scale = total_before / total_after
-            for r in regs:
-                r.instability *= scale
-        self._set_regions(regs)
+                
+                deltas[ri.region_id] -= flow
+                deltas[rj.region_id] += flow
+        
+        # 3. Apply deltas
+        for rid, delta in deltas.items():
+            if abs(delta) > 1e-6:
+                r = self.get_region(rid)
+                if r:
+                    self.set_region_instability(rid, r.instability + delta)
+        
+        self._record("redistribute_instability", {"count": len(regs)})
 
     def aggregate_metrics(self):
         regs = self._get_regions()
@@ -844,10 +1073,16 @@ class TopologyState:
             "impossible_neighborhoods": [list(n) for n in self.impossible_neighborhoods],
             "restructuring_queue": [list(r) for r in self.restructuring_queue],
             "crystalline_atoms": list(self._get_struct("crystalline_atoms")),
+            "topology_epoch": self._topology_epoch,
+            "tombstones": list(self._tombstones),
         }
 
     def from_dict(self, data: dict):
         self.clear()
+        
+        # Identity and Epoch (Phase 60)
+        self._topology_epoch = data.get("topology_epoch", 1)
+        self._tombstones = set(data.get("tombstones", []))
 
         # Regions
         regions = []
@@ -892,12 +1127,35 @@ class TopologyState:
         self._set_struct("crystalline_atoms", list(data.get("crystalline_atoms", [])))
 
     def merge(self, other_data: dict, alpha: float = 0.5):
-        """Merge remote topology state into local (Phase 32)."""
+        """Merge remote topology state into local (Phase 32/60)."""
+        remote_epoch = other_data.get("topology_epoch", 1)
+        remote_tombstones = set(other_data.get("tombstones", []))
+        
+        # Phase 60: Causal Reconciliation Heuristic
+        # 1. Update local tombstones (union)
+        self._tombstones.update(remote_tombstones)
+        
+        # 2. Sync Epoch
+        if remote_epoch > self._topology_epoch:
+            self._topology_epoch = remote_epoch
+        
+        # 3. Prune local regions that are tombstones in remote
+        if remote_epoch >= self._topology_epoch:
+            regs = self._get_regions()
+            new_regs = [r for r in regs if r.region_id not in remote_tombstones]
+            if len(new_regs) < len(regs):
+                self._set_regions(new_regs)
+                self._structural_change = True
+
         remote_regions = other_data.get("regions", [])
         local_ids = {r.region_id: r for r in self._get_regions()}
         
         for r_data in remote_regions:
             rid = r_data.get("region_id")
+            # Phase 60: Skip if region is a local tombstone
+            if rid in self._tombstones:
+                continue
+                
             if rid in local_ids:
                 # Merge existing region attributes (Phase 32)
                 l_reg = local_ids[rid]

@@ -208,6 +208,18 @@ class SemanticOS:
         with self.ws.transaction("manual_telemetry"):
             self.ws.emit_telemetry(event_type, details)
 
+    def record_degradation(self, subsystem: str, severity: str, cause: str,
+                           topology_state: Optional[str] = None,
+                           semantic_entropy: Optional[float] = None):
+        """Record a structured degradation event with causality tracking."""
+        self.ws.record_degradation(
+            subsystem=subsystem,
+            severity=severity,
+            cause=cause,
+            topology_state=topology_state,
+            semantic_entropy=semantic_entropy,
+        )
+
 _os_instance: Optional[SemanticOS] = None
 
 def get_semantic_os() -> SemanticOS:

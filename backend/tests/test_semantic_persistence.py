@@ -39,7 +39,6 @@ def test_persistence_round_trip():
     record_motif_observation(['organization', 'price'])
     
     # Verify pre-save state
-    print(f"DEBUG: Before save, compat(price, PRICE)={reng.get_compatibility('price', SemanticType.PRICE)}")
     assert reng.get_compatibility("price", SemanticType.PRICE) > 0.6
     assert be.motif_learner.total_records == 1
     
@@ -47,7 +46,6 @@ def test_persistence_round_trip():
     save_semantic_state()
     import time
     time.sleep(0.1) # Wait for filesystem sync
-    print(f"DEBUG: File exists after save+sleep: {os.path.exists(test_path)}")
     assert os.path.exists(test_path)
     
     # 5. Clear in-memory state

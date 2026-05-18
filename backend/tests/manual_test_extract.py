@@ -6,7 +6,8 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-html = open(Path(__file__).parent / 'test_page.html').read()
+with open(Path(__file__).parent / 'test_page.html') as f:
+    html = f.read()
 print(f"HTML length: {len(html)}")
 
 soup = BeautifulSoup(html, "html.parser")

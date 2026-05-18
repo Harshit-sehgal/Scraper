@@ -14,6 +14,7 @@ import math
 import logging
 from collections import Counter
 from typing import Callable, Dict, Tuple, Optional
+from app.transaction_context import active_transaction
 
 
 class MotifState:
@@ -24,9 +25,19 @@ class MotifState:
         self._motif_counts: Counter = Counter()
         self._motif_timestamps: Dict[Tuple[str, ...], int] = {}
         self._motif_stability: Dict[Tuple[str, ...], float] = {}
-        
-        # ─── Transaction Staging ──────────────────────────────────────
-        self._staging: Optional[dict] = None
+
+    @property
+    def _staging(self) -> Optional[dict]:
+        tx = active_transaction.get()
+        if tx is not None:
+            return tx.get(f"motif_staging_{id(self)}")
+        return None
+
+    @_staging.setter
+    def _staging(self, value: Optional[dict]):
+        tx = active_transaction.get()
+        if tx is not None:
+            tx[f"motif_staging_{id(self)}"] = value
 
     def _record(self, action: str, details: dict):
         if self._delta_callback:

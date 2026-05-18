@@ -5,6 +5,7 @@ All changes go through this state object, which supports transactions.
 """
 
 from typing import Dict, List, Optional, Callable
+from app.transaction_context import active_transaction
 
 import time
 
@@ -17,9 +18,19 @@ class ActionState:
         self._active_actions: Dict[str, dict] = {}
         # Action Log: history of triggered actions
         self._action_history: List[dict] = []
-        
-        # ─── Transaction Staging ──────────────────────────────────────
-        self._staging: Optional[dict] = None
+
+    @property
+    def _staging(self) -> Optional[dict]:
+        tx = active_transaction.get()
+        if tx is not None:
+            return tx.get(f"action_staging_{id(self)}")
+        return None
+
+    @_staging.setter
+    def _staging(self, value: Optional[dict]):
+        tx = active_transaction.get()
+        if tx is not None:
+            tx[f"action_staging_{id(self)}"] = value
 
     def _record(self, action: str, details: dict):
         if self._delta_callback:
@@ -78,7 +89,7 @@ class ActionState:
             "fail_count": 0
         }
         self._set_struct("active_actions", actions)
-        self._record("register_action", {"action_id": action_id, "handler": handler_name})
+        self._record("register_action", {"action_id": action_id, "target_vec": list(target_vec), "handler_name": handler_name, "threshold": max(0.01, min(1.0, threshold))})
 
     def log_execution(self, action_id: str, success: bool, details: Optional[dict] = None):
         """Record the outcome of an action execution."""
@@ -101,7 +112,7 @@ class ActionState:
         if len(history) > 500:
             history = history[-250:]
         self._set_struct("action_history", history)
-        self._record("log_execution", {"action_id": action_id, "success": success})
+        self._record("log_execution", {"action_id": action_id, "success": success, "details": details or {}})
 
     # ─── Read-Only Accessors ─────────────────────────────────────────────
 

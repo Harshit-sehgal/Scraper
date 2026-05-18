@@ -10,9 +10,10 @@ def test_telemetry_emission():
     
     # 2. Query telemetry
     stream = sos.get_telemetry()
-    assert len(stream) == 1
-    assert stream[0]["type"] == "test_event"
-    assert stream[0]["details"]["foo"] == "bar"
+    # Now 2 events: 'test_event' AND the automatic 'transaction' event
+    assert len(stream) == 2
+    assert any(t["type"] == "test_event" and t["details"]["foo"] == "bar" for t in stream)
+    assert any(t["type"] == "transaction" for t in stream)
     
     # 3. Verify heatmap pulse
     heatmap = sos.get_activity_heatmap()

@@ -86,6 +86,16 @@ class GlobalCognitiveScheduler:
                 logging.getLogger(__name__).error(
                     f"TASK FAILED: [{task.task_id}] - {e}"
                 )
+                # Record degradation telemetry (best-effort)
+                try:
+                    if hasattr(self, 'ws') and self.ws is not None:
+                        self.ws.record_degradation(
+                            subsystem="cognitive_scheduler",
+                            severity="warning",
+                            cause=f"Task [{task.task_id}] failed: {e}",
+                        )
+                except Exception:
+                    pass
 
             duration = time.time() - t0
             self._execution_stats["total_execution_time"] += duration
@@ -149,15 +159,9 @@ class GraphUpdateScheduler:
                 ))
 
         if virtual_tokens:
-            result = ie.infer(virtual_tokens, list(ws.role_position_memory.keys()))
-            regions = ws.field_regions
-            if regions:
-                ws.set_region_energy(regions[-1].region_id, result.energy)
-
-            ws.decay_field_regions()
-            ws.aggregate_from_regions()
-            ws.redistribute_instability()
-
+            # Phase 35: Use formal relaxation API instead of legacy infer
+            ie.relax_manifold()
+            
             pressure_after = ws.metrics.field_pressure
             drop = pressure_before - pressure_after
             ws.snapshot(label=f"relax_wave_{self._wave_count}")
@@ -165,7 +169,7 @@ class GraphUpdateScheduler:
             self.dispatcher.dispatch(SemanticEvent(
                 event_type=SemanticEventType.EQUILIBRIUM_REACHED,
                 source="graph_update_scheduler",
-                payload={"energy": result.energy, "wave": self._wave_count, "pressure_drop": drop},
+                payload={"energy": ws.metrics.global_energy, "wave": self._wave_count, "pressure_drop": drop},
                 instability_delta=-0.1
             ))
 

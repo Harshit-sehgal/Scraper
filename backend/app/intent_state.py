@@ -5,6 +5,7 @@ All changes go through this state object, which supports transactions.
 """
 
 from typing import Callable, Dict, List, Optional
+from app.transaction_context import active_transaction
 
 class IntentState:
     """Sole owner of the semantic field's cognitive intents and goal attractors."""
@@ -13,9 +14,19 @@ class IntentState:
         self._delta_callback = delta_callback
         # Active Intents: intent_id -> details {target_vec, strength, target_roles}
         self._active_intents: Dict[str, dict] = {}
-        
-        # ─── Transaction Staging ──────────────────────────────────────
-        self._staging: Optional[dict] = None
+
+    @property
+    def _staging(self) -> Optional[dict]:
+        tx = active_transaction.get()
+        if tx is not None:
+            return tx.get(f"intent_staging_{id(self)}")
+        return None
+
+    @_staging.setter
+    def _staging(self, value: Optional[dict]):
+        tx = active_transaction.get()
+        if tx is not None:
+            tx[f"intent_staging_{id(self)}"] = value
 
     def _record(self, action: str, details: dict):
         if self._delta_callback:
@@ -66,7 +77,7 @@ class IntentState:
             "target_roles": list(target_roles) if target_roles else []
         }
         self._set_struct("active_intents", intents)
-        self._record("set_intent", {"intent_id": intent_id, "strength": strength, "roles_count": len(target_roles) if target_roles else 0})
+        self._record("set_intent", {"intent_id": intent_id, "target_vec": list(target_vec), "strength": strength, "target_roles": list(target_roles) if target_roles else []})
 
     def remove_intent(self, intent_id: str):
         intents = self._get_struct("active_intents")

@@ -346,11 +346,13 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 record[field.name] = _sanitize_field_value(field, link.get("href") if link else None, base_url=base_url)
             elif field.field_type == FieldType.EMAIL:
                 link = container.find("a", href=re.compile(r"mailto:", re.I))
-                val = link.get("href").split("mailto:", 1)[1].split("?")[0] if link else text
+                href = link.get("href") if link else None
+                val = href.split("mailto:", 1)[1].split("?")[0] if href else text
                 record[field.name] = _sanitize_field_value(field, val)
             elif field.field_type == FieldType.PHONE:
                 link = container.find("a", href=re.compile(r"tel:", re.I))
-                val = link.get("href").split("tel:", 1)[1].split("?")[0] if link else text
+                href = link.get("href") if link else None
+                val = href.split("tel:", 1)[1].split("?")[0] if href else text
                 record[field.name] = _sanitize_field_value(field, val)
             elif any(k in field_name for k in ["title", "name", "company"]):
                 heading = container.find(["h1", "h2", "h3", "h4", "a", "strong"])
