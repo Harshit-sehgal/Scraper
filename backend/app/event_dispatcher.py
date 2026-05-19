@@ -60,3 +60,9 @@ def get_dispatcher() -> EventDispatcher:
         get_scheduler()
         _bootstrap_done = True
     return _dispatcher
+
+def reset_dispatcher():
+    """Reset the global dispatcher (for testing)."""
+    global _dispatcher, _bootstrap_done
+    _dispatcher = EventDispatcher()
+    _bootstrap_done = False

@@ -446,3 +446,8 @@ def get_plugin_manager(ws=None) -> SubstratePluginManager:
     if _manager is None:
         _manager = SubstratePluginManager(ws=ws)
     return _manager
+
+def reset_plugin_manager():
+    """Reset the global plugin manager (for testing)."""
+    global _manager
+    _manager = None

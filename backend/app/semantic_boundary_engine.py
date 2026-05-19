@@ -457,6 +457,11 @@ def get_boundary_engine() -> SemanticBoundaryEngine:
         _boundary_engine = SemanticBoundaryEngine()
     return _boundary_engine
 
+def reset_boundary_engine():
+    """Reset the global boundary engine (for testing)."""
+    global _boundary_engine
+    _boundary_engine = None
+
 def score_boundary(type_a: str, type_b: str, value_a: str, value_b: str,
                    pos_a: int = 0, pos_b: int = 0) -> bool:
     engine = get_boundary_engine()

@@ -2628,3 +2628,20 @@ def reset_world_state():
     """Reset the global world state singleton (for testing)."""
     global _world_state
     _world_state = None
+    
+    # Also reset dependent singletons to avoid stale subscriptions/state
+    from app.event_dispatcher import reset_dispatcher
+    from app.graph_update_scheduler import reset_scheduler
+    from app.semantic_os import reset_semantic_os
+    from app.instability_api import reset_immune_system
+    from app.semantic_allocation_engine import reset_role_engine
+    from app.semantic_boundary_engine import reset_boundary_engine
+    from app.llm_bridge import reset_plugin_manager
+    
+    reset_dispatcher()
+    reset_scheduler()
+    reset_semantic_os()
+    reset_immune_system()
+    reset_role_engine()
+    reset_boundary_engine()
+    reset_plugin_manager()

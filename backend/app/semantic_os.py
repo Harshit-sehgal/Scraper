@@ -227,3 +227,8 @@ def get_semantic_os() -> SemanticOS:
     if _os_instance is None:
         _os_instance = SemanticOS()
     return _os_instance
+
+def reset_semantic_os():
+    """Reset the global Semantic OS instance (for testing)."""
+    global _os_instance
+    _os_instance = None

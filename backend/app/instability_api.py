@@ -95,3 +95,8 @@ def get_immune_system(ws=None) -> ImmunityLayer:
     if _immune_system is None:
         _immune_system = ImmunityLayer(ws=ws)
     return _immune_system
+
+def reset_immune_system():
+    """Reset the global immune system (for testing)."""
+    global _immune_system
+    _immune_system = None

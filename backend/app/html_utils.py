@@ -166,8 +166,26 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
     return False
 
 def _extract_contacts_from_node(node) -> tuple[str | None, str | None]:
-    """Search a BeautifulSoup node for email and phone numbers."""
+    """Search a BeautifulSoup node for email and phone numbers, including href attributes."""
     text = node.get_text(separator=" ", strip=True)
+    
+    # Check hrefs in this node and its descendants
+    hrefs = []
+    if node.name == "a":
+        hrefs.append(node.get("href") or "")
+    for a in node.find_all("a"):
+        hrefs.append(a.get("href") or "")
+        
+    for href in hrefs:
+        if href.lower().startswith("mailto:"):
+            email = href.split("mailto:", 1)[1].split("?")[0]
+            if _valid_email(email):
+                text += f" {email}"
+        elif href.lower().startswith("tel:"):
+            phone = href.split("tel:", 1)[1].split("?")[0]
+            if _valid_phone(phone):
+                text += f" {phone}"
+
     return _valid_email(text), _valid_phone(text)
 
 def _enrich_record_contacts(

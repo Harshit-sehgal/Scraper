@@ -2,7 +2,7 @@ import re
 
 from app import scraper as scraper_mod
 from app.models import FieldType, SchemaField
-from app.scraper import apply_selectors, extract_with_regex
+from app.selector_engine import apply_selectors, extract_with_regex
 
 
 def _lead_schema() -> list[SchemaField]:

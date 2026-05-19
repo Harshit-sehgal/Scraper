@@ -53,13 +53,21 @@ def test_topology_api():
     from app.topology_api import TopologyAPI
     clear_semantic_state(clear_file=False)
     api = TopologyAPI(ws)
-    r = api.add_region(['origin', 'destination'], 'TEST', instability=0.5, integrity=0.5)
+    r_original = api.add_region(['origin', 'destination'], 'TEST', instability=0.5, integrity=0.5)
+    rid = r_original.region_id
+    # Re-fetch from API to get the "live" version (it might have been cloned by MVCC)
+    r = ws.topology_state.get_region(rid)
     assert api.region_count() == 1
     assert api.find_region('TEST', {'origin', 'destination'}) is not None
     assert api.prune_weak_regions(min_instability=0.6) == 0
+    
+    # Update properties on the live version
     r.instability = 0.01
+    r.semantic_pressure = 0.0 # Force low energy for pruning test
     r.local_energy = 0.1
+    # print(f"DEBUG TEST: r ID={id(r)} inst={r.instability} energy={r.local_energy}")
     assert api.prune_weak_regions(min_instability=0.02) == 1
+
     assert api.region_count() == 0
     print("  topology_api.py: OK")
 

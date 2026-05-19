@@ -38,6 +38,11 @@ def _get_role_engine():
         _role_engine = RoleEmbeddingEngine()
     return _role_engine
 
+def reset_role_engine():
+    """Reset the global role engine (for testing)."""
+    global _role_engine
+    _role_engine = None
+
 
 # Exclusivity constraints — now defined in field_laws.py to prevent
 # upward dependency from core_types.py to this allocation engine.

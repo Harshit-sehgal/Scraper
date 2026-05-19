@@ -47,8 +47,11 @@ class RoleEmbeddingEngine:
                             break
                     vec = self._get_type_vector(best_type)
                     # Dampen baseline toward neutral to leave room for learning
+                    # Phase 71: Add tiny random jitter to prevent exact manifold collapse
+                    import random
                     for i in range(len(vec)):
-                        vec[i] = vec[i] * 0.85 + 0.5 * 0.15
+                        jitter = (random.random() - 0.5) * 0.01
+                        vec[i] = max(0.0, min(1.0, vec[i] * 0.85 + 0.5 * 0.15 + jitter))
                     self.ws.set_manifold_vector(role, vec)
 
     @property

@@ -23,6 +23,21 @@ except ImportError as e:
 
 
 @pytest.fixture(autouse=True)
+def reset_semantic_world_state():
+    try:
+        from app.semantic_world_state import reset_world_state
+        reset_world_state()
+    except ImportError:
+        pass
+    yield
+    try:
+        from app.semantic_world_state import reset_world_state
+        reset_world_state()
+    except ImportError:
+        pass
+
+
+@pytest.fixture(autouse=True)
 def reset_failure_injection():
     from app.failure_injector import set_injection_probability
 

@@ -203,3 +203,8 @@ def get_scheduler():
         _scheduler = object()
         _scheduler = GraphUpdateScheduler()
     return _scheduler
+
+def reset_scheduler():
+    """Reset the global scheduler (for testing)."""
+    global _scheduler
+    _scheduler = None
