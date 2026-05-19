@@ -43,7 +43,7 @@ class ResourceGovernor:
             "throttled_cycles": 0,
         }
 
-    def check_browser_memory(self) -> Dict[str, Any]:
+    async def check_browser_memory(self) -> Dict[str, Any]:
         """Inspect and prune the browser pool context pool if memory limits are exceeded."""
         from app.browser_pool import get_browser_pool
         pool = get_browser_pool()
@@ -66,9 +66,9 @@ class ResourceGovernor:
                 ctx = pool._contexts.pop(key, None)
                 if ctx:
                     try:
-                        pass
-                    except Exception:
-                        pass
+                        await ctx.close()
+                    except Exception as e:
+                        logger.debug("Failed to close context during prune: %s", e)
                     pruned += 1
             
             self.metrics["browser_prunes"] += pruned

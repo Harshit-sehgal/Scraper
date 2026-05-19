@@ -64,3 +64,40 @@ def test_token_tracking_and_throttling():
     assert report["accumulated_tokens"] == 10000
     assert report["token_spend_dollars"] == pytest.approx(0.02)
     assert report["token_budget_remaining"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_check_browser_memory_pruning(monkeypatch):
+    class MockContext:
+        def __init__(self):
+            self.closed = False
+        async def close(self):
+            self.closed = True
+
+    class MockPool:
+        def __init__(self):
+            self._contexts = {
+                "domain-1": MockContext(),
+                "domain-2": MockContext(),
+                "domain-3": MockContext(),
+                "domain-4": MockContext(),
+            }
+
+    mock_pool = MockPool()
+    monkeypatch.setattr("app.browser_pool.get_browser_pool", lambda: mock_pool)
+
+    # 4 contexts * 150MB = 600MB. Limit to 300MB to trigger pruning of 2 contexts.
+    budgets = ResourceBudgets(max_browser_memory_mb=300.0)
+    governor = ResourceGovernor(budgets=budgets)
+
+    # Record the contexts before pruning
+    original_contexts = list(mock_pool._contexts.values())
+
+    res = await governor.check_browser_memory()
+    assert res["pruned"] == 2
+    assert len(mock_pool._contexts) == 2
+    
+    # Assert that the pruned contexts had their close() method called
+    closed_count = sum(1 for ctx in original_contexts if ctx.closed)
+    assert closed_count == 2
+

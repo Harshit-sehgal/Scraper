@@ -211,6 +211,8 @@ class Settings(BaseSettings):
     # ─── API Security ──────────────────────────────────────────────────────
     API_KEY: str = ""
     """If set, all /api/* endpoints require X-API-Key header."""
+    CORS_ORIGINS: list[str] = ["*"]
+    """Allowed origins for CORS. Defaults to '*' but should be locked down in production."""
     RATE_LIMIT_GLOBAL: str = "100/minute"
     """Global rate limit for /api/* endpoints (slowapi format). Empty = disabled."""
     RATE_LIMIT_JOB_CREATE: str = "10/minute"
