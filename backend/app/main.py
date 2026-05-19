@@ -61,6 +61,17 @@ rate_limiter = RateLimiterMiddleware(
 )
 app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limiter.middleware)
 
+# ─── Initialize Recovery Framework ────────────────────────────────────────
+# Register all recovery action handlers on startup
+from app.recovery_handlers import register_all_recovery_handlers
+register_all_recovery_handlers()
+
+# ─── Initialize Domain Health Monitor ────────────────────────────────────
+# Set up the domain health monitoring system
+from app.domain_health_alerts import get_domain_health_monitor
+health_monitor = get_domain_health_monitor()
+logging.getLogger(__name__).info("Domain health monitor initialized")
+
 # Runtime safety rails — driven by centralized config
 CONFIG = {
     "max_discovery_urls": settings.MAX_DISCOVERY_URLS,

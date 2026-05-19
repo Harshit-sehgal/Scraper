@@ -313,3 +313,223 @@ async def get_extraction_economics(window: int = Query(200, ge=10, le=1000)):
             for d, s in report.cost_by_domain.items()
         },
     }
+
+
+# ─── Domain Health Monitoring Endpoints ──────────────────────────────────
+
+
+@router.get("/health/domains")
+async def get_all_domains_health():
+    """Get health status for all monitored domains.
+    
+    Returns a sorted list of domains with health scores and alerts.
+    Useful for dashboards and automated alerting systems.
+    """
+    from app.domain_health_alerts import get_domain_health_monitor
+    
+    monitor = get_domain_health_monitor()
+    domains_health = monitor.get_all_domains_health()
+    
+    return {
+        "total_domains_monitored": len(domains_health),
+        "domains": domains_health,
+        "summary": {
+            "healthy": sum(1 for d in domains_health if d["health_level"] == "healthy"),
+            "degrading": sum(1 for d in domains_health if d["health_level"] == "degrading"),
+            "unhealthy": sum(1 for d in domains_health if d["health_level"] == "unhealthy"),
+            "critical": sum(1 for d in domains_health if d["health_level"] == "critical"),
+            "blacklisted": sum(1 for d in domains_health if d["health_level"] == "blacklisted"),
+        }
+    }
+
+
+@router.get("/health/domain/{domain}")
+async def get_domain_health(domain: str):
+    """Get detailed health status for a specific domain.
+    
+    Returns comprehensive health metrics including:
+    - Health level (healthy/degrading/unhealthy/critical/blacklisted)
+    - Health score (0.0 to 1.0)
+    - Success rate
+    - Consistency score (how uniform failures are)
+    - Degradation trend (positive = worsening)
+    - Total attempts
+    - Recent failure category
+    """
+    from app.domain_health_alerts import get_domain_health_monitor
+    
+    monitor = get_domain_health_monitor()
+    
+    # Create a fake URL to extract domain
+    url = f"https://{domain}/"
+    health = monitor.get_domain_health(url)
+    
+    if health is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No health data for domain: {domain}"
+        )
+    
+    return health
+
+
+@router.get("/health/summary")
+async def get_system_health_summary():
+    """Get system-wide health summary.
+    
+    Provides a quick overview of system health across all domains.
+    Useful for dashboards and status pages.
+    """
+    from app.domain_health_alerts import get_domain_health_monitor
+    
+    monitor = get_domain_health_monitor()
+    domains_health = monitor.get_all_domains_health()
+    
+    if not domains_health:
+        return {
+            "status": "no_data",
+            "domains_monitored": 0,
+            "overall_health_score": 0.0,
+        }
+    
+    # Calculate overall health score
+    overall_score = sum(d["health_score"] for d in domains_health) / len(domains_health)
+    
+    # Determine overall status
+    if overall_score >= 0.8:
+        overall_status = "healthy"
+    elif overall_score >= 0.7:
+        overall_status = "degrading"
+    elif overall_score >= 0.5:
+        overall_status = "unhealthy"
+    else:
+        overall_status = "critical"
+    
+    return {
+        "status": overall_status,
+        "overall_health_score": round(overall_score, 3),
+        "domains_monitored": len(domains_health),
+        "critical_count": sum(1 for d in domains_health if d["health_level"] in ["critical", "blacklisted"]),
+        "unhealthy_count": sum(1 for d in domains_health if d["health_level"] in ["unhealthy", "critical"]),
+    }
+
+
+# ─── Selector Memory Stats Endpoints ──────────────────────────────────────
+
+
+@router.get("/selectors/stats")
+async def get_selector_memory_stats():
+    """Get selector memory pool statistics.
+    
+    Returns aggregate statistics about cached selectors:
+    - Total domains with cached selectors
+    - Average confidence across all selectors
+    - Distribution by confidence level
+    - High/medium/low confidence counts
+    """
+    selector_memory = get_selector_memory()
+    stats = selector_memory.get_memory_stats()
+    
+    return {
+        "total_domains": stats["total_domains"],
+        "total_selectors": stats["total_selectors"],
+        "avg_confidence": round(stats["avg_confidence"], 3),
+        "high_confidence": stats["high_confidence"],  # >= 0.75
+        "medium_confidence": stats["medium_confidence"],  # 0.5-0.74
+        "low_confidence": stats["low_confidence"],  # < 0.5
+        "confidence_distribution": stats["by_confidence"],
+    }
+
+
+@router.get("/selectors/domain/{domain}")
+async def get_domain_selector_confidence(domain: str):
+    """Get selector confidence for a specific domain.
+    
+    Returns detailed confidence metrics:
+    - Raw confidence (success rate)
+    - Age factor (degradation over time)
+    - Freshness factor (penalty for non-use)
+    - Final confidence score
+    - Reason (detailed explanation)
+    """
+    from urllib.parse import urlparse
+    
+    selector_memory = get_selector_memory()
+    
+    # Create a fake URL to extract domain
+    url = f"https://{domain}/"
+    confidence = selector_memory.get_selector_confidence(url)
+    
+    if confidence is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No cached selectors for domain: {domain}"
+        )
+    
+    return {
+        "domain": domain,
+        "raw_confidence": round(confidence.raw_confidence, 3),
+        "age_factor": round(confidence.age_factor, 3),
+        "freshness_factor": round(confidence.freshness_factor, 3),
+        "final_score": round(confidence.final_score, 3),
+        "reason": confidence.reason,
+    }
+
+
+@router.post("/selectors/cleanup")
+async def trigger_selector_cleanup():
+    """Manually trigger selector memory cleanup.
+    
+    Forces deletion of all selectors below the confidence threshold,
+    regardless of the normal cleanup interval.
+    
+    Returns cleanup statistics.
+    """
+    selector_memory = get_selector_memory()
+    stats = selector_memory.force_cleanup()
+    
+    if not stats:
+        return {
+            "message": "Cleanup not performed (too soon after last cleanup)",
+            "next_cleanup_available_in_seconds": selector_memory._alert_cooldown_seconds,
+        }
+    
+    return {
+        "domains_checked": stats["domains_checked"],
+        "selectors_deleted": stats["selectors_deleted"],
+        "deleted_domains": stats["deleted_domains"],
+        "low_confidence_selectors": stats["low_confidence_selectors"],
+    }
+
+
+@router.get("/selectors/low-confidence")
+async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)):
+    """Get all selectors scoring below the specified threshold.
+    
+    Useful for identifying domains at risk of extraction failure.
+    """
+    selector_memory = get_selector_memory()
+    low_confidence = []
+    
+    for domain, entry in selector_memory._memory.items():
+        confidence = selector_memory._compute_confidence(entry)
+        if confidence.final_score < threshold:
+            low_confidence.append({
+                "domain": domain,
+                "score": round(confidence.final_score, 3),
+                "raw_confidence": round(confidence.raw_confidence, 3),
+                "age_factor": round(confidence.age_factor, 3),
+                "freshness_factor": round(confidence.freshness_factor, 3),
+                "success_count": entry.get("success_count", 0),
+                "failure_count": entry.get("failure_count", 0),
+                "reason": confidence.reason,
+            })
+    
+    # Sort by score (worst first)
+    low_confidence.sort(key=lambda x: x["score"])
+    
+    return {
+        "threshold": threshold,
+        "count": len(low_confidence),
+        "selectors": low_confidence,
+    }
