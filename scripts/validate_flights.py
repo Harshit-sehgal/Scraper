@@ -11,11 +11,12 @@ from app.benchmark_accuracy import calculate_extraction_accuracy
 from app.config import settings
 
 # URL from a known search (London to Paris)
-URL = "https://www.flightsnholidays.co.uk/flights-result.aspx?Origin=LON&Destination=PAR&DepartureDate=15/06/2026&ReturnDate=22/06/2026&Adults=1&Children=0&Infants=0&Class=Economy&IsDirect=false"
+URL = "https://www.flightsnholidays.co.uk/flight-result.aspx?From=LON&To=PAR&ddate=06/15/2026&retdate=06/22/2026&Adult=1&Child=0&Infant=0&Class=Economy&FType=-1&IsReturn=1"
 
 GOLDEN_RECORDS = [
-    {"origin": "LHR", "destination": "CDG", "price": "238"},
-    {"origin": "LGW", "destination": "ORY", "price": "195"}
+    {"origin": "LON", "destination": "PAR", "date": "15-06-2026", "price": "238"},
+    {"origin": "LON", "destination": "PAR", "date": "15-06-2026", "price": "248"},
+    {"origin": "LON", "destination": "PAR", "date": "15-06-2026", "price": "260"}
 ]
 
 async def validate():

@@ -53,6 +53,8 @@ class ScrapeTelemetry:
     js_render_delay_ms: float = 0.0        # Time spent waiting for JS/DOM quiescence
     confidence_map: dict = field(default_factory=dict) # Per-field extraction confidence scores
     regression_severity: Optional[str] = None  # "critical" | "high" | "low" | "info"
+    failure_category: Optional[str] = None
+    extraction_method: Optional[str] = None
     motifs_generated: int = 0
     motifs_used: int = 0
     

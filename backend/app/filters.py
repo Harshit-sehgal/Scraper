@@ -6,6 +6,7 @@ Uses geopy (free OpenStreetMap Nominatim geocoder) for distance calculations.
 
 import logging
 import re
+import time
 from typing import Any, Optional
 
 from geopy.distance import geodesic
@@ -28,14 +29,26 @@ def geocode_address(address: str) -> Optional[tuple[float, float]]:
     if address in _geocode_cache:
         return _geocode_cache[address]
 
-    try:
-        location = _geocoder.geocode(address)
-        if location:
-            coords = (location.latitude, location.longitude)
-            _geocode_cache[address] = coords
-            return coords
-    except Exception as e:
-        logging.exception("Geocode error for %s: %s", address, e)
+    max_retries = 3
+    backoff = 1.0  # Base delay in seconds
+    for attempt in range(max_retries):
+        try:
+            location = _geocoder.geocode(address)
+            if location:
+                coords = (location.latitude, location.longitude)
+                _geocode_cache[address] = coords
+                return coords
+            break  # If geocoding succeeded but returned no location, break early
+        except Exception as e:
+            if attempt < max_retries - 1:
+                logging.warning(
+                    "Geocoding attempt %d failed for '%s' (retrying in %.1fs): %s",
+                    attempt + 1, address, backoff, str(e)
+                )
+                time.sleep(backoff)
+                backoff *= 2.0  # Exponential backoff
+            else:
+                logging.exception("Geocode error for %s after %d attempts: %s", address, max_retries, e)
 
     _geocode_cache[address] = None
     return None

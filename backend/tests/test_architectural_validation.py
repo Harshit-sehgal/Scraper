@@ -21,7 +21,7 @@ class ArchitecturalValidator:
     """Core validator for architectural rules"""
     
     def __init__(self):
-        self.app_dir = Path("backend/app")
+        self.app_dir = Path(__file__).resolve().parent.parent / "app"
         self.imports_map: Dict[str, Set[str]] = {}
         self.layer_map: Dict[str, str] = {}
         self._parse_all_modules()
@@ -383,7 +383,8 @@ class TestAsyncBoundaries:
         # Check source code for blocking patterns in async functions
         async_violations = []
         
-        for py_file in Path("backend/app").glob('*.py'):
+        app_path = Path(__file__).resolve().parent.parent / "app"
+        for py_file in app_path.glob('*.py'):
             try:
                 with open(py_file) as f:
                     content = f.read()
@@ -399,7 +400,7 @@ class TestAsyncBoundaries:
     
     def test_scheduler_update_guards(self):
         """graph_update_scheduler should have guards preventing infinite updates"""
-        scheduler_file = Path("backend/app/graph_update_scheduler.py")
+        scheduler_file = Path(__file__).resolve().parent.parent / "app" / "graph_update_scheduler.py"
         
         if scheduler_file.exists():
             with open(scheduler_file) as f:
@@ -420,7 +421,8 @@ class TestAsyncBoundaries:
         # Check for recursive callback patterns with guards
         violations = []
         
-        for py_file in Path("backend/app").glob('*.py'):
+        app_path = Path(__file__).resolve().parent.parent / "app"
+        for py_file in app_path.glob('*.py'):
             try:
                 with open(py_file) as f:
                     tree = ast.parse(f.read())

@@ -116,6 +116,11 @@ class SemanticWorldState:
         """Get a read-only view of the topology graph."""
         return self._topology.get_view()
 
+    def clear_active_regions(self):
+        """Clear active transient regions between records to prevent cross-record contamination."""
+        with self._lock:
+            self._topology.clear_regions()
+
     def set_region_energy(self, region_id: int, energy: float):
         """Set energy for a specific field region (delegated to TopologyState)."""
         self._topology.set_region_energy(region_id, energy)

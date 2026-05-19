@@ -34,10 +34,16 @@ def _normalized_text_key(text: str) -> str:
 
 def _is_placeholder_value(text: str) -> bool:
     key = _normalized_text_key(text)
-    if not key or len(key) < settings.SELECTOR_MIN_TEXT_LEN:
+    if not key:
         return True
     if key in EMPTY_TOKENS or key in PLACEHOLDER_PHRASES:
         return True
+    if len(key) < settings.SELECTOR_MIN_TEXT_LEN:
+        # If extremely short but contains alphanumeric characters (e.g. "LON", "PAR", "238", "1"), it is valid.
+        # Only treat as placeholder if it is purely symbols (e.g. "--", "...")
+        if not re.search(r"[a-zA-Z0-9]", key):
+            return True
+        return False
     if key.endswith(" page") and key.split()[0] in EMPTY_TOKENS:
         return True
     if key.startswith(("click ", "read ", "view ")):

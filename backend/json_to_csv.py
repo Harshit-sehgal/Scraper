@@ -1,8 +1,11 @@
 import csv
 import json
 
-INPUT_FILE = "/home/harshit/Documents/Work/Money/scraper/chennai_leads.json"
-OUTPUT_FILE = "/home/harshit/Documents/Work/Money/scraper/chennai_interior_designers.csv"
+from pathlib import Path
+
+WORKSPACE_DIR = Path(__file__).resolve().parent.parent
+INPUT_FILE = str(WORKSPACE_DIR / "chennai_leads.json")
+OUTPUT_FILE = str(WORKSPACE_DIR / "chennai_interior_designers.csv")
 
 
 def clean_phone(p):
@@ -26,7 +29,32 @@ def clean_leads(input_file=INPUT_FILE, output_file=OUTPUT_FILE):
 
         for item in data:
             name = (item.get("company_name") or "").strip()
-            if not name or name in seen_names or "File not found" in name or "Copyright" in name or len(name) < 3:
+            email = (item.get("email") or "").strip()
+            source_url = (item.get("source_url") or "").strip()
+
+            if not name or "File not found" in name or "Copyright" in name or len(name) < 3:
+                # Dynamic Self-Healing: Infer name from domain or email
+                inferred = ""
+                if source_url:
+                    try:
+                        from urllib.parse import urlparse
+                        domain = urlparse(source_url).netloc.lower().replace("www.", "")
+                        part = domain.split(".")[0]
+                        if part and len(part) >= 3:
+                            inferred = part.replace("-", " ").replace("_", " ").title()
+                    except Exception:
+                        pass
+                if not inferred and email and "@" in email:
+                    try:
+                        domain = email.split("@")[1]
+                        part = domain.split(".")[0]
+                        if part and len(part) >= 3:
+                            inferred = part.replace("-", " ").replace("_", " ").title()
+                    except Exception:
+                        pass
+                name = inferred or "Unknown Studio"
+
+            if name in seen_names:
                 continue
 
             phone = clean_phone(item.get("contact_phone", ""))

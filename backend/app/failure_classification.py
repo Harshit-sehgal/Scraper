@@ -564,7 +564,7 @@ def _is_partial_extraction(records: list[dict], schema_fields: list[str]) -> boo
                 filled_slots += 1
 
     fill_rate = filled_slots / max(1, total_slots)
-    return fill_rate < 0.3
+    return fill_rate < 0.5
 
 
 # ═══════════════════════════════════════════════════════════════════════

@@ -74,6 +74,78 @@ INVALID_EMAIL_DOMAINS = {
 
 
 @dataclass
+class EnrichmentContext:
+    city: str
+    niche: str
+    country_name: str
+    country_code: str
+
+
+CITY_COUNTRY_MAP = {
+    "chennai": ("India", "+91"),
+    "mumbai": ("India", "+91"),
+    "delhi": ("India", "+91"),
+    "bangalore": ("India", "+91"),
+    "bengaluru": ("India", "+91"),
+    "kolkata": ("India", "+91"),
+    "london": ("United Kingdom", "+44"),
+    "paris": ("France", "+33"),
+    "new york": ("United States", "+1"),
+    "nyc": ("United States", "+1"),
+    "san francisco": ("United States", "+1"),
+    "chicago": ("United States", "+1"),
+    "los angeles": ("United States", "+1"),
+    "lax": ("United States", "+1"),
+}
+
+
+def infer_enrichment_context(input_file: Path, records: list[dict]) -> EnrichmentContext:
+    filename = input_file.stem.lower()
+    words = re.split(r"\W+|_", filename)
+    
+    city = None
+    country_name = None
+    country_code = None
+    niche_words = []
+    
+    for word in words:
+        if word in CITY_COUNTRY_MAP:
+            city = word.title()
+            country_name, country_code = CITY_COUNTRY_MAP[word]
+        elif word in ["interior", "design", "designer", "designers", "architect", "architects", "lead", "leads", "leadlist"]:
+            niche_words.append(word)
+            
+    if not city and records:
+        for r in records:
+            addr = str(r.get("address") or r.get("address_or_location") or r.get("location") or "").lower()
+            if not addr:
+                continue
+            for k, (cntry, code) in CITY_COUNTRY_MAP.items():
+                if k in addr:
+                    city = k.title()
+                    country_name = cntry
+                    country_code = code
+                    break
+            if city:
+                break
+                
+    if not city:
+        city = "Chennai"
+        country_name = "India"
+        country_code = "+91"
+        
+    niche = " ".join(niche_words).title() if niche_words else "Interior Designer"
+    niche = niche.replace("Designers", "Designer").replace("Architects", "Architect")
+    
+    return EnrichmentContext(
+        city=city,
+        niche=niche,
+        country_name=country_name,
+        country_code=country_code
+    )
+
+
+@dataclass
 class ContactData:
     emails: list[str]
     phones: list[str]
@@ -129,25 +201,48 @@ def is_placeholder_text(value: str) -> bool:
     return False
 
 
-def normalize_phone(value: str) -> str | None:
+def normalize_phone(value: str, country_code: str = "+91") -> str | None:
     text = re.sub(r"\s+", " ", str(value or "")).strip(" -:;,.|")
     if not text or is_placeholder_text(text):
         return None
 
     digits = re.sub(r"\D", "", text)
-    if len(digits) < 10 or len(digits) > 15:
+    # Support shorter local numbers in some countries (minimum 7 digits)
+    if len(digits) < 7 or len(digits) > 15:
         return None
     if len(set(digits)) <= 2:
         return None
 
-    if len(digits) == 10:
-        return f"+91 {digits}"
-    if len(digits) == 11 and digits.startswith("0"):
-        return f"+91 {digits[1:]}"
-    if len(digits) == 12 and digits.startswith("91"):
-        return f"+{digits}"
+    prefix_clean = country_code.replace("+", "")
+    
+    if text.startswith("+"):
+        return text
 
-    return text if text.startswith("+") else f"+{digits}"
+    if country_code == "+91":
+        if len(digits) == 10:
+            return f"+91 {digits}"
+        if len(digits) == 11 and digits.startswith("0"):
+            return f"+91 {digits[1:]}"
+        if len(digits) == 12 and digits.startswith("91"):
+            return f"+91 {digits[2:]}"
+    elif country_code == "+44":
+        if len(digits) == 10:
+            return f"+44 {digits}"
+        if len(digits) == 11 and digits.startswith("0"):
+            return f"+44 {digits[1:]}"
+        if len(digits) == 12 and digits.startswith("44"):
+            return f"+44 {digits[2:]}"
+    elif country_code == "+1":
+        if len(digits) == 10:
+            return f"+1 {digits}"
+        if len(digits) == 11 and digits.startswith("1"):
+            return f"+1 {digits[1:]}"
+
+    if digits.startswith(prefix_clean):
+        return f"{country_code} {digits[len(prefix_clean):]}"
+    if digits.startswith("0"):
+        return f"{country_code} {digits[1:]}"
+    return f"{country_code} {digits}"
 
 
 def valid_email(value: str) -> bool:
@@ -240,7 +335,7 @@ def extract_addresses_from_json_ld(soup: BeautifulSoup) -> list[str]:
     return dedupe_keep_order(addresses)
 
 
-def extract_contact_data_from_html(html: str) -> ContactData:
+def extract_contact_data_from_html(html: str, context: EnrichmentContext) -> ContactData:
     soup = BeautifulSoup(html, "html.parser")
     for t in soup(["script", "style", "noscript", "svg"]):
         t.extract()
@@ -257,11 +352,11 @@ def extract_contact_data_from_html(html: str) -> ContactData:
                 email_candidates.append(email)
         elif href_lower.startswith("tel:"):
             candidate = href.split(":", 1)[1].split("?", 1)[0]
-            phone = normalize_phone(candidate)
+            phone = normalize_phone(candidate, country_code=context.country_code)
             if phone:
                 phone_candidates.append(phone)
 
-    text = soup.get_text(" ", strip=True)
+    text = soup.get_text("\n", strip=True)
 
     for e in EMAIL_RE.findall(text):
         email = normalize_email(e)
@@ -270,7 +365,7 @@ def extract_contact_data_from_html(html: str) -> ContactData:
     emails = dedupe_keep_order(email_candidates)
 
     for p in PHONE_RE.findall(text):
-        n = normalize_phone(p)
+        n = normalize_phone(p, country_code=context.country_code)
         if n:
             phone_candidates.append(n)
     phones = dedupe_keep_order(phone_candidates)
@@ -279,14 +374,18 @@ def extract_contact_data_from_html(html: str) -> ContactData:
 
     if not addresses:
         lines = re.split(r"[\n|]", text)
+        city_lower = context.city.lower()
+        country_lower = context.country_name.lower()
         for line in lines:
             line = re.sub(r"\s+", " ", line).strip(" ,")
             if len(line) < 20:
                 continue
             if "http://" in line.lower() or "https://" in line.lower() or "@" in line:
                 continue
-            if "chennai" in line.lower() and (
-                "tamil nadu" in line.lower() or PIN_RE.search(line)
+            if city_lower in line.lower() and (
+                country_lower in line.lower()
+                or any(w in line.lower() for w in ["road", "street", "building", "floor", "avenue", "lane", "postal"])
+                or PIN_RE.search(line)
             ):
                 addresses.append(line[:220])
 
@@ -356,8 +455,8 @@ def _score_website_candidate(result: dict, company_name: str) -> float:
     return score
 
 
-def search_official_website(company_name: str, city: str = "Chennai") -> str | None:
-    query = f"{company_name} {city} interior design official website"
+def search_official_website(company_name: str, context: EnrichmentContext) -> str | None:
+    query = f"{company_name} {context.city} {context.niche} official website"
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=8))
@@ -383,15 +482,40 @@ def search_official_website(company_name: str, city: str = "Chennai") -> str | N
     return ranked[0][1]
 
 
-def enrich_lead(lead: dict) -> dict:
+def enrich_lead(lead: dict, context: EnrichmentContext) -> dict:
     enriched = dict(lead)
 
     company_name = str(lead.get("company_name") or "").strip()
+    email = (lead.get("email") or "").strip()
+    source_url = (lead.get("source_url") or "").strip()
+
+    if not company_name or company_name == "null" or "File not found" in company_name or len(company_name) < 3:
+        inferred = ""
+        if source_url:
+            try:
+                from urllib.parse import urlparse
+                domain = urlparse(source_url).netloc.lower().replace("www.", "")
+                part = domain.split(".")[0]
+                if part and len(part) >= 3:
+                    inferred = part.replace("-", " ").replace("_", " ").title()
+            except Exception:
+                pass
+        if not inferred and email and "@" in email:
+            try:
+                domain = email.split("@")[1]
+                part = domain.split(".")[0]
+                if part and len(part) >= 3:
+                    inferred = part.replace("-", " ").replace("_", " ").title()
+            except Exception:
+                pass
+        company_name = inferred or "Unknown Studio"
+
+    enriched["company_name"] = company_name
     website = normalize_website(lead.get("website") or "")
     if website and is_blocked_domain(website):
         website = ""
 
-    existing_phone = normalize_phone(enriched.get("phone") or enriched.get("contact_phone") or "")
+    existing_phone = normalize_phone(enriched.get("phone") or enriched.get("contact_phone") or "", country_code=context.country_code)
     existing_email = normalize_email(enriched.get("email") or "")
     existing_address = normalize_address(enriched.get("address") or enriched.get("address_or_location") or "")
 
@@ -414,7 +538,7 @@ def enrich_lead(lead: dict) -> dict:
     if website:
         official_website = website
     else:
-        official_website = search_official_website(company_name, city="Chennai")
+        official_website = search_official_website(company_name, context=context)
 
     emails: list[str] = []
     phones: list[str] = []
@@ -435,13 +559,12 @@ def enrich_lead(lead: dict) -> dict:
             logging.exception(e)
             continue
 
-        data = extract_contact_data_from_html(html)
+        data = extract_contact_data_from_html(html, context=context)
         emails.extend(data.emails)
         phones.extend(data.phones)
         addresses.extend(data.addresses)
         sources.append(normalize_website(url))
 
-        # One extra contact/about page per target website.
         if idx < 2:
             for cl in candidate_contact_links(url, html):
                 try:
@@ -450,22 +573,21 @@ def enrich_lead(lead: dict) -> dict:
                     import logging
                     logging.exception(e)
                     continue
-                cdata = extract_contact_data_from_html(contact_html)
+                cdata = extract_contact_data_from_html(contact_html, context=context)
                 emails.extend(cdata.emails)
                 phones.extend(cdata.phones)
                 addresses.extend(cdata.addresses)
                 sources.append(normalize_website(cl))
                 time.sleep(0.3)
 
-        # Stop early if already extracted useful contact data.
         if emails or phones:
             break
 
     emails = dedupe_keep_order([e for e in (normalize_email(v) for v in emails) if e])
-    phones = dedupe_keep_order([p for p in (normalize_phone(v) for v in phones) if p])
+    phones = dedupe_keep_order([p for p in (normalize_phone(v, country_code=context.country_code) for v in phones) if p])
     addresses = dedupe_keep_order([a for a in (normalize_address(v) for v in addresses) if a])
 
-    if phones and not normalize_phone(enriched.get("phone") or ""):
+    if phones and not normalize_phone(enriched.get("phone") or "", country_code=context.country_code):
         enriched["phone"] = phones[0]
     if emails and not normalize_email(enriched.get("email") or ""):
         enriched["email"] = emails[0]
@@ -479,7 +601,7 @@ def enrich_lead(lead: dict) -> dict:
     enriched["enrichment_sources"] = dedupe_keep_order(sources)
 
     confidence = 0.0
-    has_phone = bool(normalize_phone(enriched.get("phone") or ""))
+    has_phone = bool(normalize_phone(enriched.get("phone") or "", country_code=context.country_code))
     has_email = bool(normalize_email(enriched.get("email") or ""))
     has_address = bool(normalize_address(enriched.get("address") or ""))
 
@@ -506,12 +628,45 @@ def enrich_lead(lead: dict) -> dict:
 
 
 def main() -> None:
+    import sys
     root = workspace_root()
-    input_json = root / "chennai_interior_designers_cleaned.json"
-    out_json = root / "chennai_interior_designers_enriched.json"
-    out_csv = root / "chennai_interior_designers_enriched.csv"
 
+    input_json = None
+    if len(sys.argv) > 1:
+        input_json = Path(sys.argv[1])
+    else:
+        # Heuristically scan for lead files in workspace root
+        candidates = list(root.glob("*leads*.json")) + list(root.glob("*cleaned*.json"))
+        # Exclude already enriched files
+        candidates = [c for c in candidates if "enriched" not in c.name]
+        if candidates:
+            input_json = candidates[0]
+        else:
+            input_json = root / "chennai_leads.json"
+
+    if not input_json.exists():
+        print(f"Error: Lead file not found at {input_json}. Please run the scraper first.")
+        return
+
+    print(f"Processing lead file: {input_json}")
     leads = json.loads(input_json.read_text(encoding="utf-8"))
+
+    # Dynamic Context Auto-Analysis & Parameter Inference
+    context = infer_enrichment_context(input_json, leads)
+    print("\n" + "="*40)
+    print(" DYNAMIC ENRICHMENT CONTEXT INFERRED")
+    print("="*40)
+    print(f"  Target City:   {context.city}")
+    print(f"  Target Niche:  {context.niche}")
+    print(f"  Country Name:  {context.country_name}")
+    print(f"  Dial Code:     {context.country_code}")
+    print("="*40 + "\n")
+
+    # Dynamic Output Paths
+    stem = input_json.stem
+    base_name = re.sub(r"(_cleaned|_leads)$", "", stem)
+    out_json = root / f"{base_name}_enriched.json"
+    out_csv = root / f"{base_name}_enriched.csv"
 
     enriched_rows = []
     enriched_count = 0
@@ -523,7 +678,7 @@ def main() -> None:
         name = lead.get("company_name") or "<unknown>"
         print(f"[{i}/{len(leads)}] Enriching: {name}")
         try:
-            row = enrich_lead(lead)
+            row = enrich_lead(lead, context=context)
         except Exception as e:
             import logging
             logging.exception(e)
@@ -540,7 +695,7 @@ def main() -> None:
 
         if row.get("enrichment_status") == "enriched":
             enriched_count += 1
-        if normalize_phone(row.get("phone") or ""):
+        if normalize_phone(row.get("phone") or "", country_code=context.country_code):
             with_phone += 1
         if normalize_email(row.get("email") or ""):
             with_email += 1

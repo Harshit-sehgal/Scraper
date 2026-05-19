@@ -1077,6 +1077,13 @@ class TopologyState:
             self._meso_clusters.clear()
             self._macro_continents.clear()
 
+    def clear_regions(self):
+        if self._staging is not None:
+            self._staging["regions"].clear()
+        else:
+            self._regions.clear()
+        self._record("clear_regions", {})
+
 
     # ─── Controlled Mutations — Region Attributes ──────────────────────
 

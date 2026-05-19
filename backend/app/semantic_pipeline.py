@@ -312,6 +312,7 @@ def run_pipeline(
         # Layer 5: Global semantic allocation
         allocated_records: list = []
         for record in records:
+            state.clear_active_regions()
             tokens = []
             pos = 0
             seen_values: set[str] = set()

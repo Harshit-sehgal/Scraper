@@ -39,7 +39,7 @@ def _dedupe_records(records: list[dict], schema_fields: list[SchemaField]) -> li
     # Identify primary identifying fields (e.g., name, company)
     id_fields = [f.name for f in schema_fields if any(k in f.name.lower() for k in ["name", "company", "title"])]
     if not id_fields:
-        id_fields = [f.name for f in schema_fields][:2] # fallback to first two fields
+        id_fields = [f.name for f in schema_fields] # fallback to all fields for domain-specific records
 
     for record in records:
         id_vals = []
