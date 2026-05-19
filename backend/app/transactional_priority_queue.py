@@ -109,6 +109,9 @@ class TransactionalPriorityQueue:
         self._last_aging = time.time()
         self._counter = 0
         self._next_entry_id = 0
+        
+        # Lazy deletion: track invalidated trace_ids to avoid O(n) remove
+        self._invalid_trace_ids: set = set()
 
         # Tracking
         self._completed_count = 0
@@ -145,14 +148,20 @@ class TransactionalPriorityQueue:
         )
 
         with self._lock:
-            if len(self._heap) >= self._max_size:
-                # Evict lowest-priority entry (last in heap after aging)
+            # Calculate valid size (excluding lazily-deleted entries)
+            valid_size = len(self._heap) - len(self._invalid_trace_ids)
+            
+            if valid_size >= self._max_size:
+                # Evict lowest-priority entry (nlargest = slowest, but avoids heapify for eviction check)
+                # Only evict if new entry has higher priority than current lowest
                 if self._heap:
                     lowest = heapq.nlargest(1, self._heap)[0]
                     if lowest.effective_priority > entry.effective_priority:
-                        # Remove lowest by filtering (heapq cannot delete arbitrary)
-                        self._heap.remove(lowest)
-                        heapq.heapify(self._heap)
+                        # Use lazy deletion: just mark as invalid (O(1) instead of O(n))
+                        self._invalid_trace_ids.add(lowest.trace_id)
+                        self._priority_counts[lowest.priority] = max(
+                            0, self._priority_counts.get(lowest.priority, 0) - 1
+                        )
                         logger.warning(
                             "PRIORITY QUEUE EVICTED: label=%s priority=%.2f to make room for %s",
                             lowest.label, lowest.effective_priority, label,
@@ -174,10 +183,16 @@ class TransactionalPriorityQueue:
 
         Applies aging before popping if the aging interval has elapsed.
         Returns None if the queue is empty.
+        Skips any entries marked as invalid (lazy deletion).
         """
         self._maybe_age()
 
         with self._lock:
+            # Skip invalid entries (lazy deletion)
+            while self._heap and self._heap[0].trace_id in self._invalid_trace_ids:
+                heapq.heappop(self._heap)
+                self._invalid_trace_ids.discard(self._heap[0].trace_id if self._heap else None)
+            
             if not self._heap:
                 return None
             entry = heapq.heappop(self._heap)
@@ -187,22 +202,35 @@ class TransactionalPriorityQueue:
             return entry
 
     def peek(self) -> Optional[PriorityQueueEntry]:
-        """Return the highest-priority entry without removing it."""
+        """Return the highest-priority entry without removing it.
+        
+        Skips invalid entries (lazy deletion).
+        """
         self._maybe_age()
         with self._lock:
-            if not self._heap:
+            # Skip invalid entries
+            idx = 0
+            while idx < len(self._heap) and self._heap[idx].trace_id in self._invalid_trace_ids:
+                idx += 1
+            
+            if idx >= len(self._heap):
                 return None
-            return self._heap[0]
+            return self._heap[idx]
 
     def remove(self, trace_id: str) -> bool:
-        """Remove an entry by trace_id (e.g., on timeout or cancellation)."""
+        """Remove an entry by trace_id (e.g., on timeout or cancellation).
+        
+        Uses lazy deletion: O(1) operation by marking as invalid.
+        Actual removal happens during pop() operations.
+        """
         with self._lock:
-            for i, entry in enumerate(self._heap):
+            # Check if entry exists in the heap
+            for entry in self._heap:
                 if entry.trace_id == trace_id:
-                    removed = self._heap.pop(i)
-                    heapq.heapify(self._heap)
-                    self._priority_counts[removed.priority] = max(
-                        0, self._priority_counts.get(removed.priority, 0) - 1
+                    # Lazy deletion: just mark as invalid
+                    self._invalid_trace_ids.add(trace_id)
+                    self._priority_counts[entry.priority] = max(
+                        0, self._priority_counts.get(entry.priority, 0) - 1
                     )
                     return True
         return False
@@ -212,14 +240,16 @@ class TransactionalPriorityQueue:
         self._completed_count += 1
 
     def size(self) -> int:
-        """Return the current queue size."""
+        """Return the current queue size (excluding lazily-deleted entries)."""
         with self._lock:
-            return len(self._heap)
+            # Count only valid entries
+            return len(self._heap) - len(self._invalid_trace_ids)
 
     def clear(self):
         """Clear all queued entries."""
         with self._lock:
             self._heap.clear()
+            self._invalid_trace_ids.clear()
             self._priority_counts = {p: 0 for p in PriorityLevel}
             self._counter = 0
 
@@ -293,7 +323,6 @@ class TransactionalPriorityQueue:
 # Global singleton
 _queue: Optional[TransactionalPriorityQueue] = None
 _queue_lock = threading.Lock()
-_queue_lock = threading.Lock()
 
 
 def get_priority_queue() -> TransactionalPriorityQueue:
@@ -302,7 +331,6 @@ def get_priority_queue() -> TransactionalPriorityQueue:
     if _queue is None:
         with _queue_lock:
             if _queue is None:
-                _queue = TransactionalPriorityQueue()
                 _queue = TransactionalPriorityQueue()
     return _queue
 
