@@ -2150,13 +2150,13 @@ class TopologyState:
         return {
             "regions": [asdict(r) for r in self._get_regions()],
             "communities": [list(c) for c in self.global_communities],
-            "schema_patterns": {f"{k[0]}|{k[1]}": v for k, v in self.schema_patterns.items()},
-            "topological_laws": {f"{k[0]}|{k[1]}": v for k, v in self.topological_laws.items()},
-            "neighborhood_cohesion": {f"{k[0]}|{k[1]}": v for k, v in self.neighborhood_cohesion.items()},
-            "cohesion_merge_success": {f"{k[0]}|{k[1]}": v for k, v in self.get_cohesion_merge_success().items()},
-            "cohesion_merge_attempts": {f"{k[0]}|{k[1]}": v for k, v in self.get_cohesion_merge_attempts().items()},
-            "cohesion_split_success": {f"{k[0]}|{k[1]}": v for k, v in self.get_cohesion_split_success().items()},
-            "cohesion_split_attempts": {f"{k[0]}|{k[1]}": v for k, v in self.get_cohesion_split_attempts().items()},
+            "schema_patterns": {str(k): v for k, v in self.schema_patterns.items()},
+            "topological_laws": {str(k): v for k, v in self.topological_laws.items()},
+            "neighborhood_cohesion": {str(k): v for k, v in self.neighborhood_cohesion.items()},
+            "cohesion_merge_success": {str(k): v for k, v in self.get_cohesion_merge_success().items()},
+            "cohesion_merge_attempts": {str(k): v for k, v in self.get_cohesion_merge_attempts().items()},
+            "cohesion_split_success": {str(k): v for k, v in self.get_cohesion_split_success().items()},
+            "cohesion_split_attempts": {str(k): v for k, v in self.get_cohesion_split_attempts().items()},
             "centrality": self.global_centrality,
             "anchors": [list(a) for a in self.anchors],
             "impossible_neighborhoods": [list(n) for n in self.impossible_neighborhoods],
@@ -2193,7 +2193,7 @@ class TopologyState:
         # Communities
         self._set_struct("communities", [set(c) for c in data.get("communities", [])])
 
-        # Pipe-separated-key dicts
+        # Pipe-separated-key dicts or tuple keys
         for data_key, struct_key in [
             ("schema_patterns", "schema_patterns"),
             ("topological_laws", "topological_laws"),
@@ -2205,9 +2205,21 @@ class TopologyState:
         ]:
             target = {}
             for k, v in data.get(data_key, {}).items():
-                parts = k.split("|")
-                if len(parts) == 2:
-                    target[tuple(parts)] = v
+                # Support both old pipe-separated format and new tuple format
+                if isinstance(k, str):
+                    if "|" in k:
+                        parts = k.split("|")
+                        if len(parts) == 2:
+                            target[tuple(parts)] = v
+                    else:
+                        # Assume it's repr of a tuple, convert back
+                        try:
+                            target[eval(k)] = v
+                        except (ValueError, SyntaxError):
+                            target[tuple(k.split("|"))] = v
+                else:
+                    # Already a tuple/list
+                    target[tuple(k)] = v
             self._set_struct(struct_key, target)
 
         # Simple replacements
@@ -2271,9 +2283,21 @@ class TopologyState:
         # Merge topological laws (Max)
         remote_laws = other_data.get("topological_laws", {})
         for key_str, r_val in remote_laws.items():
-            parts = key_str.split("|")
-            if len(parts) == 2:
-                pair = tuple(parts)
+            # Support both old pipe-separated format and new tuple repr format
+            pair = None
+            if "|" in key_str:
+                # Old format: "a|b"
+                parts = key_str.split("|")
+                if len(parts) == 2:
+                    pair = tuple(parts)
+            else:
+                # New format: "('a', 'b')"
+                try:
+                    pair = eval(key_str)
+                except (ValueError, SyntaxError):
+                    pass
+            
+            if pair:
                 local = self.topological_laws.get(pair, 0.0)
                 merged = r_val if abs(r_val) > abs(local) else local
                 self.set_topological_law(pair, merged)
