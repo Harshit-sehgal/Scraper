@@ -10,6 +10,7 @@ from app.config import settings
 from app.models import SchemaField, FieldType
 from app.semantic_segmentation import segment_single_text, is_likely_noise_field
 from app.browser_pool import get_browser_pool
+from app.domain_intelligence import get_domain_intelligence
 
 EMPTY_TOKENS = {"-", "n/a", "na", "null", "none", "", "not available", "empty", "0", "false", "undefined"}
 PLACEHOLDER_PHRASES = {"no data", "not specified", "coming soon", "tbd", "unknown"}
@@ -284,6 +285,9 @@ async def fetch_page_content(url: str) -> tuple[str, float, str, int]:
         try:
             await page.goto(url, wait_until="networkidle", timeout=settings.PLAYWRIGHT_TIMEOUT)
             
+            # Phase 79: Adaptive hydration and scroll from domain intelligence
+            intel = get_domain_intelligence().get_intelligence(url)
+
             # Wait for common loading indicators to disappear
             loading_selectors = [
                 ".loading", ".spinner", ".loader", "#loading", "#spinner",
@@ -299,36 +303,45 @@ async def fetch_page_content(url: str) -> tuple[str, float, str, int]:
 
             # Adaptive post-network buffer: check DOM stabilization
             stabilization_start = time.time()
+            
+            # Use learned hydration delay as a timeout hint if available
+            settle_timeout = intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
+            settle_timeout = max(settle_timeout, 3.0) # Ensure at least 3s for stabilization pass
+            
+            # Phase 79: More robust stabilization loop
+            min_wait_ms = 2500 # Increased absolute minimum wait
             try:
                 await page.wait_for_function(
                     f"""() => {{
                         const body = document.body;
                         if (!body) return true;
-                        const html = body.innerHTML;
+                        const start = Date.now();
+                        let lastHtml = body.innerHTML;
+                        let stableSince = Date.now();
+                        
                         return new Promise(resolve => {{
-                            let lastHtml = html;
-                            let stableChecks = 0;
-                            let totalChecks = 0;
                             const interval = setInterval(() => {{
-                                const current = document.body ? document.body.innerHTML : lastHtml;
-                                if (current === lastHtml) {{
-                                    stableChecks++;
-                                }} else {{
-                                    stableChecks = 0;
+                                const currentHtml = document.body ? document.body.innerHTML : lastHtml;
+                                const now = Date.now();
+                                
+                                if (currentHtml !== lastHtml) {{
+                                    lastHtml = currentHtml;
+                                    stableSince = now;
                                 }}
                                 
-                                // Resolve if stable for N checks AND we've waited at least M checks
-                                // or if we hit the absolute check limit.
-                                if ((stableChecks >= {settings.DOM_STABILIZATION_MIN_STABLE_CHECKS} && totalChecks > {settings.DOM_STABILIZATION_MIN_TOTAL_CHECKS}) || totalChecks > {settings.DOM_STABILIZATION_MAX_CHECKS}) {{
+                                const stableFor = now - stableSince;
+                                const totalWait = now - start;
+                                
+                                // Conditions for completion:
+                                // 1. Stable for at least 1.5s AND total wait > 2.5s
+                                if (stableFor >= 1500 && totalWait >= {min_wait_ms}) {{
                                     clearInterval(interval);
                                     resolve(true);
                                 }}
-                                lastHtml = current;
-                                totalChecks++;
                             }}, {settings.DOM_STABILIZATION_INTERVAL});
                         }});
                     }}""",
-                    timeout=settings.PAGE_SETTLE_DELAY * 1000,
+                    timeout=settle_timeout * 1000,
                 )
             except Exception:
                 pass
@@ -337,6 +350,8 @@ async def fetch_page_content(url: str) -> tuple[str, float, str, int]:
             # Robust Infinite-Scroll and Lazy-Load Handling
             scroll_attempts = 0
             max_scrolls = getattr(settings, 'MAX_SCROLL_ATTEMPTS', 3)
+            
+            # Always scroll for now to ensure comprehensive data capture while learning
             last_height = await page.evaluate("document.body.scrollHeight")
             while scroll_attempts < max_scrolls:
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -346,6 +361,10 @@ async def fetch_page_content(url: str) -> tuple[str, float, str, int]:
                     break
                 last_height = new_height
                 scroll_attempts += 1
+            
+            # Phase 79: Record infinite scroll requirement
+            if scroll_attempts > 0:
+                intel.infinite_scroll_required = True
             
             # Scroll back to top to ensure all fixed/lazy elements render properly before capture
             await page.evaluate("window.scrollTo(0, 0)")

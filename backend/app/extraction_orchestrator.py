@@ -20,6 +20,7 @@ from app.selector_memory import get_selector_memory
 from app.selector_discovery import discover_selectors
 from app.selector_engine import apply_selectors, extract_with_regex
 from app.data_utils import process_raw_records
+from app.domain_intelligence import get_domain_intelligence
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +47,21 @@ async def orchestrate_extraction(
 ) -> ExtractionResult:
     """Cascade through extraction methods until high-quality data is found."""
     memory = get_selector_memory()
+    intel = get_domain_intelligence().get_intelligence(url)
+
     gate_threshold = max(
         min_record_score * settings.SCORE_GATE_THRESHOLD_FACTOR, 
         settings.SCORE_GATE_ABSOLUTE_MIN
     )
+    
+    # Phase 79: Strategy Self-Selection
+    # If the domain has a very high success rate with regex or httpx,
+    # or if anti-bot risk is extreme, we might jump straight to those strategies.
+    preferred = intel.preferred_strategy
+    if preferred == "regex" and intel.anti_bot_risk > 0.7:
+        logger.info("[Orchestrator] Jumping to preferred REGEX strategy for high-risk domain %s", url)
+        regex_results = extract_with_regex(html, schema_fields, base_url=url)
+        return ExtractionResult(regex_results, "regex")
 
     # ── Layer 1: Selector Profiles ─────────────────────────────────────
     # (Note: Profile extraction usually happens before fetch in the main loop

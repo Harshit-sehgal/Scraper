@@ -381,6 +381,18 @@
 - [x] Add hallucination detection for LLM-based cleaning.
 - [x] Integrate accuracy scoring into standard benchmark outputs.
 
+## Phase 79: Domain Behavior Intelligence [DONE]
+- [x] Create `domain_intelligence.py` to learn and persist hydration, scroll, and anti-bot signatures.
+- [x] Hook intelligence updates into the telemetry collection loop.
+- [x] Update `html_utils.py` to utilize learned patterns for adaptive hydration timeouts.
+- [x] Implement initial strategy self-selection hints in the extraction orchestrator.
+
+## Phase 80: Strategy Self-Selection & Optimization
+- [ ] Implement dynamic cascade re-ordering based on domain strategy success rates.
+- [ ] Add "Fast-path" detection to skip browser rendering for high-confidence regex domains.
+- [ ] Integrate economic cost tracking (LLM tokens + browser time) per strategy.
+- [ ] Build a "Strategy Confidence" model to predict the optimal extraction path.
+
 ## Phase 75: Advanced Browser Pool & Session Lifecycle [DONE]
 - [x] Persistent Chromium management and context pooling (Initial).
 - [x] Implement browser health checks and automated page recycling.

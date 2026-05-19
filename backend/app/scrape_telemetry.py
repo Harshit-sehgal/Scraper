@@ -69,6 +69,13 @@ class ScrapeTelemetryCollector:
         telemetry = ScrapeTelemetry(url=url, **kwargs)
         self._history.append(telemetry)
 
+        # Phase 79: Update Domain Intelligence
+        try:
+            from app.domain_intelligence import get_domain_intelligence
+            get_domain_intelligence().update_from_telemetry(telemetry.to_dict())
+        except Exception:
+            pass
+
         # Emit to semantic world state observability if available
         try:
             from app.semantic_world_state import get_world_state
