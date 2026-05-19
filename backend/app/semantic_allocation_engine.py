@@ -320,26 +320,44 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
                         # Strong pull: synthesized knowledge is high-integrity
                         graph.compatibility[key] = min(1.0, current + (1.0 - current) * 0.5)
 
-    # Topological Law Bias (Phase 24): Proximity Laws
+     # Topological Law Bias (Phase 24): Proximity Laws
     # If roles A and B have a proximity law and are close, boost.
     if ws.topological_laws:
+        # Build spatial index: bucket candidates by position (O(n) preprocessing)
+        # Bucket size = proximity threshold (50 units)
+        position_buckets: dict[int, list] = {}
+        for cand_val, token in graph.candidates.items():
+            bucket_id = int(token.position // 50)
+            if bucket_id not in position_buckets:
+                position_buckets[bucket_id] = []
+            position_buckets[bucket_id].append((cand_val, token))
+        
         for (r1, r2), strength in ws.topological_laws.items():
             if r1 in graph.roles and r2 in graph.roles:
-                # Find candidate positions for these roles
-                for c1, t1 in graph.candidates.items():
-                    for c2, t2 in graph.candidates.items():
-                        if c1 == c2: continue
-                        dist = abs(t1.position - t2.position)
-                        if dist < 50: # Physically close
-                            # Boost compatibility for both
-                            for role in [r1, r2]:
-                                for cand in [c1, c2]:
-                                    key = (cand, role)
-                                    if key in graph.compatibility:
-                                        # Boost proportional to law strength and physical proximity
-                                        proximity_factor = (50 - dist) / 50.0
-                                        boost = 0.1 * strength * proximity_factor
-                                        graph.compatibility[key] = min(1.0, graph.compatibility[key] + boost)
+                # For each bucket, check only nearby buckets (spatial locality)
+                for bucket_id, candidates_in_bucket in position_buckets.items():
+                    # Check current bucket and adjacent buckets only
+                    nearby_buckets = [bucket_id - 1, bucket_id, bucket_id + 1]
+                    nearby_candidates = []
+                    for nearby_id in nearby_buckets:
+                        if nearby_id in position_buckets:
+                            nearby_candidates.extend(position_buckets[nearby_id])
+                    
+                    # Now check pairs within nearby candidates (O(k²) where k << n)
+                    for i, (c1, t1) in enumerate(candidates_in_bucket):
+                        for c2, t2 in nearby_candidates:
+                            if c1 == c2: continue
+                            dist = abs(t1.position - t2.position)
+                            if dist < 50: # Physically close
+                                # Boost compatibility for both
+                                for role in [r1, r2]:
+                                    for cand in [c1, c2]:
+                                        key = (cand, role)
+                                        if key in graph.compatibility:
+                                            # Boost proportional to law strength and physical proximity
+                                            proximity_factor = (50 - dist) / 50.0
+                                            boost = 0.1 * strength * proximity_factor
+                                            graph.compatibility[key] = min(1.0, graph.compatibility[key] + boost)
 
     # Build exclusivity edges
     reng = _get_role_engine()
