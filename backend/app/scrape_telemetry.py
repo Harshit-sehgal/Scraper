@@ -117,41 +117,14 @@ def get_scrape_telemetry() -> ScrapeTelemetryCollector:
     return _collector
 
 
-# ─── Anti-bot Detection Helpers ──────────────────────────────────────────
-
-ANTI_BOT_SIGNALS = {
-    "challenge-platform": 0.9,
-    "cf-browser-verification": 0.9,
-    "cf-turnstile": 0.9,
-    "g-recaptcha": 0.9,
-    "h-captcha": 0.9,
-    "blocked": 0.7,
-    "access denied": 0.7,
-    "please verify": 0.6,
-    "security check": 0.6,
-    "sorry, you have been blocked": 0.95,
-    "enable javascript": 0.5,
-    "javascript is required": 0.5,
-    "ddos-guard": 0.8,
-    "perimeterx": 0.8,
-    "akamai": 0.7,
-    "cloudflare": 0.6,
-}
-
+from app.anti_bot_engine import get_anti_bot_engine
 
 def detect_anti_bot(html: str) -> float:
     """Score how likely this page is an anti-bot / challenge page.
 
     Returns 0.0 (no anti-bot) to 1.0 (definitely blocked).
     """
-    if not html:
-        return 0.0
-    lower = html.lower()
-    max_score = 0.0
-    for signal, score in ANTI_BOT_SIGNALS.items():
-        if signal in lower:
-            max_score = max(max_score, score)
-    return max_score
+    return get_anti_bot_engine().detect_challenges(html)
 
 
 def estimate_dom_nodes(html: str) -> int:
