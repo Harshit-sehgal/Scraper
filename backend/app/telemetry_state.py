@@ -16,10 +16,27 @@ class TelemetryStateAdapter:
 
     def __init__(self) -> None:
         self._telemetry = get_scrape_telemetry()
+        self._domain_stabilization_times: Dict[str, List[float]] = {}
 
     def record_scrape(self, url: str, **kwargs: Any) -> None:
         """Record scrape event statistics and telemetry parameters."""
         self._telemetry.record(url, **kwargs)
+
+    def record_stabilization(self, domain: str, settle_ms: float) -> None:
+        """Record the actual time it took for a domain's DOM to stabilize."""
+        if domain not in self._domain_stabilization_times:
+            self._domain_stabilization_times[domain] = []
+        self._domain_stabilization_times[domain].append(settle_ms)
+        if len(self._domain_stabilization_times[domain]) > 10:
+            self._domain_stabilization_times[domain].pop(0)
+
+    def get_avg_stabilization(self, domain: str) -> float:
+        """Retrieve the adaptive average DOM stabilization time for a domain in ms."""
+        times = self._domain_stabilization_times.get(domain)
+        if not times:
+            return 1500.0  # Default base wait: 1.5 seconds
+        # Bound between 500ms and 5000ms to avoid infinite delay or flash exits
+        return max(500.0, min(5000.0, sum(times) / len(times)))
 
     def get_recent_snapshots(self, count: int = 20) -> List[Dict[str, Any]]:
         """Retrieve recent scrape telemetry snapshots."""

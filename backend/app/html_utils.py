@@ -346,6 +346,9 @@ async def fetch_page_content(
                     except Exception: pass
 
             # Adaptive post-network buffer: check DOM stabilization
+            from app.telemetry_state import get_telemetry_state
+            telemetry = get_telemetry_state()
+            avg_stabilization = telemetry.get_avg_stabilization(domain)
             stabilization_start = time.time()
             settle_timeout = intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
             settle_timeout = max(settle_timeout, 3.0) 
@@ -371,7 +374,7 @@ async def fetch_page_content(
                                  }}
                                  const stableFor = now - stableSince;
                                  const totalWait = now - start;
-                                 if (stableFor >= 1500 && totalWait >= {min_wait_ms}) {{
+                                 if (stableFor >= {avg_stabilization} && totalWait >= {min_wait_ms}) {{
                                      clearInterval(interval);
                                      resolve(true);
                                  }}
@@ -382,6 +385,7 @@ async def fetch_page_content(
                 )
             except Exception: pass
             js_render_delay_ms = (time.time() - stabilization_start) * 1000
+            telemetry.record_stabilization(domain, js_render_delay_ms)
 
             # Scroll handling
             if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:

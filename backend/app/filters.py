@@ -26,8 +26,13 @@ _LOCATION_NAME_HINTS = ("location", "address", "city", "area", "region", "zip", 
 
 def geocode_address(address: str) -> Optional[tuple[float, float]]:
     """Convert an address string to (latitude, longitude) using free OpenStreetMap."""
-    if address in _geocode_cache:
-        return _geocode_cache[address]
+    from app.geocode_cache import get_geocode_cache
+    cache = get_geocode_cache()
+    cached = cache.get(address)
+    if cached is not None:
+        if cached[2] == "EXCLUDED_NEGATIVE_CACHE":
+            return None
+        return (cached[0], cached[1])
 
     max_retries = 3
     backoff = 1.0  # Base delay in seconds
@@ -36,7 +41,7 @@ def geocode_address(address: str) -> Optional[tuple[float, float]]:
             location = _geocoder.geocode(address)
             if location:
                 coords = (location.latitude, location.longitude)
-                _geocode_cache[address] = coords
+                cache.set(address, location.latitude, location.longitude, location.address)
                 return coords
             break  # If geocoding succeeded but returned no location, break early
         except Exception as e:
@@ -50,7 +55,7 @@ def geocode_address(address: str) -> Optional[tuple[float, float]]:
             else:
                 logging.exception("Geocode error for %s after %d attempts: %s", address, max_retries, e)
 
-    _geocode_cache[address] = None
+    cache.set_negative(address)
     return None
 
 
