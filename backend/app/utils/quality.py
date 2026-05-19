@@ -15,7 +15,7 @@ def normalized_dedup_text(value) -> str:
 def compute_source_breakdown(results: list[dict]) -> dict:
     """Compute count and percentage of records per source domain."""
     from urllib.parse import urlparse
-    counts = {}
+    counts: dict[str, int] = {}
     for r in results:
         url = r.get("_source_url") or r.get("source_url") or ""
         domain = urlparse(url).netloc or "unknown"

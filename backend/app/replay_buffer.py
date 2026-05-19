@@ -476,7 +476,7 @@ class ReplayBuffer:
                 chains[chain_key].append(entry)
 
         # Build final output
-        result = []
+        result: list[dict] = []
         for key in chain_order[-limit:]:
             events = chains[key]
             if not events:

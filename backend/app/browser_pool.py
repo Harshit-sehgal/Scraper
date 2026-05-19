@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 
 from playwright.async_api import async_playwright, Browser, BrowserContext
 
@@ -23,7 +23,7 @@ class BrowserPool:
     """Manages a persistent Chromium instance with reusable contexts."""
 
     def __init__(self) -> None:
-        self._playwright = None
+        self._playwright: Optional[Any] = None
         self._browser: Optional[Browser] = None
         self._contexts: dict[str, BrowserContext] = {}
         self._context_use_count: dict[str, int] = {}
