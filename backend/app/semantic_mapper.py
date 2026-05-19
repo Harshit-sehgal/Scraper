@@ -11,6 +11,7 @@ regardless of whether it was found on a flight site or a product page.
 
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
 from app.intent_parser import SEMANTIC_NEED_KEYWORDS, IntentSchema
@@ -39,8 +40,8 @@ class RecordMapping:
     unmatched_values: List[str] = field(default_factory=list)
 
 
-# Consolidated Semantic Patterns
-SEMANTIC_PATTERNS = {
+# Consolidated Semantic Patterns (raw patterns)
+_SEMANTIC_PATTERNS_RAW = {
     SemanticType.PRICE: [
         r"[\$\u20a8\u20ac\u00a3\u00a5\u20b9]\s*\d+[\d,]*\.?\d*",
         r"\d+[\d,]*\.?\d*\s*(usd|eur|gbp|inr|rs|yen|pound)",
@@ -77,38 +78,52 @@ SEMANTIC_PATTERNS = {
     ],
 }
 
+# Pre-compile all regex patterns at module load (O(1) per call instead of O(n) recompilation)
+SEMANTIC_PATTERNS: Dict[SemanticType, List[Tuple[re.Pattern, int]]] = {}
+for stype, patterns in _SEMANTIC_PATTERNS_RAW.items():
+    flags = 0 if stype == SemanticType.CODE else re.IGNORECASE
+    SEMANTIC_PATTERNS[stype] = [(re.compile(p, flags), flags) for p in patterns]
 
+# Pre-compile common regex patterns used in detect_semantic_type
+_DIGIT_PATTERN = re.compile(r"\d+")
+_NUMERIC_PATTERN = re.compile(r"^\d+\.?\d*$")
+_QUANTIFIER_PATTERN = re.compile(r"\d+\s*(stop|direct|non.?stop)", re.IGNORECASE)
+
+
+@lru_cache(maxsize=4096)
 def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType, float]:
-    """Detect semantic type of a value using regex patterns and field name hints."""
+    """Detect semantic type of a value using regex patterns and field name hints.
+    
+    Results are cached with LRU (max 4096 entries) to avoid re-processing
+    common values. This significantly improves performance for repetitive data.
+    """
     if not value:
         return SemanticType.TEXT, 0.0
 
     # 1. Field-name hinting (higher priority for disambiguation)
     name_lower = (field_name or "").lower()
     
-    # 2. Pattern-based matching (universal physics)
-    for stype, patterns in SEMANTIC_PATTERNS.items():
-        # Case-sensitivity varies by type
-        flags = 0 if stype == SemanticType.CODE else re.IGNORECASE
-        for pattern in patterns:
-            if re.search(pattern, str(value), flags):
+    # 2. Pattern-based matching (universal physics) - using pre-compiled patterns
+    for stype, compiled_patterns in SEMANTIC_PATTERNS.items():
+        for pattern, _ in compiled_patterns:
+            if pattern.search(str(value)):
                 # Boost confidence if field name also matches
                 confidence = 0.95
                 return stype, confidence
 
     # 3. Numeric context
-    if re.search(r"\d+", str(value)):
+    if _DIGIT_PATTERN.search(str(value)):
         if any(k in name_lower for k in ["price", "cost", "fare", "amount", "salary"]):
             return SemanticType.PRICE, 0.80
         if any(k in name_lower for k in ["date", "time", "start", "end", "schedule"]):
             return SemanticType.DATE, 0.80
         
         # Numeric with quantifier
-        if re.search(r"\d+\s*(stop|direct|non.?stop)", str(value), re.IGNORECASE):
+        if _QUANTIFIER_PATTERN.search(str(value)):
             return SemanticType.NUMBER, 0.70
         
         # Generic number
-        if re.match(r"^\d+\.?\d*$", str(value).strip()):
+        if _NUMERIC_PATTERN.match(str(value).strip()):
             return SemanticType.NUMBER, 0.60
 
     # 4. Organization/Entity context
