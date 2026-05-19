@@ -82,3 +82,40 @@ async def test_frontier_persistence_across_restarts():
     
     # No more URLs
     assert await new_frontier.get_next_url() is None
+
+
+@pytest.mark.asyncio
+async def test_domain_crawl_limit():
+    from app.config import settings
+    # Override settings limit for testing
+    original_limit = settings.CRAWL_MAX_PAGES_PER_DOMAIN
+    settings.CRAWL_MAX_PAGES_PER_DOMAIN = 2
+    
+    try:
+        frontier = CrawlFrontier()
+        
+        # Add 2 URLs for the same domain
+        assert await frontier.add_url("https://cap.com/page1") is True
+        assert await frontier.add_url("https://cap.com/page2") is True
+        
+        # Get next URL, mark completed to increment domain crawl count
+        url1 = await frontier.get_next_url()
+        await frontier.mark_completed(url1, success=True)
+        
+        url2 = await frontier.get_next_url()
+        await frontier.mark_completed(url2, success=True)
+        
+        # Verify that domain capillary count is 2
+        assert frontier._domain_page_counts.get("cap.com") == 2
+        
+        # Try adding page3 for cap.com -> should be rejected because limit is 2
+        assert await frontier.add_url("https://cap.com/page3") is False
+        
+        # Test that restart preserves counts
+        new_frontier = CrawlFrontier()
+        assert new_frontier._domain_page_counts.get("cap.com") == 2
+        assert await new_frontier.add_url("https://cap.com/page3") is False
+        
+    finally:
+        settings.CRAWL_MAX_PAGES_PER_DOMAIN = original_limit
+

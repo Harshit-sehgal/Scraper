@@ -444,3 +444,37 @@ class TestDetectionPatterns:
     def test_is_malformed_dom_no_html(self):
         assert not _is_malformed_dom("")
         assert not _is_malformed_dom("some plain text with no tags")
+
+
+class TestExceptionTranslation:
+    def test_exception_translations(self):
+        from app.failure_classification import translate_exception_to_friendly_message
+        
+        # Test crawl timeouts
+        msg1 = translate_exception_to_friendly_message("Playwright Navigation Timeout: goto failed after 30000ms")
+        assert "Crawl Timeout" in msg1
+        
+        # Test wait timeouts
+        msg2 = translate_exception_to_friendly_message("Timeout waiting for selector .loader to be hidden")
+        assert "Wait Timeout" in msg2
+        
+        # Test DNS resolution
+        msg3 = translate_exception_to_friendly_message("dns_lookup_failed: Could not resolve address")
+        assert "DNS Lookup Failed" in msg3
+        
+        # Test connections
+        msg4 = translate_exception_to_friendly_message("ConnectionRefusedError: server rejected port 80")
+        assert "Connection Refused" in msg4
+        
+        # Test anti-bot defenses
+        msg5 = translate_exception_to_friendly_message("Cloudflare DDoS challenge active")
+        assert "Anti-Bot Defense Block" in msg5
+        
+        # Test browser crashes
+        msg6 = translate_exception_to_friendly_message("Playwright crash: target context was closed")
+        assert "Browser Context Reset" in msg6
+        
+        # Test unknown system exceptions
+        msg7 = translate_exception_to_friendly_message("ValueError: some strange python error")
+        assert "Extraction Impediment" in msg7
+

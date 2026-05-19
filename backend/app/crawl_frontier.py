@@ -46,6 +46,8 @@ class CrawlFrontier:
         self._max_discovery_depth: int = 3
         self._integrated_frontier: bool = True  # Whether we're integrated with the scraper
         
+        self._domain_page_counts: Dict[str, int] = {}
+        
         # Persistent SQLite storage
         self._db_path = "backend/data/crawl_frontier.db"
         self._init_db()
@@ -81,11 +83,14 @@ class CrawlFrontier:
     def _load_from_db(self) -> None:
         import sqlite3
         import heapq
+        from urllib.parse import urlparse
         try:
             with sqlite3.connect(self._db_path) as conn:
                 # Load completed
                 for row in conn.execute("SELECT url FROM completed"):
                     self._completed.add(row[0])
+                    domain = urlparse(row[0]).netloc
+                    self._domain_page_counts[domain] = self._domain_page_counts.get(domain, 0) + 1
                 
                 # Load failed
                 for row in conn.execute("SELECT url, count FROM failed"):
@@ -119,6 +124,16 @@ class CrawlFrontier:
             if url in self._completed or url in self._pending:
                 return False
             
+            # Enforce maximum page limits per domain to prevent infinite loops
+            from urllib.parse import urlparse
+            domain = urlparse(url).netloc
+            if self._domain_page_counts.get(domain, 0) >= settings.CRAWL_MAX_PAGES_PER_DOMAIN:
+                logger.debug(
+                    "[Frontier] Domain page limit hit for %s (%d >= %d). Rejecting URL: %s",
+                    domain, self._domain_page_counts.get(domain, 0), settings.CRAWL_MAX_PAGES_PER_DOMAIN, url
+                )
+                return False
+            
             # 2. Priority calculation (lower = higher priority)
             # Higher depth = lower priority
             item_priority = priority + (depth * 5)
@@ -141,7 +156,7 @@ class CrawlFrontier:
 
     async def get_next_url(self) -> Optional[str]:
         """Get the next URL available for crawling, respecting policy."""
-        tried = []
+        tried: List[CrawlItem] = []
         next_url = None
 
         while True:
@@ -246,6 +261,9 @@ class CrawlFrontier:
             import sqlite3
             if success:
                 self._completed.add(url)
+                from urllib.parse import urlparse
+                domain = urlparse(url).netloc
+                self._domain_page_counts[domain] = self._domain_page_counts.get(domain, 0) + 1
                 self._failed.pop(url, None)
                 try:
                     with sqlite3.connect(self._db_path) as conn:
@@ -280,6 +298,9 @@ class CrawlFrontier:
                         logger.error("Failed to insert retry URL in SQLite: %s", e)
                 else:
                     self._completed.add(url) # Move to completed to stop retrying
+                    from urllib.parse import urlparse
+                    domain = urlparse(url).netloc
+                    self._domain_page_counts[domain] = self._domain_page_counts.get(domain, 0) + 1
                     try:
                         with sqlite3.connect(self._db_path) as conn:
                             conn.execute("DELETE FROM failed WHERE url = ?", (url,))
