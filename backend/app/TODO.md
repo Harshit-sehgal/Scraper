@@ -393,13 +393,20 @@
 - [x] Integrate economic cost tracking (LLM tokens + browser time) per strategy.
 - [x] Build a "Strategy Confidence" model to predict the optimal extraction path.
 
-## Phase 81: Real-World Validation & Pipeline Refinement [IN PROGRESS]
-- [ ] Perform live scrape of `flightsnholidays.co.uk` and compare against golden data.
-- [ ] Measure accuracy (Precision/Recall) using Phase 74 framework.
-- [ ] Identify and fix extraction edge cases in dynamic flight layouts.
-- [ ] Refactor `selector_discovery` to improve 'Structural Lens' for mixed-grid layouts.
-- [ ] Harden `html_utils.py` against aggressive lazy-loading patterns found in production.
-- [ ] Ensure all extraction thresholds are 100% settings-derived.
+## Phase 81: Real-World Validation & Pipeline Refinement [DONE]
+- [x] Perform live scrape of `flightsnholidays.co.uk` and compare against golden data.
+- [x] Measure accuracy (Precision/Recall) using Phase 74 framework.
+- [x] Identify and fix extraction edge cases in dynamic flight layouts.
+- [x] Refactor `selector_discovery` to improve 'Structural Lens' for mixed-grid layouts.
+- [x] Harden `html_utils.py` against aggressive lazy-loading patterns found in production.
+- [x] Ensure all extraction thresholds are 100% settings-derived.
+
+## Phase 82: Architectural Decentralization & Event-Driven Learning [PLANNING]
+- [ ] Implement `crawl_state.py` for frontier/budget delegation.
+- [ ] Implement `telemetry_state.py` for runtime performance statistics.
+- [ ] Implement `regression_state.py` for archived failures.
+- [ ] Refactor `semantic_world_state.py` to leverage decentralized adapters.
+- [ ] Eliminate circular imports between `selector_engine` and `selector_discovery` via event-driven learning loops.
 
 ## Phase 75: Advanced Browser Pool & Session Lifecycle [DONE]
 - [x] Persistent Chromium management and context pooling (Initial).

@@ -790,7 +790,7 @@ class ChaosTestSuite:
             # 4. Measure recovery
             # 5. Validate against expectations
             
-            result = {
+            result: dict[str, Any] = {
                 "scenario": scenario.name,
                 "failure_mode": scenario.failure_mode.value,
                 "severity": scenario.severity.value,
@@ -1030,7 +1030,7 @@ if __name__ == "__main__":
     scenarios = FailureScenarios.get_all_scenarios()
     
     # Group by category
-    categories = {}
+    categories: dict[str, list[Any]] = {}
     for scenario in scenarios:
         cat = scenario.failure_mode.value.split("_")[0]
         if cat not in categories:
