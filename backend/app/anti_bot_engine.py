@@ -11,7 +11,6 @@ Responsible for:
 from __future__ import annotations
 
 import logging
-import re
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -87,9 +86,6 @@ class AntiBotEngine:
 
     def get_retry_policy(self, url: str, last_score: float) -> dict:
         """Determine the next step based on the block score and domain history."""
-        from urllib.parse import urlparse
-        domain = urlparse(url).netloc or "unknown"
-        
         if last_score < 0.3:
             return {"action": "continue", "delay": 0}
             

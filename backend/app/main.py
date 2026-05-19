@@ -1,11 +1,9 @@
-
 """
 FastAPI Main Server — DataForge General-Purpose Web Scraper API.
 """
 
 import asyncio
 import logging
-import os
 from pathlib import Path
 
 # Load .env before any app imports that read env vars at module level
@@ -14,7 +12,6 @@ load_dotenv()
 
 # ruff: noqa: E402
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -29,7 +26,6 @@ from app.state_store import load_state, get_state_file_path
 from app.rate_limiter import RateLimiterMiddleware
 # Initialize event cascade (safe: scheduler is lazy-created, no circular import)
 from app.graph_update_scheduler import get_scheduler
-from app.topology_state import ConflictError
 get_scheduler()
 
 app = FastAPI(

@@ -11,10 +11,8 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from urllib.parse import urlparse
-
-from app.config import settings
 
 logger = logging.getLogger(__name__)
 

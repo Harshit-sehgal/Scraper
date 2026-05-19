@@ -17,7 +17,7 @@ import time
 import heapq
 import logging
 import threading
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, List, Optional
 from enum import IntEnum
 
 logger = logging.getLogger(__name__)

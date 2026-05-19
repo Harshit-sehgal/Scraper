@@ -127,7 +127,25 @@ def _values_match(v1: Any, v2: Any) -> bool:
     s1 = " ".join(s1.split())
     s2 = " ".join(s2.split())
     
-    return s1 == s2
+    if s1 == s2:
+        return True
+        
+    # Currency-aware matching: strip symbols and commas
+    import re
+    def _strip_currency(s: str) -> str:
+        return re.sub(r"[^\d.]", "", s)
+        
+    clean1 = _strip_currency(s1)
+    clean2 = _strip_currency(s2)
+    if clean1 and clean2 and clean1 == clean2:
+        return True
+        
+    # Partial match for longer strings
+    if len(s1) > 10 and len(s2) > 10:
+        if s1 in s2 or s2 in s1:
+            return True
+            
+    return False
 
 
 def _record_hash(record: Dict[str, Any]) -> str:

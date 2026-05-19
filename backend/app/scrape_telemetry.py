@@ -86,8 +86,8 @@ class ScrapeTelemetryCollector:
                 subsystem="scraper",
                 severity="info",
                 cause=f"Scraped {url}: {telemetry.records_final} records in {telemetry.fetch_ms:.0f}ms"
-                + (f" (profile)" if telemetry.profile_match else "")
-                + (f" (fallback)" if telemetry.fallback_triggered else ""),
+                + (" (profile)" if telemetry.profile_match else "")
+                + (" (fallback)" if telemetry.fallback_triggered else ""),
             )
             ws.emit_telemetry("scrape", {
                 "url": url,

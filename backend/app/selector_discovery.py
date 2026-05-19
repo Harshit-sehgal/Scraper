@@ -93,9 +93,11 @@ CRITICAL EXCLUSIONS (apply to ANY page type):
 
 EXTRACTION RULES:
 1. Return ONLY JSON: {{"item_container": "selector", "fields": {{"field_name": "selector"}}}}
-2. Target the repeating DATA CONTAINER (rows, cards, items) - NOT navigation
-3. Use relative selectors (descendant or child)
-4. Each schema field needs a selector or null
+2. Target the repeating DATA CONTAINER (rows, cards, items) - NOT navigation.
+3. Use relative selectors (descendant or child) that work INSIDE the item_container.
+4. VERIFY FIELD SEMANTICS: Ensure the selector for "price" actually points to a price value, "title" to a title, etc.
+5. If multiple elements could match, choose the most specific one.
+6. Use null for fields that cannot be found.
 
 HTML SNIPPET:
 ```html

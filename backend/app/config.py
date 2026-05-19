@@ -11,9 +11,6 @@ To override, set the corresponding env var (e.g. PLAYWRIGHT_TIMEOUT=45000).
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -61,7 +58,7 @@ class Settings(BaseSettings):
     """Ms between DOM change checks."""
     DOM_STABILIZATION_MIN_STABLE_CHECKS: int = 5
     """Consecutive stable checks required for quiescence."""
-    DOM_STABILIZATION_MIN_TOTAL_CHECKS: int = 15
+    DOM_STABILIZATION_MIN_TOTAL_CHECKS: int = 25
     """Minimum checks to perform before allowing early exit."""
     DOM_STABILIZATION_MAX_CHECKS: int = 60
     """Absolute limit on DOM stabilization checks."""

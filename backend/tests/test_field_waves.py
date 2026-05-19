@@ -16,7 +16,7 @@ def clean_state():
     dispatcher.subscribers[SemanticEventType.FIELD_WAVE] = []
     
     # Trigger creation of new world state which will subscribe itself
-    ws = get_world_state()
+    get_world_state()
     
     # Re-setup scheduler subscription
     from app.graph_update_scheduler import get_scheduler

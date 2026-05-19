@@ -14,6 +14,7 @@ from app.semantic_pipeline import run_pipeline
 from app.semantic_persistence import load_semantic_state, save_semantic_state
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
+from app.llm_bridge import get_llm_call_count, reset_llm_call_count
 
 def _add_job_log(job, message: str, level: str = "info", persist_fn=None):
     from app.models import LogEntry
@@ -69,6 +70,7 @@ async def run_job(
 
         # Auto-discovery mode
         if job.mode == ScrapeMode.AUTO:
+            reset_llm_call_count()
             job.status = JobStatus.DISCOVERING
             job.progress_total = int(job.max_pages or 10) + 2 # Discovery + URLs + Final
             job.progress_current = 1
@@ -90,6 +92,7 @@ async def run_job(
                 source_policy=job.source_policy,
                 max_per_domain=job.max_per_domain,
             )
+            job.total_llm_calls += get_llm_call_count()
             job.discovered_urls = discovered
             job.urls = [d["url"] for d in discovered if "url" in d]
 
@@ -145,10 +148,12 @@ async def run_job(
             ws = get_world_state()
             with ws.transaction(f"scrape:{url}"):
                 try:
+                    reset_llm_call_count()
                     results = await asyncio.wait_for(
                         scrape_url(url, job.schema_fields, min_record_score=job.min_record_score, user_intent=job.intent),
                         timeout=per_url_scrape_timeout_seconds,
                     )
+                    job.total_llm_calls += get_llm_call_count()
                     ai_source_prediction["sources_attempted"] += 1
                     ai_structured_rows_for_source = 0
                     for record in results:
@@ -210,6 +215,7 @@ async def run_job(
             _add_job_log(job, f"Running global AI structuring on {len(all_raw_results)} records...", persist_fn=persist_state_fn)
             logging.info("Job %s: AI structuring %d scraped rows...", job_id, len(all_raw_results))
             try:
+                reset_llm_call_count()
                 all_raw_results, ai_structuring_report = await asyncio.wait_for(
                     ai_clean_and_align_records(
                         all_raw_results,
@@ -218,6 +224,7 @@ async def run_job(
                     ),
                     timeout=ai_structuring_timeout_seconds,
                 )
+                job.total_llm_calls += get_llm_call_count()
                 # Integration Phase: ensure AI-cleaned records are integrated into the world state
                 from app.semantic_world_state import get_world_state
                 with get_world_state().transaction("global_ai_structuring"):
@@ -347,13 +354,16 @@ async def run_job(
             logging.info("Job %s: Generating AI insights over %d records...", job_id, len(job.results))
             try:
                 from app.scraper import generate_data_insight
+                reset_llm_call_count()
                 analysis_text = await asyncio.wait_for(
                     generate_data_insight(job.results),
                     timeout=insight_timeout_seconds,
                 )
+                job.total_llm_calls += get_llm_call_count()
                 job.analysis = analysis_text
                 _add_job_log(job, "AI insights generated successfully")
             except asyncio.TimeoutError:
+                job.total_llm_calls += get_llm_call_count()
                 _add_job_log(job, "AI insight generation timed out", level="warning")
                 logging.warning(
                     "Job %s: AI insight timed out after %ds; continuing without insight.",
@@ -361,9 +371,14 @@ async def run_job(
                 )
                 job.analysis = "Insight generation timed out."
             except Exception as ai_e:
+                job.total_llm_calls += get_llm_call_count()
                 logging.exception("Job %s: AI insight generation failed: %s", job_id, ai_e)
                 _add_job_log(job, "AI insight generation failed", level="error")
                 
+        # Final cost calculation (Phase 80: Economic Optimization)
+        # $0.01 per LLM call + estimated browser cost ($0.02 per URL)
+        job.estimated_cost_usd = round((job.total_llm_calls * 0.01) + (job.progress_total * 0.02), 4)
+
         job.status = JobStatus.COMPLETED
         job.cancel_requested = False
         job.completed_at = datetime.datetime.now().isoformat()

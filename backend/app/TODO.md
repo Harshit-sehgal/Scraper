@@ -393,11 +393,13 @@
 - [x] Integrate economic cost tracking (LLM tokens + browser time) per strategy.
 - [x] Build a "Strategy Confidence" model to predict the optimal extraction path.
 
-## Phase 81: Evolutionary Extraction & Failure Ontology
-- [ ] Implement selector mutation and competition (A/B testing selectors).
-- [ ] Build a formal "Failure Ontology" to classify hydration vs anti-bot vs decay.
-- [ ] Add selector lineage tracking and trust-decay curves in memory.
-- [ ] Implement "Self-Healing" benchmarks that archive failed pages automatically.
+## Phase 81: Real-World Validation & Pipeline Refinement [IN PROGRESS]
+- [ ] Perform live scrape of `flightsnholidays.co.uk` and compare against golden data.
+- [ ] Measure accuracy (Precision/Recall) using Phase 74 framework.
+- [ ] Identify and fix extraction edge cases in dynamic flight layouts.
+- [ ] Refactor `selector_discovery` to improve 'Structural Lens' for mixed-grid layouts.
+- [ ] Harden `html_utils.py` against aggressive lazy-loading patterns found in production.
+- [ ] Ensure all extraction thresholds are 100% settings-derived.
 
 ## Phase 75: Advanced Browser Pool & Session Lifecycle [DONE]
 - [x] Persistent Chromium management and context pooling (Initial).

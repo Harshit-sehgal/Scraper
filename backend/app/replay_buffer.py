@@ -12,11 +12,10 @@ Phase 66: Long-Horizon Scaling — streaming replay from persistent storage.
 
 import json
 import time
-import math
 import logging
 import threading
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Tuple, Any, Callable
+from typing import Dict, Iterator, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -373,12 +372,10 @@ class ReplayBuffer:
                         break
                     line = line.strip()
                     if not line:
-                        offset = f.tell()
                         continue
                     try:
                         entry = json.loads(line)
                     except json.JSONDecodeError:
-                        offset = f.tell()
                         continue
                     idx = entry.get("idx", 0)
                     if idx >= self._next_global_idx:

@@ -36,19 +36,27 @@ def _detect_table_headers(html: str) -> list[dict]:
     return headers_info
 
 
-def apply_selectors(html: str, selectors_map: dict, schema_fields: list[SchemaField], base_url: str = "") -> list[dict]:
+def apply_selectors(
+    html: str, 
+    selectors_map: dict, 
+    schema_fields: list[SchemaField], 
+    base_url: str = "",
+    return_field_quality: bool = False
+) -> list[dict] | tuple[list[dict], dict]:
     """Execute generated CSS selectors on full HTML and score extracted records."""
     container_sel = selectors_map.get("item_container")
     field_sels = selectors_map.get("fields", {}) or {}
 
     if not container_sel:
-        return []
+        return ([], {}) if return_field_quality else []
 
     soup = BeautifulSoup(html, "html.parser")
     page_email, page_phone = _extract_contacts_from_node(soup)
     containers = soup.select(container_sel)
     
     results = []
+    field_quality_map = {f.name: [] for f in schema_fields}
+    
     for node in containers:
         record: dict = {}
         for field in schema_fields:
@@ -67,6 +75,10 @@ def apply_selectors(html: str, selectors_map: dict, schema_fields: list[SchemaFi
                     val = None
 
             record[field.name] = _sanitize_field_value(field, val, base_url=base_url)
+            
+            if return_field_quality:
+                from app.utils.quality import _value_quality
+                field_quality_map[field.name].append(_value_quality(field, record[field.name]))
 
         # Post-extraction enrichment
         record = _enrich_record_contacts(
@@ -80,7 +92,15 @@ def apply_selectors(html: str, selectors_map: dict, schema_fields: list[SchemaFi
         if record["record_score"] > 0:
             results.append(record)
 
-    return _apply_page_level_contact_fallback(results, schema_fields, page_email, page_phone)
+    if return_field_quality:
+        # Aggregate field quality scores
+        avg_field_quality = {
+            name: (sum(scores) / len(scores)) if scores else 0.0
+            for name, scores in field_quality_map.items()
+        }
+        return results, avg_field_quality
+
+    return results
 
 
 def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: str = "") -> list[dict]:

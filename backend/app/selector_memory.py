@@ -92,7 +92,6 @@ class SelectorMemory:
         # Update if selectors changed or it's a new entry
         if entry["selectors"] != selectors:
             # Store old selector hash in lineage
-            import hashlib
             old_hash = str(hash(json.dumps(entry["selectors"], sort_keys=True)))
             if "lineage" not in entry: entry["lineage"] = []
             entry["lineage"].append({

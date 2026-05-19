@@ -193,6 +193,8 @@ class Job(BaseModel):
     analysis: Optional[str] = None
     discovered_urls: list[dict] = Field(default_factory=list)
     quality_report: dict = Field(default_factory=dict)
+    estimated_cost_usd: float = 0.0
+    total_llm_calls: int = 0
     logs: list[LogEntry] = Field(default_factory=list)
     progress_current: int = 0
     progress_total: int = 0

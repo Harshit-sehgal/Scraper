@@ -3,7 +3,6 @@ import logging
 import asyncio
 import time
 from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright
 import httpx
 
 from app.config import settings
@@ -276,7 +275,6 @@ async def fetch_page_content(url: str, preferred_method: str = "playwright") -> 
     # ── Standard Path (Playwright) ──
     page = None
     js_render_delay_ms = 0.0
-    retry_count = 0
     method_used = "playwright"
     
     try:
