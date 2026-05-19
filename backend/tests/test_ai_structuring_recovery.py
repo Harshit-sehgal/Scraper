@@ -61,7 +61,7 @@ def test_llm_json_fast_uses_groq_fallback_model(monkeypatch):
 
     calls: list[str] = []
 
-    def fake_openai_json(endpoint, payload, headers=None, timeout=45, max_attempts=2, backoff_seconds=0.8):
+    async def fake_openai_json(endpoint, payload, headers=None, timeout=45, max_attempts=2, backoff_seconds=0.8):
         model = payload.get("model")
         calls.append(model)
         if model == "primary-model":
@@ -73,11 +73,11 @@ def test_llm_json_fast_uses_groq_fallback_model(monkeypatch):
     import app.llm_bridge
     monkeypatch.setattr(app.llm_bridge, "_call_openai_compatible_json", fake_openai_json)
 
-    out = app.llm_bridge.llm_json_fast(
+    out = asyncio.run(app.llm_bridge.llm_json_fast(
         messages=[{"role": "user", "content": "test"}],
         temperature=0.0,
         timeout=3,
-    )
+    ))
 
     assert out == {"records": [{"company_name": "Fallback Row"}]}
     assert calls[:2] == ["primary-model", "fallback-model"]

@@ -62,6 +62,36 @@ class SelectorDecayPredictor:
         self._decay_history: Dict[str, List[float]] = defaultdict(list)
         # Track confidence snapshots over time per domain
         self._confidence_snapshots: Dict[str, List[tuple[float, float]]] = defaultdict(list)
+        self._load()
+
+    def _save(self) -> None:
+        import os
+        import json
+        try:
+            path = "backend/data/selector_decay_snapshots.json"
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            data = {domain: [[t, c] for t, c in snapshots] for domain, snapshots in self._confidence_snapshots.items()}
+            with open(path, "w") as f:
+                json.dump(data, f)
+        except Exception as e:
+            logger.exception("Failed to persist selector decay snapshots: %s", e)
+
+    def _load(self) -> None:
+        import os
+        import json
+        import sys
+        if "pytest" in sys.modules and not os.environ.get("TEST_SELECTOR_DECAY_PERSISTENCE"):
+            return
+        path = "backend/data/selector_decay_snapshots.json"
+        if os.path.exists(path):
+            try:
+                with open(path, "r") as f:
+                    data = json.load(f)
+                self._confidence_snapshots.clear()
+                for domain, snapshots in data.items():
+                    self._confidence_snapshots[domain] = [(float(t), float(c)) for t, c in snapshots]
+            except Exception as e:
+                logger.exception("Failed to load selector decay snapshots: %s", e)
     
     def record_observation(self, domain: str, confidence: float) -> None:
         """Record a confidence observation for a domain at the current time.
@@ -75,6 +105,7 @@ class SelectorDecayPredictor:
         # Keep only last 100 observations
         if len(self._confidence_snapshots[domain]) > 100:
             self._confidence_snapshots[domain] = self._confidence_snapshots[domain][-100:]
+        self._save()
     
     def predict_decay(self, domain: str) -> DecayPrediction:
         """Predict selector decay for a domain.

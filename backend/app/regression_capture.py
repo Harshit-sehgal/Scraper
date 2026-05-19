@@ -480,6 +480,10 @@ class RegressionCapture:
         test_code = f"""
 def {safe_name}(hostile_base_url):
     \"\"\"Replay regression: {category} on {entry.domain} (confidence={entry.failure_confidence}).\"\"\"
+    import asyncio
+    from app.models import SchemaField, FieldType
+    from app.scraper import scrape_url
+
     fields = [
         SchemaField(name={schema_args}, field_type=FieldType.STRING, required=True),
     ]

@@ -411,6 +411,25 @@ async def fetch_page_content(
         html = await page.content()
         return html, js_render_delay_ms, method_used, 0
     except Exception as e:
+        html_content = ""
+        if page:
+            try:
+                html_content = await page.content()
+            except Exception:
+                pass
+        
+        err_msg = str(e).lower()
+        is_antibot = False
+        from app.scrape_telemetry import detect_anti_bot
+        if html_content and detect_anti_bot(html_content) > 0.5:
+            is_antibot = True
+        elif any(marker in err_msg for marker in ["captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"]):
+            is_antibot = True
+            
+        if is_antibot:
+            logger.error("[Scraper] Anti-bot challenge detected during %s for %s. Refusing naive HTTP fallback to prevent IP ban.", strategy.value, url)
+            raise ValueError(f"Anti-bot challenge detected: {e}")
+
         logger.error("[Scraper] %s failed for %s: %s. Final fallback to httpx_basic", strategy.value, url, e)
         return await _fetch_with_httpx(url, strategy=FetchStrategy.HTTPX_BASIC)
     finally:

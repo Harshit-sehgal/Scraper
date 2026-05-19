@@ -13,6 +13,39 @@ from app.invariant_firewall import requires_invariants
 if TYPE_CHECKING:
     from app.observability import GovernanceSnapshot
 
+class NonBlockingRLock:
+    """An async-friendly reentrant lock wrapper.
+    
+    Prevents event-loop starvation by using non-blocking timeout acquisitions
+    when called inside a running asyncio event loop, falling back to a standard
+    reentrant lock otherwise.
+    """
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+
+    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
+        if blocking and timeout < 0:
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    # We are in a running event loop thread! Cap blocking wait
+                    # to prevent event-loop lockups if another thread holds the lock.
+                    return self._lock.acquire(blocking=True, timeout=1.0)
+            except RuntimeError:
+                pass
+        return self._lock.acquire(blocking=blocking, timeout=timeout)
+
+    def release(self) -> None:
+        self._lock.release()
+
+    def __enter__(self) -> bool:
+        return self.acquire()
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.release()
+
+
 class SemanticWorldState:
     """
     Canonical Semantic World State — now a true orchestrator.
@@ -38,7 +71,7 @@ class SemanticWorldState:
 
         self._node_id = node_id or str(uuid.uuid4())[:8]
         self._vector_clock = VectorClock(self._node_id)
-        self._lock = threading.RLock() # Reentrant lock for nested transactions
+        self._lock = NonBlockingRLock() # Reentrant lock for nested transactions
 
         self._topology = TopologyState(delta_callback=self.record_delta,
                                       read_callback=self.record_read)

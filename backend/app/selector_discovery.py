@@ -138,8 +138,8 @@ async def discover_selectors(
     html_snippet = clean_html_for_selectors(html)
     prompt = build_selector_prompt(html_snippet, schema_fields, page_analysis, solidified_motifs)
 
-    def _sync_call():
-        return llm_json(messages=[
+    try:
+        selectors = await llm_json(messages=[
             {
                 "role": "system",
                 "content": (
@@ -149,9 +149,6 @@ async def discover_selectors(
             },
             {"role": "user", "content": prompt}
         ], timeout=settings.LLM_SELECTOR_TIMEOUT)
-
-    try:
-        selectors = await run_sync_in_thread(_sync_call)
         
         if not isinstance(selectors, dict):
             logger.warning("[SelectorDiscovery] LLM returned non-dict response")

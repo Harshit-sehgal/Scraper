@@ -182,3 +182,20 @@ class TestSelectorDecayPredictorGlobal:
         p1 = get_selector_decay_predictor()
         p2 = get_selector_decay_predictor()
         assert p1 is p2
+
+    def test_snapshot_persistence(self, monkeypatch):
+        """Test that confidence snapshots are persisted to JSON and successfully reloaded."""
+        import os
+        monkeypatch.setenv("TEST_SELECTOR_DECAY_PERSISTENCE", "1")
+        predictor = SelectorDecayPredictor()
+        predictor._confidence_snapshots.clear()
+        predictor.record_observation("persistent.com", 0.88)
+        
+        predictor2 = SelectorDecayPredictor()
+        assert "persistent.com" in predictor2._confidence_snapshots
+        assert predictor2._confidence_snapshots["persistent.com"][0][1] == 0.88
+        
+        try:
+            os.remove("backend/data/selector_decay_snapshots.json")
+        except Exception:
+            pass

@@ -11,6 +11,8 @@ Responsible for:
 from __future__ import annotations
 
 import logging
+import asyncio
+import inspect
 from typing import Any, List, Optional, Tuple
 
 from app.async_utils import run_sync_in_thread
@@ -88,7 +90,11 @@ Rules:
 
             raw_response = None
             try:
-                raw_response = await run_sync_in_thread(lambda: _llm_json_fast(messages))
+                res_fast = _llm_json_fast(messages)
+                if inspect.isawaitable(res_fast):
+                    raw_response = await res_fast
+                else:
+                    raw_response = res_fast
             except Exception as e:
                 logger.warning(
                     "Fast-path semantic inference failed for chunk %d/%d: %s",
@@ -109,7 +115,11 @@ Rules:
 
             if cleaned_list is None:
                 any_standard_call = True
-                raw_std = await run_sync_in_thread(lambda: _llm_json(messages))
+                res_std = _llm_json(messages)
+                if inspect.isawaitable(res_std):
+                    raw_std = await res_std
+                else:
+                    raw_std = res_std
                 cleaned_std = _extract_list_from_json(raw_std)
 
                 if cleaned_std is None:

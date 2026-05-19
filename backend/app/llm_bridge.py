@@ -9,7 +9,8 @@ import logging
 import os
 import re
 import time
-import requests
+import asyncio
+import httpx
 from typing import Dict, Any, List, Optional, Callable
 
 
@@ -58,10 +59,10 @@ def _extract_json_payload(text: str):
 
 
 def _should_retry_http_error(error: Exception) -> bool:
-    if isinstance(error, requests.HTTPError):
+    if isinstance(error, httpx.HTTPStatusError):
         status = error.response.status_code if error.response is not None else None
         return status in {429, 500, 502, 503, 504}
-    if isinstance(error, requests.RequestException):
+    if isinstance(error, httpx.RequestError):
         return True
 
     text = str(error).lower()
@@ -70,7 +71,7 @@ def _should_retry_http_error(error: Exception) -> bool:
 
 from app.config import settings
 
-def _call_openai_compatible_json(
+async def _call_openai_compatible_json(
     endpoint: str,
     payload: dict,
     headers: dict | None = None,
@@ -86,24 +87,25 @@ def _call_openai_compatible_json(
     last_error: Exception | None = None
     for attempt in range(1, max(1, max_attempts) + 1):
         try:
-            response = requests.post(endpoint, json=payload, headers=headers or {}, timeout=timeout)
-            response.raise_for_status()
-            data = response.json()
-            content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
-            return _extract_json_payload(content)
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(endpoint, json=payload, headers=headers or {})
+                response.raise_for_status()
+                data = response.json()
+                content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+                return _extract_json_payload(content)
         except Exception as error:
             logging.exception(error)
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
-            time.sleep(backoff_seconds * attempt)
+            await asyncio.sleep(backoff_seconds * attempt)
 
     if last_error:
         raise last_error
     return None
 
 
-def _call_openai_compatible_text(
+async def _call_openai_compatible_text(
     endpoint: str,
     payload: dict,
     headers: dict | None = None,
@@ -119,16 +121,17 @@ def _call_openai_compatible_text(
     last_error: Exception | None = None
     for attempt in range(1, max(1, max_attempts) + 1):
         try:
-            response = requests.post(endpoint, json=payload, headers=headers or {}, timeout=timeout)
-            response.raise_for_status()
-            data = response.json()
-            return ((data.get("choices") or [{}])[0].get("message", {}).get("content", "") or "").strip()
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(endpoint, json=payload, headers=headers or {})
+                response.raise_for_status()
+                data = response.json()
+                return ((data.get("choices") or [{}])[0].get("message", {}).get("content", "") or "").strip()
         except Exception as error:
             logging.exception(error)
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
-            time.sleep(backoff_seconds * attempt)
+            await asyncio.sleep(backoff_seconds * attempt)
 
     if last_error:
         raise last_error
@@ -156,7 +159,7 @@ def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning
         logging.getLogger(__name__).debug("Telemetry skipped (WS unavailable): %s", e)
 
 
-def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
+async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     if temperature is None: temperature = settings.LLM_TEMPERATURE
     _record_call()
     if timeout is None: timeout = settings.LLM_TIMEOUT
@@ -170,7 +173,7 @@ def llm_json(messages: list[dict], temperature: float | None = None, timeout: in
                     "temperature": temperature,
                 }
                 headers = {"Authorization": f"Bearer {groq_key}"}
-                parsed = _call_openai_compatible_json(
+                parsed = await _call_openai_compatible_json(
                     settings.GROQ_API_ENDPOINT,
                     payload,
                     headers=headers,
@@ -191,7 +194,7 @@ def llm_json(messages: list[dict], temperature: float | None = None, timeout: in
             "temperature": temperature,
             "response_format": {"type": "json_object"},
         }
-        parsed = _call_openai_compatible_json(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
+        parsed = await _call_openai_compatible_json(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
         if parsed is not None:
             return parsed
     except Exception as e:
@@ -199,17 +202,19 @@ def llm_json(messages: list[dict], temperature: float | None = None, timeout: in
         _record_llm_degradation(subsystem="pollinations", cause=f"JSON call failed: {e}")
 
     try:
-        from g4f.client import Client
+        def _run_g4f_json():
+            from g4f.client import Client
+            client = Client()
+            res = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                timeout=timeout,
+            )
+            if not res.choices:
+                raise ValueError("Empty choices in LLM response")
+            return res.choices[0].message.content.strip()
 
-        client = Client()
-        res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            timeout=timeout,
-        )
-        if not res.choices:
-            raise ValueError("Empty choices in LLM response")
-        content = res.choices[0].message.content.strip()
+        content = await asyncio.to_thread(_run_g4f_json)
         parsed = _extract_json_payload(content)
         if parsed is not None:
             return parsed
@@ -220,7 +225,7 @@ def llm_json(messages: list[dict], temperature: float | None = None, timeout: in
     return {}
 
 
-def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
+async def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     """Fast-path JSON call for throughput-sensitive cleaning tasks."""
     if temperature is None: temperature = settings.LLM_FAST_TEMPERATURE
     _record_call()
@@ -235,7 +240,7 @@ def llm_json_fast(messages: list[dict], temperature: float | None = None, timeou
                     "temperature": temperature,
                 }
                 headers = {"Authorization": f"Bearer {groq_key}"}
-                parsed = _call_openai_compatible_json(
+                parsed = await _call_openai_compatible_json(
                     settings.GROQ_API_ENDPOINT,
                     payload,
                     headers=headers,
@@ -256,7 +261,7 @@ def llm_json_fast(messages: list[dict], temperature: float | None = None, timeou
             "temperature": temperature,
             "response_format": {"type": "json_object"},
         }
-        parsed = _call_openai_compatible_json(
+        parsed = await _call_openai_compatible_json(
             settings.POLLINATIONS_API_ENDPOINT,
             payload,
             timeout=timeout,
@@ -271,7 +276,7 @@ def llm_json_fast(messages: list[dict], temperature: float | None = None, timeou
     return {}
 
 
-def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:
+async def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:
     if temperature is None: temperature = settings.LLM_TEXT_TEMPERATURE
     _record_call()
     if timeout is None: timeout = settings.LLM_TIMEOUT
@@ -285,7 +290,7 @@ def llm_text(messages: list[dict], temperature: float | None = None, timeout: in
                     "temperature": temperature,
                 }
                 headers = {"Authorization": f"Bearer {groq_key}"}
-                text = _call_openai_compatible_text(
+                text = await _call_openai_compatible_text(
                     settings.GROQ_API_ENDPOINT,
                     payload,
                     headers=headers,
@@ -304,7 +309,7 @@ def llm_text(messages: list[dict], temperature: float | None = None, timeout: in
             "messages": messages,
             "temperature": temperature,
         }
-        text = _call_openai_compatible_text(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
+        text = await _call_openai_compatible_text(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
         if text:
             return text
     except Exception as e:
@@ -312,17 +317,19 @@ def llm_text(messages: list[dict], temperature: float | None = None, timeout: in
         logging.error("Pollinations text call failed: %s", e)
 
     try:
-        from g4f.client import Client
+        def _run_g4f_text():
+            from g4f.client import Client
+            client = Client()
+            res = client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                timeout=timeout,
+            )
+            if not res.choices:
+                raise ValueError("Empty choices in LLM response")
+            return (res.choices[0].message.content or "").strip()
 
-        client = Client()
-        res = client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            timeout=timeout,
-        )
-        if not res.choices:
-            raise ValueError("Empty choices in LLM response")
-        return (res.choices[0].message.content or "").strip()
+        return await asyncio.to_thread(_run_g4f_text)
     except Exception as e:
         logging.exception(e)
         logging.error("g4f text fallback failed: %s", e)

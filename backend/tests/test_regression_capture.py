@@ -594,3 +594,19 @@ class TestConcurrentCapture:
         assert entry1 is not None
         assert len(entry1.id) == 12  # SHA256 prefix
         assert all(c in "0123456789abcdef" for c in entry1.id)  # hex
+
+    def test_generated_test_includes_imports(self, capture_instance):
+        """Verify that generated replay tests include all required imports."""
+        entry = capture_instance.maybe_capture(
+            url="https://example.com/imports-test",
+            html="<html><body>Test imports</body></html>",
+            failure_category="anti_bot_block",
+            failure_confidence=0.9,
+            records_count=0,
+        )
+        assert entry is not None
+        test_code = capture_instance._build_replay_test(entry)
+        assert test_code is not None
+        assert "import asyncio" in test_code
+        assert "from app.models import SchemaField, FieldType" in test_code
+        assert "from app.scraper import scrape_url" in test_code

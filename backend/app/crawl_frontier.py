@@ -75,41 +75,53 @@ class CrawlFrontier:
 
     async def get_next_url(self) -> Optional[str]:
         """Get the next URL available for crawling, respecting policy."""
-        async with self._lock:
-            if not self._queue:
-                return None
-            
-            # We try to find a URL that isn't blocked by policy
-            # Since we can't 'peek' and skip in a heap easily without re-building,
-            # we iterate through a copy or just try the top.
-            # For simplicity, we'll try the top N items.
-            
-            tried = []
-            next_url = None
-            
-            while self._queue:
+        tried = []
+        next_url = None
+
+        while True:
+            # 1. Pop a candidate item under the lock
+            async with self._lock:
+                if not self._queue:
+                    # No more items in queue! Restore tried items before returning
+                    for item in tried:
+                        if item.url not in self._completed:
+                            heapq.heappush(self._queue, item)
+                    return None
+                
                 item = heapq.heappop(self._queue)
-                
-                # Check policy (non-blocking)
-                # Note: check_domain is async because it might fetch robots.txt
-                # We release the lock for the check? No, that's risky for the queue.
-                # Actually, check_domain is usually fast after the first time.
-                
-                block_reason = await self._policy.check_domain(item.url)
-                if not block_reason:
-                    next_url = item.url
+                # Temporarily remove from pending during active policy check
+                self._pending.discard(item.url)
+
+            # 2. Release lock and evaluate policy check asynchronously outside the lock
+            block_reason = await self._policy.check_domain(item.url)
+
+            if not block_reason:
+                # Target is eligible! Restore its pending status and return
+                async with self._lock:
+                    self._pending.add(item.url)
+                    # Restore other tried items under the lock
+                    for t_item in tried:
+                        if t_item.url not in self._completed:
+                            heapq.heappush(self._queue, t_item)
+                            self._pending.add(t_item.url)
+                return item.url
+            else:
+                # Blocked! Restore pending status and track in tried list
+                async with self._lock:
+                    self._pending.add(item.url)
+                tried.append(item)
+
+                if len(tried) > 20: # Don't look too deep
                     break
-                else:
-                    # Put back if not eligible yet (delay met, etc)
-                    tried.append(item)
-                    if len(tried) > 20: # Don't look too deep
-                        break
-            
-            # Put back the ones we couldn't use yet
+
+        # 3. If we searched too deep and didn't find any eligible URL,
+        # restore all tried items to the heap under the lock.
+        async with self._lock:
             for item in tried:
-                heapq.heappush(self._queue, item)
-                
-            return next_url
+                if item.url not in self._completed:
+                    heapq.heappush(self._queue, item)
+                    self._pending.add(item.url)
+        return None
 
     async def mark_completed(self, url: str, success: bool = True):
         """Mark a URL as completed or failed."""
