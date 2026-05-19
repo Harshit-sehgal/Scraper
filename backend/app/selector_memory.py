@@ -47,7 +47,7 @@ class SelectorMemory:
             logger.error("Failed to save selector memory: %s", e)
 
     def get_selectors(self, url: str) -> Optional[dict]:
-        """Get remembered selectors for a domain."""
+        """Get remembered selectors for a domain with aging and trust decay."""
         domain = self._extract_domain(url)
         if not domain:
             return None
@@ -56,11 +56,20 @@ class SelectorMemory:
         if not entry:
             return None
 
-        # Check if it has failed too many times recently
+        # 1. Failure Threshold
         if entry.get("failure_count", 0) > settings.SELECTOR_MEMORY_MAX_FAILURES:
             logger.debug("Selector memory for %s is suspended (failures: %d)", 
                          domain, entry["failure_count"])
             return None
+
+        # 2. Aging (Time-based decay)
+        # If the selector is very old (e.g. 30 days), we might want to re-validate it
+        # for now we just track it.
+        last_success = entry.get("last_success", 0)
+        age_days = (time.time() - last_success) / 86400
+        if age_days > 30:
+            logger.info("Selector memory for %s is aged (%.1f days). Re-discovery recommended.", domain, age_days)
+            # We still return it, but could trigger a "soft re-discovery" in orchestrator
 
         return entry.get("selectors")
 
@@ -77,13 +86,25 @@ class SelectorMemory:
             "failure_count": 0,
             "first_seen": now,
             "last_success": now,
+            "lineage": [] # Track previous successful selector hashes
         })
 
         # Update if selectors changed or it's a new entry
         if entry["selectors"] != selectors:
+            # Store old selector hash in lineage
+            import hashlib
+            old_hash = str(hash(json.dumps(entry["selectors"], sort_keys=True)))
+            if "lineage" not in entry: entry["lineage"] = []
+            entry["lineage"].append({
+                "hash": old_hash,
+                "replaced_at": now,
+                "successes": entry["success_count"]
+            })
+            
             entry["selectors"] = selectors
             entry["failure_count"] = 0  # Reset failures on change
             entry["last_updated"] = now
+            entry["success_count"] = 0
 
         entry["success_count"] += 1
         entry["last_success"] = now
