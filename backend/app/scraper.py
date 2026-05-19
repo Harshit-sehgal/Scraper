@@ -57,6 +57,8 @@ async def scrape_url(
         
     logger.info("Fetching: %s", url)
     telemetry = get_scrape_telemetry()
+    from app.llm_bridge import reset_llm_call_count, get_llm_call_count
+    reset_llm_call_count()
     start_time = time.time()
 
     # ── Step 0: Check crawl policy ────────────────────────────────
@@ -92,13 +94,22 @@ async def scrape_url(
         logger.info("Profile matched but returned 0 records, falling through to generic pipeline")
 
     # ── Generic extraction pipeline ────────────────────────────────
+    from app.domain_intelligence import get_domain_intelligence
+    intel = get_domain_intelligence().get_intelligence(url)
+    
+    # Phase 80: Fast Path fetch selection
+    preferred_fetch = "playwright"
+    if intel.preferred_strategy == "httpx" and intel.anti_bot_risk < 0.3:
+        preferred_fetch = "httpx"
+        logger.info("[Scraper] Selecting fast-path (httpx) for %s", url)
+
     fetch_success = False
     js_render_delay = 0.0
-    fetch_method = "playwright"
+    fetch_method = preferred_fetch
     retry_count = 0
     try:
         fetch_start = time.time()
-        html, js_render_delay, fetch_method, retry_count = await fetch_page_content(url)
+        html, js_render_delay, fetch_method, retry_count = await fetch_page_content(url, preferred_method=preferred_fetch)
         fetch_ms = (time.time() - fetch_start) * 1000
         fetch_success = True
     except Exception as e:
@@ -158,6 +169,10 @@ async def scrape_url(
         avg_score = sum(r.get("record_score", 0.0) for r in results) / len(results)
         confidence_map = {"overall_avg": round(avg_score, 3)}
 
+    llm_calls = get_llm_call_count()
+    # Very rough cost estimate: $0.01 per LLM call + browser time
+    estimated_cost = (llm_calls * 0.01) + (fetch_ms / 1000.0 * 0.005)
+
     telemetry.record(
         url=url,
         fetch_method=fetch_method,
@@ -168,6 +183,8 @@ async def scrape_url(
         fallback_triggered=(ext_result.method == "regex"),
         fallback_usage=ext_result.method,
         retry_count=retry_count,
+        llm_calls_count=llm_calls,
+        estimated_cost_usd=round(estimated_cost, 4),
         records_extracted=len(results) if ext_result.method != "regex" else 0,
         records_after_scoring=records_before_scoring,
         records_after_dedup=records_after_dedup,

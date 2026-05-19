@@ -387,11 +387,17 @@
 - [x] Update `html_utils.py` to utilize learned patterns for adaptive hydration timeouts.
 - [x] Implement initial strategy self-selection hints in the extraction orchestrator.
 
-## Phase 80: Strategy Self-Selection & Optimization
-- [ ] Implement dynamic cascade re-ordering based on domain strategy success rates.
-- [ ] Add "Fast-path" detection to skip browser rendering for high-confidence regex domains.
-- [ ] Integrate economic cost tracking (LLM tokens + browser time) per strategy.
-- [ ] Build a "Strategy Confidence" model to predict the optimal extraction path.
+## Phase 80: Strategy Self-Selection & Optimization [DONE]
+- [x] Implement dynamic cascade re-ordering based on domain strategy success rates.
+- [x] Add "Fast-path" detection to skip browser rendering for high-confidence regex domains.
+- [x] Integrate economic cost tracking (LLM tokens + browser time) per strategy.
+- [x] Build a "Strategy Confidence" model to predict the optimal extraction path.
+
+## Phase 81: Evolutionary Extraction & Failure Ontology
+- [ ] Implement selector mutation and competition (A/B testing selectors).
+- [ ] Build a formal "Failure Ontology" to classify hydration vs anti-bot vs decay.
+- [ ] Add selector lineage tracking and trust-decay curves in memory.
+- [ ] Implement "Self-Healing" benchmarks that archive failed pages automatically.
 
 ## Phase 75: Advanced Browser Pool & Session Lifecycle [DONE]
 - [x] Persistent Chromium management and context pooling (Initial).

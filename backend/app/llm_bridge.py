@@ -78,6 +78,7 @@ def _call_openai_compatible_json(
     max_attempts: int | None = None,
     backoff_seconds: float | None = None,
 ):
+    _record_call()
     if timeout is None: timeout = settings.LLM_TIMEOUT
     if max_attempts is None: max_attempts = settings.LLM_MAX_ATTEMPTS
     if backoff_seconds is None: backoff_seconds = settings.LLM_BACKOFF_SECONDS
@@ -110,6 +111,7 @@ def _call_openai_compatible_text(
     max_attempts: int | None = None,
     backoff_seconds: float | None = None,
 ) -> str:
+    _record_call()
     if timeout is None: timeout = settings.LLM_TIMEOUT
     if max_attempts is None: max_attempts = settings.LLM_MAX_ATTEMPTS
     if backoff_seconds is None: backoff_seconds = settings.LLM_BACKOFF_SECONDS
@@ -156,6 +158,7 @@ def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning
 
 def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     if temperature is None: temperature = settings.LLM_TEMPERATURE
+    _record_call()
     if timeout is None: timeout = settings.LLM_TIMEOUT
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
@@ -218,6 +221,7 @@ def llm_json(messages: list[dict], temperature: float | None = None, timeout: in
 def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     """Fast-path JSON call for throughput-sensitive cleaning tasks."""
     if temperature is None: temperature = settings.LLM_FAST_TEMPERATURE
+    _record_call()
     if timeout is None: timeout = settings.LLM_FAST_TIMEOUT
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
@@ -267,6 +271,7 @@ def llm_json_fast(messages: list[dict], temperature: float | None = None, timeou
 
 def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:
     if temperature is None: temperature = settings.LLM_TEXT_TEMPERATURE
+    _record_call()
     if timeout is None: timeout = settings.LLM_TIMEOUT
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
@@ -440,6 +445,19 @@ class SubstratePluginManager:
         return list(self._handlers.keys())
 
 _manager: Optional[SubstratePluginManager] = None
+_call_count = 0
+
+def get_llm_call_count() -> int:
+    global _call_count
+    return _call_count
+
+def reset_llm_call_count():
+    global _call_count
+    _call_count = 0
+
+def _record_call():
+    global _call_count
+    _call_count += 1
 
 def get_plugin_manager(ws=None) -> SubstratePluginManager:
     global _manager

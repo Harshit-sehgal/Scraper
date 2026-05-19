@@ -43,6 +43,8 @@ class ScrapeTelemetry:
     anti_bot_score: float = 0.0            # 0.0 = none, 1.0 = certain anti-bot detected
     retry_count: int = 0                   # Number of fetch retries
     fallback_usage: str = "none"           # "none" | "regex" | "httpx"
+    llm_calls_count: int = 0               # Total LLM requests during this scrape
+    estimated_cost_usd: float = 0.0        # Simplified cost estimate
     
     # Granular Metrics (Grounding abstractions)
     selector_hit_rate: float = 0.0          # Percentage of fields successfully matched

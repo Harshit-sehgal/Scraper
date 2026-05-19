@@ -54,16 +54,23 @@ async def orchestrate_extraction(
         settings.SCORE_GATE_ABSOLUTE_MIN
     )
     
-    # Phase 79: Strategy Self-Selection
+    # Phase 79/80: Strategy Self-Selection
     # If the domain has a very high success rate with regex or httpx,
     # or if anti-bot risk is extreme, we might jump straight to those strategies.
     preferred = intel.preferred_strategy
-    if preferred == "regex" and intel.anti_bot_risk > 0.7:
-        logger.info("[Orchestrator] Jumping to preferred REGEX strategy for high-risk domain %s", url)
-        regex_results = extract_with_regex(html, schema_fields, base_url=url)
-        return ExtractionResult(regex_results, "regex")
 
-    # ── Layer 1: Selector Profiles ─────────────────────────────────────
+    if preferred == "regex":
+        # Jump straight to regex if it's historically successful
+        if intel.success_count > 3 or intel.anti_bot_risk > 0.7:
+            logger.info("[Orchestrator] Selecting proven REGEX strategy for %s", url)
+            regex_results = extract_with_regex(html, schema_fields, base_url=url)
+            # Only return if we actually got results
+            if regex_results:
+                return ExtractionResult(regex_results, "regex")
+            logger.info("[Orchestrator] Preferred REGEX failed, falling through to cascade")
+
+    # ── Layer 2: Selector Memory ───────────────────────────────────────
+
     # (Note: Profile extraction usually happens before fetch in the main loop
     # but we handle the case where it might be called here or if it returned 0)
     # Actually, Step 1 is already in scraper.py's main loop to avoid double-fetch.

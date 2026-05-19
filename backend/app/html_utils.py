@@ -254,8 +254,9 @@ def _boost_contacts_with_page_html(
     e, p = _extract_page_contacts(html)
     return _apply_page_level_contact_fallback(results, schema_fields, e, p)
 
-async def fetch_page_content(url: str) -> tuple[str, float, str, int]:
-    """Load a URL in a pooled headless browser context and fallback to plain HTTP when needed.
+
+async def fetch_page_content(url: str, preferred_method: str = "playwright") -> tuple[str, float, str, int]:
+    """Load a URL in a pooled headless browser context or via plain HTTP.
 
     Returns:
         tuple of (html_content, js_render_delay_ms, method_used, retry_count)
@@ -263,6 +264,16 @@ async def fetch_page_content(url: str) -> tuple[str, float, str, int]:
     from urllib.parse import urlparse
     domain = urlparse(url).netloc.lower() or "default"
     
+    # ── Phase 80: Fast Path (HTTPx) ──
+    if preferred_method == "httpx":
+        try:
+            html, delay, method, retries = await _fetch_with_httpx(url)
+            if html:
+                return html, delay, method, retries
+        except Exception as e:
+            logging.warning("[Scraper] Fast-path (httpx) failed for %s: %s. Falling back to Playwright", url, e)
+
+    # ── Standard Path (Playwright) ──
     page = None
     js_render_delay_ms = 0.0
     retry_count = 0
@@ -391,7 +402,15 @@ async def fetch_page_content(url: str) -> tuple[str, float, str, int]:
             except Exception:
                 pass
 
-    # httpx fallback
+    # Final httpx fallback (if preferred_method wasn't already httpx)
+    if preferred_method != "httpx":
+        return await _fetch_with_httpx(url)
+    
+    return "", 0.0, method_used, 0
+
+
+async def _fetch_with_httpx(url: str) -> tuple[str, float, str, int]:
+    """Internal helper for httpx fetching with retries."""
     method_used = "httpx"
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(settings.REQUEST_TIMEOUT),
@@ -417,7 +436,7 @@ async def fetch_page_content(url: str) -> tuple[str, float, str, int]:
                         settings.MAX_RETRIES, url, e,
                     )
                     raise
-    return "", 0.0, method_used, retry_count
+    return "", 0.0, method_used, 0
 
 def clean_html_for_selectors(html: str, max_chars: int | None = None) -> str:
     """Remove known-noise tags while preserving structure useful for selector discovery."""
