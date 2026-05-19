@@ -409,7 +409,7 @@ def _detect_value_type(values: List[str], value_patterns: ValuePatterns) -> Opti
         return None
 
     # Check against detected page patterns
-    sample = values[0] if values else ""
+    sample = values[0]
 
     # Currency check
     if value_patterns.currencies:

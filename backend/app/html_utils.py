@@ -150,17 +150,17 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
         )
         address_text = _compact_text(str(record.get(address_field) or "")) if address_field else ""
         if address_text and name_text and address_text.startswith(name_text[:40]):
-             email_present = any(
+            email_present = any(
                     record.get(f.name) for f in schema_fields
                     if f.field_type == FieldType.EMAIL and not _is_empty_value(record.get(f.name))
                 )
-             phone_present = any(
+            phone_present = any(
                     record.get(f.name) for f in schema_fields
                     if f.field_type == FieldType.PHONE and not _is_empty_value(record.get(f.name))
                 )
-             url_field = next((f.name for f in schema_fields if f.field_type == FieldType.URL), "")
-             website_present = bool(record.get(url_field)) if url_field else False
-             if not (email_present or phone_present or website_present):
+            url_field = next((f.name for f in schema_fields if f.field_type == FieldType.URL), "")
+            website_present = bool(record.get(url_field)) if url_field else False
+            if not (email_present or phone_present or website_present):
                 return True
 
     return False
@@ -178,13 +178,17 @@ def _extract_contacts_from_node(node) -> tuple[str | None, str | None]:
         
     for href in hrefs:
         if href.lower().startswith("mailto:"):
-            email = href.split("mailto:", 1)[1].split("?")[0]
-            if _valid_email(email):
-                text += f" {email}"
+            parts = href.split("mailto:", 1)
+            if len(parts) > 1:
+                email = parts[1].split("?")[0]
+                if _valid_email(email):
+                    text += f" {email}"
         elif href.lower().startswith("tel:"):
-            phone = href.split("tel:", 1)[1].split("?")[0]
-            if _valid_phone(phone):
-                text += f" {phone}"
+            parts = href.split("tel:", 1)
+            if len(parts) > 1:
+                phone = parts[1].split("?")[0]
+                if _valid_phone(phone):
+                    text += f" {phone}"
 
     return _valid_email(text), _valid_phone(text)
 
@@ -322,34 +326,34 @@ async def fetch_page_content(url: str, preferred_method: str = "playwright") -> 
             try:
                 await page.wait_for_function(
                     f"""() => {{
-                        const body = document.body;
-                        if (!body) return true;
-                        const start = Date.now();
-                        let lastHtml = body.innerHTML;
-                        let stableSince = Date.now();
-                        
-                        return new Promise(resolve => {{
-                            const interval = setInterval(() => {{
-                                const currentHtml = document.body ? document.body.innerHTML : lastHtml;
-                                const now = Date.now();
-                                
-                                if (currentHtml !== lastHtml) {{
-                                    lastHtml = currentHtml;
-                                    stableSince = now;
-                                }}
-                                
-                                const stableFor = now - stableSince;
-                                const totalWait = now - start;
-                                
-                                // Conditions for completion:
-                                // 1. Stable for at least 1.5s AND total wait > 2.5s
-                                if (stableFor >= 1500 && totalWait >= {min_wait_ms}) {{
-                                    clearInterval(interval);
-                                    resolve(true);
-                                }}
-                            }}, {settings.DOM_STABILIZATION_INTERVAL});
-                        }});
-                    }}""",
+                         const body = document.body;
+                         if (!body) return true;
+                         const start = Date.now();
+                         let lastHtml = body.innerHTML;
+                         let stableSince = Date.now();
+                         
+                         return new Promise(resolve => {{
+                             const interval = setInterval(() => {{
+                                 const currentHtml = document.body ? document.body.innerHTML : lastHtml;
+                                 const now = Date.now();
+                                 
+                                 if (currentHtml !== lastHtml) {{
+                                     lastHtml = currentHtml;
+                                     stableSince = now;
+                                 }}
+                                 
+                                 const stableFor = now - stableSince;
+                                 const totalWait = now - start;
+                                 
+                                 // Conditions for completion:
+                                 // 1. Stable for at least 1.5s AND total wait > 2.5s
+                                 if (stableFor >= 1500 && totalWait >= {min_wait_ms}) {{
+                                     clearInterval(interval);
+                                     resolve(true);
+                                 }}
+                             }}, {settings.DOM_STABILIZATION_INTERVAL});
+                         }});
+                     }}""",
                     timeout=settle_timeout * 1000,
                 )
             except Exception:

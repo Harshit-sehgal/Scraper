@@ -55,8 +55,6 @@ async def orchestrate_extraction(
     )
     
     # Phase 79/80: Strategy Self-Selection
-    # If the domain has a very high success rate with regex or httpx,
-    # or if anti-bot risk is extreme, we might jump straight to those strategies.
     preferred = intel.preferred_strategy
 
     if preferred == "regex":
@@ -64,17 +62,9 @@ async def orchestrate_extraction(
         if intel.success_count > 3 or intel.anti_bot_risk > 0.7:
             logger.info("[Orchestrator] Selecting proven REGEX strategy for %s", url)
             regex_results = extract_with_regex(html, schema_fields, base_url=url)
-            # Only return if we actually got results
             if regex_results:
                 return ExtractionResult(regex_results, "regex")
             logger.info("[Orchestrator] Preferred REGEX failed, falling through to cascade")
-
-    # ── Layer 2: Selector Memory ───────────────────────────────────────
-
-    # (Note: Profile extraction usually happens before fetch in the main loop
-    # but we handle the case where it might be called here or if it returned 0)
-    # Actually, Step 1 is already in scraper.py's main loop to avoid double-fetch.
-    # We focus on Layers 2-4 here.
 
     # ── Layer 2: Selector Memory ───────────────────────────────────────
     remembered_selectors = memory.get_selectors(url)
@@ -95,8 +85,23 @@ async def orchestrate_extraction(
     # ── Layer 3: LLM Discovery ─────────────────────────────────────────
     logger.info("[Orchestrator] Initiating LLM discovery for %s", url)
     discovered_selectors = await discover_selectors(html, schema_fields)
+    
     if discovered_selectors and discovered_selectors.get("item_container"):
-        raw_results = apply_selectors(html, discovered_selectors, schema_fields, base_url=url)
+        # Phase 81: Semantic Alignment Pass
+        # We run apply_selectors with field quality tracking to see if the LLM
+        # swapped fields (common with dynamic grids).
+        raw_results, field_quality = apply_selectors(
+            html, discovered_selectors, schema_fields, base_url=url, return_field_quality=True
+        )
+        
+        # Check for field-swapping
+        swapped = _detect_field_swaps(field_quality, schema_fields)
+        if swapped:
+            logger.warning("[Orchestrator] Detected field swap in discovery: %s. Attempting alignment.", swapped)
+            discovered_selectors = _align_selectors(discovered_selectors, swapped)
+            # Re-apply with aligned selectors
+            raw_results = apply_selectors(html, discovered_selectors, schema_fields, base_url=url)
+            
         if raw_results:
             scores = [r.get("record_score", 0.0) for r in raw_results]
             avg_score = sum(scores) / len(scores)
@@ -111,3 +116,34 @@ async def orchestrate_extraction(
     logger.info("[Orchestrator] Falling back to regex extraction for %s", url)
     regex_results = extract_with_regex(html, schema_fields, base_url=url)
     return ExtractionResult(regex_results, "regex")
+
+
+def _detect_field_swaps(quality_map: dict[str, float], fields: list[SchemaField]) -> dict[str, str]:
+    """Identify likely field swaps based on semantic quality scores.
+    
+    Returns a map of field_name -> correct_field_name if a swap is likely.
+    """
+    swaps = {}
+    # If we had access to the manifold here, we would use it to find which role
+    # best fits the actual extracted values. 
+    # For now, we use a simple heuristic: if a required field has 0.0 quality
+    # and an optional field has 1.0, they MIGHT be swapped.
+    # This is placeholder logic for the real 'Semantic Alignment' pass.
+    return swaps
+
+def _align_selectors(selectors: dict, swaps: dict) -> dict:
+    """Re-map selectors based on detected swaps."""
+    if not swaps:
+        return selectors
+        
+    field_sels = selectors.get("fields", {})
+    new_sels = dict(field_sels)
+    
+    for current_field, target_field in swaps.items():
+        if current_field in field_sels and target_field in field_sels:
+            # Swap them
+            new_sels[current_field] = field_sels[target_field]
+            new_sels[target_field] = field_sels[current_field]
+            
+    selectors["fields"] = new_sels
+    return selectors

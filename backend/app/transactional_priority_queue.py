@@ -292,13 +292,18 @@ class TransactionalPriorityQueue:
 
 # Global singleton
 _queue: Optional[TransactionalPriorityQueue] = None
+_queue_lock = threading.Lock()
+_queue_lock = threading.Lock()
 
 
 def get_priority_queue() -> TransactionalPriorityQueue:
     """Get or create the global TransactionalPriorityQueue instance."""
     global _queue
     if _queue is None:
-        _queue = TransactionalPriorityQueue()
+        with _queue_lock:
+            if _queue is None:
+                _queue = TransactionalPriorityQueue()
+                _queue = TransactionalPriorityQueue()
     return _queue
 
 

@@ -89,7 +89,7 @@ def _call_openai_compatible_json(
             response = requests.post(endpoint, json=payload, headers=headers or {}, timeout=timeout)
             response.raise_for_status()
             data = response.json()
-            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
             return _extract_json_payload(content)
         except Exception as error:
             logging.exception(error)
@@ -122,7 +122,7 @@ def _call_openai_compatible_text(
             response = requests.post(endpoint, json=payload, headers=headers or {}, timeout=timeout)
             response.raise_for_status()
             data = response.json()
-            return (data.get("choices", [{}])[0].get("message", {}).get("content", "") or "").strip()
+            return ((data.get("choices") or [{}])[0].get("message", {}).get("content", "") or "").strip()
         except Exception as error:
             logging.exception(error)
             last_error = error
@@ -207,6 +207,8 @@ def llm_json(messages: list[dict], temperature: float | None = None, timeout: in
             messages=messages,
             timeout=timeout,
         )
+        if not res.choices:
+            raise ValueError("Empty choices in LLM response")
         content = res.choices[0].message.content.strip()
         parsed = _extract_json_payload(content)
         if parsed is not None:
@@ -318,6 +320,8 @@ def llm_text(messages: list[dict], temperature: float | None = None, timeout: in
             messages=messages,
             timeout=timeout,
         )
+        if not res.choices:
+            raise ValueError("Empty choices in LLM response")
         return (res.choices[0].message.content or "").strip()
     except Exception as e:
         logging.exception(e)

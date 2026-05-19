@@ -19,7 +19,12 @@ def create_exports_router(jobs_store: dict):
             raise HTTPException(status_code=400, detail="No results to export")
 
         output = io.StringIO()
-        fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else (list(job.results[0].keys()) if job.results else [])
+        if job.schema_fields:
+            fieldnames = [f.name for f in job.schema_fields]
+        elif job.results:
+            fieldnames = list(job.results[0].keys())
+        else:
+            fieldnames = []
         writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
         for row in job.results:
@@ -66,7 +71,12 @@ def create_exports_router(jobs_store: dict):
         ws = wb.active
         ws.title = "Scraped Data"
 
-        fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else (list(job.results[0].keys()) if job.results else [])
+        if job.schema_fields:
+            fieldnames = [f.name for f in job.schema_fields]
+        elif job.results:
+            fieldnames = list(job.results[0].keys())
+        else:
+            fieldnames = []
 
         # Write headers
         for col_num, header in enumerate(fieldnames, 1):
