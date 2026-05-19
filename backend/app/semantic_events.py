@@ -14,6 +14,7 @@ class SemanticEventType(Enum):
     TOPOLOGY_SHIFT = "topology_shift"
     EQUILIBRIUM_REACHED = "equilibrium_reached"
     FIELD_WAVE = "field_wave" # Decentralized propagation wave
+    SELECTOR_FAILURE = "selector_failure" # Emitted when selector quality decays or fails
 
 
 @dataclass

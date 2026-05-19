@@ -53,6 +53,14 @@ class SemanticWorldState:
         self._observability = ObservabilityState(delta_callback=self.record_delta)
         self._history = HistoryState(delta_callback=self.record_delta)
 
+        # Isolated domain-specific state adapters (Phase 82 Decentralization)
+        from app.crawl_state import get_crawl_state
+        from app.telemetry_state import get_telemetry_state
+        from app.regression_state import get_regression_state
+        self.crawl = get_crawl_state()
+        self.telemetry = get_telemetry_state()
+        self.regression = get_regression_state()
+
         # Phase 60/63: Stability-aware Conflict Arbitration & Drift Tracking
         self._manifold._energy_ref = self._energy
         self._manifold._obs_ref = self._observability

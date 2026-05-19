@@ -401,12 +401,12 @@
 - [x] Harden `html_utils.py` against aggressive lazy-loading patterns found in production.
 - [x] Ensure all extraction thresholds are 100% settings-derived.
 
-## Phase 82: Architectural Decentralization & Event-Driven Learning [PLANNING]
-- [ ] Implement `crawl_state.py` for frontier/budget delegation.
-- [ ] Implement `telemetry_state.py` for runtime performance statistics.
-- [ ] Implement `regression_state.py` for archived failures.
-- [ ] Refactor `semantic_world_state.py` to leverage decentralized adapters.
-- [ ] Eliminate circular imports between `selector_engine` and `selector_discovery` via event-driven learning loops.
+## Phase 82: Architectural Decentralization & Event-Driven Learning [DONE]
+- [x] Implement `crawl_state.py` for frontier/budget delegation.
+- [x] Implement `telemetry_state.py` for runtime performance statistics.
+- [x] Implement `regression_state.py` for archived failures.
+- [x] Refactor `semantic_world_state.py` to leverage decentralized adapters.
+- [x] Eliminate circular imports between `selector_engine` and `selector_discovery` via event-driven learning loops.
 
 ## Phase 75: Advanced Browser Pool & Session Lifecycle [DONE]
 - [x] Persistent Chromium management and context pooling (Initial).

@@ -112,6 +112,18 @@ async def orchestrate_extraction(
                 memory.record_failure(url)
                 if provenance_builder:
                     provenance_builder.add_fallback_step("memory_failed")
+                
+                # Emit SelectorFailureEvent to support event-driven decouple loops (Phase 82)
+                try:
+                    from app.event_dispatcher import get_dispatcher
+                    from app.semantic_events import SemanticEvent, SemanticEventType
+                    get_dispatcher().dispatch(SemanticEvent(
+                        event_type=SemanticEventType.SELECTOR_FAILURE,
+                        source="extraction_orchestrator",
+                        payload={"url": url, "avg_score": avg_score}
+                    ))
+                except Exception as e:
+                    logger.warning("[Orchestrator] Failed to dispatch selector failure event: %s", e)
 
     # ── Layer 3: LLM Discovery ─────────────────────────────────────────
     logger.info("[Orchestrator] Initiating LLM discovery for %s", url)

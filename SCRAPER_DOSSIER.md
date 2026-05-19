@@ -54,7 +54,7 @@ graph TD
 ## 3. Current System State
 
 * **Validation Health**: **680 / 680 tests passing perfectly** (0 failures).
-* **Type-Safety Compliance**: **0 errors** reported by `mypy` across all 103 source files.
+* **Type-Safety Compliance**: **0 errors** reported by `mypy` across all **107 source files**.
 * **Server Boot State**: FastAPI server initializes successfully on `127.0.0.1:8000` with automated health monitoring.
 * **Extraction Pipelines**: Fully operational. Dynamic self-healing name inference and exponential retry loop for geocoding have been integrated across the CSV generation and enrichment pipelines.
 * **Lead Enrichment Pipeline**: Completely generalized to remove all hardcoded parameters. Automatically analyzes input filenames and records to dynamically infer Target City, Niche, and Country code with dynamic formatting rules.
@@ -67,14 +67,14 @@ graph TD
 Despite all tests passing, a deep structural audit has highlighted several key deficiencies that represent opportunities for architectural hardening:
 
 ### Deficiency 1: High Dependent Coupling on `semantic_world_state`
-* **Status**: Moderate Risk
-* **Description**: `semantic_world_state` currently has 25 direct imports/dependents. This is an architectural bottleneck. In a distributed multi-node topology, a single monolith state manager leads to blocking transaction bottlenecks and concurrency limits.
-* **Resolution Plan**: Refactor `semantic_world_state` to delegate specific state subdomains (e.g., node health telemetry, search discovery logs) to minor isolated adapters, reducing direct imports below a target limit of `<10`.
+* **Status**: Resolved (Isolated state adapters implemented)
+* **Description**: `semantic_world_state` previously had 25 direct imports/dependents, acting as a structural bottleneck.
+* **Resolution**: Decentralized domain state into Crawl, Telemetry, and Regression adapters in Phase 82.
 
 ### Deficiency 2: Circular Import Dependencies in Learning Loops
-* **Status**: Low Risk
-* **Description**: A circular import boundary exists between `selector_engine` and `selector_discovery` to support live learning feedback loops. While managed dynamically via imports within functions, it violates strict architectural boundaries.
-* **Resolution Plan**: Introduce a clean Event Dispatcher / Callback Interface that decouples the two modules. The engine should emit a `SelectorFailedEvent` that the intelligence layer catches and handles, completely removing the cyclic import.
+* **Status**: Resolved (Event-driven boundaries integrated)
+* **Description**: A circular import boundary existed between `selector_engine` and `selector_discovery` to support live learning feedback loops.
+* **Resolution**: Transitioned to event-driven loops by emitting a `SELECTOR_FAILURE` event, handled asynchronously via the Event Dispatcher in Phase 82.
 
 ### Deficiency 3: nominatim Cluster Rate-Limit Vulnerability
 * **Status**: Low Risk
@@ -92,8 +92,8 @@ Despite all tests passing, a deep structural audit has highlighted several key d
 
 | Priority | ID | Task | Component / Layer | Status | Target Phase |
 | :---: | :---: | :--- | :--- | :---: | :---: |
-| 🔴 **High** | `TD-001` | Refactor `semantic_world_state` to delegate domain telemetry and reduce import count below 10 | Intelligence | ⏳ Pending | Phase 82 |
-| 🔴 **High** | `TD-002` | Decouple circular import between `selector_engine` and `selector_discovery` using event-driven handlers | Extract / Intel | ⏳ Pending | Phase 82 |
+| 🔴 **High** | `TD-001` | Refactor `semantic_world_state` to delegate domain telemetry and reduce import count below 10 | Intelligence | ✅ Completed | Phase 82 |
+| 🔴 **High** | `TD-002` | Decouple circular import between `selector_engine` and `selector_discovery` using event-driven handlers | Extract / Intel | ✅ Completed | Phase 82 |
 | 🟡 **Medium** | `TD-003` | Promote Nominatim memory cache to a shared, persistent geocoding schema model | Utility / Memory | ⏳ Pending | Phase 83 |
 | 🟡 **Medium** | `TD-004` | Execute live scraping pipeline tests on `flightsnholidays.co.uk` against golden accuracy references | Crawl / Fetch | ✅ Completed | Phase 81 |
 | 🟢 **Low** | `TD-005` | Enhance the JS DOM stabilization function with adaptive quietness coefficients based on latency | Fetch / Playwright | ⏳ Pending | Phase 81 |
