@@ -80,7 +80,7 @@ class BrowserPool:
                     self._contexts.pop(domain, None)
 
             # Create new context with optional proxy configuration
-            context_options = {
+            context_options: Dict[str, Any] = {
                 "user_agent": settings.USER_AGENT,
                 "viewport": {"width": settings.BROWSER_VIEWPORT_WIDTH, "height": settings.BROWSER_VIEWPORT_HEIGHT},
             }
@@ -95,7 +95,7 @@ class BrowserPool:
                         context_options["proxy"] = proxy_config
                         logger.debug(f"[BrowserPool] Creating context for {domain} with proxy: {proxy_config['server']}")
             
-            context = await self._browser.new_context(**context_options)
+            context = await self._browser.new_context(**context_options)  # type: ignore[arg-type]
             
             if settings.PLAYWRIGHT_STEALTH:
                 stealth_js = """

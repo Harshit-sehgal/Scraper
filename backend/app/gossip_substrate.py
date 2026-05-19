@@ -235,24 +235,26 @@ class GossipSubstrate:
     
     def get_health_report(self) -> Dict[str, Any]:
         """Get health status of all peers."""
-        report = {
-            "local_node": self.node_id,
-            "vector_clock": self.vector_clock.to_dict(),
-            "peers": {},
-            "conflicts_detected": len(self.conflicts),
-        }
+        peers_report: Dict[str, Dict[str, Any]] = {}
         
         for node_id in self.known_nodes:
             if node_id == self.node_id:
                 continue
             health = self.peer_health[node_id]
-            report["peers"][node_id] = {
+            peers_report[node_id] = {
                 "reliability_score": health.reliability_score,
                 "success_count": health.success_count,
                 "failure_count": health.failure_count,
                 "is_healthy": health.is_healthy,
                 "seconds_since_seen": time.time() - health.last_seen,
             }
+        
+        report: Dict[str, Any] = {
+            "local_node": self.node_id,
+            "vector_clock": self.vector_clock.to_dict(),
+            "peers": peers_report,
+            "conflicts_detected": len(self.conflicts),
+        }
         
         return report
 
