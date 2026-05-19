@@ -244,5 +244,20 @@ class Settings(BaseSettings):
     TELEMETRY_RECORD_EXTRACTION: bool = True
     """Emit per-URL scrape telemetry events."""
 
+    def __getattr__(self, name: str):
+        """Provide backwards-compatible aliases for config parameters."""
+        # Mapping of old names to new names
+        aliases = {
+            "BROWSER_POOL_SIZE": "BROWSER_MAX_CONTEXTS",
+            "RENDER_TIMEOUT": "PLAYWRIGHT_TIMEOUT",
+            "FETCH_TIMEOUT": "REQUEST_TIMEOUT",
+            "MIN_RECORD_SCORE": "DEFAULT_MIN_RECORD_SCORE",
+        }
+        
+        if name in aliases:
+            return super().__getattribute__(aliases[name])
+        
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
 
 settings = Settings()
