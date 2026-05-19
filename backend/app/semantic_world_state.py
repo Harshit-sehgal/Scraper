@@ -3,12 +3,15 @@ import time
 import threading
 from copy import deepcopy
 from collections import Counter
-from typing import Dict, List, Tuple, Optional, Any, Set, Callable
+from typing import Dict, List, Tuple, Optional, Any, Set, Callable, TYPE_CHECKING
 from contextlib import contextmanager
 from app.transaction_context import active_transaction
 
 from app.core_types import FieldConflictRegion
 from app.invariant_firewall import requires_invariants
+
+if TYPE_CHECKING:
+    from app.observability import GovernanceSnapshot
 
 class SemanticWorldState:
     """
@@ -1535,17 +1538,18 @@ class SemanticWorldState:
 
         # Macro: semantic continents (first-class field structures)
         macro_continents = view.get_macro_continents()
-        macro = {
+        continents_list: List[dict] = []
+        macro: Dict[str, Any] = {
             "total_regions": view.region_count(),
             "meso_clusters": len(meso),
             "macro_continents": len(macro_continents),
             "field_pressure": round(self.metrics.field_pressure, 3),
             "convergence": round(self.metrics.convergence_score, 3),
-            "continents": [],
+            "continents": continents_list,
         }
 
         for continent in macro_continents:
-            macro["continents"].append({
+            continents_list.append({
                 "continent_id": continent.get("continent_id", ""),
                 "size": continent.get("size", 0),
                 "pressure": continent.get("pressure", 0.0),

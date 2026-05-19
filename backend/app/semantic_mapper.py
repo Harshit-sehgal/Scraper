@@ -347,8 +347,12 @@ def _find_best_value_for_need(
             if value in used_values:
                 continue
 
-            for pattern in patterns:
+            for compiled in patterns:
+                pattern = compiled[0]
                 if re.search(pattern, str(value), re.IGNORECASE):
+                    # pattern is a compiled regex object, convert to string for display
+                    pattern_str = pattern.pattern
+                    snippet = pattern_str[:30] if len(pattern_str) > 30 else pattern_str
                     candidates.append(FieldMapping(
                         field_name=semantic_need,
                         semantic_need=semantic_need,
@@ -356,8 +360,8 @@ def _find_best_value_for_need(
                         mapped_value=value.strip(),
                         confidence=0.95,
                         matched_by="pattern",
-                        evidence=f"Matched pattern {pattern[:30]}...",
-                        signals=[f"pattern_match:{pattern[:40]}", "high_confidence"]
+                        evidence=f"Matched pattern {snippet}...",
+                        signals=[f"pattern_match:{snippet[:40]}", "high_confidence"]
                     ))
                     break
 
@@ -428,20 +432,20 @@ def _detect_value_type(values: List[str], value_patterns: ValuePatterns) -> Opti
 
     # Currency check
     if value_patterns.currencies:
-        for pattern in SEMANTIC_PATTERNS.get(SemanticType.PRICE, []):
-            if re.search(pattern, sample, re.IGNORECASE):
+        for compiled in SEMANTIC_PATTERNS.get(SemanticType.PRICE, []):
+            if re.search(compiled[0], sample, re.IGNORECASE):
                 return "price"
 
     # Date check
     if value_patterns.dates:
-        for pattern in SEMANTIC_PATTERNS.get(SemanticType.DATE, []):
-            if re.search(pattern, sample, re.IGNORECASE):
+        for compiled in SEMANTIC_PATTERNS.get(SemanticType.DATE, []):
+            if re.search(compiled[0], sample, re.IGNORECASE):
                 return "date"
 
     # Rating check
     if value_patterns.ratings:
-        for pattern in SEMANTIC_PATTERNS.get(SemanticType.RATING, []):
-            if re.search(pattern, sample, re.IGNORECASE):
+        for compiled in SEMANTIC_PATTERNS.get(SemanticType.RATING, []):
+            if re.search(compiled[0], sample, re.IGNORECASE):
                 return "rating"
 
     return None

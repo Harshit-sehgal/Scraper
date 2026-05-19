@@ -1,13 +1,14 @@
 """
-Scraper Router — endpoints for scraper observability, memory, and configuration.
+Scraper Router — endpoints for scraper observability, memory, configuration,
+trend analysis, and economic tracking.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.config import settings
 from app.scrape_telemetry import get_scrape_telemetry
@@ -15,6 +16,8 @@ from app.selector_memory import get_selector_memory
 from app.scraper_diagnostics import run_diagnostics
 from app.models import SchemaField
 from app.browser_pool import get_browser_pool
+from app.trend_analyzer import TrendAnalyzer, EconomicTracker
+from app.regression_capture import get_regression_capture
 
 router = APIRouter(prefix="/api/scraper", tags=["scraper"])
 logger = logging.getLogger(__name__)
@@ -104,3 +107,209 @@ async def get_scraper_diagnostics(
     """Run a deep diagnostic scrape for a URL."""
     report = await run_diagnostics(url, fields, min_record_score=min_score)
     return report.to_dict()
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Trend Analysis & Telemetry Intelligence
+# ═══════════════════════════════════════════════════════════════════════
+
+
+@router.get("/trends")
+async def get_extraction_trends(window: int = Query(100, ge=10, le=500)):
+    """Analyze scrape telemetry for degradation patterns, domain health trends,
+    and actionable alerts.
+
+    Args:
+        window: Number of recent telemetry events to analyze (10-500).
+
+    Returns:
+        A TrendReport with domain-level trends, global metrics, and alerts.
+    """
+    telemetry_history = get_scrape_telemetry().get_recent(window)
+    analyzer = TrendAnalyzer(history_window=window)
+    report = analyzer.analyze(telemetry_history)
+    return {
+        "generated_at": report.generated_at,
+        "domain_count": report.domain_count,
+        "degrading_domains": report.degrading_domains,
+        "improving_domains": report.improving_domains,
+        "stable_domains": report.stable_domains,
+        "unseen_domains": report.unseen_domains,
+        "global_failure_rate": round(report.global_failure_rate, 3),
+        "global_avg_latency_ms": round(report.global_avg_latency_ms, 1),
+        "total_scrapes": report.total_scrapes,
+        "alerts": report.alerts,
+        "domain_trends": {
+            d: {
+                "health_score": t.health_score,
+                "failure_rate": round(t.failure_rate, 3),
+                "avg_fetch_ms": round(t.avg_fetch_ms, 1),
+                "avg_quality_score": round(t.avg_quality_score, 3),
+                "quality_trend": t.quality_trend,
+                "anti_bot_trend": t.anti_bot_trend,
+                "fetch_latency_trend": t.fetch_latency_trend,
+                "selector_decay_accelerating": t.selector_decay_accelerating,
+                "top_failure_categories": t.top_failure_categories,
+                "sample_count": t.sample_count,
+            }
+            for d, t in report.domain_trends.items()
+        },
+    }
+
+
+@router.get("/trends/{domain}")
+async def get_domain_trend(
+    domain: str,
+    window: int = Query(100, ge=10, le=500),
+):
+    """Get detailed trend analysis for a specific domain."""
+    telemetry_history = get_scrape_telemetry().get_recent(window)
+
+    # Filter to only this domain's events
+    from app.trend_analyzer import TrendAnalyzer as TA
+    domain_events = [
+        e for e in telemetry_history
+        if TA.extract_domain(e.get("url", "")) == domain.lower()
+    ]
+
+    if not domain_events:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No telemetry data found for domain: {domain}",
+        )
+
+    analyzer = TrendAnalyzer(history_window=window)
+    trend = analyzer.analyze_domain(domain, domain_events)
+
+    return {
+        "domain": trend.domain,
+        "health_score": trend.health_score,
+        "total_scrapes": trend.total_scrapes,
+        "total_failures": trend.total_failures,
+        "failure_rate": round(trend.failure_rate, 3),
+        "avg_fetch_ms": round(trend.avg_fetch_ms, 1),
+        "avg_quality_score": round(trend.avg_quality_score, 3),
+        "fetch_latency_trend": trend.fetch_latency_trend,
+        "quality_trend": trend.quality_trend,
+        "anti_bot_trend": trend.anti_bot_trend,
+        "selector_decay_accelerating": trend.selector_decay_accelerating,
+        "avg_cost_usd": round(trend.avg_cost_usd, 4),
+        "top_failure_categories": trend.top_failure_categories,
+        "sample_count": trend.sample_count,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Regression Capture & Autonomous Benchmark Evolution
+# ═══════════════════════════════════════════════════════════════════════
+
+
+@router.get("/regressions")
+async def get_regression_archive(limit: int = Query(20, ge=1, le=100)):
+    """Return the regression capture archive — statistics and recent captures.
+
+    The regression capture system automatically archives extraction failures
+    as named fixtures in fixtures/pages/, building an organic benchmark suite
+    from real operational failures.
+
+    Args:
+        limit: Maximum number of recent captures to return (1-100).
+
+    Returns:
+        Archive statistics and the most recent capture entries.
+    """
+    capture = get_regression_capture()
+    stats = capture.get_statistics()
+    # Trim recent captures to the requested limit
+    stats["recent_captures"] = stats.get("recent_captures", [])[:limit]
+    return stats
+
+
+@router.get("/regressions/{entry_id}")
+async def get_regression_detail(entry_id: str):
+    """Return detailed information about a specific regression capture."""
+    capture = get_regression_capture()
+    registry = capture.get_registry()
+    for e in registry.entries:
+        if e.id == entry_id:
+            return {
+                "id": e.id,
+                "url": e.url,
+                "domain": e.domain,
+                "failure_category": e.failure_category,
+                "failure_confidence": e.failure_confidence,
+                "html_preview": e.html_preview[:500],
+                "html_size": e.html_size,
+                "captured_at": e.captured_at,
+                "schema_fields": e.schema_fields,
+                "fixture_filename": e.fixture_filename,
+                "has_replay_test": e.replay_test_generated,
+                "telemetry_snapshot": e.telemetry_snapshot,
+            }
+    raise HTTPException(status_code=404, detail=f"Regression entry not found: {entry_id}")
+
+
+@router.post("/regressions/{entry_id}/generate-test")
+async def generate_regression_replay_test(entry_id: str):
+    """Generate a pytest replay test for a captured regression."""
+    capture = get_regression_capture()
+    test_code = capture.generate_replay_test(entry_id)
+    if test_code is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Regression entry not found or fixture missing: {entry_id}",
+        )
+    return {"entry_id": entry_id, "test_code": test_code}
+
+
+@router.post("/regressions/generate-all-tests")
+async def generate_all_replay_tests():
+    """Generate replay tests for all captured regressions that lack one."""
+    capture = get_regression_capture()
+    all_tests = capture.generate_all_replay_tests()
+    return {
+        "total_tests_generated": all_tests.count("TEST SEPARATOR") + 1 if all_tests else 0,
+        "test_code": all_tests,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Economic Tracking & Cost Analysis
+# ═══════════════════════════════════════════════════════════════════════
+
+
+@router.get("/economics")
+async def get_extraction_economics(window: int = Query(200, ge=10, le=1000)):
+    """Return extraction cost and efficiency analysis.
+
+    Provides cost breakdowns by domain and category (LLM, browser, network),
+    with efficiency ratings.
+    """
+    telemetry_history = get_scrape_telemetry().get_recent(window)
+    tracker = EconomicTracker()
+    report = tracker.analyze(telemetry_history)
+
+    return {
+        "generated_at": report.generated_at,
+        "total_cost_usd": report.total_cost_usd,
+        "total_scrapes": report.total_scrapes,
+        "total_records": report.total_records,
+        "avg_cost_per_scrape": report.avg_cost_per_scrape,
+        "avg_cost_per_record": report.avg_cost_per_record,
+        "efficiency_rating": report.efficiency_rating,
+        "cost_by_category": report.cost_by_category,
+        "most_expensive_domains": report.most_expensive_domains,
+        "least_expensive_domains": report.least_expensive_domains,
+        "cost_by_domain": {
+            d: {
+                "total_cost_usd": s.total_cost_usd,
+                "avg_cost_per_scrape": s.avg_cost_per_scrape,
+                "avg_cost_per_record": s.avg_cost_per_record,
+                "total_records": s.total_records,
+                "total_scrapes": s.total_scrapes,
+                "cost_breakdown": s.cost_breakdown,
+                "efficiency_rating": s.efficiency_rating,
+            }
+            for d, s in report.cost_by_domain.items()
+        },
+    }

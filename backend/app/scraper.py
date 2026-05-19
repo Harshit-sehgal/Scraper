@@ -1,19 +1,22 @@
 """
-Scraping Engine — Thin orchestration layer.
+Scraping Engine — Thin orchestration layer with autonomous failure classification
+and extraction provenance tracking.
 
 Delegates to specialised sub-engines:
-  - extraction_orchestrator: Manages fallback cascade (profile -> memory -> discovery -> regex)
-  - html_utils:              DOM fetching, cleaning, contact extraction
-  - scrape_telemetry:        Per-URL observability
-  - cleaning_engine:         AI cleaning & schema alignment
-  - insight_engine:          Data insight generation & schema suggestion
+  - extraction_orchestrator:    Manages fallback cascade (profile -> memory -> discovery -> regex)
+  - html_utils:                DOM fetching, cleaning, contact extraction
+  - scrape_telemetry:          Per-URL observability
+  - cleaning_engine:           AI cleaning & schema alignment
+  - insight_engine:            Data insight generation & schema suggestion
+  - failure_classification:    Classify and recover from extraction failures
+  - extraction_provenance:     Field-level extraction explainability
 """
 
 from __future__ import annotations
 
 import logging
 import time
-from typing import List
+from typing import List, Optional
 from bs4 import BeautifulSoup
 
 from app.config import settings
@@ -32,6 +35,13 @@ from app.scrape_telemetry import (
 )
 from app.crawl_policy import get_crawl_policy
 from app.extraction_orchestrator import orchestrate_extraction
+from app.failure_classification import (
+    classify_failure, update_domain_with_failure, FailureClassification,
+)
+from app.extraction_provenance import (
+    ProvenanceBuilder, enrich_records_with_provenance, summarize_provenance,
+)
+from app.regression_capture import get_regression_capture
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +113,9 @@ async def scrape_url(
         preferred_fetch = "httpx"
         logger.info("[Scraper] Selecting fast-path (httpx) for %s", url)
 
+    # Phase 82: Build provenance tracker for this extraction
+    provenance_builder = ProvenanceBuilder(url, intel.domain)
+
     fetch_success = False
     js_render_delay = 0.0
     fetch_method = preferred_fetch
@@ -115,11 +128,29 @@ async def scrape_url(
     except Exception as e:
         fetch_ms = (time.time() - start_time) * 1000
         logger.error("Failed to fetch %s: %s", url, e)
-        telemetry.record(url=url, error=str(e), fetch_ms=fetch_ms)
-        policy.record_result(url, success=False)
+        provenance_builder.add_error(f"Fetch failed: {e}")
+        # Classify the failure and update domain intelligence
+        classification = classify_failure(
+            error_message=str(e),
+            fetch_method=fetch_method,
+        )
+        provenance_builder.add_error(f"Classified: {classification.category.value}")
+        update_domain_with_failure(get_domain_intelligence(), url, classification)
+        telemetry.record(url=url, error=str(e), fetch_ms=fetch_ms, failure_category=classification.category.value)
+
+        # Phase 85: Capture regression for autonomous benchmark evolution
+        get_regression_capture().maybe_capture(
+            url=url,
+            html=None,
+            failure_category=classification.category.value,
+            failure_confidence=classification.confidence,
+            records_count=0,
+            schema_fields=[f.name for f in schema_fields],
+        )
+
         return []
-    finally:
-        policy.record_result(url, success=fetch_success)
+
+    policy.record_result(url, success=fetch_success)
 
     anti_bot = detect_anti_bot(html)
     dom_nodes = estimate_dom_nodes(html)
@@ -130,9 +161,75 @@ async def scrape_url(
     token_density = len(page_text) / max(1, dom_nodes)
 
     # ── Step 2-4: Extraction Cascade ──────────────────────────────
-    ext_result = await orchestrate_extraction(url, html, schema_fields, min_record_score)
+    ext_result = await orchestrate_extraction(
+        url, html, schema_fields, min_record_score,
+        provenance_builder=provenance_builder,
+    )
     results = ext_result.records
     
+    # Track extraction method in provenance
+    provenance_builder.set_extraction_method(ext_result.method)
+    provenance_builder.set_memory_hit(ext_result.method == "memory")
+    if ext_result.method == "regex":
+        provenance_builder.add_fallback_step("regex")
+
+    # ── Failure Classification & Regression Capture ────────────────
+    # classification may have been set in except block above
+    if not results and not classification:
+        # Extraction returned nothing — classify the failure
+        classification = classify_failure(
+            telemetry={
+                "fetch_method": fetch_method,
+                "dom_nodes": dom_nodes,
+                "anti_bot_score": anti_bot,
+                "selector_hit_rate": 0.0,
+                "fallback_usage": ext_result.method,
+            },
+            html=html,
+            extraction_result={
+                "method": ext_result.method,
+                "records": [],
+                "selector_success": ext_result.selector_success,
+            },
+            fetch_method=fetch_method,
+        )
+        if classification:
+            provenance_builder.add_error(f"No records: {classification.recovery_strategy}")
+            update_domain_with_failure(get_domain_intelligence(), url, classification)
+
+        # Phase 85: Capture regression for autonomous benchmark evolution
+        if classification:
+            get_regression_capture().maybe_capture(
+                url=url,
+                html=html,
+                failure_category=classification.category.value,
+                failure_confidence=classification.confidence,
+                records_count=0,
+                schema_fields=[f.name for f in schema_fields],
+                telemetry={
+                    "fetch_method": fetch_method,
+                    "dom_nodes": dom_nodes,
+                    "anti_bot_score": anti_bot,
+                    "selector_hit_rate": 0.0,
+                    "records_final": 0,
+                },
+            )
+    else:
+        # Capture when quality is low (partial extraction)
+        if any(
+            r.get("record_score", 1.0) < min_record_score * 0.5
+            for r in results
+        ):
+            get_regression_capture().maybe_capture(
+                url=url,
+                html=html,
+                failure_category="low_quality_extraction",
+                failure_confidence=0.6,
+                records_count=len(results),
+                schema_fields=[f.name for f in schema_fields],
+                force=True,
+            )
+
     # ── Post-Extraction Processing ────────────────────────────────
 
     # Global page-level contact boosting
@@ -169,6 +266,16 @@ async def scrape_url(
         avg_score = sum(r.get("record_score", 0.0) for r in results) / len(results)
         confidence_map = {"overall_avg": round(avg_score, 3)}
 
+    # ── Provenance Finalization ────────────────────────────────────
+    provenance_builder.set_records_count(len(results))
+    provenance = provenance_builder.build()
+
+    # Enrich records with provenance metadata (for explainability)
+    results = enrich_records_with_provenance(results, provenance)
+
+    # Build provenance summary for telemetry
+    provenance_summary = summarize_provenance(provenance)
+
     llm_calls = get_llm_call_count()
     # Very rough cost estimate: $0.01 per LLM call + browser time
     estimated_cost = (llm_calls * 0.01) + (fetch_ms / 1000.0 * 0.005)
@@ -194,6 +301,8 @@ async def scrape_url(
         token_density=token_density,
         selector_hit_rate=selector_hit_rate,
         confidence_map=confidence_map,
+        failure_category=classification.category.value if classification else None,
+        extraction_method=ext_result.method,
     )
 
     return results

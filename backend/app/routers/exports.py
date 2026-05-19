@@ -69,6 +69,8 @@ def create_exports_router(jobs_store: dict):
 
         wb = Workbook()
         ws = wb.active
+        if ws is None:
+            raise HTTPException(status_code=500, detail="Failed to create worksheet")
         ws.title = "Scraped Data"
 
         if job.schema_fields:

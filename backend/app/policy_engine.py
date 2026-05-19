@@ -94,11 +94,14 @@ class SubstratePolicy:
 
         return True
 
+_policy_instances: WeakKeyDictionary | None = None
+
 def get_policy_engine(ws=None) -> SubstratePolicy:
     target_ws = ws or get_world_state()
-    if not hasattr(get_policy_engine, "_instances"):
-        get_policy_engine._instances = WeakKeyDictionary()
-    instances = get_policy_engine._instances
+    global _policy_instances
+    if _policy_instances is None:
+        _policy_instances = WeakKeyDictionary()
+    instances = _policy_instances
     if target_ws not in instances:
         instances[target_ws] = SubstratePolicy(ws=target_ws)
     return instances[target_ws]

@@ -187,6 +187,8 @@ def _detect_cards_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
         sample_texts: list[str] = []
 
         for container in containers[:20]:
+            if isinstance(container, str):
+                continue
             text = container.get_text(strip=True)
             if len(text) > 50:  # Has substantial content
                 item_count += 1

@@ -55,7 +55,7 @@ def apply_selectors(
     containers = soup.select(container_sel)
     
     results = []
-    field_quality_map = {f.name: [] for f in schema_fields}
+    field_quality_map: dict[str, list[float]] = {f.name: [] for f in schema_fields}
     
     for node in containers:
         record: dict = {}

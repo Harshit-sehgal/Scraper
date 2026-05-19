@@ -29,6 +29,7 @@ class DomainIntelligence:
         self.selector_decay_rate = data.get("selector_decay_rate", 0.0) if data else 0.0
         self.success_count = data.get("success_count", 0) if data else 0
         self.total_fetches = data.get("total_fetches", 0) if data else 0
+        self.failure_history = data.get("failure_history", {}) if data else {}
         self.last_updated = data.get("last_updated", time.time()) if data else time.time()
 
     def to_dict(self) -> dict:
@@ -41,6 +42,7 @@ class DomainIntelligence:
             "selector_decay_rate": round(self.selector_decay_rate, 3),
             "success_count": self.success_count,
             "total_fetches": self.total_fetches,
+            "failure_history": dict(self.failure_history),
             "last_updated": self.last_updated
         }
 

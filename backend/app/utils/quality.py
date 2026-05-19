@@ -58,6 +58,28 @@ def _value_quality(field: SchemaField, value) -> float:
         if len(text) > 20:
             score += 0.1
 
+    # Negative Evidence: identify "swapped" or "noise" text in identifying fields
+    field_name_lower = field.name.lower()
+    is_identity_field = any(k in field_name_lower for k in ["name", "title", "company"])
+    is_status_field = any(k in field_name_lower for k in ["availability", "stock", "status", "condition"])
+    
+    noise_status_phrases = ["in stock", "out of stock", "click here", "read more", "view details", "add to cart", "instock"]
+    
+    if is_identity_field:
+        if any(p in text.lower() for p in noise_status_phrases):
+            score -= 0.6 # Heavy penalty
+        if len(text) < 3:
+            score -= 0.2
+            
+    if is_status_field:
+        # Status fields should be short. If it's a long sentence, it's likely a swapped title.
+        if len(text) > 25:
+            score -= 0.4
+        if not any(p in text.lower() for p in noise_status_phrases):
+            # If it's not a known status phrase AND it's not a simple number/code
+            if field.field_type == FieldType.STRING and len(text) > 10:
+                score -= 0.2
+            
     # Type-specific quality "votes"
     if field.field_type == FieldType.EMAIL:
         if re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", text):

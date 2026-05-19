@@ -447,7 +447,6 @@ class TopologyState:
 
         # ─── Distributed Recovery (Phase 60) ──────────────────────────
         self._topology_epoch: int = 1
-        self._tombstones_real: Set[str] = set()  # noqa: F811 # Final storage for tombstones
 
         # ─── Transaction Staging ──────────────────────────────────────
     @property
@@ -1199,14 +1198,14 @@ class TopologyState:
         forces: Dict[Tuple[str, str], Dict[str, float | str]] = {}
         for edge in view.get_edge_fields():
             pair = tuple(sorted([edge.source, edge.target]))  # type: ignore[assignment]
-            forces[pair] = {  # type: ignore[assignment]
+            forces[pair] = {  # type: ignore[arg-type, index]
                 'affinity': edge.affinity,
                 'repulsion': edge.repulsion,
                 'pressure': edge.pressure,
                 'route_strength': edge.route_strength,
                 'semantics': edge.semantics,
             }
-        return forces
+        return forces  # type: ignore[return-value]
 
     def _redirect_repulsive_pressure(self, source_region, pressure_amount: float, forces: dict):
         """Redirect repulsive pressure through alternative high-affinity edge field routes.
@@ -1563,8 +1562,8 @@ class TopologyState:
         # 2. Apply deltas
         for rid, delta in deltas.items():
             if abs(delta) > 1e-6:
-                r = self.get_region(rid)
-                if r:
+                r = self.get_region(rid)  # type: ignore[assignment]
+                if r is not None:
                     self.set_region_instability(rid, r.instability + delta)
 
         total_flow = round(sum(abs(d) for d in deltas.values()), 4)

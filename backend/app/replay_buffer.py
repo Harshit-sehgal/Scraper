@@ -82,7 +82,7 @@ class ReplayBuffer:
         # Current segment tracking
         self._current_segment_idx = 0
         self._current_segment_count = 0
-        self._current_segment_file = None  # Lazy-opened
+        self._current_segment_file: Optional[Path] = None  # Lazy-opened
         self._next_global_idx = 0
 
         # Checkpoint index
