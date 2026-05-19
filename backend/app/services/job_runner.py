@@ -156,6 +156,12 @@ async def run_job(
                     job.total_llm_calls += get_llm_call_count()
                     ai_source_prediction["sources_attempted"] += 1
                     ai_structured_rows_for_source = 0
+                    
+                    # Build URL metadata lookup map once per URL (instead of per record)
+                    url_metadata = None
+                    if job.discovered_urls:
+                        url_metadata = next((d for d in job.discovered_urls if d.get("url") == url), None)
+                    
                     for record in results:
                         if record.pop("_ai_source_structured", False):
                             ai_structured_rows_for_source += 1
@@ -163,15 +169,10 @@ async def run_job(
                         source_type = "unknown"
                         source_trust_score = 0.4
 
-                        if job.discovered_urls:
-                            matched = next((d for d in job.discovered_urls if d.get("url") == url), None)
-                            if matched:
-                                source_type = str(matched.get("source_type") or "unknown")
-                                source_trust_score = safe_score(matched.get("source_trust_score") or 0.4)
-                            else:
-                                inferred = infer_source_metadata(url=url)
-                                source_type = str(inferred.get("source_type") or "unknown")
-                                source_trust_score = safe_score(inferred.get("source_trust_score") or 0.4)
+                        # Use pre-computed URL metadata (O(1) instead of O(n) lookup per record)
+                        if url_metadata:
+                            source_type = str(url_metadata.get("source_type") or "unknown")
+                            source_trust_score = safe_score(url_metadata.get("source_trust_score") or 0.4)
                         else:
                             inferred = infer_source_metadata(url=url)
                             source_type = str(inferred.get("source_type") or "unknown")
