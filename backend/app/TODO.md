@@ -375,9 +375,39 @@
 - [x] **Observability pressure heatmaps** (Phase 72): Implemented real-time visualization of edge field pressure and wave propagation ripples in the frontend dashboard.
 - [x] **Scraper Hardening & Decomposition** (Phase 73): Achieved 100% configuration coverage, modularized extraction orchestration, and implemented persistent selector memory.
 
+## Phase 74: Extraction Accuracy Framework [DONE]
+- [x] Implement `benchmark_accuracy.py` for empirical interpretation measurement.
+- [x] Track precision, recall, schema conformity, and field-level reliability.
+- [x] Add hallucination detection for LLM-based cleaning.
+- [x] Integrate accuracy scoring into standard benchmark outputs.
+
+## Phase 75: Advanced Browser Pool & Session Lifecycle
+- [x] Persistent Chromium management and context pooling (Initial).
+- [ ] Implement browser health checks and automated page recycling.
+- [ ] Track startup latency, memory usage, and context reuse rates.
+- [ ] Add graceful teardown and adaptive concurrency per node.
+
+## Phase 76: Anti-Bot Resilience Engine
+- [ ] Build dedicated `anti_bot_engine.py` for signal detection.
+- [ ] Implement CAPTCHA detection hooks and adaptive request pacing.
+- [ ] Add browser entropy stabilization and session warming.
+- [ ] Implement retry policies stratified by failure type (WAF vs Block).
+
+## Phase 77: Crawl Orchestration & Frontier
+- [ ] Build `crawl_frontier.py` with priority queue and domain budgets.
+- [ ] Implement adaptive crawl pacing based on domain response patterns.
+- [ ] Add freshness scoring and deduplication for large-scale crawling.
+- [ ] Implement max-depth and robots-pacing enforcement.
+
+## Phase 78: Scraper Telemetry & Dashboard Expansion
+- [ ] Extend `/api/system/telemetry` with granular render and stabilization metrics.
+- [ ] Build extraction confidence histogram and domain health score visualizations.
+- [ ] Add retry heatmap to identify systemic block hot-spots.
+- [ ] Complete real-world hostile site validation suite.
+
 ## Smallest Coherent Next Step
+- [ ] **Empirical Accuracy Measurement**: Build the accuracy framework to score interpreted data against golden datasets.
 - [ ] **Multi-shard federation**: Test and harden state merging across geographically distributed substrate nodes.
-- [ ] **Automated Benchmark Reporting**: Integrate hostile benchmarks into a visual reporting dashboard for regression tracking.
 
 ## Project Status: Complete — All Phases Verified
 The engine passes architecture validation and the full invariant/test suite, with deterministic replay, governance, resource shedding, failure injection isolation, snapshot desync detection, transactional priority queuing, large-scale replay buffer, and pressure-triggered enforcement all implemented and verified.
