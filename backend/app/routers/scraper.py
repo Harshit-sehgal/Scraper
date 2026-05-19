@@ -14,6 +14,7 @@ from app.scrape_telemetry import get_scrape_telemetry
 from app.selector_memory import get_selector_memory
 from app.scraper_diagnostics import run_diagnostics
 from app.models import SchemaField
+from app.browser_pool import get_browser_pool
 
 router = APIRouter(prefix="/api/scraper", tags=["scraper"])
 logger = logging.getLogger(__name__)
@@ -53,6 +54,12 @@ async def get_selector_memory_stats():
             reverse=True
         )[:10]
     }
+
+
+@router.get("/browser")
+async def get_browser_stats():
+    """Return browser pool operational metrics."""
+    return get_browser_pool().get_metrics()
 
 
 @router.delete("/telemetry")

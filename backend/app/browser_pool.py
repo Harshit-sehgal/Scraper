@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Optional
+from typing import Optional, Dict
 
 from playwright.async_api import async_playwright, Browser, BrowserContext
 
@@ -30,19 +30,37 @@ class BrowserPool:
         self._lock = asyncio.Lock()
         self._last_activity = time.time()
         self._cleanup_task: Optional[asyncio.Task] = None
+        
+        # Metrics
+        self.startup_latency_ms: float = 0.0
+        self.active_contexts: int = 0
+        self.context_reuse_rate: float = 0.0
+        self.total_fetches: int = 0
+        self.reused_fetches: int = 0
+        self.crash_count: int = 0
 
     async def get_context(self, domain: str) -> BrowserContext:
         """Get or create a browser context for a specific domain."""
         async with self._lock:
             self._last_activity = time.time()
+            self.total_fetches += 1
+            
             if not self._playwright:
+                start = time.time()
                 self._playwright = await async_playwright().start()
+                self.startup_latency_ms = (time.time() - start) * 1000
             
             if not self._browser or not self._browser.is_connected():
                 logger.info("[BrowserPool] Launching new Chromium instance")
-                self._browser = await self._playwright.chromium.launch(
-                    headless=settings.PLAYWRIGHT_HEADLESS
-                )
+                try:
+                    self._browser = await self._playwright.chromium.launch(
+                        headless=settings.PLAYWRIGHT_HEADLESS
+                    )
+                except Exception as e:
+                    self.crash_count += 1
+                    logger.error("[BrowserPool] Failed to launch browser: %s", e)
+                    raise
+                    
                 # Ensure background cleanup is running
                 if not self._cleanup_task or self._cleanup_task.done():
                     self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
@@ -53,6 +71,8 @@ class BrowserPool:
                 use_count = self._context_use_count.get(domain, 0)
                 if use_count < settings.BROWSER_CONTEXT_LIFETIME:
                     self._context_use_count[domain] = use_count + 1
+                    self.reused_fetches += 1
+                    self.context_reuse_rate = self.reused_fetches / self.total_fetches
                     return context
                 else:
                     logger.debug("[BrowserPool] Context for %s reached lifetime, rotating", domain)
@@ -77,41 +97,84 @@ class BrowserPool:
                 
             self._contexts[domain] = context
             self._context_use_count[domain] = 1
+            self.active_contexts = len(self._contexts)
             
             # Auto-restart if we have too many contexts
             if len(self._contexts) > settings.BROWSER_MAX_CONTEXTS:
                 logger.info("[BrowserPool] Max contexts reached, scheduling full restart")
-                # We don't restart immediately to avoid breaking active fetches
-                # but we stop issuing new ones to old contexts
+                # Mark for teardown in next idle cycle
             
             return context
+
+    async def check_health(self) -> bool:
+        """Perform a basic health check on the browser instance."""
+        if not self._browser or not self._browser.is_connected():
+            return False
+        
+        try:
+            # Try to create a dummy page and close it
+            ctx = await self._browser.new_context()
+            page = await ctx.new_page()
+            await page.close()
+            await ctx.close()
+            return True
+        except Exception as e:
+            logger.warning("[BrowserPool] Health check failed: %s", e)
+            return False
+
+    def get_metrics(self) -> dict:
+        """Return browser pool operational metrics."""
+        return {
+            "startup_latency_ms": round(self.startup_latency_ms, 2),
+            "active_contexts": self.active_contexts,
+            "context_reuse_rate": round(self.context_reuse_rate, 3),
+            "total_fetches": self.total_fetches,
+            "crash_count": self.crash_count,
+            "connected": self._browser.is_connected() if self._browser else False
+        }
 
     async def close(self) -> None:
         """Gracefully close all contexts and the browser instance."""
         async with self._lock:
-            for ctx in self._contexts.values():
+            for ctx in list(self._contexts.values()):
                 try:
                     await ctx.close()
                 except Exception:
                     pass
             self._contexts.clear()
+            self._context_use_count.clear()
             
             if self._browser:
-                await self._browser.close()
+                try:
+                    await self._browser.close()
+                except Exception:
+                    pass
                 self._browser = None
             
             if self._playwright:
-                await self._playwright.stop()
+                try:
+                    await self._playwright.stop()
+                except Exception:
+                    pass
                 self._playwright = None
+            
+            self.active_contexts = 0
 
     async def _periodic_cleanup(self) -> None:
         """Close browser if idle for too long."""
         while True:
             await asyncio.sleep(60)
-            if self._browser and time.time() - self._last_activity > settings.BROWSER_IDLE_TIMEOUT:
-                logger.info("[BrowserPool] Idle timeout reached, closing browser")
-                await self.close()
-                break
+            if self._browser:
+                if time.time() - self._last_activity > settings.BROWSER_IDLE_TIMEOUT:
+                    logger.info("[BrowserPool] Idle timeout reached, closing browser")
+                    await self.close()
+                    break
+                
+                # Also check health
+                if not await self.check_health():
+                    logger.warning("[BrowserPool] Unhealthy browser detected in cleanup, restarting")
+                    await self.close()
+                    break
 
 
 # Global Singleton
