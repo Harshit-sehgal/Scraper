@@ -61,6 +61,10 @@ class SemanticWorldState:
         self.telemetry = get_telemetry_state()
         self.regression = get_regression_state()
 
+        # Phase 83: Multi-Shard Federation Manager
+        from app.federation_manager import FederationManager
+        self.federation = FederationManager(self)
+
         # Phase 60/63: Stability-aware Conflict Arbitration & Drift Tracking
         self._manifold._energy_ref = self._energy
         self._manifold._obs_ref = self._observability

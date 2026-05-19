@@ -264,6 +264,12 @@ class Settings(BaseSettings):
     EMAIL_BLOCKED_DOMAINS: str = "example.com,test.com,localhost"
     """Comma-separated list of email domains to reject as invalid."""
 
+    # ─── Federation / Sharding ──────────────────────────────────────────────
+    NODE_ID: str = "node-1"
+    """Unique identifier for this node/worker context."""
+    SHARD_ID: str = "shard-1"
+    """Unique identifier for the sharded workload context."""
+
     def __getattr__(self, name: str):
         """Provide backwards-compatible aliases for config parameters."""
         # Mapping of old names to new names
