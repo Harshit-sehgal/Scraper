@@ -244,6 +244,16 @@ class Settings(BaseSettings):
     TELEMETRY_RECORD_EXTRACTION: bool = True
     """Emit per-URL scrape telemetry events."""
 
+    # ─── Proxy & Anti-Bot Evasion ──────────────────────────────────────────
+    PROXY_ROTATION_ENABLED: bool = False
+    """Enable proxy rotation for anti-bot resilience."""
+    PROXY_LIST: str = ""
+    """Comma-separated list of proxy URLs (http://ip:port or socks5://ip:port)."""
+    PROXY_ROTATION_FAILURE_THRESHOLD: int = 5
+    """Rotate proxy after this many consecutive failures."""
+    PROXY_TIMEOUT_SECONDS: int = 30
+    """Timeout for proxy connection attempts."""
+
     def __getattr__(self, name: str):
         """Provide backwards-compatible aliases for config parameters."""
         # Mapping of old names to new names

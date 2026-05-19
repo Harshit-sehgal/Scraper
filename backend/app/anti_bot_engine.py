@@ -6,6 +6,7 @@ Responsible for:
 - Identifying CAPTCHAs and blocking patterns
 - Providing adaptive pacing and retry policies
 - Browser entropy stabilization
+- Proxy rotation coordination
 """
 
 from __future__ import annotations
@@ -56,6 +57,16 @@ class AntiBotEngine:
 
     def __init__(self) -> None:
         self._block_history: Dict[str, List[float]] = {}
+        # Lazy import to avoid circular dependencies
+        self._proxy_manager: Optional[object] = None
+
+    @property
+    def proxy_manager(self):
+        """Lazy-load proxy manager."""
+        if self._proxy_manager is None:
+            from app.proxy_manager import get_proxy_manager
+            self._proxy_manager = get_proxy_manager()
+        return self._proxy_manager
 
     def detect_challenges(self, html: str, headers: Optional[dict] = None) -> float:
         """Score how likely the page is a challenge or block page.
@@ -86,18 +97,27 @@ class AntiBotEngine:
 
     def get_retry_policy(self, url: str, last_score: float) -> dict:
         """Determine the next step based on the block score and domain history."""
+        policy = {}
+        
         if last_score < 0.3:
-            return {"action": "continue", "delay": 0}
+            policy = {"action": "continue", "delay": 0}
             
-        if last_score > 0.8:
-            # Hard block: need significant slowdown or proxy rotation
-            return {"action": "retry_slow", "delay": 30, "proxy_rotate": True}
+        elif last_score > 0.8:
+            # Hard block: need significant slowdown and proxy rotation
+            policy = {"action": "retry_slow", "delay": 30, "rotate_proxy": True}
             
-        if last_score > 0.5:
+        elif last_score > 0.5:
             # Medium challenge: probably just need more wait time/js execution
-            return {"action": "retry_wait", "delay": 5}
+            policy = {"action": "retry_wait", "delay": 5}
             
-        return {"action": "continue", "delay": 0}
+        else:
+            policy = {"action": "continue", "delay": 0}
+        
+        # Include current proxy info if available
+        if self.proxy_manager.enabled:
+            policy["current_proxy"] = self.proxy_manager.current_proxy
+        
+        return policy
 
     def record_block(self, domain: str, score: float):
         """Track block patterns per domain for adaptive pacing."""
@@ -106,6 +126,24 @@ class AntiBotEngine:
         self._block_history[domain].append(score)
         # Keep last 10 attempts
         self._block_history[domain] = self._block_history[domain][-10:]
+        
+        # If score indicates hard block, record proxy failure
+        if score > 0.8 and self.proxy_manager.enabled:
+            self.proxy_manager.record_failure()
+            logger.info(f"Hard block detected on {domain}, recorded proxy failure")
+
+    def record_success(self, domain: str):
+        """Record successful fetch from domain."""
+        if self.proxy_manager.enabled:
+            self.proxy_manager.record_success()
+
+    def rotate_proxy(self) -> Optional[str]:
+        """Explicitly rotate to next proxy and return it."""
+        if self.proxy_manager.enabled:
+            new_proxy = self.proxy_manager.rotate()
+            logger.info(f"Rotated proxy: {new_proxy}")
+            return new_proxy
+        return None
 
 
 # Global Singleton
