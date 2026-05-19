@@ -5,6 +5,13 @@ Remembers successful CSS selectors for domains to:
   1. Skip LLM discovery on subsequent scrapes (speed & cost)
   2. Track selector "survival" (how long a selector remains valid)
   3. Provide historical confidence for domain extraction
+  4. Auto-cleanup selectors below confidence threshold (NEW)
+
+Confidence Scoring:
+  - Score = (successes / (successes + failures)) * age_factor * freshness_factor
+  - Selectors below SELECTOR_CONFIDENCE_THRESHOLD (default 0.5) are auto-deleted
+  - age_factor: decays selectors older than 14 days
+  - freshness_factor: penalizes selectors not used in 7 days
 """
 
 from __future__ import annotations
@@ -12,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
@@ -19,6 +27,22 @@ from urllib.parse import urlparse
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Confidence scoring thresholds
+DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD = 0.5  # Minimum confidence to keep selector
+SELECTOR_CLEANUP_CHECK_INTERVAL = 86400  # Run cleanup every 24 hours
+SELECTOR_AGE_DECAY_THRESHOLD = 14 * 86400  # Start decaying after 14 days
+SELECTOR_FRESHNESS_THRESHOLD = 7 * 86400  # Penalize if not used in 7 days
+
+
+@dataclass
+class SelectorConfidenceScore:
+    """Confidence metrics for a selector."""
+    raw_confidence: float  # success/(success+failure)
+    age_factor: float  # Decay based on age
+    freshness_factor: float  # Decay based on lack of recent use
+    final_score: float  # Final weighted score
+    reason: str  # Explanation of the score
 
 
 class SelectorMemory:
@@ -28,7 +52,9 @@ class SelectorMemory:
         self.path = Path(storage_path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._memory: dict[str, dict] = {}
+        self._last_cleanup: float = 0.0  # Track when we last cleaned up
         self._load()
+        self._auto_cleanup()  # Clean up on initialization
 
     def _load(self):
         if self.path.exists():
@@ -46,8 +72,134 @@ class SelectorMemory:
         except Exception as e:
             logger.error("Failed to save selector memory: %s", e)
 
+    def _compute_confidence(self, entry: dict) -> SelectorConfidenceScore:
+        """Compute confidence score for a selector entry.
+        
+        Formula:
+          raw_confidence = successes / (successes + failures + 1)  # +1 to avoid div by zero
+          age_factor = 1.0 if age < 14 days else exponential decay
+          freshness_factor = 1.0 if used in last 7 days else linear decay
+          final_score = raw_confidence * age_factor * freshness_factor
+        """
+        now = time.time()
+        successes = entry.get("success_count", 0)
+        failures = entry.get("failure_count", 0)
+        first_seen = entry.get("first_seen", now)
+        last_success = entry.get("last_success", now)
+        
+        # 1. Raw success rate
+        total = successes + failures + 1  # +1 to avoid division by zero
+        raw_confidence = successes / total
+        
+        # 2. Age decay (selectors older than 14 days start decaying)
+        age_seconds = now - first_seen
+        if age_seconds < SELECTOR_AGE_DECAY_THRESHOLD:
+            age_factor = 1.0
+        else:
+            # Exponential decay: each additional day reduces by 5%
+            extra_days = (age_seconds - SELECTOR_AGE_DECAY_THRESHOLD) / 86400
+            age_factor = max(0.0, 1.0 - (0.05 * extra_days))
+        
+        # 3. Freshness decay (not used in last 7 days)
+        last_used_ago = now - last_success
+        if last_used_ago < SELECTOR_FRESHNESS_THRESHOLD:
+            freshness_factor = 1.0
+        else:
+            # Linear decay: each day without use reduces by 10%
+            extra_days = (last_used_ago - SELECTOR_FRESHNESS_THRESHOLD) / 86400
+            freshness_factor = max(0.0, 1.0 - (0.1 * extra_days))
+        
+        # 4. Final score
+        final_score = raw_confidence * age_factor * freshness_factor
+        
+        reason = (
+            f"raw={raw_confidence:.2f} (success={successes}/{total-1}), "
+            f"age={age_factor:.2f} (age={age_seconds/86400:.1f}d), "
+            f"freshness={freshness_factor:.2f} (last_used={last_used_ago/86400:.1f}d ago)"
+        )
+        
+        return SelectorConfidenceScore(
+            raw_confidence=raw_confidence,
+            age_factor=age_factor,
+            freshness_factor=freshness_factor,
+            final_score=final_score,
+            reason=reason
+        )
+
+    def _auto_cleanup(self, force: bool = False) -> dict:
+        """Auto-cleanup low-confidence selectors.
+        
+        Returns:
+            dict with cleanup stats (domains_checked, selectors_deleted, etc.)
+        """
+        now = time.time()
+        # Only run cleanup every SELECTOR_CLEANUP_CHECK_INTERVAL seconds
+        if not force and (now - self._last_cleanup) < SELECTOR_CLEANUP_CHECK_INTERVAL:
+            return {}
+        
+        threshold = getattr(settings, "SELECTOR_CONFIDENCE_THRESHOLD", DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD)
+        stats = {
+            "domains_checked": 0,
+            "selectors_deleted": 0,
+            "deleted_domains": [],
+            "low_confidence_selectors": []
+        }
+        
+        domains_to_delete = []
+        
+        for domain, entry in self._memory.items():
+            stats["domains_checked"] += 1
+            confidence = self._compute_confidence(entry)
+            
+            if confidence.final_score < threshold:
+                logger.info(
+                    "Deleting low-confidence selector for %s (score=%.2f, %s)",
+                    domain, confidence.final_score, confidence.reason
+                )
+                stats["selectors_deleted"] += 1
+                stats["deleted_domains"].append(domain)
+                stats["low_confidence_selectors"].append({
+                    "domain": domain,
+                    "score": confidence.final_score,
+                    "reason": confidence.reason
+                })
+                domains_to_delete.append(domain)
+        
+        # Delete low-confidence entries
+        for domain in domains_to_delete:
+            del self._memory[domain]
+        
+        if domains_to_delete:
+            self._save()
+        
+        self._last_cleanup = now
+        
+        if stats["selectors_deleted"] > 0:
+            logger.info("Selector cleanup complete: %d deleted from %d domains",
+                       stats["selectors_deleted"], stats["domains_checked"])
+        
+        return stats
+
+    def get_selector_confidence(self, url: str) -> Optional[SelectorConfidenceScore]:
+        """Get confidence score for selectors of a domain."""
+        domain = self._extract_domain(url)
+        if not domain:
+            return None
+        
+        entry = self._memory.get(domain)
+        if not entry:
+            return None
+        
+        return self._compute_confidence(entry)
+
     def get_selectors(self, url: str) -> Optional[dict]:
-        """Get remembered selectors for a domain with aging and trust decay."""
+        """Get remembered selectors for a domain with aging and trust decay.
+        
+        Also triggers cleanup if it's time.
+        """
+        # Trigger auto-cleanup if needed (non-blocking)
+        self._auto_cleanup()
+        
         domain = self._extract_domain(url)
         if not domain:
             return None
@@ -124,6 +276,56 @@ class SelectorMemory:
         entry["last_failure"] = time.time()
         self._memory[domain] = entry
         self._save()
+
+    def get_memory_stats(self) -> dict:
+        """Get current selector memory statistics.
+        
+        Returns:
+            dict with memory stats (total domains, avg confidence, etc.)
+        """
+        if not self._memory:
+            return {
+                "total_domains": 0,
+                "avg_confidence": 0.0,
+                "total_selectors": 0,
+                "high_confidence": 0,
+                "medium_confidence": 0,
+                "low_confidence": 0,
+                "by_confidence": {}
+            }
+        
+        stats = {
+            "total_domains": len(self._memory),
+            "avg_confidence": 0.0,
+            "total_selectors": len(self._memory),
+            "high_confidence": 0,  # >= 0.75
+            "medium_confidence": 0,  # 0.5 - 0.74
+            "low_confidence": 0,  # < 0.5
+            "by_confidence": {}
+        }
+        
+        total_score = 0.0
+        for domain, entry in self._memory.items():
+            confidence = self._compute_confidence(entry)
+            total_score += confidence.final_score
+            
+            score_bucket = f"{confidence.final_score:.2f}"
+            stats["by_confidence"][score_bucket] = stats["by_confidence"].get(score_bucket, 0) + 1
+            
+            if confidence.final_score >= 0.75:
+                stats["high_confidence"] += 1
+            elif confidence.final_score >= 0.5:
+                stats["medium_confidence"] += 1
+            else:
+                stats["low_confidence"] += 1
+        
+        stats["avg_confidence"] = total_score / len(self._memory) if self._memory else 0.0
+        
+        return stats
+
+    def force_cleanup(self) -> dict:
+        """Force cleanup of low-confidence selectors (ignore interval check)."""
+        return self._auto_cleanup(force=True)
 
     @staticmethod
     def _extract_domain(url: str) -> Optional[str]:
