@@ -4,14 +4,18 @@ LAW 14: All field perturbations must pass through the Immunity Layer.
 High-entropy data sources are quarantined before they can affect stable basins.
 """
 
-from typing import Dict, List, Optional
+from __future__ import annotations
+from typing import Dict, List, Optional, TYPE_CHECKING
 import logging
 from app.semantic_world_state import get_world_state
+
+if TYPE_CHECKING:
+    from app.semantic_world_state import SemanticWorldState
 
 class InstabilityAPI:
     """Hardened interface for controlled exclusion and tension mutations."""
 
-    def __init__(self, ws=None):
+    def __init__(self, ws: Optional[SemanticWorldState] = None):
         self.ws = ws or get_world_state()
 
     # ─── Query Operations ────────────────────────────────────────────────
@@ -43,7 +47,7 @@ class InstabilityAPI:
 class ImmunityLayer:
     """Governs semantic data ingestion and protects against adversarial perturbations."""
 
-    def __init__(self, ws=None):
+    def __init__(self, ws: Optional[SemanticWorldState] = None):
         self.ws = ws or get_world_state()
         # Quarantine Registry: domain/source -> trust_score
         self._quarantined_sources: Dict[str, float] = {}
@@ -90,7 +94,7 @@ class ImmunityLayer:
 
 _immune_system: Optional[ImmunityLayer] = None
 
-def get_immune_system(ws=None) -> ImmunityLayer:
+def get_immune_system(ws: Optional[SemanticWorldState] = None) -> ImmunityLayer:
     global _immune_system
     if _immune_system is None:
         _immune_system = ImmunityLayer(ws=ws)

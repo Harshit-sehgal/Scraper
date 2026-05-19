@@ -6,9 +6,9 @@ import time
 from app.discovery import discover_urls, infer_source_metadata
 from app.filters import apply_location_radius, process_results
 from app.models import FieldType, JobStatus, ScrapeMode
+from app.scraper_recovery_integration import scrape_url_with_recovery
 from app.scraper import (
     ai_clean_and_align_records,
-    scrape_url,
 )
 from app.semantic_pipeline import run_pipeline
 from app.semantic_persistence import load_semantic_state, save_semantic_state
@@ -149,12 +149,24 @@ async def run_job(
             with ws.transaction(f"scrape:{url}"):
                 try:
                     reset_llm_call_count()
-                    results = await asyncio.wait_for(
-                        scrape_url(url, job.schema_fields, min_record_score=job.min_record_score, user_intent=job.intent, world_state=ws),
-                        timeout=per_url_scrape_timeout_seconds,
+                    results, recovery_stats = await asyncio.wait_for(
+                        scrape_url_with_recovery(
+                            url, 
+                            job.schema_fields, 
+                            min_record_score=job.min_record_score, 
+                            user_intent=job.intent, 
+                            world_state=ws,
+                            max_recovery_attempts=3
+                        ),
+                        timeout=per_url_scrape_timeout_seconds * 4, # Recovery takes longer
                     )
                     job.total_llm_calls += get_llm_call_count()
                     ai_source_prediction["sources_attempted"] += 1
+                    
+                    if recovery_stats["recovery_attempts"] > 0:
+                        actions = ", ".join(recovery_stats["recovery_actions_taken"])
+                        _add_job_log(job, f"Recovery applied to {url}: {actions}", level="info")
+                    
                     ai_structured_rows_for_source = 0
                     
                     # Build URL metadata lookup map once per URL (instead of per record)

@@ -6,6 +6,7 @@ from app.semantic_ir import (
 )
 from app.semantic_world_state import get_world_state, SemanticWorldState
 from app.event_dispatcher import get_dispatcher
+import pytest
 from app.semantic_events import SemanticEvent, SemanticEventType
 
 
@@ -101,7 +102,7 @@ def test_event_dispatcher_dispatch_does_not_raise():
                 instability_delta=0.5,
             ))
         except Exception as e:
-            assert False, f"Dispatch of {event_type.value} raised: {e}"
+            pytest.fail(f"Dispatch of {event_type.value} raised: {e}")
 
 
 def test_owner_cannot_own_self_in_graph():

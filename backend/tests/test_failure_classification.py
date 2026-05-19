@@ -24,7 +24,6 @@ from app.failure_classification import (
     _has_challenge_patterns,
     _has_captcha_patterns,
     _is_malformed_dom,
-    _is_partial_extraction,
 )
 
 

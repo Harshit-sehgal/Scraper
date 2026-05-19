@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 logger = logging.getLogger(__name__)
 from app.models import SchemaField, FieldType
 from app.html_utils import (
-    _compact_text, _is_empty_value, _is_likely_noise_row,
+    _compact_text,
     _extract_contacts_from_node, _sanitize_field_value,
     _enrich_record_contacts, _apply_page_level_contact_fallback
 )

@@ -7,12 +7,17 @@ ALL operations go through SemanticWorldState GC gateway APIs.
 No subsystem bypass — strengthens the ownership boundary.
 """
 
+from __future__ import annotations
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.semantic_world_state import SemanticWorldState
 
 logger = logging.getLogger(__name__)
 
 
-def collect_garbage(ws):
+def collect_garbage(ws: SemanticWorldState):
     """Run full garbage collection cycle on the semantic field.
     
     Delegates all operations to SemanticWorldState GC gateway APIs.

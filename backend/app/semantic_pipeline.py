@@ -17,7 +17,7 @@ Flow:
 
 import logging
 from dataclasses import dataclass, field
-from typing import List, Set
+from typing import Any, Callable, List, Set
 
 from app.semantic_allocation_engine import (
     _UNIVERSAL_ROOTS,
@@ -240,7 +240,7 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
     return filtered
 
 
-def detect_role_swap_warnings(output: dict, schema_fields: list, detect_type_fn, universal_roots) -> list:
+def detect_role_swap_warnings(output: dict, schema_fields: list, detect_type_fn: Callable, universal_roots: Any) -> list:
     """Detect potential role swap warnings from allocation output."""
     from app.semantic_segmentation import sem_type_str
     warnings = []

@@ -19,9 +19,9 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from app.config import settings
@@ -137,18 +137,18 @@ class SelectorMemory:
         if not force and (now - self._last_cleanup) < SELECTOR_CLEANUP_CHECK_INTERVAL:
             return {}
         
-        threshold = getattr(settings, "SELECTOR_CONFIDENCE_THRESHOLD", DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD)
-        stats = {
+        threshold: float = getattr(settings, "SELECTOR_CONFIDENCE_THRESHOLD", DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD) or DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD
+        stats: Dict[str, Any] = {
             "domains_checked": 0,
             "selectors_deleted": 0,
             "deleted_domains": [],
             "low_confidence_selectors": []
         }
         
-        domains_to_delete = []
+        domains_to_delete: List[str] = []
         
         for domain, entry in self._memory.items():
-            stats["domains_checked"] += 1
+            stats["domains_checked"] = int(stats["domains_checked"]) + 1
             confidence = self._compute_confidence(entry)
             
             if confidence.final_score < threshold:
@@ -156,7 +156,7 @@ class SelectorMemory:
                     "Deleting low-confidence selector for %s (score=%.2f, %s)",
                     domain, confidence.final_score, confidence.reason
                 )
-                stats["selectors_deleted"] += 1
+                stats["selectors_deleted"] = int(stats["selectors_deleted"]) + 1
                 stats["deleted_domains"].append(domain)
                 stats["low_confidence_selectors"].append({
                     "domain": domain,
@@ -174,9 +174,9 @@ class SelectorMemory:
         
         self._last_cleanup = now
         
-        if stats["selectors_deleted"] > 0:
+        if int(stats["selectors_deleted"]) > 0:
             logger.info("Selector cleanup complete: %d deleted from %d domains",
-                       stats["selectors_deleted"], stats["domains_checked"])
+                       int(stats["selectors_deleted"]), int(stats["domains_checked"]))
         
         return stats
 
@@ -277,7 +277,7 @@ class SelectorMemory:
         self._memory[domain] = entry
         self._save()
 
-    def get_memory_stats(self) -> dict:
+    def get_memory_stats(self) -> Dict[str, Any]:
         """Get current selector memory statistics.
         
         Returns:
@@ -294,7 +294,7 @@ class SelectorMemory:
                 "by_confidence": {}
             }
         
-        stats = {
+        stats: Dict[str, Any] = {
             "total_domains": len(self._memory),
             "avg_confidence": 0.0,
             "total_selectors": len(self._memory),
@@ -310,14 +310,15 @@ class SelectorMemory:
             total_score += confidence.final_score
             
             score_bucket = f"{confidence.final_score:.2f}"
-            stats["by_confidence"][score_bucket] = stats["by_confidence"].get(score_bucket, 0) + 1
+            bucket = stats["by_confidence"]
+            bucket[score_bucket] = bucket.get(score_bucket, 0) + 1
             
             if confidence.final_score >= 0.75:
-                stats["high_confidence"] += 1
+                stats["high_confidence"] = int(stats["high_confidence"]) + 1
             elif confidence.final_score >= 0.5:
-                stats["medium_confidence"] += 1
+                stats["medium_confidence"] = int(stats["medium_confidence"]) + 1
             else:
-                stats["low_confidence"] += 1
+                stats["low_confidence"] = int(stats["low_confidence"]) + 1
         
         stats["avg_confidence"] = total_score / len(self._memory) if self._memory else 0.0
         

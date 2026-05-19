@@ -9,12 +9,10 @@ Tests the end-to-end recovery system including:
 - API endpoints for health and stats
 """
 
-import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from app.recovery_strategies import (
-    RecoveryStrategist,
     RecoveryAction,
     get_recovery_strategist,
     get_recovery_executor,
@@ -23,8 +21,6 @@ from app.recovery_handlers import register_all_recovery_handlers
 from app.failure_classification import FailureCategory, FailureClassification
 from app.domain_health_alerts import (
     DomainHealthMonitor,
-    DomainHealthLevel,
-    get_domain_health_monitor,
 )
 from app.selector_memory import get_selector_memory
 
@@ -229,7 +225,7 @@ class TestSelectorMemoryCleanup:
         }
         
         initial_count = len(selector_memory._memory)
-        stats = selector_memory.force_cleanup()
+        selector_memory.force_cleanup()
         
         # Should have deleted low-confidence selector
         assert len(selector_memory._memory) <= initial_count

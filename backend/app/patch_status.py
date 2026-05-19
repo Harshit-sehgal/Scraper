@@ -10,6 +10,7 @@ Fixes needed:
 4. semantic_pipeline.py             — clean up contradiction engine references
 """
 
+import logging
 
 
 def check_all_fixes() -> dict:
@@ -65,18 +66,19 @@ def check_all_fixes() -> dict:
 
     return results
 
+
 def generate_patch_report(results: dict) -> str:
     """Generate a human-readable patch report."""
     lines = []
     lines.append("Architecture Patch Status Report")
     lines.append("=" * 40)
     lines.append("")
-    
+
     fixed = sum(1 for v in results.values() if v)
     total = len(results)
     lines.append(f"Fixes applied: {fixed}/{total}")
     lines.append("")
-    
+
     by_module: dict = {}
     for key, ok in results.items():
         module = "other"
@@ -89,17 +91,18 @@ def generate_patch_report(results: dict) -> str:
         elif "pipeline" in key:
             module = "semantic_pipeline.py"
         by_module.setdefault(module, []).append((key, ok))
-    
+
     for module, items in sorted(by_module.items()):
         lines.append(f"\n{module}:")
         for key, ok in items:
             symbol = "✓" if ok else "✗"
             lines.append(f"  {symbol} {key}")
-    
+
     return "\n".join(lines)
 
 
 if __name__ == '__main__':
     results = check_all_fixes()
     report = generate_patch_report(results)
-    print(report)
+    logger = logging.getLogger(__name__)
+    logger.info("Patch status report:\n%s", report)

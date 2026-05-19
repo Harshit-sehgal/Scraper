@@ -10,11 +10,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 
 from playwright.async_api import async_playwright, Browser, BrowserContext
 
 from app.config import settings
+
+if TYPE_CHECKING:
+    from app.strategy_evolution import FetchStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +42,7 @@ class BrowserPool:
         self.reused_fetches: int = 0
         self.crash_count: int = 0
 
-    async def get_context(self, domain: str) -> BrowserContext:
+    async def get_context(self, domain: str, strategy: Optional[FetchStrategy] = None) -> BrowserContext:
         """Get or create a browser context for a specific domain."""
         async with self._lock:
             self._last_activity = time.time()
@@ -66,24 +69,49 @@ class BrowserPool:
                     self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
 
             # Check for existing context
-            context = self._contexts.get(domain)
+            # We key by (domain, strategy) to allow different strategies for same domain
+            context_key = f"{domain}:{strategy.value if strategy else 'default'}"
+            context = self._contexts.get(context_key)
             if context:
-                use_count = self._context_use_count.get(domain, 0)
+                use_count = self._context_use_count.get(context_key, 0)
                 if use_count < settings.BROWSER_CONTEXT_LIFETIME:
-                    self._context_use_count[domain] = use_count + 1
+                    self._context_use_count[context_key] = use_count + 1
                     self.reused_fetches += 1
                     self.context_reuse_rate = self.reused_fetches / self.total_fetches
                     return context
                 else:
-                    logger.debug("[BrowserPool] Context for %s reached lifetime, rotating", domain)
+                    logger.debug("[BrowserPool] Context for %s reached lifetime, rotating", context_key)
                     await context.close()
-                    self._contexts.pop(domain, None)
+                    self._contexts.pop(context_key, None)
 
             # Create new context with optional proxy configuration
-            context_options: Dict[str, Any] = {
-                "user_agent": settings.USER_AGENT,
-                "viewport": {"width": settings.BROWSER_VIEWPORT_WIDTH, "height": settings.BROWSER_VIEWPORT_HEIGHT},
-            }
+            from app.strategy_evolution import FetchStrategy
+            is_stealth = strategy == FetchStrategy.PLAYWRIGHT_STEALTH
+            
+            # Use AntiBotEngine's stealth profile for enhanced fingerprint randomization
+            context_options: Dict[str, Any]
+            if is_stealth:
+                from app.anti_bot_engine import get_anti_bot_engine
+                stealth_profile = get_anti_bot_engine().get_stealth_profile(domain)
+                context_options = {
+                    "user_agent": stealth_profile["user_agent"],
+                    "viewport": stealth_profile["viewport"],
+                    "device_scale_factor": stealth_profile["device_scale_factor"],
+                    "is_mobile": False,
+                    "has_touch": False,
+                    "locale": stealth_profile["locale"],
+                    "timezone_id": stealth_profile["timezone"],
+                }
+            else:
+                context_options = {
+                    "user_agent": self._get_random_ua() if is_stealth else settings.USER_AGENT,
+                    "viewport": {"width": settings.BROWSER_VIEWPORT_WIDTH, "height": settings.BROWSER_VIEWPORT_HEIGHT},
+                    "device_scale_factor": 1.0 if not is_stealth else 2.0,
+                    "is_mobile": False,
+                    "has_touch": False,
+                    "locale": "en-US",
+                    "timezone_id": "America/New_York",
+                }
             
             # Add proxy if enabled
             if settings.PROXY_ROTATION_ENABLED:
@@ -97,7 +125,9 @@ class BrowserPool:
             
             context = await self._browser.new_context(**context_options)  # type: ignore[arg-type]
             
-            if settings.PLAYWRIGHT_STEALTH:
+            # Phase 80: Advanced Stealth Evasion
+            if settings.PLAYWRIGHT_STEALTH or is_stealth:
+                # Basic stealth
                 stealth_js = """
                 Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
                 window.chrome = { runtime: {} };
@@ -106,16 +136,48 @@ class BrowserPool:
                 """
                 await context.add_init_script(stealth_js)
                 
-            self._contexts[domain] = context
-            self._context_use_count[domain] = 1
+                if is_stealth:
+                    # Advanced fingerprint randomization
+                    advanced_stealth = """
+                    // WebGL spoofing
+                    const getParameter = WebGLRenderingContext.prototype.getParameter;
+                    WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                        if (parameter === 37445) return 'Intel Open Source Technology Center';
+                        if (parameter === 37446) return 'Mesa DRI Intel(R) Ivybridge Mobile ';
+                        return getParameter.apply(this, arguments);
+                    };
+                    
+                    // Hardware concurrency randomization
+                    Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 4});
+                    
+                    // Battery status spoofing
+                    if (navigator.getBattery) {
+                        navigator.getBattery = () => Promise.resolve({
+                            charging: true,
+                            chargingTime: 0,
+                            dischargingTime: Infinity,
+                            level: 1
+                        });
+                    }
+                    """
+                    await context.add_init_script(advanced_stealth)
+                
+            self._contexts[context_key] = context
+            self._context_use_count[context_key] = 1
             self.active_contexts = len(self._contexts)
             
-            # Auto-restart if we have too many contexts
-            if len(self._contexts) > settings.BROWSER_MAX_CONTEXTS:
-                logger.info("[BrowserPool] Max contexts reached, scheduling full restart")
-                # Mark for teardown in next idle cycle
-            
             return context
+
+    def _get_random_ua(self) -> str:
+        """Return a randomized browser user agent."""
+        import random
+        uas = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
+        ]
+        return random.choice(uas)
 
     async def check_health(self) -> bool:
         """Perform a basic health check on the browser instance."""

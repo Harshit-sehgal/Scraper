@@ -3,8 +3,7 @@ Tests for Domain Behavior Intelligence — Phase 79 Verification.
 """
 
 import pytest
-import time
-from app.domain_intelligence import get_domain_intelligence, DomainIntelligenceRegistry
+from app.domain_intelligence import DomainIntelligenceRegistry
 
 @pytest.fixture
 def registry():

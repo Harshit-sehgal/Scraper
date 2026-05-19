@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+from typing import Callable
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -24,9 +25,9 @@ from app.utils.quality import build_quality_report, compute_source_breakdown, sa
 def create_jobs_router(
     jobs_store: dict,
     recycle_bin_store: dict,
-    persist_state_fn,
-    schedule_task_fn,
-    run_job_coro_fn,
+    persist_state_fn: Callable,
+    schedule_task_fn: Callable,
+    run_job_coro_fn: Callable,
     config: dict,
 ):
     router = APIRouter()

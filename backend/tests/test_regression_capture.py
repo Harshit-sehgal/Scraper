@@ -14,8 +14,6 @@ Covers:
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 import time
 from pathlib import Path
 
@@ -23,8 +21,6 @@ import pytest
 
 from app.regression_capture import (
     RegressionCapture,
-    RegressionEntry,
-    RegressionRegistry,
     get_regression_capture,
 )
 

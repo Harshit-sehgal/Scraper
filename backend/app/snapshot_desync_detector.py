@@ -7,9 +7,8 @@ hash comparisons per subsystem to pinpoint exactly where state diverged.
 Phase 47: Distributed Resilience — detecting divergent state in multi-node clusters.
 """
 
-import hashlib
 import logging
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

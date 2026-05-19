@@ -4,13 +4,18 @@ LAW 12: Cognitive Agency must be bounded by substrate safety policies.
 No action may be triggered if it violates system thermodynamic stability.
 """
 
+from __future__ import annotations
+from typing import Optional, TYPE_CHECKING
 from weakref import WeakKeyDictionary
 from app.semantic_world_state import get_world_state
+
+if TYPE_CHECKING:
+    from app.semantic_world_state import SemanticWorldState
 
 class SubstratePolicy:
     """Governs when and how autonomous actions and structural changes occur."""
 
-    def __init__(self, ws=None):
+    def __init__(self, ws: Optional[SemanticWorldState] = None):
         self.ws = ws or get_world_state()
         # Phase 68: Operational Guardrails
         self.max_community_density = 15 # Max roles per cluster
@@ -96,7 +101,7 @@ class SubstratePolicy:
 
 _policy_instances: WeakKeyDictionary | None = None
 
-def get_policy_engine(ws=None) -> SubstratePolicy:
+def get_policy_engine(ws: Optional[SemanticWorldState] = None) -> SubstratePolicy:
     target_ws = ws or get_world_state()
     global _policy_instances
     if _policy_instances is None:

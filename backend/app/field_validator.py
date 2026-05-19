@@ -1,9 +1,14 @@
 """Runtime field state validation — catches structural drift before it propagates."""
 
+from __future__ import annotations
 import math
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.semantic_world_state import SemanticWorldState
 
 
-def validate_world_state(ws) -> list:
+def validate_world_state(ws: SemanticWorldState) -> list:
     """Validate world state integrity. Returns list of issues found (empty = clean)."""
     issues = []
     view = ws.get_topology_view()

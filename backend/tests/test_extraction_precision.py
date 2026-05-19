@@ -5,7 +5,6 @@ These tests focus on the 'Regex Fallback' and 'Selector Engine' components
 without requiring live network or LLM calls.
 """
 
-import pytest
 from pathlib import Path
 from app.models import FieldType, SchemaField
 from app.selector_engine import extract_with_regex, apply_selectors

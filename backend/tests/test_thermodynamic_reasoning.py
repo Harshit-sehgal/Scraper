@@ -84,7 +84,9 @@ def test_crystalline_gravity_predictive_completion():
         
     # HEAD version doesn't generate crystalline records automatically
     # This is a feature from the externally-modified version
-    assert True  # crystalline record generation pending
+    # Check that world state is stable after crystal-like loading
+    assert ws.metrics.global_energy > 0, "Energy should be non-zero after loading"
+    assert ws.get_topology_view() is not None, "Topology should exist after loading"
     
     # 2. Test Gravity: provide a partial record where price is ambiguous
     # We have two prices: $199 and $999.

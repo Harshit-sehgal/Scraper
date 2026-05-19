@@ -12,7 +12,7 @@ Owns:
 """
 
 import math
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 from app.transaction_context import active_transaction
 
 
@@ -86,7 +86,7 @@ class HistoryState:
         }
         return getattr(self, attr_map[key])
 
-    def _set_val(self, key: str, val):
+    def _set_val(self, key: str, val: Any):
         if self._staging is not None:
             self._staging[key] = val
         else:

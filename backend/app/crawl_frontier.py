@@ -15,7 +15,7 @@ import heapq
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set
 from urllib.parse import urlparse
 
 from app.config import settings
@@ -43,6 +43,8 @@ class CrawlFrontier:
         self._failed: Dict[str, int] = {}
         self._lock = asyncio.Lock()
         self._policy = get_crawl_policy()
+        self._max_discovery_depth: int = 3
+        self._integrated_frontier: bool = True  # Whether we're integrated with the scraper
 
     async def add_url(
         self, 
@@ -130,13 +132,84 @@ class CrawlFrontier:
                 else:
                     self._completed.add(url) # Move to completed to stop retrying
 
+    async def add_discovered_links(self, links: List[str], source_url: str, source_depth: int = 0) -> int:
+        """Add links discovered during extraction back to the frontier.
+        
+        This implements the crawl orchestration loop:
+          scrape_url → discover_links → add_to_frontier → scrape_next_url
+        
+        Args:
+            links: URLs discovered during extraction
+            source_url: The URL they were discovered from
+            source_depth: Current crawl depth
+            
+        Returns:
+            Number of new URLs added (after dedup)
+        """
+        if not self._integrated_frontier:
+            return 0
+        
+        added = 0
+        for link in links:
+            new_depth = source_depth + 1
+            if new_depth <= self._max_discovery_depth:
+                success = await self.add_url(link, depth=new_depth, source_url=source_url)
+                if success:
+                    added += 1
+        
+        if added > 0:
+            logger.debug("[Frontier] Added %d discovered links from %s (depth %d)", 
+                        added, source_url, source_depth)
+        return added
+
+    async def get_next_urls(self, count: int = 5) -> List[str]:
+        """Get multiple URLs available for crawling.
+        
+        Useful for batch processing — returns up to `count` URLs
+        that pass the crawl policy check.
+        """
+        urls = []
+        for _ in range(count):
+            url = await self.get_next_url()
+            if url:
+                urls.append(url)
+            else:
+                break
+        return urls
+
+    async def get_frontier_for_domain(self, domain: str, max_urls: int = 10) -> List[str]:
+        """Get next URLs for a specific domain.
+        
+        Useful for domain-priority crawling where a single domain
+        needs focused attention.
+        
+        Note: This pops URLs from the frontier heap, so they won't
+        be returned by subsequent get_next_url() calls.
+        """
+        domain_urls: list[str] = []
+        async with self._lock:
+            # Collect non-matching items to re-push later
+            remaining = []
+            while self._queue and len(domain_urls) < max_urls:
+                item = heapq.heappop(self._queue)
+                if domain in urlparse(item.url).netloc:
+                    domain_urls.append(item.url)
+                    self._pending.discard(item.url)
+                else:
+                    remaining.append(item)
+            # Re-push non-domain items
+            for item in remaining:
+                heapq.heappush(self._queue, item)
+        return domain_urls
+
     def get_stats(self) -> dict:
         """Return frontier operational statistics."""
         return {
             "queue_size": len(self._queue),
             "pending_count": len(self._pending),
             "completed_count": len(self._completed),
-            "failed_count": len(self._failed)
+            "failed_count": len(self._failed),
+            "integrated": self._integrated_frontier,
         }
 
 

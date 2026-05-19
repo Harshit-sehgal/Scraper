@@ -20,10 +20,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from app.failure_classification import classify_failure, FailureCategory
-from app.recovery_strategies import get_recovery_strategist, get_recovery_executor, RecoveryPlan
+from app.recovery_strategies import get_recovery_strategist, get_recovery_executor
 from app.selector_memory import get_selector_memory
 from app.domain_intelligence import get_domain_intelligence
 from app.models import SchemaField
@@ -59,9 +59,9 @@ async def scrape_url_with_recovery(
     strategist = get_recovery_strategist()
     executor = get_recovery_executor()
     selector_memory = get_selector_memory()
-    domain_intel = get_domain_intelligence()
+    get_domain_intelligence()
     
-    recovery_stats = {
+    recovery_stats: Dict[str, Any] = {
         "url": url,
         "attempts": 0,
         "recovery_attempts": 0,
@@ -90,6 +90,22 @@ async def scrape_url_with_recovery(
                 world_state=world_state,
             )
             
+            # Since scrape_url catches exceptions and returns [], 
+            # we must check telemetry to see if it actually failed.
+            from app.scrape_telemetry import get_scrape_telemetry
+            telemetry = get_scrape_telemetry()
+            last_event = telemetry.get_last_for_url(url)
+            
+            if last_event and last_event.error:
+                # It was a fetch or structural failure
+                logger.warning("Scrape attempt %d failed: %s", attempt, last_event.error)
+                raise Exception(last_event.error)
+            
+            if not results and attempt < max_recovery_attempts:
+                # Extraction returned nothing - treat as failure to trigger recovery
+                logger.warning("Scrape attempt %d returned 0 records, triggering recovery", attempt)
+                raise Exception("zero_records_extracted")
+            
             recovery_stats["success"] = True
             recovery_stats["total_time_ms"] = (time.time() - start_time) * 1000
             logger.info("Scrape succeeded on attempt %d for %s (got %d records)", 
@@ -98,107 +114,52 @@ async def scrape_url_with_recovery(
             
         except Exception as e:
             last_error = e
-            logger.warning("Scrape attempt %d failed for %s: %s", attempt, url, type(e).__name__)
+            error_msg = str(e)
             
-            # Try recovery if we haven't exceeded max attempts
-            if attempt < max_recovery_attempts:
-                try:
-                    # Classify the failure
-                    classification = classify_failure(
-                        error_message=str(e),
-                        fetch_method="playwright",
-                    )
-                    recovery_stats["failure_classifications"].append({
-                        "attempt": attempt,
-                        "category": classification.category.value,
-                        "confidence": classification.confidence,
-                    })
-                    
-                    # Get domain intelligence for parameter tuning
-                    intel = domain_intel.get_intelligence(url)
-                    domain_info = {
-                        "anti_bot_risk": intel.anti_bot_risk,
-                        "failure_rate": intel.failure_rate,
-                        "failure_pattern": intel.primary_failure_pattern,
-                    }
-                    
-                    # Generate recovery plan
-                    plan = strategist.generate_recovery_plan(
-                        classification,
-                        attempt_number=attempt,
-                        domain_info=domain_info,
-                    )
-                    
-                    logger.info(
-                        "Generated recovery plan for %s: %s (reason: %s)",
-                        url, plan.primary_action.value, plan.reason
-                    )
-                    
-                    # Attempt recovery
-                    recovery_stats["recovery_attempts"] += 1
-                    recovery_stats["recovery_actions_taken"].append(plan.primary_action.value)
-                    
-                    # For now, we'll just wait and retry (basic recovery)
-                    # In a full implementation, each action would be registered with handlers
-                    if plan.backoff_seconds > 0:
-                        logger.info("Backoff %.1f seconds before retry", plan.backoff_seconds)
-                        await asyncio.sleep(plan.backoff_seconds)
-                    
-                    # Special case: if SELECTOR_DECAY, clean up selector memory
-                    if classification.category == FailureCategory.SELECTOR_DECAY:
-                        logger.info("Selector decay detected, cleaning up selector memory for %s", url)
-                        selector_memory.force_cleanup()
-                    
-                    # Continue to next attempt
-                    continue
-                    
-                except Exception as recovery_error:
-                    logger.error("Recovery generation failed: %s", recovery_error)
-                    # Fall through to next attempt
-                    continue
-            else:
-                logger.warning("Max recovery attempts (%d) reached for %s", max_recovery_attempts, url)
-    
-    # All attempts failed
-    recovery_stats["total_time_ms"] = (time.time() - start_time) * 1000
-    if last_error:
-        try:
-            classification = classify_failure(str(last_error), "playwright")
+            # Get telemetry if available for richer classification
+            from app.scrape_telemetry import get_scrape_telemetry
+            last_event = get_scrape_telemetry().get_last_for_url(url)
+            event_dict = last_event.to_dict() if last_event else {}
+            
+            # 1. Classify the failure
+            classification = classify_failure(
+                error_message=error_msg,
+                telemetry=event_dict,
+                html=None, # We don't have HTML here, scrape_url doesn't return it
+            )
+            recovery_stats["failure_classifications"].append(classification.to_dict())
             recovery_stats["final_failure_category"] = classification.category.value
-        except Exception:
-            recovery_stats["final_failure_category"] = "unknown"
-    
-    logger.error(
-        "All %d scrape attempts failed for %s (final error: %s)",
-        max_recovery_attempts, url, type(last_error).__name__ if last_error else "unknown"
-    )
-    
+            
+            # Special case: if SELECTOR_DECAY, clean up selector memory
+            if classification.category == FailureCategory.SELECTOR_DECAY:
+                logger.info("Selector decay detected, cleaning up selector memory for %s", url)
+                selector_memory.force_cleanup()
+
+            if attempt >= max_recovery_attempts:
+                break
+                
+            # 2. Generate recovery plan
+            plan = strategist.generate_recovery_plan(classification, attempt)
+            logger.info("Generated recovery plan for %s: %s (attempt %d)", 
+                       url, plan.primary_action.value, attempt)
+            
+            # 3. Execute recovery
+            recovery_stats["recovery_attempts"] += 1
+            recovery_stats["recovery_actions_taken"].append(plan.primary_action.value)
+            
+            success = await executor.execute(plan, context={
+                "url": url,
+                "attempt": attempt,
+                "world_state": world_state,
+            })
+            
+            if not success:
+                logger.warning("Recovery action %s failed for %s", plan.primary_action.value, url)
+            
+            # Exponential backoff
+            await asyncio.sleep(plan.backoff_seconds)
+            
+    recovery_stats["total_time_ms"] = (time.time() - start_time) * 1000
+    logger.error("All %d scrape attempts failed for %s. Last error: %s", 
+                max_recovery_attempts, url, last_error)
     return [], recovery_stats
-
-
-# Hook for executor to register handlers
-def register_recovery_handlers():
-    """Register recovery action handlers with the executor.
-    
-    This should be called on application startup to wire up all recovery actions
-    to their corresponding implementations.
-    """
-    from app.recovery_strategies import (
-        get_recovery_executor,
-        RecoveryAction,
-    )
-    from app.browser_pool import get_browser_pool
-    from app.proxy_manager import get_proxy_manager
-    from app.selector_memory import get_selector_memory
-    from app.rate_limiter import get_rate_limiter
-    
-    executor = get_recovery_executor()
-    
-    # Register placeholder handlers (in production, these would do real work)
-    async def noop_handler(params: dict, context: dict) -> bool:
-        return True
-    
-    # Register all actions with noop handlers for now
-    # In a full implementation, these would be wired to real recovery logic
-    for action in RecoveryAction:
-        executor.register_handler(action, noop_handler)

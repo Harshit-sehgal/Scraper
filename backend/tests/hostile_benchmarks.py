@@ -9,11 +9,9 @@ Targets:
 """
 
 import asyncio
-import json
 import logging
 import threading
 import time
-from typing import List
 
 import uvicorn
 from fastapi import FastAPI

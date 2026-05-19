@@ -244,6 +244,12 @@ class Settings(BaseSettings):
     TELEMETRY_RECORD_EXTRACTION: bool = True
     """Emit per-URL scrape telemetry events."""
 
+    # ─── LLM Provider Settings ───────────────────────────────────────────────
+    GROQ_API_ENDPOINT: str = "https://api.groq.com/openai/v1/chat/completions"
+    """Groq API endpoint for LLM calls."""
+    POLLINATIONS_API_ENDPOINT: str = "https://text.pollinations.ai/openai"
+    """Pollinations AI endpoint for LLM calls."""
+
     # ─── Proxy & Anti-Bot Evasion ──────────────────────────────────────────
     PROXY_ROTATION_ENABLED: bool = False
     """Enable proxy rotation for anti-bot resilience."""
@@ -253,6 +259,10 @@ class Settings(BaseSettings):
     """Rotate proxy after this many consecutive failures."""
     PROXY_TIMEOUT_SECONDS: int = 30
     """Timeout for proxy connection attempts."""
+
+    # ─── Email Validation ────────────────────────────────────────────────────
+    EMAIL_BLOCKED_DOMAINS: str = "example.com,test.com,localhost"
+    """Comma-separated list of email domains to reject as invalid."""
 
     def __getattr__(self, name: str):
         """Provide backwards-compatible aliases for config parameters."""

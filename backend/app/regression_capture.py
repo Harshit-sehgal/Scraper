@@ -17,14 +17,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import time
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
-
-from app.failure_classification import FailureCategory
 
 logger = logging.getLogger(__name__)
 
@@ -266,14 +262,112 @@ class RegressionCapture:
 
         return "\n\n# ===== TEST SEPARATOR =====\n\n".join(all_tests)
 
+    def classify_severity(self, entry: RegressionEntry) -> str:
+        """Classify the severity of a regression entry.
+        
+        Severity levels:
+          - critical: Anti-bot block, captcha, IP ban — the site is actively hostile
+          - high: Selector decay, hydration failure, empty page — extraction failed structurally
+          - medium: Low quality, partial extraction, selector mismatch — got something but not enough
+          - low: Connection timeout, HTTP error, rate limited — transient, likely temporary
+          - info: All other categories — captured for awareness
+        """
+        high_severity_categories = {
+            "anti_bot_block", "captcha", "ip_banned", "browser_crash",
+        }
+        med_severity_categories = {
+            "selector_decay", "hydration_failure", "lazy_load_timeout",
+            "empty_page", "no_records_extracted", "malformed_dom",
+        }
+        low_severity_categories = {
+            "low_quality_extraction", "partial_extraction", "selector_mismatch",
+            "connection_timeout", "http_error", "rate_limited", "dns_resolution_failure",
+        }
+        
+        cat = entry.failure_category or "unknown"
+        if cat in high_severity_categories:
+            return "critical"
+        if cat in med_severity_categories:
+            return "high"
+        if cat in low_severity_categories:
+            return "low"
+        return "info"
+
+    def prune_fixtures(self, max_age_days: int = 30, max_fixtures: int = 200) -> int:
+        """Prune old fixture files to manage disk usage.
+        
+        Args:
+            max_age_days: Remove fixtures older than this (default 30)
+            max_fixtures: Maximum number of fixtures to keep (default 200)
+            
+        Returns:
+            Number of fixtures pruned
+        """
+        if not self._fixtures_dir.exists():
+            return 0
+        
+        cut_off = time.time() - (max_age_days * 86400)
+        
+        # Get all fixture files with their modification times
+        fixtures = []
+        for f in self._fixtures_dir.iterdir():
+            if f.suffix == ".html":
+                fixtures.append((f.stat().st_mtime, f))
+        
+        # Sort by modification time (oldest first)
+        fixtures.sort(key=lambda x: x[0])
+        
+        to_remove = []
+        
+        # Remove fixtures older than max_age_days
+        for mtime, fpath in fixtures:
+            if mtime < cut_off:
+                to_remove.append(fpath)
+        
+        # If still over limit, remove oldest
+        remaining = len(fixtures) - len(to_remove)
+        if remaining > max_fixtures:
+            keep_set = set(f for _, f in fixtures[-max_fixtures:])
+            extra_fixtures = [f for _, f in fixtures if f not in keep_set and f not in to_remove]
+            to_remove.extend(extra_fixtures)
+        
+        # Also clean up registry entries for removed fixtures
+        removed_names = {f.name for f in to_remove}
+        self._registry.entries = [
+            e for e in self._registry.entries
+            if e.fixture_filename not in removed_names
+        ]
+        
+        # Actually delete files
+        pruned = 0
+        for fpath in to_remove:
+            try:
+                fpath.unlink()
+                pruned += 1
+            except OSError:
+                pass
+        
+        if pruned > 0:
+            self._save_registry()
+            logger.info("Pruned %d stale fixture files", pruned)
+        
+        return pruned
+
     def get_statistics(self) -> dict:
         """Return summary statistics of the regression archive."""
+        # Compute severity distribution
+        severity_dist = {"critical": 0, "high": 0, "low": 0, "info": 0}
+        for entry in self._registry.entries:
+            sev = self.classify_severity(entry)
+            severity_dist[sev] = severity_dist.get(sev, 0) + 1
+        
         return {
             "total_captured": self._registry.total_captured,
             "total_with_replay_tests": self._registry.total_with_replay_tests,
             "last_capture_at": self._registry.last_capture_at,
             "domain_count": len(self._registry.domain_coverage),
             "category_count": len(self._registry.category_coverage),
+            "severity_distribution": severity_dist,
             "domain_coverage": dict(
                 sorted(
                     self._registry.domain_coverage.items(),
@@ -291,6 +385,7 @@ class RegressionCapture:
                     "id": e.id,
                     "domain": e.domain,
                     "category": e.failure_category,
+                    "severity": self.classify_severity(e),
                     "confidence": e.failure_confidence,
                     "captured_at": e.captured_at,
                     "fixture": e.fixture_filename,

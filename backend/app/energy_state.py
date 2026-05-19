@@ -377,7 +377,7 @@ class EnergyState:
 
     # ─── Bulk/Derived Setters ────────────────────────────────────────────
 
-    def update_from_regions(self, regions, region_count: Optional[int] = None):
+    def update_from_regions(self, regions: list, region_count: Optional[int] = None):
         if not regions:
             return
         n = region_count if region_count else len(regions)
@@ -394,7 +394,7 @@ class EnergyState:
         self.set_entropy(avg_instability)
         self._set_val("cumulative_uncertainty", sum(r.instability for r in regions))
 
-    def evolve_from_regions(self, regions, region_count: Optional[int] = None):
+    def evolve_from_regions(self, regions: list, region_count: Optional[int] = None):
         if not regions:
             return
         n = region_count if region_count else len(regions)

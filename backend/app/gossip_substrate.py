@@ -9,11 +9,15 @@ Implements Push-Pull gossip with:
 - Health tracking for peer reliability
 """
 
+from __future__ import annotations
 import random
 import time
 import logging
-from typing import Dict, Set, Any, Optional, Tuple, List
+from typing import Dict, Set, Any, Optional, Tuple, List, TYPE_CHECKING
 from collections import defaultdict
+
+if TYPE_CHECKING:
+    from app.heartbeat_manager import HeartbeatManager
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +138,7 @@ class GossipSubstrate:
             reliability = health.reliability_score
             
             # Prefer recently seen nodes
-            time_penalty = max(0, (time.time() - health.last_seen) / 300)
+            time_penalty = max(0.0, (time.time() - health.last_seen) / 300)
             adjusted_weight = (reliability * 0.8) + (1 - time_penalty) * 0.2
             weights.append(adjusted_weight)
         
@@ -146,12 +150,12 @@ class GossipSubstrate:
         for _ in range(min(count, len(candidates))):
             total = sum(weights)
             pick = random.uniform(0, total)
-            cumsum = 0
+            cumsum = 0.0
             for i, w in enumerate(weights):
                 cumsum += w
                 if pick <= cumsum:
                     selected.append(candidates[i])
-                    weights[i] = 0  # Don't pick same twice
+                    weights[i] = 0.0  # Don't pick same twice
                     break
         
         return selected
@@ -181,11 +185,11 @@ class GossipSubstrate:
         
         try:
             # Phase 1: Pull state from peer
-            remote_state = peer.to_dict()
             remote_clock = peer.get_vector_clock() if hasattr(peer, 'get_vector_clock') else {}
-            
-            # Check for conflicts
-            conflict_detected = self._detect_conflicts(local_node_id, peer_id, remote_state, remote_clock)
+            remote_state = peer.to_dict()
+
+            # Check for conflicts (logged internally)
+            self._detect_conflicts(local_node_id, peer_id, remote_state, remote_clock)
             
             # Merge pull state
             self.vector_clock.update(remote_clock)
@@ -233,6 +237,115 @@ class GossipSubstrate:
         self.state_versions[key] = (remote_state, remote_clock)
         return False
     
+    def integrate_heartbeat(self, heartbeat_manager: Optional[HeartbeatManager] = None) -> None:
+        """Push gossip substrate state into the heartbeat manager.
+        
+        LAW: Distributed truth requires continuous verification.
+        This bridges gossip-level state into the heartbeat/health system.
+        """
+        if not heartbeat_manager:
+            return
+        
+        # Register each known peer as a heartbeat node
+        for peer_id in self.known_nodes:
+            if peer_id == self.node_id:
+                continue
+            health = self.peer_health[peer_id]
+            checksum = str(hash(frozenset(self.vector_clock.clock.items())))
+            
+            heartbeat_manager.record_heartbeat(
+                node_id=peer_id,
+                clock=self.vector_clock.to_dict(),
+                checksum=checksum,
+                energy=health.reliability_score,
+            )
+        
+        # Also register local node
+        heartbeat_manager.record_heartbeat(
+            node_id=self.node_id,
+            clock=self.vector_clock.to_dict(),
+            checksum=str(hash(frozenset(self.vector_clock.clock.items()))),
+            energy=1.0,
+        )
+        
+        logger.debug(
+            "[Gossip] Integrated %d peers into heartbeat manager",
+            len(self.known_nodes) - 1,
+        )
+
+    def propagate_state_via_gossip(self, state_key: Optional[str] = None, state_value: Any = None, heartbeat_manager: Optional[HeartbeatManager] = None) -> int:
+        """Propagate a state update through the gossip network.
+        
+        This implements push-based state propagation:
+          1. Update local clock for causality tracking
+          2. Gossip with each known healthy peer
+          3. If heartbeat_manager is provided, sync state there too
+        
+        Args:
+            state_key: Optional key for the state being propagated.
+                       If None, performs a general gossip sync.
+            state_value: Optional value for the state being propagated.
+            heartbeat_manager: Optional heartbeat manager for observability.
+        
+        Returns: Number of peers successfully updated
+        """
+        self.vector_clock.increment()
+        
+        # Update local state version if state_key provided
+        if state_key is not None:
+            self.state_versions[f"state:{state_key}"] = (state_value, self.vector_clock.to_dict())
+        
+        # Gossip with healthy peers
+        peers = self.select_peers_for_gossip(count=3)
+        success_count = 0
+        
+        for peer_id in peers:
+            # Simulate state transfer through peer provider
+            peer_provider = self.peers.get(peer_id)
+            if peer_provider and hasattr(peer_provider, 'receive_state'):
+                try:
+                    if state_key is not None:
+                        peer_provider.receive_state(state_key, state_value, self.vector_clock.to_dict())
+                    elif hasattr(peer_provider, 'to_dict'):
+                        # General gossip sync: exchange state
+                        remote_state = peer_provider.to_dict()
+                        if hasattr(peer_provider, 'merge_state'):                                peer_provider.merge_state(remote_state)
+                    success_count += 1
+                    self.peer_health[peer_id].success_count += 1
+                    self.peer_health[peer_id].last_seen = time.time()
+                except Exception as e:
+                    logger.warning("[Gossip] State propagation to %s failed: %s", peer_id, e)
+                    self.peer_health[peer_id].failure_count += 1
+        
+        # Sync with heartbeat manager for observability
+        if heartbeat_manager:
+            self.integrate_heartbeat(heartbeat_manager)
+        
+        logger.debug(
+            "[Gossip] Propagated state%s to %d/%d peers",
+            f" '{state_key}'" if state_key else "", success_count, len(peers),
+        )
+        return success_count
+
+    def get_state_version(self, state_key: str) -> Optional[Any]:
+        """Get local version of a propagated state key."""
+        data = self.state_versions.get(f"state:{state_key}")
+        if data:
+            return data[0]  # Return state value (ignore clock)
+        return None
+
+    def get_all_state_versions(self) -> Dict[str, Any]:
+        """Get all propagated state versions."""
+        result = {}
+        for key, (value, clock) in self.state_versions.items():
+            if key.startswith("state:"):
+                state_key = key[6:]  # Remove "state:" prefix
+                result[state_key] = {
+                    "value": value,
+                    "clock": clock,
+                }
+        return result
+
     def get_health_report(self) -> Dict[str, Any]:
         """Get health status of all peers."""
         peers_report: Dict[str, Dict[str, Any]] = {}
@@ -254,6 +367,7 @@ class GossipSubstrate:
             "vector_clock": self.vector_clock.to_dict(),
             "peers": peers_report,
             "conflicts_detected": len(self.conflicts),
+            "propagated_states": len([k for k in self.state_versions if k.startswith("state:")]),
         }
         
         return report

@@ -4,10 +4,14 @@ True ownership boundary: NO external code should mutate telemetry_stream directl
 All changes go through this state object, which supports transactions.
 """
 
+from __future__ import annotations
 import logging
 import time
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Callable, Any, TYPE_CHECKING
 from app.transaction_context import active_transaction
+
+if TYPE_CHECKING:
+    from app.semantic_world_state import SemanticWorldState
 
 from collections import deque
 from dataclasses import dataclass
@@ -612,7 +616,7 @@ class ObservabilityState:
 
         return (c * 0.4) + (stability * 0.3) + (persistence * 0.3)
 
-    def apply_resource_shedding(self, ws, snapshot: GovernanceSnapshot, max_bytes: int = 10000000):
+    def apply_resource_shedding(self, ws: SemanticWorldState, snapshot: GovernanceSnapshot, max_bytes: int = 10000000):
         """Prune non-essential state if memory footprint exceeds threshold (Phase 47/50).
 
         Enhanced with Value-Aware Pruning to preserve semantic continuity.
@@ -656,7 +660,7 @@ class ObservabilityState:
         return True
 # ─── Legacy Observability Utilities ──────────────────────────────────
 
-def field_summary(ws) -> dict:
+def field_summary(ws: SemanticWorldState) -> dict:
     """Return a summary of the field's current energetic state."""
     return {
         "energy": ws.metrics.global_energy,
@@ -665,7 +669,7 @@ def field_summary(ws) -> dict:
         "integrity": ws.metrics.integrity_score
     }
 
-def topology_report(ws) -> dict:
+def topology_report(ws: SemanticWorldState) -> dict:
     """Return a detailed report of the manifold's topology."""
     return {
         "pressure": ws.get_system_pressure(),

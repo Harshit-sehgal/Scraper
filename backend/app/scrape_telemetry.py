@@ -52,6 +52,9 @@ class ScrapeTelemetry:
     token_density: float = 0.0             # Text characters per DOM node
     js_render_delay_ms: float = 0.0        # Time spent waiting for JS/DOM quiescence
     confidence_map: dict = field(default_factory=dict) # Per-field extraction confidence scores
+    regression_severity: Optional[str] = None  # "critical" | "high" | "low" | "info"
+    motifs_generated: int = 0
+    motifs_used: int = 0
     
     error: Optional[str] = None
     timestamp: float = field(default_factory=time.time)
@@ -106,6 +109,13 @@ class ScrapeTelemetryCollector:
             pass
 
         return telemetry
+
+    def get_last_for_url(self, url: str) -> Optional[ScrapeTelemetry]:
+        """Return the most recent telemetry event for a specific URL."""
+        for t in reversed(self._history):
+            if t.url == url:
+                return t
+        return None
 
     def get_recent(self, n: int = 20) -> list[dict]:
         """Get the N most recent telemetry snapshots."""

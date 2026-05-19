@@ -377,18 +377,18 @@ def test_run_job_source_breakdown_counts_final_records(monkeypatch):
             }
         ]
 
-    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent="", world_state=None):
+    async def fake_scrape_url(url, schema_fields, **kwargs):
         return [
             {"company_name": "A Studio", "record_score": 0.8},
             {"company_name": "B Studio", "record_score": 0.81},
             {"company_name": "C Studio", "record_score": 0.82},
-        ]
+        ], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
     async def fake_generate_data_insight(rows):
         return "ok"
 
     monkeypatch.setattr("app.services.job_runner.discover_urls", fake_discover_urls)
-    monkeypatch.setattr("app.services.job_runner.scrape_url", fake_scrape_url)
+    monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
     monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
@@ -416,15 +416,15 @@ def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch):
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
-    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent="", world_state=None):
+    async def fake_scrape_url(url, schema_fields, **kwargs):
         if "bad.example" in url:
             raise RuntimeError("synthetic scrape failure")
-        return [{"company_name": "Working Source", "record_score": 0.9}]
+        return [{"company_name": "Working Source", "record_score": 0.9}], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
     async def fake_generate_data_insight(rows):
         return "ok"
 
-    monkeypatch.setattr("app.services.job_runner.scrape_url", fake_scrape_url)
+    monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
     monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
@@ -449,14 +449,14 @@ def test_run_job_warns_when_contact_ai_coverage_zero_without_groq(monkeypatch):
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
-    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent="", world_state=None):
-        return [{"company_name": "Studio Zero", "record_score": 0.91}]
+    async def fake_scrape_url(url, schema_fields, **kwargs):
+        return [{"company_name": "Studio Zero", "record_score": 0.91}], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
     async def fake_generate_data_insight(rows):
         return "ok"
 
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    monkeypatch.setattr("app.services.job_runner.scrape_url", fake_scrape_url)
+    monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
     monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
@@ -483,13 +483,13 @@ def test_run_job_creates_logs(monkeypatch):
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
-    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent="", world_state=None):
-        return [{"company_name": "Log Studio", "record_score": 0.9}]
+    async def fake_scrape_url(url, schema_fields, **kwargs):
+        return [{"company_name": "Log Studio", "record_score": 0.9}], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
     async def fake_generate_data_insight(rows):
         return "ok"
 
-    monkeypatch.setattr("app.services.job_runner.scrape_url", fake_scrape_url)
+    monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
     monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
@@ -515,10 +515,10 @@ def test_run_job_updates_progress(monkeypatch):
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
-    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent="", world_state=None):
-        return [{"company_name": "Progress Studio", "record_score": 0.9}]
+    async def fake_scrape_url(url, schema_fields, **kwargs):
+        return [{"company_name": "Progress Studio", "record_score": 0.9}], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
-    monkeypatch.setattr("app.services.job_runner.scrape_url", fake_scrape_url)
+    monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
     monkeypatch.setattr("app.scraper.generate_data_insight", lambda r: "ok")
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 

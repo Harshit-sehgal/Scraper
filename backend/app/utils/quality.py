@@ -1,13 +1,12 @@
-import logging
+from typing import Any
 import re
 from statistics import mean
-import math
 from app.models import SchemaField, FieldType
 
 def clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
 
-def normalized_dedup_text(value) -> str:
+def normalized_dedup_text(value: Any) -> str:
     if value is None:
         return ""
     return " ".join(str(value).split()).strip().casefold()
@@ -27,10 +26,10 @@ def compute_source_breakdown(results: list[dict]) -> dict:
         for domain, count in counts.items()
     }
 
-def safe_score(value) -> float:
+def safe_score(value: Any) -> float:
     try:
         return float(value)
-    except Exception as e:
+    except Exception:
         return 0.0
 
 def _value_quality(field: SchemaField, value) -> float:

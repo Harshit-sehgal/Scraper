@@ -16,9 +16,7 @@ import pytest
 from app.trend_analyzer import (
     TrendAnalyzer,
     EconomicTracker,
-    DomainTrend,
     TrendReport,
-    DomainCostSummary,
     EconomicReport,
 )
 

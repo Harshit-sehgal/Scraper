@@ -821,7 +821,7 @@ class TopologyState:
 
     def detect_communities(self):
         """Flood-fill communities from cohesion + field regions."""
-        graph = {}
+        graph: Dict[str, Set[str]] = {}
         cohesion = self._get_struct("neighborhood_cohesion")
         for (ra, rb), val in cohesion.items():
             if val > 0.5:

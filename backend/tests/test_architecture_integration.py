@@ -5,6 +5,8 @@ and the core SemanticWorldState. They pass regardless of which version of the
 tracked files is checked out — asserting invariants rather than specific fields.
 """
 
+import pytest
+
 
 def test_topology_state_has_owned_data():
     """TopologyState must own its data (not reference external state)."""
@@ -171,4 +173,4 @@ def test_all_14_modules_are_importable():
         try:
             __import__(m)
         except Exception as e:
-            assert False, f'{m} failed to import: {e}'
+            pytest.fail(f'{m} failed to import: {e}')

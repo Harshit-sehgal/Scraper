@@ -22,7 +22,7 @@ import logging
 import time
 from dataclasses import dataclass, field, asdict
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -371,8 +371,6 @@ def classify_failure(
 
     # ── Stage 3: HTML / DOM Signal Analysis ──────────────────────────
     if html is not None:
-        html_lower = html.lower()
-
         # Anti-bot challenge patterns (check BEFORE empty page, since challenge
         # pages can be short but are clearly not "empty")
         if _has_challenge_patterns(html):
@@ -561,8 +559,8 @@ def _is_partial_extraction(records: list[dict], schema_fields: list[str]) -> boo
     total_slots = len(records) * len(schema_fields)
     filled_slots = 0
     for record in records:
-        for field in schema_fields:
-            if not _is_empty_value(record.get(field)):
+        for fname in schema_fields:
+            if not _is_empty_value(record.get(fname)):
                 filled_slots += 1
 
     fill_rate = filled_slots / max(1, total_slots)
@@ -574,7 +572,7 @@ def _is_partial_extraction(records: list[dict], schema_fields: list[str]) -> boo
 # ═══════════════════════════════════════════════════════════════════════
 
 def update_domain_with_failure(
-    domain_intel_registry,
+    domain_intel_registry: Any,
     url: str,
     classification: FailureClassification,
 ) -> None:

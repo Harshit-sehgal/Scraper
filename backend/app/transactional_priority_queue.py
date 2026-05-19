@@ -52,6 +52,8 @@ class PriorityQueueEntry:
         self.label = label
         self.trace_id = trace_id
         self.payload = payload
+        self.entry_id = entry_id
+        self._tie_breaker = 0
 
     @property
     def effective_priority(self) -> float:
@@ -190,11 +192,12 @@ class TransactionalPriorityQueue:
         with self._lock:
             # Skip invalid entries (lazy deletion)
             while self._heap and self._heap[0].trace_id in self._invalid_trace_ids:
-                heapq.heappop(self._heap)
-                self._invalid_trace_ids.discard(self._heap[0].trace_id if self._heap else None)
+                invalid_entry = heapq.heappop(self._heap)
+                self._invalid_trace_ids.discard(invalid_entry.trace_id)
             
             if not self._heap:
                 return None
+            
             entry = heapq.heappop(self._heap)
             self._priority_counts[entry.priority] = max(
                 0, self._priority_counts.get(entry.priority, 0) - 1
@@ -208,14 +211,14 @@ class TransactionalPriorityQueue:
         """
         self._maybe_age()
         with self._lock:
-            # Skip invalid entries
-            idx = 0
-            while idx < len(self._heap) and self._heap[idx].trace_id in self._invalid_trace_ids:
-                idx += 1
+            # Skip invalid entries to find the true highest priority
+            while self._heap and self._heap[0].trace_id in self._invalid_trace_ids:
+                invalid_entry = heapq.heappop(self._heap)
+                self._invalid_trace_ids.discard(invalid_entry.trace_id)
             
-            if idx >= len(self._heap):
+            if not self._heap:
                 return None
-            return self._heap[idx]
+            return self._heap[0]
 
     def remove(self, trace_id: str) -> bool:
         """Remove an entry by trace_id (e.g., on timeout or cancellation).

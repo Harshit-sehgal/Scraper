@@ -11,15 +11,11 @@ Layers:
 from __future__ import annotations
 
 import logging
-from typing import List, Optional, Tuple
-
 from app.config import settings
 from app.models import SchemaField
-from app.selector_profiles.loader import try_profile_extraction
 from app.selector_memory import get_selector_memory
 from app.selector_discovery import discover_selectors
 from app.selector_engine import apply_selectors, extract_with_regex
-from app.data_utils import process_raw_records
 from app.domain_intelligence import get_domain_intelligence
 from app.extraction_provenance import ProvenanceBuilder, ExtractionMethod
 

@@ -171,7 +171,7 @@ def llm_json(messages: list[dict], temperature: float | None = None, timeout: in
                 }
                 headers = {"Authorization": f"Bearer {groq_key}"}
                 parsed = _call_openai_compatible_json(
-                    "https://api.groq.com/openai/v1/chat/completions",
+                    settings.GROQ_API_ENDPOINT,
                     payload,
                     headers=headers,
                     timeout=timeout,
@@ -191,7 +191,7 @@ def llm_json(messages: list[dict], temperature: float | None = None, timeout: in
             "temperature": temperature,
             "response_format": {"type": "json_object"},
         }
-        parsed = _call_openai_compatible_json("https://text.pollinations.ai/openai", payload, timeout=timeout)
+        parsed = _call_openai_compatible_json(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
         if parsed is not None:
             return parsed
     except Exception as e:
@@ -236,7 +236,7 @@ def llm_json_fast(messages: list[dict], temperature: float | None = None, timeou
                 }
                 headers = {"Authorization": f"Bearer {groq_key}"}
                 parsed = _call_openai_compatible_json(
-                    "https://api.groq.com/openai/v1/chat/completions",
+                    settings.GROQ_API_ENDPOINT,
                     payload,
                     headers=headers,
                     timeout=timeout,
@@ -257,7 +257,7 @@ def llm_json_fast(messages: list[dict], temperature: float | None = None, timeou
             "response_format": {"type": "json_object"},
         }
         parsed = _call_openai_compatible_json(
-            "https://text.pollinations.ai/openai",
+            settings.POLLINATIONS_API_ENDPOINT,
             payload,
             timeout=timeout,
         )
@@ -286,7 +286,7 @@ def llm_text(messages: list[dict], temperature: float | None = None, timeout: in
                 }
                 headers = {"Authorization": f"Bearer {groq_key}"}
                 text = _call_openai_compatible_text(
-                    "https://api.groq.com/openai/v1/chat/completions",
+                    settings.GROQ_API_ENDPOINT,
                     payload,
                     headers=headers,
                     timeout=timeout,
@@ -304,7 +304,7 @@ def llm_text(messages: list[dict], temperature: float | None = None, timeout: in
             "messages": messages,
             "temperature": temperature,
         }
-        text = _call_openai_compatible_text("https://text.pollinations.ai/openai", payload, timeout=timeout)
+        text = _call_openai_compatible_text(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
         if text:
             return text
     except Exception as e:
@@ -333,7 +333,7 @@ def llm_text(messages: list[dict], temperature: float | None = None, timeout: in
 class SubstratePluginManager:
     """Manages the registration and execution of external action handlers."""
 
-    def __init__(self, ws=None):
+    def __init__(self, ws: Any = None):
         self.ws = ws
         # Handlers: handler_name -> callable
         self._handlers: Dict[str, Callable] = {}
@@ -452,7 +452,6 @@ _manager: Optional[SubstratePluginManager] = None
 _call_count = 0
 
 def get_llm_call_count() -> int:
-    global _call_count
     return _call_count
 
 def reset_llm_call_count():
@@ -461,9 +460,9 @@ def reset_llm_call_count():
 
 def _record_call():
     global _call_count
-    _call_count += 1
+    _call_count = _call_count + 1
 
-def get_plugin_manager(ws=None) -> SubstratePluginManager:
+def get_plugin_manager(ws: Any = None) -> SubstratePluginManager:
     global _manager
     if _manager is None:
         _manager = SubstratePluginManager(ws=ws)

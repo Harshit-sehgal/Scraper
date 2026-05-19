@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import List, Optional
 from bs4 import BeautifulSoup
+
+from urllib.parse import urljoin, urlparse
 
 from app.config import settings
 from app.html_utils import (
@@ -36,16 +37,21 @@ from app.scrape_telemetry import (
 from app.crawl_policy import get_crawl_policy
 from app.extraction_orchestrator import orchestrate_extraction
 from app.failure_classification import (
-    classify_failure, update_domain_with_failure, FailureClassification,
+    classify_failure, update_domain_with_failure,
 )
 from app.extraction_provenance import (
-    ProvenanceBuilder, enrich_records_with_provenance, summarize_provenance,
+    ProvenanceBuilder, enrich_records_with_provenance,
 )
 from app.regression_capture import get_regression_capture
+from app.motif_feedback import MotifFeedbackEngine
+from app.crawl_frontier import get_crawl_frontier
+from app.selector_decay_predictor import get_selector_decay_predictor
+from app.domain_evolution_model import get_domain_evolution_model
+from app.self_tuning_extraction import get_self_tuning_controller
 
 logger = logging.getLogger(__name__)
 
-# Re-export for backwards compatibility
+# Re-export for backwards compatibility (used by routers/jobs.py and services/job_runner.py)
 from app.cleaning_engine import ai_clean_and_align_records  # noqa: F401
 from app.insight_engine import generate_data_insight, suggest_schema_from_intent, suggest_schema_from_intent_sync  # noqa: F401
 
@@ -106,29 +112,40 @@ async def scrape_url(
 
     # ── Generic extraction pipeline ────────────────────────────────
     from app.domain_intelligence import get_domain_intelligence
-    intel = get_domain_intelligence().get_intelligence(url)
+    from app.strategy_evolution import get_strategy_evolution_engine
     
-    # Phase 80: Fast Path fetch selection
-    preferred_fetch = "playwright"
-    if intel.preferred_strategy == "httpx" and intel.anti_bot_risk < 0.3:
-        preferred_fetch = "httpx"
-        logger.info("[Scraper] Selecting fast-path (httpx) for %s", url)
+    intel = get_domain_intelligence().get_intelligence(url)
+    strategy_engine = get_strategy_evolution_engine()
+    
+    # Phase 80: Autonomous Strategy Selection
+    recommended_strategy = strategy_engine.evolve_strategy(intel.domain)
+    logger.info("[Scraper] Selected strategy for %s: %s", url, recommended_strategy.value)
 
     # Phase 82: Build provenance tracker for this extraction
     provenance_builder = ProvenanceBuilder(url, intel.domain)
 
     fetch_success = False
+    classification = None
     js_render_delay = 0.0
-    fetch_method = preferred_fetch
+    fetch_method = recommended_strategy.value
     retry_count = 0
     try:
         fetch_start = time.time()
-        html, js_render_delay, fetch_method, retry_count = await fetch_page_content(url, preferred_method=preferred_fetch)
+        html, js_render_delay, fetch_method, retry_count = await fetch_page_content(
+            url, preferred_method=recommended_strategy
+        )
         fetch_ms = (time.time() - fetch_start) * 1000
         fetch_success = True
     except Exception as e:
         fetch_ms = (time.time() - start_time) * 1000
         logger.error("Failed to fetch %s: %s", url, e)
+        
+        # Record failure in strategy engine
+        strategy_engine.record_fetch_attempt(
+            intel.domain, recommended_strategy, success=False, 
+            time_ms=fetch_ms, failure_reason=type(e).__name__
+        )
+        
         provenance_builder.add_error(f"Fetch failed: {e}")
         # Classify the failure and update domain intelligence
         classification = classify_failure(
@@ -162,6 +179,14 @@ async def scrape_url(
     token_density = len(page_text) / max(1, dom_nodes)
 
     # ── Step 2-4: Extraction Cascade ──────────────────────────────
+    # Capture solidified_motifs count before extraction for telemetry
+    solidified_motifs_count = 0
+    if world_state and hasattr(world_state, 'solidified_motifs'):
+        try:
+            solidified_motifs_count = len(world_state.solidified_motifs)
+        except Exception:
+            pass
+
     ext_result = await orchestrate_extraction(
         url, html, schema_fields, min_record_score,
         provenance_builder=provenance_builder,
@@ -174,6 +199,68 @@ async def scrape_url(
     provenance_builder.set_memory_hit(ext_result.method == "memory")
     if ext_result.method == "regex":
         provenance_builder.add_fallback_step("regex")
+
+    # Phase 80: Record successful attempt and extraction quality
+    avg_score = 0.0
+    if results:
+        avg_score = sum(r.get("record_score", 0.0) for r in results) / len(results)
+    
+    strategy_engine.record_fetch_attempt(
+        intel.domain, recommended_strategy, success=True, 
+        time_ms=fetch_ms, quality=avg_score
+    )
+
+    # ── Autonomous Adaptation: Close Motif Feedback Loop ──────────
+    # Extract field co-occurrence motifs from results and feed back
+    # into world_state for improved future selector discovery.
+    new_motifs = []
+    if results and world_state:
+        feedback_engine = MotifFeedbackEngine()
+        new_motifs = feedback_engine.extract_motifs_from_results(results, schema_fields, min_cooccurrence=2)
+        if new_motifs:
+            # Merge new motifs with existing solidified motifs (dedup, keep latest)
+            existing = {tuple(sorted(m)) for m in world_state.solidified_motifs}
+            for m in new_motifs:
+                m_sorted = tuple(sorted(m))
+                if m_sorted not in existing:
+                    existing.add(m_sorted)
+                    # Append to world_state's internal motif list
+                    # Use the history state's setter to update solidified_motifs
+                    current = list(world_state.solidified_motifs)
+                    current.append(list(m_sorted))
+                    # Write back through history state's internal setter
+                    if hasattr(world_state, '_history'):
+                        world_state._history._set_val("solidified_motifs", current)
+            logger.info(
+                "[Scraper] Closed motif feedback loop: %d new motifs from %d results",
+                len(new_motifs), len(results),
+            )
+    elif results and not world_state:
+        logger.debug("[Scraper] No world_state available, skipping motif feedback")
+
+    # ── Crawl Orchestration: Feed Discovered Links ────────────────
+    # Extract all links from the page and add them to the crawl frontier
+    # for subsequent processing, completing the crawl orchestration loop.
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        discovered_links = []
+        for a_tag in soup.find_all("a", href=True):
+            href = a_tag["href"]
+            if href.startswith("http") and intel.domain in urlparse(href).netloc:
+                discovered_links.append(href)
+            elif href.startswith("/") or href.startswith("?"):
+                full_url = urljoin(url, href)
+                if intel.domain in urlparse(full_url).netloc:
+                    discovered_links.append(full_url)
+        
+        if discovered_links:
+            frontier = get_crawl_frontier()
+            added = await frontier.add_discovered_links(discovered_links, url, source_depth=0)
+            if added > 0:
+                logger.debug("[Scraper] Added %d/%d discovered links to frontier from %s",
+                            added, len(discovered_links), url)
+    except Exception as e:
+        logger.debug("[Scraper] Link discovery skipped for %s: %s", url, e)
 
     # ── Failure Classification & Regression Capture ────────────────
     # classification may have been set in except block above
@@ -276,11 +363,22 @@ async def scrape_url(
     results = enrich_records_with_provenance(results, provenance)
 
     # Build provenance summary for telemetry
-    provenance_summary = summarize_provenance(provenance)
-
     llm_calls = get_llm_call_count()
     # Very rough cost estimate: $0.01 per LLM call + browser time
     estimated_cost = (llm_calls * 0.01) + (fetch_ms / 1000.0 * 0.005)
+
+    # ── Regression Intelligence: Compute severity from classification ──
+    regression_severity = None
+    if classification:
+        from app.regression_capture import RegressionEntry
+        # Build a temporary entry to classify severity
+        temp_entry = RegressionEntry(
+            id="", url=url, domain=intel.domain,
+            failure_category=classification.category.value,
+            failure_confidence=classification.confidence,
+            captured_at=start_time,
+        )
+        regression_severity = get_regression_capture().classify_severity(temp_entry)
 
     telemetry.record(
         url=url,
@@ -304,7 +402,52 @@ async def scrape_url(
         selector_hit_rate=selector_hit_rate,
         confidence_map=confidence_map,
         failure_category=classification.category.value if classification else None,
+        regression_severity=regression_severity,
         extraction_method=ext_result.method,
+        motifs_generated=len(new_motifs) if new_motifs else 0,
+        motifs_used=solidified_motifs_count,
     )
+
+    # ── Predictive Adaptation: Record observations ────────────────────
+    # 1. Selector Decay Prediction: Track confidence trend
+    try:
+        decay_predictor = get_selector_decay_predictor()
+        decay_predictor.record_observation(intel.domain, selector_hit_rate)
+        
+        # Log prediction if decay risk is elevated
+        prediction = decay_predictor.predict_decay(intel.domain)
+        if prediction.risk_level in ("decaying", "critical"):
+            logger.info(
+                "[PredictiveAdaptation] %s decay risk=%.2f level=%s days_until_failure=%.1f",
+                intel.domain, prediction.decay_risk, prediction.risk_level,
+                prediction.days_until_failure,
+            )
+    except Exception as e:
+        logger.debug("[PredictiveAdaptation] Decay prediction failed: %s", e)
+    
+    # 2. Domain Evolution Model: Track mutations and anti-bot changes
+    try:
+        evolution_model = get_domain_evolution_model()
+        if ext_result.method == "regex":
+            # Regex fallback suggests selector drift → record mutation
+            evolution_model.record_mutation(intel.domain)
+        if anti_bot > 0.5:
+            # Anti-bot escalation detected
+            evolution_model.record_anti_bot_escalation(intel.domain, anti_bot)
+    except Exception as e:
+        logger.debug("[PredictiveAdaptation] Evolution modeling failed: %s", e)
+    
+    # 3. Self-Tuning Extraction: Feed telemetry for parameter adjustment
+    try:
+        tuning_controller = get_self_tuning_controller()
+        tuning_controller.record_telemetry(intel.domain, {
+            "fetch_ms": fetch_ms,
+            "error": classification.category.value if classification else None,
+            "failure_category": classification.category.value if classification else None,
+            "anti_bot_score": anti_bot,
+            "confidence_map": confidence_map,
+        })
+    except Exception as e:
+        logger.debug("[PredictiveAdaptation] Self-tuning failed: %s", e)
 
     return results

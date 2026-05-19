@@ -1,11 +1,15 @@
-from typing import List, Optional
+from __future__ import annotations
+from typing import List, Optional, TYPE_CHECKING
 from app.semantic_world_state import get_world_state
 from app.semantic_ir import SemanticType
+
+if TYPE_CHECKING:
+    from app.semantic_world_state import SemanticWorldState
 
 class TopologicalQuery:
     """Evaluates geometric and relational queries against the semantic field."""
     
-    def __init__(self, ws=None):
+    def __init__(self, ws: Optional[SemanticWorldState] = None):
         self.ws = ws or get_world_state()
 
     def find_roles_near(self, role_name: str, radius: float = 0.5) -> List[dict]:
@@ -77,5 +81,5 @@ class TopologicalQuery:
                 
         return {"error": f"Unknown TQL command: {cmd}"}
 
-def get_tql_engine(ws=None) -> TopologicalQuery:
+def get_tql_engine(ws: Optional[SemanticWorldState] = None) -> TopologicalQuery:
     return TopologicalQuery(ws=ws)

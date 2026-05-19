@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import time
 import logging
-from typing import List, Optional
+
 
 from app.models import SchemaField
 from app.html_utils import fetch_page_content
@@ -21,7 +21,6 @@ from app.scrape_telemetry import detect_anti_bot, estimate_dom_nodes
 from app.selector_memory import get_selector_memory
 from app.extraction_orchestrator import orchestrate_extraction
 from app.data_utils import process_raw_records
-from app.utils.quality import score_record_quality
 
 logger = logging.getLogger(__name__)
 

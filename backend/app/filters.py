@@ -6,7 +6,7 @@ Uses geopy (free OpenStreetMap Nominatim geocoder) for distance calculations.
 
 import logging
 import re
-from typing import Optional
+from typing import Any, Optional
 
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
@@ -60,7 +60,7 @@ def calculate_distance(
 # Type Coercion Engine
 # ──────────────────────────────────────────────
 
-def coerce_value(value, field_type: FieldType):
+def coerce_value(value: Any, field_type: FieldType):
     """
     Coerce a raw value to its declared type.
     e.g., "18 years old" → 18 (integer), "true" → True (boolean)

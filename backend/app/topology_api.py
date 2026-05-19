@@ -7,6 +7,7 @@ No subsystem should call topology_state.add() directly — use TopologyAPI inste
 import logging
 from typing import List, Set, Optional
 from app.core_types import FieldConflictRegion
+from app.topology_state import RegionSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ class TopologyAPI:
 
     # ─── Query Operations (read-only) ────────────────────────────────────
 
-    def find_region(self, token: str, roles: Set[str], domain: str = "") -> Optional[FieldConflictRegion]:
+    def find_region(self, token: str, roles: Set[str], domain: str = "") -> Optional[RegionSnapshot]:
         return self._topology.find(token, roles, domain)
 
     def region_count(self) -> int:

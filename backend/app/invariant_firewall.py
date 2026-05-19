@@ -8,7 +8,7 @@ from a pre-mutation snapshot.
 
 import functools
 import logging
-from typing import Optional
+from typing import Callable, Optional
 
 from app.field_validator import validate_world_state
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 _ROLLBACK_GUARD_ATTR = "_invariant_rollback_active"
 
 
-def requires_invariants(mutation_fn):
+def requires_invariants(mutation_fn: Callable):
     """Decorator that enforces field invariants around a mutation.
 
     Checks invariants before and after the mutation and rejects

@@ -13,7 +13,7 @@ Responsible for:
 from __future__ import annotations
 
 import logging
-from typing import Tuple, Dict, List, Optional
+from typing import Any, Tuple, Dict, List, Optional
 from collections import Counter
 
 from app.models import SchemaField
@@ -109,6 +109,90 @@ Use these patterns as hints: if you find one field from a group, look nearby for
 This can help with relative selector selection (e.g., if you find the price, the title might be a sibling or parent).
 """
         return context
+
+
+    @staticmethod
+    def extract_motifs_from_results(
+        results: List[Dict[str, Any]],
+        schema_fields: List[SchemaField],
+        min_cooccurrence: int = 2,
+    ) -> List[Tuple[str, ...]]:
+        """Extract field co-occurrence motifs from extraction results.
+        
+        Scans results for fields that frequently appear together and returns
+        them as solidified motifs that can be fed back into selector discovery.
+        
+        This CLOSES the autonomous adaptation loop:
+          extract → find co-occurring fields → solidify motifs → feed back → better extractions
+        
+        Args:
+            results: List of extracted record dicts
+            schema_fields: The target schema fields
+            min_cooccurrence: Minimum times a field pair must appear together
+            
+        Returns:
+            List of field name tuples representing solidified motifs
+        """
+        if not results:
+            return []
+        
+        from collections import Counter
+        
+        # Track which fields appear together per record
+        field_pairs: Counter = Counter()
+        for record in results:
+            # Find non-empty fields in this record
+            present_fields = []
+            for field in schema_fields:
+                val = record.get(field.name)
+                if val is not None and val != "" and val != []:
+                    present_fields.append(field.name)
+            
+            # Record all field pairs as co-occurrences
+            if len(present_fields) >= 2:
+                for i in range(len(present_fields)):
+                    for j in range(i + 1, len(present_fields)):
+                        pair = tuple(sorted([present_fields[i], present_fields[j]]))
+                        field_pairs[pair] += 1
+        
+        # Group field pairs into motifs: fields that co-occur frequently
+        # Fields that share many connections form a motif
+        field_connections: Dict[str, set] = {}
+        for (f1, f2), count in field_pairs.items():
+            if count >= min_cooccurrence:
+                field_connections.setdefault(f1, set()).add(f2)
+                field_connections.setdefault(f2, set()).add(f1)
+        
+        # Build motifs from connected components (greedy clustering)
+        assigned = set()
+        motifs: List[Tuple[str, ...]] = []
+        
+        for fname, neighbors in sorted(field_connections.items(), key=lambda x: -len(x[1])):
+            if fname in assigned:
+                continue
+            # Start a new motif with this field and its strongly connected neighbors
+            motif_fields = {fname}
+            for neighbor in neighbors:
+                if neighbor not in assigned:
+                    # Check if this neighbor is also connected to other motif members
+                    neighbor_neighbors = field_connections.get(neighbor, set())
+                    shared = motif_fields & neighbor_neighbors
+                    if len(shared) >= 1 or len(motif_fields) == 1:
+                        motif_fields.add(neighbor)
+            
+            if len(motif_fields) >= 2:
+                motif = tuple(sorted(motif_fields))
+                motifs.append(motif)
+                assigned.update(motif_fields)
+        
+        if motifs:
+            logger.info(
+                "Extracted %d motifs from %d results: %s",
+                len(motifs), len(results),
+                ["(" + ", ".join(m) + ")" for m in motifs],
+            )
+        
+        return motifs
 
 
 def get_motif_feedback_engine() -> MotifFeedbackEngine:

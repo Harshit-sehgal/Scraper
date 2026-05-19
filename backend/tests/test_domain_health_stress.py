@@ -9,10 +9,8 @@ Tests the domain health monitoring system under high load:
 """
 
 import pytest
-import time
 from app.domain_health_alerts import (
     DomainHealthMonitor,
-    DomainHealthLevel,
 )
 
 
@@ -115,7 +113,7 @@ class TestDomainHealthStress:
         monitor = DomainHealthMonitor()
         alert_count = 0
         
-        async def dummy_alert_handler(alert):
+        def dummy_alert_handler(alert):
             nonlocal alert_count
             alert_count += 1
         
@@ -158,7 +156,6 @@ class TestDomainHealthStress:
         domain = "https://degrading.com/"
         
         # Gradually degrade from 100% success to 10% success
-        success_rate = 100
         for i in range(100):
             # Decrease success rate by 1% every 10 attempts
             success = i % (100 - (i // 10)) == 0
