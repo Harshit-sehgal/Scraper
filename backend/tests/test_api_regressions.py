@@ -377,7 +377,7 @@ def test_run_job_source_breakdown_counts_final_records(monkeypatch):
             }
         ]
 
-    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent=""):
+    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent="", world_state=None):
         return [
             {"company_name": "A Studio", "record_score": 0.8},
             {"company_name": "B Studio", "record_score": 0.81},
@@ -416,7 +416,7 @@ def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch):
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
-    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent=""):
+    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent="", world_state=None):
         if "bad.example" in url:
             raise RuntimeError("synthetic scrape failure")
         return [{"company_name": "Working Source", "record_score": 0.9}]
@@ -449,7 +449,7 @@ def test_run_job_warns_when_contact_ai_coverage_zero_without_groq(monkeypatch):
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
-    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent=""):
+    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent="", world_state=None):
         return [{"company_name": "Studio Zero", "record_score": 0.91}]
 
     async def fake_generate_data_insight(rows):
@@ -483,7 +483,7 @@ def test_run_job_creates_logs(monkeypatch):
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
-    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent=""):
+    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent="", world_state=None):
         return [{"company_name": "Log Studio", "record_score": 0.9}]
 
     async def fake_generate_data_insight(rows):
@@ -515,7 +515,7 @@ def test_run_job_updates_progress(monkeypatch):
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
-    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent=""):
+    async def fake_scrape_url(url, schema_fields, min_record_score=0.35, user_intent="", world_state=None):
         return [{"company_name": "Progress Studio", "record_score": 0.9}]
 
     monkeypatch.setattr("app.services.job_runner.scrape_url", fake_scrape_url)

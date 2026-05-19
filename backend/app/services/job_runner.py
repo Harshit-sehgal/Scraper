@@ -150,7 +150,7 @@ async def run_job(
                 try:
                     reset_llm_call_count()
                     results = await asyncio.wait_for(
-                        scrape_url(url, job.schema_fields, min_record_score=job.min_record_score, user_intent=job.intent),
+                        scrape_url(url, job.schema_fields, min_record_score=job.min_record_score, user_intent=job.intent, world_state=ws),
                         timeout=per_url_scrape_timeout_seconds,
                     )
                     job.total_llm_calls += get_llm_call_count()

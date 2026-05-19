@@ -60,6 +60,7 @@ async def scrape_url(
     schema_fields: list[SchemaField],
     min_record_score: float | None = None,
     user_intent: str = "",
+    world_state=None,
 ) -> list[dict]:
     """Orchestrate the full extraction flow for a single URL."""
     if min_record_score is None:
@@ -164,6 +165,7 @@ async def scrape_url(
     ext_result = await orchestrate_extraction(
         url, html, schema_fields, min_record_score,
         provenance_builder=provenance_builder,
+        world_state=world_state,
     )
     results = ext_result.records
     

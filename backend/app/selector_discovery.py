@@ -15,6 +15,7 @@ from app.html_utils import clean_html_for_selectors
 from app.llm_bridge import llm_json
 from app.models import SchemaField
 from app.page_profiler import detect_page_structure, detect_value_patterns
+from app.motif_feedback import MotifFeedbackEngine
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +40,29 @@ def _analyze_page_data_type(html: str, schema_fields: list[SchemaField]) -> dict
     }
 
 
-def build_selector_prompt(html_snippet: str, schema_fields: list[SchemaField], page_analysis: dict | None = None) -> str:
-    """Construct the prompt for selector discovery via LLM."""
+def build_selector_prompt(html_snippet: str, schema_fields: list[SchemaField], page_analysis: dict | None = None, solidified_motifs: list | None = None) -> str:
+    """Construct the prompt for selector discovery via LLM.
+    
+    Args:
+        html_snippet: The HTML to extract from
+        schema_fields: Target schema fields
+        page_analysis: Optional page structure analysis
+        solidified_motifs: Optional learned structural patterns for autonomous adaptation
+    """
     page_analysis = page_analysis or {}
     
     structure_type = page_analysis.get("structure_type", "unknown")
     structure_confidence = page_analysis.get("structure_confidence", 0.0)
     headers = page_analysis.get("headers", [])
     patterns = page_analysis.get("patterns_detected", {})
+    
+    # Generate motif feedback context if available
+    motif_context = ""
+    if solidified_motifs:
+        feedback_engine = MotifFeedbackEngine()
+        motif_hint = feedback_engine.build_motif_context(solidified_motifs, schema_fields)
+        if motif_hint:
+            motif_context = "\n" + motif_hint + "\n"
     
     structure_context = f"""
 PAGE STRUCTURE DETECTED: {structure_type.upper()} (confidence: {structure_confidence:.2f})
@@ -80,7 +96,7 @@ PAGE STRUCTURE DETECTED: {structure_type.upper()} (confidence: {structure_confid
 Extract structured data from this HTML snippet.
 
 {structure_context}
-{header_context}
+{motif_context}{header_context}
 
 USER SCHEMA:
 {schema_str}
@@ -108,14 +124,21 @@ HTML SNIPPET:
 async def discover_selectors(
     html: str,
     schema_fields: list[SchemaField],
+    solidified_motifs: list | None = None,
 ) -> dict:
-    """Analyze page structure and map schema to CSS selectors via LLM."""
+    """Analyze page structure and map schema to CSS selectors via LLM.
+    
+    Args:
+        html: Page HTML content
+        schema_fields: Target schema fields to extract
+        solidified_motifs: Optional learned structural patterns for autonomous adaptation
+    """
     # 1. Analyze page structure
     page_analysis = _analyze_page_data_type(html, schema_fields)
 
     # 2. Map schema to CSS selectors via LLM
     html_snippet = clean_html_for_selectors(html)
-    prompt = build_selector_prompt(html_snippet, schema_fields, page_analysis)
+    prompt = build_selector_prompt(html_snippet, schema_fields, page_analysis, solidified_motifs)
 
     def _sync_call():
         return llm_json(messages=[

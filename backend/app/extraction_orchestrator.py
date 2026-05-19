@@ -46,6 +46,7 @@ async def orchestrate_extraction(
     schema_fields: list[SchemaField],
     min_record_score: float,
     provenance_builder: ProvenanceBuilder | None = None,
+    world_state=None,
 ) -> ExtractionResult:
     """Cascade through extraction methods until high-quality data is found.
 
@@ -118,7 +119,15 @@ async def orchestrate_extraction(
 
     # ── Layer 3: LLM Discovery ─────────────────────────────────────────
     logger.info("[Orchestrator] Initiating LLM discovery for %s", url)
-    discovered_selectors = await discover_selectors(html, schema_fields)
+    
+    # Get learned motifs if world_state is available
+    solidified_motifs = None
+    if world_state:
+        solidified_motifs = world_state.solidified_motifs
+        if solidified_motifs:
+            logger.info("[Orchestrator] Using %d learned motifs for discovery guidance", len(solidified_motifs))
+    
+    discovered_selectors = await discover_selectors(html, schema_fields, solidified_motifs=solidified_motifs)
     
     if discovered_selectors and discovered_selectors.get("item_container"):
         # Phase 81: Semantic Alignment Pass
