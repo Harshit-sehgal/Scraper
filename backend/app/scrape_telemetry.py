@@ -102,6 +102,20 @@ class ScrapeTelemetryCollector:
         """Get the N most recent telemetry snapshots."""
         return [t.to_dict() for t in self._history[-n:]]
 
+    def get_confidence_histogram(self, n: int = 100) -> dict[str, int]:
+        """Return a histogram of extraction confidence scores from recent history."""
+        # 10 buckets: 0.0-0.1, 0.1-0.2, ... 0.9-1.0
+        bins = [0] * 10
+        recent = self._history[-n:]
+        for t in recent:
+            if not t.confidence_map:
+                continue
+            score = t.confidence_map.get("overall_avg", 0.0)
+            idx = min(9, int(score * 10))
+            bins[idx] += 1
+            
+        return {f"{i/10:.1f}-{i/10+0.1:.1f}": count for i, count in enumerate(bins)}
+
     def clear(self) -> None:
         self._history.clear()
 

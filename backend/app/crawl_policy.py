@@ -153,6 +153,25 @@ class CrawlPolicyEngine:
             "robots_checked": state.robots_checked,
         }
 
+    def get_domain_health_score(self, domain: str) -> float:
+        """Calculate a health score [0, 1] for a domain based on recent successes/failures."""
+        state = self._domains.get(domain)
+        if not state or state.total_fetches == 0:
+            return 1.0
+        
+        # Linear penalty for consecutive failures
+        failure_penalty = (state.consecutive_failures / self._max_retries) * 0.8
+        
+        # Simple success ratio component
+        # Note: we don't track total successes explicitly, but we can infer it
+        # for a better metric we might want to track windowed success rate
+        
+        score = 1.0 - failure_penalty
+        if time.time() < state.cooldown_until:
+            score *= 0.2 # Severely penalized if in cooldown
+            
+        return round(max(0.0, score), 2)
+
     def get_all_domain_states(self) -> dict[str, dict]:
         """Get states for all tracked domains."""
         states = {

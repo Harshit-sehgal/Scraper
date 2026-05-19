@@ -119,10 +119,13 @@ function setupControls() {
 
 async function updateLoop() {
     try {
-        const [topology, observability, history] = await Promise.all([
+        const [topology, observability, history, scraperStats, browserStats, memoryStats] = await Promise.all([
             fetch(`${API_BASE}/topology`).then(r => r.json()),
             fetch(`${API_BASE}/observability`).then(r => r.json()),
-            fetch(`${API_BASE}/history/topology`).then(r => r.json())
+            fetch(`${API_BASE}/history/topology`).then(r => r.json()),
+            fetch(`/api/scraper/stats`).then(r => r.json()),
+            fetch(`/api/scraper/browser`).then(r => r.json()),
+            fetch(`/api/scraper/memory`).then(r => r.json())
         ]);
 
         // Update Timeline
@@ -131,7 +134,7 @@ async function updateLoop() {
         scrubber.max = Math.max(0, topologyHistory.length - 1);
         
         if (isLiveMode) {
-            updateMetrics(topology.metrics, observability.health_index, topology.meso_clusters, topology.macro_continents);
+            updateMetrics(topology.metrics, observability.health_index, topology.meso_clusters, topology.macro_continents, scraperStats, browserStats, memoryStats);
             renderTopology(topology.field_regions, topology.global_communities, topology.topology_edges, topology.meso_clusters, topology.macro_continents);
             updateTelemetry(observability.telemetry);
             updateCharts(topology.metrics, topology.global_communities, topology.drift_logs);
@@ -146,7 +149,7 @@ async function updateLoop() {
     }
 }
 
-function updateMetrics(m, health, mesoClusters, macroContinents) {
+function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, browserStats, memoryStats) {
     document.getElementById('metric-pressure').innerText = Number(m.field_pressure || 0).toFixed(3);
     document.getElementById('metric-energy').innerText = Number(m.global_energy || 0).toFixed(3);
     document.getElementById('metric-entropy').innerText = Number(m.global_entropy || 0).toFixed(3);
@@ -154,6 +157,20 @@ function updateMetrics(m, health, mesoClusters, macroContinents) {
     document.getElementById('metric-regions').innerText = Number(m.region_count || 0);
     document.getElementById('metric-meso-count').innerText = Number(mesoClusters ? mesoClusters.length : 0);
     document.getElementById('metric-macro-count').innerText = Number(macroContinents ? macroContinents.length : 0);
+    document.getElementById('metric-health').innerText = Number(health || 0).toFixed(2);
+
+    // Scraper Phase 78 Metrics
+    if (browserStats) {
+        document.getElementById('metric-browser-contexts').innerText = browserStats.active_contexts || 0;
+        document.getElementById('metric-browser-reuse').innerText = `Reuse Rate: ${((browserStats.context_reuse_rate || 0) * 100).toFixed(0)}%`;
+    }
+    if (scraperStats) {
+        document.getElementById('metric-latency').innerText = `${(scraperStats.recent_latency_avg || 0).toFixed(0)}ms`;
+        document.getElementById('metric-success-rate').innerText = `${((scraperStats.recent_success_rate || 0) * 100).toFixed(0)}%`;
+    }
+    if (memoryStats) {
+        document.getElementById('metric-memory-domains').innerText = memoryStats.domain_count || 0;
+    }
 
     // Style energy balance based on conservation status
     const balanceEl = document.getElementById('metric-energy-balance');

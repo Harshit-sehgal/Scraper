@@ -98,6 +98,30 @@
             </div>
         </div>
 
+        <!-- Scraper Health & Operations (Phase 78) -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Browser Pool</h3>
+                <div id="metric-browser-contexts" class="metric-value">0</div>
+                <div id="metric-browser-reuse" class="text-[10px] text-gray-600 mt-1 uppercase">Reuse Rate: 0%</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Fetch Latency</h3>
+                <div id="metric-latency" class="metric-value">0ms</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Recent Avg (10)</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Success Rate</h3>
+                <div id="metric-success-rate" class="metric-value">100%</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Adaptive Recovery active</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Memory Size</h3>
+                <div id="metric-memory-domains" class="metric-value">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Learned Domains</div>
+            </div>
+        </div>
+
         <!-- Main Visualization Area -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
             <!-- Topology Map -->

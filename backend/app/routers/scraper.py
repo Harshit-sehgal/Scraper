@@ -62,6 +62,32 @@ async def get_browser_stats():
     return get_browser_pool().get_metrics()
 
 
+@router.get("/health")
+async def get_all_domains_health():
+    """Return health scores for all tracked domains."""
+    from app.crawl_policy import get_crawl_policy
+    policy = get_crawl_policy()
+    states = policy.get_all_domain_states()
+    
+    health = {}
+    for domain in states:
+        if domain.startswith("_"): continue
+        health[domain] = policy.get_domain_health_score(domain)
+        
+    return health
+
+
+@router.get("/stats")
+async def get_scraper_stats():
+    """Return aggregated scraper performance statistics."""
+    telemetry = get_scrape_telemetry()
+    return {
+        "confidence_histogram": telemetry.get_confidence_histogram(),
+        "recent_latency_avg": sum(t["fetch_ms"] for t in telemetry.get_recent(10)) / 10 if telemetry._history else 0,
+        "recent_success_rate": sum(1 for t in telemetry.get_recent(20) if not t["fallback_triggered"]) / 20 if telemetry._history else 1.0,
+    }
+
+
 @router.delete("/telemetry")
 async def clear_telemetry():
     """Clear all scrape telemetry history."""
