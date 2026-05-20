@@ -180,6 +180,7 @@ class TestReplayBuffer:
         idx = buf.append({"type": "second", "delta": {}, "metadata": {}})
         assert idx == 0  # Should reset after clear
         entry = buf.get_entry(0)
+        assert entry is not None
         assert entry["type"] == "second"
         buf.clear()
 

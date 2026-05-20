@@ -133,12 +133,12 @@ def test_contradiction_pressure_triggers_restructuring():
     ]
 
     try:
-        ws._topology.restructure_topology = tracked_restructure
+        ws._topology.restructure_topology = tracked_restructure  # type: ignore[method-assign]
         ws.observe_field_perturbation(output, tokens)
         # Contradiction pressure should have triggered restructuring
         assert was_restructured[0], "restructure_topology should have been called under high contradiction pressure"
     finally:
-        ws._topology.restructure_topology = original
+        ws._topology.restructure_topology = original  # type: ignore[method-assign]
 
 
 def test_contradiction_pressure_low_does_not_restructure():
@@ -174,14 +174,14 @@ def test_contradiction_pressure_low_does_not_restructure():
     ]
 
     try:
-        ws._topology.restructure_topology = tracked_restructure
+        ws._topology.restructure_topology = tracked_restructure  # type: ignore[method-assign]
         # contradiction_pressure = (1 + 1) / 4 = 0.5, but field_pressure 0.3 < 0.5
         # So threshold (contradiction_pressure > 0.3 AND field_pressure > 0.5) is NOT met
         ws.observe_field_perturbation(output, tokens)
         # Verify restructuring was NOT triggered
         assert not was_restructured[0], "restructure_topology should NOT have been called under low pressure"
     finally:
-        ws._topology.restructure_topology = original
+        ws._topology.restructure_topology = original  # type: ignore[method-assign]
 
     # Verify observable outcome — exclusion was still learned
     key = ("destination", "origin")

@@ -103,9 +103,11 @@ async def test_domain_crawl_limit():
         
         # Get next URL, mark completed to increment domain crawl count
         url1 = await frontier.get_next_url()
+        assert url1 is not None
         await frontier.mark_completed(url1, success=True)
         
         url2 = await frontier.get_next_url()
+        assert url2 is not None
         await frontier.mark_completed(url2, success=True)
         
         # Verify that domain capillary count is 2

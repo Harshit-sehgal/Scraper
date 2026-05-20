@@ -151,8 +151,8 @@ def start_server():
 
 async def run_benchmarks():
     fields = [
-        SchemaField(name="item_name", field_type=FieldType.STRING, required=True),
-        SchemaField(name="price", field_type=FieldType.CURRENCY),
+        SchemaField(name="item_name", field_type=FieldType.STRING, description="", required=True),
+        SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
     ]
     
     base_url = "http://127.0.0.1:8888"

@@ -9,7 +9,7 @@ from enrich_chennai_leads import (
 def test_infer_enrichment_context_from_filename():
     # Test UK / London inference from filename
     input_file = Path("/home/user/workspace/london_interior_designers_cleaned.json")
-    records = []
+    records: list = []
     ctx = infer_enrichment_context(input_file, records)
     
     assert ctx.city == "London"

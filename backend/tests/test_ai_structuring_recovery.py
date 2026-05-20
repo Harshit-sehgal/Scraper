@@ -7,8 +7,8 @@ from app.models import FieldType, SchemaField
 
 def test_ai_clean_and_align_records_recovers_after_fast_empty(monkeypatch):
     schema = [
-        SchemaField(name="company_name", field_type=FieldType.STRING, required=True),
-        SchemaField(name="phone", field_type=FieldType.PHONE, required=False),
+        SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True),
+        SchemaField(name="phone", field_type=FieldType.PHONE, description="", required=False),
     ]
     records = [{"company_name": "Acme Interiors", "phone": None}]
 
@@ -31,7 +31,7 @@ def test_ai_clean_and_align_records_recovers_after_fast_empty(monkeypatch):
 
 
 def test_ai_clean_and_align_records_honors_consecutive_failure_threshold(monkeypatch):
-    schema = [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)]
+    schema = [SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True)]
     records = [
         {"company_name": "A"},
         {"company_name": "B"},

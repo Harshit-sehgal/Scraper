@@ -79,6 +79,7 @@ def test_topology_transaction_rollback():
             ws._topology.set_region_instability(rid, 0.9)
             # Staged value should be 0.9
             staged = ws._topology.get_view().find_by_token_and_roles("test", ("role_a",))
+            assert staged is not None
             assert staged.instability == 0.9
             raise ValueError("Rollback")
     except ValueError:
@@ -86,6 +87,7 @@ def test_topology_transaction_rollback():
         
     # After rollback, value should be 0.5
     committed = ws._topology.get_view().find_by_token_and_roles("test", ("role_a",))
+    assert committed is not None
     assert committed.instability == 0.5
 
 def test_topology_addition_rollback():

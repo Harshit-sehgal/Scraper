@@ -249,7 +249,7 @@ def test_auto_discovery_empty_with_cancel_marks_canceled(monkeypatch):
         name="job-cancel-empty-discovery",
         mode=ScrapeMode.AUTO,
         topic="interior designers chennai",
-        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True)],
         cancel_requested=True,
     )
     main_mod.jobs_store[job.id] = job
@@ -278,7 +278,7 @@ def test_auto_discovery_empty_marks_failed_with_terminal_time(monkeypatch):
         name="job-fail-empty-discovery",
         mode=ScrapeMode.AUTO,
         topic="interior designers chennai",
-        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True)],
         cancel_requested=False,
     )
     main_mod.jobs_store[job.id] = job
@@ -345,7 +345,7 @@ def test_export_csv_sanitizes_filename_header(client):
         id="export-job",
         name='bad/name "x"',
         status=JobStatus.COMPLETED,
-        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True)],
         results=[{"company_name": "Acme"}],
         total_records=1,
         filtered_records=1,
@@ -397,7 +397,7 @@ def test_run_job_source_breakdown_counts_final_records(monkeypatch):
         name="job-source-breakdown-record-count",
         mode=ScrapeMode.AUTO,
         topic="interior designers chennai",
-        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True)],
         max_pages=1,
     )
     main_mod.jobs_store[job.id] = job
@@ -433,7 +433,7 @@ def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch):
         name="job-warnings-on-scrape-failure",
         mode=ScrapeMode.MANUAL,
         urls=["https://bad.example", "https://ok.example"],
-        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True)],
     )
     main_mod.jobs_store[job.id] = job
 
@@ -466,8 +466,8 @@ def test_run_job_warns_when_contact_ai_coverage_zero_without_groq(monkeypatch):
         mode=ScrapeMode.MANUAL,
         urls=["https://ok.example"],
         schema_fields=[
-            SchemaField(name="company_name", field_type=FieldType.STRING, required=True),
-            SchemaField(name="email", field_type=FieldType.EMAIL, required=False),
+            SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True),
+            SchemaField(name="email", field_type=FieldType.EMAIL, description="", required=False),
         ],
     )
     main_mod.jobs_store[job.id] = job
@@ -498,7 +498,7 @@ def test_run_job_creates_logs(monkeypatch):
         name="job-log-test",
         mode=ScrapeMode.MANUAL,
         urls=["https://log.example"],
-        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True)],
     )
     main_mod.jobs_store[job.id] = job
 
@@ -527,7 +527,7 @@ def test_run_job_updates_progress(monkeypatch):
         name="job-progress-test",
         mode=ScrapeMode.MANUAL,
         urls=["https://p1.example", "https://p2.example"],
-        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True)],
     )
     main_mod.jobs_store[job.id] = job
 

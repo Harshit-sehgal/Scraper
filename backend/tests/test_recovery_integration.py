@@ -140,6 +140,7 @@ class TestDomainHealthMonitor:
             monitor.record_attempt(f"https://healthy.com/page{i}", success=True)
         
         health = monitor.get_domain_health("https://healthy.com/any")
+        assert health is not None
         assert health["health_level"] == "healthy"
         assert health["health_score"] >= 0.8
     
@@ -156,6 +157,7 @@ class TestDomainHealthMonitor:
             monitor.record_attempt(f"https://degrading.com/page{i}", success=False)
         
         health = monitor.get_domain_health("https://degrading.com/any")
+        assert health is not None
         assert health["degradation_trend"] > 0.0  # Positive trend = degrading
         assert health["health_level"] in ["degrading", "unhealthy"]
     
@@ -170,8 +172,9 @@ class TestDomainHealthMonitor:
             monitor.record_attempt(f"https://test.com/page{i}", success=True)
         
         health = monitor.get_domain_health("https://test.com/any")
+        assert health is not None
         # Clustered failures = lower consistency (more predictable failure pattern)
-        assert "consistency_score" in health or health is not None
+        assert "consistency_score" in health
     
     def test_critical_health_threshold(self):
         """Test critical health status."""
@@ -184,6 +187,7 @@ class TestDomainHealthMonitor:
             monitor.record_attempt(f"https://critical.com/page{i}", success=True)
         
         health = monitor.get_domain_health("https://critical.com/any")
+        assert health is not None
         assert health["health_level"] in ["unhealthy", "critical"]
     
     def test_system_wide_health_summary(self):
@@ -305,7 +309,7 @@ class TestRecoveryHandlers:
         from app.recovery_handlers import handle_backoff_and_slow
         
         params = {"delay_ms": 100}  # Short delay for testing
-        context = {}
+        context: dict = {}
         
         import time
         start = time.time()

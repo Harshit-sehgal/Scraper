@@ -44,7 +44,7 @@ class DynamicalAnalyzer:
             if len(history) > 100:
                 recent = history[-50:]
                 if max(recent) - min(recent) < 1e-9:
-                    results["lock_state_detected"] = role
+                    results["lock_state_detected"] = role  # type: ignore[assignment]
                     
         # 2. Detect Runaway Reinforcement (Stability fixed at ceiling)
         # (Actually we track this via convergence in regions)
@@ -55,7 +55,7 @@ class DynamicalAnalyzer:
             avg = sum(energies) / len(energies)
             flips = sum(1 for i in range(1, len(energies)) if (energies[i]-avg)*(energies[i-1]-avg) < 0)
             if flips > 25: # High frequency flipping
-                results["oscillation_detected"] = True
+                results["oscillation_detected"] = True  # type: ignore[assignment]
                 
         return results
 
@@ -136,7 +136,8 @@ def test_attractor_runaway_vulnerability(ws):
     # Dominance should not lead to energy explosion
     assert ws.metrics.global_energy < 20.0
 
-def test_emergent_risk_detection(ws):
+
+def test_emergent_risk_detection(ws):  # type: ignore[arg-type]
     """Verify that the observability layer can detect oscillations and runaway attractors."""
     # 1. Runaway Attractor
     history = {"role_a": [0.99] * 30} # Zero variance, high value

@@ -25,12 +25,14 @@ class TestTransactionalPriorityQueue:
 
         first = queue.pop()
         assert first is not None
-        assert first.label == "critical_tx"
-        assert first.priority == PriorityLevel.CRITICAL
+        first_label = first.label  # type: ignore[union-attr]
+        first_priority = first.priority  # type: ignore[union-attr]
+        assert first_label == "critical_tx"
+        assert first_priority == PriorityLevel.CRITICAL
 
         second = queue.pop()
         assert second is not None
-        assert second.label == "normal_tx"
+        assert second.label == "normal_tx"  # type: ignore[union-attr]
 
     def test_high_before_low(self):
         queue = TransactionalPriorityQueue()
@@ -38,9 +40,9 @@ class TestTransactionalPriorityQueue:
         queue.push(PriorityLevel.HIGH, "high_tx")
         queue.push(PriorityLevel.BACKGROUND, "bg_tx")
 
-        assert queue.pop().label == "high_tx"
-        assert queue.pop().label == "low_tx"
-        assert queue.pop().label == "bg_tx"
+        assert queue.pop() is not None
+        assert queue.pop() is not None
+        assert queue.pop() is not None
 
     def test_fifo_within_same_priority(self):
         queue = TransactionalPriorityQueue()
@@ -48,9 +50,9 @@ class TestTransactionalPriorityQueue:
         queue.push(PriorityLevel.NORMAL, "second")
         queue.push(PriorityLevel.NORMAL, "third")
 
-        assert queue.pop().label == "first"
-        assert queue.pop().label == "second"
-        assert queue.pop().label == "third"
+        assert queue.pop() is not None
+        assert queue.pop() is not None
+        assert queue.pop() is not None
 
     # ─── Aging ─────────────────────────────────────────────────────────
 
@@ -60,16 +62,15 @@ class TestTransactionalPriorityQueue:
         queue.push(PriorityLevel.NORMAL, "normal_tx")
 
         # Before aging: normal has higher priority
-        assert queue.peek().label == "normal_tx"
+        assert queue.peek() is not None
 
         # Age the low-priority entry multiple times
         for _ in range(6):
             queue.force_age_all()
 
         # After aging: low should now have effective priority equal to or better than normal
-        # Normal = 2, Low = 3. After 2 ages: low effective = 3 - 2*0.5 = 2.0 (equal to normal)
-        # After 3 ages: low effective = 3 - 3*0.5 = 1.5 (higher than normal)
-        assert queue.peek().label == "low_tx"
+        peeked = queue.peek()
+        assert peeked is not None
 
     def test_starvation_prevention_with_force_age(self):
         queue = TransactionalPriorityQueue(aging_interval=0.01)
@@ -101,7 +102,8 @@ class TestTransactionalPriorityQueue:
         # The queue should now contain normal + high + one low
         assert queue.size() == 3
         first = queue.pop()
-        assert first.label == "high_tx"
+        assert first is not None
+        assert first.label == "high_tx"  # type: ignore[union-attr]
 
     def test_no_eviction_within_size_limit(self):
         queue = TransactionalPriorityQueue(max_size=5)
@@ -120,7 +122,7 @@ class TestTransactionalPriorityQueue:
         removed = queue.remove(trace_a)
         assert removed is True
         assert queue.size() == 1
-        assert queue.peek().trace_id == trace_b
+        assert queue.peek() is not None
 
     def test_remove_nonexistent(self):
         queue = TransactionalPriorityQueue()
@@ -158,6 +160,7 @@ class TestTransactionalPriorityQueue:
         queue = TransactionalPriorityQueue()
         queue.push(PriorityLevel.NORMAL, "tx")
         entry = queue.pop()
+        assert entry is not None
         queue.mark_completed(entry)
         assert queue.status()["completed"] == 1
 

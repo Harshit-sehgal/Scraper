@@ -27,7 +27,7 @@ def _clean_engine():
 
 
 def test_pipeline_none_input():
-    assert run_pipeline(None, ["name"]) == []
+    assert run_pipeline(None, ["name"]) == []  # type: ignore[arg-type]
 
 
 def test_pipeline_empty_input():
@@ -193,7 +193,7 @@ def test_role_engine_persistent_cache():
 
 
 def test_strip_metadata_none():
-    assert strip_metadata(None) == []
+    assert strip_metadata(None) == []  # type: ignore[arg-type]
 
 
 def test_strip_metadata_removes_fields():
@@ -204,7 +204,7 @@ def test_strip_metadata_removes_fields():
 
 
 def test_filter_noise_none():
-    assert filter_noise_records(None) == []
+    assert filter_noise_records(None) == []  # type: ignore[arg-type]
 
 
 def test_detect_price_with_symbol():

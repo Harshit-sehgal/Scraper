@@ -51,7 +51,7 @@ class TestDomainHealthStress:
         health = monitor.get_domain_health(f"{domain}any")
         
         assert health is not None
-        assert health["success_rate"] == pytest.approx(0.5, 0.1)
+        assert health["success_rate"] == pytest.approx(0.5, 0.1)  # type: ignore[index]
     
     def test_extreme_failure_rate(self):
         """Test monitoring of domain with extreme failure rate."""
@@ -66,8 +66,8 @@ class TestDomainHealthStress:
         health = monitor.get_domain_health(f"{domain}any")
         
         assert health is not None
-        assert health["health_level"] == "blacklisted"  # Should be blacklisted
-        assert health["success_rate"] == pytest.approx(0.05, 0.01)
+        assert health["health_level"] == "blacklisted"  # type: ignore[index]  # Should be blacklisted
+        assert health["success_rate"] == pytest.approx(0.05, 0.01)  # type: ignore[index]
     
     def test_recovery_from_critical(self):
         """Test recovery from critical state to healthy."""
@@ -79,6 +79,7 @@ class TestDomainHealthStress:
             monitor.record_attempt(f"{domain}page{i}", success=False)
         
         health_critical = monitor.get_domain_health(f"{domain}any")
+        assert health_critical is not None
         assert health_critical["health_level"] in ["critical", "unhealthy", "blacklisted"]
         
         # Then recover (many successes)
@@ -86,6 +87,7 @@ class TestDomainHealthStress:
             monitor.record_attempt(f"{domain}page{i}", success=True)
         
         health_recovered = monitor.get_domain_health(f"{domain}any")
+        assert health_recovered is not None
         assert health_recovered["health_score"] > health_critical["health_score"]
     
     def test_long_tail_domain_pattern(self):
@@ -148,6 +150,7 @@ class TestDomainHealthStress:
         health = monitor.get_domain_health(f"{domain}any")
         
         # High variance (clustered failures) = lower consistency
+        assert health is not None
         assert health["consistency_score"] < 1.0
     
     def test_trend_detection_gradual_degradation(self):
@@ -240,7 +243,7 @@ class TestHealthMetricsEdgeCases:
         
         health = monitor.get_domain_health("https://single.com/any")
         assert health is not None
-        assert health["success_rate"] == 1.0  # Single success
+        assert health["success_rate"] == 1.0  # type: ignore[index]  # Single success
     
     def test_100_percent_failure_domain(self):
         """Test domain with 100% failure rate."""
@@ -251,6 +254,7 @@ class TestHealthMetricsEdgeCases:
             monitor.record_attempt(f"{domain}page{i}", success=False)
         
         health = monitor.get_domain_health(f"{domain}any")
+        assert health is not None
         assert health["success_rate"] == 0.0
         assert health["health_level"] == "blacklisted"
     
@@ -263,6 +267,7 @@ class TestHealthMetricsEdgeCases:
             monitor.record_attempt(f"{domain}page{i}", success=True)
         
         health = monitor.get_domain_health(f"{domain}any")
+        assert health is not None
         assert health["success_rate"] == 1.0
         assert health["health_level"] == "healthy"
     
@@ -277,7 +282,3 @@ class TestHealthMetricsEdgeCases:
         assert health is not None
         assert health["success_rate"] == 1.0
         assert health["health_level"] == "healthy"
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

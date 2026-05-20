@@ -10,6 +10,8 @@ from app import scraper as scraper_mod
 from app.intent_parser import parse_user_intent
 from app.models import FieldType, SchemaField
 from app.page_profiler import detect_page_structure, detect_value_patterns
+from app.html_utils import clean_html_for_selectors
+from app.selector_engine import extract_with_regex
 from app.semantic_mapper import match_values_to_intent
 from app.semantic_segmentation import StructuralMemoryTracker, expand_composite_records
 
@@ -22,16 +24,16 @@ async def debug_flight_scrape():
     )
 
     schema = [
-        SchemaField(name="origin", field_type=FieldType.STRING, required=True),
-        SchemaField(name="destination", field_type=FieldType.STRING, required=True),
-        SchemaField(name="date", field_type=FieldType.DATE, required=False),
-        SchemaField(name="price", field_type=FieldType.CURRENCY, required=True),
-        SchemaField(name="stops", field_type=FieldType.STRING, required=False),
+        SchemaField(name="origin", field_type=FieldType.STRING, description="", required=True),
+        SchemaField(name="destination", field_type=FieldType.STRING, description="", required=True),
+        SchemaField(name="date", field_type=FieldType.DATE, description="", required=False),
+        SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=True),
+        SchemaField(name="stops", field_type=FieldType.STRING, description="", required=False),
     ]
 
     # Step 1: Fetch
-    html = await scraper_mod.fetch_page_content(url)
-    print(f"Step 1: Fetched {len(html)} chars")
+    html, js_render_delay, fetch_method, retry_count = await scraper_mod.fetch_page_content(url)
+    print(f"Step 1: Fetched {len(html)} chars (method={fetch_method}, delay={js_render_delay:.0f}ms, retries={retry_count})")
 
     # Step 2: Profile
     intent = parse_user_intent("flights from London to Paris")
@@ -40,8 +42,8 @@ async def debug_flight_scrape():
     print(f"Step 2: Structure={profile.structure_type}, headers={profile.headers[:3]}")
 
     # Step 3: Extract (fallback to regex since no selector)
-    scraper_mod.clean_html_for_selectors(html, max_chars=12000)
-    results = scraper_mod.extract_with_regex(html, schema)
+    clean_html_for_selectors(html, max_chars=12000)
+    results = extract_with_regex(html, schema)
     print(f"Step 3: Regex extracted {len(results)} raw records")
     if results:
         print(f"  Sample record keys: {list(results[0].keys())}")

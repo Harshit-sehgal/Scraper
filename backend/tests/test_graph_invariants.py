@@ -21,8 +21,8 @@ def test_world_state_round_trip_preserves_structure():
     ws._instability.set_exclusion(tuple(sorted(["origin", "destination"])), 0.9)
     ws._motif._motif_counts[tuple(sorted(["A", "B"]))] = 5
     ws._motif._motif_timestamps[tuple(sorted(["A", "B"]))] = 42
-    ws._topology.get_cohesion_merge_success()[tuple(sorted(["a", "b"]))] = 3.0
-    ws._topology.get_cohesion_merge_attempts()[tuple(sorted(["a", "b"]))] = 5.0
+    ws._topology.get_cohesion_merge_success()[tuple(sorted(["a", "b"]))] = 3.0  # type: ignore[index]
+    ws._topology.get_cohesion_merge_attempts()[tuple(sorted(["a", "b"]))] = 5.0  # type: ignore[index]
 
     data = ws.to_dict()
     ws2 = SemanticWorldState()

@@ -6,6 +6,7 @@ without requiring live network or LLM calls.
 """
 
 from pathlib import Path
+from typing import Any, cast
 from app.models import FieldType, SchemaField
 from app.selector_engine import extract_with_regex, apply_selectors
 
@@ -18,12 +19,12 @@ def load_fixture(name: str) -> str:
 def test_travel_site_regex_extraction():
     html = load_fixture("travel_site.html")
     fields = [
-        SchemaField(name="airline", field_type=FieldType.STRING),
-        SchemaField(name="price", field_type=FieldType.CURRENCY),
+        SchemaField(name="airline", field_type=FieldType.STRING, description="", required=False),
+        SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
     ]
     
     # Regex fallback should find the two flight cards
-    results = extract_with_regex(html, fields)
+    results = cast("list[dict[str, Any]]", extract_with_regex(html, fields))
     
     assert len(results) >= 2
     # Verify content
@@ -31,18 +32,18 @@ def test_travel_site_regex_extraction():
     assert "British Airways" in airlines
     assert "Air France" in airlines
     
-    prices = [r.get("price") for r in results]
+    prices = [r.get("price") for r in results]  # type: ignore[union-attr,call-overload]
     assert "245.50" in prices or "£245.50" in prices
 
 def test_legacy_directory_regex_extraction():
     html = load_fixture("legacy_directory.html")
     fields = [
-        SchemaField(name="company", field_type=FieldType.STRING),
-        SchemaField(name="phone", field_type=FieldType.PHONE),
-        SchemaField(name="website", field_type=FieldType.URL),
+        SchemaField(name="company", field_type=FieldType.STRING, description="", required=False),
+        SchemaField(name="phone", field_type=FieldType.PHONE, description="", required=False),
+        SchemaField(name="website", field_type=FieldType.URL, description="", required=False),
     ]
     
-    results = extract_with_regex(html, fields)
+    results = cast("list[dict[str, Any]]", extract_with_regex(html, fields))
     
     assert len(results) == 3
     companies = [r.get("company") for r in results]
@@ -58,11 +59,11 @@ def test_legacy_directory_regex_extraction():
 def test_messy_blog_regex_extraction():
     html = load_fixture("messy_blog.html")
     fields = [
-        SchemaField(name="title", field_type=FieldType.STRING),
-        SchemaField(name="author", field_type=FieldType.STRING),
+        SchemaField(name="title", field_type=FieldType.STRING, description="", required=False),
+        SchemaField(name="author", field_type=FieldType.STRING, description="", required=False),
     ]
     
-    results = extract_with_regex(html, fields)
+    results = cast("list[dict[str, Any]]", extract_with_regex(html, fields))
     
     # Should ignore the ad banner and newsletter
     assert len(results) == 2
@@ -73,8 +74,8 @@ def test_messy_blog_regex_extraction():
 def test_selector_application_precision():
     html = load_fixture("travel_site.html")
     fields = [
-        SchemaField(name="airline", field_type=FieldType.STRING),
-        SchemaField(name="price", field_type=FieldType.CURRENCY),
+        SchemaField(name="airline", field_type=FieldType.STRING, description="", required=False),
+        SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
     ]
     
     # Simulate an LLM-generated selector map
@@ -86,7 +87,7 @@ def test_selector_application_precision():
         }
     }
     
-    results = apply_selectors(html, selectors, fields)
+    results = cast("list[dict[str, Any]]", apply_selectors(html, selectors, fields))
     
     assert len(results) == 2
     assert results[0]["airline"] == "British Airways"

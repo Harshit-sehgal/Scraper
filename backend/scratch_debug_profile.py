@@ -15,10 +15,10 @@ async def debug():
     from app.utils.quality import score_record_quality
     
     fields = [
-        SchemaField(name="origin", field_type=FieldType.STRING),
-        SchemaField(name="destination", field_type=FieldType.STRING),
-        SchemaField(name="date", field_type=FieldType.STRING),
-        SchemaField(name="price", field_type=FieldType.CURRENCY),
+        SchemaField(name="origin", field_type=FieldType.STRING, description="", required=False),
+        SchemaField(name="destination", field_type=FieldType.STRING, description="", required=False),
+        SchemaField(name="date", field_type=FieldType.STRING, description="", required=False),
+        SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
     ]
     
     print("\nNORMALIZED & SCORED RECORDS:")

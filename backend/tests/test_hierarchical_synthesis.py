@@ -1,3 +1,4 @@
+from typing import Any, cast
 from app.semantic_world_state import get_world_state
 from app.semantic_os import get_semantic_os
 
@@ -17,6 +18,7 @@ def test_envelope_creation_and_persistence():
     # 2. Verify
     assert ws._abstraction.get_role_level(envelope_id) == 1
     env = ws._abstraction.get_envelope(envelope_id)
+    assert env is not None
     assert env["constituents"] == {"role_a", "role_b"}
     
     # 3. Checkpoint round-trip
@@ -26,7 +28,8 @@ def test_envelope_creation_and_persistence():
     
     ws.from_dict(state)
     assert ws._abstraction.get_role_level(envelope_id) == 1
-    assert ws._abstraction.get_envelope(envelope_id)["constituents"] == {"role_a", "role_b"}
+    env2 = cast("dict[str, Any]", ws._abstraction.get_envelope(envelope_id))
+    assert env2["constituents"] == {"role_a", "role_b"}
 
 def test_causal_replay_abstraction():
     ws = get_world_state()
@@ -156,5 +159,6 @@ def test_cross_domain_knowledge_synthesis():
     
     # 4. Verify local_env was updated with r2
     env = ws._abstraction.get_envelope("local_env")
+    assert env is not None
     assert "r2" in env["constituents"]
     assert "r1" in env["constituents"]

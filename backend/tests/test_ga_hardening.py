@@ -2,6 +2,7 @@ import asyncio
 import io
 import json
 import zipfile
+from typing import Any, cast
 import pytest
 
 from app import main as main_mod
@@ -25,7 +26,7 @@ def test_job_results_disk_offload_and_retrieval(client, monkeypatch):
         id=job_id,
         name="Large Scrape Job",
         status=JobStatus.COMPLETED,
-        schema_fields=[SchemaField(name="name", field_type=FieldType.STRING, required=True)],
+        schema_fields=[SchemaField(name="name", field_type=FieldType.STRING, description="", required=True)],
         results=results,
         total_records=1005,
     )
@@ -202,23 +203,23 @@ def test_diagnostics_exporter_endpoint(client, monkeypatch):
         # Verify anonymized_state.json PII masking
         anonymized_state = json.loads(zf.read("anonymized_state.json"))
         job_data = anonymized_state["jobs"][pii_job_id]
-        record = job_data["results"][0]
+        record = cast("dict[str, Any]", job_data["results"][0])
         assert record["email"] == "<redacted_email>"
         assert record["phone"] == "<redacted_phone>"
         assert "Bearer" not in record["auth_header"]
         
         # Verify active_settings.json masking
-        active_settings = json.loads(zf.read("active_settings.json"))
+        active_settings: dict = json.loads(zf.read("active_settings.json"))
         assert active_settings["API_KEY"] == "********"
         assert active_settings["ALERT_WEBHOOK_URL"] == "********"
         
         # Verify selector decay snapshot
-        selector_decay = json.loads(zf.read("selector_decay_snapshots.json"))
+        selector_decay: dict = json.loads(zf.read("selector_decay_snapshots.json"))
         assert "example.com" in selector_decay
         assert selector_decay["example.com"]["confidence"]["final_score"] == 0.9
         
         # Verify telemetry snapshot sanitization
-        telemetry = json.loads(zf.read("telemetry_snapshots.json"))
+        telemetry: list = json.loads(zf.read("telemetry_snapshots.json"))
         assert len(telemetry) == 1
         assert "<redacted_email>" in telemetry[0]["details"]["url"]
 
@@ -260,6 +261,7 @@ async def test_domain_escalation_webhook(monkeypatch):
     
     # Verify the webhook POST was correctly generated and contains expected fields
     assert webhook_triggered is True
+    assert webhook_payload is not None
     assert webhook_payload["event"] == "anti_bot_escalation"
     assert webhook_payload["domain"] == domain
     assert webhook_payload["old_level"] == "basic"

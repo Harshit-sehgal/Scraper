@@ -159,7 +159,7 @@ def test_exclusion_pruning_via_cohesion():
     ws.clear()
     
     # 1. Set an exclusion between role_a and role_b
-    key = tuple(sorted(["role_a", "role_b"]))
+    key = ("role_a", "role_b")
     ws._instability.set_exclusion(key, 0.8)
     
     # 2. Set high mutual cohesion

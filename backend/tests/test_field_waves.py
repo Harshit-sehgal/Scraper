@@ -45,7 +45,9 @@ async def test_field_wave_propagation():
     
     # 2. Emit a wave from Region A
     # A significant instability spike in A should ripple to B
-    initial_instability_b = ws._topology.get_region(rid_b).instability
+    region_b = ws._topology.get_region(rid_b)
+    assert region_b is not None
+    initial_instability_b = region_b.instability
     
     with ws.transaction("trigger_wave"):
         # We manually trigger a wave to ensure it's not decayed by evolve during setup
@@ -55,7 +57,9 @@ async def test_field_wave_propagation():
     await asyncio.sleep(0.1)
     
     # 3. Verify Region B absorbed the wave
-    final_instability_b = ws._topology.get_region(rid_b).instability
+    region_b_final = ws._topology.get_region(rid_b)
+    assert region_b_final is not None
+    final_instability_b = region_b_final.instability
     assert final_instability_b > initial_instability_b
     
     # 4. Check causal telemetry
@@ -93,7 +97,9 @@ async def test_wave_causal_chain():
     await asyncio.sleep(0.1)
     
     # Verify C absorbed a wave
-    inst_c = ws._topology.get_region(rc.region_id).instability
+    region_c = ws._topology.get_region(rc.region_id)
+    assert region_c is not None
+    inst_c = region_c.instability
     assert inst_c > 0.1
     
     # Verify causality chain
