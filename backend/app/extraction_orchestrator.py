@@ -151,6 +151,8 @@ async def orchestrate_extraction(
         else:
             raw_results = result
             field_quality = {}
+            
+        logger.info("[Orchestrator] FIELD QUALITY MAP: %s", field_quality)
         
         # Check for field-swapping
         swapped = _detect_field_swaps(field_quality, schema_fields)
@@ -191,36 +193,64 @@ def _detect_field_swaps(quality_map: dict[str, float], fields: list[SchemaField]
     """Identify likely field swaps based on semantic quality scores.
     
     Returns a map of field_name -> correct_field_name if a swap is likely.
+    Only proposes a swap when BOTH fields are low-quality AND cross-checking
+    confirms the swap would improve overall quality.
     """
-    swaps = {}
+    swaps: dict[str, str] = {}
     
-    # 1. Identify "unhappy" fields (low quality) and "potential candidates" (better quality)
+    # Only consider fields with genuinely low quality scores
     unhappy = [f for f in fields if quality_map.get(f.name, 0.0) < 0.4]
-    candidates = [f for f in fields if quality_map.get(f.name, 0.0) > 0.45]
     
-    if not unhappy or not candidates:
+    if len(unhappy) < 2:
         return {}
 
-    # 2. Heuristic check: common swap pairs
-    for f_unhappy in unhappy:
-        for f_candidate in candidates:
-            name_u = f_unhappy.name.lower()
-            name_c = f_candidate.name.lower()
+    # Common swap pairs (order doesn't matter)
+    swap_pairs = [
+        ("title", "availability"),
+        ("name", "price"),
+        ("price", "rating"),
+        ("origin", "destination"),
+        ("title", "category"),
+    ]
+    
+    already_swapped: set[str] = set()
+    
+    for f_a in unhappy:
+        if f_a.name in already_swapped:
+            continue
+        for f_b in unhappy:
+            if f_b.name == f_a.name or f_b.name in already_swapped:
+                continue
+                
+            name_a = f_a.name.lower()
+            name_b = f_b.name.lower()
             
-            swap_pairs = [
-                ("title", "availability"),
-                ("name", "price"),
-                ("price", "rating"),
-                ("origin", "destination"),
-                ("title", "category")
-            ]
-            
+            # Check if this pair matches a known swap pattern
+            is_swap_pair = False
             for p1, p2 in swap_pairs:
-                if (p1 in name_u and p2 in name_c) or (p2 in name_u and p1 in name_c):
-                    # Check if swapping actually makes sense (heuristic)
-                    # For title vs availability: title is usually longer
-                    swaps[f_unhappy.name] = f_candidate.name
+                if (p1 in name_a and p2 in name_b) or (p2 in name_a and p1 in name_b):
+                    is_swap_pair = True
                     break
+            
+            if not is_swap_pair:
+                continue
+            
+            # Both fields are unhappy AND match a swap pair.
+            # Now verify: would swapping actually improve things?
+            # We can't directly access the raw values here (only quality scores),
+            # so we verify that the pair are indeed both below threshold and
+            # belong to semantically incompatible categories (e.g., an identity
+            # field holding a status phrase, or a status field holding a long name).
+            q_a = quality_map.get(f_a.name, 0.0)
+            q_b = quality_map.get(f_b.name, 0.0)
+            
+            # Both must be genuinely low (not just borderline)
+            if q_a < 0.35 and q_b < 0.35:
+                swaps[f_a.name] = f_b.name
+                swaps[f_b.name] = f_a.name
+                already_swapped.add(f_a.name)
+                already_swapped.add(f_b.name)
+                break  # One swap per field
                     
     return swaps
 

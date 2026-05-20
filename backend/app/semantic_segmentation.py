@@ -788,7 +788,9 @@ def is_likely_noise(text: str) -> Tuple[bool, float, List[str]]:
 def is_composite_value(text: str) -> bool:
     """Detect if text contains multiple distinct semantic values.
 
-    A composite value has 2+ different types or 2+ instances of non-text types.
+    A composite value has 2+ DIFFERENT types among its meaningful candidates.
+    Two candidates of the same type (e.g., two ORG words forming a company
+    name like "British Airways") does NOT make a composite.
     """
     if not text or len(text) < 10:
         return False
@@ -802,15 +804,9 @@ def is_composite_value(text: str) -> bool:
 
     types = set(c.primary_type for c in meaningful)
 
-    # 2+ different types = composite (e.g., number + rating, price + code)
-    if len(types) >= 2:
-        return True
-
-    # 2+ instances of same type = composite (e.g. two dates, two codes)
-    if len(meaningful) >= 2:
-        return True
-
-    return False
+    # Require 2+ DIFFERENT types (e.g., organization + price + code)
+    # Same-type candidates (e.g., two ORGs in "British Airways") are NOT composite.
+    return len(types) >= 2
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -53,6 +53,9 @@ def calculate_extraction_accuracy(
     field_hits = {k: 0 for r in expected for k in r.keys()}
     field_totals = {k: 0 for r in expected for k in r.keys()}
     
+    # Count total extracted fields
+    total_extracted_fields = sum(len(r) for r in extracted)
+    
     # Local copies to track matched records
     available_extracted = list(extracted)
     
@@ -82,7 +85,6 @@ def calculate_extraction_accuracy(
     # 2. Precision & Recall Calculation
     # We only count fields from matched records for precision to avoid penalizing
     # the scraper for extracting valid records that just aren't in the small golden set.
-    total_matched_extracted_fields = 0
     # The true positives are the matched fields in the matched records
     # So precision should be true_positives / total_fields_in_golden_set (since we only care if we got the fields right for the ones we checked)
     # Actually, precision for a golden set subset should be:

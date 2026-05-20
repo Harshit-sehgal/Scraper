@@ -241,7 +241,8 @@ function syncPollers(jobs) {
 
     activeIds.forEach(id => {
         if (!pollers[id]) {
-            pollers[id] = setInterval(() => pollJob(id), 3000);
+            const pollInterval = (typeof window.DATAFORGE_POLL_JOB_INTERVAL === 'number') ? window.DATAFORGE_POLL_JOB_INTERVAL : 3000;
+            pollers[id] = setInterval(() => pollJob(id), pollInterval);
         }
     });
 }
@@ -751,6 +752,8 @@ function exportExcel() { if (currentJobId) window.open(`${API}/api/jobs/${curren
 // ─── Form: Init ───
 
 function initForm() {
+    _fieldCounter = 0;
+    _filterCounter = 0;
     document.getElementById('inp-name').value = '';
     document.getElementById('inp-intent').value = '';
     document.getElementById('inp-topic').value = '';
@@ -777,6 +780,8 @@ function initForm() {
 
 // ─── Schema Fields ───
 
+let _fieldCounter = 0;
+
 function addField(preset = null) {
     const c = document.getElementById('schema-container');
     const row = document.createElement('div');
@@ -785,14 +790,15 @@ function addField(preset = null) {
     const name = esc(p.name || '');
     const desc = esc(p.description || '');
     const selectedType = p.field_type || 'string';
+    const fid = _fieldCounter++;
     row.innerHTML = `
         <div class="form-group">
-            <label>Name</label>
-            <input type="text" class="sf-name" placeholder="company_name" value="${name}">
+            <label for="sf-name-${fid}">Name</label>
+            <input type="text" class="sf-name" id="sf-name-${fid}" placeholder="company_name" value="${name}">
         </div>
         <div class="form-group">
-            <label>Type</label>
-            <select class="sf-type">
+            <label for="sf-type-${fid}">Type</label>
+            <select class="sf-type" id="sf-type-${fid}">
                 <option value="string" ${selectedType === 'string' ? 'selected' : ''}>Text</option>
                 <option value="integer" ${selectedType === 'integer' ? 'selected' : ''}>Integer</option>
                 <option value="float" ${selectedType === 'float' ? 'selected' : ''}>Decimal</option>
@@ -808,10 +814,10 @@ function addField(preset = null) {
             </select>
         </div>
         <div class="form-group">
-            <label>Hint for AI</label>
-            <input type="text" class="sf-desc" placeholder="e.g. star rating out of 5" value="${desc}">
+            <label for="sf-desc-${fid}">Hint for AI</label>
+            <input type="text" class="sf-desc" id="sf-desc-${fid}" placeholder="e.g. star rating out of 5" value="${desc}">
         </div>
-        <button type="button" class="btn-x" onclick="this.parentElement.remove()">✕</button>
+        <button type="button" class="btn-x" onclick="this.parentElement.remove()" aria-label="Remove field">✕</button>
     `;
     c.appendChild(row);
 }
@@ -873,22 +879,25 @@ async function suggestSchemaFromIntent() {
 
 // ─── Filters ───
 
+let _filterCounter = 0;
+
 function addFilter() {
     const c = document.getElementById('filters-container');
     const fieldOptions = Array.from(document.querySelectorAll('.sf-name'))
         .map(i => i.value).filter(v => v)
         .map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
 
+    const fid = _filterCounter++;
     const row = document.createElement('div');
     row.className = 'filter-row';
     row.innerHTML = `
         <div class="form-group">
-            <label>Field</label>
-            <select class="ff-field">${fieldOptions || '<option value="">—</option>'}</select>
+            <label for="ff-field-${fid}">Field</label>
+            <select class="ff-field" id="ff-field-${fid}">${fieldOptions || '<option value="">—</option>'}</select>
         </div>
         <div class="form-group">
-            <label>Operator</label>
-            <select class="ff-op" onchange="onFilterOpChange(this)">
+            <label for="ff-op-${fid}">Operator</label>
+            <select class="ff-op" id="ff-op-${fid}" onchange="onFilterOpChange(this)">
                 <option value="equals">Equals</option>
                 <option value="not_equals">Not Equals</option>
                 <option value="greater_than">&gt; Greater</option>
@@ -907,10 +916,10 @@ function addFilter() {
             </select>
         </div>
         <div class="form-group ff-value-group">
-            <label>Value</label>
-            <input type="text" class="ff-value" placeholder="e.g. 50">
+            <label for="ff-value-${fid}">Value</label>
+            <input type="text" class="ff-value" id="ff-value-${fid}" placeholder="e.g. 50">
         </div>
-        <button type="button" class="btn-x" onclick="this.parentElement.remove()">✕</button>
+        <button type="button" class="btn-x" onclick="this.parentElement.remove()" aria-label="Remove field">✕</button>
     `;
     c.appendChild(row);
 }
@@ -927,12 +936,13 @@ function onFilterOpChange(sel) {
         row.querySelector('.ff-value-group label').textContent = 'Max km/mi';
         // Insert origin and unit fields before the X button
         const xBtn = row.querySelector('.btn-x');
+        const distId = _filterCounter;
         const origin = document.createElement('div');
         origin.className = 'form-group dist-extra';
-        origin.innerHTML = '<label>Origin address</label><input type="text" class="ff-origin" placeholder="Los Angeles, CA">';
+        origin.innerHTML = `<label for="ff-origin-${distId}">Origin address</label><input type="text" class="ff-origin" id="ff-origin-${distId}" placeholder="Los Angeles, CA">`;
         const unit = document.createElement('div');
         unit.className = 'form-group dist-extra';
-        unit.innerHTML = '<label>Unit</label><select class="ff-unit"><option value="km">km</option><option value="miles">miles</option></select>';
+        unit.innerHTML = `<label for="ff-unit-${distId}">Unit</label><select class="ff-unit" id="ff-unit-${distId}"><option value="km">km</option><option value="miles">miles</option></select>`;
         row.insertBefore(origin, xBtn);
         row.insertBefore(unit, xBtn);
     } else {
@@ -1255,9 +1265,11 @@ document.addEventListener('DOMContentLoaded', () => {
         : 'jobs';
     switchView(initialView);
     refreshJobs();
+    const refreshInterval = (typeof window.DATAFORGE_REFRESH_INTERVAL === 'number') ? window.DATAFORGE_REFRESH_INTERVAL : 10000;
+    const statusInterval = (typeof window.DATAFORGE_STATUS_INTERVAL === 'number') ? window.DATAFORGE_STATUS_INTERVAL : 10000;
     setInterval(() => {
         refreshJobs();
         updateJobsLastUpdatedLabel();
-    }, 10000);
-    statusTimer = setInterval(refreshSystemStatus, 10000);
+    }, refreshInterval);
+    statusTimer = setInterval(refreshSystemStatus, statusInterval);
 });

@@ -218,7 +218,7 @@ class Settings(BaseSettings):
     """URL to send webhook alerts for domain anti-bot level shifts."""
     CORS_ORIGINS: list[str] = ["*"]
     """Allowed origins for CORS. Defaults to '*' but should be locked down in production."""
-    RATE_LIMIT_GLOBAL: str = "100/minute"
+    RATE_LIMIT_GLOBAL: str = "600/minute"
     """Global rate limit for /api/* endpoints (slowapi format). Empty = disabled."""
     RATE_LIMIT_JOB_CREATE: str = "10/minute"
     """Stricter rate limit for job creation (POST /api/jobs)."""

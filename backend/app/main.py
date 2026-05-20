@@ -264,15 +264,6 @@ app.include_router(
 app.include_router(scraper_router)
 
 
-# Serve Frontend
-FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
-if FRONTEND_DIR.exists():
-    app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
-    DASHBOARD_DIR = FRONTEND_DIR / "dashboard"
-    if DASHBOARD_DIR.exists():
-        app.mount("/dashboard", StaticFiles(directory=str(DASHBOARD_DIR), html=True), name="dashboard")
-
-
 # ─── Routes ──────────────────────────────────────────────────────────────
 
 
@@ -622,7 +613,7 @@ async def export_system_diagnostics():
                 }
     except Exception as e:
         logger.exception("Failed to build selector decay snapshots for diagnostics: %s", e)
-        selector_decay_snapshots = {"error": str(e)}
+        selector_decay_snapshots = {"error": {"message": str(e)}}
 
     # 4. telemetry_snapshots.json
     telemetry_snapshots = []
@@ -632,7 +623,7 @@ async def export_system_diagnostics():
             telemetry_snapshots = sanitize_value(ws._observability.telemetry)
     except Exception as e:
         logger.exception("Failed to build telemetry snapshots for diagnostics: %s", e)
-        telemetry_snapshots = {"error": str(e)}
+        telemetry_snapshots = [{"error": str(e)}]
 
     # Create ZIP archive in memory
     zip_buffer = io.BytesIO()
@@ -647,4 +638,13 @@ async def export_system_diagnostics():
         "Content-Disposition": "attachment; filename=dataforge_diagnostics.zip"
     }
     return Response(zip_buffer.getvalue(), media_type="application/zip", headers=headers)
+
+
+# ─── Serve Frontend (must be AFTER all API route definitions) ────────────
+FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
+if FRONTEND_DIR.exists():
+    app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+    DASHBOARD_DIR = FRONTEND_DIR / "dashboard"
+    if DASHBOARD_DIR.exists():
+        app.mount("/dashboard", StaticFiles(directory=str(DASHBOARD_DIR), html=True), name="dashboard")
 

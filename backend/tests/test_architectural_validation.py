@@ -11,9 +11,8 @@ This test suite validates:
 """
 
 import ast
-import os
 from pathlib import Path
-from typing import Set, Dict, List, Tuple
+from typing import Set, Dict, List
 import pytest
 
 
@@ -83,11 +82,11 @@ class ArchitecturalValidator:
     
     def get_dependents(self, module: str) -> Set[str]:
         """Get modules that import the given module"""
-        dependents = set()
+        deps = set()
         for mod, imports in self.imports_map.items():
             if module in imports:
-                dependents.add(mod)
-        return dependents
+                deps.add(mod)
+        return deps
 
 
 # ============================================================================
@@ -283,16 +282,9 @@ class TestCircularDependencies:
     
     def test_cycle_intentionality(self):
         """Cycles should be intentional (learning loops, etc.)"""
-        # Known intentional cycles in system:
-        intentional_cycles = {
-            'selector_engine',  # ↔ selector_discovery (learning loop)
-            'selector_memory',  # Part of learning
-            'domain_evolution_model',  # Learning
-        }
-        
+        # Known intentional cycles in system (for documentation):
+        # 'selector_engine', 'selector_memory', 'domain_evolution_model'
         # This test is mostly documentary - cycles exist but are understood
-        # Real validation: look for NEW unintentional cycles
-        # This would be enforced in CI/CD by comparing against baseline
         
         assert True  # Placeholder for cycle intentionality verification
 
@@ -319,7 +311,6 @@ class TestStateOwnership:
     
     def test_memory_layer_state_ownership(self):
         """Memory layer modules should own state, not Intelligence"""
-        memory_modules = [m for m, l in self.validator.layer_map.items() if l == 'Memory']
         intelligence_state_access = []
         
         # Intelligence should READ from memory, not WRITE state
@@ -518,7 +509,6 @@ class TestIntegrationPoints:
         for mod in isolated:
             if mod in self.validator.imports_map:
                 imports = len(self.validator.get_imports(mod))
-                dependents = len(self.validator.get_dependents(mod))
                 
                 # Isolated modules: few imports, OK to have dependents
                 assert imports <= 2, \

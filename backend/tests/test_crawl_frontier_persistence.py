@@ -5,10 +5,8 @@ Unit Tests for SQLite Persistence and Continuity of the Crawl Frontier.
 from __future__ import annotations
 
 import os
-import sqlite3
 import pytest
-import asyncio
-from app.crawl_frontier import CrawlFrontier, CrawlItem
+from app.crawl_frontier import CrawlFrontier
 
 
 @pytest.fixture(autouse=True)

@@ -5,7 +5,6 @@ Unit Tests for Phase 85 Shared Geocoding Cache.
 from __future__ import annotations
 
 import os
-import time
 import pytest
 from app.geocode_cache import GeocodeCache, CACHE_DB_PATH
 
@@ -28,7 +27,7 @@ def clean_cache_env():
 
 
 def test_geocode_cache_initialization():
-    cache = GeocodeCache()
+    GeocodeCache()
     assert os.path.exists(CACHE_DB_PATH)
 
 

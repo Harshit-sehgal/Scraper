@@ -30,7 +30,7 @@ def clean_benchmark_env():
 
 
 def test_db_initialization():
-    reporter = BenchmarkReporter()
+    BenchmarkReporter()
     assert os.path.exists(DB_PATH)
 
 

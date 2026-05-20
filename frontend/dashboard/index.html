@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Semantic Reliability Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="/app/favicon.svg">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -130,7 +131,7 @@
                     <span>Active Topology Heatmap</span>
                     <div class="flex items-center space-x-4">
                         <span class="text-gray-600 text-[10px] font-normal uppercase tracking-widest">Topology Timeline Replay</span>
-                        <input type="range" id="timeline-scrubber" min="0" max="0" value="0" class="w-48 accent-green-500 bg-gray-900 h-1 rounded-lg cursor-pointer">
+                        <input type="range" id="timeline-scrubber" min="0" max="0" value="0" aria-label="Topology Timeline Replay" class="w-48 accent-green-500 bg-gray-900 h-1 rounded-lg cursor-pointer">
                         <button id="live-mode-btn" class="px-2 py-0.5 border border-green-500 text-[8px] rounded text-green-500 font-bold bg-green-500/10">LIVE</button>
                     </div>
                 </h3>
@@ -176,6 +177,6 @@
         </footer>
     </div>
 
-    <script src="dashboard.js"></script>
+    <script src="/dashboard/dashboard.js"></script>
 </body>
 </html>

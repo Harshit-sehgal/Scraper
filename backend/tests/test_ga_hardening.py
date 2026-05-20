@@ -1,20 +1,15 @@
 import asyncio
 import io
 import json
-import os
-import re
 import zipfile
 import pytest
-import httpx
 
 from app import main as main_mod
 from app.config import settings
-from app.models import FieldType, Job, JobStatus, SchemaField, ScrapeMode
+from app.models import FieldType, Job, JobStatus, SchemaField
 from app.utils.job_results_store import (
     save_job_results_to_disk,
-    load_job_results_from_disk,
-    get_job_results_path,
-    delete_job_results_from_disk
+    get_job_results_path
 )
 from app.browser_pool import BrowserPool
 from app.domain_evolution_model import get_domain_evolution_model

@@ -3,8 +3,25 @@
  * Phase 63: Real-time Topology Visualization & Drift Monitoring
  */
 
-const API_BASE = '/api/system';
-const UPDATE_INTERVAL = 2000; // 2 seconds
+// Configurable API base — supports window.DATAFORGE_API_BASE override, same as app.js
+const API_SERVER = (() => {
+    const explicit = typeof window.DATAFORGE_API_BASE === 'string' ? window.DATAFORGE_API_BASE.trim() : '';
+    if (explicit) return explicit.replace(/\/$/, '');
+    const { protocol, hostname, port } = window.location;
+    if ((protocol === 'http:' || protocol === 'https:') && ((hostname === 'localhost' || hostname === '127.0.0.1') && port !== '8000')) {
+        return 'http://127.0.0.1:8000';
+    }
+    return window.location.origin;
+})();
+
+const API_SYSTEM = `${API_SERVER}/api/system`;
+const API_SCRAPER = `${API_SERVER}/api/scraper`;
+
+const UPDATE_INTERVAL = (typeof window.DATAFORGE_DASHBOARD_INTERVAL === 'number') ? window.DATAFORGE_DASHBOARD_INTERVAL : 2000;
+const MAX_INTERVAL = (typeof window.DATAFORGE_DASHBOARD_MAX_INTERVAL === 'number') ? window.DATAFORGE_DASHBOARD_MAX_INTERVAL : 30000;
+let currentInterval = UPDATE_INTERVAL;
+let failedPolls = 0;
+let pollTimer = null;
 
 let energyChart, communityChart, driftChart;
 let historyData = {
@@ -88,8 +105,7 @@ function escapeHtml(value) {
 async function init() {
     initCharts();
     setupControls();
-    updateLoop();
-    setInterval(updateLoop, UPDATE_INTERVAL);
+    updateLoop(); // start the loop (self-rescheduling with backoff)
 }
 
 function setupControls() {
@@ -118,38 +134,80 @@ function setupControls() {
 }
 
 async function updateLoop() {
-    try {
-        const [topology, observability, history, scraperStats, browserStats, memoryStats] = await Promise.all([
-            fetch(`${API_BASE}/topology`).then(r => r.json()),
-            fetch(`${API_BASE}/observability`).then(r => r.json()),
-            fetch(`${API_BASE}/history/topology`).then(r => r.json()),
-            fetch(`/api/scraper/stats`).then(r => r.json()),
-            fetch(`/api/scraper/browser`).then(r => r.json()),
-            fetch(`/api/scraper/memory/stats`).then(r => r.json())
-        ]);
+    // Use allSettled so individual failures don't crash the whole update
+    const results = await Promise.allSettled([
+        fetch(`${API_SYSTEM}/topology`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        fetch(`${API_SYSTEM}/observability`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        fetch(`${API_SYSTEM}/history/topology`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        fetch(`${API_SCRAPER}/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        fetch(`${API_SCRAPER}/browser`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        fetch(`${API_SCRAPER}/memory/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+    ]);
 
-        // Update Timeline
-        topologyHistory = history.history || [];
-        const scrubber = document.getElementById('timeline-scrubber');
-        scrubber.max = Math.max(0, topologyHistory.length - 1);
+    const [topologyResult, observabilityResult, historyResult, scraperStatsResult, browserStatsResult, memoryStatsResult] = results;
+
+    // Check for rate limiting or other failures
+    const anyFailed = results.some(r => r.status === 'rejected');
+    if (anyFailed) {
+        failedPolls++;
+        // Exponential backoff — double interval up to MAX_INTERVAL
+        currentInterval = Math.min(UPDATE_INTERVAL * Math.pow(2, failedPolls), MAX_INTERVAL);
+        console.warn(`Dashboard poll #${failedPolls} partial failure, backing off to ${currentInterval}ms`);
         
-        if (isLiveMode) {
-            updateMetrics(topology.metrics, observability.health_index, topology.meso_clusters, topology.macro_continents, scraperStats, browserStats, memoryStats);
-            renderTopology(topology.field_regions, topology.global_communities, topology.topology_edges, topology.meso_clusters, topology.macro_continents);
-            updateTelemetry(observability.telemetry);
-            updateCharts(topology.metrics, topology.global_communities, topology.drift_logs);
-            scrubber.value = scrubber.max;
-        }
-        
-        document.getElementById('last-update').innerText = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
-    } catch (err) {
-        console.error("Dashboard Sync Failed:", err);
-        document.getElementById('status-badge').innerText = "SYNC OFFLINE";
-        document.getElementById('status-badge').className = "px-3 py-1 bg-red-900/30 text-red-400 border border-red-800 rounded-full text-xs font-bold";
+        document.getElementById('status-badge').innerText = "DEGRADED";
+        document.getElementById('status-badge').className = "px-3 py-1 bg-yellow-900/30 text-yellow-400 border border-yellow-800 rounded-full text-xs font-bold";
+    } else {
+        // Reset backoff on success
+        failedPolls = 0;
+        currentInterval = UPDATE_INTERVAL;
+        document.getElementById('status-badge').innerText = "REAL-TIME STREAMING";
+        document.getElementById('status-badge').className = "px-3 py-1 bg-green-900/30 text-green-400 border border-green-800 rounded-full text-xs font-bold animate-pulse";
     }
+
+    // Extract values safely — use empty objects for failed fetches
+    const topology = topologyResult.status === 'fulfilled' ? topologyResult.value : {};
+    const observability = observabilityResult.status === 'fulfilled' ? observabilityResult.value : { health_index: null, telemetry: [] };
+    const history = historyResult.status === 'fulfilled' ? historyResult.value : { history: [] };
+    const scraperStats = scraperStatsResult.status === 'fulfilled' ? scraperStatsResult.value : null;
+    const browserStats = browserStatsResult.status === 'fulfilled' ? browserStatsResult.value : null;
+    const memoryStats = memoryStatsResult.status === 'fulfilled' ? memoryStatsResult.value : null;
+
+    // Update Timeline
+    topologyHistory = history.history || [];
+    const scrubber = document.getElementById('timeline-scrubber');
+    scrubber.max = Math.max(0, topologyHistory.length - 1);
+
+    if (isLiveMode && topologyResult.status === 'fulfilled') {
+        updateMetrics(
+            topology.metrics || {},
+            observability.health_index,
+            topology.meso_clusters || [],
+            topology.macro_continents || [],
+            scraperStats,
+            browserStats,
+            memoryStats
+        );
+        renderTopology(
+            topology.field_regions || [],
+            topology.global_communities || [],
+            topology.topology_edges || [],
+            topology.meso_clusters || [],
+            topology.macro_continents || []
+        );
+        updateTelemetry(observability.telemetry || []);
+        updateCharts(topology.metrics || {}, topology.global_communities || [], topology.drift_logs || {});
+        scrubber.value = scrubber.max;
+    }
+
+    document.getElementById('last-update').innerText = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
+
+    // Reschedule with backoff
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = setTimeout(updateLoop, currentInterval);
 }
 
 function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, browserStats, memoryStats) {
+    m = m || {};
     document.getElementById('metric-pressure').innerText = Number(m.field_pressure || 0).toFixed(3);
     document.getElementById('metric-energy').innerText = Number(m.global_energy || 0).toFixed(3);
     document.getElementById('metric-entropy').innerText = Number(m.global_entropy || 0).toFixed(3);
@@ -157,7 +215,7 @@ function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, b
     document.getElementById('metric-regions').innerText = Number(m.region_count || 0);
     document.getElementById('metric-meso-count').innerText = Number(mesoClusters ? mesoClusters.length : 0);
     document.getElementById('metric-macro-count').innerText = Number(macroContinents ? macroContinents.length : 0);
-    document.getElementById('metric-health').innerText = Number(health || 0).toFixed(2);
+    document.getElementById('metric-health').innerText = Number(health ? (health.score || health) : 0).toFixed(2);
 
     // Scraper Phase 78 Metrics
     if (browserStats) {

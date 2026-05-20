@@ -8,7 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="/app/favicon.svg">
+    <link rel="stylesheet" href="/app/styles.css">
 </head>
 <body>
 
@@ -27,7 +28,7 @@
                 </nav>
             </div>
             <div class="topbar-right">
-                <span class="shortcut-hint" title="Keyboard shortcuts">N new • / search • Esc clear</span>
+                            <span class="shortcut-hint" title="Keyboard shortcuts">N new • / search • Esc clear</span>
                 <span class="engine-status" id="engine-status"><span class="dot"></span><span id="engine-status-text">Ready</span></span>
             </div>
         </header>
@@ -47,8 +48,8 @@
 
                 <div class="jobs-toolbar">
                     <div class="jobs-toolbar-left">
-                        <input type="text" id="jobs-search" placeholder="Search jobs by name...">
-                        <select id="jobs-status-filter">
+                        <input type="text" id="jobs-search" placeholder="Search jobs by name..." aria-label="Search jobs">
+                        <select id="jobs-status-filter" aria-label="Filter by status">
                             <option value="all">All statuses</option>
                             <option value="pending">Pending</option>
                             <option value="discovering">Discovering</option>
@@ -137,8 +138,8 @@
                     <div class="section">
                         <label class="section-label">Source Mode</label>
                         <div class="toggle-group" id="mode-toggle">
-                            <button type="button" class="toggle active" data-mode="manual" onclick="setMode('manual')">Manual URLs</button>
-                            <button type="button" class="toggle" data-mode="auto" onclick="setMode('auto')">Auto Discover</button>
+                            <button type="button" class="toggle active" data-mode="manual" onclick="setMode('manual')" aria-label="Manual URLs mode">Manual URLs</button>
+                            <button type="button" class="toggle" data-mode="auto" onclick="setMode('auto')" aria-label="Auto Discover mode">Auto Discover</button>
                         </div>
                     </div>
 
@@ -237,7 +238,7 @@
 
                     <!-- Advanced -->
                     <details class="section collapsible">
-                        <summary class="section-label clickable">Advanced Options</summary>
+                        <summary class="section-label clickable" aria-label="Advanced Options">Advanced Options</summary>
                         <div class="advanced-body">
                             <div class="row-2">
                                 <label class="check-label">
@@ -313,15 +314,14 @@
                     <p id="quality-text"></p>
                 </div>
 
-                <div class="results-scrollbar hidden" id="results-scrollbar">
-                    <span class="scroll-label">Columns</span>
-                    <input type="range" id="results-scroll-slider" min="0" max="0" value="0" step="1">
+                <div class="results-scrollbar hidden" id="results-scrollbar">                    <span class="scroll-label">Columns</span>
+                    <input type="range" id="results-scroll-slider" min="0" max="0" value="0" step="1" aria-label="Scroll columns">
                     <span class="scroll-pos" id="results-scroll-pos">0%</span>
                 </div>
 
                 <div class="table-wrap">
                     <div class="results-toolbar" id="results-toolbar">
-                        <input type="text" id="inp-result-search" placeholder="Filter rows in this result set...">
+                        <input type="text" id="inp-result-search" placeholder="Filter rows in this result set..." aria-label="Filter results">
                         <span class="table-copy-hint">Double-click a cell to copy</span>
                         <span class="table-count" id="result-count-label">0 rows</span>
                     </div>
@@ -414,6 +414,6 @@
     <!-- Toast -->
     <div id="toasts"></div>
 
-    <script src="app.js"></script>
+    <script src="/app/app.js"></script>
 </body>
 </html>

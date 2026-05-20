@@ -301,13 +301,18 @@ def run_pipeline(
         if not records:
             return []
 
-        # Layer 3: Semantic segmentation (Disabled because it destroys valid text)
-        # mem = StructuralMemoryTracker()
-        # records = expand_composite_records(records, memory=mem)
+        # Layer 3: Semantic segmentation — expand composite records into
+        # individual candidates. Only expands when a value has multiple distinct
+        # semantic types (e.g., "Lufthansa LON PAR" → ORG + CODE + CODE).
+        # Single-type values (e.g., company names like "British Airways")
+        # are NOT expanded.
+        mem = StructuralMemoryTracker()
+        records = expand_composite_records(records, memory=mem)
         report.after_segmentation = len(records)
         
-        # Layer 4: Entity grouping (boundary-aware merge) (Disabled)
-        # records = group_adjacent_entities(records)
+        # Layer 4: Entity grouping (boundary-aware merge) — merges segmented
+        # tokens that belong together (e.g., "Prestige" + "Group" → "Prestige Group")
+        records = group_adjacent_entities(records)
         
         # Layer 5: Global semantic allocation
         allocated_records: list = []
