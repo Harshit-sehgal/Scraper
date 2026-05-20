@@ -15,6 +15,7 @@ import heapq
 import logging
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional, Set
 from urllib.parse import urlparse
 
@@ -49,7 +50,10 @@ class CrawlFrontier:
         self._domain_page_counts: Dict[str, int] = {}
         
         # Persistent SQLite storage
-        self._db_path = "backend/data/crawl_frontier.db"
+        # Resolve path relative to the backend directory (project_root/backend/)
+        # __file__ is backend/app/crawl_frontier.py → .parent.parent = backend/
+        backend_root = Path(__file__).resolve().parent.parent
+        self._db_path = str(backend_root / "data" / "crawl_frontier.db")
         self._init_db()
         self._load_from_db()
 

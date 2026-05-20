@@ -5,13 +5,18 @@ Unit Tests for SQLite Persistence and Continuity of the Crawl Frontier.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import pytest
 from app.crawl_frontier import CrawlFrontier
+
+# Match the path resolution used in crawl_frontier.py
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent / "backend"
+_DB_PATH = str(_BACKEND_ROOT / "data" / "crawl_frontier.db")
 
 
 @pytest.fixture(autouse=True)
 def clean_db():
-    db_path = "backend/data/crawl_frontier.db"
+    db_path = _DB_PATH
     if os.path.exists(db_path):
         try:
             os.remove(db_path)
