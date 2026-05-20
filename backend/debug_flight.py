@@ -10,7 +10,7 @@ from app import scraper as scraper_mod
 from app.intent_parser import parse_user_intent
 from app.models import FieldType, SchemaField
 from app.page_profiler import detect_page_structure, detect_value_patterns
-from app.semantic_mapper import map_to_schema_fields, match_values_to_intent
+from app.semantic_mapper import match_values_to_intent
 from app.semantic_segmentation import StructuralMemoryTracker, expand_composite_records
 
 
@@ -66,11 +66,11 @@ async def debug_flight_scrape():
         for i, m in enumerate(mapped[:3]):
             print(f"  Record {i}: mapped={m.mapped_fields}, conf={m.confidence_scores}")
 
-        # Convert to schema
-        converted = map_to_schema_fields(mapped, schema, intent)
+        # Convert to schema — directly use mapped_fields from RecordMapping
+        converted = [m.mapped_fields for m in mapped]
         print(f"\n  Converted: {len(converted)} records")
         for i, r in enumerate(converted[:3]):
-            vals = {k: v for k, v in r.items() if v and k != 'record_score'}
+            vals = {k: v for k, v in r.items() if v}
             print(f"  Record {i}: {vals}")
 
 

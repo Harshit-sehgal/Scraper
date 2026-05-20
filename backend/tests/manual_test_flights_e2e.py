@@ -24,11 +24,11 @@ from app.models import SchemaField, FieldType
 
 
 FLIGHT_SCHEMA = [
-    SchemaField(name="origin", field_type=FieldType.STRING, required=True),
-    SchemaField(name="destination", field_type=FieldType.STRING, required=True),
-    SchemaField(name="date", field_type=FieldType.STRING),
-    SchemaField(name="price", field_type=FieldType.STRING),
-    SchemaField(name="stops", field_type=FieldType.STRING),
+    SchemaField(name="origin", field_type=FieldType.STRING, description="", required=True),
+    SchemaField(name="destination", field_type=FieldType.STRING, description="", required=True),
+    SchemaField(name="date", field_type=FieldType.STRING, description="", required=False),
+    SchemaField(name="price", field_type=FieldType.STRING, description="", required=False),
+    SchemaField(name="stops", field_type=FieldType.STRING, description="", required=False),
 ]
 
 

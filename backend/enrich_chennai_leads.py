@@ -134,6 +134,8 @@ def infer_enrichment_context(input_file: Path, records: list[dict]) -> Enrichmen
         country_name = "India"
         country_code = "+91"
         
+    assert country_name is not None and country_code is not None, "country name/code must be set"
+        
     niche = " ".join(niche_words).title() if niche_words else "Interior Designer"
     niche = niche.replace("Designers", "Designer").replace("Architects", "Architect")
     
