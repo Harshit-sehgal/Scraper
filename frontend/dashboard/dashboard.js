@@ -125,7 +125,7 @@ async function updateLoop() {
             fetch(`${API_BASE}/history/topology`).then(r => r.json()),
             fetch(`/api/scraper/stats`).then(r => r.json()),
             fetch(`/api/scraper/browser`).then(r => r.json()),
-            fetch(`/api/scraper/memory`).then(r => r.json())
+            fetch(`/api/scraper/memory/stats`).then(r => r.json())
         ]);
 
         // Update Timeline
