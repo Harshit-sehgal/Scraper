@@ -349,7 +349,7 @@ def _find_best_value_for_need(
 
             for compiled in patterns:
                 pattern = compiled[0]
-                if re.search(pattern, str(value), re.IGNORECASE):
+                if pattern.search(str(value)):
                     # pattern is a compiled regex object, convert to string for display
                     pattern_str = pattern.pattern
                     snippet = pattern_str[:30] if len(pattern_str) > 30 else pattern_str
@@ -433,19 +433,19 @@ def _detect_value_type(values: List[str], value_patterns: ValuePatterns) -> Opti
     # Currency check
     if value_patterns.currencies:
         for compiled in SEMANTIC_PATTERNS.get(SemanticType.PRICE, []):
-            if re.search(compiled[0], sample, re.IGNORECASE):
+            if compiled[0].search(sample):
                 return "price"
 
     # Date check
     if value_patterns.dates:
         for compiled in SEMANTIC_PATTERNS.get(SemanticType.DATE, []):
-            if re.search(compiled[0], sample, re.IGNORECASE):
+            if compiled[0].search(sample):
                 return "date"
 
     # Rating check
     if value_patterns.ratings:
         for compiled in SEMANTIC_PATTERNS.get(SemanticType.RATING, []):
-            if re.search(compiled[0], sample, re.IGNORECASE):
+            if compiled[0].search(sample):
                 return "rating"
 
     return None
