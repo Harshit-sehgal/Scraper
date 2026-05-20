@@ -121,3 +121,37 @@ def test_energy_global_out_of_bounds():
     ws._energy._global_energy = 50.0
     issues = validate_world_state(ws)
     assert any("global_energy" in i and "out of bounds" in i for i in issues)
+
+
+def test_decision_history_exceeds_5000():
+    """decision_history > 5000 entries should be flagged as memory bloat."""
+    clear_semantic_state(clear_file=False)
+    ws = get_world_state()
+    ws._history.decision_history = [{"placeholder": i} for i in range(5001)]
+    issues = validate_world_state(ws)
+    assert any("decision_history" in i and "5000" in i for i in issues)
+
+
+def test_region_count_exceeds_500():
+    """field_regions > 500 should be flagged as memory bloat."""
+    clear_semantic_state(clear_file=False)
+    ws = get_world_state()
+    from app.core_types import FieldConflictRegion
+    # Bypass topology clamping and MVCC by hacking _regions directly
+    ws._topology._regions = [
+        FieldConflictRegion(competing_roles=["a"], token=f"tok{i}", instability=0.5, integrity=0.5)
+        for i in range(501)
+    ]
+    issues = validate_world_state(ws)
+    assert any("field_regions" in i and "500" in i for i in issues)
+
+
+def test_learned_exclusions_exceeds_500():
+    """learned_exclusions > 500 entries should be flagged as memory bloat."""
+    clear_semantic_state(clear_file=False)
+    ws = get_world_state()
+    # Add 529 entries (23×23 grid) to exceed 500 threshold
+    ws._instability._exclusions = {(f"r{i}", f"r{j}"): 0.5 for i in range(23) for j in range(23)}
+    assert len(ws._instability.exclusions) > 500  # Sanity check: 529
+    issues = validate_world_state(ws)
+    assert any("learned_exclusions" in i and "500" in i for i in issues)
