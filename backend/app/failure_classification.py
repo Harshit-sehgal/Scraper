@@ -341,6 +341,24 @@ def classify_failure(
             FailureCategory.BROWSER_CRASH, 0.90, signals
         )
 
+    # Selector decay / empty extraction failure
+    if any(kw in error_text for kw in [
+        "zero_records_extracted", "no records extracted", "selector decay", "empty page",
+    ]):
+        signals.append({"signal": "selector_decay_msg", "source": "error_message"})
+        return _build_classification(
+            FailureCategory.SELECTOR_DECAY, 0.85, signals
+        )
+
+    # Anti-bot block / WAF
+    if any(kw in error_text for kw in [
+        "403 forbidden", "forbidden", "waf challenge", "anti-bot", "cloudflare", "captcha", "ip banned", "access denied",
+    ]):
+        signals.append({"signal": "anti_bot_msg", "source": "error_message"})
+        return _build_classification(
+            FailureCategory.ANTI_BOT_BLOCK, 0.90, signals
+        )
+
     # ── Stage 2: HTTP Status Code Analysis ────────────────────────────
     if status_code is not None:
         if status_code == 429:

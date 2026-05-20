@@ -707,8 +707,11 @@ function renderTable(results, emptyMessage = 'No results') {
         const rowClass = isUnstable ? 'unstable-row' : '';
         return `<tr class="${rowClass}">${keys.map(k => {
             let v = row[k];
+            if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+                v = JSON.stringify(v);
+            }
             if (Array.isArray(v)) v = v.join(', ');
-            if (v === null || v === undefined) v = '—';
+            if (v === null || v === undefined || v === '{}' || v === '') v = '—';
             const text = String(v);
             const cellClass = (k === '_is_unstable' && isUnstable) ? 'unstable-cell' : '';
             return `<td class="${cellClass}" data-raw="${esc(text)}" title="${esc(text)}">${esc(text)}</td>`;

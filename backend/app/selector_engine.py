@@ -69,7 +69,30 @@ def apply_selectors(
                         if field.field_type == FieldType.URL:
                             val = target.get("href")
                         else:
-                            val = target.get_text(separator=" ", strip=True)
+                            text_val = target.get_text(separator=" ", strip=True)
+                            # Check if the element has title or alt attributes which might contain fuller text
+                            title_val = target.get("title")
+                            alt_val = target.get("alt")
+                            
+                            # Determine if we should prefer the title attribute
+                            # 1. If text_val is truncated (ends with ellipses '...' or '…') and title is present
+                            # 2. If the field is a title/name field and title_val is longer/more descriptive than text_val
+                            use_title = False
+                            if title_val:
+                                title_clean = title_val.strip()
+                                if title_clean:
+                                    if text_val.endswith("...") or text_val.endswith("…"):
+                                        use_title = True
+                                    elif any(k in field.name.lower() for k in ["title", "name", "company", "product"]):
+                                        if len(title_clean) > len(text_val):
+                                            use_title = True
+                            
+                            if use_title and title_val:
+                                val = title_val.strip()
+                            elif alt_val and not text_val:
+                                val = alt_val.strip()
+                            else:
+                                val = text_val
                 except Exception as e:
                     logger.debug("[SelectorEngine] Invalid selector '%s': %s", sel, e)
                     val = None

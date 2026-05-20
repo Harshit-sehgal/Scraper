@@ -200,9 +200,36 @@ class ChaosSimulator:
     
     def _is_system_healthy(self, previous_failure: FailureMode) -> bool:
         """Check if system is healthy after failure"""
-        # This would be implemented with actual health checks
-        # For now, return True to indicate recovery
-        return True
+        try:
+            from app.domain_health_alerts import get_domain_health_monitor
+            monitor = get_domain_health_monitor()
+            
+            # If a specific current URL/domain is tracked, check it first
+            if self.system and hasattr(self.system, "current_url"):
+                url = getattr(self.system, "current_url")
+                if url:
+                    domain_health = monitor.get_domain_health(url)
+                    if domain_health:
+                        # Consider healthy if status is back to "healthy"
+                        return domain_health.get("health_level") == "healthy"
+            
+            # Fallback/General check: if any domain in the system is unhealthy or critical, return False
+            healths = monitor.get_all_domains_health()
+            if not healths:
+                return True  # If no domains are monitored yet, default to healthy
+                
+            for h in healths:
+                if h.get("health_level") in ["unhealthy", "critical", "blacklisted"]:
+                    return False
+            return True
+        except Exception as e:
+            self.logger.error(f"Error checking system health: {e}")
+            return True
+
+    def is_failure_active(self, failure_mode: FailureMode) -> bool:
+        """Check if a specific failure mode is currently active"""
+        return self.active_failures.get(failure_mode.value, False)
+
 
 
 # ============================================================================
@@ -1019,6 +1046,16 @@ async def run_all_chaos_tests() -> Dict[str, Any]:
         "results": results,
         "report": report,
     }
+
+_simulator: ChaosSimulator | None = None
+
+
+def get_chaos_simulator() -> ChaosSimulator:
+    """Get the global chaos simulator."""
+    global _simulator
+    if _simulator is None:
+        _simulator = ChaosSimulator()
+    return _simulator
 
 
 if __name__ == "__main__":

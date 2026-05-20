@@ -81,14 +81,33 @@ async def scrape_url_with_recovery(
         recovery_stats["attempts"] += 1
         
         try:
-            logger.info("Scrape attempt %d/%d for %s", attempt, max_recovery_attempts, url)
-            results = await scrape_url(
-                url,
-                schema_fields,
-                min_record_score=min_record_score,
-                user_intent=user_intent,
-                world_state=world_state,
-            )
+            # Chaos failure injection check
+            from app.chaos_simulator import get_chaos_simulator, FailureMode
+            chaos = get_chaos_simulator()
+            
+            if chaos.is_failure_active(FailureMode.NETWORK_TIMEOUT):
+                logger.warning("[Chaos Simulation] Injecting NETWORK_TIMEOUT")
+                raise Exception("Timed out waiting for response")
+                
+            if chaos.is_failure_active(FailureMode.BROWSER_CRASH):
+                logger.warning("[Chaos Simulation] Injecting BROWSER_CRASH")
+                raise Exception("Browser target closed unexpectedly")
+                
+            if chaos.is_failure_active(FailureMode.ANTI_BOT_ESCALATION):
+                logger.warning("[Chaos Simulation] Injecting ANTI_BOT_ESCALATION")
+                raise Exception("403 Forbidden - WAF Challenge")
+                
+            if chaos.is_failure_active(FailureMode.SELECTOR_POISONING):
+                logger.warning("[Chaos Simulation] Injecting SELECTOR_POISONING (zero records)")
+                results = []
+            else:
+                results = await scrape_url(
+                    url,
+                    schema_fields,
+                    min_record_score=min_record_score,
+                    user_intent=user_intent,
+                    world_state=world_state,
+                )
             
             # Since scrape_url catches exceptions and returns [], 
             # we must check telemetry to see if it actually failed.
