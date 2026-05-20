@@ -15,9 +15,8 @@ Failure Categories:
 """
 
 import asyncio
-import random
 import time
-from typing import Callable, List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 import logging

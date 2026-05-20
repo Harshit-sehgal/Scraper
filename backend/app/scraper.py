@@ -55,6 +55,14 @@ logger = logging.getLogger(__name__)
 from app.cleaning_engine import ai_clean_and_align_records  # noqa: F401
 from app.insight_engine import generate_data_insight, suggest_schema_from_intent, suggest_schema_from_intent_sync  # noqa: F401
 
+__all__ = [
+    "scrape_url",
+    "ai_clean_and_align_records",
+    "generate_data_insight",
+    "suggest_schema_from_intent",
+    "suggest_schema_from_intent_sync",
+]
+
 
 def _limit_source_records(records: list[dict], schema_fields: list[SchemaField]) -> list[dict]:
     """Wrapper to allow monkeypatching settings in tests."""

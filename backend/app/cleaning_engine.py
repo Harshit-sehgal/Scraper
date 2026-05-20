@@ -11,11 +11,8 @@ Responsible for:
 from __future__ import annotations
 
 import logging
-import asyncio
 import inspect
 from typing import Any, List, Optional, Tuple
-
-from app.async_utils import run_sync_in_thread
 from app.config import settings
 from app.data_utils import _prepare_records_for_ai, normalize_scraped_record
 from app.llm_bridge import llm_json as _llm_json, llm_json_fast as _llm_json_fast

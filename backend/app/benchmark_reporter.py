@@ -15,7 +15,7 @@ import sqlite3
 import time
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
 

@@ -5,8 +5,6 @@ Job Results Store — Utility to compress and stream large record datasets to/fr
 import gzip
 import json
 import logging
-import os
-import shutil
 from pathlib import Path
 
 logger = logging.getLogger(__name__)

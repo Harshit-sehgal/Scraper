@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 
 from app.config import settings
-from app.async_utils import run_sync_in_thread
 from app.llm_bridge import llm_json as _llm_json, llm_text as _llm_text
 
 logger = logging.getLogger(__name__)

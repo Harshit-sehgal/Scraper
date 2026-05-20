@@ -157,7 +157,6 @@ class CrawlFrontier:
     async def get_next_url(self) -> Optional[str]:
         """Get the next URL available for crawling, respecting policy."""
         tried: List[CrawlItem] = []
-        next_url = None
 
         while True:
             # 1. Pop a candidate item under the lock

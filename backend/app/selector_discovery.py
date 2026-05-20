@@ -7,7 +7,6 @@ Extracted from scraper.py to isolate LLM-related orchestration.
 from __future__ import annotations
 
 import logging
-from app.async_utils import run_sync_in_thread
 from app.config import settings
 from app.html_utils import clean_html_for_selectors
 from app.llm_bridge import llm_json

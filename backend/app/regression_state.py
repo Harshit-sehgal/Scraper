@@ -5,7 +5,7 @@ Regression State Adapter — isolated state management for tracking archived fai
 from __future__ import annotations
 
 import logging
-from typing import Optional, Dict, List, Any
+from typing import Optional, Any
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
