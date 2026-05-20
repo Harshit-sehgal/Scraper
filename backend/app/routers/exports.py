@@ -27,10 +27,8 @@ def create_exports_router(jobs_store: dict):
         output = io.StringIO()
         if job.schema_fields:
             fieldnames = [f.name for f in job.schema_fields]
-        elif results_list:
-            fieldnames = list(results_list[0].keys())
         else:
-            fieldnames = []
+            fieldnames = list(results_list[0].keys())
         writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
         for row in results_list:
@@ -93,10 +91,8 @@ def create_exports_router(jobs_store: dict):
 
         if job.schema_fields:
             fieldnames = [f.name for f in job.schema_fields]
-        elif results_list:
-            fieldnames = list(results_list[0].keys())
         else:
-            fieldnames = []
+            fieldnames = list(results_list[0].keys())
 
         # Write headers
         for col_num, header in enumerate(fieldnames, 1):

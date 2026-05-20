@@ -6,6 +6,10 @@ and the human-readable report generator.
 
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 from app.patch_status import check_all_fixes, generate_patch_report
 
 
@@ -103,3 +107,19 @@ class TestGeneratePatchReport:
         assert "other" in report
         assert "some_random_unknown_check" in report
         assert "another_mystery_value" in report
+
+
+class TestMainBlock:
+    """Tests for the `if __name__ == '__main__'` block in patch_status.py."""
+
+    def test_main_block_runs_without_error(self):
+        """Running patch_status.py as __main__ should not crash."""
+        patch_path = Path(__file__).parent.parent / "app" / "patch_status.py"
+        result = subprocess.run(
+            [sys.executable, str(patch_path)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        # Should print the report via logger; at minimum should not crash

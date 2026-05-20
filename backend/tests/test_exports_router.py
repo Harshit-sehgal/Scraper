@@ -387,6 +387,34 @@ class TestExportResultsOnDisk:
 # ─── Excel with None values in list fields ──────────────────────────
 
 
+class TestExcelWorksheetCreation:
+    """Edge case: Workbook.active returns None."""
+
+    @pytest.mark.asyncio
+    async def test_excel_ws_none_returns_500(self):
+        """When openpyxl's Workbook().active is None, return 500."""
+        from httpx import ASGITransport, AsyncClient
+        from unittest.mock import patch as mock_patch
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["ws-none"] = _make_job(
+            "ws-none",
+            results=[{"x": "1"}],
+            schema_fields=[SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)],
+        )
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = ASGITransport(app=test_app)
+        # Mock openpyxl's Workbook to return a workbook with .active = None
+        async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+            with mock_patch("app.routers.exports.Workbook") as mock_wb_cls:
+                mock_wb = mock_wb_cls.return_value
+                mock_wb.active = None
+                resp = await c.get("/api/jobs/ws-none/export/excel")
+        assert resp.status_code == 500
+
+
 class TestExcelListNoneValues:
     """None values inside list fields should be filtered out in Excel export."""
 
