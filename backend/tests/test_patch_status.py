@@ -38,9 +38,6 @@ class TestCheckAllFixes:
 
     def test_file_not_found_does_not_crash(self):
         """Even if a tracked file were missing, the function should not crash."""
-        # Backup original file check by using a missing file path
-        # check_all_fixes reads fixed paths relative to its directory,
-        # so this should work as long as the project structure is intact.
         results = check_all_fixes()
         # All should at least be valid booleans
         for ok in results.values():
@@ -94,3 +91,15 @@ class TestGeneratePatchReport:
         assert "semantic_allocation_engine.py" in report
         assert "semantic_ir.py" in report
         assert "semantic_pipeline.py" in report
+
+    def test_unknown_key_falls_to_other_module(self):
+        """Keys that don't match any known module should be grouped under 'other'."""
+        results = {
+            "some_random_unknown_check": True,
+            "another_mystery_value": False,
+        }
+        report = generate_patch_report(results)
+        assert "Fixes applied: 1/2" in report
+        assert "other" in report
+        assert "some_random_unknown_check" in report
+        assert "another_mystery_value" in report

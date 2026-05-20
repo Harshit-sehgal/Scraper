@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -22,6 +23,7 @@ def _make_job(
     name: str = "test-job",
     results: list[dict[str, Any]] | None = None,
     schema_fields: list[SchemaField] | None = None,
+    results_on_disk: bool = False,
 ) -> Job:
     return Job(
         id=job_id,
@@ -30,6 +32,7 @@ def _make_job(
         results=results or [],
         schema_fields=schema_fields or [],
         urls=["https://example.com"],
+        results_on_disk=results_on_disk,
     )
 
 
@@ -147,7 +150,7 @@ class TestCsvExport:
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async    def test_csv_content_type(self, csv_client):
+    async def test_csv_content_type(self, csv_client):
         resp = await csv_client.get("/api/jobs/csv-job/export/csv")
         assert resp.headers.get("content-type", "").startswith("text/csv")
 
@@ -320,6 +323,104 @@ class TestExportWithoutSchema:
         assert len(data) == 2
         assert "title" in data[0]
 
+    @pytest.mark.asyncio
+    async def test_excel_infers_fields(self, no_schema_client):
+        """Excel should also handle schema-less export by inferring field names."""
+        resp = await no_schema_client.get("/api/jobs/noschema/export/excel")
+        assert resp.status_code == 200
+        assert "spreadsheetml" in resp.headers.get("content-type", "")
+
+
+# ─── Export with results_on_disk ────────────────────────────────────
+
+
+class TestExportResultsOnDisk:
+    """When results_on_disk is True, exports should load from disk instead of memory."""
+
+    @pytest_asyncio.fixture
+    async def disk_client(self):
+        from httpx import ASGITransport, AsyncClient
+
+        mock_on_disk_data = [
+            {"city": "London", "temp": "15"},
+            {"city": "Paris", "temp": "18"},
+        ]
+        with patch("app.utils.job_results_store.load_job_results_from_disk", return_value=mock_on_disk_data):
+            jobs_store: dict[str, Job] = {}
+            router = create_exports_router(jobs_store)
+            # Job has empty in-memory results but results_on_disk=True
+            jobs_store["disk-job"] = _make_job(
+                "disk-job",
+                name="disk-test",
+                results=[],  # empty in memory
+                results_on_disk=True,
+            )
+            test_app = FastAPI()
+            test_app.include_router(router)
+            transport = ASGITransport(app=test_app)
+            async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+                yield c
+
+    @pytest.mark.asyncio
+    async def test_csv_loads_from_disk(self, disk_client):
+        resp = await disk_client.get("/api/jobs/disk-job/export/csv")
+        assert resp.status_code == 200
+        text = resp.text
+        assert "London" in text
+        assert "Paris" in text
+
+    @pytest.mark.asyncio
+    async def test_json_loads_from_disk(self, disk_client):
+        resp = await disk_client.get("/api/jobs/disk-job/export/json")
+        assert resp.status_code == 200
+        data = json.loads(resp.content)
+        assert len(data) == 2
+        assert data[0]["city"] == "London"
+
+    @pytest.mark.asyncio
+    async def test_excel_loads_from_disk(self, disk_client):
+        resp = await disk_client.get("/api/jobs/disk-job/export/excel")
+        assert resp.status_code == 200
+        assert resp.content[:2] == b"PK"
+
+
+# ─── Excel with None values in list fields ──────────────────────────
+
+
+class TestExcelListNoneValues:
+    """None values inside list fields should be filtered out in Excel export."""
+
+    @pytest_asyncio.fixture
+    async def none_list_client(self):
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["none-list-job"] = _make_job(
+            "none-list-job",
+            name="none-list-test",
+            results=[
+                {"name": "X", "tags": ["a", None, "b"]},
+                {"name": "Y", "tags": [None]},
+            ],
+            schema_fields=[
+                SchemaField(name="name", field_type=FieldType.STRING, description="", required=False),
+                SchemaField(name="tags", field_type=FieldType.STRING, description="", required=False),
+            ],
+        )
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = ASGITransport(app=test_app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+            yield c
+
+    @pytest.mark.asyncio
+    async def test_excel_with_none_in_lists(self, none_list_client):
+        """None items in list values should not cause errors in Excel export."""
+        resp = await none_list_client.get("/api/jobs/none-list-job/export/excel")
+        assert resp.status_code == 200
+        assert resp.content[:2] == b"PK"
+
 
 # ─── Export filename ────────────────────────────────────────────────
 
@@ -350,7 +451,7 @@ class TestExportFilename:
             yield c
 
     @pytest.mark.asyncio
-    async    def test_csv_filename_contains_job_name(self, name_client):
+    async def test_csv_filename_contains_job_name(self, name_client):
         resp = await name_client.get("/api/jobs/n1/export/csv")
         disp = resp.headers.get("content-disposition", "")
         assert "My_Cool_Job" in disp
