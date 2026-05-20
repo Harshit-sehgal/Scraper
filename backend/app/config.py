@@ -11,6 +11,7 @@ To override, set the corresponding env var (e.g. PLAYWRIGHT_TIMEOUT=45000).
 
 from __future__ import annotations
 
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -209,8 +210,12 @@ class Settings(BaseSettings):
     """Override for jobs_state.json path. Empty = use default ./backend/data/jobs_state.json"""
 
     # ─── API Security ──────────────────────────────────────────────────────
+    ENV: str = "development"
+    """Application runtime environment: development or production."""
     API_KEY: str = ""
     """If set, all /api/* endpoints require X-API-Key header."""
+    ALERT_WEBHOOK_URL: Optional[str] = None
+    """URL to send webhook alerts for domain anti-bot level shifts."""
     CORS_ORIGINS: list[str] = ["*"]
     """Allowed origins for CORS. Defaults to '*' but should be locked down in production."""
     RATE_LIMIT_GLOBAL: str = "100/minute"

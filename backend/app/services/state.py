@@ -2,6 +2,8 @@ from app.state_store import save_state
 from app.models import JobStatus
 
 def prune_history_stores(jobs_store: dict, recycle_bin_store: dict, max_job_history: int, max_recycle_bin_history: int):
+    from app.utils.job_results_store import delete_job_results_from_disk
+    
     if len(jobs_store) > max_job_history:
         active_ids = {
             jid
@@ -23,6 +25,7 @@ def prune_history_stores(jobs_store: dict, recycle_bin_store: dict, max_job_hist
         for jid in list(jobs_store.keys()):
             if jid not in keep_ids:
                 del jobs_store[jid]
+                delete_job_results_from_disk(jid)
 
     if len(recycle_bin_store) > max_recycle_bin_history:
         recycle_items = sorted(
@@ -34,6 +37,7 @@ def prune_history_stores(jobs_store: dict, recycle_bin_store: dict, max_job_hist
         for jid in list(recycle_bin_store.keys()):
             if jid not in keep_ids:
                 del recycle_bin_store[jid]
+                delete_job_results_from_disk(jid)
 
 def persist_state(jobs_store: dict, recycle_bin_store: dict, max_job_history: int, max_recycle_bin_history: int):
     prune_history_stores(jobs_store, recycle_bin_store, max_job_history, max_recycle_bin_history)

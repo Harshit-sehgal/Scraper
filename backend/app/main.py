@@ -65,6 +65,19 @@ async def lifespan(app: FastAPI):
 
     # ─── STARTUP ──────────────────────────────────────────────────────
 
+    # Strict Production Security Check
+    if settings.ENV.lower() == "production":
+        if not settings.CORS_ORIGINS or "*" in settings.CORS_ORIGINS:
+            raise ValueError(
+                "CORS_ORIGINS contains wildcard '*' or is empty. In production environment, "
+                "CORS_ORIGINS must be locked down to trusted domains for safety."
+            )
+        if not settings.API_KEY or not settings.API_KEY.strip():
+            raise ValueError(
+                "API_KEY is empty or not configured. In production environment, "
+                "API_KEY must be explicitly set to secure all API endpoints."
+            )
+
     # Initialize event cascade (safe: scheduler is lazy-created, no circular import)
     from app.graph_update_scheduler import get_scheduler
     get_scheduler()
@@ -510,3 +523,128 @@ async def trigger_manifold_compression():
     plugins = get_plugin_manager(ws=get_world_state())
     result = plugins.call_tool("manifold_compressor")
     return {"result": result}
+
+
+@app.get("/api/system/diagnostics/export")
+async def export_system_diagnostics():
+    """Generates and exports an authenticated and sanitized system diagnostics ZIP bundle."""
+    import io
+    import zipfile
+    import json
+    import re
+    from fastapi import Response
+    from app.config import settings
+    from app.selector_memory import get_selector_memory
+    from app.semantic_world_state import get_world_state
+
+    # Regular expressions for PII sanitization
+    email_regex = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+    phone_regex = re.compile(r"\+?\b\d[\d\s()\-]{8,14}\d\b")
+    sensitive_keys = {"authorization", "auth", "api_key", "key", "password", "token", "secret", "signature", "alert_webhook_url"}
+
+    def sanitize_value(val):
+        if isinstance(val, str):
+            val = email_regex.sub("<redacted_email>", val)
+            val = phone_regex.sub("<redacted_phone>", val)
+            return val
+        elif isinstance(val, dict):
+            return {
+                k: ("********" if any(s in k.lower() for s in sensitive_keys) else sanitize_value(v))
+                for k, v in val.items()
+            }
+        elif isinstance(val, list):
+            return [sanitize_value(item) for item in val]
+        else:
+            return val
+
+    # 1. anonymized_state.json
+    anonymized_jobs = {}
+    for j_id, job in jobs_store.items():
+        if hasattr(job, "model_dump"):
+            job_dict = job.model_dump()
+        elif hasattr(job, "dict"):
+            job_dict = job.dict()
+        else:
+            job_dict = dict(job)
+        anonymized_jobs[j_id] = sanitize_value(job_dict)
+
+    anonymized_recycle = {}
+    for j_id, job in recycle_bin_store.items():
+        if hasattr(job, "model_dump"):
+            job_dict = job.model_dump()
+        elif hasattr(job, "dict"):
+            job_dict = job.dict()
+        else:
+            job_dict = dict(job)
+        anonymized_recycle[j_id] = sanitize_value(job_dict)
+
+    anonymized_state = {
+        "jobs": anonymized_jobs,
+        "recycle_bin": anonymized_recycle
+    }
+
+    # 2. active_settings.json
+    settings_dict = {}
+    if hasattr(settings, "model_dump"):
+        settings_dict = settings.model_dump()
+    elif hasattr(settings, "dict"):
+        settings_dict = settings.dict()
+    else:
+        settings_dict = dict(settings)
+
+    masked_settings = {}
+    for k, v in settings_dict.items():
+        if any(s in k.lower() for s in sensitive_keys):
+            masked_settings[k] = "********"
+        else:
+            masked_settings[k] = sanitize_value(v)
+
+    # 3. selector_decay_snapshots.json
+    selector_decay_snapshots = {}
+    try:
+        memory = get_selector_memory()
+        if memory and hasattr(memory, "_memory"):
+            for domain, entry in memory._memory.items():
+                conf = memory._compute_confidence(entry)
+                selector_decay_snapshots[domain] = {
+                    "selectors": entry.get("selectors"),
+                    "success_count": entry.get("success_count", 0),
+                    "failure_count": entry.get("failure_count", 0),
+                    "first_seen": entry.get("first_seen"),
+                    "last_success": entry.get("last_success"),
+                    "confidence": {
+                        "raw_confidence": conf.raw_confidence,
+                        "age_factor": conf.age_factor,
+                        "freshness_factor": conf.freshness_factor,
+                        "final_score": conf.final_score,
+                        "reason": conf.reason
+                    }
+                }
+    except Exception as e:
+        logger.exception("Failed to build selector decay snapshots for diagnostics: %s", e)
+        selector_decay_snapshots = {"error": str(e)}
+
+    # 4. telemetry_snapshots.json
+    telemetry_snapshots = []
+    try:
+        ws = get_world_state()
+        if hasattr(ws, "_observability") and ws._observability:
+            telemetry_snapshots = sanitize_value(ws._observability.telemetry)
+    except Exception as e:
+        logger.exception("Failed to build telemetry snapshots for diagnostics: %s", e)
+        telemetry_snapshots = {"error": str(e)}
+
+    # Create ZIP archive in memory
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        zip_file.writestr("anonymized_state.json", json.dumps(anonymized_state, indent=2))
+        zip_file.writestr("active_settings.json", json.dumps(masked_settings, indent=2))
+        zip_file.writestr("selector_decay_snapshots.json", json.dumps(selector_decay_snapshots, indent=2))
+        zip_file.writestr("telemetry_snapshots.json", json.dumps(telemetry_snapshots, indent=2))
+
+    zip_buffer.seek(0)
+    headers = {
+        "Content-Disposition": "attachment; filename=dataforge_diagnostics.zip"
+    }
+    return Response(zip_buffer.getvalue(), media_type="application/zip", headers=headers)
+

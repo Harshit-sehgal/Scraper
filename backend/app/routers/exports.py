@@ -15,19 +15,25 @@ def create_exports_router(jobs_store: dict):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
         job = jobs_store[job_id]
-        if not job.results:
+        
+        results_list = list(job.results)
+        if job.results_on_disk:
+            from app.utils.job_results_store import load_job_results_from_disk
+            results_list = load_job_results_from_disk(job.id)
+
+        if not results_list:
             raise HTTPException(status_code=400, detail="No results to export")
 
         output = io.StringIO()
         if job.schema_fields:
             fieldnames = [f.name for f in job.schema_fields]
-        elif job.results:
-            fieldnames = list(job.results[0].keys())
+        elif results_list:
+            fieldnames = list(results_list[0].keys())
         else:
             fieldnames = []
         writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
-        for row in job.results:
+        for row in results_list:
             flat_row = {}
             for k in fieldnames:
                 v = row.get(k)
@@ -49,10 +55,16 @@ def create_exports_router(jobs_store: dict):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
         job = jobs_store[job_id]
-        if not job.results:
+        
+        results_list = list(job.results)
+        if job.results_on_disk:
+            from app.utils.job_results_store import load_job_results_from_disk
+            results_list = load_job_results_from_disk(job.id)
+
+        if not results_list:
             raise HTTPException(status_code=400, detail="No results to export")
 
-        json_content = json.dumps(job.results, indent=2)
+        json_content = json.dumps(results_list, indent=2)
         return Response(
             content=json_content,
             media_type="application/json",
@@ -64,7 +76,13 @@ def create_exports_router(jobs_store: dict):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
         job = jobs_store[job_id]
-        if not job.results:
+        
+        results_list = list(job.results)
+        if job.results_on_disk:
+            from app.utils.job_results_store import load_job_results_from_disk
+            results_list = load_job_results_from_disk(job.id)
+
+        if not results_list:
             raise HTTPException(status_code=400, detail="No results to export")
 
         wb = Workbook()
@@ -75,8 +93,8 @@ def create_exports_router(jobs_store: dict):
 
         if job.schema_fields:
             fieldnames = [f.name for f in job.schema_fields]
-        elif job.results:
-            fieldnames = list(job.results[0].keys())
+        elif results_list:
+            fieldnames = list(results_list[0].keys())
         else:
             fieldnames = []
 
@@ -85,7 +103,7 @@ def create_exports_router(jobs_store: dict):
             ws.cell(row=1, column=col_num, value=header)
 
         # Write data
-        for row_num, row in enumerate(job.results, 2):
+        for row_num, row in enumerate(results_list, 2):
             for col_num, field in enumerate(fieldnames, 1):
                 value = row.get(field)
                 if isinstance(value, list):

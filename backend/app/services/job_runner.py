@@ -392,6 +392,15 @@ async def run_job(
         # $0.01 per LLM call + estimated browser cost ($0.02 per URL)
         job.estimated_cost_usd = round((job.total_llm_calls * 0.01) + (job.progress_total * 0.02), 4)
 
+        # Bound memory footprint if results > 1000
+        if len(job.results) > 1000:
+            from app.utils.job_results_store import save_job_results_to_disk
+            file_path = save_job_results_to_disk(job.id, job.results)
+            job.results_on_disk = True
+            job.results_file_path = file_path
+            job.results = []
+            _add_job_log(job, "Job results bounded and offloaded to disk due to size (>1000 records).")
+
         job.status = JobStatus.COMPLETED
         job.cancel_requested = False
         job.completed_at = datetime.datetime.now().isoformat()

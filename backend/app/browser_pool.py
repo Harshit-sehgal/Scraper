@@ -34,6 +34,13 @@ class BrowserPool:
         self._last_activity = time.time()
         self._cleanup_task: Optional[asyncio.Task] = None
         
+        # Hard recycling states
+        self._active_fetches = 0
+        self._cumulative_fetches = 0
+        self._recycling = False
+        self._recycle_event = asyncio.Event()
+        self._recycle_event.set()
+        
         # Metrics
         self.startup_latency_ms: float = 0.0
         self.active_contexts: int = 0
@@ -44,6 +51,13 @@ class BrowserPool:
 
     async def get_context(self, domain: str, strategy: Optional[FetchStrategy] = None) -> BrowserContext:
         """Get or create a browser context for a specific domain."""
+        await self._recycle_event.wait()
+        
+        # Check if we should recycle before proceeding
+        if self._should_recycle():
+            asyncio.create_task(self._check_and_trigger_recycle())
+            await self._recycle_event.wait()
+
         async with self._lock:
             self._last_activity = time.time()
             self.total_fetches += 1
@@ -124,6 +138,23 @@ class BrowserPool:
                         logger.debug(f"[BrowserPool] Creating context for {domain} with proxy: {proxy_config['server']}")
             
             context = await self._browser.new_context(**context_options)  # type: ignore[arg-type]
+            
+            # Register page tracking
+            def register_page_tracking(ctx):
+                def on_page(page):
+                    self._active_fetches += 1
+                    self._cumulative_fetches += 1
+                    logger.debug("[BrowserPool] Page created. Active: %d, Cumulative: %d", self._active_fetches, self._cumulative_fetches)
+                    
+                    def on_close(p):
+                        self._active_fetches = max(0, self._active_fetches - 1)
+                        logger.debug("[BrowserPool] Page closed. Active: %d", self._active_fetches)
+                        asyncio.create_task(self._check_and_trigger_recycle())
+                        
+                    page.on("close", on_close)
+                ctx.on("page", on_page)
+
+            register_page_tracking(context)
             
             # Phase 80: Advanced Stealth Evasion
             if settings.PLAYWRIGHT_STEALTH or is_stealth:
@@ -232,6 +263,73 @@ class BrowserPool:
                 self._playwright = None
             
             self.active_contexts = 0
+            self._active_fetches = 0
+            self._cumulative_fetches = 0
+
+    def _get_rss_memory(self) -> int:
+        import resource
+        try:
+            return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
+        except Exception:
+            return 0
+
+    def _should_recycle(self) -> bool:
+        if self._cumulative_fetches >= 200:
+            logger.info("[BrowserPool] Cumulative fetches (%d) reached limit (200). Recycling required.", self._cumulative_fetches)
+            return True
+        rss = self._get_rss_memory()
+        if rss > 1024 * 1024 * 1024:  # 1GB
+            logger.info("[BrowserPool] Process RSS memory (%.2f MB) exceeded 1GB. Recycling required.", rss / (1024*1024))
+            return True
+        return False
+
+    async def _check_and_trigger_recycle(self):
+        if not self._should_recycle() or self._recycling:
+            return
+
+        self._recycling = True
+        self._recycle_event.clear()
+        
+        while self._active_fetches > 0:
+            logger.info("[BrowserPool] Waiting for %d active fetches to drain before recycling...", self._active_fetches)
+            await asyncio.sleep(0.5)
+
+        logger.info("[BrowserPool] Active fetches drained to 0. Performing hard browser process recycle.")
+        try:
+            await self._hard_recycle()
+        except Exception as e:
+            logger.error("[BrowserPool] Hard recycle failed: %s", e)
+        finally:
+            self._recycling = False
+            self._recycle_event.set()
+
+    async def _hard_recycle(self) -> None:
+        for ctx in list(self._contexts.values()):
+            try:
+                await ctx.close()
+            except Exception:
+                pass
+        self._contexts.clear()
+        self._context_use_count.clear()
+        
+        if self._browser:
+            try:
+                await self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
+        
+        if self._playwright:
+            try:
+                await self._playwright.stop()
+            except Exception:
+                pass
+            self._playwright = None
+            
+        self.active_contexts = 0
+        self._active_fetches = 0
+        self._cumulative_fetches = 0
+        logger.info("[BrowserPool] Hard recycle completed successfully.")
 
     async def _periodic_cleanup(self) -> None:
         """Close browser if idle for too long."""

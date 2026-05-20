@@ -31,6 +31,17 @@ from app.selector_memory import get_selector_memory
 logger = logging.getLogger(__name__)
 
 
+async def _trigger_webhook(url: str, payload: dict):
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(url, json=payload)
+            if response.status_code >= 400:
+                logger.warning("Alert webhook returned status code %d", response.status_code)
+    except Exception as e:
+        logger.warning("Failed to deliver alert webhook: %s", e)
+
+
 @dataclass
 class DomainEvolutionMetrics:
     """Evolution metrics for a single domain."""
@@ -161,6 +172,32 @@ class DomainEvolutionModel:
                 "Anti-bot escalation detected for %s: %s → %s (score=%.2f)",
                 domain, old_level, new_level, new_anti_bot_score,
             )
+            
+            from app.config import settings
+            if getattr(settings, "ALERT_WEBHOOK_URL", None):
+                payload = {
+                    "event": "anti_bot_escalation",
+                    "domain": domain,
+                    "old_level": old_level,
+                    "new_level": new_level,
+                    "score": new_anti_bot_score,
+                    "timestamp": time.time(),
+                }
+                try:
+                    import asyncio
+                    loop = asyncio.get_running_loop()
+                    if loop.is_running():
+                        loop.create_task(_trigger_webhook(settings.ALERT_WEBHOOK_URL, payload))
+                except RuntimeError:
+                    # No running event loop, send in background thread
+                    import threading
+                    def fire_sync():
+                        import httpx
+                        try:
+                            httpx.post(settings.ALERT_WEBHOOK_URL, json=payload, timeout=5.0)
+                        except Exception as ex:
+                            logger.debug("Failed to deliver webhook synchronously: %s", ex)
+                    threading.Thread(target=fire_sync, daemon=True).start()
         
         self._recompute_volatility(domain)
     

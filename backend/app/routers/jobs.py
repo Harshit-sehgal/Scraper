@@ -65,10 +65,17 @@ def create_jobs_router(
             raise HTTPException(status_code=404, detail="Job not found")
         job = jobs_store[job_id]
         
+        results_list = list(job.results)
+        loaded_from_disk = False
+        if job.results_on_disk:
+            from app.utils.job_results_store import load_job_results_from_disk
+            results_list = load_job_results_from_disk(job.id)
+            loaded_from_disk = True
+
         # Backfill source metadata helper logic
-        if job.results:
+        if results_list:
             changed = False
-            for row in job.results:
+            for row in results_list:
                 source_url = str(row.get("source_url") or "").strip()
                 if not source_url:
                     continue
@@ -85,11 +92,18 @@ def create_jobs_router(
 
             if changed:
                 q = dict(job.quality_report or {})
-                q["source_breakdown"] = compute_source_breakdown(job.results)
+                q["source_breakdown"] = compute_source_breakdown(results_list)
                 job.quality_report = q
+                if loaded_from_disk:
+                    from app.utils.job_results_store import save_job_results_to_disk
+                    save_job_results_to_disk(job.id, results_list)
+                else:
+                    job.results = results_list
                 persist_state_fn()
                 
-        return job.model_dump()
+        dumped = job.model_dump()
+        dumped["results"] = results_list
+        return dumped
 
     @router.post("/api/jobs")
     async def create_job(job_data: JobCreate):
@@ -156,14 +170,22 @@ def create_jobs_router(
         job = jobs_store[job_id]
         if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
             raise HTTPException(status_code=409, detail="Job is still running; wait for completion before re-cleaning")
-        if not job.results:
+        
+        results_list = list(job.results)
+        loaded_from_disk = False
+        if job.results_on_disk:
+            from app.utils.job_results_store import load_job_results_from_disk
+            results_list = load_job_results_from_disk(job.id)
+            loaded_from_disk = True
+
+        if not results_list:
             raise HTTPException(status_code=400, detail="No results to re-clean")
         if not job.schema_fields:
             raise HTTPException(status_code=400, detail="Job has no schema fields for re-cleaning")
 
         started = datetime.datetime.now().isoformat()
-        before_records = len(job.results)
-        working_rows = [dict(r) for r in job.results]
+        before_records = len(results_list)
+        working_rows = [dict(r) for r in results_list]
         reclean_warnings: list[str] = []
 
         job.status = JobStatus.RUNNING
@@ -235,6 +257,20 @@ def create_jobs_router(
         for row in job.results:
             row["scraped_at"] = scraped_at
 
+        # Save back to disk if they remain above 1,000, or if it was loaded from disk and is still above 1000
+        if len(job.results) > 1000:
+            from app.utils.job_results_store import save_job_results_to_disk
+            file_path = save_job_results_to_disk(job.id, job.results)
+            job.results_on_disk = True
+            job.results_file_path = file_path
+            job.results = []
+        else:
+            if loaded_from_disk:
+                from app.utils.job_results_store import delete_job_results_from_disk
+                delete_job_results_from_disk(job.id)
+                job.results_on_disk = False
+                job.results_file_path = None
+
         prev_quality = dict(job.quality_report or {})
         existing_warnings = list(prev_quality.get("warnings") or [])
         radius_report = prev_quality.get("radius")
@@ -275,7 +311,7 @@ def create_jobs_router(
             "started_at": started,
             "completed_at": job.completed_at,
             "before_records": before_records,
-            "after_records": len(job.results),
+            "after_records": filtered_count,
             "ai_structuring": ai_report,
             "warnings": reclean_warnings,
         }
@@ -286,7 +322,7 @@ def create_jobs_router(
             "job_id": job.id,
             "status": job.status.value,
             "before_records": before_records,
-            "after_records": len(job.results),
+            "after_records": filtered_count,
             "warnings": reclean_warnings,
         }
 
@@ -319,10 +355,12 @@ def create_jobs_router(
         keep_ids = {jid for jid, _ in terminal[:keep_recent]}
 
         removed = 0
+        from app.utils.job_results_store import delete_job_results_from_disk
         for jid, _ in terminal:
             if jid in keep_ids:
                 continue
             del jobs_store[jid]
+            delete_job_results_from_disk(jid)
             removed += 1
 
         if removed:
@@ -353,12 +391,17 @@ def create_jobs_router(
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
         del recycle_bin_store[job_id]
+        from app.utils.job_results_store import delete_job_results_from_disk
+        delete_job_results_from_disk(job_id)
         persist_state_fn()
         return {"message": "Job permanently deleted"}
 
     @router.delete("/api/recycle_bin")
     async def clear_recycle_bin():
         count = len(recycle_bin_store)
+        from app.utils.job_results_store import delete_job_results_from_disk
+        for job_id in list(recycle_bin_store.keys()):
+            delete_job_results_from_disk(job_id)
         recycle_bin_store.clear()
         if count:
             persist_state_fn()

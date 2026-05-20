@@ -198,3 +198,6 @@ class Job(BaseModel):
     logs: list[LogEntry] = Field(default_factory=list)
     progress_current: int = 0
     progress_total: int = 0
+    results_on_disk: bool = Field(default=False, description="Whether results are stored in a compressed disk file")
+    results_file_path: Optional[str] = Field(default=None, description="Path to the compressed results file")
+

@@ -7,12 +7,14 @@ import logging
 import os
 from pathlib import Path
 from threading import Lock
+import concurrent.futures
 
 from typing import Optional
 
 from app.models import Job, JobStatus
 
 _STATE_LOCK = Lock()
+_SAVE_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 _DEFAULT_STATE_FILE = Path(__file__).resolve().parent.parent / "data" / "jobs_state.json"
 
 
@@ -70,6 +72,16 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
     return jobs_store, recycle_bin_store, world_state_data
 
 
+def _write_state_to_disk(path: Path, payload: dict) -> None:
+    temp_path = path.with_suffix(path.suffix + ".tmp")
+    try:
+        with _STATE_LOCK:
+            temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            temp_path.replace(path)
+    except Exception as e:
+        logging.exception("Failed to persist state in background thread to %s: %s", path, e)
+
+
 def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) -> None:
     path = get_state_file_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -90,10 +102,4 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
         "world_state": world_state_data,
     }
 
-    temp_path = path.with_suffix(path.suffix + ".tmp")
-    try:
-        with _STATE_LOCK:
-            temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-            temp_path.replace(path)
-    except Exception as e:
-        logging.exception("Failed to persist state to %s: %s", path, e)
+    _SAVE_EXECUTOR.submit(_write_state_to_disk, path, payload)
