@@ -48,7 +48,6 @@ def calculate_extraction_accuracy(
     # 1. Record Matching & Field Accuracy
     true_positives = 0
     total_expected_fields = sum(len(r) for r in expected)
-    total_extracted_fields = 0
     
     field_hits = {k: 0 for r in expected for k in r.keys()}
     field_totals = {k: 0 for r in expected for k in r.keys()}
