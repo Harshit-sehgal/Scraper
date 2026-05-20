@@ -82,10 +82,11 @@ _UNIVERSAL_ROOTS = [
     (['pric', 'cost', 'salar', 'fare', 'preci', 'prix', 'wert'], SemanticType.PRICE),
     (['date', 'time', 'schedule', 'fecha', 'zeit', 'horar'], SemanticType.DATE),
     (['loc', 'city', 'addr', 'place', 'dest', 'orig', 'ubica', 'stadt', 'code'], SemanticType.LOCATION),
-    (['nam', 'comp', 'firm', 'brand', 'make', 'model', 'builder', 'nombr', 'hotel', 'resort'], SemanticType.ORGANIZATION),
+    (['nam', 'comp', 'firm', 'brand', 'make', 'model', 'builder', 'nombr', 'hotel', 'resort', 'title'], SemanticType.ORGANIZATION),
     (['rat', 'scor', 'review', 'calif', 'bewert'], SemanticType.RATING),
     (['count', 'number', 'year', 'mileage', 'age', 'experien', 'num', 'jahr'], SemanticType.NUMBER),
     (['code', 'currenc', 'ident', 'id', 'codig'], SemanticType.CODE),
+    (['avail', 'stock', 'status', 'state'], SemanticType.TEXT),
 ]
 
 

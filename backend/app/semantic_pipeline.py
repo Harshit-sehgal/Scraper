@@ -301,13 +301,13 @@ def run_pipeline(
         if not records:
             return []
 
-        # Layer 3: Semantic segmentation
-        mem = StructuralMemoryTracker()
-        records = expand_composite_records(records, memory=mem)
+        # Layer 3: Semantic segmentation (Disabled because it destroys valid text)
+        # mem = StructuralMemoryTracker()
+        # records = expand_composite_records(records, memory=mem)
         report.after_segmentation = len(records)
         
-        # Layer 4: Entity grouping (boundary-aware merge)
-        records = group_adjacent_entities(records)
+        # Layer 4: Entity grouping (boundary-aware merge) (Disabled)
+        # records = group_adjacent_entities(records)
         
         # Layer 5: Global semantic allocation
         allocated_records: list = []
