@@ -48,7 +48,9 @@ class SelectorConfidenceScore:
 class SelectorMemory:
     """Persistent memory of successful selectors per domain."""
 
-    def __init__(self, storage_path: str = "backend/data/selector_memory.json"):
+    def __init__(self, storage_path: str | None = None):
+        if storage_path is None:
+            storage_path = str(Path(__file__).resolve().parent.parent / "data" / "selector_memory.json")
         self.path = Path(storage_path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._memory: dict[str, dict] = {}

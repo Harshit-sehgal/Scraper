@@ -14,11 +14,13 @@ import os
 import sqlite3
 import time
 import logging
+from pathlib import Path
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-CACHE_DB_PATH = "./backend/data/geocoding_cache.db"
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+CACHE_DB_PATH = str(_BACKEND_ROOT / "data" / "geocoding_cache.db")
 NEGATIVE_CACHE_TTL_DAYS = 7
 
 

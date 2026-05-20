@@ -108,12 +108,16 @@ class RegressionCapture:
 
     def __init__(
         self,
-        fixtures_dir: str = "backend/tests/fixtures/pages",
-        registry_path: str = "backend/data/regression_registry.json",
+        fixtures_dir: str | None = None,
+        registry_path: str | None = None,
         min_confidence: float = 0.5,
         min_html_length: int = 100,
         auto_archive: bool = True,
     ):
+        if fixtures_dir is None:
+            fixtures_dir = str(Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "pages")
+        if registry_path is None:
+            registry_path = str(Path(__file__).resolve().parent.parent / "data" / "regression_registry.json")
         self._fixtures_dir = Path(fixtures_dir)
         self._registry_path = Path(registry_path)
         self._min_confidence = min_confidence

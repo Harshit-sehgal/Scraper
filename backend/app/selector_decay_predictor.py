@@ -64,11 +64,16 @@ class SelectorDecayPredictor:
         self._confidence_snapshots: Dict[str, List[tuple[float, float]]] = defaultdict(list)
         self._load()
 
+    @staticmethod
+    def _get_snapshots_path() -> str:
+        from pathlib import Path
+        return str(Path(__file__).resolve().parent.parent / "data" / "selector_decay_snapshots.json")
+
     def _save(self) -> None:
         import os
         import json
         try:
-            path = "backend/data/selector_decay_snapshots.json"
+            path = self._get_snapshots_path()
             os.makedirs(os.path.dirname(path), exist_ok=True)
             data = {domain: [[t, c] for t, c in snapshots] for domain, snapshots in self._confidence_snapshots.items()}
             with open(path, "w") as f:
@@ -82,7 +87,7 @@ class SelectorDecayPredictor:
         import sys
         if "pytest" in sys.modules and not os.environ.get("TEST_SELECTOR_DECAY_PERSISTENCE"):
             return
-        path = "backend/data/selector_decay_snapshots.json"
+        path = self._get_snapshots_path()
         if os.path.exists(path):
             try:
                 with open(path, "r") as f:

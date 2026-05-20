@@ -15,12 +15,14 @@ import sqlite3
 import time
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = "./backend/data/benchmarks/benchmark_history.db"
-DASHBOARD_PATH = "./backend/data/benchmarks/regression_dashboard.md"
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = str(_BACKEND_ROOT / "data" / "benchmarks" / "benchmark_history.db")
+DASHBOARD_PATH = str(_BACKEND_ROOT / "data" / "benchmarks" / "regression_dashboard.md")
 
 
 @dataclass

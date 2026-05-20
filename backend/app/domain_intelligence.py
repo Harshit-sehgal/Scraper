@@ -50,7 +50,9 @@ class DomainIntelligence:
 class DomainIntelligenceRegistry:
     """Persistent registry of domain intelligence."""
 
-    def __init__(self, storage_path: str = "backend/data/domain_intelligence.json"):
+    def __init__(self, storage_path: str | None = None):
+        if storage_path is None:
+            storage_path = str(Path(__file__).resolve().parent.parent / "data" / "domain_intelligence.json")
         self.path = Path(storage_path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._registry: Dict[str, DomainIntelligence] = {}

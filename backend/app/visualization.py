@@ -13,11 +13,13 @@ import os
 import time
 import logging
 from enum import Enum
+from pathlib import Path
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-MAP_PATH = "./backend/data/governance/architecture_map.md"
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+MAP_PATH = str(_BACKEND_ROOT / "data" / "governance" / "architecture_map.md")
 
 
 class OperatorMode(str, Enum):
