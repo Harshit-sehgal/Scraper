@@ -13,6 +13,13 @@ from app.telemetry_state import TelemetryStateAdapter, get_telemetry_state
 class TestTelemetryStateAdapter:
     """Tests for TelemetryStateAdapter methods."""
 
+    def setup_method(self):
+        """Reset module-level singletons before each test to avoid cross-test pollution."""
+        import app.telemetry_state as ts
+        import app.scrape_telemetry as st
+        ts._telemetry_state = None
+        st._collector = None
+
     def test_initial_stats_empty(self):
         adapter = TelemetryStateAdapter()
         stats = adapter.get_stats()
@@ -96,8 +103,13 @@ class TestTelemetryStateAdapter:
 class TestGetTelemetryState:
     """Tests for the module-level singleton."""
 
+    def setup_method(self):
+        import app.telemetry_state as ts
+        import app.scrape_telemetry as st
+        ts._telemetry_state = None
+        st._collector = None
+
     def test_returns_singleton(self):
-        # Reset global state
         import app.telemetry_state as ts
         ts._telemetry_state = None
 
