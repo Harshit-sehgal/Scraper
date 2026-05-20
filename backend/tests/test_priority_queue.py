@@ -116,7 +116,7 @@ class TestTransactionalPriorityQueue:
     def test_remove_by_trace_id(self):
         queue = TransactionalPriorityQueue()
         trace_a = queue.push(PriorityLevel.NORMAL, "tx_a")
-        trace_b = queue.push(PriorityLevel.HIGH, "tx_b")
+        _ = queue.push(PriorityLevel.HIGH, "tx_b")
 
         assert queue.size() == 2
         removed = queue.remove(trace_a)
