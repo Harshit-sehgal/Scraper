@@ -174,7 +174,8 @@ class DomainEvolutionModel:
             )
             
             from app.config import settings
-            if getattr(settings, "ALERT_WEBHOOK_URL", None):
+            webhook_url = getattr(settings, "ALERT_WEBHOOK_URL", None)
+            if webhook_url:
                 payload = {
                     "event": "anti_bot_escalation",
                     "domain": domain,
@@ -187,14 +188,14 @@ class DomainEvolutionModel:
                     import asyncio
                     loop = asyncio.get_running_loop()
                     if loop.is_running():
-                        loop.create_task(_trigger_webhook(settings.ALERT_WEBHOOK_URL, payload))
+                        loop.create_task(_trigger_webhook(webhook_url, payload))
                 except RuntimeError:
                     # No running event loop, send in background thread
                     import threading
                     def fire_sync():
                         import httpx
                         try:
-                            httpx.post(settings.ALERT_WEBHOOK_URL, json=payload, timeout=5.0)
+                            httpx.post(webhook_url, json=payload, timeout=5.0)
                         except Exception as ex:
                             logger.debug("Failed to deliver webhook synchronously: %s", ex)
                     threading.Thread(target=fire_sync, daemon=True).start()

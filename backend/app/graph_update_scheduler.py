@@ -36,7 +36,7 @@ class CognitiveTask:
 
 
 class GlobalCognitiveScheduler:
-    def __init__(self, ws=None):
+    def __init__(self, ws: Any = None) -> None:
         self.ws = ws
         self._task_queue: List[CognitiveTask] = []
         self._is_paused = False
@@ -48,7 +48,7 @@ class GlobalCognitiveScheduler:
         }
 
     def schedule(self, task_id: str, priority: TaskPriority,
-                 handler: Callable, *args, **kwargs):
+                 handler: Callable, *args: Any, **kwargs: Any) -> None:
         task = CognitiveTask(task_id, priority, handler, args, kwargs)
         heapq.heappush(self._task_queue, task)
         logging.getLogger(__name__).debug(
@@ -111,7 +111,7 @@ class GlobalCognitiveScheduler:
 
         return completed
 
-    def clear(self):
+    def clear(self) -> None:
         self._task_queue.clear()
 
 
@@ -122,12 +122,18 @@ from app.semantic_world_state import get_world_state
 
 
 class GraphUpdateScheduler:
-    def _setup_subscriptions(self):
+    def __init__(self) -> None:
+        self.pending_updates: int = 0
+        self._total_wave_intensity: float = 0.0
+        self.dispatcher = get_dispatcher()
+        self._setup_subscriptions()
+
+    def _setup_subscriptions(self) -> None:
         self.dispatcher.subscribe(SemanticEventType.UNCERTAINTY_SPIKE, self.on_instability)
         self.dispatcher.subscribe(SemanticEventType.TOPOLOGY_SHIFT, self.on_instability)
         self.dispatcher.subscribe(SemanticEventType.FIELD_WAVE, self.on_field_wave)
 
-    def on_instability(self, event: SemanticEvent):
+    def on_instability(self, event: SemanticEvent) -> None:
         ws = get_world_state()
         ws.record_decision({
             "type": event.event_type.value,
@@ -144,7 +150,7 @@ class GraphUpdateScheduler:
             if source_id:
                 ws._topology.emit_field_wave(source_id, event.instability_delta * 2.0)
 
-    def on_field_wave(self, event: SemanticEvent):
+    def on_field_wave(self, event: SemanticEvent) -> None:
         """Monitor field waves to trigger global manifold relaxation."""
         intensity = event.payload.get("intensity", 0.0)
         self._total_wave_intensity += intensity
@@ -154,13 +160,7 @@ class GraphUpdateScheduler:
             self.run_global_relaxation()
             self._total_wave_intensity *= 0.5 # Dampen after work
 
-    def __init__(self):
-        self.pending_updates = 0
-        self._total_wave_intensity = 0.0
-        self.dispatcher = get_dispatcher()
-        self._setup_subscriptions()
-
-    def run_global_relaxation(self):
+    def run_global_relaxation(self) -> None:
         """Global manifold relaxation triggered by field agitation."""
         from app.semantic_inference_engine import RoleEmbeddingEngine
         ie = RoleEmbeddingEngine()
@@ -184,7 +184,7 @@ class GraphUpdateScheduler:
         ))
 
     def schedule(self, task_id: str, priority: TaskPriority,
-                 handler: Callable, *args, **kwargs):
+                 handler: Callable, *args: Any, **kwargs: Any) -> None:
         """Delegate scheduling to the active world state's scheduler."""
         ws = get_world_state()
         if hasattr(ws, '_scheduler') and ws._scheduler:
@@ -194,17 +194,17 @@ class GraphUpdateScheduler:
             logging.getLogger(__name__).warning(f"No active scheduler for task {task_id}")
 
 
-_scheduler = None
+_scheduler: Any = None
 
 
-def get_scheduler():
+def get_scheduler() -> GraphUpdateScheduler:
     global _scheduler
     if _scheduler is None:
         _scheduler = object()
         _scheduler = GraphUpdateScheduler()
     return _scheduler
 
-def reset_scheduler():
+def reset_scheduler() -> None:
     """Reset the global scheduler (for testing)."""
     global _scheduler
     _scheduler = None
