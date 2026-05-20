@@ -202,7 +202,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
 
     try:
         def _run_g4f_json():
-            from g4f.client import Client
+            from g4f.client import Client  # type: ignore[import-untyped]
             client = Client()
             res = client.chat.completions.create(
                 model="gpt-4o-mini",

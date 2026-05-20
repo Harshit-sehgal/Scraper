@@ -9,8 +9,8 @@ import re
 import time
 from typing import Any, Optional
 
-from geopy.distance import geodesic
-from geopy.geocoders import Nominatim
+from geopy.distance import geodesic  # type: ignore[import-untyped]
+from geopy.geocoders import Nominatim  # type: ignore[import-untyped]
 
 from app.config import settings
 from app.models import FieldType, FilterOperator, FilterRule, SchemaField

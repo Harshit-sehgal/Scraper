@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 
 @dataclass
@@ -260,7 +260,7 @@ def _detect_key_value_structure(soup: BeautifulSoup) -> Optional[StructureProfil
     """Detect if page uses key-value or definition list structure."""
     # Check for definition lists
     dl = soup.find("dl")
-    if dl:
+    if dl and isinstance(dl, Tag):
         dts = dl.find_all("dt")
         if len(dts) > 3:
             headers = [dt.get_text(strip=True) for dt in dts[:10]]
