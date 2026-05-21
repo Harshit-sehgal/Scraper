@@ -17,7 +17,6 @@ import pytest
 
 from app.selector_discovery import analyze_url_for_fields
 from app.page_profiler import StructureProfile, ValuePatterns
-from app.acquisition_state import AcquisitionState
 from app.acquisition_telemetry import AcquisitionTelemetryCollector
 
 

@@ -37,7 +37,7 @@ class EmptyResponseCheck:
     data_signals: int = 0
     """Number of data-like signals found (prices, dates, structured content)."""
 
-    suggestions: list[str] = None
+    suggestions: list[str] | None = None
     """Actionable suggestions for the user."""
 
     def __post_init__(self):
