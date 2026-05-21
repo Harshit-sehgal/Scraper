@@ -118,6 +118,8 @@ class JobCreate(BaseModel):
     max_pages: int = Field(10, ge=1, description="Max pages to follow per URL")
     deduplicate: bool = Field(True, description="Remove duplicate records")
     deduplicate_field: str = Field("", description="Field to use for deduplication")
+    # Selectors map from URL analysis (item_container + field selectors)
+    selectors_map: dict = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
     min_record_score: float = Field(0.35, ge=0.0, le=1.0, description="Minimum quality score required per extracted record")
 
     @model_validator(mode="after")
@@ -181,6 +183,8 @@ class Job(BaseModel):
     deduplicate: bool = True
     deduplicate_field: str = ""
     min_record_score: float = 0.35
+    # Selectors map from URL analysis (pre-discovered CSS selectors)
+    selectors_map: dict = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
     cancel_requested: bool = False
     status: JobStatus = JobStatus.PENDING
     created_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())

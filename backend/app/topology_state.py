@@ -5,14 +5,13 @@ global_communities, schema_patterns, topological_laws, or cohesion
 structures directly. All topology changes go through this state object.
 """
 
-from typing import Callable, Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Set, Tuple, Optional
 from dataclasses import dataclass
 from app.core_types import FieldConflictRegion, MAX_COUPLING_TRANSFER
 from app.transaction_context import active_transaction
 
 class ConflictError(Exception):
     """Raised when an optimistic concurrency conflict is detected."""
-    pass
 
 
 def _clamp01(value: float) -> float:

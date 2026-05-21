@@ -75,9 +75,9 @@ def _read_node_value(target, field_type: FieldType | None = None, field_name: st
         if title_clean:
             if text_val.endswith("...") or text_val.endswith("…"):
                 use_title = True
-            elif any(k in field_name.lower() for k in ["title", "name", "company", "product"]):
-                if len(title_clean) > len(text_val):
-                    use_title = True
+            elif field_type in (None, FieldType.STRING) and len(title_clean) > len(text_val):
+                # For generic string fields, prefer the title attribute if it's longer
+                use_title = True
     if use_title and title_val:
         return title_val.strip()
     if alt_val and not text_val:
@@ -196,7 +196,12 @@ def apply_selectors(
 
 
 def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: str = "") -> list[dict]:
-    """Fallback extraction path when selector generation fails."""
+    """Fallback extraction path when selector generation fails.
+    
+    Dispatches extraction logic purely by FieldType — no field-name matching.
+    The user declaratively sets the type on each field in their schema;
+    the code respects that choice without guessing based on field names.
+    """
     soup = BeautifulSoup(html, "html.parser")
     
     # Remove obvious noise before searching for containers
@@ -206,7 +211,9 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
     page_email, page_phone = _extract_contacts_from_node(soup)
     
     # Priority 1: Common data container classes
-    containers = list(soup.find_all(["article", "li", "tr", "div"], class_=re.compile(r"product|item|card|listing|row|flight-result|result-item|search-result|itinerary", re.I)))
+    containers = list(soup.find_all(["article", "li", "tr", "div"], class_=re.compile(
+        r"item|card|listing|row|result|itinerary|entry", re.I
+    )))
     
     # Priority 2: Headings and their parents
     if not containers:
@@ -222,65 +229,151 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
         containers = [soup.body]
 
     results = []
-    seen_texts = set() # Local dedup for regex path
+    seen_texts = set()
+    
+    # Use the first schema field as the primary entity field (user-defined ordering)
+    desc_field = schema_fields[0].name if schema_fields else "text"
     
     for container in containers[:settings.REGEX_MAX_CONTAINERS]:
         text = _compact_text(container.get_text(separator=" ", strip=True))
         if len(text) < settings.SELECTOR_MIN_TEXT_LEN or text in seen_texts:
             continue
+        # Skip containers that look like noise: ads, newsletters, signup forms, sidebars
+        classes = " ".join(container.get("class", []))
+        id_attr = container.get("id", "")
+        noise_text = text.lower()
+        if re.search(r"subscribe|newsletter|sign.?up|advertisement|ad[-_]?banner|sidebar|sponsored|cookie",
+                      f"{classes} {id_attr} {noise_text}", re.I):
+            continue
         seen_texts.add(text)
 
         record: dict = {}
-        # Identify the most "descriptive" field to hold full text if needed
-        desc_field = next((f.name for f in schema_fields if any(k in f.name.lower() for k in ["title", "name", "company", "description"])), schema_fields[0].name if schema_fields else "text")
         
         for field in schema_fields:
-            field_name = field.name.lower()
+            ft = field.field_type
+            val = None
 
-            if field.field_type == FieldType.URL:
+            if ft == FieldType.URL:
                 link = container.find("a")
-                record[field.name] = _sanitize_field_value(field, link.get("href") if link else None, base_url=base_url)
-            elif field.field_type == FieldType.EMAIL:
+                val = _sanitize_field_value(field, link.get("href") if link else None, base_url=base_url)
+            
+            elif ft == FieldType.EMAIL:
                 link = container.find("a", href=re.compile(r"mailto:", re.I))
                 href = link.get("href") if link else None
                 val = href.split("mailto:", 1)[1].split("?")[0] if href else text
-                record[field.name] = _sanitize_field_value(field, val)
-            elif field.field_type == FieldType.PHONE:
+                val = _sanitize_field_value(field, val)
+            
+            elif ft == FieldType.PHONE:
                 link = container.find("a", href=re.compile(r"tel:", re.I))
                 href = link.get("href") if link else None
                 val = href.split("tel:", 1)[1].split("?")[0] if href else text
-                record[field.name] = _sanitize_field_value(field, val)
-            elif field.field_type == FieldType.CURRENCY or "price" in field_name:
-                # Find elements with price-like classes or text containing currency symbols
-                price_node = container.find(True, class_=re.compile(r"price|amount|cost|amt|fare", re.I))
+                val = _sanitize_field_value(field, val)
+            
+            elif ft == FieldType.CURRENCY:
+                price_node = container.find(True, class_=re.compile(r"price|amount|cost|amt|fare|mrp|discount|total|sale|offer", re.I))
                 if price_node:
                     val = price_node.get_text()
                 else:
-                    # Search text for currency-like pattern
-                    match = re.search(r"([$£€¥₹]\s*\d+[\d,.]*|\d+[\d,.]*\s*[$£€¥₹])", text)
+                    match = re.search(r"([$£€¥₹]\s*\d+[\d,.]*|\d+[\d,.]*\s*[$£€¥₹]|Rs\.?\s*\d+)", text)
                     val = match.group(1) if match else None
-                record[field.name] = _sanitize_field_value(field, val)
-            elif any(k in field_name for k in ["title", "name", "company", "airline", "product"]):
-                # Try to find a heading or a strong/a element with relevant class
-                heading = container.find(["h1", "h2", "h3", "h4", "strong", "a", "span", "div"], class_=re.compile(r"title|name|company|heading|airline|product", re.I))
-                if not heading and container.name == "tr":
-                    # For table rows, try the first cell
-                    heading = container.find("td")
-                if not heading:
-                    heading = container.find(["h1", "h2", "h3", "h4", "strong"])
-                if not heading:
-                    # If it's an <a> tag, make sure it doesn't just say 'Visit' or 'Click'
-                    link = container.find("a")
-                    if link and not re.search(r"visit|click|more|details|select", link.get_text(), re.I):
-                        heading = link
-                
-                candidate = heading.get_text(" ", strip=True) if heading else text[:settings.SELECTOR_HEADING_FALLBACK_LEN]
-                record[field.name] = _sanitize_field_value(field, candidate)
-            elif field.name == desc_field:
-                # descriptive field gets full composite text if nothing better was found
-                record[field.name] = _sanitize_field_value(field, text[:200]) # Limit length for regex path
+                val = _sanitize_field_value(field, val)
+            
+            elif ft == FieldType.PERCENTAGE:
+                pct_node = container.find(True, class_=re.compile(r"percent|discount|saving|off|tax|vat", re.I))
+                if pct_node:
+                    val = pct_node.get_text()
+                else:
+                    match = re.search(r"(\d+[\.\,]?\d*%)", text)
+                    val = match.group(1) if match else None
+                val = _sanitize_field_value(field, val)
+            
+            elif ft == FieldType.RATING:
+                rating_node = container.find(True, class_=re.compile(r"rating|stars|score|review", re.I))
+                if rating_node:
+                    val = rating_node.get_text()
+                else:
+                    match = re.search(r"(\d+\.?\d*/\d+|\d+\.?\d*\s*stars?|★+)", text, re.I)
+                    val = match.group(1) if match else None
+                val = _sanitize_field_value(field, val)
+            
+            elif ft == FieldType.BOOLEAN:
+                bool_node = container.find(True, class_=re.compile(r"stock|available|status|active", re.I))
+                if bool_node:
+                    val = bool_node.get_text()
+                else:
+                    match = re.search(r"\b(In Stock|Out of Stock|Available|Unavailable|Sold Out|Yes|No)\b", text, re.I)
+                    val = match.group(1) if match else None
+                val = _sanitize_field_value(field, val)
+            
+            elif ft == FieldType.CODE:
+                code_node = container.find(True, class_=re.compile(r"sku|product-code|barcode|isbn|model-number|part", re.I))
+                if code_node:
+                    val = code_node.get_text()
+                else:
+                    match = re.search(r"(SKU[-:\s]*[A-Za-z0-9-]+|\b[0-9]{12,13}\b)", text, re.I)
+                    val = match.group(1) if match else None
+                val = _sanitize_field_value(field, val)
+            
+            elif ft == FieldType.LOCATION:
+                loc_node = container.find(True, class_=re.compile(r"origin|destination|city|location|airport|from|to|station", re.I))
+                if loc_node:
+                    val = loc_node.get_text()
+                else:
+                    match = re.search(r"\b[A-Z]{3}\b", text)
+                    val = match.group(0) if match else None
+                val = _sanitize_field_value(field, val)
+            
+            elif ft in (FieldType.NUMBER, FieldType.INTEGER, FieldType.FLOAT):
+                num_node = container.find(True, class_=re.compile(r"number|count|amount|value|qty|quantity", re.I))
+                if num_node:
+                    val = num_node.get_text()
+                else:
+                    match = re.search(r"(\d+[\d,]*\.?\d*)", text)
+                    val = match.group(1) if match else None
+                val = _sanitize_field_value(field, val)
+            
             else:
-                record[field.name] = None
+                # STRING, DATE, or unknown — extract the most prominent text
+                if field.name == desc_field:
+                    # Primary entity: get the most specific identifying text
+                    # Strategy 1: Look for heading/link elements
+                    heading = container.find(["h1", "h2", "h3", "h4", "strong"])
+                    if not heading:
+                        link = container.find("a")
+                        if link and not re.search(r"visit|click|more|details|select|here|book", link.get_text(), re.I):
+                            heading = link
+                    if not heading and container.name == "tr":
+                        heading = container.find("td")
+                    
+                    # Strategy 2: Look for img alt text (e.g. airline logo, company logo)
+                    if not heading:
+                        img = container.find("img", alt=True)
+                        if img and img.get("alt", "").strip() and len(img["alt"].strip()) > 2:
+                            heading = img
+                    
+                    # Strategy 3: Look for elements with identifying class patterns
+                    if not heading:
+                        named_el = container.find(class_=re.compile(r"name|title|brand|company|org", re.I))
+                        if named_el:
+                            heading = named_el
+                    
+                    # Strategy 4: First element with short, meaningful text (not a full sentence)
+                    if not heading:
+                        for child in container.find_all(["span", "div", "p", "b", "i"], recursive=True, limit=10):
+                            child_text = child.get_text(strip=True)
+                            if child_text and len(child_text) < 60 and child_text != text:
+                                if re.match(r"^[A-Za-z]\w+(\s+[A-Za-z]\w+){0,4}$", child_text):
+                                    heading = child
+                                    break
+                    
+                    candidate = heading.get("alt") if heading and heading.name == "img" else \
+                        (heading.get_text(" ", strip=True) if heading else text[:settings.SELECTOR_HEADING_FALLBACK_LEN])
+                    val = _sanitize_field_value(field, candidate)
+                else:
+                    # Secondary fields: use container text or None
+                    val = _sanitize_field_value(field, text[:200]) if text else None
+
+            record[field.name] = val
 
         record = _enrich_record_contacts(
             record, schema_fields, container,
@@ -296,15 +389,4 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
     return _apply_page_level_contact_fallback(results, schema_fields, page_email, page_phone)
 
 
-def _get_field_keywords(field_name: str) -> list[str]:
-    """Get common alternative names for a field to help header matching."""
-    name = field_name.lower()
-    if any(k in name for k in ["company", "name", "title"]):
-        return ["name", "company", "title", "business", "firm"]
-    if any(k in name for k in ["price", "cost", "amt"]):
-        return ["price", "cost", "amount", "total", "fare"]
-    if any(k in name for k in ["date", "time"]):
-        return ["date", "time", "when", "departure", "arrival"]
-    if any(k in name for k in ["location", "address", "city"]):
-        return ["location", "address", "city", "destination", "origin"]
-    return [name]
+

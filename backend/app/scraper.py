@@ -25,9 +25,8 @@ from app.html_utils import (
     _is_empty_value, fetch_page_content, _boost_contacts_with_page_html,
 )
 from app.models import SchemaField
-from app.semantic_pipeline import run_pipeline
 from app.data_utils import (
-    _dedupe_records, _limit_source_records as _base_limit_source_records,
+    _limit_source_records as _base_limit_source_records,
     process_raw_records,
 )
 from app.selector_profiles.loader import try_profile_extraction, match_profile_for_url
@@ -75,6 +74,7 @@ async def scrape_url(
     min_record_score: float | None = None,
     user_intent: str = "",
     world_state=None,
+    selectors_map: dict | None = None,
 ) -> list[dict]:
     """Orchestrate the full extraction flow for a single URL."""
     if min_record_score is None:
@@ -208,6 +208,7 @@ async def scrape_url(
         provenance_builder=provenance_builder,
         world_state=world_state,
         user_intent=user_intent,
+        provided_selectors=selectors_map,
     )
     results = ext_result.records
     

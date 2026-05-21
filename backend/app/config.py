@@ -131,6 +131,17 @@ class Settings(BaseSettings):
     INSIGHT_TEMPERATURE: float = 0.5
     """Temperature for insight generation LLM calls."""
 
+    # ─── URL Analyzer ──────────────────────────────────────────────────────
+    URL_ANALYZER_MAX_FIELDS: int = 30
+    """Max fields returned by the URL analyzer (higher than intent parser because
+    we're analyzing an actual page with all its data columns)."""
+    URL_ANALYZER_SNIPPET_MAX_CHARS: int = 30000
+    """Max characters of HTML sent to LLM for URL analysis (higher than selector
+    discovery because we need the LLM to see more of the page to find all fields)."""
+    URL_ANALYZER_TEMPERATURE: float = 0.5
+    """Temperature for URL analysis LLM calls (higher than default 0.1 to encourage
+    more thorough exploration and descriptive field naming)."""
+
     # ─── Scraper Heuristics (Grounding abstractions) ───────────────────────
     SELECTOR_SNIPPET_MAX_CHARS: int = 16000
     """Max characters of HTML sent to LLM for selector discovery."""

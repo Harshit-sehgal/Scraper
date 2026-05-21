@@ -18,7 +18,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, asdict
 from enum import Enum
-from typing import Optional, Callable, Any
+from typing import Callable, Any, Optional
 
 from app.failure_classification import FailureCategory, FailureClassification
 
@@ -319,7 +319,6 @@ class RecoveryStrategist:
     
     def __init__(self):
         """Initialize recovery strategist."""
-        pass
     
     def generate_recovery_plan(
         self,

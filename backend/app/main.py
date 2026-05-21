@@ -18,6 +18,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from pydantic import BaseModel, Field
+
 from app.config import settings
 from app.routers.jobs import create_jobs_router
 from app.routers.exports import create_exports_router
@@ -26,6 +28,15 @@ from app.services.job_runner import run_job
 from app.services.state import persist_state
 from app.state_store import load_state, get_state_file_path
 from app.rate_limiter import RateLimiterMiddleware
+
+
+# ─── Request Models ────────────────────────────────────────────────────────
+
+
+class URLPreviewRequest(BaseModel):
+    """Request body for URL analysis."""
+    url: str = Field(..., description="The URL to analyze for data extraction")
+
 
 logger = logging.getLogger(__name__)
 
@@ -638,6 +649,41 @@ async def export_system_diagnostics():
         "Content-Disposition": "attachment; filename=dataforge_diagnostics.zip"
     }
     return Response(zip_buffer.getvalue(), media_type="application/zip", headers=headers)
+
+
+# ─── URL Analyzer Endpoint ──────────────────────────────────────────────
+
+
+@app.post("/api/url/analyze")
+async def analyze_url(req: URLPreviewRequest):
+    """Analyze a URL and auto-detect what data fields can be extracted.
+    
+    Fetches the URL, analyzes page structure, detects value patterns,
+    and uses LLM to discover all data fields with their CSS selectors,
+    types, confidence scores, and example values.
+    
+    This is the "preview URL → suggest fields" step that lets users
+    see what data is available before deciding what to scrape.
+    
+    Returns:
+        url: The analyzed URL
+        page_structure: Type of structure (table|cards|list|mixed)
+        structure_confidence: How confident we are in the structure type
+        estimated_record_count: Estimated number of records on the page
+        item_container: CSS selector for repeating items
+        fetch_method: Method used to fetch the page
+        fetch_time_ms: Time taken to fetch and analyze
+        anti_bot_score: Likelihood the page has anti-bot protection
+        suggested_fields: List of detected fields with name, type, selector, example, confidence
+    """
+    from app.selector_discovery import analyze_url_for_fields
+    
+    result = await analyze_url_for_fields(url=req.url)
+    
+    if "error" in result and result["error"]:
+        return JSONResponse(status_code=422, content=result)
+    
+    return result
 
 
 # ─── Serve Frontend (must be AFTER all API route definitions) ────────────

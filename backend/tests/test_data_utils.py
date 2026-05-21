@@ -23,11 +23,11 @@ from app.models import FieldType, SchemaField
 
 # ─── Schema Fixtures ───────────────────────────────────────────────────────────
 
-STR_FIELD = SchemaField(name="name", field_type=FieldType.STRING)
-INT_FIELD = SchemaField(name="count", field_type=FieldType.INTEGER)
-FLOAT_FIELD = SchemaField(name="price", field_type=FieldType.FLOAT)
-EMAIL_FIELD = SchemaField(name="email", field_type=FieldType.EMAIL)
-PHONE_FIELD = SchemaField(name="phone", field_type=FieldType.PHONE)
+STR_FIELD = SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)
+INT_FIELD = SchemaField(name="count", field_type=FieldType.INTEGER, description="", required=False)
+FLOAT_FIELD = SchemaField(name="price", field_type=FieldType.FLOAT, description="", required=False)
+EMAIL_FIELD = SchemaField(name="email", field_type=FieldType.EMAIL, description="", required=False)
+PHONE_FIELD = SchemaField(name="phone", field_type=FieldType.PHONE, description="", required=False)
 
 SIMPLE_SCHEMA = [STR_FIELD, INT_FIELD]
 FULL_SCHEMA = [STR_FIELD, INT_FIELD, FLOAT_FIELD, EMAIL_FIELD, PHONE_FIELD]
@@ -106,7 +106,7 @@ class TestDedupeRecords:
 
     def test_fallback_to_all_fields(self):
         """When no name/company/title fields, use all fields as identity."""
-        schema = [SchemaField(name="code", field_type=FieldType.STRING), SchemaField(name="price", field_type=FieldType.FLOAT)]
+        schema = [SchemaField(name="code", field_type=FieldType.STRING, description="", required=False), SchemaField(name="price", field_type=FieldType.FLOAT, description="", required=False)]
         records = [
             {"code": "A1", "price": "10"},
             {"code": "A1", "price": "10"},
@@ -222,8 +222,8 @@ class TestAlignProfileKeysToSchema:
         from app.data_utils import align_profile_keys_to_schema
         records = [{"name": "Acme", "price": "100"}]
         schema = [
-            SchemaField(name="name", field_type=FieldType.STRING),
-            SchemaField(name="price", field_type=FieldType.CURRENCY),
+            SchemaField(name="name", field_type=FieldType.STRING, description="", required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
         ]
         aligned = align_profile_keys_to_schema(records, schema)
         assert aligned[0]["name"] == "Acme"
@@ -233,8 +233,8 @@ class TestAlignProfileKeysToSchema:
         from app.data_utils import align_profile_keys_to_schema
         records = [{"origin": "LON", "destination": "PAR"}]
         schema = [
-            SchemaField(name="origin_airport", field_type=FieldType.STRING),
-            SchemaField(name="destination_airport", field_type=FieldType.STRING),
+            SchemaField(name="origin_airport", field_type=FieldType.STRING, description="", required=False),
+            SchemaField(name="destination_airport", field_type=FieldType.STRING, description="", required=False),
         ]
         aligned = align_profile_keys_to_schema(records, schema)
         assert aligned[0]["origin_airport"] == "LON"
@@ -244,7 +244,7 @@ class TestAlignProfileKeysToSchema:
         from app.data_utils import align_profile_keys_to_schema
         records = [{"fare": "250"}]
         schema = [
-            SchemaField(name="ticket_price", field_type=FieldType.CURRENCY),
+            SchemaField(name="ticket_price", field_type=FieldType.CURRENCY, description="", required=False),
         ]
         aligned = align_profile_keys_to_schema(records, schema)
         assert aligned[0]["ticket_price"] == "250"
@@ -264,12 +264,12 @@ class TestAlignProfileKeysToSchema:
         }
         record = {key: sample_values.get(key, f"sample_{key}") for key in profile_fields}
         schema = [
-            SchemaField(name="airlines_name", field_type=FieldType.STRING, description="Name of the airline"),
-            SchemaField(name="origin_airport", field_type=FieldType.STRING, description="Airport of origin"),
-            SchemaField(name="destination_airport", field_type=FieldType.STRING, description="Airport of destination"),
-            SchemaField(name="prices", field_type=FieldType.CURRENCY, description="Price of the flight"),
-            SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure"),
-            SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival"),
+            SchemaField(name="airlines_name", field_type=FieldType.STRING, description="Name of the airline", required=False),
+            SchemaField(name="origin_airport", field_type=FieldType.STRING, description="Airport of origin", required=False),
+            SchemaField(name="destination_airport", field_type=FieldType.STRING, description="Airport of destination", required=False),
+            SchemaField(name="prices", field_type=FieldType.CURRENCY, description="Price of the flight", required=False),
+            SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure", required=False),
+            SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival", required=False),
         ]
         aligned = align_profile_keys_to_schema([record], schema, profile_fields=profile_fields)
         row = aligned[0]
@@ -291,11 +291,10 @@ class TestAlignProfileKeysToSchema:
         from app.data_utils import align_profile_keys_to_schema
         records = [{"return_date": "01-06-2026", "date": "30-05-2026"}]
         schema = [
-            SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure"),
-            SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival"),
+            SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure", required=False),
+            SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival", required=False),
         ]
-        aligned = align_profile_keys_to_schema(
-            records, schema, profile_fields={"return_date": {"type": "text"}, "date": {"type": "text"}}
+        aligned = align_profile_keys_to_schema(records, schema, profile_fields={"return_date": {"type": "text"}, "date": {"type": "text"}}
         )
         assert aligned[0]["departure_date"] == "30-05-2026"
         assert aligned[0]["arrival_date"] == "01-06-2026"
@@ -303,7 +302,8 @@ class TestAlignProfileKeysToSchema:
     def test_intent_boost_mapping(self):
         from app.data_utils import align_extracted_keys_to_schema
         records = [{"fare": "250"}]
-        schema = [SchemaField(name="ticket_price", field_type=FieldType.CURRENCY)]
+        schema = [
+            SchemaField(name="ticket_price", field_type=FieldType.CURRENCY, description="", required=False)]
         aligned = align_extracted_keys_to_schema(
             records,
             schema,
@@ -315,8 +315,8 @@ class TestAlignProfileKeysToSchema:
         from app.data_utils import align_profile_keys_to_schema
         records = [{"stops": "1 Stop", "date": "30-05-2026"}]
         schema = [
-            SchemaField(name="departure_date", field_type=FieldType.DATE),
-            SchemaField(name="arrival_date", field_type=FieldType.DATE),
+            SchemaField(name="departure_date", field_type=FieldType.DATE, description="", required=False),
+            SchemaField(name="arrival_date", field_type=FieldType.DATE, description="", required=False),
         ]
         aligned = align_profile_keys_to_schema(records, schema)
         assert aligned[0]["departure_date"] == "30-05-2026"

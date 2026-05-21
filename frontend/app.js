@@ -779,6 +779,7 @@ function initForm() {
     note.classList.add('hidden');
     setMode('manual');
     addField();
+    clearAnalysis();
 }
 
 // ─── Schema Fields ───
@@ -1014,6 +1015,204 @@ async function previewDiscovery() {
     }
 }
 
+// ─── URL Analyzer ───
+
+let _analyzedFields = [];
+let _selectorsMap = null;
+
+async function analyzeURL() {
+    const urlInput = document.getElementById('inp-analyze-url');
+    const url = urlInput.value.trim();
+    if (!url) {
+        toast('Enter a URL to analyze', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btn-analyze-url');
+    const btnText = btn.querySelector('.analyze-btn-text');
+    const spinner = document.getElementById('analyze-spinner');
+    const results = document.getElementById('analyze-results');
+    const error = document.getElementById('analyze-error');
+
+    // Reset UI
+    results.classList.add('hidden');
+    error.classList.add('hidden');
+    btn.disabled = true;
+    if (btnText) btnText.textContent = 'Analyzing...';
+    if (spinner) spinner.classList.remove('hidden');
+
+    try {
+        const res = await fetch(`${API}/api/url/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+            throw new Error(data.error || (data.detail || 'Analysis failed'));
+        }
+
+        _analyzedFields = Array.isArray(data.suggested_fields) ? data.suggested_fields : [];
+
+        // Build selectors_map from the analysis result
+        _selectorsMap = {
+            item_container: data.item_container || '',
+            fields: {}
+        };
+        _analyzedFields.forEach(f => {
+            if (f.selector) {
+                _selectorsMap.fields[f.name] = {
+                    selector: f.selector,
+                    type: f.type || 'string'
+                };
+            }
+        });
+
+        // Populate Info Bar
+        const structureEl = document.getElementById('ai-structure');
+        const recordsEl = document.getElementById('ai-records');
+        const antibotEl = document.getElementById('ai-antibot');
+        const fetchTimeEl = document.getElementById('ai-fetch-time');
+
+        if (structureEl) {
+            const structType = data.page_structure || 'unknown';
+            const structConf = data.structure_confidence ? ` (${(data.structure_confidence * 100).toFixed(0)}%)` : '';
+            structureEl.textContent = `📐 ${structType}${structConf}`;
+        }
+        if (recordsEl) {
+            recordsEl.textContent = `📊 ~${data.estimated_record_count || '?'} records`;
+        }
+        if (antibotEl) {
+            const score = data.anti_bot_score || 0;
+            const riskLabel = score < 0.3 ? 'Low' : score < 0.6 ? 'Medium' : 'High';
+            const color = score < 0.3 ? '#1f9a5f' : score < 0.6 ? '#c7851b' : '#d24646';
+            antibotEl.innerHTML = `🛡️ Anti-bot: <span style="color:${color};font-weight:700;">${riskLabel}</span> (${(score * 100).toFixed(0)}%)`;
+        }
+        if (fetchTimeEl) {
+            fetchTimeEl.textContent = `⏱️ ${(data.fetch_time_ms / 1000).toFixed(1)}s`;
+        }
+
+        // Populate Field List
+        const fieldList = document.getElementById('analyze-field-list');
+        const fieldCount = document.getElementById('analyze-field-count');
+
+        if (fieldCount) fieldCount.textContent = String(_analyzedFields.length);
+
+        if (!_analyzedFields.length) {
+            fieldList.innerHTML = '<div class="empty"><p>No data fields detected on this page</p></div>';
+        } else {
+            fieldList.innerHTML = _analyzedFields.map((f, i) => {
+                const conf = Math.min(f.confidence || 0.5, 1.0);
+                const confPct = Math.round(conf * 100);
+                const example = f.example_value ? String(f.example_value).slice(0, 60) : '';
+                const typeLabel = f.type || 'string';
+                return `
+                    <div class="analyze-field-item selected" data-index="${i}" onclick="this.querySelector('.analyze-field-checkbox').click()">
+                        <input type="checkbox" class="analyze-field-checkbox" checked data-index="${i}" onchange="toggleField(${i})">
+                        <span class="analyze-field-name">${esc(f.name)}</span>
+                        <span class="analyze-field-type">${esc(typeLabel)}</span>
+                        ${example ? `<span class="analyze-field-example">${esc(example)}</span>` : ''}
+                        <span class="analyze-field-confidence">
+                            ${confPct}%
+                            <span class="conf-bar"><span class="conf-bar-fill" style="width:${confPct}%"></span></span>
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        results.classList.remove('hidden');
+        toast(`Found ${_analyzedFields.length} fields on ${url}`, 'success');
+    } catch (err) {
+        error.classList.remove('hidden');
+        document.getElementById('analyze-error-text').textContent = err.message || 'Failed to analyze URL';
+        toast(`Analysis error: ${err.message}`, 'error');
+    } finally {
+        btn.disabled = false;
+        if (btnText) btnText.textContent = 'Analyze URL';
+        if (spinner) spinner.classList.add('hidden');
+    }
+}
+
+function toggleField(index) {
+    const items = document.querySelectorAll('.analyze-field-item');
+    const checkboxes = document.querySelectorAll('.analyze-field-checkbox');
+    if (items[index] && checkboxes[index]) {
+        const isChecked = checkboxes[index].checked;
+        items[index].classList.toggle('selected', isChecked);
+    }
+}
+
+function toggleAllFields(select) {
+    const checkboxes = document.querySelectorAll('.analyze-field-checkbox');
+    const items = document.querySelectorAll('.analyze-field-item');
+    checkboxes.forEach((cb, i) => {
+        cb.checked = select;
+        if (items[i]) items[i].classList.toggle('selected', select);
+    });
+}
+
+function applyAnalyzedFields() {
+    // Gather selected fields
+    const checkboxes = document.querySelectorAll('.analyze-field-checkbox:checked');
+    if (!checkboxes.length) {
+        toast('Select at least one field to apply', 'error');
+        return;
+    }
+
+    const selected = [];
+    checkboxes.forEach(cb => {
+        const idx = parseInt(cb.dataset.index, 10);
+        if (!isNaN(idx) && _analyzedFields[idx]) {
+            selected.push(_analyzedFields[idx]);
+        }
+    });
+
+    if (!selected.length) {
+        toast('No valid fields selected', 'error');
+        return;
+    }
+
+    // Clear existing schema fields
+    const schemaContainer = document.getElementById('schema-container');
+    schemaContainer.innerHTML = '';
+
+    // Add each selected field
+    selected.forEach(f => {
+        addField({
+            name: f.name,
+            field_type: f.type || 'string',
+            description: f.description || f.example_value || ''
+        });
+    });
+
+    // If in manual mode and URL is set, pre-populate the URLs textarea
+    const urlInput = document.getElementById('inp-analyze-url');
+    const urlsTextarea = document.getElementById('inp-urls');
+    if (urlInput && urlsTextarea && currentMode === 'manual') {
+        const url = urlInput.value.trim();
+        if (url && !urlsTextarea.value.includes(url)) {
+            const existing = urlsTextarea.value.trim();
+            urlsTextarea.value = existing ? existing + '\n' + url : url;
+        }
+    }
+
+    toast(`Applied ${selected.length} fields to schema`, 'success');
+
+    // Scroll to schema section
+    document.getElementById('schema-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function clearAnalysis() {
+    _analyzedFields = [];
+    _selectorsMap = null;
+    document.getElementById('analyze-results').classList.add('hidden');
+    document.getElementById('analyze-error').classList.add('hidden');
+    document.getElementById('inp-analyze-url').value = '';
+}
+
 // ─── Submit Job ───
 
 async function submitJob(e) {
@@ -1083,6 +1282,25 @@ async function submitJob(e) {
         if (!topic) { toast('Enter a topic', 'error'); return; }
     }
 
+    // Build selectors_map if we have one from URL analysis and it matches a URL being scraped
+    let selectorsMap = {};
+    if (_selectorsMap && _selectorsMap.fields && Object.keys(_selectorsMap.fields).length > 0) {
+        // Only include selectors for fields that are still in the schema
+        const schemaNames = new Set(schema.map(f => f.name));
+        const filteredFields = {};
+        Object.entries(_selectorsMap.fields).forEach(([name, sel]) => {
+            if (schemaNames.has(name)) {
+                filteredFields[name] = sel;
+            }
+        });
+        if (Object.keys(filteredFields).length > 0) {
+            selectorsMap = {
+                item_container: _selectorsMap.item_container || '',
+                fields: filteredFields
+            };
+        }
+    }
+
     const payload = {
         name, mode: currentMode, intent, urls, topic, location, preferred_domain: domain,
         origin_location: originLocation,
@@ -1090,6 +1308,7 @@ async function submitJob(e) {
         source_policy: sourcePolicy,
         max_per_domain: maxPerDomain,
         schema_fields: schema, filters,
+        selectors_map: selectorsMap,
         deduplicate: document.getElementById('chk-dedup').checked,
         deduplicate_field: document.getElementById('inp-dedup-field').value.trim(),
         pagination: document.getElementById('chk-pagination').checked,
@@ -1245,6 +1464,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const resultBody = document.getElementById('res-tbody');
     if (resultBody) resultBody.addEventListener('dblclick', onResultsCellDoubleClick);
+
+    // URL Analyzer: Enter key triggers analysis
+    const analyzeUrlInput = document.getElementById('inp-analyze-url');
+    if (analyzeUrlInput) {
+        analyzeUrlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                analyzeURL();
+            }
+        });
+    }
 
     document.addEventListener('keydown', onGlobalKeydown);
     window.addEventListener('focus', () => {

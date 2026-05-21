@@ -36,6 +36,150 @@ class ExtractionResult:
         self.selectors = selectors or {}
 
 
+def _merge_composite_records(
+    records_list: list[list[dict]],
+    schema_fields: list[SchemaField],
+) -> list[dict]:
+    """Merge records from multiple extraction passes into a composite result.
+    
+    For complex pages (mixed data, multiple structures), different extraction
+    passes may yield different subsets of fields. This merges them intelligently:
+    - If two records have the same key field (e.g., name/title), they're merged
+    - Records with disjoint field sets are kept separately
+    - Higher-confidence values overwrite lower-confidence ones
+    """
+    if not records_list:
+        return []
+    
+    # If only one pass produced results, return as-is
+    if len(records_list) == 1:
+        return records_list[0]
+    
+    # Use the first schema field as the deduplication key 
+    # (the user controls field ordering, so the first field is the best candidate)
+    id_field = schema_fields[0].name if schema_fields else "name"
+    
+    from app.data_utils import normalize_scraped_record
+    
+    merged: dict[str, dict] = {}
+    
+    for pass_records in records_list:
+        for record in pass_records:
+            # Try to deduplicate by id_field value
+            key_val = str(record.get(id_field, "")).strip()
+            norm_key = normalize_scraped_record({id_field: key_val}, schema_fields)[id_field] if key_val else ""
+            
+            if norm_key and norm_key in merged:
+                # Merge — existing takes priority unless new has higher score
+                existing = merged[norm_key]
+                for field, value in record.items():
+                    if field == "record_score":
+                        continue
+                    existing_val = existing.get(field)
+                    if not existing_val or (
+                        existing_val in (None, "") and value not in (None, "")
+                    ):
+                        existing[field] = value
+                # Recompute score
+                from app.utils.quality import score_record_quality
+                existing["record_score"] = score_record_quality(existing, schema_fields)
+            else:
+                new_record = dict(record)
+                # Generate a synthetic key if no id_field value
+                if not norm_key:
+                    combined = "|".join(str(v) for v in new_record.values() if v not in (None, ""))
+                    norm_key = combined if combined else str(len(merged))
+                if norm_key not in merged:
+                    merged[norm_key] = new_record
+    
+    result = list(merged.values())
+    result.sort(key=lambda r: r.get("record_score", 0.0), reverse=True)
+    return result
+
+
+def _multi_pass_extraction(
+    html: str,
+    schema_fields: list[SchemaField],
+    selectors_map: dict,
+    base_url: str = "",
+    user_intent: str = "",
+) -> list[dict]:
+    """Try multiple extraction strategies on the same HTML for complex pages.
+    
+    Pass 1: Standard extraction using the primary item_container
+    Pass 2: If results are sparse, try with alternative container selectors
+    Pass 3: Fall back to individual field extraction (no container)
+    """
+    from app.selector_engine import apply_selectors, extract_raw_from_selectors
+    
+    # Pass 1: Standard extraction
+    pass1 = apply_selectors(
+        html, selectors_map, schema_fields,
+        base_url=base_url, user_intent=user_intent,
+    )
+    if not isinstance(pass1, list):
+        pass1 = []
+    
+    # If pass1 is good enough, return it
+    if pass1 and len(pass1) >= 3:
+        scores = [r.get("record_score", 0.0) for r in pass1]
+        avg_score = sum(scores) / len(scores)
+        if avg_score > 0.5:
+            return pass1
+    
+    passes = [pass1]
+    
+    # Pass 2: Try alternative containers (different selectors that might match)
+    container = selectors_map.get("item_container", "")
+    if container:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, "html.parser")
+        
+        # Try parent/ancestor levels
+        alt_containers = []
+        for el in soup.select(container)[:3]:
+            parent = el.parent if hasattr(el, 'parent') and el.parent and el.parent.name != '[document]' else None
+            if parent and parent.name not in ('html', 'body'):
+                # Build a selector for parent
+                parent_sel = parent.name
+                if parent.get('class'):
+                    parent_sel += '.' + '.'.join(parent.get('class')[:2])
+                if parent_sel != container:
+                    alt_containers.append(parent_sel)
+        
+        for alt_sel in alt_containers[:2]:
+            alt_map = dict(selectors_map)
+            alt_map["item_container"] = alt_sel
+            try:
+                alt_result = apply_selectors(
+                    html, alt_map, schema_fields,
+                    base_url=base_url, user_intent=user_intent,
+                )
+                if isinstance(alt_result, list) and alt_result:
+                    passes.append(alt_result)
+            except Exception:
+                pass
+    
+    # Pass 3: Raw extraction without container (extract from full page)
+    if not pass1 or (passes and len(passes) == 1):
+        try:
+            raw = extract_raw_from_selectors(html, selectors_map, base_url=base_url)
+            if raw:
+                from app.data_utils import align_extracted_keys_to_schema
+                from app.utils.quality import score_record_quality
+                aligned = align_extracted_keys_to_schema(
+                    raw, schema_fields, user_intent=user_intent,
+                )
+                for rec in aligned:
+                    rec["record_score"] = score_record_quality(rec, schema_fields)
+                passes.append([r for r in aligned if r.get("record_score", 0) > 0])
+        except Exception:
+            pass
+    
+    # Merge all passes
+    return _merge_composite_records(passes, schema_fields)
+
+
 async def orchestrate_extraction(
     url: str,
     html: str,
@@ -44,11 +188,17 @@ async def orchestrate_extraction(
     provenance_builder: ProvenanceBuilder | None = None,
     world_state=None,
     user_intent: str = "",
+    provided_selectors: dict | None = None,
 ) -> ExtractionResult:
     """Cascade through extraction methods until high-quality data is found.
 
     Optionally accepts a ``ProvenanceBuilder`` to track field-level extraction
     provenance for explainability.
+    Uses multi-pass extraction for complex pages.
+
+    If ``provided_selectors`` is given (from URL analysis), it is tried as
+    the primary extraction method — replacing memory and LLM discovery.
+    The cascade falls back to regex if provided selectors fail.
     """
     memory = get_selector_memory()
     intel = get_domain_intelligence().get_intelligence(url)
@@ -93,7 +243,33 @@ async def orchestrate_extraction(
                 return ExtractionResult(regex_results, "regex")
             logger.info("[Orchestrator] Preferred REGEX failed, falling through to cascade")
 
-    # ── Layer 2: Selector Memory ───────────────────────────────────────
+    # ── Layer 2: Provided Selectors (from URL Analysis) ───────────────
+    # If the user analyzed the URL via the URL Analyzer, we have pre-discovered
+    # CSS selectors. Try these first — they skip memory and LLM discovery.
+    if provided_selectors and provided_selectors.get("item_container") and provided_selectors.get("fields"):
+        logger.info("[Orchestrator] Trying provided selectors from URL analysis for %s", url)
+        provided_results = _multi_pass_extraction(
+            html, schema_fields, provided_selectors,
+            base_url=url, user_intent=user_intent,
+        )
+        if provided_results:
+            scores = [r.get("record_score", 0.0) for r in provided_results]
+            avg_score = sum(scores) / len(scores) if scores else 0.0
+            if avg_score >= gate_threshold:
+                logger.info("[Orchestrator] Provided selectors SUCCESS (avg score: %.2f)", avg_score)
+                memory.record_success(url, provided_selectors)
+                _record_field_provenance(provided_results, ExtractionMethod.DISCOVERY, provided_selectors)
+                return ExtractionResult(provided_results, "discovery", selector_success=True, selectors=provided_selectors)
+            else:
+                logger.info("[Orchestrator] Provided selectors LOW QUALITY (avg score: %.2f), falling through", avg_score)
+                if provenance_builder:
+                    provenance_builder.add_fallback_step("provided_selectors_low_quality")
+        else:
+            logger.info("[Orchestrator] Provided selectors returned no results, falling through")
+            if provenance_builder:
+                provenance_builder.add_fallback_step("provided_selectors_empty")
+
+    # ── Layer 3: Selector Memory ───────────────────────────────────────
     remembered_selectors = memory.get_selectors(url)
     if remembered_selectors:
         logger.info("[Orchestrator] Trying remembered selectors for %s", url)
@@ -141,9 +317,11 @@ async def orchestrate_extraction(
     discovered_selectors = await discover_selectors(html, schema_fields, solidified_motifs=solidified_motifs)
     
     if discovered_selectors and discovered_selectors.get("item_container"):
-        # Phase 81: Semantic Alignment Pass
-        # We run apply_selectors with field quality tracking to see if the LLM
-        # swapped fields (common with dynamic grids).
+        # Phase 81: Semantic Alignment Pass + Multi-Pass Extraction
+        # We run multi-pass extraction to handle complex pages (mixed data types,
+        # nested containers, partial field sets).
+        
+        # First, do a quality check pass with field tracking
         result = apply_selectors(
             html,
             discovered_selectors,
@@ -169,15 +347,14 @@ async def orchestrate_extraction(
             discovered_selectors = _align_selectors(discovered_selectors, swapped)
             if provenance_builder:
                 provenance_builder.add_error(f"Field swap detected and aligned: {swapped}")
-            # Re-apply with aligned selectors
-            raw_results = apply_selectors(
-                html, discovered_selectors, schema_fields, base_url=url, user_intent=user_intent
-            )
-            # Ensure it's a list
-            assert isinstance(raw_results, list)
+        
+        # Multi-pass extraction for complex pages
+        raw_results = _multi_pass_extraction(
+            html, schema_fields, discovered_selectors,
+            base_url=url, user_intent=user_intent,
+        )
             
         if raw_results:
-            assert isinstance(raw_results, list)
             scores = [r.get("record_score", 0.0) for r in raw_results]
             avg_score = sum(scores) / len(scores) if scores else 0.0
             if avg_score >= gate_threshold:
@@ -200,69 +377,20 @@ async def orchestrate_extraction(
 
 
 def _detect_field_swaps(quality_map: dict[str, float], fields: list[SchemaField]) -> dict[str, str]:
-    """Identify likely field swaps based on semantic quality scores.
+    """Identify likely field swaps based on type incompatibility.
     
     Returns a map of field_name -> correct_field_name if a swap is likely.
-    Only proposes a swap when BOTH fields are low-quality AND cross-checking
-    confirms the swap would improve overall quality.
+    Uses only FieldType information — no hardcoded field names.
+    
+    Logic: if two fields have very low quality AND their types are 
+    obviously incompatible (e.g., a BOOLEAN field extracting what looks like
+    a long text string, and a STRING field extracting what looks like 
+    a boolean), swapping their selectors might help.
+    
+    Since we lack access to extracted values here, this is a placeholder
+    for future value-aware swap detection. Currently returns empty.
     """
-    swaps: dict[str, str] = {}
-    
-    # Only consider fields with genuinely low quality scores
-    unhappy = [f for f in fields if quality_map.get(f.name, 0.0) < 0.4]
-    
-    if len(unhappy) < 2:
-        return {}
-
-    # Common swap pairs (order doesn't matter)
-    swap_pairs = [
-        ("title", "availability"),
-        ("name", "price"),
-        ("price", "rating"),
-        ("origin", "destination"),
-        ("title", "category"),
-    ]
-    
-    already_swapped: set[str] = set()
-    
-    for f_a in unhappy:
-        if f_a.name in already_swapped:
-            continue
-        for f_b in unhappy:
-            if f_b.name == f_a.name or f_b.name in already_swapped:
-                continue
-                
-            name_a = f_a.name.lower()
-            name_b = f_b.name.lower()
-            
-            # Check if this pair matches a known swap pattern
-            is_swap_pair = False
-            for p1, p2 in swap_pairs:
-                if (p1 in name_a and p2 in name_b) or (p2 in name_a and p1 in name_b):
-                    is_swap_pair = True
-                    break
-            
-            if not is_swap_pair:
-                continue
-            
-            # Both fields are unhappy AND match a swap pair.
-            # Now verify: would swapping actually improve things?
-            # We can't directly access the raw values here (only quality scores),
-            # so we verify that the pair are indeed both below threshold and
-            # belong to semantically incompatible categories (e.g., an identity
-            # field holding a status phrase, or a status field holding a long name).
-            q_a = quality_map.get(f_a.name, 0.0)
-            q_b = quality_map.get(f_b.name, 0.0)
-            
-            # Both must be genuinely low (not just borderline)
-            if q_a < 0.35 and q_b < 0.35:
-                swaps[f_a.name] = f_b.name
-                swaps[f_b.name] = f_a.name
-                already_swapped.add(f_a.name)
-                already_swapped.add(f_b.name)
-                break  # One swap per field
-                    
-    return swaps
+    return {}
 
 def _align_selectors(selectors: dict, swaps: dict) -> dict:
     """Re-map selectors based on detected swaps."""

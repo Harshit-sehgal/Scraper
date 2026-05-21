@@ -124,6 +124,7 @@ def create_jobs_router(
             max_distance_km=job_data.max_distance_km,
             schema_fields=job_data.schema_fields,
             filters=job_data.filters,
+            selectors_map=job_data.selectors_map,
             pagination=job_data.pagination,
             max_pages=job_data.max_pages,
             deduplicate=job_data.deduplicate,

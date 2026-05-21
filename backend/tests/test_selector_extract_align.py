@@ -1,5 +1,7 @@
 """Tests: extract full selector map, then align to user schema."""
 
+from typing import Any
+
 from app.data_utils import align_extracted_keys_to_schema
 from app.models import FieldType, SchemaField
 from app.selector_engine import apply_selectors, extract_raw_from_selectors
@@ -42,24 +44,26 @@ SELECTORS = {
 }
 
 USER_SCHEMA = [
-    SchemaField(name="airlines_name", field_type=FieldType.STRING, description="Airline name"),
-    SchemaField(name="origin_airport", field_type=FieldType.STRING, description="Origin airport"),
-    SchemaField(name="destination_airport", field_type=FieldType.STRING, description="Destination"),
-    SchemaField(name="prices", field_type=FieldType.CURRENCY, description="Price"),
-    SchemaField(name="departure_date", field_type=FieldType.DATE, description="Departure date"),
-    SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Arrival date"),
+    SchemaField(name="airlines_name", field_type=FieldType.STRING, description="Airline name", required=False),
+    SchemaField(name="origin_airport", field_type=FieldType.STRING, description="Origin airport", required=False),
+    SchemaField(name="destination_airport", field_type=FieldType.STRING, description="Destination", required=False),
+    SchemaField(name="prices", field_type=FieldType.CURRENCY, description="Price", required=False),
+    SchemaField(name="departure_date", field_type=FieldType.DATE, description="Departure date", required=False),
+    SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Arrival date", required=False),
 ]
 
 
 class TestExtractAllThenAlign:
     def test_extract_raw_includes_all_selector_keys(self):
-        raw = extract_raw_from_selectors(SAMPLE_HTML, SELECTORS)
+        raw: list[dict[str, Any]] = extract_raw_from_selectors(SAMPLE_HTML, SELECTORS)
         assert len(raw) == 2
-        assert set(raw[0].keys()) == set(SELECTORS["fields"].keys())
+        fields = SELECTORS["fields"]
+        assert isinstance(fields, dict)
+        assert set(raw[0].keys()) == set(fields.keys())
 
     def test_align_maps_to_user_schema(self):
-        raw = extract_raw_from_selectors(SAMPLE_HTML, SELECTORS)
-        aligned = align_extracted_keys_to_schema(raw, USER_SCHEMA)
+        raw: list[dict[str, Any]] = extract_raw_from_selectors(SAMPLE_HTML, SELECTORS)
+        aligned: list[dict[str, Any]] = align_extracted_keys_to_schema(raw, USER_SCHEMA)
         assert aligned[0]["airlines_name"] == "Acme Air"
         assert aligned[0]["origin_airport"] == "AAA"
         assert aligned[0]["prices"] == "£99"
@@ -68,7 +72,7 @@ class TestExtractAllThenAlign:
         assert "stops" not in aligned[0]
 
     def test_apply_selectors_end_to_end(self):
-        results = apply_selectors(SAMPLE_HTML, SELECTORS, USER_SCHEMA)
+        results: list[dict[str, Any]] = apply_selectors(SAMPLE_HTML, SELECTORS, USER_SCHEMA)  # type: ignore[assignment]
         assert len(results) == 2
         assert results[0]["airlines_name"] == "Acme Air"
         assert results[0]["arrival_date"] == "02-01-2026"

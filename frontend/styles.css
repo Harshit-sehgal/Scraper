@@ -1065,7 +1065,221 @@ tr:hover td {
     }
 }
 
-/* ─── Thermodynamic Gating Styles ─── */
+/* ═══════════════════════════════════════════
+   URL Analyzer Styles
+   ═══════════════════════════════════════════ */
+
+.url-analyzer-section {
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+    background: linear-gradient(135deg, var(--accent-soft) 0%, #f4faf7 100%);
+    margin-bottom: 1.8rem;
+}
+
+.analyzer-icon {
+    font-size: 1rem;
+    margin-right: 0.3rem;
+}
+
+.analyzer-input-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+}
+
+.analyzer-url-input {
+    flex: 1;
+    background: var(--bg-card) !important;
+    font-family: var(--mono);
+    font-size: 0.83rem !important;
+    padding: 0.6rem 0.75rem !important;
+}
+
+.analyze-results {
+    margin-top: 1rem;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    overflow: hidden;
+    animation: reveal 0.28s ease;
+}
+
+.analyze-info-bar {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    background: #edf7f4;
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+}
+
+.analyze-info-item {
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    background: var(--bg-card);
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    white-space: nowrap;
+    font-family: var(--mono);
+}
+
+.analyze-fields-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ink-strong);
+}
+
+.analyze-field-actions {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.field-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    margin-left: 0.35rem;
+}
+
+.analyze-field-list {
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.analyze-field-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.52rem 0.75rem;
+    border-bottom: 1px solid #eaf1e8;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.analyze-field-item:last-child {
+    border-bottom: 0;
+}
+
+.analyze-field-item:hover {
+    background: #f7fcf8;
+}
+
+.analyze-field-item.selected {
+    background: var(--accent-soft);
+}
+
+.analyze-field-checkbox {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+}
+
+.analyze-field-name {
+    font-weight: 600;
+    font-size: 0.83rem;
+    color: var(--ink-strong);
+    font-family: var(--mono);
+    min-width: 120px;
+}
+
+.analyze-field-type {
+    font-size: 0.7rem;
+    color: #fff;
+    background: var(--accent);
+    padding: 0.12rem 0.42rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.analyze-field-example {
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.analyze-field-example::before {
+    content: "e.g. ";
+    color: var(--ink-faint);
+    font-size: 0.7rem;
+}
+
+.analyze-field-confidence {
+    font-size: 0.7rem;
+    color: var(--ink-faint);
+    font-family: var(--mono);
+    flex-shrink: 0;
+}
+
+.analyze-field-confidence .conf-bar {
+    display: inline-block;
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: #eaf1e8;
+    margin-left: 0.3rem;
+    vertical-align: middle;
+    overflow: hidden;
+}
+
+.analyze-field-confidence .conf-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+    transition: width 0.3s ease;
+}
+
+.analyze-apply-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border-top: 1px solid var(--line);
+    background: #f7fbf8;
+}
+
+.analyze-error {
+    margin-top: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #f0c4c4;
+    border-radius: var(--radius-sm);
+    background: #fef6f6;
+    color: #972a2a;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.analyze-error-icon {
+    font-size: 1rem;
+}
+
+/* ═══════════════════════════════════════════
+   Thermodynamic Gating Styles
+   ═══════════════════════════════════════════ */
+
 .unstable-row {
     background-color: rgba(173, 96, 83, 0.05) !important;
 }

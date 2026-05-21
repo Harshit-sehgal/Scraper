@@ -132,6 +132,65 @@
                     </div>
                 </div>
 
+                <!-- ═══════════════════════════════════ -->
+                <!-- URL Analyzer — Preview Before Scrape  -->
+                <!-- ═══════════════════════════════════ -->
+                <div class="section url-analyzer-section">
+                    <div class="section-head-row">
+                        <label class="section-label">
+                            <span class="analyzer-icon">🔍</span>
+                            URL Analyzer
+                        </label>
+                        <span class="hint">Paste a URL to preview what data can be extracted</span>
+                    </div>
+                    <p class="hint-block">Enter a URL first, let the scraper analyze it and suggest data fields. Then select what you want and scrape with anti-bot protection.</p>
+                    
+                    <div class="analyzer-input-row">
+                        <input type="url" id="inp-analyze-url" placeholder="https://example.com/products" class="analyzer-url-input">
+                        <button type="button" class="btn primary" onclick="analyzeURL()" id="btn-analyze-url">
+                            <span class="analyze-btn-text">Analyze URL</span>
+                            <span class="spinner hidden" id="analyze-spinner"></span>
+                        </button>
+                    </div>
+
+                    <!-- Analysis Results -->
+                    <div id="analyze-results" class="analyze-results hidden">
+                        <!-- Page Info Bar -->
+                        <div class="analyze-info-bar" id="analyze-info-bar">
+                            <span class="analyze-info-item" id="ai-structure">—</span>
+                            <span class="analyze-info-item" id="ai-records">—</span>
+                            <span class="analyze-info-item" id="ai-antibot">—</span>
+                            <span class="analyze-info-item" id="ai-fetch-time">—</span>
+                        </div>
+
+                        <!-- Detected Fields -->
+                        <div class="analyze-fields-header">
+                            <span>Detected Fields <span id="analyze-field-count" class="field-count-badge">0</span></span>
+                            <div class="analyze-field-actions">
+                                <button type="button" class="btn ghost small" onclick="toggleAllFields(true)" id="btn-select-all">Select All</button>
+                                <button type="button" class="btn ghost small" onclick="toggleAllFields(false)">Deselect All</button>
+                            </div>
+                        </div>
+                        <div id="analyze-field-list" class="analyze-field-list">
+                            <div class="empty"><p>No fields detected</p></div>
+                        </div>
+
+                        <!-- Apply Button -->
+                        <div class="analyze-apply-row">
+                            <button type="button" class="btn primary" onclick="applyAnalyzedFields()" id="btn-apply-fields">
+                                Apply Selected Fields to Schema
+                            </button>
+                            <button type="button" class="btn ghost small" onclick="clearAnalysis()">Clear</button>
+                        </div>
+                    </div>
+
+                    <!-- Error State -->
+                    <div id="analyze-error" class="analyze-error hidden">
+                        <span class="analyze-error-icon">⚠️</span>
+                        <span id="analyze-error-text"></span>
+                    </div>
+                </div>
+
                 <form id="job-form" onsubmit="submitJob(event)">
 
                     <!-- Mode Toggle -->

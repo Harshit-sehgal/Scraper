@@ -15,7 +15,7 @@ from typing import Dict, Any, List, Optional, Callable
 
 # ─── Legacy LLM Utility Support ──────────────────────────────────────
 
-def _extract_json_payload(text: str):
+def _extract_json_payload(text: str | None):
     raw = (text or "").strip()
     if not raw:
         return None

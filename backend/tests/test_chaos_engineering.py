@@ -5,7 +5,6 @@ Verifies system resilience, automated failure classification, recovery planning,
 and execution SLAs under injected chaos failure scenarios.
 """
 
-import asyncio
 import logging
 import pytest
 import time
@@ -13,7 +12,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 from app.chaos_simulator import get_chaos_simulator, FailureMode
 from app.failure_classification import FailureCategory
-from app.recovery_strategies import RecoveryAction, get_recovery_executor, RecoveryExecutor
+from app.recovery_strategies import RecoveryAction, RecoveryExecutor
 from app.scraper_recovery_integration import scrape_url_with_recovery
 from app.models import SchemaField, FieldType
 from app.selector_memory import get_selector_memory
@@ -71,12 +70,12 @@ async def test_network_timeout_recovery():
     # Patch scrape_url to return simulated records on success
     mock_results = [{"company_name": "Antigravity Solutions", "email": "contact@antigravity.ai"}]
     
-    with patch("app.scraper.scrape_url", AsyncMock(return_value=mock_results)) as mock_scrape, \
+    with patch("app.scraper.scrape_url", AsyncMock(return_value=mock_results)), \
          patch("app.recovery_strategies.RecoveryExecutor.execute", mock_execute):
          
         schema = [
-            SchemaField(name="company_name", field_type=FieldType.STRING, required=True),
-            SchemaField(name="email", field_type=FieldType.EMAIL, required=True),
+            SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True),
+            SchemaField(name="email", field_type=FieldType.EMAIL, description="", required=True),
         ]
         
         results, stats = await scrape_url_with_recovery(
@@ -126,10 +125,10 @@ async def test_browser_crash_recovery():
 
     mock_results = [{"name": "Crashed Site Resolved"}]
     
-    with patch("app.scraper.scrape_url", AsyncMock(return_value=mock_results)) as mock_scrape, \
+    with patch("app.scraper.scrape_url", AsyncMock(return_value=mock_results)), \
          patch("app.recovery_strategies.RecoveryExecutor.execute", mock_execute):
          
-        schema = [SchemaField(name="name", field_type=FieldType.STRING, required=True)]
+        schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=True)]
         
         results, stats = await scrape_url_with_recovery(
             url="https://crashed-site.com",
@@ -184,10 +183,10 @@ async def test_selector_decay_rediscovery():
 
     mock_results = [{"product": "Decay Cleared Book"}]
     
-    with patch("app.scraper.scrape_url", AsyncMock(return_value=mock_results)) as mock_scrape, \
+    with patch("app.scraper.scrape_url", AsyncMock(return_value=mock_results)), \
          patch("app.recovery_strategies.RecoveryExecutor.execute", mock_execute):
          
-        schema = [SchemaField(name="product", field_type=FieldType.STRING, required=True)]
+        schema = [SchemaField(name="product", field_type=FieldType.STRING, description="", required=True)]
         
         results, stats = await scrape_url_with_recovery(
             url=url,
@@ -227,7 +226,7 @@ async def test_anti_bot_proxy_rotation():
 
     mock_results = [{"insight": "Anti-bot bypassed"}]
     
-    with patch("app.scraper.scrape_url", AsyncMock(return_value=mock_results)) as mock_scrape, \
+    with patch("app.scraper.scrape_url", AsyncMock(return_value=mock_results)), \
          patch("app.recovery_strategies.RecoveryExecutor.execute", mock_execute), \
          patch("app.recovery_handlers.get_proxy_manager") as mock_pm:
          
@@ -238,7 +237,7 @@ async def test_anti_bot_proxy_rotation():
         mock_mgr.rotate = MagicMock(return_value="http://new-proxy:8888")
         mock_pm.return_value = mock_mgr
         
-        schema = [SchemaField(name="insight", field_type=FieldType.STRING, required=True)]
+        schema = [SchemaField(name="insight", field_type=FieldType.STRING, description="", required=True)]
         
         results, stats = await scrape_url_with_recovery(
             url="https://bot-guarded.com/login",
@@ -279,10 +278,10 @@ async def test_concurrency_reduction_under_resource_exhaustion():
 
     mock_results = [{"name": "Resource Exhaustion Resolved"}]
     
-    with patch("app.scraper.scrape_url", AsyncMock(return_value=mock_results)) as mock_scrape, \
+    with patch("app.scraper.scrape_url", AsyncMock(return_value=mock_results)), \
          patch("app.recovery_strategies.RecoveryExecutor.execute", mock_execute):
          
-        schema = [SchemaField(name="name", field_type=FieldType.STRING, required=True)]
+        schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=True)]
         
         # We need max_recovery_attempts=3 to trigger escalation to REDUCE_CONCURRENCY on attempt 2
         results, stats = await scrape_url_with_recovery(

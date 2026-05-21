@@ -156,7 +156,8 @@ async def run_job(
                             min_record_score=job.min_record_score, 
                             user_intent=job.intent, 
                             world_state=ws,
-                            max_recovery_attempts=3
+                            max_recovery_attempts=3,
+                            selectors_map=job.selectors_map,
                         ),
                         timeout=per_url_scrape_timeout_seconds * 4, # Recovery takes longer
                     )
