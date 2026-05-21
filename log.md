@@ -233,15 +233,52 @@ ebed3e1 feat(acquisition): wire acquisition_mode into pipeline with escalation
 
 ---
 
+## Pass 6 — Pre-Existing mypy Errors
+
+### Bugs Fixed
+
+#### 21. `containers` type narrowed incompatibly
+**File**: `backend/app/selector_discovery.py:539`
+`soup.select()` returns `ResultSet[Tag]`, then `containers = [soup]` assigns
+`list[BeautifulSoup]`. Added `: list` type annotation to accept both types.
+
+#### 22. `parent.get('class')[:2]` unsafe on `str | list | None`
+**File**: `backend/app/extraction_orchestrator.py:146`
+`parent.get('class')` returns `str | list[str] | None`, but `[:2]` slicing
+only safe on `list`. Added `isinstance(classes, list)` guard.
+
+### Commit
+```
+09a0f76 fix(types): resolve 2 pre-existing mypy type errors
+c2f4645 chore: add .coverage and .commandcode/ to .gitignore
+```
+
+---
+
+## Final State
+
+| Check | Result |
+|-------|--------|
+| Full test suite | 1206 passed |
+| mypy | **0 errors** |
+| pyflakes | 0 issues |
+| compileall | clean |
+| frontend JS | valid |
+| shell scripts | valid |
+| git tree | clean |
+
+---
+
 ## Files Summary
 
 | Category | Count |
 |----------|-------|
 | New Python modules | 5 |
 | New test files | 7 |
-| Modified Python files | 3 |
+| Modified Python files | 4 |
 | Modified JS files | 2 |
 | Modified HTML/CSS files | 3 |
-| Total bugs fixed | 20 |
+| Config files | 1 |
+| Total bugs fixed | 22 |
 | Annotations fixed (E701/E702) | 58 |
 | Total tests | 1206 |
