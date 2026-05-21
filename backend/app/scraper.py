@@ -234,7 +234,7 @@ async def scrape_url(
     new_motifs = []
     if results and world_state:
         feedback_engine = MotifFeedbackEngine()
-        new_motifs = feedback_engine.extract_motifs_from_results(results, schema_fields, min_cooccurrence=2)
+        new_motifs = feedback_engine.extract_motifs_from_results(results, schema_fields, min_cooccurrence=settings.MOTIF_MIN_COOCCURRENCE)
         if new_motifs:
             # Merge new motifs with existing solidified motifs (dedup, keep latest)
             existing = {tuple(sorted(m)) for m in world_state.solidified_motifs}
@@ -389,7 +389,7 @@ async def scrape_url(
     # Build provenance summary for telemetry
     llm_calls = get_llm_call_count()
     # Very rough cost estimate: $0.01 per LLM call + browser time
-    estimated_cost = (llm_calls * 0.01) + (fetch_ms / 1000.0 * 0.005)
+    estimated_cost = (llm_calls * settings.COST_PER_LLM_CALL) + (fetch_ms / 1000.0 * settings.COST_PER_FETCH_MS)
 
     # ── Regression Intelligence: Compute severity from classification ──
     regression_severity = None

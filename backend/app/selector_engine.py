@@ -63,6 +63,100 @@ def build_selector_field_metadata(
     return meta
 
 
+def _extract_field_by_pattern(node, sel_entry, field_name: str = "") -> str | None:
+    """Fallback: extract field value from a container node when CSS selector is missing.
+    
+    Uses the field's example_value to locate matching text, then applies
+    type-aware patterns for extraction.
+    """
+    import re as re_mod
+    full_text = node.get_text(separator=" ", strip=True)
+    if not full_text:
+        return None
+
+    example = (sel_entry.get("example_value") or "").strip() if isinstance(sel_entry, dict) else ""
+
+    ftype = None
+    if isinstance(sel_entry, dict) and sel_entry.get("type"):
+        try:
+            ftype = FieldType(sel_entry["type"])
+        except ValueError:
+            pass
+
+    # Strategy 1: Type-based regex extraction
+    if ftype is not None:
+        if ftype == FieldType.CURRENCY:
+            match = re_mod.search(r'(?:[$£€¥₹]|USD\s*|EUR\s*)\s*\d[\d,.]*', full_text)
+            return match.group(0).strip() if match else None
+        if ftype == FieldType.EMAIL:
+            match = re_mod.search(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', full_text)
+            return match.group(0).strip() if match else None
+        if ftype == FieldType.PHONE:
+            match = re_mod.search(r'[\d\s\-()+]{7,20}', full_text)
+            return match.group(0).strip() if match else None
+        if ftype == FieldType.URL:
+            match = re_mod.search(r'https?://[^\s]+', full_text)
+            return match.group(0).strip() if match else None
+        if ftype == FieldType.DATE:
+            patterns = [
+                r'\d{1,2}[-/]\d{1,2}[-/]\d{2,4}',
+                r'\d{4}-\d{2}-\d{2}',
+                r'\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}',
+            ]
+            for pat in patterns:
+                match = re_mod.search(pat, full_text, re_mod.IGNORECASE)
+                if match:
+                    return match.group(0).strip()
+            return None
+        if ftype == FieldType.NUMBER:
+            match = re_mod.search(r'-?\d+(?:\.\d+)?', full_text)
+            return match.group(0).strip() if match else None
+        if ftype == FieldType.RATING:
+            match = re_mod.search(r'(?:\d+(?:\.\d+)?)\s*(?:[/|]?\s*\d+)?\s*(?:stars?|rating)?', full_text, re_mod.IGNORECASE)
+            if match:
+                return match.group(0).strip()
+            match = re_mod.search(r'\b(?:one|two|three|four|five)\b', full_text, re_mod.IGNORECASE)
+            return match.group(0).strip() if match else None
+
+    # Strategy 2: Search for the example value literally
+    if example and len(example) > 2:
+        if example.lower() in full_text.lower():
+            return example.strip()
+
+    # Strategy 3: Fuzzy example match — try word-level matching for multi-word examples
+    if example and len(example) > 2:
+        example_words = example.lower().split()
+        if settings.SELECTOR_FUZZY_MIN_WORDS <= len(example_words) <= settings.SELECTOR_FUZZY_MAX_WORDS:
+            text_lower = full_text.lower()
+            matches = sum(1 for w in example_words if w in text_lower)
+            if matches / len(example_words) >= settings.SELECTOR_FUZZY_MATCH_RATIO:
+                window = _extract_context_window(full_text, example_words)
+                if window:
+                    return window
+
+    return None
+
+
+def _extract_context_window(text: str, keywords: list[str], max_len: int | None = None) -> str | None:
+    """Extract a focused text window around keyword matches for a field value."""
+    max_len = max_len if max_len is not None else settings.SELECTOR_CONTEXT_WINDOW_MAX_LEN
+    text_lower = text.lower()
+    first_pos = -1
+    for kw in keywords:
+        idx = text_lower.find(kw)
+        if idx != -1:
+            first_pos = idx
+            break
+    if first_pos == -1:
+        return None
+    start = max(0, first_pos - max_len // 4)
+    end = min(len(text), first_pos + max_len)
+    segment = text[start:end].strip()
+    if len(segment) < settings.SELECTOR_MIN_SEGMENT_LEN:
+        return None
+    return segment
+
+
 def _read_node_value(target, field_type: FieldType | None = None, field_name: str = "") -> str | None:
     if field_type == FieldType.URL:
         return target.get("href")
@@ -118,6 +212,8 @@ def extract_raw_from_selectors(
                         val = _read_node_value(target, ftype, key)
                 except Exception as e:
                     logger.debug("[SelectorEngine] Invalid selector '%s' for %s: %s", sel, key, e)
+            else:
+                val = _extract_field_by_pattern(node, sel_entry, key)
             if isinstance(sel_entry, dict) and sel_entry.get("type") == "currency" and val:
                 from app.selector_profiles.loader import _postprocess_field
                 val = _postprocess_field(val, sel_entry)

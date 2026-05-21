@@ -14,6 +14,8 @@ from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
 
+from app.config import settings
+
 
 @dataclass
 class EmptyResponseCheck:
@@ -104,7 +106,7 @@ def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseChe
     Returns:
         EmptyResponseCheck with classification and suggestions
     """
-    if not html or len(html.strip()) < 50:
+    if not html or len(html.strip()) < settings.EMPTY_RESPONSE_MIN_HTML_LEN:
         return EmptyResponseCheck(
             is_empty=True,
             empty_type="blank",
@@ -121,7 +123,7 @@ def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseChe
     for empty_type, patterns in EMPTY_PAGE_SIGNALS.items():
         for pattern in patterns:
             if pattern.search(html):
-                detected_types.append((empty_type, 0.8))
+                detected_types.append((empty_type, settings.EMPTY_PAGE_SIGNAL_CONFIDENCE))
                 break
 
     # ── Step 2: Extract visible text and count data signals ──
@@ -141,13 +143,13 @@ def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseChe
         data_signals += len(matches)
 
     # ── Step 3: Check for minimal content ──
-    if text_length < 100:
+    if text_length < settings.EMPTY_RESPONSE_MINIMAL_TEXT_LEN:
         detected_types.append(("minimal", 0.9))
-    elif text_length < 300 and data_signals < 2:
-        detected_types.append(("minimal", 0.5))
+    elif text_length < settings.EMPTY_RESPONSE_LOW_TEXT_LEN and data_signals < settings.EMPTY_RESPONSE_LOW_SIGNAL_COUNT:
+        detected_types.append(("minimal", settings.EMPTY_RESPONSE_CONFIDENCE_THRESHOLD))
 
     # ── Step 4: If we found strong data signals, the page is not empty ──
-    if data_signals >= 5:
+    if data_signals >= settings.EMPTY_RESPONSE_DATA_SIGNAL_THRESHOLD:
         return EmptyResponseCheck(
             is_empty=False,
             empty_type="",
@@ -158,7 +160,7 @@ def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseChe
         )
 
     # Moderate data signals reduce empty confidence
-    if data_signals >= 2:
+    if data_signals >= settings.EMPTY_RESPONSE_MODERATE_SIGNAL_COUNT:
         detected_types = [(etype, conf * 0.5) for etype, conf in detected_types]
 
     # ── Step 5: Determine the best classification ──
@@ -170,7 +172,7 @@ def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseChe
         else:
             best_type, best_conf = max(detected_types, key=lambda x: x[1])
 
-        is_empty = best_conf >= 0.5
+        is_empty = best_conf >= settings.EMPTY_RESPONSE_CONFIDENCE_THRESHOLD
 
         suggestions = []
         if best_type == "cookie_wall":

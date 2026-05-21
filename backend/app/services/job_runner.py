@@ -3,6 +3,7 @@ import datetime
 import logging
 import time
 
+from app.config import settings
 from app.discovery import discover_urls, infer_source_metadata
 from app.filters import apply_location_radius, process_results
 from app.models import FieldType, JobStatus, ScrapeMode
@@ -156,10 +157,10 @@ async def run_job(
                             min_record_score=job.min_record_score, 
                             user_intent=job.intent, 
                             world_state=ws,
-                            max_recovery_attempts=3,
+                            max_recovery_attempts=settings.MAX_RECOVERY_ATTEMPTS,
                             selectors_map=job.selectors_map,
                         ),
-                        timeout=per_url_scrape_timeout_seconds * 4, # Recovery takes longer
+                        timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
                     )
                     job.total_llm_calls += get_llm_call_count()
                     ai_source_prediction["sources_attempted"] += 1
@@ -391,16 +392,16 @@ async def run_job(
                 
         # Final cost calculation (Phase 80: Economic Optimization)
         # $0.01 per LLM call + estimated browser cost ($0.02 per URL)
-        job.estimated_cost_usd = round((job.total_llm_calls * 0.01) + (job.progress_total * 0.02), 4)
+        job.estimated_cost_usd = round((job.total_llm_calls * settings.COST_PER_LLM_CALL) + (job.progress_total * settings.COST_PER_URL_SCRAPE), 4)
 
         # Bound memory footprint if results > 1000
-        if len(job.results) > 1000:
+        if len(job.results) > settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD:
             from app.utils.job_results_store import save_job_results_to_disk
             file_path = save_job_results_to_disk(job.id, job.results)
             job.results_on_disk = True
             job.results_file_path = file_path
             job.results = []
-            _add_job_log(job, "Job results bounded and offloaded to disk due to size (>1000 records).")
+            _add_job_log(job, f"Job results bounded and offloaded to disk due to size (>{settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD} records).")
 
         job.status = JobStatus.COMPLETED
         job.cancel_requested = False

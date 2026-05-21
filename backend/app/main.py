@@ -706,7 +706,7 @@ async def analyze_url(req: URLPreviewRequest):
     """
     from app.selector_discovery import analyze_url_for_fields
     
-    URL_ANALYZER_TIMEOUT = 120  # seconds — overall timeout for the full analysis
+    URL_ANALYZER_TIMEOUT = settings.URL_ANALYZER_TIMEOUT
     
     try:
         result = await asyncio.wait_for(

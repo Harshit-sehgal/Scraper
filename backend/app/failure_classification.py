@@ -24,6 +24,8 @@ from dataclasses import dataclass, field, asdict
 from enum import Enum
 from typing import Any, Optional
 
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -324,7 +326,7 @@ def classify_failure(
         signals.append({"signal": "timeout", "source": "error_message"})
         # Could be multiple categories; check for hydration specifics
         if telemetry.get("fetch_method") == "playwright":
-            if telemetry.get("dom_nodes", 0) < 50:
+            if telemetry.get("dom_nodes", 0) < settings.CLASSIFY_HYDRATION_DOM_THRESHOLD:
                 return _build_classification(
                     FailureCategory.HYDRATION_FAILURE, 0.75, signals
                 )
@@ -418,7 +420,7 @@ def classify_failure(
 
         # Empty or near-empty page (checked AFTER challenge/malformed patterns
         # since challenge pages can also be short but aren't "empty")
-        if len(html.strip()) < 500:
+        if len(html.strip()) < settings.CLASSIFY_EMPTY_PAGE_HTML_THRESHOLD:
             signals.append({"signal": "tiny_html", "source": "html_size"})
             return _build_classification(
                 FailureCategory.EMPTY_PAGE, 0.85, signals
@@ -427,7 +429,7 @@ def classify_failure(
         # Lazy load indicators with few records
         dom_nodes = telemetry.get("dom_nodes", 0)
         extraction_method = (extraction_result or {}).get("method", "")
-        if dom_nodes < 100 and extraction_method == "regex":
+        if dom_nodes < settings.CLASSIFY_LAZYLOAD_DOM_THRESHOLD and extraction_method == "regex":
             signals.append({"signal": "low_dom_count", "source": "dom_analysis"})
             return _build_classification(
                 FailureCategory.LAZY_LOAD_TIMEOUT, 0.65, signals
@@ -463,7 +465,7 @@ def classify_failure(
     # ── Stage 5: Telemetry-based heuristics ───────────────────────────
     if telemetry:
         anti_bot_score = telemetry.get("anti_bot_score", 0.0)
-        if anti_bot_score > 0.6 and not html:
+        if anti_bot_score > settings.CLASSIFY_ANTIBOT_SCORE_THRESHOLD and not html:
             signals.append({"signal": "high_anti_bot_no_html", "source": "telemetry"})
             return _build_classification(
                 FailureCategory.ANTI_BOT_BLOCK, 0.70, signals
@@ -471,7 +473,7 @@ def classify_failure(
 
         fallback = telemetry.get("fallback_usage", "none")
         selector_hit = telemetry.get("selector_hit_rate", 1.0)
-        if fallback != "none" and selector_hit < 0.3:
+        if fallback != "none" and selector_hit < settings.CLASSIFY_LOW_SELECTOR_HIT_THRESHOLD:
             signals.append({"signal": "low_selector_hit", "source": "telemetry"})
             return _build_classification(
                 FailureCategory.SELECTOR_MISMATCH, 0.60, signals
@@ -480,7 +482,7 @@ def classify_failure(
     # ── Stage 6: Fallback to domain intelligence patterns ─────────────
     if domain_intel:
         decay_rate = domain_intel.get("selector_decay_rate", 0.0)
-        if decay_rate > 0.5:
+        if decay_rate > settings.CLASSIFY_DECAY_RATE_THRESHOLD:
             signals.append({"signal": "high_decay_rate", "source": "domain_intel"})
             return _build_classification(
                 FailureCategory.SELECTOR_DECAY, 0.55, signals
@@ -565,7 +567,7 @@ def _is_malformed_dom(html: str) -> bool:
         return False
     ratio = closings / max(1, openings)
     # If fewer than 30% of tags are closed, likely malformed
-    return ratio < 0.3
+    return ratio < settings.CLASSIFY_MALFORMED_DOM_RATIO
 
 
 def _is_partial_extraction(records: list[dict], schema_fields: list[str]) -> bool:
@@ -582,7 +584,7 @@ def _is_partial_extraction(records: list[dict], schema_fields: list[str]) -> boo
                 filled_slots += 1
 
     fill_rate = filled_slots / max(1, total_slots)
-    return fill_rate < 0.5
+    return fill_rate < settings.CLASSIFY_PARTIAL_EXTRACTION_FILL_RATE
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -608,7 +610,7 @@ def update_domain_with_failure(
     intel.failure_history[category] = intel.failure_history.get(category, 0) + 1
 
     # If a domain consistently produces the same failure, adjust preferred strategy
-    threshold = 3
+    threshold = settings.CLASSIFY_FAILURE_PATTERN_THRESHOLD
     for cat, count in intel.failure_history.items():
         if count >= threshold:
             # This domain has a pattern — adjust strategy proactively
@@ -618,7 +620,7 @@ def update_domain_with_failure(
                 intel.preferred_strategy = "httpx"
             elif cat in ("hydration_failure", "lazy_load_timeout"):
                 intel.hydration_delay_ms = min(
-                    intel.hydration_delay_ms + 500, 10000
+                    intel.hydration_delay_ms + settings.CLASSIFY_HYDRATION_DELAY_INCREMENT, settings.CLASSIFY_HYDRATION_DELAY_MAX
                 )
             break
 

@@ -15,6 +15,8 @@ from __future__ import annotations
 from enum import Enum
 from dataclasses import dataclass
 
+from app.config import settings
+
 
 class AcquisitionMode(str, Enum):
     """Acquisition mode controlling fetch aggressiveness and recovery behavior."""
@@ -71,7 +73,7 @@ class AcquisitionConfig:
                 attempt_recovery=False,
                 use_playwright=True,
                 attempt_search_form=False,
-                max_retries=1,
+                max_retries=settings.ACQUISITION_STANDARD_MAX_RETRIES,
                 try_alternatives=False,
                 detect_empty_responses=True,
                 detect_session_params=True,
@@ -83,11 +85,11 @@ class AcquisitionConfig:
                 attempt_recovery=True,
                 use_playwright=True,
                 attempt_search_form=True,
-                max_retries=2,
+                max_retries=settings.ACQUISITION_AGGRESSIVE_MAX_RETRIES,
                 try_alternatives=True,
                 detect_empty_responses=True,
                 detect_session_params=True,
-                timeout_multiplier=1.5,
+                timeout_multiplier=settings.ACQUISITION_AGGRESSIVE_TIMEOUT_MULT,
             )
         elif mode == AcquisitionMode.DEEP_SCAN:
             return cls(
@@ -95,11 +97,11 @@ class AcquisitionConfig:
                 attempt_recovery=True,
                 use_playwright=True,
                 attempt_search_form=True,
-                max_retries=3,
+                max_retries=settings.ACQUISITION_DEEP_SCAN_MAX_RETRIES,
                 try_alternatives=True,
                 detect_empty_responses=True,
                 detect_session_params=True,
-                timeout_multiplier=2.0,
+                timeout_multiplier=settings.ACQUISITION_DEEP_SCAN_TIMEOUT_MULT,
             )
         return cls(mode=mode)
 

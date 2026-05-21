@@ -123,8 +123,8 @@ class BrowserPool:
                     "device_scale_factor": 1.0 if not is_stealth else 2.0,
                     "is_mobile": False,
                     "has_touch": False,
-                    "locale": "en-US",
-                    "timezone_id": "America/New_York",
+                    "locale": settings.STEALTH_DEFAULT_LOCALE,
+                    "timezone_id": settings.STEALTH_TIMEZONE_POOL.split(",")[0],
                 }
             
             # Add proxy if enabled
@@ -159,37 +159,38 @@ class BrowserPool:
             # Phase 80: Advanced Stealth Evasion
             if settings.PLAYWRIGHT_STEALTH or is_stealth:
                 # Basic stealth
-                stealth_js = """
-                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-                window.chrome = { runtime: {} };
-                Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
-                Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+                _nav_langs = settings.STEALTH_NAVIGATOR_LANGUAGES.split(",")
+                stealth_js = f"""
+                Object.defineProperty(navigator, 'webdriver', {{get: () => undefined}});
+                window.chrome = {{ runtime: {{}} }};
+                Object.defineProperty(navigator, 'plugins', {{get: () => [1, 2, 3, 4, 5]}});
+                Object.defineProperty(navigator, 'languages', {{get: () => {_nav_langs}}});
                 """
                 await context.add_init_script(stealth_js)
                 
                 if is_stealth:
                     # Advanced fingerprint randomization
-                    advanced_stealth = """
+                    advanced_stealth = f"""
                     // WebGL spoofing
                     const getParameter = WebGLRenderingContext.prototype.getParameter;
-                    WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                    WebGLRenderingContext.prototype.getParameter = function(parameter) {{
                         if (parameter === 37445) return 'Intel Open Source Technology Center';
                         if (parameter === 37446) return 'Mesa DRI Intel(R) Ivybridge Mobile ';
                         return getParameter.apply(this, arguments);
-                    };
+                    }};
                     
                     // Hardware concurrency randomization
-                    Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 4});
+                    Object.defineProperty(navigator, 'hardwareConcurrency', {{get: () => {settings.STEALTH_HARDWARE_CONCURRENCY}}});
                     
                     // Battery status spoofing
-                    if (navigator.getBattery) {
-                        navigator.getBattery = () => Promise.resolve({
+                    if (navigator.getBattery) {{
+                        navigator.getBattery = () => Promise.resolve({{
                             charging: true,
                             chargingTime: 0,
                             dischargingTime: Infinity,
                             level: 1
-                        });
-                    }
+                        }});
+                    }}
                     """
                     await context.add_init_script(advanced_stealth)
                 
@@ -202,13 +203,7 @@ class BrowserPool:
     def _get_random_ua(self) -> str:
         """Return a randomized browser user agent."""
         import random
-        uas = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
-        ]
-        return random.choice(uas)
+        return random.choice(settings.STEALTH_UA_POOL.split(","))
 
     async def check_health(self) -> bool:
         """Perform a basic health check on the browser instance."""
@@ -274,12 +269,12 @@ class BrowserPool:
             return 0
 
     def _should_recycle(self) -> bool:
-        if self._cumulative_fetches >= 200:
-            logger.info("[BrowserPool] Cumulative fetches (%d) reached limit (200). Recycling required.", self._cumulative_fetches)
+        if self._cumulative_fetches >= settings.BROWSER_MAX_CUMULATIVE_FETCHES:
+            logger.info("[BrowserPool] Cumulative fetches (%d) reached limit. Recycling required.", self._cumulative_fetches)
             return True
         rss = self._get_rss_memory()
-        if rss > 1024 * 1024 * 1024:  # 1GB
-            logger.info("[BrowserPool] Process RSS memory (%.2f MB) exceeded 1GB. Recycling required.", rss / (1024*1024))
+        if rss > settings.BROWSER_MAX_RSS_MEMORY_MB * 1024 * 1024:
+            logger.info("[BrowserPool] Process RSS memory (%.2f MB) exceeded limit. Recycling required.", rss / (1024*1024))
             return True
         return False
 
@@ -292,7 +287,7 @@ class BrowserPool:
         
         while self._active_fetches > 0:
             logger.info("[BrowserPool] Waiting for %d active fetches to drain before recycling...", self._active_fetches)
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(settings.BROWSER_DRAIN_POLL_INTERVAL)
 
         logger.info("[BrowserPool] Active fetches drained to 0. Performing hard browser process recycle.")
         try:
@@ -334,7 +329,7 @@ class BrowserPool:
     async def _periodic_cleanup(self) -> None:
         """Close browser if idle for too long."""
         while True:
-            await asyncio.sleep(60)
+            await asyncio.sleep(settings.BROWSER_CLEANUP_INTERVAL)
             if self._browser:
                 if time.time() - self._last_activity > settings.BROWSER_IDLE_TIMEOUT:
                     logger.info("[BrowserPool] Idle timeout reached, closing browser")

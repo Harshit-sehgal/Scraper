@@ -12,6 +12,7 @@ from urllib.parse import urlparse, urlunparse
 from ddgs import DDGS
 
 from app.async_utils import run_sync_in_thread
+from app.config import settings
 from app.models import SourcePolicy
 
 NOISY_URL_PARTS = (
@@ -39,44 +40,17 @@ LISTING_HINTS = (
     "contact",
 )
 
-SOCIAL_ROOT_DOMAINS = {
-    "facebook.com",
-    "instagram.com",
-    "linkedin.com",
-    "x.com",
-    "twitter.com",
-    "youtube.com",
-    "pinterest.com",
-    "threads.net",
-}
+SOCIAL_ROOT_DOMAINS = set(d.strip() for d in settings.DISCOVERY_SOCIAL_DOMAINS.split(","))
 
-DIRECTORY_ROOT_DOMAINS = {
-    "justdial.com",
-    "sulekha.com",
-    "magicbricks.com",
-    "houzz.com",
-    "houzz.in",
-    "threebestrated.in",
-    "yellowpages.com",
-    "yelp.com",
-    "indiamart.com",
-    "tradeindia.com",
-    "mapquest.com",
-}
+DIRECTORY_ROOT_DOMAINS = set(d.strip() for d in settings.DISCOVERY_DIRECTORY_DOMAINS.split(","))
 
-SEARCH_ROOT_DOMAINS = {
-    "google.com",
-    "g.co",
-    "bing.com",
-    "duckduckgo.com",
-    "search.yahoo.com",
-}
+SEARCH_ROOT_DOMAINS = set(d.strip() for d in settings.DISCOVERY_SEARCH_DOMAINS.split(","))
 
 SOURCE_TRUST_SCORE = {
-    "official": 0.92,
-    "directory": 0.62,
-    "social": 0.5,
-    "search_result": 0.35,
+    "official": settings.SOURCE_TRUST_OFFICIAL,
+    "directory": settings.SOURCE_TRUST_DIRECTORY,
+    "social": settings.SOURCE_TRUST_SOCIAL,
+    "search_result": settings.SOURCE_TRUST_SEARCH,
 }
 
 # Domains that repeatedly fail to resolve/connect can be excluded from discovery.

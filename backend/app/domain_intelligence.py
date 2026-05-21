@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Dict, Optional
 from urllib.parse import urlparse
 
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -90,7 +92,7 @@ class DomainIntelligenceRegistry:
             return
 
         intel = self.get_intelligence(url)
-        alpha = 0.3 # Smoothing factor for moving averages
+        alpha = settings.DOMAIN_INTELLIGENCE_SMOOTHING_ALPHA
         
         # 1. Update basic counts
         intel.total_fetches += 1

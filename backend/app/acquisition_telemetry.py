@@ -13,6 +13,7 @@ from dataclasses import dataclass, field, asdict
 from typing import Optional
 
 from app.acquisition_state import AcquisitionState
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +42,9 @@ class AcquisitionEvent:
 class AcquisitionTelemetryCollector:
     """Collects and aggregates acquisition telemetry events."""
 
-    def __init__(self, max_history: int = 500) -> None:
+    def __init__(self, max_history: int | None = None) -> None:
         self._history: list[AcquisitionEvent] = []
-        self._max_history = max_history
+        self._max_history = max_history if max_history is not None else settings.ACQUISITION_TELEMETRY_MAX_HISTORY
         self._state_counts: Counter = Counter()
         self._recovery_attempts: int = 0
         self._recovery_successes: int = 0
@@ -93,8 +94,9 @@ class AcquisitionTelemetryCollector:
 
         return event
 
-    def get_recent(self, n: int = 20) -> list[dict]:
+    def get_recent(self, n: int | None = None) -> list[dict]:
         """Get the N most recent acquisition events."""
+        n = n if n is not None else settings.ACQUISITION_TELEMETRY_RECENT_DEFAULT
         return [e.to_dict() for e in self._history[-n:]]
 
     def get_summary(self) -> dict:

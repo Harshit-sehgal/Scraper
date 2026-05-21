@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
+from app.config import settings
+
 
 # Patterns that strongly indicate an ephemeral/session parameter
 # These are parameter names (case-insensitive) that are commonly used
@@ -83,7 +85,7 @@ def detect_session_params(url: str) -> dict:
             if pattern.match(param_lower):
                 ephemeral_params.append(param_name)
                 details.append((param_name, f"param name matches pattern: {pattern.pattern}"))
-                confidence_score = max(confidence_score, 0.8)
+                confidence_score = max(confidence_score, settings.SESSION_PARAM_NAME_CONFIDENCE)
                 name_matched = True
                 break
 
@@ -96,7 +98,7 @@ def detect_session_params(url: str) -> dict:
                 if pattern.match(value):
                     ephemeral_params.append(param_name)
                     details.append((param_name, f"value matches session token pattern: {pattern.pattern}"))
-                    confidence_score = max(confidence_score, 0.7)
+                    confidence_score = max(confidence_score, settings.SESSION_PARAM_VALUE_CONFIDENCE)
                     break
 
     # Check 3: URL path contains long hash-like segments
@@ -104,7 +106,7 @@ def detect_session_params(url: str) -> dict:
     for segment in path_segments:
         # Long hex-like path segments (e.g., /search/abc123def456ghi)
         if re.match(r"^[0-9a-f]{16,}$", segment, re.I):
-            confidence_score = max(confidence_score, 0.6)
+            confidence_score = max(confidence_score, settings.SESSION_PATH_HASH_CONFIDENCE)
             ephemeral_params.append(f"path:/{segment}")
             details.append((f"path:/{segment}", "path segment looks like a session hash"))
 
@@ -125,10 +127,10 @@ def detect_session_params(url: str) -> dict:
 
     # If no ephemeral params found but URL has query params, low confidence
     if not ephemeral_params and params:
-        confidence_score = min(confidence_score, 0.3)
+        confidence_score = min(confidence_score, settings.SESSION_NO_EPHEMERAL_MAX_CONFIDENCE)
 
     return {
-        "is_session_bound": len(ephemeral_params) > 0 or confidence_score >= 0.6,
+        "is_session_bound": len(ephemeral_params) > 0 or confidence_score >= settings.SESSION_BOUND_CONFIDENCE_THRESHOLD,
         "ephemeral_params": ephemeral_params,
         "canonical_url": canonical_url,
         "confidence": round(confidence_score, 2),

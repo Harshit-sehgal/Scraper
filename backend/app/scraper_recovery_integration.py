@@ -23,6 +23,7 @@ import time
 from typing import Any, Dict, Optional
 
 from app.failure_classification import classify_failure, FailureCategory
+from app.config import settings
 from app.recovery_strategies import get_recovery_strategist, get_recovery_executor
 from app.selector_memory import get_selector_memory
 from app.domain_intelligence import get_domain_intelligence
@@ -37,7 +38,7 @@ async def scrape_url_with_recovery(
     min_record_score: float | None = None,
     user_intent: str = "",
     world_state=None,
-    max_recovery_attempts: int = 3,
+    max_recovery_attempts: int = settings.MAX_RECOVERY_ATTEMPTS,
     selectors_map: dict | None = None,
 ) -> tuple[list[dict], dict]:
     """Scrape a URL with intelligent failure recovery.

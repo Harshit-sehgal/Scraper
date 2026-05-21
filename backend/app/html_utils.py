@@ -464,7 +464,7 @@ async def _fetch_with_httpx(
         headers = {"User-Agent": settings.USER_AGENT}
         if strategy == FetchStrategy.HTTPX_BASIC:
             # Minimal headers for basic fetch
-            headers = {"User-Agent": "python-httpx/0.27.0"}
+            headers = {"User-Agent": settings.HTTPX_BASIC_USER_AGENT}
         
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(settings.REQUEST_TIMEOUT),
