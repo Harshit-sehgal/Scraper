@@ -88,11 +88,15 @@ def _load_all_profiles() -> dict[str, dict]:
     return _profile_cache
 
 
+def match_profile_for_url(url: str) -> Optional[dict]:
+    """Public alias for domain profile lookup."""
+    return _match_domain(url)
+
+
 def _match_domain(url: str) -> Optional[dict]:
     """Find a profile that matches the URL's domain.
     
-    Uses substring matching so 'flightsnholidays.co.uk' matches
-    'www.flightsnholidays.co.uk' and 'flightsnholidays.co.uk'.
+    Uses substring matching so profile domains match www. and bare hostnames.
     """
     from urllib.parse import urlparse
     parsed = urlparse(url)
@@ -217,7 +221,6 @@ async def extract_with_profile(
             if wait_for_sel:
                 try:
                     await page.wait_for_selector(wait_for_sel, timeout=max_wait * 1000)
-                    await asyncio.sleep(settings.PAGE_SETTLE_DELAY)  # buffer for remaining JS rendering
                 except Exception:
                     logger.warning(
                         "[ProfileExtractor] Selector '%s' not found within %ds",
@@ -225,41 +228,55 @@ async def extract_with_profile(
                     )
                     return []
 
-            # Build the evaluate JS string from the profile config
+            # Poll item_container count until stable (dynamic list rendering)
+            container_locator = page.locator(container_sel)
+            stable_polls = 0
+            prev_count = -1
+            for _ in range(settings.PROFILE_CONTAINER_POLL_ATTEMPTS):
+                await asyncio.sleep(settings.PAGE_SETTLE_DELAY / 2)
+                try:
+                    count = await container_locator.count()
+                except Exception:
+                    count = 0
+                if count > 0 and count == prev_count:
+                    stable_polls += 1
+                    if stable_polls >= settings.PROFILE_CONTAINER_STABLE_POLLS:
+                        break
+                else:
+                    stable_polls = 0
+                prev_count = count
+            await asyncio.sleep(settings.PAGE_SETTLE_DELAY)
+
             field_extractors = {}
             for field_name, field_cfg in field_defs.items():
                 sel = field_cfg.get("selector", "")
                 attr = field_cfg.get("attribute", "text")
                 field_extractors[field_name] = {"selector": sel, "attribute": attr}
 
-            # Serialize for embedding in JS
-            import json as _json
-            field_json = _json.dumps(field_extractors)
-
-            records = await page.evaluate(f"""
-                () => {{
-                    const fieldDefs = {field_json};
-                    const cards = document.querySelectorAll('{container_sel}');
-                    return Array.from(cards).map(card => {{
-                        const record = {{}};
-                        for (const [name, cfg] of Object.entries(fieldDefs)) {{
+            records = await page.evaluate(
+                """([containerSel, fieldDefs]) => {
+                    const cards = document.querySelectorAll(containerSel);
+                    return Array.from(cards).map(card => {
+                        const record = {};
+                        for (const [name, cfg] of Object.entries(fieldDefs)) {
                             const el = card.querySelector(cfg.selector);
-                            if (!el) {{
+                            if (!el) {
                                 record[name] = null;
                                 continue;
-                            }}
-                            if (cfg.attribute === 'href') {{
+                            }
+                            if (cfg.attribute === 'href') {
                                 record[name] = el.getAttribute('href') || null;
-                            }} else if (cfg.attribute === 'text') {{
+                            } else if (cfg.attribute === 'text') {
                                 record[name] = (el.textContent || '').trim() || null;
-                            }} else {{
+                            } else {
                                 record[name] = el.getAttribute(cfg.attribute) || null;
-                            }}
-                        }}
+                            }
+                        }
                         return record;
-                    }});
-                }}
-            """)
+                    });
+                }""",
+                [container_sel, field_extractors],
+            )
 
             # Post-process field values
             for record in records:

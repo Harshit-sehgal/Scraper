@@ -30,7 +30,7 @@ from app.data_utils import (
     _dedupe_records, _limit_source_records as _base_limit_source_records,
     process_raw_records,
 )
-from app.selector_profiles.loader import try_profile_extraction
+from app.selector_profiles.loader import try_profile_extraction, match_profile_for_url
 from app.scrape_telemetry import (
     get_scrape_telemetry, detect_anti_bot, estimate_dom_nodes,
 )
@@ -99,6 +99,7 @@ async def scrape_url(
         return []
 
     # ── Step 1: Try profile-based extraction first ──────────────────
+    matched_profile = match_profile_for_url(url)
     profile_results = await try_profile_extraction(url, max_wait=settings.PROFILE_MAX_WAIT)
     if profile_results is not None:
         logger.info(
@@ -106,7 +107,14 @@ async def scrape_url(
             len(profile_results), url,
         )
         if profile_results:
-            results = process_raw_records(profile_results, schema_fields, min_record_score)
+            profile_field_defs = (matched_profile or {}).get("fields") if matched_profile else None
+            results = process_raw_records(
+                profile_results,
+                schema_fields,
+                min_record_score,
+                profile_fields=profile_field_defs,
+                user_intent=user_intent,
+            )
             telemetry.record(
                 url=url,
                 profile_match=True,
@@ -199,6 +207,7 @@ async def scrape_url(
         url, html, schema_fields, min_record_score,
         provenance_builder=provenance_builder,
         world_state=world_state,
+        user_intent=user_intent,
     )
     results = ext_result.records
     
@@ -339,14 +348,20 @@ async def scrape_url(
 
     records_before_scoring = len(results)
 
-    # Local filtering and limiting
-    results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * settings.RECORD_ACCEPTANCE_FACTOR)]
-    results = _dedupe_records(results, schema_fields)
+    if results:
+        from app.selector_engine import build_selector_field_metadata
+        selector_meta = build_selector_field_metadata(
+            (ext_result.selectors or {}).get("fields", {}),
+            schema_fields,
+        )
+        results = process_raw_records(
+            results,
+            schema_fields,
+            min_record_score,
+            profile_fields=selector_meta,
+            user_intent=user_intent,
+        )
     records_after_dedup = len(results)
-    results = _limit_source_records(results, schema_fields)
-
-    # Final semantic pipeline orchestration
-    results = run_pipeline(results, [f.name for f in schema_fields])
 
     # Calculate selector hit rate and confidence map
     selector_hit_rate = 0.0

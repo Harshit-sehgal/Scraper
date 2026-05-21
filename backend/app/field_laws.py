@@ -41,3 +41,9 @@ ROLE_EXCLUSIVITY: List[Tuple[str, str]] = [
     ("start", "end"),
     ("price", "cost"),
 ]
+
+# Semantic needs that must not align to the same schema slot
+SEMANTIC_NEED_EXCLUSIVITY: List[Tuple[str, str]] = [
+    ("status", "date"),
+    ("seller", "location"),
+]

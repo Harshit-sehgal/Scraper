@@ -43,6 +43,7 @@ async def orchestrate_extraction(
     min_record_score: float,
     provenance_builder: ProvenanceBuilder | None = None,
     world_state=None,
+    user_intent: str = "",
 ) -> ExtractionResult:
     """Cascade through extraction methods until high-quality data is found.
 
@@ -96,7 +97,9 @@ async def orchestrate_extraction(
     remembered_selectors = memory.get_selectors(url)
     if remembered_selectors:
         logger.info("[Orchestrator] Trying remembered selectors for %s", url)
-        raw_results = apply_selectors(html, remembered_selectors, schema_fields, base_url=url)
+        raw_results = apply_selectors(
+            html, remembered_selectors, schema_fields, base_url=url, user_intent=user_intent
+        )
         if raw_results:
             # Ensure raw_results is a list (apply_selectors returns list when return_field_quality=False)
             assert isinstance(raw_results, list)
@@ -142,7 +145,12 @@ async def orchestrate_extraction(
         # We run apply_selectors with field quality tracking to see if the LLM
         # swapped fields (common with dynamic grids).
         result = apply_selectors(
-            html, discovered_selectors, schema_fields, base_url=url, return_field_quality=True
+            html,
+            discovered_selectors,
+            schema_fields,
+            base_url=url,
+            return_field_quality=True,
+            user_intent=user_intent,
         )
         
         # Handle tuple return value
@@ -162,7 +170,9 @@ async def orchestrate_extraction(
             if provenance_builder:
                 provenance_builder.add_error(f"Field swap detected and aligned: {swapped}")
             # Re-apply with aligned selectors
-            raw_results = apply_selectors(html, discovered_selectors, schema_fields, base_url=url)
+            raw_results = apply_selectors(
+                html, discovered_selectors, schema_fields, base_url=url, user_intent=user_intent
+            )
             # Ensure it's a list
             assert isinstance(raw_results, list)
             

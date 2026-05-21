@@ -1,0 +1,84 @@
+"""Live E2E: profile extraction + schema alignment (requires network + Playwright)."""
+
+from __future__ import annotations
+
+import pytest
+
+from app.data_utils import align_profile_keys_to_schema
+from app.models import FieldType, SchemaField
+from app.scraper import scrape_url
+from app.selector_profiles.loader import _load_all_profiles, match_profile_for_url, try_profile_extraction
+
+
+def _profile_search_url(domain: str) -> str:
+    """Build a search URL from profile domain only (no site-specific logic in app code)."""
+    return (
+        f"https://www.{domain}/flight-result.aspx"
+        "?From=LON&To=PAR&ddate=05/30/2026&retdate=06/01/2026"
+        "&Adult=1&Child=0&Infant=0&Class=Economy&FType=-1&IsReturn=1"
+    )
+
+
+def _custom_flight_schema() -> list[SchemaField]:
+    return [
+        SchemaField(name="airlines_name", field_type=FieldType.STRING, description="Name of the airline", required=True),
+        SchemaField(name="origin_airport", field_type=FieldType.STRING, description="Airport of origin", required=True),
+        SchemaField(name="destination_airport", field_type=FieldType.STRING, description="Airport of destination", required=True),
+        SchemaField(name="prices", field_type=FieldType.CURRENCY, description="Price of the flight", required=True),
+        SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure", required=True),
+        SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival", required=True),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_profile_extraction_aligns_all_schema_fields():
+    """Profile returns multiple rows; alignment maps every profile key to best schema field."""
+    profiles = _load_all_profiles()
+    if not profiles:
+        pytest.skip("No selector profiles on disk")
+    domain = next(iter(profiles.keys()))
+    url = _profile_search_url(domain)
+
+    profile = match_profile_for_url(url)
+    assert profile is not None
+
+    raw = await try_profile_extraction(url)
+    if not raw:
+        pytest.skip(f"Live extraction unavailable for {domain}")
+
+    schema = _custom_flight_schema()
+    aligned = align_profile_keys_to_schema(raw, schema, profile_fields=profile.get("fields"))
+    assert len(aligned) >= 2
+
+    for row in aligned:
+        assert row.get("airlines_name")
+        assert row.get("origin_airport")
+        assert row.get("destination_airport")
+        assert row.get("prices") is not None
+        assert row.get("departure_date")
+        assert row.get("arrival_date") not in ("Direct", "1 Stop", "2 Stops", None)
+        assert "stops" not in row
+        assert row.get("arrival_date")
+
+
+@pytest.mark.asyncio
+async def test_scrape_url_end_to_end_multiple_records():
+    profiles = _load_all_profiles()
+    if not profiles:
+        pytest.skip("No selector profiles on disk")
+    domain = next(iter(profiles.keys()))
+    url = _profile_search_url(domain)
+
+    results = await scrape_url(url, _custom_flight_schema(), min_record_score=0.1)
+    if not results:
+        pytest.skip(f"scrape_url returned no records for {domain}")
+
+    assert len(results) >= 2
+    for r in results:
+        assert r.get("airlines_name")
+        assert r.get("origin_airport")
+        assert r.get("destination_airport")
+        assert r.get("prices") is not None
+        assert r.get("departure_date")
+        assert r.get("arrival_date") not in ("Direct", "1 Stop", "2 Stops", None)
+        assert r.get("arrival_date")

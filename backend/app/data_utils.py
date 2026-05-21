@@ -96,18 +96,193 @@ def _prepare_records_for_ai(records: list[dict], schema_fields: list[SchemaField
             prepared.append(item)
     return prepared
 
+def _get_word_tokens(name: str) -> set[str]:
+    """Split a field name into word tokens for boundary-safe matching."""
+    import re
+    return {t.lower() for t in re.split(r"[_\-\s]+", name) if t}
+
+
+def _profile_field_type_hint(profile_field_cfg: dict | None) -> str | None:
+    if not profile_field_cfg:
+        return None
+    return (profile_field_cfg.get("type") or "").strip().lower() or None
+
+
+def _schema_type_alignment_bonus(profile_type: str | None, schema_field: SchemaField) -> float:
+    if not profile_type:
+        return 0.0
+    from app.config import settings
+    compatible = settings.PROFILE_SELECTOR_TYPE_COMPATIBILITY.get(profile_type, ())
+    if schema_field.field_type.value in compatible:
+        return settings.PROFILE_ALIGNMENT_SCORE_TYPE_BONUS
+    return 0.0
+
+
+def _alignment_score(
+    profile_key: str,
+    schema_field: SchemaField,
+    profile_field_cfg: dict | None = None,
+) -> float:
+    """Score how well a profile field key matches a user schema field (higher = better)."""
+    from app.config import settings
+    from app.intent_parser import (
+        build_semantic_synonym_groups,
+        role_tokens_are_exclusive,
+        semantic_needs_are_exclusive,
+        tokens_to_semantic_need,
+    )
+
+    pk_lower = profile_key.lower()
+    sf_lower = schema_field.name.lower()
+    pk_tokens = _get_word_tokens(profile_key)
+    sf_tokens = _get_word_tokens(schema_field.name)
+    if schema_field.description:
+        sf_tokens |= _get_word_tokens(schema_field.description)
+
+    if pk_lower == sf_lower:
+        return settings.PROFILE_ALIGNMENT_SCORE_EXACT
+
+    score = 0.0
+
+    if pk_lower.rstrip("s") == sf_lower.rstrip("s") and min(len(pk_lower), len(sf_lower)) >= 3:
+        score += settings.PROFILE_ALIGNMENT_SCORE_PLURAL
+    if pk_lower + "s" == sf_lower or sf_lower + "s" == pk_lower:
+        score += settings.PROFILE_ALIGNMENT_SCORE_PLURAL - 5.0
+    if pk_tokens and sf_tokens:
+        overlap = pk_tokens & sf_tokens
+        if overlap:
+            score += settings.PROFILE_ALIGNMENT_SCORE_TOKEN_OVERLAP * len(overlap) / max(
+                len(pk_tokens), len(sf_tokens)
+            )
+
+    if len(pk_lower) >= 3 and pk_lower in sf_lower:
+        score += settings.PROFILE_ALIGNMENT_SCORE_SUBSTRING
+    elif len(sf_lower) >= 3 and sf_lower in pk_lower:
+        score += settings.PROFILE_ALIGNMENT_SCORE_REVERSE_SUBSTRING
+
+    for group in build_semantic_synonym_groups():
+        if pk_tokens & group and sf_tokens & group:
+            score += settings.PROFILE_ALIGNMENT_SCORE_SYNONYM
+            break
+
+    pk_need = tokens_to_semantic_need(pk_tokens)
+    sf_need = tokens_to_semantic_need(sf_tokens)
+    if pk_need == "date" and sf_need == "date":
+        if "departure" in sf_tokens or "depart" in sf_tokens:
+            score += settings.PROFILE_ALIGNMENT_SCORE_DEPARTURE_BIAS
+        elif "arrival" in sf_tokens:
+            score -= settings.PROFILE_ALIGNMENT_SCORE_DEPARTURE_BIAS / 2
+
+    profile_type = _profile_field_type_hint(profile_field_cfg)
+    score += _schema_type_alignment_bonus(profile_type, schema_field)
+
+    if semantic_needs_are_exclusive(pk_need, sf_need) or role_tokens_are_exclusive(pk_tokens, sf_tokens):
+        score -= settings.PROFILE_ALIGNMENT_NEGATIVE_PENALTY
+
+    return score
+
+
+def align_extracted_keys_to_schema(
+    raw_records: list[dict],
+    schema_fields: list[SchemaField],
+    selector_field_defs: dict | None = None,
+    user_intent: str = "",
+) -> list[dict]:
+    """Map extracted selector keys to the user's schema using best-match scoring.
+
+    Reads every key present in raw records (full selector field set), then assigns
+    each to the schema field with the highest alignment score (one-to-one).
+    """
+    if not raw_records or not schema_fields:
+        return raw_records
+
+    profile_keys = [k for k in raw_records[0].keys() if not k.startswith("_")]
+    if not profile_keys:
+        return raw_records
+
+    selector_field_defs = selector_field_defs or {}
+    intent_boost_fields: set[str] = set()
+    if user_intent:
+        from app.intent_parser import keywords_to_tokens, parse_user_intent
+        intent = parse_user_intent(user_intent)
+        for _need, kws in intent.semantic_needs.items():
+            intent_boost_fields |= keywords_to_tokens(kws)
+
+    candidates: list[tuple[float, str, str]] = []
+    for pk in profile_keys:
+        pk_cfg = selector_field_defs.get(pk) if isinstance(selector_field_defs.get(pk), dict) else None
+        pk_tokens = _get_word_tokens(pk)
+        for sf in schema_fields:
+            sc = _alignment_score(pk, sf, pk_cfg)
+            sf_tokens = _get_word_tokens(sf.name)
+            if sf.description:
+                sf_tokens |= _get_word_tokens(sf.description)
+            if intent_boost_fields and (pk_tokens & intent_boost_fields) and (
+                sf_tokens & intent_boost_fields
+            ):
+                from app.config import settings
+                sc += settings.PROFILE_ALIGNMENT_SCORE_SYNONYM / 2
+            if sc > 0:
+                candidates.append((sc, pk, sf.name))
+
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    mapping: dict[str, str] = {}
+    used_schema: set[str] = set()
+    for sc, pk, sf_name in candidates:
+        if pk in mapping or sf_name in used_schema:
+            continue
+        mapping[pk] = sf_name
+        used_schema.add(sf_name)
+
+    schema_names = {f.name for f in schema_fields}
+    aligned_records = []
+    for r in raw_records:
+        aligned = {}
+        for pk, val in r.items():
+            if pk.startswith("_"):
+                continue
+            if pk in mapping:
+                aligned[mapping[pk]] = val
+            elif pk in schema_names:
+                aligned[pk] = val
+        aligned_records.append(aligned)
+
+    return aligned_records
+
+
+def align_profile_keys_to_schema(
+    raw_records: list[dict],
+    schema_fields: list[SchemaField],
+    profile_fields: dict | None = None,
+) -> list[dict]:
+    """Backward-compatible alias for profile-based extraction."""
+    return align_extracted_keys_to_schema(
+        raw_records, schema_fields, selector_field_defs=profile_fields
+    )
+
+
 def process_raw_records(
     raw_records: list[dict],
     schema_fields: list[SchemaField],
     min_record_score: float,
+    profile_fields: dict | None = None,
+    user_intent: str = "",
 ) -> list[dict]:
     """Normalize, score, dedup, limit, and run pipeline on raw extracted records."""
     from app.utils.quality import score_record_quality
     from app.semantic_pipeline import run_pipeline
     from app.config import settings
 
+    # Align full selector output to the user schema (best match per field)
+    aligned_records = align_extracted_keys_to_schema(
+        raw_records,
+        schema_fields,
+        selector_field_defs=profile_fields,
+        user_intent=user_intent,
+    )
+
     results = []
-    for r in raw_records:
+    for r in aligned_records:
         norm = normalize_scraped_record(r, schema_fields)
         norm["record_score"] = score_record_quality(norm, schema_fields)
         results.append(norm)
