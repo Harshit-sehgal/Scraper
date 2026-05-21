@@ -185,15 +185,63 @@ ebed3e1 feat(acquisition): dashboard visibility + user-facing acquisition status
 
 ---
 
+## Pass 5 — Acquisition Mode Wiring & Escalation
+
+### Features Added
+
+#### Wired AcquisitionConfig into the pipeline
+**File**: `backend/app/selector_discovery.py`
+`analyze_url_for_fields` now instantiates `AcquisitionConfig.from_mode()`
+from the `acquisition_mode` parameter and gates behavior:
+- `config.detect_session_params` controls session URL detection
+- `config.attempt_search_form` controls form detection
+- `config.attempt_recovery` controls search form recovery attempts
+- `config.detect_empty_responses` controls empty-200 detection
+
+#### Added escalation loop
+**File**: `backend/app/selector_discovery.py`
+After the pipeline completes, `should_escalate()` checks if the acquisition
+state warrants escalating to a more aggressive mode. If so, the function
+recursively calls itself with the escalated mode. Limited by `config.max_retries`
+and a depth counter to prevent infinite loops.
+
+#### Refined escalation triggers
+**File**: `backend/app/acquisition_mode.py`
+- Removed `awaiting_search_params` from triggers (can't fix by escalating)
+- Gated `empty_response` boolean to only trigger from STANDARD mode
+  (AGGRESSIVE/DEEP_SCAN already detect empty responses)
+
+#### Exposed acquisition_config in API response
+Added `acquisition_config` dict to the analyze response, showing the
+active mode, recovery settings, and escalation status.
+
+### Bugs Fixed
+
+#### 18. `awaiting_search_params` triggered unnecessary escalation
+Removed from triggers — user must provide search params, escalation can't fix.
+
+#### 19. `empty_response` boolean caused false escalations from AGGRESSIVE/DEEP_SCAN
+Now only triggers escalation from STANDARD mode.
+
+#### 20. Tests called `analyze_url_for_fields` outside `with` mock blocks
+Fixed indentation in `test_three_way_acquisition.py` — mocks were inactive.
+
+### Commit
+```
+ebed3e1 feat(acquisition): wire acquisition_mode into pipeline with escalation
+```
+
+---
+
 ## Files Summary
 
 | Category | Count |
 |----------|-------|
 | New Python modules | 5 |
 | New test files | 7 |
-| Modified Python files | 2 |
+| Modified Python files | 3 |
 | Modified JS files | 2 |
 | Modified HTML/CSS files | 3 |
-| Total bugs fixed | 17 |
+| Total bugs fixed | 20 |
 | Annotations fixed (E701/E702) | 58 |
 | Total tests | 1206 |

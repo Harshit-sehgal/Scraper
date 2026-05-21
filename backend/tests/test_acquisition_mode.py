@@ -87,8 +87,8 @@ class TestShouldEscalate:
     def test_escalate_on_anti_bot_blocked(self):
         assert should_escalate(AcquisitionMode.AGGRESSIVE, "anti_bot_blocked") is True
 
-    def test_escalate_on_awaiting_search_params(self):
-        assert should_escalate(AcquisitionMode.STANDARD, "awaiting_search_params") is True
+    def test_no_escalate_on_awaiting_search_params(self):
+        assert should_escalate(AcquisitionMode.STANDARD, "awaiting_search_params") is False
 
     def test_no_escalate_on_direct(self):
         assert should_escalate(AcquisitionMode.STANDARD, "direct") is False

@@ -18,7 +18,8 @@ from app.strategy_evolution import FetchStrategy
 from app.acquisition_state import AcquisitionLineage, AcquisitionState
 from app.session_url_detector import detect_session_params
 from app.acquisition_telemetry import get_acquisition_telemetry
-from app.empty_response_detector import detect_empty_response
+from app.empty_response_detector import detect_empty_response, EmptyResponseCheck
+from app.acquisition_mode import AcquisitionMode, AcquisitionConfig, should_escalate, escalate_mode
 
 logger = logging.getLogger(__name__)
 
@@ -1341,7 +1342,7 @@ def _infer_field_name(example_value: str, field_type: str) -> str:
     return ""
 
 
-async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None = None, acquisition_mode: str = "standard") -> dict:
+async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None = None, acquisition_mode: str = "standard", _escalation_depth: int = 0) -> dict:
     """Analyze a URL and auto-detect what data fields can be extracted.
 
     This is the core of the "preview URL → suggest fields" workflow.
@@ -1386,6 +1387,13 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
     reset_llm_call_count()
     start_time = time.time()
 
+    # Build acquisition config from the requested mode
+    try:
+        mode_enum = AcquisitionMode(acquisition_mode)
+    except ValueError:
+        mode_enum = AcquisitionMode.STANDARD
+    config = AcquisitionConfig.from_mode(mode_enum)
+
     logger.info("[URLAnalyzer] Fetching and analyzing: %s", url)
 
     # ── Step 1: Determine final URL (lightweight check) ──────────────
@@ -1411,7 +1419,9 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
     redirect_info = _detect_redirect(url, final_url)
 
     # Detect session-bound URL parameters
-    session_detection = detect_session_params(url)
+    session_detection = detect_session_params(url) if config.detect_session_params else {
+        "is_session_bound": False, "ephemeral_params": [], "canonical_url": url, "confidence": 0.0, "details": []
+    }
 
     # ── Step 2: Fetch the URL with anti-bot stealth ──────────────────
     try:
@@ -1475,11 +1485,12 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
     # If the URL redirected (e.g. session token expired) and the user
     # provided search params, attempt to POST to the site's search form
     # to generate a fresh search session.
-    search_form = _detect_search_form(html)
+    search_form = _detect_search_form(html) if config.attempt_search_form else {"detected": False, "form_fields": [], "action": ""}
     search_recovery = None
 
     if (
-        redirect_info.get("redirected")
+        config.attempt_recovery
+        and redirect_info.get("redirected")
         and search_params
         and search_form.get("detected")
     ):
@@ -1522,7 +1533,7 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
             logger.info(
                 "[URLAnalyzer] Redirected URL with search form detected — "
                 "provide search_params to attempt recovery. Fields: %s",
-                [f["name"] or f["id"] for f in search_form.get("search_fields", [])],
+                [f["name"] or f["id"] for f in (search_form.get("search_fields") or []) if isinstance(f, dict)],  # type: ignore[union-attr]
             )
 
     # ── Step 4: Check anti-bot score ─────────────────────────────────
@@ -1543,7 +1554,9 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
 
     # ── Step 6b: Empty Response Check ─────────────────────────────────
     # Detect pages that return 200 but have no useful data
-    empty_check = detect_empty_response(html)
+    empty_check = detect_empty_response(html) if config.detect_empty_responses else EmptyResponseCheck(
+        is_empty=False, empty_type="", confidence=0.0, message="Empty response detection disabled"
+    )
 
     # ── Step 7: Extract container values and build structured prompt ─
     container_values = _extract_container_text_values(html, profile.container_selector)
@@ -1688,8 +1701,8 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
         search_params=search_params,
     )
     # Enrich lineage with session detection results
-    acquisition_lineage.session_bound = session_detection["is_session_bound"]
-    acquisition_lineage.ephemeral_params = session_detection["ephemeral_params"]
+    acquisition_lineage.session_bound = bool(session_detection.get("is_session_bound", False))  # type: ignore[assignment]
+    acquisition_lineage.ephemeral_params = list(session_detection.get("ephemeral_params") or [])  # type: ignore[assignment,arg-type]
 
     # If the page is effectively empty, update the acquisition state
     if empty_check.is_empty and acquisition_lineage.state == AcquisitionState.DIRECT:
@@ -1710,16 +1723,36 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
             state=acquisition_lineage.state,
             original_url=acquisition_lineage.original_url,
             final_url=acquisition_lineage.final_url,
-            canonical_url=canonical_url,
+            canonical_url=canonical_url,  # type: ignore[arg-type]
             fetch_method=fetch_method,
-            session_bound=session_detection["is_session_bound"],
-            ephemeral_params=session_detection["ephemeral_params"],
+            session_bound=bool(session_detection.get("is_session_bound", False)),  # type: ignore[arg-type]
+            ephemeral_params=list(session_detection.get("ephemeral_params") or []),  # type: ignore[arg-type,arg-type]
             recovery_method=acquisition_lineage.recovery_method,
             recovered_url=acquisition_lineage.recovered_url,
             fetch_time_ms=round((time.time() - start_time) * 1000, 1),
         )
     except Exception:
         logger.debug("[URLAnalyzer] Failed to record acquisition telemetry", exc_info=True)
+
+    # ── Escalation Check ─────────────────────────────────────────────
+    # If the acquisition failed or was degraded, check whether we should
+    # escalate to a more aggressive mode and retry.
+    escalated_mode = None
+    max_depth = config.max_retries
+    if (_escalation_depth < max_depth
+            and should_escalate(mode_enum, acquisition_lineage.state.value, empty_check.is_empty)):
+        escalated_mode = escalate_mode(mode_enum)
+        if escalated_mode != mode_enum:
+            logger.info(
+                "[URLAnalyzer] Escalating from %s → %s (depth %d) due to state=%s",
+                mode_enum.value, escalated_mode.value, _escalation_depth + 1, acquisition_lineage.state.value,
+            )
+            return await analyze_url_for_fields(
+                url=url,
+                search_params=search_params,
+                acquisition_mode=escalated_mode.value,
+                _escalation_depth=_escalation_depth + 1,
+            )
 
     return {
         "url": url,
@@ -1729,6 +1762,16 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
         "session_detection": session_detection,
         "canonical_url": canonical_url,
         "acquisition_mode": acquisition_mode,
+        "acquisition_config": {
+            "mode": config.mode.value,
+            "attempt_recovery": config.attempt_recovery,
+            "attempt_search_form": config.attempt_search_form,
+            "use_playwright": config.use_playwright,
+            "detect_empty_responses": config.detect_empty_responses,
+            "detect_session_params": config.detect_session_params,
+            "max_retries": config.max_retries,
+            "escalated": escalated_mode is not None,
+        },
         "content_quality": content_quality,
         "empty_check": {
             "is_empty": empty_check.is_empty,

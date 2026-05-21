@@ -223,7 +223,7 @@ class TestThreeWayAcquisition:
             }
 
             # No search_params provided — no recovery attempted
-            result = await analyze_url_for_fields(stale_url)
+            result = await analyze_url_for_fields(stale_url, acquisition_mode="aggressive")
 
             # Verify acquisition lineage — awaiting search params
             lineage = result["acquisition_lineage"]
@@ -330,6 +330,7 @@ class TestThreeWayAcquisition:
             result = await analyze_url_for_fields(
                 stale_url,
                 search_params={"origin": "NYC", "destination": "LHR"},
+                acquisition_mode="aggressive",
             )
 
             # Verify acquisition lineage

@@ -126,9 +126,12 @@ def should_escalate(
 
     Escalation triggers:
     - Session expired → escalate from STANDARD to AGGRESSIVE
-    - Empty response → escalate from STANDARD to AGGRESSIVE
     - Recovery failed → escalate from AGGRESSIVE to DEEP_SCAN
-    - Anti-bot blocked → escalate from AGGRESSIVE to DEEP_SCAN
+    - Empty response state → escalate to try different rendering
+    - Anti-bot blocked → escalate to try stealth
+
+    A plain empty_response boolean only triggers escalation from STANDARD,
+    since AGGRESSIVE/DEEP_SCAN already have empty-response detection enabled.
     """
     if current_mode == AcquisitionMode.DEEP_SCAN:
         return False  # Already at max
@@ -138,13 +141,12 @@ def should_escalate(
         "recovery_failed",
         "empty_response",
         "anti_bot_blocked",
-        "awaiting_search_params",
     }
 
     if acquisition_state in escalation_triggers:
         return True
 
-    if empty_response:
+    if empty_response and current_mode == AcquisitionMode.STANDARD:
         return True
 
     return False
