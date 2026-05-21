@@ -141,10 +141,11 @@ async function updateLoop() {
         fetch(`${API_SYSTEM}/history/topology`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
         fetch(`${API_SCRAPER}/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
         fetch(`${API_SCRAPER}/browser`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SCRAPER}/memory/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        fetch(`${API_SCRAPER}/memory/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        fetch(`${API_SYSTEM}/acquisition/telemetry`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
     ]);
 
-    const [topologyResult, observabilityResult, historyResult, scraperStatsResult, browserStatsResult, memoryStatsResult] = results;
+    const [topologyResult, observabilityResult, historyResult, scraperStatsResult, browserStatsResult, memoryStatsResult, acqTelemetryResult] = results;
 
     // Check for rate limiting or other failures
     const anyFailed = results.some(r => r.status === 'rejected');
@@ -171,6 +172,7 @@ async function updateLoop() {
     const scraperStats = scraperStatsResult.status === 'fulfilled' ? scraperStatsResult.value : null;
     const browserStats = browserStatsResult.status === 'fulfilled' ? browserStatsResult.value : null;
     const memoryStats = memoryStatsResult.status === 'fulfilled' ? memoryStatsResult.value : null;
+    const acqTelemetry = acqTelemetryResult.status === 'fulfilled' ? acqTelemetryResult.value : null;
 
     // Update Timeline
     topologyHistory = history.history || [];
@@ -185,7 +187,8 @@ async function updateLoop() {
             topology.macro_continents || [],
             scraperStats,
             browserStats,
-            memoryStats
+            memoryStats,
+            acqTelemetry
         );
         renderTopology(
             topology.field_regions || [],
@@ -206,7 +209,7 @@ async function updateLoop() {
     pollTimer = setTimeout(updateLoop, currentInterval);
 }
 
-function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, browserStats, memoryStats) {
+function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, browserStats, memoryStats, acqTelemetry) {
     m = m || {};
     document.getElementById('metric-pressure').innerText = Number(m.field_pressure || 0).toFixed(3);
     document.getElementById('metric-energy').innerText = Number(m.global_energy || 0).toFixed(3);
@@ -228,6 +231,42 @@ function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, b
     }
     if (memoryStats) {
         document.getElementById('metric-memory-domains').innerText = memoryStats.domain_count || 0;
+    }
+
+    // Acquisition Pipeline Metrics (Phase 92)
+    if (acqTelemetry) {
+        const t = acqTelemetry;
+        document.getElementById('metric-session-bound').innerText = t.session_bound_urls || 0;
+        document.getElementById('metric-total-acquisitions').innerText = t.total_acquisitions || 0;
+
+        const rate = t.recovery_success_rate != null ? (t.recovery_success_rate * 100).toFixed(0) : null;
+        document.getElementById('metric-recovery-rate').innerText = rate != null ? `${rate}%` : '--%';
+        document.getElementById('metric-recovery-detail').innerText = `${t.recovery_successes || 0} / ${t.recovery_attempts || 0} attempts`;
+
+        const emptyCount = (t.state_distribution && t.state_distribution.empty_response) || 0;
+        document.getElementById('metric-empty-200').innerText = emptyCount;
+
+        // Acquisition mode distribution
+        const dist = t.state_distribution || {};
+        const modes = [];
+        if (dist.direct) modes.push(`direct:${dist.direct}`);
+        if (dist.recovered) modes.push(`recovered:${dist.recovered}`);
+        if (dist.session_expired) modes.push(`expired:${dist.session_expired}`);
+        if (dist.empty_response) modes.push(`empty:${dist.empty_response}`);
+        if (dist.awaiting_search_params) modes.push(`awaiting:${dist.awaiting_search_params}`);
+        document.getElementById('metric-acq-modes').innerText = modes.length ? modes.join('  ') : '--';
+
+        // Color-code recovery rate
+        const recoveryEl = document.getElementById('metric-recovery-rate');
+        if (rate != null) {
+            if (rate >= 80) recoveryEl.className = 'metric-value text-green-500';
+            else if (rate >= 40) recoveryEl.className = 'metric-value text-yellow-500';
+            else recoveryEl.className = 'metric-value text-red-500';
+        }
+
+        // Style empty-200 count
+        const emptyEl = document.getElementById('metric-empty-200');
+        if (emptyCount > 0) emptyEl.className = 'metric-value text-red-500';
     }
 
     // Style energy balance based on conservation status

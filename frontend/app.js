@@ -1101,6 +1101,53 @@ async function analyzeURL() {
             fetchTimeEl.textContent = `⏱️ ${(data.fetch_time_ms / 1000).toFixed(1)}s`;
         }
 
+        // ── Acquisition Pipeline Banner (Phase 92) ──
+        const acqBanner = document.getElementById('acquisition-banner');
+        if (acqBanner) {
+            const lineage = data.acquisition_lineage || {};
+            const state = lineage.state || 'direct';
+            const userMsg = data.user_message || lineage.user_message || '';
+            const sessionBound = data.session_detection?.is_session_bound || lineage.session_bound || false;
+            const emptyCheck = data.empty_check || {};
+            const canonicalUrl = data.canonical_url || '';
+
+            let bannerClass = 'direct';
+            let bannerText = userMsg || 'Page loaded successfully.';
+
+            if (state === 'recovered') {
+                bannerClass = 'recovered';
+            } else if (state === 'session_expired' || state === 'recovery_failed' || state === 'no_search_form') {
+                bannerClass = 'expired';
+            } else if (state === 'empty_response' || emptyCheck.is_empty) {
+                bannerClass = 'empty';
+            } else if (sessionBound && state !== 'recovered') {
+                bannerClass = 'session';
+            }
+
+            const isSessionBound = state !== 'recovered' && (sessionBound || (data.session_detection?.ephemeral_params || []).length > 0);
+
+            let bannerHTML = `<strong>${esc(bannerText)}</strong>`;
+            if (canonicalUrl && canonicalUrl !== url) {
+                bannerHTML += `<br><small style="opacity:0.7">Canonical: ${esc(canonicalUrl)}</small>`;
+            }
+            if (state === 'recovered') {
+                bannerHTML += `<br><small style="opacity:0.7">Recovered fresh results via search form submission</small>`;
+            }
+            if (isSessionBound) {
+                bannerHTML += `<br><small style="opacity:0.7">Original URL contained ephemeral session parameters</small>`;
+            }
+            if (emptyCheck.is_empty) {
+                bannerHTML += `<br><small style="opacity:0.7">${esc(emptyCheck.message || 'Page returned 200 but contained no useful data')}</small>`;
+                if (emptyCheck.suggestions && emptyCheck.suggestions.length) {
+                    bannerHTML += `<br><small style="opacity:0.7">Suggestion: ${esc(emptyCheck.suggestions[0])}</small>`;
+                }
+            }
+
+            acqBanner.className = `acquisition-banner ${bannerClass}`;
+            acqBanner.innerHTML = bannerHTML;
+            acqBanner.classList.remove('hidden');
+        }
+
         // Populate Field List
         const fieldList = document.getElementById('analyze-field-list');
         const fieldCount = document.getElementById('analyze-field-count');

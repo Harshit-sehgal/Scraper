@@ -1292,3 +1292,37 @@ tr:hover td {
 .unstable-row td {
     border-bottom: 1px solid rgba(173, 96, 83, 0.1);
 }
+
+/* ── Acquisition Pipeline Banner ── */
+.acquisition-banner {
+    margin: 0.4rem 0 0.8rem;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.775rem;
+    border-radius: 0.35rem;
+    line-height: 1.45;
+}
+.acquisition-banner.recovered {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+}
+.acquisition-banner.expired {
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    color: #92400e;
+}
+.acquisition-banner.empty {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+}
+.acquisition-banner.session {
+    background: #ffedd5;
+    border: 1px solid #fed7aa;
+    color: #9a3412;
+}
+.acquisition-banner.direct {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
