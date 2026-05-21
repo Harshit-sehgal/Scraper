@@ -130,6 +130,8 @@ class AcquisitionLineage(BaseModel):
         redirected = self.state not in (
             AcquisitionState.DIRECT,
             AcquisitionState.RECOVERED,
+            AcquisitionState.EMPTY_RESPONSE,
+            AcquisitionState.ANTI_BOT_BLOCKED,
             AcquisitionState.CROSS_DOMAIN,
         )
 
