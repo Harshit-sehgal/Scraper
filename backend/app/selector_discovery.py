@@ -459,27 +459,62 @@ def build_url_analysis_prompt(values: list[str], page_analysis: dict) -> str:
         rows.append(f"  #{i:<3} \"{val}\"  type: {vtype}")
     
     value_block = "\n".join(rows)
-    
+
+    few_shot = """
+=== EXAMPLE ===
+Input values from a flight search page:
+  #1   "New York"           type: location
+  #2   "JFK"                type: code
+  #3   "London-Stansted"    type: location
+  #4   "STN"                type: code
+  #5   "\u00a3450"          type: currency
+  #6   "30/05/2026"         type: date
+  #7   "2h 30m"             type: string
+  #8   "British Airways"    type: string
+  #9   "BA178"              type: code
+  #10  "08:30"              type: time
+  #11  "11:00"              type: time
+
+Expected output:
+{"page_type": "cards", "estimated_record_count": 24, "fields": [
+  {"name": "origin_city", "type": "location", "example_value": "New York", "confidence": 0.95, "description": "Departure city"},
+  {"name": "departure_airport", "type": "code", "example_value": "JFK", "confidence": 0.95, "description": "Departure airport code"},
+  {"name": "destination_city", "type": "location", "example_value": "London-Stansted", "confidence": 0.95, "description": "Arrival city and airport"},
+  {"name": "arrival_airport", "type": "code", "example_value": "STN", "confidence": 0.95, "description": "Arrival airport code"},
+  {"name": "price", "type": "currency", "example_value": "\u00a3450", "confidence": 0.95, "description": "Ticket price"},
+  {"name": "travel_date", "type": "date", "example_value": "30/05/2026", "confidence": 0.95, "description": "Date of travel"},
+  {"name": "duration", "type": "string", "example_value": "2h 30m", "confidence": 0.85, "description": "Flight duration"},
+  {"name": "airline_name", "type": "string", "example_value": "British Airways", "confidence": 0.95, "description": "Airline operating the flight"},
+  {"name": "flight_number", "type": "code", "example_value": "BA178", "confidence": 0.95, "description": "Flight number"},
+  {"name": "departure_time", "type": "time", "example_value": "08:30", "confidence": 0.95, "description": "Scheduled departure time"},
+  {"name": "arrival_time", "type": "time", "example_value": "11:00", "confidence": 0.95, "description": "Scheduled arrival time"}
+]}
+=== END EXAMPLE ===
+"""
+
     return f"""You are a data schema designer. Name each data field found on this webpage.
 
 I extracted these values from ONE data row on this {structure_type.upper()} page (confidence: {structure_confidence:.0%}):
 
 {value_block}
 
+{few_shot}
+
 For EACH value, assign a descriptive snake_case field name.
 Determine its data type from: string, number, currency, email, phone, url, date, time, rating, boolean, percentage, location, code.
 
 CRITICAL: NEVER use type names as field names.
-  ❌ BAD: {{"name": "string"}} or {{"name": "code"}} or {{"name": "time"}} or {{"name": "text"}}
-  ✅ GOOD: {{"name": "airline_name"}} or {{"name": "flight_number"}} or {{"name": "departure_time"}}
+  \u2716 BAD: {{"name": "string"}} or {{"name": "code"}} or {{"name": "time"}} or {{"name": "text"}} or {{"name": "number"}} or {{"name": "date"}} or {{"name": "currency"}}
+  \u2714 GOOD: {{"name": "airline_name"}} or {{"name": "flight_number"}} or {{"name": "departure_time"}} or {{"name": "price"}}
 
-Differentiate duplicate types — if two values share the same type, give them distinct context-specific names.
+Differentiate duplicate types — if two values share the same type, give them distinct context-specific names (e.g. "origin_airport_code" vs "destination_airport_code" instead of "code" and "code").
 
-Suggested naming patterns:
-- Flights: airline_name, flight_number, departure_airport, arrival_airport, departure_date, departure_time, arrival_time, duration, stops, price, seat_type, cabin_class, baggage_allowance
-- Products: product_name, brand, price, original_price, rating, reviews_count, availability_status, description, sku, color, size
-- Directory listings: company_name, address, phone, email, website, rating, category, reviews
-- Jobs: job_title, company_name, location, salary_range, job_type, posted_date, description
+Look at each value carefully and infer its contextual meaning. For example:
+- A 3-letter uppercase word like "LHR" or "JFK" is likely an airport code, name it "origin_airport_code" or "destination_airport_code"
+- A city name like "London" or "New York" is a location, name it "origin_city" or "destination_city"
+- A monetary value like "$450" or "\u00a3450" is a price, name it "price", "total_price", or "fee"
+- A short time like "08:30" or "14:00" is a time, name it "departure_time" or "arrival_time"
+- A date like "30/05/2026" is a date, name it "departure_date", "travel_date", or "return_date"
 
 Return ONLY JSON — NO markdown, NO commentary:
 {{
@@ -495,6 +530,109 @@ Return ONLY JSON — NO markdown, NO commentary:
     }}
   ]
 }}"""
+
+
+# ─── Generic field name post-processing ───────────────────────────────────
+
+_GENERIC_NAMES: set[str] = {
+    # Pure type names that should never be field identifiers
+    "string", "text", "number", "integer", "float", "boolean", "bool",
+    "code", "date", "time", "currency", "email", "phone", "url",
+    "website", "rating", "location", "address", "percentage",
+    "list", "object", "field",
+}
+
+
+def _rename_generic_fields(fields: list[dict]) -> list[dict]:
+    """Post-process field list to replace generic type-name fields.
+    
+    If an LLM returns a field named "string", "code", "time", etc.
+    (a type name used as a field identifier), try to infer a better
+    name from the example value and the field's data type.
+    """
+    renamed: list[dict] = []
+    seen_names: dict[str, int] = {}
+    
+    for f in fields:
+        name: str = f.get("name", "")
+        example: str = str(f.get("example_value", ""))
+        ftype: str = f.get("type", "string")
+        
+        if name.lower() in _GENERIC_NAMES:
+            # Try to infer a better name from the example value
+            better = _infer_field_name(example, ftype)
+            if better:
+                name = better
+                f["name"] = better
+                f["description"] = f.get("description", "") or better.replace("_", " ").title()
+        
+        # Deduplicate names (e.g. two "string" fields → "field_1", "field_2")
+        lower = name.lower()
+        if lower in seen_names:
+            seen_names[lower] += 1
+            name = f"{name}_{seen_names[lower]}"
+            f["name"] = name
+        else:
+            seen_names[lower] = 1
+        
+        renamed.append(f)
+    
+    return renamed
+
+
+# Simple type-aware naming hints for generic fields
+# Maps (type, example_value_pattern) → suggested field name
+_FIELD_NAME_HINTS: list[tuple[str, str, str]] = [
+    # Currency values
+    ("currency", "", "price"),
+    # 3-letter uppercase codes (airport codes)
+    ("code", "^[A-Z]{3}$", "airport_code"),
+    # 2-letter uppercase codes
+    ("code", "^[A-Z]{2}$", "code_abbreviation"),
+    # Mixed letter-digit codes (flight numbers, product codes)
+    ("code", "", "reference_code"),
+    # Date values
+    ("date", "", "date"),
+    # Time values
+    ("time", "", "time"),
+    # Email
+    ("email", "", "email"),
+    # Phone
+    ("phone", "", "phone_number"),
+    # Location/city names (capitalized proper nouns like "London")
+    ("location", "[A-Z][a-z]+", "city_name"),
+    # URLs
+    ("url", "", "website_url"),
+    # Ratings
+    ("rating", "", "rating"),
+    # Percentages
+    ("percentage", "", "percentage"),
+    # Booleans
+    ("boolean", "", "flag"),
+    # Numbers by themselves
+    ("number", "", "value"),
+]
+
+
+def _infer_field_name(example_value: str, field_type: str) -> str:
+    """Try to infer a descriptive field name from an example value and type.
+    
+    Returns an empty string if no good inference is possible.
+    """
+    if not example_value:
+        return ""
+    
+    val = example_value.strip()
+    
+    # Check specific patterns first
+    for pattern_type, pattern, suggestion in _FIELD_NAME_HINTS:
+        if field_type != pattern_type:
+            continue
+        if pattern and not re.fullmatch(pattern, val, re.IGNORECASE):
+            continue
+        return suggestion
+    
+    return ""
 
 
 async def analyze_url_for_fields(url: str) -> dict:
@@ -678,6 +816,9 @@ async def analyze_url_for_fields(url: str) -> dict:
                 "confidence": hint["confidence"],
                 "description": hint.get("description", ""),
             })
+    
+    # Post-processing: rename generic type-name fields to more descriptive names
+    suggested_fields = _rename_generic_fields(suggested_fields)
     
     # Sort by confidence descending
     suggested_fields.sort(key=lambda f: f["confidence"], reverse=True)
