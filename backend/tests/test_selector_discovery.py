@@ -15,6 +15,8 @@ from app.page_profiler import ValuePatterns
 from app.selector_discovery import (
     _analyze_page_data_type,
     _classify_value,
+    _infer_field_name,
+    _rename_generic_fields,
     _value_patterns_to_field_types,
     build_selector_prompt,
     build_url_analysis_prompt,
@@ -264,6 +266,122 @@ class TestValuePatternsToFieldTypes:
         # Descriptions should not suggest specific field names like 'origin' or 'destination'
         assert "origin" not in desc
         assert "destination" not in desc
+
+
+class TestRenameGenericFields:
+    """Tests for _rename_generic_fields()."""
+
+    def test_renames_currency_type_name(self):
+        """Currency field named 'currency' should become 'price' with example value hint."""
+        fields = [
+            {"name": "currency", "type": "currency", "example_value": "$450", "confidence": 0.9},
+        ]
+        result = _rename_generic_fields(fields)
+        assert result[0]["name"] == "price"
+
+    def test_renames_3letter_code_to_airport_code(self):
+        """Code field with 3-letter uppercase example should become 'airport_code'."""
+        fields = [
+            {"name": "code", "type": "code", "example_value": "LHR", "confidence": 0.8},
+        ]
+        result = _rename_generic_fields(fields)
+        assert result[0]["name"] == "airport_code"
+
+    def test_renames_2letter_code_to_abbreviation(self):
+        """Code field with 2-letter uppercase example should become 'code_abbreviation'."""
+        fields = [
+            {"name": "code", "type": "code", "example_value": "NY", "confidence": 0.7},
+        ]
+        result = _rename_generic_fields(fields)
+        assert result[0]["name"] == "code_abbreviation"
+
+    def test_leaves_descriptive_name_unchanged(self):
+        """Non-generic field names should be left untouched."""
+        fields = [
+            {"name": "airline_name", "type": "string", "example_value": "British Airways", "confidence": 0.95},
+        ]
+        result = _rename_generic_fields(fields)
+        assert result[0]["name"] == "airline_name"
+
+    def test_deduplicates_duplicate_generic_names(self):
+        """Two fields with the same generic name should be deduplicated."""
+        fields = [
+            {"name": "string", "type": "string", "example_value": "Hello", "confidence": 0.5},
+            {"name": "string", "type": "string", "example_value": "World", "confidence": 0.5},
+        ]
+        result = _rename_generic_fields(fields)
+        # First stays "string" (can't infer better), second gets suffix _2
+        # (counter increments before use, so 1 → 2 for the duplicate)
+        names = [f["name"] for f in result]
+        assert names[0] == "string"
+        assert names[1] == "string_2"
+
+    def test_renames_multiple_generic_names(self):
+        """Multiple generic fields should each be renamed appropriately."""
+        fields = [
+            {"name": "currency", "type": "currency", "example_value": "$450", "confidence": 0.9},
+            {"name": "date", "type": "date", "example_value": "2024-01-01", "confidence": 0.9},
+            {"name": "time", "type": "time", "example_value": "10:00", "confidence": 0.8},
+            {"name": "string", "type": "string", "example_value": "Some description", "confidence": 0.7},
+        ]
+        result = _rename_generic_fields(fields)
+        names = [f["name"] for f in result]
+        assert names[0] == "price"
+        assert names[1] == "date"
+        assert names[2] == "time"
+        assert names[3] == "string"  # No hint matches for generic string
+
+    def test_renames_location_with_capitalized_word(self):
+        """Location field with proper noun example should become 'city_name'."""
+        fields = [
+            {"name": "location", "type": "location", "example_value": "London", "confidence": 0.9},
+        ]
+        result = _rename_generic_fields(fields)
+        assert result[0]["name"] == "city_name"
+
+    def test_empty_list_returns_empty(self):
+        """Empty input should return empty list."""
+        assert _rename_generic_fields([]) == []
+
+
+class TestInferFieldName:
+    """Tests for _infer_field_name()."""
+
+    def test_currency_example(self):
+        assert _infer_field_name("$450", "currency") == "price"
+        assert _infer_field_name("£1,200", "currency") == "price"
+
+    def test_3letter_code_example(self):
+        assert _infer_field_name("LHR", "code") == "airport_code"
+        assert _infer_field_name("JFK", "code") == "airport_code"
+
+    def test_2letter_code_example(self):
+        assert _infer_field_name("NY", "code") == "code_abbreviation"
+        assert _infer_field_name("CA", "code") == "code_abbreviation"
+
+    def test_mixed_code_example(self):
+        assert _infer_field_name("BA178", "code") == "reference_code"
+
+    def test_email_example(self):
+        assert _infer_field_name("test@example.com", "email") == "email"
+
+    def test_phone_example(self):
+        assert _infer_field_name("+1-555-1234", "phone") == "phone_number"
+
+    def test_city_name_example(self):
+        assert _infer_field_name("London", "location") == "city_name"
+        assert _infer_field_name("Paris", "location") == "city_name"
+
+    def test_empty_example_returns_empty(self):
+        assert _infer_field_name("", "string") == ""
+
+    def test_no_match_returns_empty(self):
+        """No matching hint should return empty."""
+        assert _infer_field_name("Some random text", "string") == ""
+
+    def test_wrong_type_returns_empty(self):
+        """Type mismatch should return empty even if pattern matches."""
+        assert _infer_field_name("LHR", "string") == ""  # LHR matches code pattern but type is string
 
 
 class TestDiscoverSelectors:
