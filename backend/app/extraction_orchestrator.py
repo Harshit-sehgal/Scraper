@@ -143,7 +143,9 @@ def _multi_pass_extraction(
                 # Build a selector for parent
                 parent_sel = parent.name
                 if parent.get('class'):
-                    parent_sel += '.' + '.'.join(parent.get('class')[:2])
+                    classes = parent.get('class')
+                    if isinstance(classes, list):
+                        parent_sel += '.' + '.'.join(classes[:2])
                 if parent_sel != container:
                     alt_containers.append(parent_sel)
         

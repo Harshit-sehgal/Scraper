@@ -532,8 +532,8 @@ def _extract_container_text_values(html: str, container_selector: str) -> list[s
     Also collects img alt texts.
     """
     soup = BeautifulSoup(html, "html.parser")
-    containers = soup.select(container_selector)
-    
+    containers: list = soup.select(container_selector)
+
     # Fallback: scan all visible elements
     if not containers:
         containers = [soup]
