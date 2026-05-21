@@ -303,7 +303,8 @@ def _make_pw_mocks(mock_playwright):
 
 
 def _make_page_mock(evaluate_return=None, goto_side_effect=None,
-                     wait_for_selector_return=None, wait_for_selector_side_effect=None):
+                     wait_for_selector_return=None, wait_for_selector_side_effect=None,
+                     container_count: int = 2):
     """Build a mock page with configurable async methods."""
     m = MagicMock()
     m.goto = AsyncMock(side_effect=goto_side_effect) if goto_side_effect else AsyncMock()
@@ -314,6 +315,9 @@ def _make_page_mock(evaluate_return=None, goto_side_effect=None,
     else:
         m.wait_for_selector = AsyncMock(return_value=True)
     m.evaluate = AsyncMock(return_value=evaluate_return if evaluate_return is not None else [])
+    loc_mock = MagicMock()
+    loc_mock.count = AsyncMock(return_value=container_count)
+    m.locator = MagicMock(return_value=loc_mock)
     m.route = AsyncMock()  # page.route() must be awaitable
     return m
 

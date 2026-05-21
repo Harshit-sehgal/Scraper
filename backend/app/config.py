@@ -47,6 +47,25 @@ class Settings(BaseSettings):
     """Extra seconds when networkidle times out and we fall back to domcontentloaded."""
     PROFILE_MAX_WAIT: int = 30
     """Max seconds for a selector profile to find its wait_for selector."""
+    PROFILE_CONTAINER_POLL_ATTEMPTS: int = 8
+    """Max polls while waiting for profile item_container count to stabilize."""
+    PROFILE_CONTAINER_STABLE_POLLS: int = 2
+    """Consecutive stable container counts before extraction proceeds."""
+    PROFILE_ALIGNMENT_SCORE_EXACT: float = 1000.0
+    PROFILE_ALIGNMENT_SCORE_PLURAL: float = 85.0
+    PROFILE_ALIGNMENT_SCORE_TOKEN_OVERLAP: float = 55.0
+    PROFILE_ALIGNMENT_SCORE_SUBSTRING: float = 45.0
+    PROFILE_ALIGNMENT_SCORE_REVERSE_SUBSTRING: float = 40.0
+    PROFILE_ALIGNMENT_SCORE_SYNONYM: float = 50.0
+    PROFILE_ALIGNMENT_SCORE_TYPE_BONUS: float = 25.0
+    PROFILE_ALIGNMENT_SCORE_DEPARTURE_BIAS: float = 35.0
+    PROFILE_ALIGNMENT_NEGATIVE_PENALTY: float = 500.0
+    PROFILE_SELECTOR_TYPE_COMPATIBILITY: dict[str, tuple[str, ...]] = {
+        "currency": ("currency", "float", "number"),
+        "number": ("number", "float", "integer"),
+        "text": ("string",),
+        "href": ("url",),
+    }
     PAGE_LOADING_INDICATOR_TIMEOUT: int = 2000
     """Ms to wait for each common loading indicator to disappear."""
     PAGE_SCROLL_DELAY: float = 0.5

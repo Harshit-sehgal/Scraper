@@ -8,7 +8,9 @@ regardless of domain (flight, hotel, product, job, etc.)
 Core principle: Match by semantic need (price, date, rating), not by domain.
 """
 
+import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 from app.models import FieldType
 
@@ -27,7 +29,7 @@ class IntentSchema:
 SEMANTIC_NEED_KEYWORDS = {
     "name": ["name", "title", "title", "entity", "business", "company", "item", "product", "hotel", "flight", "job", "property"],
     "price": ["price", "fare", "cost", "amount", "rate", "fee", "rent", "sale", "budget", "cheap", "expensive", "under", "above"],
-    "date": ["date", "departure", "arrival", "when", "check-in", "check-out", "schedule", "timing", "time"],
+    "date": ["date", "departure", "arrival", "return", "when", "check-in", "check-out", "schedule", "timing", "time"],
     "duration": ["duration", "hours", "time", "takes", "travel time", "flight time"],
     "rating": ["rating", "stars", "review", "score", "feedback", "rank", "out of"],
     "location": ["location", "address", "place", "area", "city", "near", "around", "from", "to", "destination", "origin"],
@@ -169,6 +171,66 @@ def _determine_optional_needs(semantic_needs: dict, required_needs: list) -> lis
             optional.append(need)
 
     return optional
+
+
+def keywords_to_tokens(keywords: list[str], min_len: int = 2) -> set[str]:
+    """Tokenize keyword phrases for overlap-based semantic matching."""
+    tokens: set[str] = set()
+    for kw in keywords:
+        for part in re.split(r"[_\-\s]+", kw.lower()):
+            if len(part) >= min_len:
+                tokens.add(part)
+    return tokens
+
+
+@lru_cache(maxsize=1)
+def build_semantic_synonym_groups() -> tuple[frozenset[str], ...]:
+    """Build synonym groups from universal SEMANTIC_NEED_KEYWORDS (not domain-specific)."""
+    groups: list[frozenset[str]] = []
+    for keywords in SEMANTIC_NEED_KEYWORDS.values():
+        token_set = frozenset(keywords_to_tokens(keywords))
+        if token_set:
+            groups.append(token_set)
+    return tuple(groups)
+
+
+def tokens_to_semantic_need(tokens: set[str]) -> str | None:
+    """Return the best-matching semantic need for a token set."""
+    if not tokens:
+        return None
+    best_need = None
+    best_overlap = 0
+    for need, keywords in SEMANTIC_NEED_KEYWORDS.items():
+        need_tokens = keywords_to_tokens(keywords)
+        overlap = len(tokens & need_tokens)
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_need = need
+    return best_need if best_overlap > 0 else None
+
+
+def semantic_needs_are_exclusive(need_a: str | None, need_b: str | None) -> bool:
+    """True when two semantic needs must not share one schema field."""
+    if not need_a or not need_b or need_a == need_b:
+        return False
+    from app.field_laws import SEMANTIC_NEED_EXCLUSIVITY
+    for a, b in SEMANTIC_NEED_EXCLUSIVITY:
+        if (need_a == a and need_b == b) or (need_a == b and need_b == a):
+            return True
+    return False
+
+
+def role_tokens_are_exclusive(tokens_a: set[str], tokens_b: set[str]) -> bool:
+    """True when token sets match opposite sides of ROLE_EXCLUSIVITY."""
+    from app.field_laws import ROLE_EXCLUSIVITY
+    for left, right in ROLE_EXCLUSIVITY:
+        left_tokens = keywords_to_tokens([left], min_len=2) | {left}
+        right_tokens = keywords_to_tokens([right], min_len=2) | {right}
+        if (tokens_a & left_tokens and tokens_b & right_tokens) or (
+            tokens_a & right_tokens and tokens_b & left_tokens
+        ):
+            return True
+    return False
 
 
 

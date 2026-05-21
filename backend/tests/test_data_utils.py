@@ -211,3 +211,114 @@ class TestProcessRawRecords:
             result = process_raw_records(records, SIMPLE_SCHEMA, 0.5)
             # Empty record gets low score and gets filtered
             assert result == []
+
+
+# ─── align_profile_keys_to_schema ─────────────────────────────────────────────
+
+class TestAlignProfileKeysToSchema:
+    """Tests for align_profile_keys_to_schema()."""
+
+    def test_exact_matches_preserved(self):
+        from app.data_utils import align_profile_keys_to_schema
+        records = [{"name": "Acme", "price": "100"}]
+        schema = [
+            SchemaField(name="name", field_type=FieldType.STRING),
+            SchemaField(name="price", field_type=FieldType.CURRENCY),
+        ]
+        aligned = align_profile_keys_to_schema(records, schema)
+        assert aligned[0]["name"] == "Acme"
+        assert aligned[0]["price"] == "100"
+
+    def test_fuzzy_substring_mapping(self):
+        from app.data_utils import align_profile_keys_to_schema
+        records = [{"origin": "LON", "destination": "PAR"}]
+        schema = [
+            SchemaField(name="origin_airport", field_type=FieldType.STRING),
+            SchemaField(name="destination_airport", field_type=FieldType.STRING),
+        ]
+        aligned = align_profile_keys_to_schema(records, schema)
+        assert aligned[0]["origin_airport"] == "LON"
+        assert aligned[0]["destination_airport"] == "PAR"
+
+    def test_synonym_group_mapping(self):
+        from app.data_utils import align_profile_keys_to_schema
+        records = [{"fare": "250"}]
+        schema = [
+            SchemaField(name="ticket_price", field_type=FieldType.CURRENCY),
+        ]
+        aligned = align_profile_keys_to_schema(records, schema)
+        assert aligned[0]["ticket_price"] == "250"
+
+    def test_t15_custom_schema_mapping(self):
+        """Regression: custom schema must map full profile field set via semantic alignment."""
+        from app.data_utils import align_profile_keys_to_schema
+        from app.selector_profiles.loader import _load_all_profiles
+
+        all_profiles = _load_all_profiles()
+        assert all_profiles, "need at least one selector profile for mapping test"
+        profile = next(iter(all_profiles.values()))
+        profile_fields = profile.get("fields", {})
+        sample_values = {
+            "airline": "Sample Air", "origin": "AAA", "destination": "BBB",
+            "date": "01-01-2026", "return_date": "02-01-2026", "price": "100", "stops": "Direct",
+        }
+        record = {key: sample_values.get(key, f"sample_{key}") for key in profile_fields}
+        schema = [
+            SchemaField(name="airlines_name", field_type=FieldType.STRING, description="Name of the airline"),
+            SchemaField(name="origin_airport", field_type=FieldType.STRING, description="Airport of origin"),
+            SchemaField(name="destination_airport", field_type=FieldType.STRING, description="Airport of destination"),
+            SchemaField(name="prices", field_type=FieldType.CURRENCY, description="Price of the flight"),
+            SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure"),
+            SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival"),
+        ]
+        aligned = align_profile_keys_to_schema([record], schema, profile_fields=profile_fields)
+        row = aligned[0]
+        if "airline" in profile_fields:
+            assert row["airlines_name"] == "Sample Air"
+        if "origin" in profile_fields:
+            assert row["origin_airport"] == "AAA"
+        if "destination" in profile_fields:
+            assert row["destination_airport"] == "BBB"
+        if "price" in profile_fields:
+            assert row["prices"] == "100"
+        if "date" in profile_fields:
+            assert row["departure_date"] == "01-01-2026"
+        if "return_date" in profile_fields:
+            assert row["arrival_date"] == sample_values["return_date"]
+        assert "stops" not in row
+
+    def test_return_date_maps_to_arrival_date(self):
+        from app.data_utils import align_profile_keys_to_schema
+        records = [{"return_date": "01-06-2026", "date": "30-05-2026"}]
+        schema = [
+            SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure"),
+            SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival"),
+        ]
+        aligned = align_profile_keys_to_schema(
+            records, schema, profile_fields={"return_date": {"type": "text"}, "date": {"type": "text"}}
+        )
+        assert aligned[0]["departure_date"] == "30-05-2026"
+        assert aligned[0]["arrival_date"] == "01-06-2026"
+
+    def test_intent_boost_mapping(self):
+        from app.data_utils import align_extracted_keys_to_schema
+        records = [{"fare": "250"}]
+        schema = [SchemaField(name="ticket_price", field_type=FieldType.CURRENCY)]
+        aligned = align_extracted_keys_to_schema(
+            records,
+            schema,
+            user_intent="find cheap fares and ticket prices",
+        )
+        assert aligned[0]["ticket_price"] == "250"
+
+    def test_stops_not_mapped_to_arrival_date(self):
+        from app.data_utils import align_profile_keys_to_schema
+        records = [{"stops": "1 Stop", "date": "30-05-2026"}]
+        schema = [
+            SchemaField(name="departure_date", field_type=FieldType.DATE),
+            SchemaField(name="arrival_date", field_type=FieldType.DATE),
+        ]
+        aligned = align_profile_keys_to_schema(records, schema)
+        assert aligned[0]["departure_date"] == "30-05-2026"
+        assert aligned[0].get("arrival_date") is None
+

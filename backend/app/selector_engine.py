@@ -36,14 +36,108 @@ def _detect_table_headers(html: str) -> list[dict]:
     return headers_info
 
 
+def _selector_css(sel_entry) -> str | None:
+    if not sel_entry:
+        return None
+    if isinstance(sel_entry, str):
+        return sel_entry.strip() or None
+    if isinstance(sel_entry, dict):
+        return (sel_entry.get("selector") or "").strip() or None
+    return None
+
+
+def build_selector_field_metadata(
+    field_sels: dict,
+    schema_fields: list[SchemaField],
+) -> dict:
+    """Build type-hint metadata for alignment from selector map + schema."""
+    schema_by_name = {f.name: f for f in schema_fields}
+    meta: dict = {}
+    for key, entry in (field_sels or {}).items():
+        if isinstance(entry, dict):
+            meta[key] = dict(entry)
+            if key in schema_by_name and "type" not in meta[key]:
+                meta[key]["type"] = schema_by_name[key].field_type.value
+        elif key in schema_by_name:
+            meta[key] = {"selector": str(entry), "type": schema_by_name[key].field_type.value}
+    return meta
+
+
+def _read_node_value(target, field_type: FieldType | None = None, field_name: str = "") -> str | None:
+    if field_type == FieldType.URL:
+        return target.get("href")
+    text_val = target.get_text(separator=" ", strip=True)
+    title_val = target.get("title")
+    alt_val = target.get("alt")
+    use_title = False
+    if title_val:
+        title_clean = title_val.strip()
+        if title_clean:
+            if text_val.endswith("...") or text_val.endswith("…"):
+                use_title = True
+            elif any(k in field_name.lower() for k in ["title", "name", "company", "product"]):
+                if len(title_clean) > len(text_val):
+                    use_title = True
+    if use_title and title_val:
+        return title_val.strip()
+    if alt_val and not text_val:
+        return alt_val.strip()
+    return text_val
+
+
+def extract_raw_from_selectors(
+    html: str,
+    selectors_map: dict,
+    base_url: str = "",
+) -> list[dict]:
+    """Extract every field in the selector map from each item container (unmapped keys)."""
+    container_sel = selectors_map.get("item_container")
+    field_sels = selectors_map.get("fields", {}) or {}
+    if not container_sel or not field_sels:
+        return []
+
+    soup = BeautifulSoup(html, "html.parser")
+    containers = soup.select(container_sel)
+
+    raw_records: list[dict] = []
+    for node in containers:
+        record: dict = {}
+        for key, sel_entry in field_sels.items():
+            sel = _selector_css(sel_entry)
+            val = None
+            if sel:
+                try:
+                    target = node.select_one(sel)
+                    if target:
+                        ftype = None
+                        if isinstance(sel_entry, dict) and sel_entry.get("type"):
+                            try:
+                                ftype = FieldType(sel_entry["type"])
+                            except ValueError:
+                                ftype = None
+                        val = _read_node_value(target, ftype, key)
+                except Exception as e:
+                    logger.debug("[SelectorEngine] Invalid selector '%s' for %s: %s", sel, key, e)
+            if isinstance(sel_entry, dict) and sel_entry.get("type") == "currency" and val:
+                from app.selector_profiles.loader import _postprocess_field
+                val = _postprocess_field(val, sel_entry)
+            record[key] = val
+        if any(v not in (None, "") for v in record.values()):
+            raw_records.append(record)
+    return raw_records
+
+
 def apply_selectors(
     html: str, 
     selectors_map: dict, 
     schema_fields: list[SchemaField], 
     base_url: str = "",
-    return_field_quality: bool = False
+    return_field_quality: bool = False,
+    user_intent: str = "",
 ) -> list[dict] | tuple[list[dict], dict]:
-    """Execute generated CSS selectors on full HTML and score extracted records."""
+    """Extract all selector-map fields, align to user schema, then score records."""
+    from app.data_utils import align_extracted_keys_to_schema
+
     container_sel = selectors_map.get("item_container")
     field_sels = selectors_map.get("fields", {}) or {}
 
@@ -53,39 +147,38 @@ def apply_selectors(
     soup = BeautifulSoup(html, "html.parser")
     page_email, page_phone = _extract_contacts_from_node(soup)
     containers = soup.select(container_sel)
-    
+
+    raw_records = extract_raw_from_selectors(html, selectors_map, base_url=base_url)
+    if not raw_records:
+        return ([], {}) if return_field_quality else []
+
+    field_meta = build_selector_field_metadata(field_sels, schema_fields)
+    aligned_records = align_extracted_keys_to_schema(
+        raw_records,
+        schema_fields,
+        selector_field_defs=field_meta,
+        user_intent=user_intent,
+    )
+
     results = []
     field_quality_map: dict[str, list[float]] = {f.name: [] for f in schema_fields}
-    
-    for node in containers:
+
+    for idx, aligned in enumerate(aligned_records):
+        node = containers[idx] if idx < len(containers) else None
         record: dict = {}
         for field in schema_fields:
-            sel = field_sels.get(field.name)
-            val = None
-            if sel:
-                try:
-                    target = node.select_one(sel)
-                    if target:
-                        if field.field_type == FieldType.URL:
-                            val = target.get("href")
-                        else:
-                            val = target.get_text(separator=" ", strip=True)
-                except Exception as e:
-                    logger.debug("[SelectorEngine] Invalid selector '%s': %s", sel, e)
-                    val = None
-
+            val = aligned.get(field.name)
             record[field.name] = _sanitize_field_value(field, val, base_url=base_url)
-            
             if return_field_quality:
                 from app.utils.quality import _value_quality
                 field_quality_map[field.name].append(_value_quality(field, record[field.name]))
 
-        # Post-extraction enrichment
-        record = _enrich_record_contacts(
-            record, schema_fields, node, 
-            page_email=page_email, page_phone=page_phone,
-            allow_page_fallback=False,
-        )
+        if node is not None:
+            record = _enrich_record_contacts(
+                record, schema_fields, node,
+                page_email=page_email, page_phone=page_phone,
+                allow_page_fallback=False,
+            )
 
         from app.utils.quality import score_record_quality
         record["record_score"] = score_record_quality(record, schema_fields)
@@ -93,7 +186,6 @@ def apply_selectors(
             results.append(record)
 
     if return_field_quality:
-        # Aggregate field quality scores
         avg_field_quality = {
             name: (sum(scores) / len(scores)) if scores else 0.0
             for name, scores in field_quality_map.items()

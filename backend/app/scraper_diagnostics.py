@@ -90,13 +90,25 @@ async def run_diagnostics(
         memory = get_selector_memory()
         report.memory_hit = memory.get_selectors(url) is not None
         
-        ext_result = await orchestrate_extraction(url, html, schema_fields, min_record_score)
+        ext_result = await orchestrate_extraction(
+            url, html, schema_fields, min_record_score, user_intent=""
+        )
         report.extraction_method = ext_result.method
         report.selector_success = ext_result.selector_success
         report.raw_records_count = len(ext_result.records)
-        
-        # 4. Processing
-        final_results = process_raw_records(ext_result.records, schema_fields, min_record_score)
+
+        from app.selector_engine import build_selector_field_metadata
+        selector_meta = build_selector_field_metadata(
+            (ext_result.selectors or {}).get("fields", {}),
+            schema_fields,
+        )
+        # 4. Processing — align full selector output to schema
+        final_results = process_raw_records(
+            ext_result.records,
+            schema_fields,
+            min_record_score,
+            profile_fields=selector_meta,
+        )
         report.final_records_count = len(final_results)
         report.record_samples = final_results
         

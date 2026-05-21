@@ -17,15 +17,14 @@ def deduplicate_results(records: list[dict], schema_fields: list, deduplicate_fi
     if not records:
         return records
 
-    dedup_key = deduplicate_field
-    if not dedup_key and records:
-        dedup_key = list(records[0].keys())[0]
-
     seen = set()
     unique = []
     for r in records:
-        dedup_value = normalized_dedup_text(r.get(dedup_key, "")) if dedup_key else ""
-        if not dedup_value:
+        if deduplicate_field:
+            # User specified a specific field to dedup on
+            dedup_value = normalized_dedup_text(r.get(deduplicate_field, ""))
+        else:
+            # Use ALL schema fields as a composite dedup key
             dedup_value = "|".join(
                 normalized_dedup_text(r.get(f.name)) for f in schema_fields
             )

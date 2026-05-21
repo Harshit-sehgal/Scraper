@@ -108,9 +108,11 @@ EXTRACTION RULES:
 1. Return ONLY JSON: {{"item_container": "selector", "fields": {{"field_name": "selector"}}}}
 2. Target the repeating DATA CONTAINER (rows, cards, items) - NOT navigation.
 3. Use relative selectors (descendant or child) that work INSIDE the item_container.
-4. VERIFY FIELD SEMANTICS: Ensure the selector for "price" actually points to a price value, "title" to a title, etc.
-5. If multiple elements could match, choose the most specific one.
-6. Use null for fields that cannot be found.
+4. Include EVERY distinct data column visible in each item (descriptive snake_case keys).
+   Map user schema fields when possible, AND add any extra columns found (e.g. stops, return_date, rating).
+5. VERIFY FIELD SEMANTICS: Ensure each selector points at the correct value type for its key name.
+6. If multiple elements could match, choose the most specific one.
+7. Use null only for fields that cannot be found.
 
 HTML SNIPPET:
 ```html

@@ -102,7 +102,11 @@ def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType
 
     # 1. Field-name hinting (higher priority for disambiguation)
     name_lower = (field_name or "").lower()
-    
+    if any(k in name_lower for k in ("airport", "iata", "icao")):
+        for pattern, _ in SEMANTIC_PATTERNS.get(SemanticType.CODE, []):
+            if pattern.search(str(value).strip()):
+                return SemanticType.CODE, 0.95
+
     # 2. Pattern-based matching (universal physics) - using pre-compiled patterns
     for stype, compiled_patterns in SEMANTIC_PATTERNS.items():
         for pattern, _ in compiled_patterns:
