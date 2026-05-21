@@ -17,3 +17,6 @@ backend/.mypy_cache/
 backend/.venv/
 backend/data/
 server.log
+.coverage
+backend/.coverage
+.commandcode/
