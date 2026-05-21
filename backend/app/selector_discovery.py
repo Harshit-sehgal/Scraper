@@ -15,6 +15,10 @@ from app.models import SchemaField
 from app.page_profiler import detect_page_structure, detect_value_patterns
 from app.motif_feedback import MotifFeedbackEngine
 from app.strategy_evolution import FetchStrategy
+from app.acquisition_state import AcquisitionLineage, AcquisitionState
+from app.session_url_detector import detect_session_params
+from app.acquisition_telemetry import get_acquisition_telemetry
+from app.empty_response_detector import detect_empty_response
 
 logger = logging.getLogger(__name__)
 
@@ -298,6 +302,49 @@ def _detect_redirect(original_url: str, final_url: str) -> dict:
         "original_url": original_url,
         "final_url": final_url,
     }
+
+
+def build_redirect_info(
+    original_url: str,
+    final_url: str,
+    search_recovery: dict | None = None,
+    search_form: dict | None = None,
+    search_params: dict[str, str] | None = None,
+    fetch_method: str = "",
+    existing_redirect_info: dict | None = None,
+) -> dict:
+    """Build redirect_info dict from an AcquisitionLineage.
+
+    Uses the typed AcquisitionLineage model to determine the correct
+    acquisition state, then converts back to the legacy dict format
+    for backward compatibility with the API response.
+
+    Args:
+        original_url: The URL as originally provided
+        final_url: The URL after redirects and recovery
+        search_recovery: Result from _try_form_search_recovery (if attempted)
+        search_form: Result from _detect_search_form (if detected)
+        search_params: User-provided search parameters
+        fetch_method: How the page was fetched
+        existing_redirect_info: Pre-computed redirect_info dict (if available).
+            If provided, uses this instead of re-running _detect_redirect.
+
+    Returns:
+        dict with redirected, redirect_type, message, original_url, final_url
+    """
+    redirect_info = existing_redirect_info or _detect_redirect(original_url, final_url)
+
+    lineage = AcquisitionLineage.from_redirect_info(
+        redirect_info=redirect_info,
+        original_url=original_url,
+        final_url=final_url,
+        fetch_method=fetch_method,
+        search_recovery=search_recovery,
+        search_form=search_form,
+        search_params=search_params,
+    )
+
+    return lineage.to_dict()
 
 
 # ─── Content Quality Assessment ────────────────────────────────────────
@@ -1018,7 +1065,9 @@ def _map_search_params_to_fields(
         param_lower = param_key.lower().replace("_", "").replace("-", "")
 
         # Find the matching param variants or use the param key directly
-        variant_keywords = param_variants.get(param_lower, [param_lower])
+        # Use the original key (with underscores) for dict lookup since
+        # param_variants keys use underscores (e.g. "departure_date")
+        variant_keywords = param_variants.get(param_key.lower(), [param_lower])
 
         best_match = None
         best_score = 0
@@ -1292,7 +1341,7 @@ def _infer_field_name(example_value: str, field_type: str) -> str:
     return ""
 
 
-async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None = None) -> dict:
+async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None = None, acquisition_mode: str = "standard") -> dict:
     """Analyze a URL and auto-detect what data fields can be extracted.
 
     This is the core of the "preview URL → suggest fields" workflow.
@@ -1361,6 +1410,9 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
     # Run redirect detection immediately (before full fetch)
     redirect_info = _detect_redirect(url, final_url)
 
+    # Detect session-bound URL parameters
+    session_detection = detect_session_params(url)
+
     # ── Step 2: Fetch the URL with anti-bot stealth ──────────────────
     try:
         html, js_render_delay, fetch_method, retry_count = await _fetch_page_content(
@@ -1371,7 +1423,16 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
         return {
             "url": url,
             "redirect_info": redirect_info,
+            "acquisition_lineage": AcquisitionLineage(
+                original_url=url, final_url=final_url,
+                state=AcquisitionState.DIRECT,
+                message=f"Failed to fetch URL: {str(e)}",
+            ).model_dump(mode="json"),
+            "user_message": f"Failed to fetch the URL: {str(e)}",
+            "session_detection": session_detection,
+            "canonical_url": session_detection.get("canonical_url", url),
             "content_quality": None,
+            "empty_check": {"is_empty": True, "empty_type": "blank", "confidence": 1.0, "message": "Failed to fetch", "suggestions": []},
             "search_form": None,
             "search_recovery": None,
             "error": f"Failed to fetch URL: {str(e)}",
@@ -1381,13 +1442,23 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
             "item_container": None,
             "suggested_fields": [],
             "anti_bot_score": 0.0,
+            "acquisition_mode": acquisition_mode,
         }
 
     if not html or len(html.strip()) < 100:
         return {
             "url": url,
             "redirect_info": redirect_info,
+            "acquisition_lineage": AcquisitionLineage(
+                original_url=url, final_url=final_url,
+                state=AcquisitionState.DIRECT,
+                message="Fetched page appears empty",
+            ).model_dump(mode="json"),
+            "user_message": "The fetched page appears to be empty.",
+            "session_detection": session_detection,
+            "canonical_url": session_detection.get("canonical_url", url),
             "content_quality": None,
+            "empty_check": {"is_empty": True, "empty_type": "blank", "confidence": 1.0, "message": "Fetched page appears empty", "suggestions": ["The URL may be incorrect or the server returned an empty page"]},
             "search_form": None,
             "search_recovery": None,
             "error": "Fetched page appears empty",
@@ -1397,6 +1468,7 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
             "item_container": None,
             "suggested_fields": [],
             "anti_bot_score": 0.0,
+            "acquisition_mode": acquisition_mode,
         }
 
     # ── Step 3: Search Form Recovery (for expired session URLs) ──────
@@ -1434,13 +1506,15 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
             if search_recovery.get("fresh_url"):
                 final_url = search_recovery["fresh_url"]
             # Update redirect_info to reflect successful recovery
-            redirect_info = {
-                "redirected": False,
-                "redirect_type": "none",
-                "message": "Search session was recovered via form submission → fresh results page",
-                "original_url": url,
-                "final_url": final_url,
-            }
+            redirect_info = build_redirect_info(
+                original_url=url,
+                final_url=final_url,
+                search_recovery=search_recovery,
+                search_form=search_form,
+                search_params=search_params,
+                fetch_method=fetch_method,
+                existing_redirect_info=redirect_info,
+            )
     else:
         # If redirected but no search params provided, still detect the form
         # to guide the user on what params are available
@@ -1466,6 +1540,10 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
 
     # ── Step 6: Content Quality Gate ─────────────────────────────────
     content_quality = _assess_content_quality(html, profile)
+
+    # ── Step 6b: Empty Response Check ─────────────────────────────────
+    # Detect pages that return 200 but have no useful data
+    empty_check = detect_empty_response(html)
 
     # ── Step 7: Extract container values and build structured prompt ─
     container_values = _extract_container_text_values(html, profile.container_selector)
@@ -1599,10 +1677,66 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
         profile.structure_type, len(suggested_fields), elapsed, quality_warning,
     )
 
+    # Build acquisition lineage from the final state
+    acquisition_lineage = AcquisitionLineage.from_redirect_info(
+        redirect_info=redirect_info,
+        original_url=url,
+        final_url=final_url,
+        fetch_method=fetch_method,
+        search_recovery=search_recovery,
+        search_form=search_form if search_form else None,
+        search_params=search_params,
+    )
+    # Enrich lineage with session detection results
+    acquisition_lineage.session_bound = session_detection["is_session_bound"]
+    acquisition_lineage.ephemeral_params = session_detection["ephemeral_params"]
+
+    # If the page is effectively empty, update the acquisition state
+    if empty_check.is_empty and acquisition_lineage.state == AcquisitionState.DIRECT:
+        acquisition_lineage.state = AcquisitionState.EMPTY_RESPONSE
+        acquisition_lineage.message = empty_check.message
+
+    # Determine the canonical URL: the stable, bookmarkable URL
+    # If recovery succeeded, use the recovered URL; otherwise use the
+    # session-stripped version of the original URL
+    canonical_url = session_detection["canonical_url"]
+    if acquisition_lineage.state == AcquisitionState.RECOVERED and acquisition_lineage.recovered_url:
+        canonical_url = acquisition_lineage.recovered_url
+
+    # Record acquisition telemetry
+    try:
+        get_acquisition_telemetry().record(
+            url=url,
+            state=acquisition_lineage.state,
+            original_url=acquisition_lineage.original_url,
+            final_url=acquisition_lineage.final_url,
+            canonical_url=canonical_url,
+            fetch_method=fetch_method,
+            session_bound=session_detection["is_session_bound"],
+            ephemeral_params=session_detection["ephemeral_params"],
+            recovery_method=acquisition_lineage.recovery_method,
+            recovered_url=acquisition_lineage.recovered_url,
+            fetch_time_ms=round((time.time() - start_time) * 1000, 1),
+        )
+    except Exception:
+        logger.debug("[URLAnalyzer] Failed to record acquisition telemetry", exc_info=True)
+
     return {
         "url": url,
         "redirect_info": redirect_info,
+        "acquisition_lineage": acquisition_lineage.model_dump(mode="json"),
+        "user_message": acquisition_lineage.get_user_message(),
+        "session_detection": session_detection,
+        "canonical_url": canonical_url,
+        "acquisition_mode": acquisition_mode,
         "content_quality": content_quality,
+        "empty_check": {
+            "is_empty": empty_check.is_empty,
+            "empty_type": empty_check.empty_type,
+            "confidence": empty_check.confidence,
+            "message": empty_check.message,
+            "suggestions": empty_check.suggestions,
+        },
         "search_form": search_form if search_form.get("detected") else None,
         "search_recovery": search_recovery,
         "page_structure": profile.structure_type,

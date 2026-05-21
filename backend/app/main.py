@@ -45,6 +45,13 @@ class URLPreviewRequest(BaseModel):
             "Values are the search values (e.g. 'NYC', 'LHR', '05/15/2026')."
         ),
     )
+    acquisition_mode: str = Field(
+        default="standard",
+        description=(
+            "Acquisition mode: 'standard' (basic fetch), 'aggressive' (session recovery, "
+            "search form submission), or 'deep_scan' (all recovery strategies, multiple retries)."
+        ),
+    )
 
 
 logger = logging.getLogger(__name__)
@@ -436,6 +443,13 @@ async def system_observability():
     }
 
 
+@app.get("/api/system/acquisition/telemetry")
+async def acquisition_telemetry():
+    """Exposes acquisition telemetry: state distribution, recovery rates, recent events."""
+    from app.acquisition_telemetry import get_acquisition_telemetry
+    return get_acquisition_telemetry().get_summary()
+
+
 @app.get("/api/system/history/topology")
 async def system_topology_history(limit: int = 20):
     """Returns a timeline of historical topology states for replay."""
@@ -696,7 +710,7 @@ async def analyze_url(req: URLPreviewRequest):
     
     try:
         result = await asyncio.wait_for(
-            analyze_url_for_fields(url=req.url, search_params=req.search_params),
+            analyze_url_for_fields(url=req.url, search_params=req.search_params, acquisition_mode=req.acquisition_mode),
             timeout=URL_ANALYZER_TIMEOUT,
         )
     except asyncio.TimeoutError:
