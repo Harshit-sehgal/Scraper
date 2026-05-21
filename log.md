@@ -151,6 +151,40 @@ cf6c526 fix(acquisition): post-integration cleanup — f-strings, types, unused 
 
 ---
 
+## Pass 4 — Dashboard & User-Facing Messages
+
+### Features Added
+
+#### Dashboard: Acquisition Telemetry Cards
+**Files**: `frontend/dashboard/index.html`, `frontend/dashboard/dashboard.js`
+Added a 5-card "Acquisition Pipeline" row to the semantic reliability dashboard:
+- Session-Bound URLs detected
+- Recovery Success Rate (color-coded)
+- Empty-200 detections (fake-success pages)
+- Total Acquisitions count
+- Acquisition Mode distribution
+
+Fetches from `/api/system/acquisition/telemetry` on each dashboard poll cycle.
+
+#### Frontend: Acquisition Status Banner
+**Files**: `frontend/index.html`, `frontend/app.js`, `frontend/styles.css`
+Added a contextual banner below the info bar that surfaces the user_message
+from `AcquisitionLineage` with color coding:
+- Green: direct/recovered
+- Amber: expired session / partial recovery
+- Red: empty response / recovery failed
+- Orange: session-bound (pre-recovery)
+
+Also displays canonical URL, empty-check suggestions, and session-detection
+warnings inline for immediate troubleshooting visibility.
+
+### Commit
+```
+ebed3e1 feat(acquisition): dashboard visibility + user-facing acquisition status banner
+```
+
+---
+
 ## Files Summary
 
 | Category | Count |
@@ -158,7 +192,8 @@ cf6c526 fix(acquisition): post-integration cleanup — f-strings, types, unused 
 | New Python modules | 5 |
 | New test files | 7 |
 | Modified Python files | 2 |
-| Modified JS files | 1 |
+| Modified JS files | 2 |
+| Modified HTML/CSS files | 3 |
 | Total bugs fixed | 17 |
 | Annotations fixed (E701/E702) | 58 |
 | Total tests | 1206 |
