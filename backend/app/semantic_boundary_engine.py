@@ -206,7 +206,8 @@ class MotifLearner:
 
     def observe_types(self, types: List[str]):
         # Identity Protection: filter out known-noisy motifs
-        if any(t == "text" for t in types) and len(types) > 4: return
+        if any(t == "text" for t in types) and len(types) > 4:
+            return
         """Record and REINFORCE a type sequence from a record."""
         ws = get_world_state()
         self.total_records += 1
@@ -403,9 +404,11 @@ def group_adjacent_entities(records: list) -> list:
                 # If spans exist: max 3 chars gap
                 # If no spans: must be consecutive indices (e.g. 0 and 1)
                 if h_start > 0 or n_start > 0:
-                    if n_start - h_end > 3: break
+                    if n_start - h_end > 3:
+                        break
                 else:
-                    if n_idx - h_idx > 1: break
+                    if n_idx - h_idx > 1:
+                        break
 
                 # Extract types from key names
                 parts_h = k_head.split('_')

@@ -181,6 +181,301 @@ import re
 from bs4 import BeautifulSoup
 
 
+# ─── Redirect Detection ────────────────────────────────────────────────
+
+def _detect_redirect(original_url: str, final_url: str) -> dict:
+    """Detect and classify URL redirects by comparing original vs final URL.
+
+    Compares the originally requested URL against the final URL after
+    browser navigation to detect redirects and classify them.
+    Works with ANY domain — no hardcoded values.
+
+    Classification logic:
+    - Same URL (or trailing-slash difference only) → no redirect
+    - Different domain/scheme → cross-domain (not flagged as redirect)
+    - Final URL is homepage (/) and original had a deep path → homepage redirect
+    - Path shortened significantly (deep → shallow) → session/expired token redirect
+    - Path changed → generic path_changed redirect
+
+    Args:
+        original_url: The URL that was requested
+        final_url: The URL after browser navigation (after all redirects)
+
+    Returns:
+        dict with:
+        - redirected: bool
+        - redirect_type: str (none|homepage_redirect|session_expired|path_changed)
+        - message: str
+        - original_url: str
+        - final_url: str
+    """
+    from urllib.parse import urlparse
+
+    # Normalize trailing slash
+    orig_norm = original_url.rstrip("/")
+    final_norm = final_url.rstrip("/")
+
+    # Same URL → no redirect
+    if orig_norm == final_norm:
+        return {
+            "redirected": False,
+            "redirect_type": "none",
+            "message": "No redirect detected — URLs match after normalization",
+            "original_url": original_url,
+            "final_url": final_url,
+        }
+
+    parsed_orig = urlparse(original_url)
+    parsed_final = urlparse(final_url)
+
+    # Different domain/scheme — cross-domain navigation, not a site redirect
+    if parsed_orig.netloc != parsed_final.netloc:
+        return {
+            "redirected": False,
+            "redirect_type": "none",
+            "message": f"Different domain: {parsed_orig.netloc} → {parsed_final.netloc}",
+            "original_url": original_url,
+            "final_url": final_url,
+        }
+
+    orig_path = parsed_orig.path.rstrip("/")
+    final_path = parsed_final.path.rstrip("/")
+
+    orig_segments = [s for s in orig_path.split("/") if s]
+    final_segments = [s for s in final_path.split("/") if s]
+
+    # Redirect to homepage (final is "/" or empty)
+    if not final_path or final_path == "/":
+        # Deep path (3+ segments) redirected to homepage → likely expired session/token
+        if len(orig_segments) >= 3:
+            return {
+                "redirected": True,
+                "redirect_type": "session_expired",
+                "message": (
+                    f"URL redirected to homepage — the search session, token, "
+                    f"or page identifier has likely expired. Original path had "
+                    f"{len(orig_segments)} segments (/{'/'.join(orig_segments)}), "
+                    f"final is the root homepage."
+                ),
+                "original_url": original_url,
+                "final_url": final_url,
+            }
+        return {
+            "redirected": True,
+            "redirect_type": "homepage_redirect",
+            "message": "URL redirected to the site homepage",
+            "original_url": original_url,
+            "final_url": final_url,
+        }
+
+    # Path changed
+    if orig_path != final_path:
+        # Deep path → shallow path: likely expired session/token
+        if len(orig_segments) >= 3 and len(final_segments) <= 2:
+            return {
+                "redirected": True,
+                "redirect_type": "session_expired",
+                "message": (
+                    f"URL redirected from a deep path (/{'/'.join(orig_segments)}) "
+                    f"to a shallower path (/{'/'.join(final_segments)}) — "
+                    f"the session, token, or identifier likely expired."
+                ),
+                "original_url": original_url,
+                "final_url": final_url,
+            }
+        return {
+            "redirected": True,
+            "redirect_type": "path_changed",
+            "message": f"URL path changed: {orig_path} → {final_path}",
+            "original_url": original_url,
+            "final_url": final_url,
+        }
+
+    return {
+        "redirected": False,
+        "redirect_type": "none",
+        "message": "No redirect detected",
+        "original_url": original_url,
+        "final_url": final_url,
+    }
+
+
+# ─── Content Quality Assessment ────────────────────────────────────────
+
+def _assess_content_quality(html: str, profile) -> dict:
+    """Assess whether the fetched page contains meaningful data containers.
+
+    Detects landing pages (hero banners, search forms, welcome text),
+    empty/poor pages (no repeating data containers), and pages with real
+    extractable data.
+
+    Works with ANY StructureProfile — no domain-specific assumptions.
+    When the profile's container selector doesn't find enough data, falls
+    back to scanning the page for repeating element patterns generically.
+
+    Args:
+        html: The page HTML content
+        profile: A StructureProfile object (from page_profiler.detect_page_structure)
+
+    Returns:
+        dict with:
+        - quality: str (good|low|landing_page)
+        - has_data_containers: bool
+        - is_landing_page: bool
+        - data_container_count: int
+        - landing_signals: list of detected landing page indicators
+        - message: str
+    """
+    from collections import Counter
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    # ── Landing Page Detection ──────────────────────────────────────
+    landing_signals: list[str] = []
+
+    # Hero/banner sections (generic selectors, no hardcoded domain)
+    hero_selectors = [
+        ".hero", ".banner", ".jumbotron", ".landing", ".cover",
+        "[class*='hero']", "[class*='banner']", "[class*='landing']",
+        "[class*='jumbotron']",
+    ]
+    for sel in hero_selectors:
+        try:
+            if soup.select(sel):
+                landing_signals.append("hero_banner")
+                break
+        except Exception:
+            continue
+
+    # Search forms (generic — any form with text/search input)
+    forms = soup.find_all("form")
+    search_form_found = False
+    for form in forms:
+        inputs = form.find_all("input")
+        for inp in inputs:
+            input_type = inp.get("type", "").lower()
+            if input_type in ("", "text", "search"):
+                search_form_found = True
+                break
+        if search_form_found:
+            break
+    if search_form_found:
+        landing_signals.append("search_form")
+
+    # Welcome/landing page text patterns (generic, domain-agnostic)
+    body_text = soup.get_text().lower()[:2000]
+    welcome_patterns = [
+        "welcome", "find your", "search for", "book now", "get started",
+        "start your", "explore", "discover", "find the best",
+        "looking for", "where are you going", "destination",
+    ]
+    for pattern in welcome_patterns:
+        if pattern in body_text:
+            landing_signals.append(f"landing_text:{pattern}")
+            break  # One landing text signal is enough
+
+    # ── Data Container Detection ────────────────────────────────────
+    data_container_count = 0
+    has_profile_selector = profile is not None and hasattr(profile, 'container_selector')
+    container_selector = profile.container_selector if has_profile_selector else None
+
+    if container_selector and container_selector != "body":
+        try:
+            containers = soup.select(container_selector)
+            data_container_count = sum(
+                1 for c in containers
+                if len(c.get_text(strip=True)) > 20
+            )
+        except Exception:
+            pass
+
+    # ── Generic Data Container Discovery (fallback) ─────────────────
+    # When profile's container selector finds little, scan for repeating
+    # element patterns across the full DOM (no hardcoded selectors).
+    if data_container_count < 3:
+        tag_class_counts: Counter = Counter()
+        for tag in soup.find_all(True):
+            if tag.name in ('script', 'style', 'noscript', 'svg', 'form', 'nav', 'footer', 'header'):
+                continue
+            classes = ' '.join(tag.get('class', []) or [])
+            if classes:
+                key = f"{tag.name}.{'.'.join(classes.split()[:2])}"
+                tag_class_counts[key] += 1
+
+        # Find patterns with many repetitions (3+) — likely data containers
+        for pattern, count in tag_class_counts.most_common(20):
+            if count < 3:
+                continue
+            try:
+                # Build a rough CSS selector from the pattern
+                css_sel = pattern.replace('.', '.')
+                matching = soup.select(css_sel)
+                content_count = sum(
+                    1 for m in matching
+                    if len(m.get_text(strip=True)) > 20
+                )
+                if content_count > data_container_count:
+                    data_container_count = content_count
+            except Exception:
+                continue
+
+        # Also scan for repeating direct children of common containers
+        for container_tag in ['div', 'li', 'article', 'section', 'tr']:
+            parents = soup.find_all(container_tag, limit=10)
+            for parent in parents:
+                children = parent.find_all(recursive=False)
+                if len(children) >= 3:
+                    # Check if children share the same structure
+                    child_classes = [
+                        ' '.join(c.get('class', []) or []) for c in children
+                    ]
+                    unique_classes = len(set(child_classes))
+                    if unique_classes <= 2:
+                        # Likely repeating items
+                        data_container_count = max(
+                            data_container_count, len(children)
+                        )
+
+    # ── Classification ──────────────────────────────────────────────
+    is_landing_page = (
+        len(landing_signals) >= 2
+        or (len(landing_signals) >= 1 and data_container_count < 3)
+    )
+
+    if is_landing_page:
+        return {
+            "quality": "landing_page",
+            "has_data_containers": data_container_count >= 3,
+            "is_landing_page": True,
+            "data_container_count": data_container_count,
+            "landing_signals": landing_signals,
+            "message": (
+                f"This appears to be a landing or homepage (signals: "
+                f"{', '.join(landing_signals)}), not a data results page "
+                f"with extractable records."
+            ),
+        }
+
+    if data_container_count >= 3:
+        return {
+            "quality": "good",
+            "has_data_containers": True,
+            "is_landing_page": False,
+            "data_container_count": data_container_count,
+            "landing_signals": landing_signals,
+            "message": f"Found {data_container_count} data containers on the page with good extraction potential.",
+        }
+
+    return {
+        "quality": "low",
+        "has_data_containers": False,
+        "is_landing_page": False,
+        "data_container_count": data_container_count,
+        "landing_signals": landing_signals,
+        "message": "No repeating data containers detected on this page — content may be too sparse for extraction.",
+    }
+
+
 def _extract_container_text_values(html: str, container_selector: str) -> list[str]:
     """Extract meaningful, distinct text values from the first data container.
     
@@ -532,6 +827,368 @@ Return ONLY JSON — NO markdown, NO commentary:
 }}"""
 
 
+# ─── Search Form Detection ──────────────────────────────────────────────
+
+def _detect_search_form(html: str) -> dict:
+    """Detect search forms on a page and extract their field structure.
+
+    Scans the page HTML for forms that look like search/query forms
+    (text inputs with location, date, or search-related names/placeholders),
+    and returns a structured description of the form fields, action URL,
+    and method. Fully generic — works with any site, no hardcoded values.
+
+    Args:
+        html: The page HTML content
+
+    Returns:
+        dict with:
+        - detected: bool — whether a search form was found
+        - action: str — the form's action URL (relative or absolute)
+        - method: str — GET or POST
+        - fields: list of dicts with {id, name, type, placeholder, required_indicator}
+        - search_fields: list of field dicts identified as search-relevant
+        (city/date/airport related names and placeholders)
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    forms = soup.find_all("form")
+
+    # Keywords that suggest a field is a search/query parameter
+    SEARCH_FIELD_NAMES: set[str] = {
+        "fro", "from", "to", "destination", "origin", "source", "target",
+        "depart", "arrive", "arrival", "return",
+        "city", "airport", "location", "place",
+        "date", "checkin", "checkout", "check_in", "check_out",
+        "departure_date", "return_date", "travel_date",
+        "adult", "child", "infant", "passenger", "guest",
+        "cabin", "class", "cabinclass", "cabin_class",
+        "query", "search", "q", "keyword",
+    }
+    SEARCH_PLACEHOLDER_PATTERNS: list[str] = [
+        r"from|to", r"destination|origin", r"city|airport|location",
+        r"depart|arrive|return",
+        r"date|when|check.?in|check.?out",
+        r"search|find|fly|flight|book",
+        r"adult|child|infant|passenger|guest",
+        r"leaving|going|where",
+    ]
+
+    best_form = None
+    best_fields: list[dict] = []
+    best_form_score = 0
+
+    for form in forms:
+        inputs = form.find_all("input")
+        selects = form.find_all("select")
+        all_inputs = list(inputs) + list(selects)
+
+        if not all_inputs:
+            continue
+
+        fields: list[dict] = []
+        search_inputs: list[dict] = []
+        form_score = 0
+
+        for inp in all_inputs:
+            tag_name = inp.name  # 'input' or 'select'
+            field_id = inp.get("id", "") or ""
+            field_name = inp.get("name", "") or ""
+            field_type = inp.get("type", "text") if tag_name == "input" else "select"
+            placeholder = inp.get("placeholder", "") or ""
+
+            input_type_lower = field_type.lower()
+            # Skip hidden, submit, button, file, checkbox, radio, etc.
+            # Only keep text-like and date-like inputs
+            if input_type_lower not in ("", "text", "search", "date", "datetime-local", "tel", "number"):
+                continue
+
+            field_entry = {
+                "id": field_id,
+                "name": field_name or field_id,
+                "type": field_type,
+                "placeholder": placeholder,
+            }
+            fields.append(field_entry)
+
+            # Score this field for search relevance
+            name_lower = field_name.lower()
+            id_lower = field_id.lower()
+            placeholder_lower = placeholder.lower()
+
+            # Check field name
+            for keyword in SEARCH_FIELD_NAMES:
+                if keyword in name_lower or keyword in id_lower:
+                    form_score += 2
+                    break
+
+            # Check placeholder text against patterns
+            for pattern in SEARCH_PLACEHOLDER_PATTERNS:
+                if re.search(pattern, placeholder_lower, re.IGNORECASE):
+                    form_score += 2
+                    break
+
+            # If field is relevant, add to search_inputs
+            is_search_relevant = False
+            for keyword in SEARCH_FIELD_NAMES:
+                if keyword in name_lower or keyword in id_lower or keyword in placeholder_lower:
+                    is_search_relevant = True
+                    break
+            if is_search_relevant:
+                search_inputs.append(field_entry)
+
+        # Boost score for forms with search inputs
+        if search_inputs:
+            form_score += len(search_inputs) * 3
+
+        if form_score > best_form_score:
+            best_form_score = form_score
+            best_form = form
+            best_fields = fields
+
+    if best_form is None or best_form_score < 3:
+        return {
+            "detected": False,
+            "action": "",
+            "method": "",
+            "fields": [],
+            "search_fields": [],
+        }
+
+    action = best_form.get("action", "") or ""
+    method = (best_form.get("method", "post") or "post").upper()
+
+    return {
+        "detected": True,
+        "action": action.strip(),
+        "method": method,
+        "fields": best_fields,
+        "search_fields": search_inputs,
+    }
+
+
+# ─── Search Form POST Recovery ─────────────────────────────────────────
+
+def _build_absolute_url(base_url: str, action: str) -> str:
+    """Build an absolute URL from a base URL and potentially relative action."""
+    from urllib.parse import urljoin, urlparse
+    if action.startswith("http://") or action.startswith("https://"):
+        return action
+    if action.startswith("/"):
+        parsed = urlparse(base_url)
+        return f"{parsed.scheme}://{parsed.netloc}{action}"
+    return urljoin(base_url.rstrip("/") + "/", action.lstrip("/"))
+
+
+def _map_search_params_to_fields(
+    search_params: dict[str, str],
+    form_fields: list[dict],
+) -> dict[str, str]:
+    """Map user-provided search parameters to form field names.
+
+    Uses fuzzy matching of field names, IDs, and placeholders to find
+    the best field for each search parameter. No hardcoded field names.
+
+    Args:
+        search_params: User-provided params like {"origin": "NYC", "destination": "LHR"}
+        form_fields: Detected form fields from _detect_search_form()
+
+    Returns:
+        dict mapping form field names → values
+    """
+    mapped: dict[str, str] = {}
+
+    # Build a list of (field_entry, match_keywords) for fuzzy matching
+    param_variants: dict[str, list[str]] = {
+        "origin": ["origin", "from", "fro", "frocity", "departure", "depart", "leaving"],
+        "destination": ["destination", "dest", "to", "tocity", "arrival", "arrive", "going"],
+        "departure_date": ["departure_date", "departdate", "frodate", "depart", "checkin", "check_in"],
+        "return_date": ["return_date", "returndate", "todate", "return", "checkout", "check_out"],
+        "date": ["date", "travel_date", "traveldate"],
+        "adults": ["adult", "adults", "passenger", "passengers"],
+        "children": ["child", "children", "kid", "kids"],
+        "infants": ["infant", "infants"],
+        "cabin_class": ["cabin", "cabinclass", "cabin_class", "class"],
+        "query": ["query", "search", "q", "keyword"],
+    }
+
+    used_fields: set[str] = set()
+
+    for param_key, value in search_params.items():
+        if not value:
+            continue
+        param_lower = param_key.lower().replace("_", "").replace("-", "")
+
+        # Find the matching param variants or use the param key directly
+        variant_keywords = param_variants.get(param_lower, [param_lower])
+
+        best_match = None
+        best_score = 0
+
+        for field in form_fields:
+            field_name = field.get("name", "").lower().replace("_", "").replace("-", "")
+            field_id = field.get("id", "").lower().replace("_", "").replace("-", "")
+            placeholder = field.get("placeholder", "").lower().replace("_", "").replace("-", "")
+
+            # Skip already-mapped fields
+            if field_name in used_fields or field_id in used_fields:
+                continue
+
+            for kw in variant_keywords:
+                score = 0
+                kw_norm = kw.lower().replace("_", "").replace("-", "")
+                if kw_norm == field_name or kw_norm == field_id:
+                    score = 10  # Exact match
+                elif kw_norm in field_name or kw_norm in field_id:
+                    score = 5   # Substring match on name/id
+                elif kw_norm in placeholder:
+                    score = 3   # Placeholder match
+
+                if score > best_score:
+                    best_score = score
+                    best_match = field
+
+        if best_match:
+            form_field_name = best_match.get("name", "") or best_match.get("id", "")
+            if form_field_name:
+                mapped[form_field_name] = value
+                used_fields.add(form_field_name)
+                used_fields.add(best_match.get("id", ""))
+
+    return mapped
+
+
+async def _try_form_search_recovery(
+    landing_page_html: str,
+    landing_page_url: str,
+    search_params: dict[str, str],
+) -> dict:
+    """Try to recover from an expired session URL by submitting the site's
+    search form programmatically.
+
+    Detects the search form on the landing page, maps user-provided
+    search parameters to form fields, POSTs to the form action, and
+    follows redirects to the fresh session results page.
+
+    Fully generic — works with any site that has a search form, no
+    hardcoded domains or field names.
+
+    Args:
+        landing_page_html: HTML of the landing/homepage (after redirect)
+        landing_page_url: URL of the landing page (for resolving relative actions)
+        search_params: Dict of search parameters
+            (e.g. {"origin": "NYC", "destination": "LHR", "departure_date": "05/15/2026"})
+
+    Returns:
+        dict with:
+        - success: bool — whether recovery succeeded
+        - fresh_url: str — the URL of the fresh session results page
+        - fresh_html: str — HTML of the fresh session results page
+        - form_detected: bool
+        - form_info: dict — the detected form structure
+        - error: str | None — error message if recovery failed
+    """
+    import httpx
+
+    # Step 1: Detect the search form
+    form_info = _detect_search_form(landing_page_html)
+    if not form_info["detected"]:
+        return {
+            "success": False,
+            "fresh_url": landing_page_url,
+            "fresh_html": "",
+            "form_detected": False,
+            "form_info": form_info,
+            "error": "No search form detected on the landing page — cannot recover expired session",
+        }
+
+    # Step 2: Map user search params to form field names
+    form_action = form_info["action"]
+    form_method = form_info["method"]
+    form_fields = form_info["fields"]
+
+    mapped_params = _map_search_params_to_fields(search_params, form_fields)
+
+    if not mapped_params:
+        # Could not map any params — return the form structure so the user can see what's needed
+        return {
+            "success": False,
+            "fresh_url": landing_page_url,
+            "fresh_html": "",
+            "form_detected": True,
+            "form_info": form_info,
+            "error": (
+                f"Found a search form at '{form_action}' but could not map your "
+                f"search parameters to form fields. Detected form fields: "
+                f"{[f['name'] or f['id'] for f in form_fields]}. "
+                f"Try using field names like: origin, destination, departure_date."
+            ),
+        }
+
+    # Build absolute form action URL
+    absolute_action = _build_absolute_url(landing_page_url, form_action)
+
+    logger.info(
+        "[SearchRecovery] POSTing to %s with params: %s",
+        absolute_action, mapped_params,
+    )
+
+    # Step 3: Submit the form
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            timeout=httpx.Timeout(30.0),
+        ) as client:
+            if form_method == "GET":
+                resp = await client.get(absolute_action, params=mapped_params)
+            else:
+                resp = await client.post(absolute_action, data=mapped_params)
+
+            fresh_url = str(resp.url)
+            fresh_html = resp.text
+
+            if resp.status_code >= 400:
+                return {
+                    "success": False,
+                    "fresh_url": fresh_url,
+                    "fresh_html": fresh_html,
+                    "form_detected": True,
+                    "form_info": form_info,
+                    "error": f"Search form submission returned HTTP {resp.status_code}",
+                }
+
+            logger.info(
+                "[SearchRecovery] Form submitted successfully → %s (status %d)",
+                fresh_url, resp.status_code,
+            )
+
+            return {
+                "success": True,
+                "fresh_url": fresh_url,
+                "fresh_html": fresh_html,
+                "form_detected": True,
+                "form_info": form_info,
+                "error": None,
+            }
+
+    except httpx.TimeoutException:
+        return {
+            "success": False,
+            "fresh_url": landing_page_url,
+            "fresh_html": "",
+            "form_detected": True,
+            "form_info": form_info,
+            "error": "Search form submission timed out after 30 seconds",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "fresh_url": landing_page_url,
+            "fresh_html": "",
+            "form_detected": True,
+            "form_info": form_info,
+            "error": f"Search form submission failed: {str(e)}",
+        }
+
+
 # ─── Generic field name post-processing ───────────────────────────────────
 
 _GENERIC_NAMES: set[str] = {
@@ -635,23 +1292,37 @@ def _infer_field_name(example_value: str, field_type: str) -> str:
     return ""
 
 
-async def analyze_url_for_fields(url: str) -> dict:
+async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None = None) -> dict:
     """Analyze a URL and auto-detect what data fields can be extracted.
-    
+
     This is the core of the "preview URL → suggest fields" workflow.
-    
+
     1. Fetches the URL using anti-bot stealth headers
-    2. Analyzes page structure (table/cards/list/mixed)
-    3. Detects value patterns (currencies, dates, ratings, etc.)
-    4. Uses LLM to discover all data fields and their selectors
-    5. Returns suggested fields with types, confidence, and example values
-    
+    2. Detects redirects by comparing original vs final URL
+    3. If redirected (session_expired) AND search_params provided, attempts
+       recovery by POSTing to the site's search form to generate a fresh session
+    4. Assesses content quality (landing page vs data page)
+    5. Analyzes page structure (table/cards/list/mixed)
+    6. Detects value patterns (currencies, dates, ratings, etc.)
+    7. Uses LLM to discover all data fields and their selectors
+    8. Returns suggested fields with types, confidence, and example values
+
+    Every step is fully generic — no hardcoded domains, paths, or selectors.
+
     Args:
         url: The URL to analyze
-        
+        search_params: Optional dict of search parameters to POST to the
+            site's search form if the URL has expired. Keys are semantic
+            (e.g. origin, destination, departure_date, return_date, adults).
+            Values are the search values (e.g. "NYC", "LHR", "05/15/2026").
+
     Returns:
         dict with:
         - url: str
+        - redirect_info: dict (redirect detection result or None)
+        - content_quality: dict (content quality assessment or None)
+        - search_form: dict (detected search form structure or None)
+        - search_recovery: dict (recovery attempt result or None)
         - page_structure: str (table|cards|list|mixed)
         - structure_confidence: float
         - estimated_record_count: int
@@ -661,13 +1332,36 @@ async def analyze_url_for_fields(url: str) -> dict:
     """
     from app.html_utils import fetch_page_content as _fetch_page_content
     from app.scrape_telemetry import detect_anti_bot
-    
+    import httpx
+
     reset_llm_call_count()
     start_time = time.time()
-    
+
     logger.info("[URLAnalyzer] Fetching and analyzing: %s", url)
-    
-    # Step 1: Fetch the URL with anti-bot stealth
+
+    # ── Step 1: Determine final URL (lightweight check) ──────────────
+    # Use a quick httpx request to determine where the URL ultimately
+    # resolves to, without the overhead of a full Playwright session.
+    final_url = url
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            timeout=httpx.Timeout(10.0),
+        ) as client:
+            resp = await client.get(url)
+            if str(resp.url) != url:
+                final_url = str(resp.url)
+                logger.info(
+                    "[URLAnalyzer] URL redirected: %s → %s", url, final_url
+                )
+    except Exception:
+        logger.debug("[URLAnalyzer] Could not determine final URL via httpx for %s", url)
+        pass
+
+    # Run redirect detection immediately (before full fetch)
+    redirect_info = _detect_redirect(url, final_url)
+
+    # ── Step 2: Fetch the URL with anti-bot stealth ──────────────────
     try:
         html, js_render_delay, fetch_method, retry_count = await _fetch_page_content(
             url, preferred_method=FetchStrategy.PLAYWRIGHT_FULL
@@ -676,6 +1370,10 @@ async def analyze_url_for_fields(url: str) -> dict:
         logger.error("[URLAnalyzer] Failed to fetch %s: %s", url, e)
         return {
             "url": url,
+            "redirect_info": redirect_info,
+            "content_quality": None,
+            "search_form": None,
+            "search_recovery": None,
             "error": f"Failed to fetch URL: {str(e)}",
             "page_structure": "unknown",
             "structure_confidence": 0.0,
@@ -684,10 +1382,14 @@ async def analyze_url_for_fields(url: str) -> dict:
             "suggested_fields": [],
             "anti_bot_score": 0.0,
         }
-    
+
     if not html or len(html.strip()) < 100:
         return {
             "url": url,
+            "redirect_info": redirect_info,
+            "content_quality": None,
+            "search_form": None,
+            "search_recovery": None,
             "error": "Fetched page appears empty",
             "page_structure": "unknown",
             "structure_confidence": 0.0,
@@ -696,26 +1398,78 @@ async def analyze_url_for_fields(url: str) -> dict:
             "suggested_fields": [],
             "anti_bot_score": 0.0,
         }
-    
-    # Step 2: Check anti-bot score
+
+    # ── Step 3: Search Form Recovery (for expired session URLs) ──────
+    # If the URL redirected (e.g. session token expired) and the user
+    # provided search params, attempt to POST to the site's search form
+    # to generate a fresh search session.
+    search_form = _detect_search_form(html)
+    search_recovery = None
+
+    if (
+        redirect_info.get("redirected")
+        and search_params
+        and search_form.get("detected")
+    ):
+        logger.info(
+            "[URLAnalyzer] Redirected URL with search params — attempting recovery via %s",
+            search_form.get("action", "/search"),
+        )
+        search_recovery = await _try_form_search_recovery(
+            landing_page_html=html,
+            landing_page_url=final_url,
+            search_params=search_params,
+        )
+
+        # If recovery succeeded, analyze the fresh session page
+        if search_recovery.get("success") and search_recovery.get("fresh_html"):
+            logger.info(
+                "[URLAnalyzer] Recovery succeeded → %s, re-analyzing fresh page",
+                search_recovery.get("fresh_url", ""),
+            )
+            # Re-analyze the fresh session results page
+            html = search_recovery["fresh_html"]
+            fetch_method = "search_form_post"
+            # Update final URL for the fresh session
+            if search_recovery.get("fresh_url"):
+                final_url = search_recovery["fresh_url"]
+            # Update redirect_info to reflect successful recovery
+            redirect_info = {
+                "redirected": False,
+                "redirect_type": "none",
+                "message": "Search session was recovered via form submission → fresh results page",
+                "original_url": url,
+                "final_url": final_url,
+            }
+    else:
+        # If redirected but no search params provided, still detect the form
+        # to guide the user on what params are available
+        if redirect_info.get("redirected") and search_form.get("detected"):
+            logger.info(
+                "[URLAnalyzer] Redirected URL with search form detected — "
+                "provide search_params to attempt recovery. Fields: %s",
+                [f["name"] or f["id"] for f in search_form.get("search_fields", [])],
+            )
+
+    # ── Step 4: Check anti-bot score ─────────────────────────────────
     anti_bot_score = detect_anti_bot(html)
-    
-    # Step 3: Analyze page structure and value patterns
+
+    # ── Step 5: Analyze page structure and value patterns ─────────────
     profile = detect_page_structure(html)
     patterns = detect_value_patterns(html)
-    
+
     page_analysis = {
         "structure_type": profile.structure_type,
         "structure_confidence": profile.structure_confidence,
         "headers": profile.headers,
     }
-    
-    # Step 4: Extract container values and build structured prompt
-    # Instead of sending raw HTML to the LLM (which overwhelms it and causes
-    # generic type names), we pre-extract individual text values from the
-    # data container, classify each by type, and send ONLY structured pairs.
+
+    # ── Step 6: Content Quality Gate ─────────────────────────────────
+    content_quality = _assess_content_quality(html, profile)
+
+    # ── Step 7: Extract container values and build structured prompt ─
     container_values = _extract_container_text_values(html, profile.container_selector)
-    
+
     # If we got very few values from the container, fall back to scanning
     # visible page text for individual values
     if len(container_values) < 3:
@@ -723,16 +1477,15 @@ async def analyze_url_for_fields(url: str) -> dict:
         for noise in soup(['script', 'style', 'nav', 'footer', 'header', 'noscript', 'svg', 'form']):
             noise.decompose()
         visible_text = soup.get_text(separator=" ", strip=True)
-        # Split into short meaningful chunks and classify each
         chunks = []
         for tok in visible_text.split():
             tok = tok.strip()
             if tok and len(tok) > 1 and len(tok) < 80 and tok not in chunks:
                 chunks.append(tok)
         container_values = chunks[:40]
-    
+
     prompt = build_url_analysis_prompt(container_values, page_analysis)
-    
+
     try:
         result = await llm_json(messages=[
             {
@@ -747,8 +1500,8 @@ async def analyze_url_for_fields(url: str) -> dict:
     except Exception as e:
         logger.exception("[URLAnalyzer] LLM analysis failed for %s: %s", url, e)
         result = None
-    
-    # Step 5: Build structured response
+
+    # ── Step 8: Build structured response ────────────────────────────
     field_type_map = {
         "string": "string",
         "text": "string",
@@ -773,18 +1526,17 @@ async def analyze_url_for_fields(url: str) -> dict:
         "code": "code",
         "time": "time",
     }
-    
+
     suggested_fields = []
     if result and isinstance(result, dict):
         raw_fields = result.get("fields", [])
         if isinstance(raw_fields, dict):
-            # Handle the case where fields come as {name: value} format
             raw_fields = [
                 {"name": k, "example_value": v, "type": "string", "confidence": 0.5}
                 for k, v in raw_fields.items()
                 if isinstance(v, str)
             ]
-        
+
         if isinstance(raw_fields, list):
             for f in raw_fields:
                 if not isinstance(f, dict):
@@ -792,19 +1544,19 @@ async def analyze_url_for_fields(url: str) -> dict:
                 name = str(f.get("name", "")).strip()
                 if not name:
                     continue
-                
+
                 raw_type = str(f.get("type", "string")).lower().strip()
                 mapped_type = field_type_map.get(raw_type, "string")
-                
+
                 suggested_fields.append({
                     "name": name,
                     "type": mapped_type,
-                    "selector": "",  # Selectors determined by scraper's selector discovery pipeline
+                    "selector": "",
                     "example_value": f.get("example_value", ""),
                     "confidence": min(float(f.get("confidence", 0.5)), 1.0),
                     "description": str(f.get("description", "")),
                 })
-    
+
     # If LLM returned no fields, use pattern analysis as fallback
     if not suggested_fields:
         for hint in _value_patterns_to_field_types(patterns):
@@ -816,30 +1568,43 @@ async def analyze_url_for_fields(url: str) -> dict:
                 "confidence": hint["confidence"],
                 "description": hint.get("description", ""),
             })
-    
+
     # Post-processing: rename generic type-name fields to more descriptive names
     suggested_fields = _rename_generic_fields(suggested_fields)
-    
+
     # Sort by confidence descending
     suggested_fields.sort(key=lambda f: f["confidence"], reverse=True)
-    
+
     # Use URL-analyzer-specific field limit
     suggested_fields = suggested_fields[:settings.URL_ANALYZER_MAX_FIELDS]
-    
+
     item_container = profile.container_selector
     estimated_records = 0
     if result and isinstance(result, dict):
         estimated_records = int(result.get("estimated_record_count", 0))
 
-    
     elapsed = time.time() - start_time
+
+    # Log with redirect/quality/recovery context
+    quality_warning = ""
+    if redirect_info.get("redirected"):
+        quality_warning = f" [REDIRECTED: {redirect_info.get('redirect_type', 'unknown')}]"
+    if content_quality.get("quality") != "good":
+        quality_warning += f" [QUALITY: {content_quality.get('quality', 'unknown')}]"
+    if search_recovery and search_recovery.get("success"):
+        quality_warning += " [RECOVERED via search form]"
     logger.info(
-        "[URLAnalyzer] Analyzed %s: %s structure, %d fields suggested, %.1fs",
-        url, profile.structure_type, len(suggested_fields), elapsed,
+        "[URLAnalyzer] Analyzed %s: %s structure, %d fields suggested, %.1fs%s",
+        url if not search_recovery else search_recovery.get("fresh_url", url),
+        profile.structure_type, len(suggested_fields), elapsed, quality_warning,
     )
-    
+
     return {
         "url": url,
+        "redirect_info": redirect_info,
+        "content_quality": content_quality,
+        "search_form": search_form if search_form.get("detected") else None,
+        "search_recovery": search_recovery,
         "page_structure": profile.structure_type,
         "structure_confidence": profile.structure_confidence,
         "estimated_record_count": estimated_records,

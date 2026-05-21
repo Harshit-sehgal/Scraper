@@ -74,7 +74,8 @@ async def get_legacy_domain_health():
     
     health = {}
     for domain in states:
-        if domain.startswith("_"): continue
+        if domain.startswith("_"):
+            continue
         health[domain] = policy.get_domain_health_score(domain)
         
     return health

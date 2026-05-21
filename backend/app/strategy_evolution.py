@@ -219,15 +219,23 @@ class StrategyEvolutionEngine:
                 # Map common strings to FetchStrategy
                 s_lower = strategy.lower()
                 if "playwright" in s_lower:
-                    if "stealth" in s_lower: strategy = FetchStrategy.PLAYWRIGHT_STEALTH
-                    elif "light" in s_lower: strategy = FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT
-                    else: strategy = FetchStrategy.PLAYWRIGHT_FULL
+                    if "stealth" in s_lower:
+                        strategy = FetchStrategy.PLAYWRIGHT_STEALTH
+                    elif "light" in s_lower:
+                        strategy = FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT
+                    else:
+                        strategy = FetchStrategy.PLAYWRIGHT_FULL
                 elif "httpx" in s_lower:
-                    if "ua" in s_lower: strategy = FetchStrategy.HTTPX_WITH_UA
-                    elif "smart" in s_lower: strategy = FetchStrategy.HTTPX_SMART
-                    else: strategy = FetchStrategy.HTTPX_BASIC
-                elif "hybrid" in s_lower: strategy = FetchStrategy.HYBRID
-                else: strategy = FetchStrategy.PLAYWRIGHT_FULL
+                    if "ua" in s_lower:
+                        strategy = FetchStrategy.HTTPX_WITH_UA
+                    elif "smart" in s_lower:
+                        strategy = FetchStrategy.HTTPX_SMART
+                    else:
+                        strategy = FetchStrategy.HTTPX_BASIC
+                elif "hybrid" in s_lower:
+                    strategy = FetchStrategy.HYBRID
+                else:
+                    strategy = FetchStrategy.PLAYWRIGHT_FULL
 
         state = self._get_or_create_state(domain)
         state.record_attempt(strategy, success, time_ms, quality, failure_reason)

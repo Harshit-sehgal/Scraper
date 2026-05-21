@@ -331,17 +331,28 @@ class SemanticWorldState:
 
                     # Automated Exhaustive Dispatching (Phase 28)
                     target: Any = None
-                    if subsystem == "topology": target = self._topology
-                    elif subsystem == "energy": target = self._energy
-                    elif subsystem == "instability": target = self._instability
-                    elif subsystem == "manifold": target = self._manifold
-                    elif subsystem == "motif": target = self._motif
-                    elif subsystem == "transition": target = self._transition
-                    elif subsystem == "intent": target = self._intent
-                    elif subsystem == "action": target = self._action
-                    elif subsystem == "abstraction": target = self._abstraction
-                    elif subsystem == "observability": target = self._observability
-                    elif subsystem == "history": target = self._history
+                    if subsystem == "topology":
+                        target = self._topology
+                    elif subsystem == "energy":
+                        target = self._energy
+                    elif subsystem == "instability":
+                        target = self._instability
+                    elif subsystem == "manifold":
+                        target = self._manifold
+                    elif subsystem == "motif":
+                        target = self._motif
+                    elif subsystem == "transition":
+                        target = self._transition
+                    elif subsystem == "intent":
+                        target = self._intent
+                    elif subsystem == "action":
+                        target = self._action
+                    elif subsystem == "abstraction":
+                        target = self._abstraction
+                    elif subsystem == "observability":
+                        target = self._observability
+                    elif subsystem == "history":
+                        target = self._history
                     elif subsystem == "global":
                         # Global events (merge, federate, promote, relax, etc.)
                         # are orchestration-level and don't have direct method targets.
@@ -1259,16 +1270,20 @@ class SemanticWorldState:
                         other = rb if src == ra else ra
                         fnames = set(t.source_field for t in tokens if t.source_field)
                         if other not in fnames:
-                            if t.raw not in value_roles: value_roles[t.raw] = []
-                            if src not in value_roles[t.raw]: value_roles[t.raw].append(src)
-                            if other not in value_roles[t.raw]: value_roles[t.raw].append(other)
+                            if t.raw not in value_roles:
+                                value_roles[t.raw] = []
+                            if src not in value_roles[t.raw]:
+                                value_roles[t.raw].append(src)
+                            if other not in value_roles[t.raw]:
+                                value_roles[t.raw].append(other)
 
             # ─── Relational Recall (Phase 31) ───
             # Identify tokens that exist in 'crystalline' knowledge to stabilize new basins
             knowledge_boost = {}
             current_idx = self.metrics.total_records_processed
             for t in tokens:
-                if not t.raw: continue
+                if not t.raw:
+                    continue
                 # Temporal Manifold Weighting: newer matches give more boost
                 boost = self._history.find_crystalline_matches(t.raw, current_record=current_idx)
                 if boost > 0:
@@ -1988,7 +2003,8 @@ class SemanticWorldState:
                 reng = RoleEmbeddingEngine()
                 anchored_roles = set()
                 for a, b in anchors:
-                    anchored_roles.add(a); anchored_roles.add(b)
+                    anchored_roles.add(a)
+                    anchored_roles.add(b)
 
                 import random
                 for role in reng.manifold.keys():

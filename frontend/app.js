@@ -1041,11 +1041,18 @@ async function analyzeURL() {
     if (btnText) btnText.textContent = 'Analyzing...';
     if (spinner) spinner.classList.remove('hidden');
 
+    // AbortController with 130s timeout — slightly longer than backend's 120s
+    // so the user gets the backend's timeout error message (408), not a
+    // browser-level "NetworkError" which is ambiguous and unhelpful.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 130_000);
+
     try {
         const res = await fetch(`${API}/api/url/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url })
+            body: JSON.stringify({ url }),
+            signal: controller.signal
         });
 
         const data = await res.json();
@@ -1127,9 +1134,16 @@ async function analyzeURL() {
         toast(`Found ${_analyzedFields.length} fields on ${url}`, 'success');
     } catch (err) {
         error.classList.remove('hidden');
-        document.getElementById('analyze-error-text').textContent = err.message || 'Failed to analyze URL';
-        toast(`Analysis error: ${err.message}`, 'error');
+        if (err.name === 'AbortError') {
+            document.getElementById('analyze-error-text').textContent =
+                'Analysis timed out — the page may be too slow or protected by anti-bot measures. Try a different source URL.';
+            toast('Analysis timed out', 'error');
+        } else {
+            document.getElementById('analyze-error-text').textContent = err.message || 'Failed to analyze URL';
+            toast(`Analysis error: ${err.message}`, 'error');
+        }
     } finally {
+        clearTimeout(timeoutId);
         btn.disabled = false;
         if (btnText) btnText.textContent = 'Analyze URL';
         if (spinner) spinner.classList.add('hidden');

@@ -79,9 +79,12 @@ async def _call_openai_compatible_json(
     backoff_seconds: float | None = None,
 ):
     _record_call()
-    if timeout is None: timeout = settings.LLM_TIMEOUT
-    if max_attempts is None: max_attempts = settings.LLM_MAX_ATTEMPTS
-    if backoff_seconds is None: backoff_seconds = settings.LLM_BACKOFF_SECONDS
+    if timeout is None:
+        timeout = settings.LLM_TIMEOUT
+    if max_attempts is None:
+        max_attempts = settings.LLM_MAX_ATTEMPTS
+    if backoff_seconds is None:
+        backoff_seconds = settings.LLM_BACKOFF_SECONDS
     
     last_error: Exception | None = None
     for attempt in range(1, max(1, max_attempts) + 1):
@@ -113,9 +116,12 @@ async def _call_openai_compatible_text(
     backoff_seconds: float | None = None,
 ) -> str:
     _record_call()
-    if timeout is None: timeout = settings.LLM_TIMEOUT
-    if max_attempts is None: max_attempts = settings.LLM_MAX_ATTEMPTS
-    if backoff_seconds is None: backoff_seconds = settings.LLM_BACKOFF_SECONDS
+    if timeout is None:
+        timeout = settings.LLM_TIMEOUT
+    if max_attempts is None:
+        max_attempts = settings.LLM_MAX_ATTEMPTS
+    if backoff_seconds is None:
+        backoff_seconds = settings.LLM_BACKOFF_SECONDS
 
     last_error: Exception | None = None
     for attempt in range(1, max(1, max_attempts) + 1):
@@ -159,9 +165,11 @@ def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning
 
 
 async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
-    if temperature is None: temperature = settings.LLM_TEMPERATURE
+    if temperature is None:
+        temperature = settings.LLM_TEMPERATURE
     _record_call()
-    if timeout is None: timeout = settings.LLM_TIMEOUT
+    if timeout is None:
+        timeout = settings.LLM_TIMEOUT
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
@@ -226,9 +234,11 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
 
 async def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     """Fast-path JSON call for throughput-sensitive cleaning tasks."""
-    if temperature is None: temperature = settings.LLM_FAST_TEMPERATURE
+    if temperature is None:
+        temperature = settings.LLM_FAST_TEMPERATURE
     _record_call()
-    if timeout is None: timeout = settings.LLM_FAST_TIMEOUT
+    if timeout is None:
+        timeout = settings.LLM_FAST_TIMEOUT
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
@@ -276,9 +286,11 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
 
 
 async def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:
-    if temperature is None: temperature = settings.LLM_TEXT_TEMPERATURE
+    if temperature is None:
+        temperature = settings.LLM_TEXT_TEMPERATURE
     _record_call()
-    if timeout is None: timeout = settings.LLM_TIMEOUT
+    if timeout is None:
+        timeout = settings.LLM_TIMEOUT
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
@@ -356,10 +368,12 @@ class SubstratePluginManager:
 
     def _native_role_merger(self, **kwargs):
         """Native Tool: Merge redundant roles (Phase 44)."""
-        if not self.ws: return "Fail: No WS"
+        if not self.ws:
+            return "Fail: No WS"
         role_a = kwargs.get("role_a")
         role_b = kwargs.get("role_b")
-        if not role_a or not role_b: return "Fail: Missing roles"
+        if not role_a or not role_b:
+            return "Fail: Missing roles"
         
         with self.ws.transaction(f"refactor:merge:{role_a}"):
             # Linear blend vectors
@@ -376,8 +390,9 @@ class SubstratePluginManager:
 
     def _native_manifold_compressor(self, **kwargs):
         """Native Tool: Prune low-impact manifold dimensions (Phase 44)."""
-        if not self.ws: return "Fail: No WS"
-        
+        if not self.ws:
+            return "Fail: No WS"
+
         manifold = self.ws.role_manifold
         if len(manifold) < 10:
             return "Skip: Manifold too sparse for compression"

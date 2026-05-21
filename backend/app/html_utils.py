@@ -343,7 +343,8 @@ async def fetch_page_content(
                 for sel in loading_selectors:
                     try:
                         await page.wait_for_selector(sel, state="hidden", timeout=2000)
-                    except Exception: pass
+                    except Exception:
+                        pass
 
             # Adaptive post-network buffer: check DOM stabilization
             from app.telemetry_state import get_telemetry_state
@@ -383,7 +384,8 @@ async def fetch_page_content(
                      }}""",
                     timeout=settle_timeout * 1000,
                 )
-            except Exception: pass
+            except Exception:
+                pass
             js_render_delay_ms = (time.time() - stabilization_start) * 1000
             telemetry.record_stabilization(domain, js_render_delay_ms)
 
@@ -396,10 +398,12 @@ async def fetch_page_content(
                     await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                     await asyncio.sleep(settings.PAGE_SCROLL_DELAY)
                     new_height = await page.evaluate("document.body.scrollHeight")
-                    if new_height == last_height: break
+                    if new_height == last_height:
+                        break
                     last_height = new_height
                     scroll_attempts += 1
-                if scroll_attempts > 0: intel.infinite_scroll_required = True
+                if scroll_attempts > 0:
+                    intel.infinite_scroll_required = True
                 await page.evaluate("window.scrollTo(0, 0)")
                 await asyncio.sleep(0.2)
 

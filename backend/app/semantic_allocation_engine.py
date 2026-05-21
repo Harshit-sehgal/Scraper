@@ -349,7 +349,8 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
                     # Now check pairs within nearby candidates (O(k²) where k << n)
                     for i, (c1, t1) in enumerate(candidates_in_bucket):
                         for c2, t2 in nearby_candidates:
-                            if c1 == c2: continue
+                            if c1 == c2:
+                                continue
                             dist = abs(t1.position - t2.position)
                             if dist < 50: # Physically close
                                 # Boost compatibility for both

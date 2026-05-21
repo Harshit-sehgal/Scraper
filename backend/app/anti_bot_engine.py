@@ -108,8 +108,10 @@ class AntiBotEngine:
             headers_lower = {k.lower(): str(v).lower() for k, v in headers.items()}
             # Look for common anti-bot headers
             server = headers_lower.get("server", "")
-            if "cloudflare" in server: max_score = max(max_score, 0.45)
-            if "akamai" in server: max_score = max(max_score, 0.55)
+            if "cloudflare" in server:
+                max_score = max(max_score, 0.45)
+            if "akamai" in server:
+                max_score = max(max_score, 0.55)
             
             # Check for set-cookie headers related to bot detection
             cookies = headers_lower.get("set-cookie", "")

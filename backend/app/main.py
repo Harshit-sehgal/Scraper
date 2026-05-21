@@ -36,6 +36,15 @@ from app.rate_limiter import RateLimiterMiddleware
 class URLPreviewRequest(BaseModel):
     """Request body for URL analysis."""
     url: str = Field(..., description="The URL to analyze for data extraction")
+    search_params: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Optional search parameters to submit to the site's search form if "
+            "the URL has expired (e.g. expired session token). Keys are semantic: "
+            "origin, destination, departure_date, return_date, adults, children. "
+            "Values are the search values (e.g. 'NYC', 'LHR', '05/15/2026')."
+        ),
+    )
 
 
 logger = logging.getLogger(__name__)
@@ -665,6 +674,11 @@ async def analyze_url(req: URLPreviewRequest):
     This is the "preview URL → suggest fields" step that lets users
     see what data is available before deciding what to scrape.
     
+    Note: A 120-second overall timeout is enforced to prevent hanging
+    connections. If the page takes too long to render or the LLM is
+    unresponsive, a clear timeout error is returned instead of a
+    connection reset / cryptic NetworkError on the frontend.
+    
     Returns:
         url: The analyzed URL
         page_structure: Type of structure (table|cards|list|mixed)
@@ -678,7 +692,30 @@ async def analyze_url(req: URLPreviewRequest):
     """
     from app.selector_discovery import analyze_url_for_fields
     
-    result = await analyze_url_for_fields(url=req.url)
+    URL_ANALYZER_TIMEOUT = 120  # seconds — overall timeout for the full analysis
+    
+    try:
+        result = await asyncio.wait_for(
+            analyze_url_for_fields(url=req.url, search_params=req.search_params),
+            timeout=URL_ANALYZER_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("[URLAnalyzer] Timeout after %ds analyzing %s", URL_ANALYZER_TIMEOUT, req.url)
+        return JSONResponse(
+            status_code=408,
+            content={
+                "url": req.url,
+                "error": f"Analysis timed out after {URL_ANALYZER_TIMEOUT} seconds. The page may be too slow, heavy, or protected by anti-bot measures.",
+                "redirect_info": None,
+                "content_quality": None,
+                "page_structure": "unknown",
+                "structure_confidence": 0.0,
+                "estimated_record_count": 0,
+                "item_container": None,
+                "suggested_fields": [],
+                "anti_bot_score": 0.0,
+            },
+        )
     
     if "error" in result and result["error"]:
         return JSONResponse(status_code=422, content=result)

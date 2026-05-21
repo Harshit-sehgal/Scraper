@@ -309,7 +309,8 @@ class GossipSubstrate:
                     elif hasattr(peer_provider, 'to_dict'):
                         # General gossip sync: exchange state
                         remote_state = peer_provider.to_dict()
-                        if hasattr(peer_provider, 'merge_state'):                                peer_provider.merge_state(remote_state)
+                        if hasattr(peer_provider, 'merge_state'):
+                            peer_provider.merge_state(remote_state)
                     success_count += 1
                     self.peer_health[peer_id].success_count += 1
                     self.peer_health[peer_id].last_seen = time.time()
