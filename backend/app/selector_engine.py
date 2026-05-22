@@ -176,11 +176,17 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
             patterns = [r'(?:\d+(?:\.\d+)?)\s*(?:[/|]?\s*\d+)?\s*(?:stars?|rating)?', r'\b(?:one|two|three|four|five)\b']
 
         if patterns:
+            n_lower = field_name.lower()
+            use_last = any(w in n_lower for w in ("return", "arrival", "arrive", "end", "to_", "dest"))
+            all_matches = []
             for pat in patterns:
                 for match in re_mod.finditer(pat, full_text, re_mod.IGNORECASE):
                     if not _is_span_used(match.start(), match.end()):
-                        used_spans.append((match.start(), match.end()))
-                        return match.group(0).strip()
+                        all_matches.append(match)
+            if all_matches:
+                chosen = all_matches[-1] if use_last else all_matches[0]
+                used_spans.append((chosen.start(), chosen.end()))
+                return chosen.group(0).strip()
             return None
 
     # Strategy 2: For untyped string fields, try child-text-node matching
@@ -223,13 +229,23 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
     # Strategy 5: Classify each unused child text and match to field by type
     if ftype is not None and ftype not in (FieldType.STRING, FieldType.LOCATION, FieldType.CODE):
         return None
+    n_lower = field_name.lower()
+    use_last = any(w in n_lower for w in ("return", "arrival", "arrive", "end", "to_", "dest"))
+    best_match = None
     for idx, ct in enumerate(child_texts):
         if idx in used_child_indices:
             continue
         classification = _classify_text_value(ct)
         if _field_matches_classification(field_name, classification):
-            used_child_indices.add(idx)
-            return ct.strip()
+            if use_last:
+                best_match = (idx, ct)
+            else:
+                used_child_indices.add(idx)
+                return ct.strip()
+    if use_last and best_match:
+        idx, ct = best_match
+        used_child_indices.add(idx)
+        return ct.strip()
 
     return None
 
@@ -268,14 +284,15 @@ def _field_matches_classification(field_name: str, classification: str) -> bool:
     mapping = {
         "date": ("date", "day", "departure_date", "return_date", "arrival_date", "travel_date"),
         "currency": ("price", "cost", "fare", "amount", "fee", "total"),
-        "code": ("code", "flight_number", "airport_code", "identifier", "ref", "sku"),
         "stops": ("stops", "stop", "layover", "connection"),
         "cabin_class": ("class", "cabin", "seat_class", "travel_class"),
         "name": ("airline", "name", "title", "carrier", "operator", "provider", "company"),
         "location": ("city", "location", "place", "area", "departure_city", "arrival_city", "origin", "destination"),
-        "text": (),
+        "code": ("code", "flight_number", "airport_code", "identifier", "ref", "sku"),
     }
     keywords = mapping.get(classification, ())
+    if classification == "code":
+        keywords = keywords + mapping.get("location", ())
     return any(kw in n for kw in keywords)
 
 
