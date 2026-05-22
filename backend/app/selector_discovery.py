@@ -313,7 +313,7 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:
             if _re.search(r"\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)
         )
         text_diversity = len(set(t[:40] for t in non_empty))
-        score = len(elements) * 1 + data_signals * 6 + date_signals * 3 + avg_text_len * 0.03 + text_diversity * 2
+        score = len(elements) * 2 + data_signals * 2 + date_signals * 2 + avg_text_len * 0.03 + text_diversity * 2
         if avg_text_len < 50:
             continue
         candidates.append({

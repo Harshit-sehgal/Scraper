@@ -114,8 +114,8 @@ async def scrape_url(
             profile_match = len(profile_keys & schema_keys) / max(len(profile_keys), 1)
             if schema_match < 0.6 or profile_match < 0.5:
                 logger.info(
-                    "Profile field names (%.0f%%) don't match schema — falling through to generic pipeline",
-                    key_match * 100,
+                    "Profile field names don't match schema (s=%.0f%% p=%.0f%%) — falling through to generic pipeline",
+                    schema_match * 100, profile_match * 100,
                 )
             else:
                 profile_field_defs = (matched_profile or {}).get("fields") if matched_profile else None
