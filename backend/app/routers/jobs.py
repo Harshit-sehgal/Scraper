@@ -125,6 +125,7 @@ def create_jobs_router(
             schema_fields=job_data.schema_fields,
             filters=job_data.filters,
             selectors_map=job_data.selectors_map,
+            search_params=job_data.search_params,
             pagination=job_data.pagination,
             max_pages=job_data.max_pages,
             deduplicate=job_data.deduplicate,

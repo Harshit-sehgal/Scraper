@@ -160,6 +160,7 @@ async def run_job(
                             world_state=ws,
                             max_recovery_attempts=settings.MAX_RECOVERY_ATTEMPTS,
                             selectors_map=job.selectors_map,
+                            search_params=job.search_params,
                         ),
                         timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
                     )

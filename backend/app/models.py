@@ -120,6 +120,7 @@ class JobCreate(BaseModel):
     deduplicate_field: str = Field("", description="Field to use for deduplication")
     # Selectors map from URL analysis (item_container + field selectors)
     selectors_map: dict = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
+    search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
     min_record_score: float = Field(0.35, ge=0.0, le=1.0, description="Minimum quality score required per extracted record")
 
     @model_validator(mode="after")
@@ -187,6 +188,7 @@ class Job(BaseModel):
     min_record_score: float = 0.35
     # Selectors map from URL analysis (pre-discovered CSS selectors)
     selectors_map: dict = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
+    search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
     cancel_requested: bool = False
     status: JobStatus = JobStatus.PENDING
     created_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())

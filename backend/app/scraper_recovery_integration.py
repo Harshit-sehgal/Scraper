@@ -40,6 +40,7 @@ async def scrape_url_with_recovery(
     world_state=None,
     max_recovery_attempts: int = settings.MAX_RECOVERY_ATTEMPTS,
     selectors_map: dict | None = None,
+    search_params: dict[str, str] | None = None,
 ) -> tuple[list[dict], dict]:
     """Scrape a URL with intelligent failure recovery.
     
@@ -51,6 +52,7 @@ async def scrape_url_with_recovery(
         world_state: Semantic world state for tracking
         max_recovery_attempts: Maximum recovery attempts before giving up
         selectors_map: Pre-discovered CSS selectors map from URL analysis
+        search_params: Optional search parameters for session-bound URL recovery
         
     Returns:
         Tuple of (results, recovery_stats) where:
@@ -111,6 +113,7 @@ async def scrape_url_with_recovery(
                     user_intent=user_intent,
                     world_state=world_state,
                     selectors_map=selectors_map,
+                    search_params=search_params,
                 )
             
             # Since scrape_url catches exceptions and returns [], 
