@@ -12,7 +12,7 @@ def normalize_scraped_record(record: dict, schema_fields: list[SchemaField]) -> 
         else:
             normalized[field.name] = val
     # Preserve metadata fields needed for source breakdown and tracking
-    for mf in ("source_type", "source_url", "source_trust_score", "record_score", "_key"):
+    for mf in ("source_type", "source_url", "source_trust_score", "record_score", "_key", "_extraction_method"):
         if mf in record:
             normalized[mf] = record[mf]
     return normalized
@@ -244,7 +244,7 @@ def align_extracted_keys_to_schema(
     for r in raw_records:
         aligned = {}
         for pk, val in r.items():
-            if pk.startswith("_"):
+            if pk.startswith("_") and pk != "_extraction_method":
                 continue
             if pk in mapping:
                 aligned[mapping[pk]] = val
