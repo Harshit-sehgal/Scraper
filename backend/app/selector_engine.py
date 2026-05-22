@@ -64,26 +64,21 @@ def build_selector_field_metadata(
 
 
 def _collect_child_text_nodes(node) -> list[str]:
-    """Extract individual text chunks from direct child elements of a container.
+    """Extract individual text chunks from all leaf-level descendant elements.
     
-    Instead of concatenating all text, returns distinct text values from
-    each leaf-level child element. This preserves value boundaries for
-    multi-value containers (e.g., separate departure_date and return_date).
+    Walks the entire DOM subtree collecting text from elements that have
+    NO child elements of their own (leaf nodes). This preserves individual
+    value boundaries for multi-value containers.
     """
     texts: list[str] = []
-    for child in node.find_all(True, recursive=False):
-        if child.name in ("script", "style", "noscript", "svg"):
+    for el in node.find_all(True):
+        if el.name in ("script", "style", "noscript", "svg", "meta", "link"):
             continue
-        inner = [c for c in child.find_all(True, recursive=False) if c.name not in ("script", "style", "noscript", "svg")]
-        if not inner:
-            t = child.get_text(separator=" ", strip=True)
-            if t and len(t) > 0:
+        children = [c for c in el.find_all(True, recursive=False) if c.name not in ("script", "style", "noscript", "svg", "meta", "link")]
+        if not children:
+            t = el.get_text(separator=" ", strip=True)
+            if t:
                 texts.append(t)
-        else:
-            for sub in inner:
-                t = sub.get_text(separator=" ", strip=True)
-                if t and len(t) > 0:
-                    texts.append(t)
     if not texts:
         full = node.get_text(separator=" ", strip=True)
         if full:
@@ -105,15 +100,15 @@ def _infer_field_type_from_name(field_name: str) -> FieldType | None:
     if not n:
         return None
     type_keywords = {
-        FieldType.CURRENCY: ("price", "cost", "fare", "amount", "fee", "total", "rate", "value", "sum"),
+        FieldType.CURRENCY: ("price", "cost", "fare", "amount", "fee", "total", "rate", "value", "sum", "charge", "payment"),
         FieldType.EMAIL: ("email", "mail", "e-mail", "contact", "e_mail"),
-        FieldType.PHONE: ("phone", "tel", "mobile", "cell", "contact_no", "telephone"),
+        FieldType.PHONE: ("phone", "tel", "mobile", "cell", "contact_no", "telephone", "contact_number"),
         FieldType.URL: ("url", "link", "href", "website", "profile_url", "source"),
-        FieldType.DATE: ("date", "day", "due", "created", "updated", "published", "departure_date", "return_date"),
-        FieldType.NUMBER: ("count", "quantity", "qty", "stock", "rank", "position", "index", "num"),
-        FieldType.RATING: ("rating", "score", "stars", "review_score", "grade"),
-        FieldType.LOCATION: ("location", "address", "city", "country", "region", "state", "place", "area"),
-        FieldType.CODE: ("code", "id", "ref", "flight_number", "sku", "isbn", "upc", "airport_code", "identifier"),
+        FieldType.DATE: ("_date", "date_", " day ", "_day", "checkin", "checkout", "created_", "updated_", "published_", "due_date"),
+        FieldType.NUMBER: ("count", "quantity", "qty", "stock", "rank", "position", "index", "num", "adults", "children", "infants", "passengers", "seats", "rooms"),
+        FieldType.RATING: ("rating", "score", "stars", "review_score", "grade", "review"),
+        FieldType.LOCATION: ("location", "address", "city", "country", "region", "state", "place", "area", "origin_", "destination_", "_from", "_to"),
+        FieldType.CODE: ("code", "id", "ref", "flight_number", "sku", "isbn", "upc", "identifier", "flight_no", "ref_no"),
     }
     for ftype, keywords in type_keywords.items():
         if any(kw in n for kw in keywords):
@@ -179,27 +174,33 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
             patterns = [r'-?\d+(?:\.\d+)?']
         elif ftype == FieldType.RATING:
             patterns = [r'(?:\d+(?:\.\d+)?)\s*(?:[/|]?\s*\d+)?\s*(?:stars?|rating)?', r'\b(?:one|two|three|four|five)\b']
-        elif ftype == FieldType.LOCATION:
-            patterns = [r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}\b']
-        elif ftype == FieldType.CODE:
-            patterns = [r'\b[A-Z0-9]{2,6}\b']
 
-        for pat in patterns:
-            for match in re_mod.finditer(pat, full_text, re_mod.IGNORECASE):
-                if not _is_span_used(match.start(), match.end()):
-                    used_spans.append((match.start(), match.end()))
-                    return match.group(0).strip()
-        return None
+        if patterns:
+            for pat in patterns:
+                for match in re_mod.finditer(pat, full_text, re_mod.IGNORECASE):
+                    if not _is_span_used(match.start(), match.end()):
+                        used_spans.append((match.start(), match.end()))
+                        return match.group(0).strip()
+            return None
 
     # Strategy 2: For untyped string fields, try child-text-node matching
     child_texts = _collect_child_text_nodes(node)
     if child_texts and field_name:
         name_lower = field_name.lower().replace("_", " ")
+        name_parts = name_lower.split()
         for idx, ct in enumerate(child_texts):
             if idx in used_child_indices:
                 continue
             ct_lower = ct.lower()
             if name_lower in ct_lower:
+                used_child_indices.add(idx)
+                return ct.strip()
+            for part in name_parts:
+                if len(part) > 2 and part in ct_lower:
+                    used_child_indices.add(idx)
+                    return ct.strip()
+            singular = name_lower.rstrip("s")
+            if len(singular) > 2 and singular in ct_lower:
                 used_child_indices.add(idx)
                 return ct.strip()
 
@@ -219,16 +220,63 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
                 if window:
                     return window
 
-    # Strategy 5: For string fields, assign unused child text nodes positionally
-    if ftype == FieldType.STRING or ftype is None:
-        for idx, ct in enumerate(child_texts):
-            if idx in used_child_indices:
-                continue
-            if len(ct) > 3 and not re_mod.search(r'^[\d\s,.\-/£$€¥₹]+$', ct):
-                used_child_indices.add(idx)
-                return ct.strip()
+    # Strategy 5: Classify each unused child text and match to field by type
+    if ftype is not None and ftype not in (FieldType.STRING, FieldType.LOCATION, FieldType.CODE):
+        return None
+    for idx, ct in enumerate(child_texts):
+        if idx in used_child_indices:
+            continue
+        classification = _classify_text_value(ct)
+        if _field_matches_classification(field_name, classification):
+            used_child_indices.add(idx)
+            return ct.strip()
 
     return None
+
+
+def _classify_text_value(text: str) -> str:
+    """Classify a text value into a semantic category."""
+    import re as _re
+    t = text.strip()
+    if not t:
+        return "empty"
+    if _re.match(r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$', t):
+        return "date"
+    if _re.match(r'^\d{4}-\d{2}-\d{2}$', t):
+        return "date"
+    if _re.match(r'^[\$£€¥₹]\s*\d[\d,.]*$', t):
+        return "currency"
+    if _re.match(r'^[A-Z]{3,4}$', t):
+        return "code"
+    if _re.match(r'^\d+\s*[Ss]top', t):
+        return "stops"
+    lower = t.lower()
+    if any(w in lower for w in ("direct", "non-stop", "nonstop", "connecting")):
+        return "stops"
+    if any(w in lower for w in ("economy", "business", "first class", "premium", "coach")):
+        return "cabin_class"
+    if _re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){2,}$', t):
+        return "location"
+    if _re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$', t) and len(t) > 1:
+        return "name"
+    return "text"
+
+
+def _field_matches_classification(field_name: str, classification: str) -> bool:
+    """Check if a field name is compatible with a text classification."""
+    n = field_name.lower()
+    mapping = {
+        "date": ("date", "day", "departure_date", "return_date", "arrival_date", "travel_date"),
+        "currency": ("price", "cost", "fare", "amount", "fee", "total"),
+        "code": ("code", "flight_number", "airport_code", "identifier", "ref", "sku"),
+        "stops": ("stops", "stop", "layover", "connection"),
+        "cabin_class": ("class", "cabin", "seat_class", "travel_class"),
+        "name": ("airline", "name", "title", "carrier", "operator", "provider", "company"),
+        "location": ("city", "location", "place", "area", "departure_city", "arrival_city", "origin", "destination"),
+        "text": (),
+    }
+    keywords = mapping.get(classification, ())
+    return any(kw in n for kw in keywords)
 
 
 def _extract_context_window(text: str, keywords: list[str], max_len: int | None = None) -> str | None:

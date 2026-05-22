@@ -74,10 +74,12 @@ Input Data:
 
 Rules:
 1. Return ONLY a JSON list of objects matching the schema.
-2. Fix typos, normalize capitalization.
-3. Infer missing fields from available text where obvious.
-4. Use null for truly missing data.
-"""
+2. Fix typos, normalize capitalization and whitespace.
+3. Remove noise values — if a field contains a concatenation of multiple
+   data points (e.g. city name + airport code + date all in one field),
+   extract only the most relevant part for that field's type.
+4. Use null for truly missing data. Do NOT guess or invent values.
+5. Preserve existing values unless they are clearly noise or misassigned."""
 
         try:
             messages = [
