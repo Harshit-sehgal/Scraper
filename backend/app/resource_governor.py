@@ -11,8 +11,10 @@ Provides:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +23,9 @@ logger = logging.getLogger(__name__)
 class ResourceBudgets:
     """Configurable resource caps to guarantee system longevity under high load."""
     max_browser_memory_mb: float = 1024.0
-    max_retry_depth: int = 3
+    max_retry_depth: int = field(default_factory=lambda: settings.MAX_RECOVERY_ATTEMPTS)
     max_queue_size: int = 1000
-    max_telemetry_records: int = 500
+    max_telemetry_records: int = field(default_factory=lambda: settings.TELEMETRY_STREAM_MAXLEN)
     max_token_spend: float = 5.0  # Dollar limit
 
 

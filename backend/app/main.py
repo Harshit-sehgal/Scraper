@@ -240,7 +240,7 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limiter.middleware)
 async def _periodic_gossip_propagation():
     """Propagate gossip state every 60 seconds."""
     while True:
-        await asyncio.sleep(60)
+        await asyncio.sleep(settings.GOSSIP_PROPAGATION_INTERVAL)
         try:
             if gossip is not None:
                 propagated = gossip.propagate_state_via_gossip(heartbeat_manager=heartbeat_mgr)

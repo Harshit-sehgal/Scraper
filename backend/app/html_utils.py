@@ -405,7 +405,7 @@ async def fetch_page_content(
                 if scroll_attempts > 0:
                     intel.infinite_scroll_required = True
                 await page.evaluate("window.scrollTo(0, 0)")
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(settings.POST_SCROLL_RESET_DELAY)
 
         except Exception as e:
             logger.warning("[Scraper] %s slow load for %s: %s. Continuing with fallback", strategy.value, url, e)

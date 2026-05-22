@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     """Ms to wait for each common loading indicator to disappear."""
     PAGE_SCROLL_DELAY: float = 0.5
     """Seconds to wait after auto-scrolling to trigger lazy loaders."""
+    POST_SCROLL_RESET_DELAY: float = 0.2
+    """Seconds to wait after resetting scroll position to top."""
     MAX_SCROLL_ATTEMPTS: int = 3
     """Maximum number of sequential scrolls for infinite-scroll pages."""
     PLAYWRIGHT_STEALTH: bool = True
