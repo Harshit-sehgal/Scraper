@@ -108,22 +108,31 @@ async def scrape_url(
             len(profile_results), url,
         )
         if profile_results:
-            profile_field_defs = (matched_profile or {}).get("fields") if matched_profile else None
-            results = process_raw_records(
-                profile_results,
-                schema_fields,
-                min_record_score,
-                profile_fields=profile_field_defs,
-                user_intent=user_intent,
-            )
-            telemetry.record(
-                url=url,
-                profile_match=True,
-                profile_records=len(profile_results),
-                records_final=len(results),
-                fetch_ms=(time.time() - start_time) * 1000,
-            )
-            return results
+            profile_keys = {k.lower() for r in profile_results for k in r if not k.startswith("_")}
+            schema_keys = {f.name.lower() for f in schema_fields}
+            key_match = len(profile_keys & schema_keys) / max(len(schema_keys), 1)
+            if key_match < 0.5:
+                logger.info(
+                    "Profile field names (%.0f%%) don't match schema — falling through to generic pipeline",
+                    key_match * 100,
+                )
+            else:
+                profile_field_defs = (matched_profile or {}).get("fields") if matched_profile else None
+                results = process_raw_records(
+                    profile_results,
+                    schema_fields,
+                    min_record_score,
+                    profile_fields=profile_field_defs,
+                    user_intent=user_intent,
+                )
+                telemetry.record(
+                    url=url,
+                    profile_match=True,
+                    profile_records=len(profile_results),
+                    records_final=len(results),
+                    fetch_ms=(time.time() - start_time) * 1000,
+                )
+                return results
 
         logger.info("Profile matched but returned 0 records, falling through to generic pipeline")
 
