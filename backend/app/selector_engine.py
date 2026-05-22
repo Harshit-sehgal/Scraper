@@ -63,6 +63,39 @@ def build_selector_field_metadata(
     return meta
 
 
+def _collect_child_text_nodes(node) -> list[str]:
+    """Extract individual text chunks from direct child elements of a container.
+    
+    Instead of concatenating all text, returns distinct text values from
+    each leaf-level child element. This preserves value boundaries for
+    multi-value containers (e.g., separate departure_date and return_date).
+    """
+    texts: list[str] = []
+    for child in node.find_all(True, recursive=False):
+        if child.name in ("script", "style", "noscript", "svg"):
+            continue
+        inner = [c for c in child.find_all(True, recursive=False) if c.name not in ("script", "style", "noscript", "svg")]
+        if not inner:
+            t = child.get_text(separator=" ", strip=True)
+            if t and len(t) > 0:
+                texts.append(t)
+        else:
+            for sub in inner:
+                t = sub.get_text(separator=" ", strip=True)
+                if t and len(t) > 0:
+                    texts.append(t)
+    if not texts:
+        full = node.get_text(separator=" ", strip=True)
+        if full:
+            texts = [full]
+    return texts
+
+
+def _find_text_at_position(full_text: str, start: int, end: int) -> bool:
+    """Check if a character range overlaps with text content."""
+    return start >= 0 and end <= len(full_text)
+
+
 def _infer_field_type_from_name(field_name: str) -> FieldType | None:
     """Infer a FieldType from a field key name using general heuristics.
     
@@ -88,14 +121,21 @@ def _infer_field_type_from_name(field_name: str) -> FieldType | None:
     return None
 
 
-def _extract_field_by_pattern(node, sel_entry, field_name: str = "") -> str | None:
+def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans: list[tuple[int, int]] | None = None, used_child_indices: set | None = None) -> str | None:
     """Fallback: extract field value from a container node when CSS selector is missing.
     
-    Uses the field's example_value to locate matching text, then applies
-    type-aware patterns for extraction. Falls back to key-name-based type
-    inference when sel_entry has no type metadata.
+    Args:
+        node: BeautifulSoup node (container element)
+        sel_entry: Field selector entry (dict or string)
+        field_name: Name of the field being extracted
+        used_spans: List of (start, end) character ranges already consumed
+        used_child_indices: Set of child text node indices already consumed
     """
     import re as re_mod
+    if used_spans is None:
+        used_spans = []
+    if used_child_indices is None:
+        used_child_indices = set()
     full_text = node.get_text(separator=" ", strip=True)
     if not full_text:
         return None
@@ -112,47 +152,63 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "") -> str | No
     if ftype is None:
         ftype = _infer_field_type_from_name(field_name)
 
-    # Strategy 1: Type-based regex extraction
+    def _is_span_used(match_start: int, match_end: int) -> bool:
+        for us, ue in used_spans:
+            if match_start < ue and match_end > us:
+                return True
+        return False
+
+    # Strategy 1: Type-based regex extraction with uniqueness
     if ftype is not None:
+        patterns: list[str] = []
         if ftype == FieldType.CURRENCY:
-            match = re_mod.search(r'(?:[$£€¥₹]|USD\s*|EUR\s*)\s*\d[\d,.]*', full_text)
-            return match.group(0).strip() if match else None
-        if ftype == FieldType.EMAIL:
-            match = re_mod.search(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', full_text)
-            return match.group(0).strip() if match else None
-        if ftype == FieldType.PHONE:
-            match = re_mod.search(r'[\d\s\-()+]{7,20}', full_text)
-            return match.group(0).strip() if match else None
-        if ftype == FieldType.URL:
-            match = re_mod.search(r'https?://[^\s]+', full_text)
-            return match.group(0).strip() if match else None
-        if ftype == FieldType.DATE:
+            patterns = [r'(?:[$£€¥₹]|USD\s*|EUR\s*)\s*\d[\d,.]*']
+        elif ftype == FieldType.EMAIL:
+            patterns = [r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+']
+        elif ftype == FieldType.PHONE:
+            patterns = [r'[\d\s\-()+]{7,20}']
+        elif ftype == FieldType.URL:
+            patterns = [r'https?://[^\s]+']
+        elif ftype == FieldType.DATE:
             patterns = [
                 r'\d{1,2}[-/]\d{1,2}[-/]\d{2,4}',
                 r'\d{4}-\d{2}-\d{2}',
                 r'\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}',
             ]
-            for pat in patterns:
-                match = re_mod.search(pat, full_text, re_mod.IGNORECASE)
-                if match:
-                    return match.group(0).strip()
-            return None
-        if ftype == FieldType.NUMBER:
-            match = re_mod.search(r'-?\d+(?:\.\d+)?', full_text)
-            return match.group(0).strip() if match else None
-        if ftype == FieldType.RATING:
-            match = re_mod.search(r'(?:\d+(?:\.\d+)?)\s*(?:[/|]?\s*\d+)?\s*(?:stars?|rating)?', full_text, re_mod.IGNORECASE)
-            if match:
-                return match.group(0).strip()
-            match = re_mod.search(r'\b(?:one|two|three|four|five)\b', full_text, re_mod.IGNORECASE)
-            return match.group(0).strip() if match else None
+        elif ftype == FieldType.NUMBER:
+            patterns = [r'-?\d+(?:\.\d+)?']
+        elif ftype == FieldType.RATING:
+            patterns = [r'(?:\d+(?:\.\d+)?)\s*(?:[/|]?\s*\d+)?\s*(?:stars?|rating)?', r'\b(?:one|two|three|four|five)\b']
+        elif ftype == FieldType.LOCATION:
+            patterns = [r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}\b']
+        elif ftype == FieldType.CODE:
+            patterns = [r'\b[A-Z0-9]{2,6}\b']
 
-    # Strategy 2: Search for the example value literally
+        for pat in patterns:
+            for match in re_mod.finditer(pat, full_text, re_mod.IGNORECASE):
+                if not _is_span_used(match.start(), match.end()):
+                    used_spans.append((match.start(), match.end()))
+                    return match.group(0).strip()
+        return None
+
+    # Strategy 2: For untyped string fields, try child-text-node matching
+    child_texts = _collect_child_text_nodes(node)
+    if child_texts and field_name:
+        name_lower = field_name.lower().replace("_", " ")
+        for idx, ct in enumerate(child_texts):
+            if idx in used_child_indices:
+                continue
+            ct_lower = ct.lower()
+            if name_lower in ct_lower:
+                used_child_indices.add(idx)
+                return ct.strip()
+
+    # Strategy 3: Search for the example value literally
     if example and len(example) > 2:
         if example.lower() in full_text.lower():
             return example.strip()
 
-    # Strategy 3: Fuzzy example match — try word-level matching for multi-word examples
+    # Strategy 4: Fuzzy example match
     if example and len(example) > 2:
         example_words = example.lower().split()
         if settings.SELECTOR_FUZZY_MIN_WORDS <= len(example_words) <= settings.SELECTOR_FUZZY_MAX_WORDS:
@@ -162,6 +218,15 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "") -> str | No
                 window = _extract_context_window(full_text, example_words)
                 if window:
                     return window
+
+    # Strategy 5: For string fields, assign unused child text nodes positionally
+    if ftype == FieldType.STRING or ftype is None:
+        for idx, ct in enumerate(child_texts):
+            if idx in used_child_indices:
+                continue
+            if len(ct) > 3 and not re_mod.search(r'^[\d\s,.\-/£$€¥₹]+$', ct):
+                used_child_indices.add(idx)
+                return ct.strip()
 
     return None
 
@@ -225,6 +290,8 @@ def extract_raw_from_selectors(
     raw_records: list[dict] = []
     for node in containers:
         record: dict = {}
+        used_spans: list[tuple[int, int]] = []
+        used_child_indices: set = set()
         for key, sel_entry in field_sels.items():
             sel = _selector_css(sel_entry)
             val = None
@@ -242,7 +309,7 @@ def extract_raw_from_selectors(
                 except Exception as e:
                     logger.debug("[SelectorEngine] Invalid selector '%s' for %s: %s", sel, key, e)
             else:
-                val = _extract_field_by_pattern(node, sel_entry, key)
+                val = _extract_field_by_pattern(node, sel_entry, key, used_spans, used_child_indices)
             if isinstance(sel_entry, dict) and sel_entry.get("type") == "currency" and val:
                 from app.selector_profiles.loader import _postprocess_field
                 val = _postprocess_field(val, sel_entry)
