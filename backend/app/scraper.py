@@ -110,8 +110,9 @@ async def scrape_url(
         if profile_results:
             profile_keys = {k.lower() for r in profile_results for k in r if not k.startswith("_")}
             schema_keys = {f.name.lower() for f in schema_fields}
-            key_match = len(profile_keys & schema_keys) / max(len(schema_keys), 1)
-            if key_match < 0.5:
+            schema_match = len(profile_keys & schema_keys) / max(len(schema_keys), 1)
+            profile_match = len(profile_keys & schema_keys) / max(len(profile_keys), 1)
+            if schema_match < 0.6 or profile_match < 0.5:
                 logger.info(
                     "Profile field names (%.0f%%) don't match schema — falling through to generic pipeline",
                     key_match * 100,
