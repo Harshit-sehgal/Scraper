@@ -98,7 +98,7 @@ def calculate_extraction_accuracy(
         metrics.f1_score = 2 * (metrics.precision * metrics.recall) / (metrics.precision + metrics.recall)
 
     # 3. Completeness & Schema Conformity
-    metrics.completeness = min(1.0, len(extracted) / len(expected))
+    metrics.completeness = min(1.0, len(extracted) / max(1, len(expected)))
     
     # Per-field accuracy
     for k in field_totals:

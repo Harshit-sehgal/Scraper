@@ -453,7 +453,7 @@ class StrategyEvolutionEngine:
         return {
             "total_domains": len(self.domain_states),
             "domains": domains_report,
-            "avg_success_rate": round(total_success_rate / len(self.domain_states), 3),
+            "avg_success_rate": round(total_success_rate / max(1, len(self.domain_states)), 3),
         }
 
 
