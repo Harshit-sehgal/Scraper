@@ -236,14 +236,18 @@ async def orchestrate_extraction(
     preferred = intel.preferred_strategy
 
     if preferred == "regex":
-        # Jump straight to regex if it's historically successful
         if intel.success_count > 3 or intel.anti_bot_risk > 0.7:
             logger.info("[Orchestrator] Selecting proven REGEX strategy for %s", url)
             regex_results = extract_with_regex(html, schema_fields, base_url=url)
             if regex_results:
-                _record_field_provenance(regex_results, ExtractionMethod.REGEX)
-                return ExtractionResult(regex_results, "regex")
-            logger.info("[Orchestrator] Preferred REGEX failed, falling through to cascade")
+                scores = [r.get("record_score", 0.0) for r in regex_results]
+                avg = sum(scores) / len(scores) if scores else 0.0
+                if avg >= gate_threshold:
+                    _record_field_provenance(regex_results, ExtractionMethod.REGEX)
+                    return ExtractionResult(regex_results, "regex")
+                logger.info("[Orchestrator] Preferred REGEX returned low quality (avg: %.2f), falling through to cascade", avg)
+            else:
+                logger.info("[Orchestrator] Preferred REGEX failed, falling through to cascade")
 
     # ── Layer 2: Provided Selectors (from URL Analysis) ───────────────
     # If the user analyzed the URL via the URL Analyzer, we have pre-discovered

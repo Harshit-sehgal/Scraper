@@ -227,7 +227,7 @@ async def run_job(
 
         if run_global_ai_structuring and all_raw_results:
             avg_score = sum(r.get("record_score", 0) for r in all_raw_results) / len(all_raw_results)
-            if avg_score > 0.4:
+            if avg_score > 0.85:
                 _add_job_log(job, f"Skipping AI structuring — extraction quality sufficient (avg score: {avg_score:.2f})", persist_fn=persist_state_fn)
                 run_global_ai_structuring = False
 
