@@ -197,6 +197,8 @@ def align_extracted_keys_to_schema(
         return raw_records
 
     profile_keys = [k for k in raw_records[0].keys() if not k.startswith("_")]
+    if "_extraction_method" in raw_records[0]:
+        profile_keys.append("_extraction_method")
     if not profile_keys:
         return raw_records
 
@@ -249,6 +251,8 @@ def align_extracted_keys_to_schema(
             if pk in mapping:
                 aligned[mapping[pk]] = val
             elif pk in schema_names:
+                aligned[pk] = val
+            elif pk == "_extraction_method":
                 aligned[pk] = val
         aligned_records.append(aligned)
 
