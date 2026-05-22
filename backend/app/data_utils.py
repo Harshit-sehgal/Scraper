@@ -209,9 +209,14 @@ def align_extracted_keys_to_schema(
             intent_boost_fields |= keywords_to_tokens(kws)
 
     candidates: list[tuple[float, str, str]] = []
+    schema_name_set = {f.name.lower(): f.name for f in schema_fields}
     for pk in profile_keys:
         pk_cfg = selector_field_defs.get(pk) if isinstance(selector_field_defs.get(pk), dict) else None
         pk_tokens = _get_word_tokens(pk)
+        pk_lower = pk.lower()
+        if pk_lower in schema_name_set:
+            candidates.append((float('inf'), pk, schema_name_set[pk_lower]))
+            continue
         for sf in schema_fields:
             sc = _alignment_score(pk, sf, pk_cfg)
             sf_tokens = _get_word_tokens(sf.name)
@@ -290,5 +295,7 @@ def process_raw_records(
     results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * settings.RECORD_ACCEPTANCE_FACTOR)]
     results = _dedupe_records(results, schema_fields)
     results = _limit_source_records(results, schema_fields)
-    results = run_pipeline(results, [f.name for f in schema_fields])
+    avg_score = sum(r.get("record_score", 0) for r in results) / max(len(results), 1)
+    if avg_score < 0.5 and results:
+        results = run_pipeline(results, [f.name for f in schema_fields])
     return results
