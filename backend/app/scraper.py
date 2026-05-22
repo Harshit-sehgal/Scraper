@@ -273,6 +273,8 @@ async def scrape_url(
         provided_selectors=selectors_map,
     )
     results = ext_result.records
+    for r in results:
+        r["_extraction_method"] = ext_result.method
     
     # Track extraction method in provenance
     provenance_builder.set_extraction_method(ext_result.method)

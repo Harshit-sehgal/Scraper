@@ -226,9 +226,9 @@ async def run_job(
         )
 
         if run_global_ai_structuring and all_raw_results:
-            avg_score = sum(r.get("record_score", 0) for r in all_raw_results) / len(all_raw_results)
-            if avg_score > 0.85:
-                _add_job_log(job, f"Skipping AI structuring — extraction quality sufficient (avg score: {avg_score:.2f})", persist_fn=persist_state_fn)
+            ext_methods = set(a.get("_extraction_method", "") for a in all_raw_results if isinstance(a, dict))
+            if ext_methods and "" not in ext_methods and "regex" not in ext_methods:
+                _add_job_log(job, "Skipping AI structuring — records extracted via structured method (not regex)", persist_fn=persist_state_fn)
                 run_global_ai_structuring = False
 
         if job.cancel_requested:
