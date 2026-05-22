@@ -78,7 +78,6 @@ def _collect_child_text_nodes(node) -> list[str]:
             if t:
                 texts.append(t)
     if len(texts) < 8:
-        import re as _re
         full = node.get_text(separator="|", strip=True)
         if full:
             parts = [p.strip() for p in full.split("|") if p.strip() and len(p.strip()) > 1]
