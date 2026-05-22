@@ -334,7 +334,6 @@ def _classify_with_ambiguity(raw: str, primary_type: SemanticType) -> Dict[Seman
 def _clean_value(raw: str, ctype: object) -> str:
     """Clean a candidate value based on type (accepts str or SemanticType)."""
     # Normalize to string for comparison if needed, but prefer enum
-    from app.semantic_segmentation import sem_type_str
     ctype_str = sem_type_str(ctype)
     
     if ctype_str == "price":

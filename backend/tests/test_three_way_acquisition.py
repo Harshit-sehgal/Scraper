@@ -116,7 +116,7 @@ class TestThreeWayAcquisition:
              patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot, \
              patch("app.page_profiler.detect_page_structure") as mock_structure, \
              patch("app.page_profiler.detect_value_patterns") as mock_patterns, \
-             patch("app.llm_bridge.llm_json") as mock_llm, \
+             patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm, \
              patch("httpx.AsyncClient") as mock_httpx_client, \
              patch("app.selector_discovery.get_acquisition_telemetry", return_value=telemetry):
 
@@ -185,7 +185,7 @@ class TestThreeWayAcquisition:
              patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot, \
              patch("app.page_profiler.detect_page_structure") as mock_structure, \
              patch("app.page_profiler.detect_value_patterns") as mock_patterns, \
-             patch("app.llm_bridge.llm_json") as mock_llm, \
+             patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm, \
              patch("httpx.AsyncClient") as mock_httpx_client, \
              patch("app.selector_discovery.get_acquisition_telemetry", return_value=telemetry), \
              patch("app.selector_discovery.detect_session_params") as mock_session:
@@ -257,9 +257,9 @@ class TestThreeWayAcquisition:
              patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot, \
              patch("app.page_profiler.detect_page_structure") as mock_structure, \
              patch("app.page_profiler.detect_value_patterns") as mock_patterns, \
-             patch("app.llm_bridge.llm_json") as mock_llm, \
+             patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm, \
              patch("httpx.AsyncClient") as mock_httpx_client, \
-             patch("app.selector_discovery._try_form_search_recovery") as mock_recovery, \
+             patch("app.selector_discovery._try_form_search_recovery", new_callable=AsyncMock) as mock_recovery, \
              patch("app.selector_discovery._detect_search_form") as mock_form_detect, \
              patch("app.selector_discovery.get_acquisition_telemetry", return_value=telemetry), \
              patch("app.selector_discovery.detect_session_params") as mock_session:

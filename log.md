@@ -541,14 +541,14 @@ without per-element CSS selectors, text ordering determines assignment.
 
 | Check | Result |
 |-------|--------|
-| Full test suite | **1249 passed** |
+| Full test suite | **1458 passed** (1 API rate-limited integration test excluded) |
 | mypy | **0 errors** |
 | pyflakes | **0 issues** |
 | compileall | **clean** |
 | frontend JS | **valid** |
 | shell scripts | **valid** |
 | git tree | **clean** |
-| Total commits | **26** |
+| Total commits | **27** |
 
 ---
 
@@ -563,10 +563,49 @@ without per-element CSS selectors, text ordering determines assignment.
 | Modified HTML/CSS files | 3 |
 | Config files | 1 |
 | Shell scripts | 3 |
-| Total bugs fixed | 32 |
+| Total bugs fixed | 35 |
 | Annotations fixed (E701/E702) | 58 |
 | Hardcoded values eliminated | ~70 |
-| Total tests | 1249 |
+| Total tests | 1458 |
+
+---
+
+---
+
+## Pass 11 — Test Reliability & Constants Deduplication
+
+### Bugs Fixed
+
+#### 39. Circular self-import in `_clean_value`
+**File**: `backend/app/semantic_segmentation.py`
+`_clean_value()` imported `sem_type_str` from itself via `from app.semantic_segmentation import sem_type_str`.
+Since `sem_type_str` is defined at module scope in the same file, the import is unnecessary.
+Removed it — the function can call `sem_type_str` directly.
+
+#### 40. AsynMock patches on wrong namespace
+**Files**: `backend/tests/test_session_recovery.py`, `backend/tests/test_three_way_acquisition.py`
+Tests patched `app.llm_bridge.llm_json` but `selector_discovery.py` imports `llm_json` via
+`from app.llm_bridge import llm_json` (local reference). Patching on `app.llm_bridge` didn't
+intercept the local reference in `selector_discovery`, causing real API calls during tests.
+
+Changed all patch paths to `app.selector_discovery.llm_json` with `new_callable=AsyncMock`.
+This eliminated `RuntimeWarning: unawaited coroutine` from real LLM calls during tests.
+
+#### 41. Duplicate constants with different values in `core_types.py` vs `field_laws.py`
+**File**: `backend/app/core_types.py`
+`core_types.py` defined its own `MAX_INSTABILITY_FLUX` (0.15), `MAX_COUPLING_TRANSFER` (0.05),
+and `PROPAGATION_DECAY_FLOOR` (0.02) — different from the authoritative `field_laws.py`
+values (0.2, 0.3, 0.3). Since `field_laws.py` is the documented "foundational constants layer"
+and `core_types.py` already imported `ROLE_EXCLUSIVITY` from it at runtime, the three constants
+are now imported from `field_laws.py` instead of being defined locally.
+
+Also moved the lazy `from app.field_laws import ROLE_EXCLUSIVITY` from inside `propagate()`
+to the top-level import block — safe because `field_laws.py` has zero app package imports.
+
+### Commit
+```
+<to-be-added>
+```
 
 ---
 

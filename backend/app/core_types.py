@@ -9,12 +9,12 @@ import uuid
 from dataclasses import dataclass, field
 from typing import List
 
-# Max instability flux per evolution cycle (Phase 28)
-MAX_INSTABILITY_FLUX = 0.15
-# Coupling transfer cap (Phase 28)
-MAX_COUPLING_TRANSFER = 0.05
-# Minimum attenuation per hop (Phase 28)
-PROPAGATION_DECAY_FLOOR = 0.02
+from app.field_laws import (
+    MAX_INSTABILITY_FLUX,
+    MAX_COUPLING_TRANSFER,
+    PROPAGATION_DECAY_FLOOR,
+    ROLE_EXCLUSIVITY,
+)
 
 @dataclass
 class FieldConflictRegion:
@@ -115,7 +115,6 @@ class FieldConflictRegion:
 
     def propagate(self) -> list:
         """Autonomous propagation — governed by formal locality laws."""
-        from app.field_laws import ROLE_EXCLUSIVITY
         effects = []
         for role in self.competing_roles:
             for ra, rb in ROLE_EXCLUSIVITY:
