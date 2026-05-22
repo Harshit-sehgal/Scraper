@@ -16,7 +16,6 @@ from app.models import SchemaField
 from app.selector_memory import get_selector_memory
 from app.selector_discovery import discover_selectors
 from app.selector_engine import apply_selectors, extract_with_regex
-from app.domain_intelligence import get_domain_intelligence
 from app.extraction_provenance import ProvenanceBuilder, ExtractionMethod
 
 logger = logging.getLogger(__name__)
@@ -203,7 +202,6 @@ async def orchestrate_extraction(
     The cascade falls back to regex if provided selectors fail.
     """
     memory = get_selector_memory()
-    intel = get_domain_intelligence().get_intelligence(url)
 
     gate_threshold = max(
         min_record_score * settings.SCORE_GATE_THRESHOLD_FACTOR, 
