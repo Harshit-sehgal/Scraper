@@ -66,19 +66,27 @@ def build_selector_field_metadata(
 def _collect_child_text_nodes(node) -> list[str]:
     """Extract individual text chunks from all leaf-level descendant elements.
     
-    Walks the entire DOM subtree collecting text from elements that have
-    NO child elements of their own (leaf nodes). This preserves individual
-    value boundaries for multi-value containers.
+    Also extracts direct text content (text nodes not inside child elements).
     """
     texts: list[str] = []
     for el in node.find_all(True):
-        if el.name in ("script", "style", "noscript", "svg", "meta", "link"):
+        if el.name in ("script", "style", "noscript", "svg", "meta", "link", "select", "option", "input", "button", "textarea", "nav", "header", "footer"):
             continue
-        children = [c for c in el.find_all(True, recursive=False) if c.name not in ("script", "style", "noscript", "svg", "meta", "link")]
+        children = [c for c in el.find_all(True, recursive=False) if c.name not in ("script", "style", "noscript", "svg", "meta", "link", "select", "option", "input", "button", "textarea", "nav", "header", "footer")]
         if not children:
             t = el.get_text(separator=" ", strip=True)
             if t:
                 texts.append(t)
+    if len(texts) < 8:
+        import re as _re
+        full = node.get_text(separator="|", strip=True)
+        if full:
+            parts = [p.strip() for p in full.split("|") if p.strip() and len(p.strip()) > 1]
+            seen = set(texts)
+            for p in parts:
+                if p not in seen:
+                    texts.append(p)
+                    seen.add(p)
     if not texts:
         full = node.get_text(separator=" ", strip=True)
         if full:
@@ -169,6 +177,8 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
                 r'\d{1,2}[-/]\d{1,2}[-/]\d{2,4}',
                 r'\d{4}-\d{2}-\d{2}',
                 r'\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}',
+                r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}',
+                r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}\s*[-–]\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}',
             ]
         elif ftype == FieldType.NUMBER:
             patterns = [r'-?\d+(?:\.\d+)?']
@@ -260,6 +270,8 @@ def _classify_text_value(text: str) -> str:
         return "date"
     if _re.match(r'^\d{4}-\d{2}-\d{2}$', t):
         return "date"
+    if _re.search(r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}', t):
+        return "date"
     if _re.match(r'^[\$£€¥₹]\s*\d[\d,.]*$', t):
         return "currency"
     if _re.match(r'^[A-Z]{3,4}$', t):
@@ -273,6 +285,9 @@ def _classify_text_value(text: str) -> str:
         return "cabin_class"
     if _re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){2,}$', t):
         return "location"
+    label_patterns = ("starting from", "per person", "book now", "price per", "call now", "learn more", "view deal", "select", "adults", "child", "age")
+    if any(w in lower for w in label_patterns):
+        return "label"
     if _re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$', t) and len(t) > 1:
         return "name"
     return "text"

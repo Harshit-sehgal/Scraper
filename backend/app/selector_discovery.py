@@ -229,7 +229,7 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
         parent = el.parent
         if not parent:
             continue
-        siblings = [c for c in parent.find_all(True, recursive=False) if c.name not in ("script", "style", "noscript")]
+        siblings = [c for c in parent.find_all(True, recursive=False) if c.name not in ("script", "style", "noscript", "select", "option", "input", "button", "textarea", "form", "nav", "header", "footer")]
         same_class_count = sum(1 for c in siblings if " ".join(c.get("class", [])) == " ".join(el.get("class", [])))
         if same_class_count < 2:
             continue
@@ -241,6 +241,8 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
             for t in [c.get_text(separator=" ", strip=True)]
             if _re.search(r"[\$£€¥₹]\s*\d+|\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)
         )
+        if data_signal_count < 2:
+            continue
         candidates.append({
             "selector": parent_css,
             "item_selector": css,
@@ -284,8 +286,7 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:
     class_el_map: dict[str, list] = {}
 
     for el in soup.find_all(True):
-        classes = el.get("class")
-        if not classes:
+        if el.name in ("script", "style", "noscript", "svg", "meta", "link", "select", "option", "input", "button", "textarea", "form", "nav", "header", "footer"):
             continue
         css = _build_css_for_element(el)
         if not css:
@@ -313,6 +314,8 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:
             if _re.search(r"\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)
         )
         text_diversity = len(set(t[:40] for t in non_empty))
+        if data_signals + date_signals < 2:
+            continue
         score = len(elements) * 2 + data_signals * 2 + date_signals * 2 + avg_text_len * 0.03 + text_diversity * 2
         if avg_text_len < 50:
             continue
@@ -336,7 +339,7 @@ def _fallback_parent_child_discovery(soup) -> list[dict]:
     import re as _re
 
     for parent in body.find_all(True):
-        children = [c for c in parent.find_all(True, recursive=False) if c.name not in ("script", "style", "noscript", "svg")]
+        children = [c for c in parent.find_all(True, recursive=False) if c.name not in ("script", "style", "noscript", "svg", "select", "option", "input", "button", "textarea", "form", "nav", "header", "footer")]
         if len(children) < 2:
             continue
 
@@ -357,8 +360,9 @@ def _fallback_parent_child_discovery(soup) -> list[dict]:
             1 for t in non_empty
             if _re.search(r"[\$£€¥₹]\s*\d", t)
             or _re.search(r"\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}", t)
-            or _re.search(r"\b\d+\b", t)
         )
+        if data_signals < 2:
+            continue
         diversity = len(set(t[:30] for t in non_empty))
         score = len(children) + (data_signals * 2) + diversity
         if parent.name == "tr" and parent.parent and parent.parent.name == "tbody":
@@ -386,7 +390,7 @@ def _build_css_for_element(el) -> str | None:
         if el.name not in ("div", "span", "html", "body"):
             return f"{el.name}{cls_sel}"
         return cls_sel
-    if el.name not in ("div", "span", "html", "body", "main", "section", "article"):
+    if el.name not in ("div", "span", "html", "body", "main", "section", "article", "a", "p", "li", "ul", "ol", "img", "br", "i", "b", "strong", "em", "small", "label", "h1", "h2", "h3", "h4", "h5", "h6"):
         return el.name
     return None
 
