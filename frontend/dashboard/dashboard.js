@@ -142,10 +142,11 @@ async function updateLoop() {
         fetch(`${API_SCRAPER}/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
         fetch(`${API_SCRAPER}/browser`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
         fetch(`${API_SCRAPER}/memory/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SYSTEM}/acquisition/telemetry`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        fetch(`${API_SYSTEM}/acquisition/telemetry`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        fetch(`${API_SERVER}/api/system/status`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
     ]);
 
-    const [topologyResult, observabilityResult, historyResult, scraperStatsResult, browserStatsResult, memoryStatsResult, acqTelemetryResult] = results;
+    const [topologyResult, observabilityResult, historyResult, scraperStatsResult, browserStatsResult, memoryStatsResult, acqTelemetryResult, systemStatusResult] = results;
 
     // Check for rate limiting or other failures
     const anyFailed = results.some(r => r.status === 'rejected');
@@ -173,6 +174,7 @@ async function updateLoop() {
     const browserStats = browserStatsResult.status === 'fulfilled' ? browserStatsResult.value : null;
     const memoryStats = memoryStatsResult.status === 'fulfilled' ? memoryStatsResult.value : null;
     const acqTelemetry = acqTelemetryResult.status === 'fulfilled' ? acqTelemetryResult.value : null;
+    const systemStatus = systemStatusResult.status === 'fulfilled' ? systemStatusResult.value : null;
 
     // Update Timeline
     topologyHistory = history.history || [];
@@ -188,7 +190,8 @@ async function updateLoop() {
             scraperStats,
             browserStats,
             memoryStats,
-            acqTelemetry
+            acqTelemetry,
+            systemStatus
         );
         renderTopology(
             topology.field_regions || [],
@@ -209,7 +212,7 @@ async function updateLoop() {
     pollTimer = setTimeout(updateLoop, currentInterval);
 }
 
-function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, browserStats, memoryStats, acqTelemetry) {
+function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, browserStats, memoryStats, acqTelemetry, systemStatus) {
     m = m || {};
     document.getElementById('metric-pressure').innerText = Number(m.field_pressure || 0).toFixed(3);
     document.getElementById('metric-energy').innerText = Number(m.global_energy || 0).toFixed(3);
@@ -267,6 +270,14 @@ function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, b
         // Style empty-200 count
         const emptyEl = document.getElementById('metric-empty-200');
         if (emptyCount > 0) emptyEl.className = 'metric-value text-red-500';
+    }
+
+    if (systemStatus) {
+        const jobs = systemStatus.jobs || {};
+        document.getElementById('metric-jobs-completed').innerText = jobs.completed || 0;
+        document.getElementById('metric-jobs-degraded').innerText = jobs.degraded || 0;
+        document.getElementById('metric-jobs-empty-result').innerText = jobs.empty_result || 0;
+        document.getElementById('metric-jobs-failed').innerText = jobs.failed || 0;
     }
 
     // Style energy balance based on conservation status

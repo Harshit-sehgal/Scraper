@@ -273,7 +273,7 @@ function onJobsFilterChanged() {
 function updateKPIs(jobs) {
     document.getElementById('kpi-total').textContent = jobs.length;
     document.getElementById('kpi-running').textContent = jobs.filter(j => j.status === 'running' || j.status === 'discovering' || j.status === 'pending').length;
-    document.getElementById('kpi-done').textContent = jobs.filter(j => j.status === 'completed' || j.status === 'canceled').length;
+    document.getElementById('kpi-done').textContent = jobs.filter(j => j.status === 'completed' || j.status === 'degraded' || j.status === 'empty_result' || j.status === 'canceled').length;
     document.getElementById('kpi-records').textContent = jobs.reduce((s, j) => s + (j.filtered_records || 0), 0);
 }
 
@@ -311,7 +311,7 @@ function renderJobs(jobs) {
                 <div><span class="badge ${j.status}">${j.status}</span></div>
                 <div class="job-records">${j.total_records > 0 ? `${j.filtered_records}` : '—'}</div>
                 <div class="job-actions">
-                    ${j.status === 'completed' ? `<button class="btn ghost small" onclick="viewResults('${j.id}')">View</button>` : ''}
+                    ${['completed', 'degraded', 'empty_result'].includes(j.status) ? `<button class="btn ghost small" onclick="viewResults('${j.id}')">View</button>` : ''}
                     ${isActive ? `<button class="btn warn-ghost small" onclick="cancelJob('${j.id}')">Cancel</button>` : ''}
                     <button class="btn danger-ghost small" onclick="deleteJob('${j.id}')">✕</button>
                 </div>
@@ -347,16 +347,18 @@ async function pollJob(id) {
             }
             
             // If it's done, fully refresh to get results
-            if (j.status === 'completed' || j.status === 'failed' || j.status === 'canceled') {
+            if (j.status === 'completed' || j.status === 'degraded' || j.status === 'empty_result' || j.status === 'failed' || j.status === 'canceled') {
                 viewResults(id);
             }
         }
 
-        if (j.status === 'completed' || j.status === 'failed' || j.status === 'canceled') {
+        if (j.status === 'completed' || j.status === 'degraded' || j.status === 'empty_result' || j.status === 'failed' || j.status === 'canceled') {
             clearInterval(pollers[id]);
             delete pollers[id];
             refreshJobs();
             if (j.status === 'completed') toast(`"${j.name}" done — ${j.filtered_records} records`, 'success');
+            else if (j.status === 'degraded') toast(`"${j.name}" finished with partial results — ${j.filtered_records} records`, 'info');
+            else if (j.status === 'empty_result') toast(`"${j.name}" finished — no records extracted`, 'info');
             else if (j.status === 'canceled') toast(`"${j.name}" canceled`, 'info');
             else toast(`"${j.name}" failed: ${j.error}`, 'error');
         }

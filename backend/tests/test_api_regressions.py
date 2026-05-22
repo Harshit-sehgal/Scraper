@@ -440,7 +440,7 @@ def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch):
     asyncio.run(main_mod._run_job_wrapper(job.id))
 
     finished = main_mod.jobs_store[job.id]
-    assert finished.status == JobStatus.COMPLETED
+    assert finished.status == JobStatus.DEGRADED
     warnings = (finished.quality_report or {}).get("warnings") or []
     assert any("URL scrape failed" in w for w in warnings)
 

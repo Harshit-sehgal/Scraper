@@ -318,6 +318,8 @@ async def system_status():
             "total": len(jobs_store),
             "active": active,
             "completed": counts.get(JobStatus.COMPLETED.value, 0),
+            "degraded": counts.get(JobStatus.DEGRADED.value, 0),
+            "empty_result": counts.get(JobStatus.EMPTY_RESULT.value, 0),
             "failed": counts.get(JobStatus.FAILED.value, 0),
             "canceled": counts.get(JobStatus.CANCELED.value, 0),
         },

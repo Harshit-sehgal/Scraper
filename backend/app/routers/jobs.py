@@ -142,7 +142,7 @@ def create_jobs_router(
             raise HTTPException(status_code=404, detail="Job not found")
 
         job = jobs_store[job_id]
-        if job.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELED}:
+        if job.status in {JobStatus.COMPLETED, JobStatus.DEGRADED, JobStatus.EMPTY_RESULT, JobStatus.FAILED, JobStatus.CANCELED}:
             return {
                 "job_id": job.id,
                 "status": job.status.value,
@@ -337,7 +337,7 @@ def create_jobs_router(
 
     @router.delete("/api/jobs/cleanup/terminal")
     async def clear_terminal_jobs(keep_recent: int = Query(5, ge=0, le=5000)):
-        terminal_statuses = {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELED}
+        terminal_statuses = {JobStatus.COMPLETED, JobStatus.DEGRADED, JobStatus.EMPTY_RESULT, JobStatus.FAILED, JobStatus.CANCELED}
         terminal = [
             (jid, job)
             for jid, job in jobs_store.items()

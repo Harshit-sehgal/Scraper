@@ -63,11 +63,37 @@ def build_selector_field_metadata(
     return meta
 
 
+def _infer_field_type_from_name(field_name: str) -> FieldType | None:
+    """Infer a FieldType from a field key name using general heuristics.
+    
+    No domain-specific logic — works for any website.
+    """
+    n = (field_name or "").lower()
+    if not n:
+        return None
+    type_keywords = {
+        FieldType.CURRENCY: ("price", "cost", "fare", "amount", "fee", "total", "rate", "value", "sum"),
+        FieldType.EMAIL: ("email", "mail", "e-mail", "contact", "e_mail"),
+        FieldType.PHONE: ("phone", "tel", "mobile", "cell", "contact_no", "telephone"),
+        FieldType.URL: ("url", "link", "href", "website", "profile_url", "source"),
+        FieldType.DATE: ("date", "day", "due", "created", "updated", "published", "departure_date", "return_date"),
+        FieldType.NUMBER: ("count", "quantity", "qty", "stock", "rank", "position", "index", "num"),
+        FieldType.RATING: ("rating", "score", "stars", "review_score", "grade"),
+        FieldType.LOCATION: ("location", "address", "city", "country", "region", "state", "place", "area"),
+        FieldType.CODE: ("code", "id", "ref", "flight_number", "sku", "isbn", "upc", "airport_code", "identifier"),
+    }
+    for ftype, keywords in type_keywords.items():
+        if any(kw in n for kw in keywords):
+            return ftype
+    return None
+
+
 def _extract_field_by_pattern(node, sel_entry, field_name: str = "") -> str | None:
     """Fallback: extract field value from a container node when CSS selector is missing.
     
     Uses the field's example_value to locate matching text, then applies
-    type-aware patterns for extraction.
+    type-aware patterns for extraction. Falls back to key-name-based type
+    inference when sel_entry has no type metadata.
     """
     import re as re_mod
     full_text = node.get_text(separator=" ", strip=True)
@@ -82,6 +108,9 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "") -> str | No
             ftype = FieldType(sel_entry["type"])
         except ValueError:
             pass
+
+    if ftype is None:
+        ftype = _infer_field_type_from_name(field_name)
 
     # Strategy 1: Type-based regex extraction
     if ftype is not None:

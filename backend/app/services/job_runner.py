@@ -40,6 +40,7 @@ async def run_job(
     _add_job_log(job, f"Initializing job: {job.name}", persist_fn=persist_state_fn)
 
     all_raw_results = []
+    urls_with_records = 0
     warnings: list[str] = []
     ai_source_prediction = {
         "sources_attempted": 0,
@@ -201,6 +202,8 @@ async def run_job(
                         ai_source_prediction["sources_with_ai_structuring"] += 1
 
                     all_raw_results.extend(results)
+                    if len(results) > 0:
+                        urls_with_records += 1
                     _add_job_log(job, f"Extracted {len(results)} raw records from {url}")
                     persist_state_fn()
                 except asyncio.TimeoutError:
@@ -403,14 +406,25 @@ async def run_job(
             job.results = []
             _add_job_log(job, f"Job results bounded and offloaded to disk due to size (>{settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD} records).")
 
-        job.status = JobStatus.COMPLETED
+        total_urls = len(job.urls)
+        if len(all_raw_results) == 0:
+            job.status = JobStatus.EMPTY_RESULT
+            job.error = "The job completed but no records were extracted. This may be due to a session-bound URL, empty response, anti-bot block, JavaScript-rendered results, or missing search-form replay."
+            _add_job_log(job, job.error, level="warning", persist_fn=persist_state_fn)
+        elif urls_with_records > 0 and urls_with_records < total_urls:
+            job.status = JobStatus.DEGRADED
+            msg = f"{urls_with_records} of {total_urls} URLs produced results. Some pages may have anti-bot protection, expired sessions, or require JavaScript rendering."
+            job.error = msg
+            _add_job_log(job, msg, level="warning", persist_fn=persist_state_fn)
+        else:
+            job.status = JobStatus.COMPLETED
         job.cancel_requested = False
         job.completed_at = datetime.datetime.now().isoformat()
         job.progress_current = job.progress_total
         save_semantic_state()
         _add_job_log(job, "Job completed successfully", persist_fn=persist_state_fn)
 
-        logging.info("Job %s: Completed: %d total, %d after filtering", job_id, total, filtered_count)
+        logging.info("Job %s: Completed (%s): %d total, %d after filtering", job_id, job.status.value, total, filtered_count)
 
     except Exception as e:
         logging.exception(e)

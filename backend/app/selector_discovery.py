@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import Any
+from collections import Counter
 from app.config import settings
 from app.html_utils import clean_html_for_selectors
 from app.llm_bridge import llm_json, reset_llm_call_count
@@ -158,6 +160,7 @@ async def discover_selectors(
     html_snippet = clean_html_for_selectors(html)
     prompt = build_selector_prompt(html_snippet, schema_fields, page_analysis, solidified_motifs)
 
+    selectors = {}
     try:
         selectors = await llm_json(messages=[
             {
@@ -169,15 +172,261 @@ async def discover_selectors(
             },
             {"role": "user", "content": prompt}
         ], timeout=settings.LLM_SELECTOR_TIMEOUT)
-        
-        if not isinstance(selectors, dict):
-            logger.warning("[SelectorDiscovery] LLM returned non-dict response")
-            return {}
-            
-        return selectors
     except Exception as e:
         logger.exception("[SelectorDiscovery] LLM extraction failed: %s", e)
+
+    if not isinstance(selectors, dict):
+        selectors = {}
+
+    container_sel = selectors.get("item_container")
+    if container_sel and str(container_sel).strip():
+        return selectors
+
+    logger.info("[SelectorDiscovery] LLM returned no item_container, falling back to DOM discovery")
+    dom_selectors = _discover_selectors_from_dom(html, schema_fields)
+    if dom_selectors and dom_selectors.get("item_container"):
+        logger.info("[SelectorDiscovery] DOM discovery found container: %s", dom_selectors["item_container"])
+        return dom_selectors
+
+    return selectors or {}
+
+
+def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) -> dict | None:
+    """Discover container and field selectors by analyzing repeating DOM patterns.
+    
+    Falls back to structural DOM analysis when the LLM cannot produce CSS selectors.
+    Uses ONLY general heuristics — no domain-specific selectors or class names.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    if not soup:
+        return None
+
+    body = soup.find("body") or soup
+    if not hasattr(body, "find_all"):
+        return None
+    import re as _re
+
+    element_classes: list[tuple[Any, str, str]] = []
+    for el in body.find_all(True):
+        classes = el.get("class")
+        if not classes:
+            continue
+        css = _build_css_for_element(el)
+        if not css:
+            continue
+        text = el.get_text(separator=" ", strip=True)
+        if len(text) < 20:
+            continue
+        element_classes.append((el, css, text))
+
+    css_counts = Counter(css for _, css, _ in element_classes)
+    repeating_css = {css for css, count in css_counts.items() if count >= 3}
+
+    candidates: list[dict] = []
+    for el, css, text in element_classes:
+        if css not in repeating_css:
+            continue
+        parent = el.parent
+        if not parent:
+            continue
+        siblings = [c for c in parent.find_all(True, recursive=False) if c.name not in ("script", "style", "noscript")]
+        same_class_count = sum(1 for c in siblings if " ".join(c.get("class", [])) == " ".join(el.get("class", [])))
+        if same_class_count < 2:
+            continue
+        parent_css = _build_css_for_element(parent)
+        if not parent_css:
+            continue
+        data_signal_count = sum(
+            1 for c in siblings
+            for t in [c.get_text(separator=" ", strip=True)]
+            if _re.search(r"[\$£€¥₹]\s*\d+|\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)
+        )
+        candidates.append({
+            "selector": parent_css,
+            "item_selector": css,
+            "count": same_class_count,
+            "score": same_class_count * 3 + data_signal_count * 2,
+            "sample_text": text[:80],
+        })
+
+    if not candidates:
+        candidates = _discover_direct_repeating_elements(soup)
+    else:
+        candidates.extend(_discover_direct_repeating_elements(soup))
+    if not candidates:
+        candidates = _fallback_parent_child_discovery(soup)
+    else:
+        candidates.extend(_fallback_parent_child_discovery(soup))
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda x: x["score"], reverse=True)
+    best = candidates[0]
+
+    field_selectors = _infer_field_selectors_from_container(best["selector"], html, schema_fields)
+
+    return {
+        "item_container": best["selector"],
+        "fields": field_selectors,
+        "_discovery_method": "dom_fallback",
+    }
+
+
+def _discover_direct_repeating_elements(soup) -> list[dict]:
+    """Find elements that repeat with the same class across the page.
+    
+    When multiple elements share the same class and have meaningful data,
+    use that class directly as the item_container selector.
+    """
+    import re as _re
+    candidates: list[dict] = []
+    class_el_map: dict[str, list] = {}
+
+    for el in soup.find_all(True):
+        classes = el.get("class")
+        if not classes:
+            continue
+        css = _build_css_for_element(el)
+        if not css:
+            continue
+        if el.name in ("script", "style", "noscript", "svg", "meta", "link"):
+            continue
+        if css not in class_el_map:
+            class_el_map[css] = []
+        class_el_map[css].append(el)
+
+    for css, elements in class_el_map.items():
+        if len(elements) < 3:
+            continue
+        texts = [el.get_text(separator=" ", strip=True) for el in elements]
+        non_empty = [t for t in texts if len(t) > 20]
+        if len(non_empty) < 3:
+            continue
+        avg_text_len = sum(len(t) for t in non_empty) / len(non_empty)
+        data_signals = sum(
+            1 for t in non_empty
+            if _re.search(r"[\$£€¥₹]\s*\d+", t)
+            or _re.search(r"\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)
+        )
+        text_diversity = len(set(t[:40] for t in non_empty))
+        score = len(elements) * 2 + data_signals * 3 + avg_text_len * 0.05 + text_diversity * 2
+        if avg_text_len < 50:
+            continue
+        candidates.append({
+            "selector": css,
+            "item_selector": css,
+            "count": len(elements),
+            "score": score,
+            "sample_text": non_empty[0][:80],
+        })
+
+    return candidates
+
+
+def _fallback_parent_child_discovery(soup) -> list[dict]:
+    """Fallback: find repeating child structures in parent elements."""
+    candidates: list[dict] = []
+    body = soup.find("body") or soup
+    if not hasattr(body, "find_all"):
+        return candidates
+    import re as _re
+
+    for parent in body.find_all(True):
+        children = [c for c in parent.find_all(True, recursive=False) if c.name not in ("script", "style", "noscript", "svg")]
+        if len(children) < 2:
+            continue
+
+        child_tags = [c.name for c in children]
+        if len(set(child_tags)) > 3:
+            continue
+
+        child_classes = [" ".join(c.get("class", [])) for c in children]
+        if len(set(child_classes)) > max(3, len(children) * 0.7):
+            continue
+
+        child_texts = [c.get_text(separator=" ", strip=True) for c in children]
+        non_empty = [t for t in child_texts if len(t) > 20]
+        if len(non_empty) < 2:
+            continue
+
+        data_signals = sum(
+            1 for t in non_empty
+            if _re.search(r"[\$£€¥₹]\s*\d", t)
+            or _re.search(r"\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}", t)
+            or _re.search(r"\b\d+\b", t)
+        )
+        diversity = len(set(t[:30] for t in non_empty))
+        score = len(children) + (data_signals * 2) + diversity
+        if parent.name == "tr" and parent.parent and parent.parent.name == "tbody":
+            score += 5
+
+        css = _build_css_for_element(parent)
+        if css:
+            candidates.append({
+                "selector": css,
+                "item_selector": "",
+                "count": len(children),
+                "score": score,
+                "sample_text": non_empty[0][:80] if non_empty else "",
+            })
+    return candidates
+
+
+def _build_css_for_element(el) -> str | None:
+    """Build a CSS selector for a BeautifulSoup element using class or id."""
+    if el.get("id"):
+        return f"#{el['id']}"
+    classes = el.get("class")
+    if classes:
+        cls_sel = ".".join(f".{c}" for c in classes[:2])
+        if el.name not in ("div", "span", "html", "body"):
+            return f"{el.name}{cls_sel}"
+        return cls_sel
+    if el.name not in ("div", "span", "html", "body", "main", "section", "article"):
+        return el.name
+    return None
+
+
+def _infer_field_selectors_from_container(container_sel: str, html: str, schema_fields: list[SchemaField]) -> dict:
+    """Infer field-level selectors by scanning container items for type-matching text.
+    
+    Returns a dict mapping field_name to selector (string). Empty string means
+    the field was identified but no CSS selector could be generated — the fallback
+    in selector_engine.py will use type patterns to extract values.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    containers = soup.select(container_sel)
+    if not containers:
         return {}
+
+    field_map: dict = {}
+    first_item = containers[0]
+
+    for field in schema_fields:
+        fname = field.name
+        ftype = field.field_type.value if hasattr(field.field_type, "value") else str(field.field_type)
+
+        if ftype in ("currency", "number", "date", "email", "phone", "url", "code", "rating"):
+            field_map[fname] = ""
+            continue
+
+        elements = first_item.find_all(True)
+        for el in elements:
+            txt = el.get_text(separator=" ", strip=True)
+            if not txt:
+                continue
+            name_lower = fname.lower().replace("_", " ")
+            if name_lower in txt.lower()[:40]:
+                css = _build_css_for_element(el)
+                if css:
+                    field_map[fname] = css
+                    break
+
+        if fname not in field_map:
+            field_map[fname] = ""
+
+    return field_map
 
 
 # ─── URL Analyzer — Auto-Detect Fields from a URL ────────────────────────
@@ -374,8 +623,6 @@ def _assess_content_quality(html: str, profile) -> dict:
         - landing_signals: list of detected landing page indicators
         - message: str
     """
-    from collections import Counter
-
     soup = BeautifulSoup(html, "html.parser")
 
     # ── Landing Page Detection ──────────────────────────────────────

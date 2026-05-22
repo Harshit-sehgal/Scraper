@@ -430,6 +430,8 @@ body::after {
 .badge.discovering,
 .badge.running { color: #005d9f; background: #d7ecfb; }
 .badge.completed { color: #116943; background: #dcf4e6; }
+.badge.degraded { color: #8a5a10; background: #fdf0c2; }
+.badge.empty_result { color: #8a3a10; background: #fde8d0; }
 .badge.canceled { color: #6b4f8a; background: #eee2fb; }
 .badge.failed { color: #972a2a; background: #f8dddd; }
 

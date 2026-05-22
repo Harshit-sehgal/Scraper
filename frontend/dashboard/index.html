@@ -151,6 +151,30 @@
             </div>
         </div>
 
+        <!-- Job Status Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Completed</h3>
+                <div id="metric-jobs-completed" class="metric-value">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Successful Jobs</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Degraded</h3>
+                <div id="metric-jobs-degraded" class="metric-value" style="color:#c7851b;">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Partial Results</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Empty Result</h3>
+                <div id="metric-jobs-empty-result" class="metric-value" style="color:#d24646;">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">No Records Extracted</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Failed</h3>
+                <div id="metric-jobs-failed" class="metric-value" style="color:#d24646;">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Job Errors</div>
+            </div>
+        </div>
+
         <!-- Main Visualization Area -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
             <!-- Topology Map -->

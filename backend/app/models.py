@@ -151,6 +151,8 @@ class JobStatus(str, Enum):
     DISCOVERING = "discovering"
     RUNNING = "running"
     COMPLETED = "completed"
+    DEGRADED = "degraded"
+    EMPTY_RESULT = "empty_result"
     CANCELED = "canceled"
     FAILED = "failed"
 

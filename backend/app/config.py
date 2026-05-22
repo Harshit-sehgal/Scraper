@@ -347,6 +347,16 @@ class Settings(BaseSettings):
     EMPTY_PAGE_SIGNAL_CONFIDENCE: float = 0.8
     """Confidence for strong empty-page signals (login walls, etc.)."""
 
+    # ─── Zero Result Classification ────────────────────────────────────────
+    ZERO_RESULT_ANTIBOT_THRESHOLD: float = 0.8
+    """Anti-bot score above this classifies zero-result as anti-bot block."""
+    ZERO_RESULT_EMPTY_HTML_LEN: int = 100
+    """HTML shorter than this is classified as a blank/empty page."""
+    ZERO_RESULT_JS_SHELL_HTML_LEN: int = 1000
+    """HTML longer than this without containers suggests JS shell."""
+    ZERO_RESULT_AUTH_PATTERNS: list[str] = ["login", "sign in", "password"]
+    """Text patterns that indicate an authentication gate."""
+
     # ─── Record Quality Scoring ───────────────────────────────────────────
     QUALITY_BASE_SCORE: float = 0.3
     """Base quality score for non-empty text values."""

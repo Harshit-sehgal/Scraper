@@ -8,7 +8,7 @@ def prune_history_stores(jobs_store: dict, recycle_bin_store: dict, max_job_hist
         active_ids = {
             jid
             for jid, job in jobs_store.items()
-            if job.status not in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELED}
+            if job.status not in {JobStatus.COMPLETED, JobStatus.DEGRADED, JobStatus.EMPTY_RESULT, JobStatus.FAILED, JobStatus.CANCELED}
         }
         slots_for_terminal = max(0, max_job_history - len(active_ids))
 
