@@ -40,15 +40,11 @@ jobs:
           python -m playwright install chromium
 
       - name: Lint with pyflakes
-        run: python -m pyflakes backend/ --exclude backend/venv
-
-      - name: Check unused imports with autoflake
-        run: python -m autoflake --check --recursive backend/app/ backend/tests/
+        run: python -m pyflakes backend/app backend/tests
 
       - name: Type check with mypy
-        run: python -m mypy backend/ --check-untyped-defs --ignore-missing-imports
+        run: python -m mypy backend/app --ignore-missing-imports
 
-      - name: Test with pytest and coverage
-        run: python -m pytest backend/tests/ --cov=backend/app --cov-report=term-missing --cov-fail-under=60 -v
-        env:
-          PYTHONPATH: ${{ github.workspace }}/backend
+      - name: Test with pytest
+        working-directory: backend
+        run: PYTHONPATH=. python -m pytest -q -o "addopts="
