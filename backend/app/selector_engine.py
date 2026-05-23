@@ -240,6 +240,9 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
         return None
     n_lower = field_name.lower()
     use_last = any(w in n_lower for w in ("return", "arrival", "arrive", "end", "to_", "dest"))
+    name_entity_fields = ("airline", "carrier", "operator", "provider", "company", "brand")
+    if not use_last:
+        use_last = any(w in n_lower for w in name_entity_fields)
     best_match = None
     for idx, ct in enumerate(child_texts):
         if idx in used_child_indices:
@@ -371,7 +374,28 @@ def extract_raw_from_selectors(
         record: dict = {}
         used_spans: list[tuple[int, int]] = []
         used_child_indices: set = set()
-        for key, sel_entry in field_sels.items():
+        # Sort fields: typed fields with regex patterns first, then LOCATION/CODE, then STRING/None last.
+        # This prevents STRING fields from greedily consuming children that typed fields should match.
+        _TYPED_ORDER: dict = {}
+        for ftype in (FieldType.CURRENCY, FieldType.EMAIL, FieldType.PHONE, FieldType.URL, FieldType.DATE, FieldType.NUMBER, FieldType.RATING):
+            _TYPED_ORDER[ftype] = 0
+        _TYPED_ORDER[FieldType.LOCATION] = 1
+        _TYPED_ORDER[FieldType.CODE] = 1
+        _TYPED_ORDER[FieldType.STRING] = 2
+        _TYPED_ORDER[None] = 2
+        def _field_sort_key(item):
+            key, sel_entry = item
+            ftype = None
+            if isinstance(sel_entry, dict) and sel_entry.get("type"):
+                try:
+                    ftype = FieldType(sel_entry["type"])
+                except ValueError:
+                    pass
+            if ftype is None:
+                ftype = _infer_field_type_from_name(key)
+            return _TYPED_ORDER.get(ftype, 2)
+        sorted_fields = sorted(field_sels.items(), key=_field_sort_key)
+        for key, sel_entry in sorted_fields:
             sel = _selector_css(sel_entry)
             val = None
             if sel:
