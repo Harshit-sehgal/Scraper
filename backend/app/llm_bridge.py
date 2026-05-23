@@ -144,8 +144,8 @@ async def _call_openai_compatible_text(
 
 
 def _groq_model_candidates() -> list[str]:
-    primary = (os.getenv("GROQ_MODEL") or "llama-3.3-70b-versatile").strip()
-    fallback = (os.getenv("GROQ_FALLBACK_MODEL") or "llama-3.1-8b-instant").strip()
+    primary = (settings.GROQ_DEFAULT_MODEL or "llama-3.3-70b-versatile").strip()
+    fallback = (settings.GROQ_FALLBACK_MODEL or "llama-3.1-8b-instant").strip()
     models: list[str] = []
     for model in [primary, fallback]:
         if model and model not in models:
@@ -167,7 +167,6 @@ def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning
 async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     if temperature is None:
         temperature = settings.LLM_TEMPERATURE
-    _record_call()
     if timeout is None:
         timeout = settings.LLM_TIMEOUT
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
@@ -210,7 +209,11 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
 
     try:
         def _run_g4f_json():
-            from g4f.client import Client  # type: ignore[import-untyped]
+            try:
+                from g4f.client import Client  # type: ignore[import-untyped]
+            except ImportError:
+                logging.warning("g4f not installed — skipping g4f JSON fallback")
+                return None
             client = Client()
             res = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -222,6 +225,8 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
             return res.choices[0].message.content.strip()
 
         content = await asyncio.to_thread(_run_g4f_json)
+        if content is None:
+            return {}
         parsed = _extract_json_payload(content)
         if parsed is not None:
             return parsed
@@ -236,7 +241,6 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
     """Fast-path JSON call for throughput-sensitive cleaning tasks."""
     if temperature is None:
         temperature = settings.LLM_FAST_TEMPERATURE
-    _record_call()
     if timeout is None:
         timeout = settings.LLM_FAST_TIMEOUT
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
@@ -288,7 +292,6 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
 async def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:
     if temperature is None:
         temperature = settings.LLM_TEXT_TEMPERATURE
-    _record_call()
     if timeout is None:
         timeout = settings.LLM_TIMEOUT
     groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
@@ -329,7 +332,11 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
 
     try:
         def _run_g4f_text():
-            from g4f.client import Client
+            try:
+                from g4f.client import Client
+            except ImportError:
+                logging.warning("g4f not installed — skipping g4f text fallback")
+                return None
             client = Client()
             res = client.chat.completions.create(
                 model="gpt-4o",
@@ -340,7 +347,10 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
                 raise ValueError("Empty choices in LLM response")
             return (res.choices[0].message.content or "").strip()
 
-        return await asyncio.to_thread(_run_g4f_text)
+        result = await asyncio.to_thread(_run_g4f_text)
+        if result is None:
+            return ""
+        return result
     except Exception as e:
         logging.exception(e)
         logging.error("g4f text fallback failed: %s", e)

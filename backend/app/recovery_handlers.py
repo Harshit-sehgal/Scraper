@@ -38,8 +38,10 @@ async def handle_rotate_proxy(params: dict[str, Any], context: dict[str, Any], a
     """Rotate to next proxy in the pool."""
     logger.info("Rotating proxy for %s", context.get("url", ""))
     pm = get_proxy_manager()
-    if pm.enabled:
-        pm.rotate()
+    if not pm.enabled:
+        logger.warning("Proxy rotation disabled — returning False")
+        return False
+    pm.rotate()
     if attempt_ctx:
         attempt_ctx.anti_bot_stealth = True
         attempt_ctx.proxy_profile = "rotated"
@@ -121,7 +123,8 @@ async def handle_force_rediscovery(params: dict[str, Any], context: dict[str, An
 
 async def handle_force_rediscovery_with_swap_detection(
     params: dict[str, Any],
-    context: dict[str, Any]
+    context: dict[str, Any],
+    attempt_ctx=None,
 ) -> bool:
     """Force rediscovery with field swap detection.
     
@@ -134,7 +137,7 @@ async def handle_force_rediscovery_with_swap_detection(
     """
     # Same as basic force_rediscovery for now
     # The swap detection would be in the extraction layer
-    return await handle_force_rediscovery(params, context)
+    return await handle_force_rediscovery(params, context, attempt_ctx)
 
 
 async def handle_lower_score_threshold(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
@@ -143,6 +146,13 @@ async def handle_lower_score_threshold(params: dict[str, Any], context: dict[str
     logger.info("Recovery action: lowering quality threshold (multiplier=%.1f)", score_multiplier)
     if attempt_ctx:
         attempt_ctx.reduce_concurrency = True
+        # Actually lower the min score threshold for the next retry
+        current_score = context.get("min_record_score", 0.35)
+        attempt_ctx.min_record_score_override = current_score * score_multiplier
+        logger.info(
+            "  -> setting min_record_score_override to %.3f (was %.3f)",
+            attempt_ctx.min_record_score_override, current_score,
+        )
     return True
 
 
@@ -165,13 +175,18 @@ async def handle_escalate_to_llm(params: dict[str, Any], context: dict[str, Any]
 
 
 async def handle_abort_domain(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
-    """Stop scraping a domain temporarily."""
+    """Stop scraping a domain temporarily — mark cooldown, don't retry with a different strategy."""
     skip_minutes = params.get("skip_domain_minutes", 60)
     url = context.get("url")
     logger.warning("Recovery action: aborting domain %s for %d minutes", url, skip_minutes)
     if attempt_ctx:
-        attempt_ctx.reduce_concurrency = True
-        attempt_ctx.fetch_strategy = "httpx_basic"
+        attempt_ctx.abort_domain = True
+        # Do NOT switch to httpx_basic — aborted domains should be skipped, not retried
+        if url:
+            from urllib.parse import urlparse
+            domain = urlparse(url).netloc.lower()
+            if domain:
+                attempt_ctx.skip_domain = domain
     return True
 
 
@@ -192,7 +207,11 @@ async def handle_skip_domain(params: dict[str, Any], context: dict[str, Any], at
     url = context.get("url")
     logger.warning("Recovery action: skipping domain %s", url)
     
-    # Job runner would mark this domain as skipped
+    if attempt_ctx:
+        from urllib.parse import urlparse
+        domain = urlparse(url).netloc.lower() if url else None
+        if domain:
+            attempt_ctx.skip_domain = domain
     return True
 
 
@@ -205,6 +224,8 @@ async def handle_skip_url(params: dict[str, Any], context: dict[str, Any], attem
     url = context.get("url")
     logger.warning("Recovery action: skipping URL %s", url)
     
+    if attempt_ctx:
+        attempt_ctx.skip_url = True
     return True
 
 

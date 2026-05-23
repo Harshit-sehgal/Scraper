@@ -271,9 +271,25 @@ def _boost_contacts_with_page_html(
 
 async def fetch_page_content(
     url: str, 
-    preferred_method: FetchStrategy | str = FetchStrategy.PLAYWRIGHT_FULL
+    preferred_method: FetchStrategy | str = FetchStrategy.PLAYWRIGHT_FULL,
+    timeout_ms: int | None = None,
+    hydration_wait_ms: int | None = None,
+    skip_networkidle: bool = False,
+    scroll_attempts: int | None = None,
+    anti_bot_stealth: bool = False,
+    extra_headers: dict[str, str] | None = None,
 ) -> tuple[str, float, str, int]:
     """Load a URL in a pooled headless browser context or via plain HTTP.
+
+    Args:
+        url: The URL to fetch.
+        preferred_method: The preferred fetch strategy.
+        timeout_ms: Override the Playwright navigation timeout (ms).
+        hydration_wait_ms: Override the hydration wait/delay after load (ms).
+        skip_networkidle: If True, use domcontentloaded instead of networkidle.
+        scroll_attempts: Override the number of scroll attempts.
+        anti_bot_stealth: If True, enable extra stealth measures.
+        extra_headers: Extra HTTP headers to inject.
 
     Returns:
         tuple of (html_content, js_render_delay_ms, method_used, retry_count)
@@ -336,10 +352,17 @@ async def fetch_page_content(
 
         # Phase 1: Try networkidle with quick timeout for faster failure detection
         try:
-            wait_until = "networkidle" if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT else "domcontentloaded"
-            # Use a short initial timeout (15s) for networkidle — if the page takes longer,
-            # we fall through to domcontentloaded + anti-bot check rather than blocking for 45s
-            initial_timeout = min(settings.PLAYWRIGHT_TIMEOUT, 15000)
+            if skip_networkidle:
+                wait_until = "domcontentloaded"
+            elif strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
+                wait_until = "networkidle"
+            else:
+                wait_until = "domcontentloaded"
+            # Use recovery timeout if provided, otherwise use a short initial timeout (15s) for networkidle
+            if timeout_ms is not None:
+                initial_timeout = timeout_ms
+            else:
+                initial_timeout = min(settings.PLAYWRIGHT_TIMEOUT, 15000)
             await page.goto(url, wait_until=wait_until, timeout=initial_timeout)  # type: ignore[arg-type]
 
             # Phase 79: Adaptive hydration and scroll from domain intelligence
@@ -359,7 +382,11 @@ async def fetch_page_content(
             telemetry = get_telemetry_state()
             avg_stabilization = telemetry.get_avg_stabilization(domain)
             stabilization_start = time.time()
-            settle_timeout = intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
+            # Use recovery hydration wait if provided, otherwise domain intelligence or default
+            if hydration_wait_ms is not None:
+                settle_timeout = hydration_wait_ms / 1000.0
+            else:
+                settle_timeout = intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
             settle_timeout = max(settle_timeout, 3.0)
 
             min_wait_ms = 2500
@@ -396,20 +423,20 @@ async def fetch_page_content(
             js_render_delay_ms = (time.time() - stabilization_start) * 1000
             telemetry.record_stabilization(domain, js_render_delay_ms)
 
-            # Scroll handling
+            # Scroll handling — use recovery scroll_attempts if provided
             if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
-                scroll_attempts = 0
-                max_scrolls = getattr(settings, 'MAX_SCROLL_ATTEMPTS', 3)
+                _scroll_attempts = 0
+                max_scrolls = scroll_attempts if scroll_attempts is not None else getattr(settings, 'MAX_SCROLL_ATTEMPTS', 3)
                 last_height = await page.evaluate("document.body.scrollHeight")
-                while scroll_attempts < max_scrolls:
+                while _scroll_attempts < max_scrolls:
                     await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                     await asyncio.sleep(settings.PAGE_SCROLL_DELAY)
                     new_height = await page.evaluate("document.body.scrollHeight")
                     if new_height == last_height:
                         break
                     last_height = new_height
-                    scroll_attempts += 1
-                if scroll_attempts > 0:
+                    _scroll_attempts += 1
+                if _scroll_attempts > 0:
                     intel.infinite_scroll_required = True
                 await page.evaluate("window.scrollTo(0, 0)")
                 await asyncio.sleep(settings.POST_SCROLL_RESET_DELAY)

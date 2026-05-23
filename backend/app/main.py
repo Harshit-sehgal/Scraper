@@ -30,6 +30,22 @@ from app.state_store import load_state, get_state_file_path
 from app.rate_limiter import RateLimiterMiddleware
 
 
+from enum import Enum
+
+
+class AcquisitionMode(str, Enum):
+    """Acquisition mode for URL preview/analysis.
+    
+    Determines how aggressively the system attempts to acquire the page:
+    - standard: Basic fetch, single attempt
+    - aggressive: Session recovery, search form submission
+    - deep_scan: All recovery strategies, multiple retries
+    """
+    STANDARD = "standard"
+    AGGRESSIVE = "aggressive"
+    DEEP_SCAN = "deep_scan"
+
+
 # ─── Request Models ────────────────────────────────────────────────────────
 
 
@@ -45,8 +61,8 @@ class URLPreviewRequest(BaseModel):
             "Values are the search values (e.g. 'NYC', 'LHR', '05/15/2026')."
         ),
     )
-    acquisition_mode: str = Field(
-        default="standard",
+    acquisition_mode: AcquisitionMode = Field(
+        default=AcquisitionMode.STANDARD,
         description=(
             "Acquisition mode: 'standard' (basic fetch), 'aggressive' (session recovery, "
             "search form submission), or 'deep_scan' (all recovery strategies, multiple retries)."
@@ -567,7 +583,7 @@ async def export_system_diagnostics():
     # Regular expressions for PII sanitization
     email_regex = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
     phone_regex = re.compile(r"\+?\b\d[\d\s()\-]{8,14}\d\b")
-    sensitive_keys = {"authorization", "auth", "api_key", "key", "password", "token", "secret", "signature", "alert_webhook_url"}
+    sensitive_keys = {"authorization", "auth", "api_key", "key", "password", "token", "secret", "signature", "alert_webhook_url", "credential", "session", "cookie", "bearer", "private", "client_secret", "api_secret", "access_key", "secret_key"}
 
     def sanitize_value(val):
         if isinstance(val, str):

@@ -3,20 +3,19 @@ Extraction Orchestrator — Manages the multi-layered extraction fallback cascad
 
 Layers:
   0. Network / JSON (Hydration, JSON-LD, Next.js state, Apollo cache)
-  1. Selector Profiles (JSON)
-  2. Provided Selectors (URL Analysis)
-  3. Selector Memory (Persistent cache)
-  4. LLM Discovery (Generative)
-  5. Container Discovery (Universal evidence-based)
-  6. Rendered Visible-Text Extraction (Spatial card grouping)
-  7. Regex Fallback (Structural pattern matching)
+  1. Provided Selectors (URL Analysis)
+  2. Selector Memory (Persistent cache)
+  3. LLM Discovery (Generative)
+  4. Container Discovery (Universal evidence-based)
+  5. Rendered Visible-Text Extraction (Spatial card grouping)
+  6. Regex Fallback (Structural pattern matching)
 """
 
 from __future__ import annotations
 
 import logging
 from app.config import settings
-from app.models import SchemaField
+from app.models import FieldType, SchemaField
 from app.selector_memory import get_selector_memory
 from app.selector_discovery import discover_selectors
 from app.selector_engine import apply_selectors, extract_with_regex
@@ -286,7 +285,7 @@ async def orchestrate_extraction(
             provenance_builder.add_fallback_step("network_json_empty")
 
     # Phase 79/80: Strategy Self-Selection
-    # ── Layer 2: Provided Selectors (from URL Analysis) ───────────────
+    # ── Layer 1: Provided Selectors (from URL Analysis) ───────────────
     # If the user analyzed the URL via the URL Analyzer, we have pre-discovered
     # CSS selectors. Try these first — they skip memory and LLM discovery.
     if provided_selectors and provided_selectors.get("item_container") and provided_selectors.get("fields"):
@@ -312,16 +311,28 @@ async def orchestrate_extraction(
             if provenance_builder:
                 provenance_builder.add_fallback_step("provided_selectors_empty")
 
-    # ── Layer 3: Selector Memory ───────────────────────────────────────
-    remembered_selectors = memory.get_selectors(url)
+    # ── Layer 2: Selector Memory ───────────────────────────────────────
+    # If force_llm_discovery or bypass_selector_memory is set, skip memory
+    remembered_selectors = memory.get_selectors(url) if not (provided_selectors and provided_selectors.get("force_skip_memory")) else None
+    if provided_selectors and provided_selectors.get("force_llm_discovery"):
+        remembered_selectors = None
+        logger.info("[Orchestrator] Recovery requested force_llm_discovery — skipping memory and profiles")
+        if provenance_builder:
+            provenance_builder.add_fallback_step("force_llm_discovery")
+    elif provided_selectors and provided_selectors.get("bypass_selector_memory"):
+        remembered_selectors = None
+        logger.info("[Orchestrator] Recovery requested bypass_selector_memory — skipping memory")
+        if provenance_builder:
+            provenance_builder.add_fallback_step("bypass_selector_memory")
     if remembered_selectors:
         logger.info("[Orchestrator] Trying remembered selectors for %s", url)
         raw_results = apply_selectors(
             html, remembered_selectors, schema_fields, base_url=url, user_intent=user_intent
         )
         if raw_results:
-            # Ensure raw_results is a list (apply_selectors returns list when return_field_quality=False)
-            assert isinstance(raw_results, list)
+            # Safely ensure raw_results is a list
+            if not isinstance(raw_results, list):
+                raw_results = []
             scores = [r.get("record_score", 0.0) for r in raw_results]
             avg_score = sum(scores) / len(scores) if scores else 0.0
             if avg_score >= gate_threshold:
@@ -383,8 +394,13 @@ async def orchestrate_extraction(
             
         logger.info("[Orchestrator] FIELD QUALITY MAP: %s", field_quality)
         
-        # Check for field-swapping
-        swapped = _detect_field_swaps(field_quality, schema_fields)
+        # Check for field-swapping by analyzing extracted values against expected types
+        extracted_values = {}
+        if raw_results:
+            for field in schema_fields:
+                vals = [r.get(field.name) for r in raw_results if r.get(field.name)]
+                extracted_values[field.name] = vals[:3]  # first 3 values
+        swapped = _detect_field_swaps(field_quality, schema_fields, extracted_values)
         if swapped:
             logger.warning("[Orchestrator] Detected field swap in discovery: %s. Attempting alignment.", swapped)
             discovered_selectors = _align_selectors(discovered_selectors, swapped)
@@ -441,7 +457,7 @@ async def orchestrate_extraction(
         if provenance_builder:
             provenance_builder.add_error(f"container_discovery: {failure['failure_class']}")
 
-    # ── Layer 6: Rendered Visible-Text Extraction ────────────────────────
+    # ── Layer 5: Rendered Visible-Text Extraction ────────────────────────
     # Try grouping visible text blocks into visual cards and extracting
     # from the rendered layout. This works when CSS selectors miss content
     # but the text is present in the rendered DOM.
@@ -469,7 +485,7 @@ async def orchestrate_extraction(
         if provenance_builder:
             provenance_builder.add_fallback_step("visible_text_empty")
 
-    # ── Layer 7: Regex Fallback ──────────────────────────────────────────
+    # ── Layer 6: Regex Fallback ──────────────────────────────────────────
     logger.info("[Orchestrator] Falling back to regex extraction for %s", url)
     regex_results = extract_with_regex(html, schema_fields, base_url=url)
     _record_field_provenance(regex_results, ExtractionMethod.REGEX)
@@ -486,21 +502,118 @@ async def orchestrate_extraction(
     return ExtractionResult(regex_results, "regex")
 
 
-def _detect_field_swaps(quality_map: dict[str, float], fields: list[SchemaField]) -> dict[str, str]:
-    """Identify likely field swaps based on type incompatibility.
+def _detect_field_swaps(
+    quality_map: dict[str, float],
+    fields: list[SchemaField],
+    extracted_values: dict[str, list] | None = None,
+) -> dict[str, str]:
+    """Identify likely field swaps based on type incompatibility and extracted values.
+    
+    Analyzes extracted values against expected FieldType to detect swaps:
+    - A CURRENCY field that extracted a long text string (possible swap with STRING)
+    - An INTEGER field that extracted non-numeric text (possible swap with STRING)
+    - A PHONE field that extracted a URL (possible swap with URL field)
     
     Returns a map of field_name -> correct_field_name if a swap is likely.
-    Uses only FieldType information — no hardcoded field names.
-    
-    Logic: if two fields have very low quality AND their types are 
-    obviously incompatible (e.g., a BOOLEAN field extracting what looks like
-    a long text string, and a STRING field extracting what looks like 
-    a boolean), swapping their selectors might help.
-    
-    Since we lack access to extracted values here, this is a placeholder
-    for future value-aware swap detection. Currently returns empty.
+    When extracted_values are available, uses value-level type checking.
+    Without values, falls back to quality-based heuristic detection.
     """
-    return {}
+    if not extracted_values:
+        # No values to check — use quality-based heuristic
+        # If a field has very low quality and another has unusually high quality
+        # for its type, a swap may have occurred
+        likely_swaps: dict[str, str] = {}
+        for field in fields:
+            quality = quality_map.get(field.name, 1.0)
+            if quality < 0.3 and field.field_type in (FieldType.CURRENCY, FieldType.PHONE, FieldType.EMAIL, FieldType.URL):
+                # This field has low quality but should be easy to match — look for another
+                # field with unusually high quality that might have taken its selector
+                for other in fields:
+                    if other.name == field.name:
+                        continue
+                    other_quality = quality_map.get(other.name, 0.0)
+                    if other_quality > 0.8 and other.field_type == FieldType.STRING:
+                        likely_swaps[field.name] = other.name
+                        break
+        return likely_swaps
+
+    # Value-aware swap detection
+    import re
+    swaps: dict[str, str] = {}
+    
+    for field in fields:
+        values = extracted_values.get(field.name, [])
+        if not values:
+            continue
+        
+        # Check each field's values against its expected type
+        type_match = _check_type_compatibility(field.field_type, values)
+        if type_match >= 0.8:
+            continue  # Values look correct for this type
+        
+        # Find a field whose values match our expected type better
+        for other in fields:
+            if other.name == field.name:
+                continue
+            other_vals = extracted_values.get(other.name, [])
+            if not other_vals:
+                continue
+            # Check if our values look like the other field's type
+            our_to_other_match = _check_type_compatibility(other.field_type, values)
+            their_to_our_match = _check_type_compatibility(field.field_type, other_vals)
+            if our_to_other_match > 0.6 and their_to_our_match > 0.6:
+                swaps[field.name] = other.name
+                break
+    
+    return swaps
+
+
+def _check_type_compatibility(field_type: FieldType, values: list) -> float:
+    """Check if values are compatible with a given FieldType.
+    Returns a score from 0.0 (incompatible) to 1.0 (perfect match).
+    """
+    import re
+    if not values:
+        return 0.5  # No data to check
+    
+    str_vals = [str(v).strip() for v in values if v]
+    if not str_vals:
+        return 0.5
+    
+    if field_type == FieldType.INTEGER:
+        numeric = sum(1 for v in str_vals if re.fullmatch(r"-?\d+", v))
+        return numeric / len(str_vals)
+    
+    if field_type == FieldType.FLOAT or field_type == FieldType.PERCENTAGE:
+        numeric = sum(1 for v in str_vals if re.fullmatch(r"-?\d+(?:\.\d+)?%?", v.replace(",", "")))
+        return numeric / len(str_vals)
+    
+    if field_type == FieldType.CURRENCY:
+        currency_match = sum(1 for v in str_vals if re.search(r"[$£€¥₹]\s*\d+", v) or re.search(r"\d+\s*[$£€¥₹]", v))
+        return currency_match / len(str_vals)
+    
+    if field_type == FieldType.EMAIL:
+        email_match = sum(1 for v in str_vals if re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", v))
+        return email_match / len(str_vals)
+    
+    if field_type == FieldType.PHONE:
+        phone_match = sum(1 for v in str_vals if re.search(r"[\+\d][\d\s()\-]{6,}\d", v))
+        return phone_match / len(str_vals)
+    
+    if field_type == FieldType.URL:
+        url_match = sum(1 for v in str_vals if v.startswith("http") or "." in v[:20])
+        return url_match / len(str_vals)
+    
+    if field_type == FieldType.BOOLEAN:
+        bool_match = sum(1 for v in str_vals if v.lower() in ("true", "false", "yes", "no", "0", "1"))
+        return bool_match / len(str_vals)
+    
+    if field_type == FieldType.DATE:
+        date_match = sum(1 for v in str_vals if re.search(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4}", v))
+        return date_match / len(str_vals)
+    
+    # STRING, LIST_STRING, CODE, RATING, LOCATION, NUMBER — generic types, always match
+    return 0.8
 
 def _align_selectors(selectors: dict, swaps: dict) -> dict:
     """Re-map selectors based on detected swaps."""

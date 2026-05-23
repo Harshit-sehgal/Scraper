@@ -33,6 +33,12 @@ logger = logging.getLogger(__name__)
 _captured_payloads: dict[str, list[dict[str, Any]]] = {}
 """Maps URL → list of captured network JSON payloads for that URL."""
 
+# Safety caps to prevent unbounded memory growth
+_MAX_PAYLOADS_PER_URL: int = 50
+"""Maximum number of network payloads stored per URL."""
+_MAX_BYTES_PER_URL: int = 10 * 1024 * 1024
+"""Maximum total bytes of network payloads stored per URL (10 MB)."""
+
 
 def clear(url: str) -> None:
     """Clear captured payloads for a URL."""
@@ -79,7 +85,10 @@ def get_all_hydration_objects(url: str) -> list[dict]:
 
 
 def store_captures(url: str, payloads: list[dict]) -> None:
-    """Store captured payloads for a URL.
+    """Store captured payloads for a URL with memory limits.
+
+    Caps total stored payloads per URL at _MAX_PAYLOADS_PER_URL and total
+    byte size at _MAX_BYTES_PER_URL to prevent unbounded memory growth.
 
     Args:
         url: The page URL these payloads were captured from.
@@ -87,13 +96,42 @@ def store_captures(url: str, payloads: list[dict]) -> None:
     """
     if not payloads:
         return
-    # Keep existing captures and add new ones
+
+    # Estimate total bytes of new payloads
+    import json
+    total_new_bytes = 0
+    for p in payloads:
+        try:
+            total_new_bytes += len(json.dumps(p, ensure_ascii=False, default=str))
+        except Exception:
+            total_new_bytes += 1024  # Conservative fallback estimate
+
+    # Enforce memory caps
     existing = _captured_payloads.get(url, [])
     existing.extend(payloads)
+
+    # Cap by count — keep newest _MAX_PAYLOADS_PER_URL
+    if len(existing) > _MAX_PAYLOADS_PER_URL:
+        existing = existing[-_MAX_PAYLOADS_PER_URL:]
+
+    # Cap by total bytes — drop oldest until under limit
+    total_bytes = 0
+    for p in reversed(existing):
+        try:
+            total_bytes += len(json.dumps(p, ensure_ascii=False, default=str))
+        except Exception:
+            total_bytes += 1024
+    while total_bytes > _MAX_BYTES_PER_URL and len(existing) > 1:
+        removed = existing.pop(0)
+        try:
+            total_bytes -= len(json.dumps(removed, ensure_ascii=False, default=str))
+        except Exception:
+            total_bytes -= 1024
+
     _captured_payloads[url] = existing
     logger.info(
-        "[BrowserNetwork] Stored %d network payloads for %s",
-        len(payloads), url,
+        "[BrowserNetwork] Stored %d network payloads for %s (total ~%.1f KB)",
+        len(payloads), url, total_bytes / 1024,
     )
 
 

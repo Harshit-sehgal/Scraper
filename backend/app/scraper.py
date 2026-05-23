@@ -82,8 +82,15 @@ async def scrape_url(
     attempt_ctx = None,
 ) -> list[dict]:
     """Orchestrate the full extraction flow for a single URL."""
+    from app.recovery_strategies import AttemptContext
+    if attempt_ctx is not None and not isinstance(attempt_ctx, AttemptContext):
+        attempt_ctx = None  # Safety: only accept proper AttemptContext
     if min_record_score is None:
         min_record_score = settings.DEFAULT_MIN_RECORD_SCORE
+    # Apply recovery min_record_score_override if set
+    if attempt_ctx and attempt_ctx.min_record_score_override is not None:
+        min_record_score = attempt_ctx.min_record_score_override
+        logger.info("[Recovery] Using min_record_score override: %.2f", min_record_score)
         
     logger.info("Fetching: %s", url)
     telemetry = get_scrape_telemetry()
@@ -104,8 +111,24 @@ async def scrape_url(
         return []
 
     # ── Step 1: Try profile-based extraction first ──────────────────
-    matched_profile = match_profile_for_url(url)
-    profile_results = await try_profile_extraction(url, max_wait=settings.PROFILE_MAX_WAIT)
+    # If recovery requested force_llm_discovery, skip profiles entirely
+    skip_profiles = attempt_ctx and attempt_ctx.force_llm_discovery
+    if skip_profiles:
+        logger.info("[Recovery] force_llm_discovery set — skipping profile-based extraction")
+
+    # Transfer recovery flags to selectors_map so orchestrator can consume them
+    if attempt_ctx:
+        if selectors_map is None:
+            selectors_map = {}
+        if attempt_ctx.force_llm_discovery:
+            selectors_map["force_llm_discovery"] = True
+        if attempt_ctx.bypass_selector_memory:
+            selectors_map["bypass_selector_memory"] = True
+        matched_profile = None
+        profile_results = None
+    else:
+        matched_profile = match_profile_for_url(url)
+        profile_results = await try_profile_extraction(url, max_wait=settings.PROFILE_MAX_WAIT)
     if profile_results is not None:
         logger.info(
             "Profile-based extraction returned %d records for %s",
@@ -166,7 +189,13 @@ async def scrape_url(
         if attempt_ctx and getattr(attempt_ctx, 'fetch_strategy', None):
             fetch_strategy = attempt_ctx.fetch_strategy
         html, js_render_delay, fetch_method, retry_count = await fetch_page_content(
-            url, preferred_method=fetch_strategy
+            url,
+            preferred_method=fetch_strategy,
+            timeout_ms=attempt_ctx.timeout_ms if attempt_ctx else None,
+            hydration_wait_ms=attempt_ctx.hydration_wait_ms if attempt_ctx else None,
+            skip_networkidle=attempt_ctx.skip_networkidle if attempt_ctx else False,
+            scroll_attempts=attempt_ctx.scroll_attempts if attempt_ctx else None,
+            anti_bot_stealth=attempt_ctx.anti_bot_stealth if attempt_ctx else False,
         )
         fetch_ms = (time.time() - fetch_start) * 1000
         fetch_success = True
@@ -373,7 +402,8 @@ async def scrape_url(
 
         # Collect page evidence for zero-result classification
         evidence = collect_page_evidence(html, url=url)
-        visible_text = ""
+        # page_text was computed above; use it to strengthen zero-result classification
+        visible_text = page_text
 
         # Classify the zero-result using the dedicated classifier
         zero_classification = classify_zero_result(
@@ -607,14 +637,12 @@ async def scrape_url(
     from app.browser_network_capture import clear as clear_network_captures
     clear_network_captures(url)
 
-    # ── Return with zero-result diagnostic marker ───────────────────
-    # Callers can check the last record's _zero_result_failure to determine
-    # whether a zero-record result is a genuine empty page or an extraction failure.
+    # ── Return with zero-result diagnostic logging ─────────────────
+    # Log the failure class for diagnostics. The empty results signal
+    # the caller that extraction ran to completion but found nothing.
     if not results and zero_result_failure_class:
-        # Return a single diagnostic marker record so the caller knows extraction
-        # ran to completion but found nothing — this is not "success with 0 records"
         logger.info(
-            "[Scraper] Zero records for %s — failure_class=%s",
+            "[Scraper] Zero records for %s — failure_class=%s (not returning marker record)",
             url, zero_result_failure_class,
         )
         return []

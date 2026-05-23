@@ -4,12 +4,23 @@ Defines the data structures for jobs, schemas, filters, and results.
 """
 
 import datetime
+import re
 import uuid
 from enum import Enum
 from typing import Optional
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+# Field names reserved for system/metadata use — cannot be used as schema field names
+# These are internal fields injected by the extraction pipeline at runtime
+RESERVED_FIELD_NAMES: frozenset = frozenset({
+    "_provenance",
+    "_extraction_method",
+    "_ai_source_structured",
+    "_calibrated_confidence",
+})
 
 
 class FieldType(str, Enum):
@@ -61,10 +72,23 @@ class SourcePolicy(str, Enum):
 
 class SchemaField(BaseModel):
     """A single field definition in the extraction schema."""
-    name: str = Field(..., description="Field name, e.g. 'company_name'")
+    name: str = Field(..., description="Field name, e.g. 'company_name'", max_length=64)
     field_type: FieldType = Field(..., description="Data type for this field")
     description: str = Field("", description="Optional hint for the LLM about what this field is")
     required: bool = Field(True, description="Whether this field is required")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", v):
+            raise ValueError(
+                "Field name must be snake_case, start with a letter, "
+                "and be at most 64 characters"
+            )
+        if v in RESERVED_FIELD_NAMES:
+            raise ValueError(f"Field name '{v}' is reserved for system use")
+        return v
 
 
 class FilterRule(BaseModel):
@@ -101,7 +125,7 @@ class JobCreate(BaseModel):
     mode: ScrapeMode = Field(ScrapeMode.MANUAL, description="Manual or Auto discovery mode")
     intent: str = Field("", description="Natural language extraction intent")
     # Manual mode
-    urls: list[str] = Field(default_factory=list, description="List of URLs to scrape (manual mode)")
+    urls: list[str] = Field(default_factory=list, max_length=100, description="List of URLs to scrape (manual mode)")
     # Auto mode
     topic: str = Field("", description="Topic for auto-discovery")
     location: str = Field("", description="Location focus for auto-discovery")
@@ -129,6 +153,7 @@ class JobCreate(BaseModel):
             cleaned_urls = [u.strip() for u in self.urls if str(u or "").strip()]
             if not cleaned_urls:
                 raise ValueError("Manual mode requires at least one URL")
+            # max_length=100 on the urls field enforces the upper bound
             invalid_urls = [
                 u
                 for u in cleaned_urls
@@ -144,6 +169,18 @@ class JobCreate(BaseModel):
                 raise ValueError("Auto mode requires a non-empty topic")
             # Auto mode always discovers URLs itself.
             self.urls = []
+
+        # Validate selectors_map size if present
+        if self.selectors_map:
+            if len(self.selectors_map) > 20:
+                raise ValueError("selectors_map must have at most 20 keys")
+            fields = self.selectors_map.get("fields", {})
+            if fields and len(fields) > 50:
+                raise ValueError("selectors_map.fields must have at most 50 entries")
+            container = self.selectors_map.get("item_container", "")
+            if container and len(container) > 500:
+                raise ValueError("selectors_map.item_container must be at most 500 characters")
+
         return self
 
 

@@ -23,9 +23,10 @@ def _now_iso() -> str:
 
 
 def get_state_file_path() -> Path:
-    configured = os.getenv("DATAFORGE_STATE_FILE", "").strip()
-    if configured:
-        return Path(configured).expanduser()
+    # Use settings.STATE_FILE_PATH as the single source of truth
+    from app.config import settings
+    if settings.STATE_FILE_PATH:
+        return Path(settings.STATE_FILE_PATH).expanduser()
     return _DEFAULT_STATE_FILE
 
 

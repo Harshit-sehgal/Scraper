@@ -126,76 +126,104 @@ async def run_job(
         _add_job_log(job, f"Scraping started ({len(job.urls)} URLs queue)", persist_fn=persist_state_fn)
 
         semaphore = asyncio.Semaphore(settings.JOB_MAX_PARALLEL_URLS)
+        job_lock = asyncio.Lock()
 
-        async def _scrape_single_url(idx: int, url: str) -> tuple[int, list[dict], bool]:
+        async def _safe_log(message: str, level: str = "info"):
+            async with job_lock:
+                _add_job_log(job, message, level=level, persist_fn=persist_state_fn)
+
+        async def _safe_progress(idx: int):
+            async with job_lock:
+                job.progress_current = idx
+
+        async def _safe_warning(msg: str):
+            async with job_lock:
+                warnings.append(msg)
+
+        async def _scrape_single_url(idx: int, url: str) -> tuple[int, list[dict], bool, dict]:
             if job.cancel_requested:
-                return idx, [], False
+                return idx, [], False, {}
             elapsed = time.monotonic() - started_at
             if elapsed > max_job_runtime_seconds:
-                warnings.append(f"Job runtime limit reached at {int(elapsed)}s; partial results returned.")
-                return idx, [], False
+                await _safe_warning(f"Job runtime limit reached at {int(elapsed)}s; partial results returned.")
+                return idx, [], False, {}
 
             async with semaphore:
-                _add_job_log(job, f"Scraping ({idx}/{len(job.urls)}): {url}", persist_fn=persist_state_fn)
-                if job.mode == ScrapeMode.AUTO:
-                    job.progress_current = idx
-                else:
-                    job.progress_current = idx
+                await _safe_log(f"Scraping ({idx}/{len(job.urls)}): {url}")
+                await _safe_progress(idx)
 
                 from app.semantic_world_state import get_world_state
                 ws = get_world_state()
-                with ws.transaction(f"scrape:{url}"):
-                    try:
-                        reset_llm_call_count()
-                        results, recovery_stats = await asyncio.wait_for(
-                            scrape_url_with_recovery(
-                                url, job.schema_fields,
-                                min_record_score=job.min_record_score,
-                                user_intent=job.intent, world_state=ws,
-                                max_recovery_attempts=settings.MAX_RECOVERY_ATTEMPTS,
-                                selectors_map=job.selectors_map,
-                                search_params=job.search_params,
-                            ),
-                            timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
-                        )
+                try:
+                    reset_llm_call_count()
+                    results, recovery_stats = await asyncio.wait_for(
+                        scrape_url_with_recovery(
+                            url, job.schema_fields,
+                            min_record_score=job.min_record_score,
+                            user_intent=job.intent, world_state=ws,
+                            max_recovery_attempts=settings.MAX_RECOVERY_ATTEMPTS,
+                            selectors_map=job.selectors_map,
+                            search_params=job.search_params,
+                        ),
+                        timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
+                    )
+
+                    # Integrate results into world state in a short transaction
+                    # (do NOT hold the transaction across the network scrape)
+                    async with job_lock:
                         job.total_llm_calls += get_llm_call_count()
 
-                        if recovery_stats.get("recovery_attempts", 0) > 0:
-                            actions = ", ".join(recovery_stats.get("recovery_actions_taken", []))
-                            _add_job_log(job, f"Recovery applied to {url}: {actions}", level="info")
+                    with ws.transaction(f"integrate_scrape:{url}"):
+                        pass  # Future: integrate semantic/motif/world-state updates here
 
-                        for record in results:
-                            if record.pop("_ai_source_structured", False):
-                                pass
-                            record["source_url"] = url
-                            inferred = infer_source_metadata(url=url)
-                            record["source_type"] = str(inferred.get("source_type") or "unknown")
-                            record["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
+                    if recovery_stats.get("recovery_attempts", 0) > 0:
+                        actions = ", ".join(recovery_stats.get("recovery_actions_taken", []))
+                        await _safe_log(f"Recovery applied to {url}: {actions}", level="info")
 
-                        _add_job_log(job, f"Extracted {len(results)} raw records from {url}")
+                    # Count AI-structured records
+                    ai_structured_count = 0
+                    for record in results:
+                        if record.pop("_ai_source_structured", False):
+                            ai_structured_count += 1
+                        record["source_url"] = url
+                        inferred = infer_source_metadata(url=url)
+                        record["source_type"] = str(inferred.get("source_type") or "unknown")
+                        record["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
+
+                    url_meta = {
+                        "ai_structured_count": ai_structured_count,
+                        "attempted": True,
+                        "acquisition_lineage": recovery_stats.get("acquisition_lineage", {}),
+                    }
+
+                    await _safe_log(f"Extracted {len(results)} raw records from {url}")
+                    async with job_lock:
                         persist_state_fn()
-                        return idx, results, True
-                    except asyncio.TimeoutError:
-                        _add_job_log(job, f"Timeout on {url}", level="warning", persist_fn=persist_state_fn)
-                        logging.warning("Job %s: Timeout for %s", job_id, url)
-                        warnings.append(f"URL timeout skipped ({idx}/{len(job.urls)}): {url}")
-                        return idx, [], False
-                    except Exception as e:
-                        logging.exception("Job %s: URL scrape failed: %s", job_id, url)
-                        _add_job_log(job, f"Failed to scrape {url}: {type(e).__name__}", level="warning", persist_fn=persist_state_fn)
-                        warnings.append(f"URL scrape failed ({idx}/{len(job.urls)}): {url} ({type(e).__name__})")
-                        return idx, [], False
+                    return idx, results, True, url_meta
+                except asyncio.TimeoutError:
+                    await _safe_log(f"Timeout on {url}", level="warning")
+                    logging.warning("Job %s: Timeout for %s", job_id, url)
+                    await _safe_warning(f"URL timeout skipped ({idx}/{len(job.urls)}): {url}")
+                    return idx, [], False, {}
+                except Exception as e:
+                    logging.exception("Job %s: URL scrape failed: %s", job_id, url)
+                    await _safe_log(f"Failed to scrape {url}: {type(e).__name__}", level="warning")
+                    await _safe_warning(f"URL scrape failed ({idx}/{len(job.urls)}): {url} ({type(e).__name__})")
+                    return idx, [], False, {}
 
         tasks = [_scrape_single_url(idx, url) for idx, url in enumerate(job.urls, start=1)]
         scraped = await asyncio.gather(*tasks)
 
-        for idx, results, success in sorted(scraped, key=lambda x: x[0]):
+        for idx, results, success, meta in sorted(scraped, key=lambda x: x[0]):
             if success:
                 all_raw_results.extend(results)
                 if len(results) > 0:
                     urls_with_records += 1
                     ai_source_prediction["sources_attempted"] += 1
                     ai_source_prediction["records_processed"] += len(results)
+                    ai_source_prediction["records_ai_structured"] += meta.get("ai_structured_count", 0)
+                    if meta.get("ai_structured_count", 0) > 0:
+                        ai_source_prediction["sources_with_ai_structuring"] += 1
             if job.cancel_requested:
                 mark_job_canceled(job)
                 return
@@ -336,6 +364,7 @@ async def run_job(
             ai_source_prediction=ai_source_prediction,
             ai_structuring_report=ai_structuring_report,
             warnings=warnings,
+            acquisition_lineages=[m.get("acquisition_lineage", {}) for _, _, _, m in scraped if m.get("acquisition_lineage")],
         )
 
         job.results = normalize_job_results(filtered_results, job.schema_fields)
@@ -395,7 +424,11 @@ async def run_job(
             _add_job_log(job, f"Job results bounded and offloaded to disk due to size (>{settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD} records).")
 
         total_urls = len(job.urls)
-        if len(all_raw_results) == 0:
+        if total_urls == 0:
+            job.status = JobStatus.EMPTY_RESULT
+            job.error = "No URLs to scrape (empty URL list)."
+            _add_job_log(job, job.error, level="warning", persist_fn=persist_state_fn)
+        elif len(all_raw_results) == 0:
             job.status = JobStatus.EMPTY_RESULT
             job.error = "The job completed but no records were extracted. This may be due to a session-bound URL, empty response, anti-bot block, JavaScript-rendered results, or missing search-form replay."
             _add_job_log(job, job.error, level="warning", persist_fn=persist_state_fn)
@@ -410,7 +443,13 @@ async def run_job(
         job.completed_at = datetime.datetime.now().isoformat()
         job.progress_current = job.progress_total
         save_semantic_state()
-        _add_job_log(job, "Job completed successfully", persist_fn=persist_state_fn)
+        # Contextual completion log message
+        if job.status == JobStatus.COMPLETED:
+            _add_job_log(job, "Job completed successfully", persist_fn=persist_state_fn)
+        elif job.status == JobStatus.DEGRADED:
+            _add_job_log(job, "Job completed with degraded results", level="warning", persist_fn=persist_state_fn)
+        elif job.status == JobStatus.EMPTY_RESULT:
+            _add_job_log(job, "Job completed with empty result", level="warning", persist_fn=persist_state_fn)
 
         logging.info("Job %s: Completed (%s): %d total, %d after filtering", job_id, job.status.value, total, filtered_count)
 

@@ -28,6 +28,7 @@ from app.recovery_strategies import get_recovery_strategist, get_recovery_execut
 from app.selector_memory import get_selector_memory
 from app.domain_intelligence import get_domain_intelligence
 from app.models import SchemaField
+from app.acquisition_state import AcquisitionLineage, AcquisitionState
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,37 @@ async def scrape_url_with_recovery(
             
             recovery_stats["success"] = True
             recovery_stats["total_time_ms"] = (time.time() - start_time) * 1000
+
+            # Build acquisition lineage for successful scrape
+            from app.scrape_telemetry import get_scrape_telemetry
+            last_event = get_scrape_telemetry().get_last_for_url(url)
+            event_dict = last_event.to_dict() if last_event else {}
+            anti_bot_score = event_dict.get("anti_bot_score", 0.0)
+            fetch_method = event_dict.get("fetch_method", "")
+
+            # If recovery was used, note it in the lineage
+            if attempt > 1:
+                state = AcquisitionState.RECOVERED
+                user_message = "Scrape succeeded after recovery actions."
+            elif anti_bot_score > 0.5:
+                state = AcquisitionState.ANTI_BOT_BLOCKED
+                user_message = "Page may have anti-bot protections."
+            else:
+                state = AcquisitionState.DIRECT
+                user_message = "Page loaded successfully."
+
+            lineage = AcquisitionLineage(
+                original_url=url,
+                final_url=url,
+                state=state,
+                fetch_method=fetch_method or event_dict.get("fetch_method", "playwright_full"),
+                anti_bot_score=anti_bot_score,
+                data_evidence_score=min(1.0, len(results) / 10.0) if results else 0.0,
+                user_message=user_message,
+                recovery_method=", ".join(recovery_stats["recovery_actions_taken"]) if recovery_stats["recovery_actions_taken"] else None,
+            )
+            recovery_stats["acquisition_lineage"] = lineage.to_dict()
+
             logger.info("Scrape succeeded on attempt %d for %s (got %d records)", 
                        attempt, url, len(results))
             return results, recovery_stats
@@ -165,11 +197,20 @@ async def scrape_url_with_recovery(
 
             if attempt >= max_recovery_attempts:
                 break
-                
-            # 2. Generate recovery plan
-            plan = strategist.generate_recovery_plan(classification, attempt)
+
+            # 2. Generate recovery plan with domain intelligence
+            domain_info = get_domain_intelligence().get_intelligence(url).to_dict()
+            plan = strategist.generate_recovery_plan(classification, attempt, domain_info=domain_info)
             logger.info("Generated recovery plan for %s: %s (attempt %d)", 
                        url, plan.primary_action.value, attempt)
+
+            # Enforce per-plan max retry attempts
+            if attempt > plan.max_retry_attempts:
+                logger.warning(
+                    "Max retry attempts (%d) reached for %s, giving up",
+                    plan.max_retry_attempts, url,
+                )
+                break
             
             # 3. Execute recovery
             recovery_stats["recovery_attempts"] += 1
@@ -190,10 +231,39 @@ async def scrape_url_with_recovery(
             if attempt_ctx.force_llm_discovery and selectors_map:
                 selectors_map = None  # Force fresh discovery on retry
             
-            # Exponential backoff
-            await asyncio.sleep(plan.backoff_seconds)
+            # Backoff already applied by RecoveryExecutor.execute() — do NOT sleep again
             
     recovery_stats["total_time_ms"] = (time.time() - start_time) * 1000
+
+    # Build acquisition lineage for failed scrape
+    failure_category = recovery_stats.get("final_failure_category", "unknown")
+    state_map = {
+        "zero_records_extracted": AcquisitionState.EMPTY_RESPONSE,
+        "anti_bot": AcquisitionState.ANTI_BOT_BLOCKED,
+        "session_expired": AcquisitionState.SESSION_EXPIRED,
+        "timeout": AcquisitionState.SESSION_EXPIRED,
+    }
+    state = AcquisitionState.EMPTY_RESPONSE
+    for key, mapped_state in state_map.items():
+        if failure_category and key in failure_category:
+            state = mapped_state
+            break
+
+    lineage = AcquisitionLineage(
+        original_url=url,
+        final_url=url,
+        state=AcquisitionState.SESSION_EXPIRED,
+        message="Session-bound URL expired",
+        fetch_method="unknown",
+        session_bound=True,
+        anti_bot_score=0.0,
+        data_evidence_score=0.0,
+        user_message="",
+        recommended_next_action="provide_search_params",
+    )
+    lineage.user_message = lineage.get_user_message()
+    recovery_stats["acquisition_lineage"] = lineage.to_dict()
+
     logger.error("All %d scrape attempts failed for %s. Last error: %s", 
                 max_recovery_attempts, url, last_error)
     return [], recovery_stats

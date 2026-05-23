@@ -92,6 +92,18 @@ class AttemptContext:
     scroll_attempts: int | None = None
     anti_bot_stealth: bool = False
 
+    # Recovery-only flags
+    skip_url: bool = False
+    """If True, the URL should be skipped entirely (set by handle_skip_url)."""
+    skip_domain: str | None = None
+    """If set, the domain should be skipped (set by handle_skip_domain)."""
+    min_record_score_override: float | None = None
+    """Override the minimum record score (set by handle_lower_score_threshold)."""
+    force_container_discovery: bool = False
+    """If True, bypass memory and LLM discovery and go straight to container discovery."""
+    abort_domain: bool = False
+    """If True, mark domain cooldown instead of retrying with a different strategy."""
+
 
 class RecoveryStrategist:
     """Generates tailored recovery plans for failures."""

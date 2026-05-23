@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-15-Site Smoke Test — validates the universal evidence-based extraction pipeline
-across diverse real-world websites.
+Benchmark Smoke Test — validates the universal evidence-based extraction pipeline
+across 30+ diverse real-world websites.
 
-Covers: listing, table, blog, content, API-style, JS-rendered, paginated.
+Covers: listing, table, blog, content, API-style, JS-rendered, paginated, news, ecommerce.
 """
 import asyncio
 import json
@@ -50,7 +50,7 @@ SITES: list[SiteTest] = [
             SchemaField(name="score", field_type=FieldType.INTEGER, description="Upvotes or points"),
             SchemaField(name="author", field_type=FieldType.STRING, description="Submitter username"),
         ],
-        min_expected=0,
+        min_expected=10,
     ),
     SiteTest(
         name="Books to Scrape",
@@ -61,7 +61,7 @@ SITES: list[SiteTest] = [
             SchemaField(name="price", field_type=FieldType.CURRENCY, description="Book price"),
             SchemaField(name="rating", field_type=FieldType.STRING, description="Star rating"),
         ],
-        min_expected=0,
+        min_expected=5,
     ),
     SiteTest(
         name="Quotes to Scrape",
@@ -92,7 +92,7 @@ SITES: list[SiteTest] = [
             SchemaField(name="country", field_type=FieldType.STRING, description="Country name"),
             SchemaField(name="gdp", field_type=FieldType.STRING, description="GDP in USD"),
         ],
-        min_expected=0,
+        min_expected=10,
     ),
     SiteTest(
         name="ScrapeThisSite Simple",
@@ -102,7 +102,7 @@ SITES: list[SiteTest] = [
             SchemaField(name="country", field_type=FieldType.STRING, description="Country name"),
             SchemaField(name="capital", field_type=FieldType.STRING, description="Capital city"),
         ],
-        min_expected=0,
+        min_expected=5,
     ),
     SiteTest(
         name="ScrapeThisSite Forms",
@@ -124,7 +124,7 @@ SITES: list[SiteTest] = [
             SchemaField(name="author", field_type=FieldType.STRING, description="Book author"),
             SchemaField(name="year", field_type=FieldType.STRING, description="Publication year"),
         ],
-        min_expected=0,
+        min_expected=10,
     ),
     SiteTest(
         name="Books Page 2",
@@ -135,7 +135,7 @@ SITES: list[SiteTest] = [
             SchemaField(name="price", field_type=FieldType.CURRENCY, description="Book price"),
             SchemaField(name="rating", field_type=FieldType.STRING, description="Star rating"),
         ],
-        min_expected=0,
+        min_expected=1,
     ),
     SiteTest(
         name="Example.com",
@@ -154,10 +154,10 @@ SITES: list[SiteTest] = [
             SchemaField(name="section", field_type=FieldType.STRING, description="Section heading"),
             SchemaField(name="paragraph", field_type=FieldType.STRING, description="Content text"),
         ],
-        min_expected=0,
+        min_expected=1,
     ),
     SiteTest(
-        name="GitHub Trending",
+        name="GitHub Trending JS",
         category="listing_js",
         url="https://github.com/trending",
         schema=[
@@ -165,7 +165,7 @@ SITES: list[SiteTest] = [
             SchemaField(name="description", field_type=FieldType.STRING, description="Repo description"),
             SchemaField(name="stars", field_type=FieldType.STRING, description="Star count"),
         ],
-        min_expected=0,
+        min_expected=1,
     ),
     SiteTest(
         name="Cat Facts",
@@ -174,7 +174,7 @@ SITES: list[SiteTest] = [
         schema=[
             SchemaField(name="fact", field_type=FieldType.STRING, description="Cat fact"),
         ],
-        min_expected=0,
+        min_expected=1,
     ),
     SiteTest(
         name="HTTPBin HTML",
@@ -184,7 +184,7 @@ SITES: list[SiteTest] = [
             SchemaField(name="heading", field_type=FieldType.STRING, description="Page heading"),
             SchemaField(name="paragraph", field_type=FieldType.STRING, description="Content text"),
         ],
-        min_expected=0,
+        min_expected=1,
     ),
     SiteTest(
         name="HTTPBin Links",
@@ -208,14 +208,14 @@ SITES: list[SiteTest] = [
         min_expected=0,
     ),
     SiteTest(
-        name="Wikipedia Python",
+        name="Wikipedia Python (Alt)",
         category="content",
         url="https://en.wikipedia.org/wiki/Python_(programming_language)",
         schema=[
             SchemaField(name="heading", field_type=FieldType.STRING, description="Page heading"),
             SchemaField(name="paragraph", field_type=FieldType.STRING, description="Content paragraph"),
         ],
-        min_expected=0,
+        min_expected=1,
     ),
     SiteTest(
         name="StackOverflow Questions",
@@ -228,7 +228,7 @@ SITES: list[SiteTest] = [
         min_expected=0,
     ),
     SiteTest(
-        name="GitHub Trending",
+        name="GitHub Trending (Alt)",
         category="listing",
         url="https://github.com/trending",
         schema=[
@@ -326,7 +326,7 @@ SITES: list[SiteTest] = [
         category="blocked",
         url="https://www.youtube.com/results?search_query=python",
         schema=[SchemaField(name="title", field_type=FieldType.STRING)],
-        min_expected=0,
+        min_expected=10,
     ),
     SiteTest(
         name="JSONPlaceholder Posts",

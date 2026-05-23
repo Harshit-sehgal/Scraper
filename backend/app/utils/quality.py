@@ -176,6 +176,7 @@ def build_quality_report(
     ai_source_prediction: dict | None = None,
     ai_structuring_report: dict | None = None,
     warnings: list[str] | None = None,
+    acquisition_lineages: list[dict] | None = None,
 ) -> dict:
     scores = [safe_score(r.get("record_score", 0.0)) for r in raw_results if isinstance(r, dict)]
     kept_scores = [safe_score(r.get("record_score", 0.0)) for r in final_results if isinstance(r, dict)]
@@ -208,6 +209,23 @@ def build_quality_report(
     structured = int(source_ai.get("ai_chunks") or 0)
     source_ai["ai_row_rate"] = round((structured / processed), 3) if processed else 0.0
 
+    # Build acquisition summary from per-URL lineages
+    acquisition_summary: dict = {
+        "per_url": acquisition_lineages or [],
+        "direct": sum(1 for l in (acquisition_lineages or []) if l.get("state") == "direct"),
+        "recovered": sum(1 for l in (acquisition_lineages or []) if l.get("state") == "recovered"),
+        "session_expired": sum(1 for l in (acquisition_lineages or []) if "session" in l.get("state", "") or "recovery" in l.get("state", "")),
+        "anti_bot_blocked": sum(1 for l in (acquisition_lineages or []) if l.get("state") == "anti_bot_blocked"),
+        "empty_response": sum(1 for l in (acquisition_lineages or []) if l.get("state") in ("empty_response", "no_search_form")),
+    }
+    # Summarize recommended next actions
+    next_actions: dict[str, int] = {}
+    for l in (acquisition_lineages or []):
+        action = l.get("recommended_next_action", "") or ""
+        if action:
+            next_actions[action] = next_actions.get(action, 0) + 1
+    acquisition_summary["recommended_next_actions"] = next_actions
+
     return {
         "raw_records": len(raw_results),
         "post_filter_records": post_filter_count,
@@ -226,4 +244,5 @@ def build_quality_report(
         "ai_structuring": ai_structuring_report or {},
         "warnings": warnings or [],
         "radius": radius_report,
+        "acquisition": acquisition_summary,
     }
