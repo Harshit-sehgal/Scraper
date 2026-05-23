@@ -393,7 +393,7 @@ def _build_css_for_element(el) -> str | None:
         if el.name not in ("div", "span", "html", "body"):
             return f"{el.name}{cls_sel}"
         return cls_sel
-    if el.name not in ("div", "span", "html", "body", "main", "section", "article", "a", "p", "li", "ul", "ol", "img", "br", "i", "b", "strong", "em", "small", "label", "h1", "h2", "h3", "h4", "h5", "h6"):
+    if el.name not in ("div", "span", "html", "body", "main", "section", "article", "a", "p", "li", "ul", "ol", "img", "br", "i", "b", "strong", "em", "small", "label", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "td", "th", "tbody", "thead"):
         return el.name
     return None
 
