@@ -478,6 +478,9 @@ def _extract_record_from_element(
         if value:
             record[field.name] = value
 
+    # Preserve original element text for compound record assembly downstream
+    record["_element_text"] = full_text[:2000]
+
     return record
 
 

@@ -963,6 +963,58 @@ route-specific logic:
 
 ---
 
+## Pass 19 — Fix Visible-Text Card Grouping + Preserve DOM Text for Compound Assembly
+
+### Bugs Fixed
+
+#### 51. Simulated y-positions merged ALL visible blocks into one card
+**File**: `backend/app/rendered_visible_text_extractor.py`
+`_group_into_cards()` used simulated y-positions with a gap of 1.0, causing
+`_is_nearby()` to always return True. Every block on the page was merged into
+a single card, making visible-text extraction useless for multi-record pages.
+
+**Fix**: Rewrote `_group_into_cards()` to group blocks by `parent_path` prefix:
+- Pass 1: group by depth-3 parent prefix (e.g., `html.body.div.div.container`)
+- Pass 2: split oversized groups (16+ blocks) by depth-4 prefix
+- Pass 3: if 0–1 cards result, retry with depth-2 (broader grouping)
+- Deduplicates by combined_text
+- Removed dead code: `_merge_nearby_cards()`, `MAX_VERTICAL_GAP`, `MAX_HORIZONTAL_GAP`, `MAX_CARD_GAP` constants (replaced with `CARD_Y_SPACING`)
+
+#### 52. Compound record assembler had no access to original DOM text
+**Files**: `backend/app/container_discovery.py`, `backend/app/rendered_visible_text_extractor.py`
+Both `_extract_record_from_element()` (container discovery) and
+`_extract_record_from_card()` (visible-text extraction) now store
+`_element_text = full_text[:2000]` in each record, preserving the original
+DOM/visual text for downstream compound record assembly.
+
+#### 53. Compound assembler used concatenated values instead of original text
+**File**: `backend/app/compound_record_assembler.py`
+`assemble_compound_records()` now checks `record.get('_element_text')` FIRST
+(before `full_texts` dict and before concatenated scalar values), ensuring
+segment detection and shared-field extraction use the original DOM text.
+
+#### 54. Redundant full_texts dict construction removed from scraper
+**File**: `backend/app/scraper.py`
+The explicit `full_texts` dict in the compound assembly section was redundant
+now that `_element_text` is embedded in records directly. Simplified to
+`assemble_compound_records(results, full_texts=None)`.
+
+### Validation
+
+| Check | Result |
+|-------|--------|
+| `python -m pyflakes` (all 4 modified files) | **0 issues** |
+| Unit tests (128 fast tests) | **all passed** |
+| Module imports | **all clean** |
+| Code review | **clean** — dead code confirmed removed, fallback chain correct |
+
+### Commit
+```
+<commit_hash> fix: visible-text card grouping + _element_text preservation + compound assembly fix — Pass 19
+```
+
+---
+
 ## What Needs to Be Done
 
 ### Short-term (stability)

@@ -74,12 +74,6 @@ class CardGroupingResult:
 # Constants — generic grouping parameters
 # ---------------------------------------------------------------------------
 
-# Maximum y-gap between blocks in the same card (in pixels)
-MAX_VERTICAL_GAP = 60.0
-
-# Maximum x-distance for blocks to be in the same column
-MAX_HORIZONTAL_GAP = 200.0
-
 # Minimum blocks per card to be considered meaningful
 MIN_BLOCKS_PER_CARD = 3
 
@@ -89,8 +83,8 @@ MIN_CARDS_FOR_REPEAT = 2
 # Minimum combined text length for a meaningful card
 MIN_CARD_TEXT_LEN = 40
 
-# Maximum y-gap between cards
-MAX_CARD_GAP = 200.0
+# Estimated gap between cards (for cosmetic y_start/y_end only)
+CARD_Y_SPACING = 60.0
 
 
 # ---------------------------------------------------------------------------
@@ -165,16 +159,14 @@ def extract_from_visible_blocks(
 # ---------------------------------------------------------------------------
 
 def _group_into_cards(evidence: PageEvidence) -> CardGroupingResult:
-    """Group visible text blocks into visual cards based on y-proximity.
+    """Group visible text blocks into visual cards by structural parent containers.
 
-    Uses a simple greedy algorithm on DOM-order:
-    1. Group blocks whose parent paths share a common prefix (same container)
-    2. Adjacent blocks in DOM order with close parent paths are grouped
-    3. Separate groups when parent paths diverge significantly
-    4. Merge adjacent cards that are likely part of the same card (split by DOM structure)
-    5. Score each group based on content density
+    Uses the block's parent_path to cluster blocks into card-like groups.
+    Blocks under the same container sub-tree (depth <= 3) form one card.
+    Structural boundaries (shallow-to-deep path transitions, repeated
+    container patterns) separate cards.
 
-    NOTE: This groups by DOM proximity, not spatial layout. Blocks that are
+    NOTE: This groups by DOM structure, not spatial layout. Blocks that are
     visually adjacent but in different DOM branches may end up in different
     groups. True spatial grouping requires Playwright bounding box data.
     """
@@ -182,46 +174,88 @@ def _group_into_cards(evidence: PageEvidence) -> CardGroupingResult:
     if not blocks:
         return CardGroupingResult(cards=[], card_count=0, has_repeated_structure=False, cluster_signature="")
 
-    # Group blocks by parent path similarity (same container = likely same card)
+    # ── Strategy: Group by container prefix at depth 3 ────────────────
+    # Each block has a parent_path like "html/body/div/div[2]/section/span"
+    # We group by a prefix that represents the card-level container.
+    # The prefix depth is adaptive: use depth 3 (2 tag levels) for most pages.
+
+    def _container_prefix(path: str, depth: int = 3) -> str:
+        """Extract the first `depth` levels of a parent path."""
+        parts = path.split("/")
+        return "/".join(parts[:min(depth, len(parts))])
+
+    # First pass: group blocks by container prefix depth 3
+    groups: dict[str, list[VisibleTextBlock]] = {}
+    for block in blocks:
+        prefix = _container_prefix(block.parent_path, 3)
+        if prefix not in groups:
+            groups[prefix] = []
+        groups[prefix].append(block)
+
+    # Second pass: split oversized groups (likely merged cards) by
+    # detecting repeated pattern boundaries within the same prefix
     cards: list[VisualCard] = []
-    current_card_blocks: list[VisibleTextBlock] = []
-    current_parent_prefix = ""
-    current_y = 0.0
+    for prefix, group in groups.items():
+        # A good card has 3-12 blocks. If a group fits, keep it.
+        if len(group) <= 12:
+            if _is_meaningful_card(group):
+                cards.append(_build_card(group, len(cards)))
+            continue
 
-    for i, block in enumerate(blocks):
-        block_parent = block.parent_path
-        block_y = current_y  # Simulate y position based on order
+        # Large group: split by depth-4 prefix (finer granularity)
+        sub_groups: dict[str, list[VisibleTextBlock]] = {}
+        for block in group:
+            sub_prefix = _container_prefix(block.parent_path, 4)
+            if sub_prefix not in sub_groups:
+                sub_groups[sub_prefix] = []
+            sub_groups[sub_prefix].append(block)
 
-        # Check: is this block in the same parent container as current card?
-        same_parent = (
-            current_parent_prefix
-            and (block_parent.startswith(current_parent_prefix) or current_parent_prefix.startswith(block_parent))
-        )
+        for sub_prefix, sub_group in sub_groups.items():
+            # If still too large, split by depth 5
+            if len(sub_group) > 12:
+                finer_groups: dict[str, list[VisibleTextBlock]] = {}
+                for block in sub_group:
+                    fine_prefix = _container_prefix(block.parent_path, 5)
+                    if fine_prefix not in finer_groups:
+                        finer_groups[fine_prefix] = []
+                    finer_groups[fine_prefix].append(block)
+                for fine_prefix, fine_group in finer_groups.items():
+                    if _is_meaningful_card(fine_group):
+                        cards.append(_build_card(fine_group, len(cards)))
+            else:
+                if _is_meaningful_card(sub_group):
+                    cards.append(_build_card(sub_group, len(cards)))
 
-        # Also check: is the gap from the last block small?
-        gap = abs(block_y - current_y) if current_y > 0 else 0
-        is_nearby = gap < 3  # Adjacent in order
+    # Third pass: if we have very few cards (0-1), try depth-2 prefix
+    # (broader grouping) to catch cases where cards span deeper DOM
+    if len(cards) <= 1:
+        broader: dict[str, list[VisibleTextBlock]] = {}
+        for block in blocks:
+            prefix = _container_prefix(block.parent_path, 2)
+            if prefix not in broader:
+                broader[prefix] = []
+            broader[prefix].append(block)
+        for prefix, group in broader.items():
+            if len(group) > 12:
+                # Still too large — don't force merge everything
+                continue
+            if _is_meaningful_card(group):
+                cards.append(_build_card(group, len(cards)))
 
-        if (same_parent or is_nearby) and current_card_blocks:
-            current_card_blocks.append(block)
-        else:
-            # Finish current card
-            if current_card_blocks and _is_meaningful_card(current_card_blocks):
-                card = _build_card(current_card_blocks, len(cards))
-                cards.append(card)
-            # Start new card
-            current_card_blocks = [block]
-            current_parent_prefix = block_parent.rsplit("/", 1)[0] if "/" in block_parent else block_parent
+    # Deduplicate by combined_text (same blocks in multiple groupings)
+    seen_texts: set[str] = set()
+    unique_cards: list[VisualCard] = []
+    for card in cards:
+        if card.combined_text not in seen_texts:
+            seen_texts.add(card.combined_text)
+            unique_cards.append(card)
+    cards = unique_cards
 
-        current_y = block_y + 1.0  # Increment simulated y
-
-    # Don't forget the last card
-    if current_card_blocks and _is_meaningful_card(current_card_blocks):
-        card = _build_card(current_card_blocks, len(cards))
-        cards.append(card)
-
-    # Merge cards that are too close together
-    cards = _merge_nearby_cards(cards)
+    # Re-index after dedup
+    for i, card in enumerate(cards):
+        card.index = i
+        card.y_start = float(i * CARD_Y_SPACING)
+        card.y_end = float(i * CARD_Y_SPACING + CARD_Y_SPACING)
 
     # Detect repeated structure
     has_repeated = _detect_repeated_patterns(cards)
@@ -255,8 +289,8 @@ def _build_card(blocks: list[VisibleTextBlock], index: int) -> VisualCard:
 
     return VisualCard(
         index=index,
-        y_start=float(index * MAX_VERTICAL_GAP),
-        y_end=float(index * MAX_VERTICAL_GAP + MAX_VERTICAL_GAP),
+        y_start=float(index * CARD_Y_SPACING),
+        y_end=float(index * CARD_Y_SPACING + CARD_Y_SPACING),
         blocks=blocks,
         combined_text=combined,
         pattern_signature=sig,
@@ -304,44 +338,6 @@ def _score_card(blocks: list[VisibleTextBlock], combined: str) -> float:
         score += 0.1
 
     return round(min(score, 1.0), 4)
-
-
-def _merge_nearby_cards(cards: list[VisualCard]) -> list[VisualCard]:
-    """Merge cards that are very close together (likely same card split)."""
-    if len(cards) <= 1:
-        return cards
-
-    merged: list[VisualCard] = []
-    current = cards[0]
-
-    for next_card in cards[1:]:
-        gap = next_card.y_start - current.y_end
-        if gap < MAX_VERTICAL_GAP * 0.5:
-            # Merge
-            all_blocks = current.blocks + next_card.blocks
-            combined = current.combined_text + " " + next_card.combined_text
-            merged_card = VisualCard(
-                index=current.index,
-                y_start=current.y_start,
-                y_end=next_card.y_end,
-                blocks=all_blocks,
-                combined_text=combined,
-                pattern_signature=current.pattern_signature + "|" + next_card.pattern_signature,
-                score=max(current.score, next_card.score),
-            )
-            current = merged_card
-        else:
-            merged.append(current)
-            current = next_card
-
-    merged.append(current)
-    # Re-index
-    for i, card in enumerate(merged):
-        card.index = i
-        card.y_start = float(i * MAX_VERTICAL_GAP)
-        card.y_end = float(i * MAX_VERTICAL_GAP + MAX_VERTICAL_GAP)
-
-    return merged
 
 
 # ---------------------------------------------------------------------------
@@ -457,6 +453,9 @@ def _extract_record_from_card(
         )
         if value and value not in ("", None, [], {}):
             record[field.name] = value
+
+    # Preserve original card text for compound record assembly downstream
+    record["_element_text"] = full_text[:2000]
 
     return record
 

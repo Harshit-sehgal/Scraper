@@ -453,21 +453,14 @@ async def scrape_url(
             )
 
     # ── Compound Record Assembly ────────────────────────────────────
-    # Detect and assemble compound records if results contain internal segments
-    if results and len(results) >= 1:
-        from app.page_evidence_collector import collect_page_evidence
-        evidence = collect_page_evidence(html, url=url)
-        # Build a mapping of record index to original element text for compound detection
-        full_texts: dict[str, str] = {}
-        for i, r in enumerate(results):
-            combined = " ".join(str(v) for v in r.values() if isinstance(v, str) and len(v) > 1)
-            if combined:
-                full_texts[str(i)] = combined
-        if full_texts:
-            assembled = assemble_compound_records(results, full_texts)
-            if assembled != results:
-                logger.info("[Scraper] Assembled %d compound records from %d raw records", len(assembled), len(results))
-                results = assembled
+    # Detect and assemble compound records if results contain internal segments.
+    # Uses _element_text (preserved by container discovery and visible-text extraction)
+    # as the primary text source, falling back to concatenated record values.
+    if results:
+        assembled = assemble_compound_records(results, full_texts=None)
+        if assembled != results:
+            logger.info("[Scraper] Assembled %d compound records from %d raw records", len(assembled), len(results))
+            results = assembled
 
     # ── Post-Extraction Processing ────────────────────────────────
 

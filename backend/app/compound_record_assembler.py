@@ -332,16 +332,15 @@ def assemble_compound_records(
 
     for i, record in enumerate(records):
         # Get the full text for this record
+        # Priority: 1) _element_text set by extractor, 2) full_texts dict, 3) concatenated values
         text = ""
-        if full_texts and str(i) in full_texts:
+        if record.get("_element_text"):
+            text = record["_element_text"]
+        elif full_texts and str(i) in full_texts:
             text = full_texts[str(i)]
         else:
             # Combine all field values as a proxy for the element text
             text = " ".join(str(v) for v in record.values() if isinstance(v, str) and v)
-
-            # Also check for extraction method
-            if record.get("_extraction_method"):
-                text += " " + str(record["_extraction_method"])
 
         # Detect segments
         segments = detect_segments(text)
