@@ -489,6 +489,68 @@ def save_report(results: list[SiteResult], path: str = "smoke_test_report.json")
     print(f"\nFull report saved to {path}")
 
 
+def compare_with_previous(results: list[SiteResult], history_dir: str = "smoke_test_history"):
+    """Compare current results with the most recent previous run, print trends."""
+    import glob as _glob
+    os.makedirs(history_dir, exist_ok=True)
+    
+    history_files = sorted(_glob.glob(f"{history_dir}/smoke_*.json"), reverse=True)
+    if not history_files:
+        print("\nFirst run — no previous benchmark to compare against.")
+        return
+    
+    try:
+        with open(history_files[0], "r") as f:
+            prev = json.load(f)
+    except Exception:
+        print(f"\nCould not load previous benchmark from {history_files[0]}")
+        return
+    
+    prev_results = {r["name"]: r for r in prev.get("results", [])}
+    curr_results = {r.name: r for r in results}
+    
+    regressed = []
+    improved = []
+    same = 0
+    unchanged = 0
+    
+    for name, cr in curr_results.items():
+        pr = prev_results.get(name)
+        if not pr:
+            continue
+        if cr.records > pr["records"]:
+            improved.append(name)
+        elif cr.records < pr["records"]:
+            regressed.append(name)
+        elif cr.records == pr["records"] and cr.records > 0:
+            same += 1
+        else:
+            unchanged += 1
+    
+    prev_sites = prev.get("sites_with_data", 0)
+    prev_records = prev.get("total_records", 0)
+    curr_sites = sum(1 for r in results if r.records > 0)
+    curr_records = sum(r.records for r in results)
+    
+    print(f"\n{'='*60}")
+    print("BENCHMARK TREND vs Previous Run")
+    print(f"{'='*60}")
+    print(f"Previous: {prev.get('timestamp', 'unknown')} — {prev_sites} sites, {prev_records} records")
+    print(f"Current:  {time.strftime('%Y-%m-%d %H:%M:%S')} — {curr_sites} sites, {curr_records} records")
+    print(f"  Improved:  +{len(improved)} sites" + (f" ({', '.join(improved[:5])})" if improved else ""))
+    print(f"  Regressed: -{len(regressed)} sites" + (f" ({', '.join(regressed[:5])})" if regressed else ""))
+    print(f"  Same:       {same} sites")
+    print(f"  Site delta: {curr_sites - prev_sites:+d}")
+    print(f"  Record delta: {curr_records - prev_records:+d}")
+
+
+def save_to_history(results: list[SiteResult], history_dir: str = "smoke_test_history"):
+    """Save this run to the benchmark history."""
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    path = f"{history_dir}/smoke_{ts}.json"
+    save_report(results, path)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
@@ -497,7 +559,9 @@ async def main():
     print("Running 15-site smoke test (this will take several minutes)...")
     results = await run_all_tests()
     print_report(results)
+    compare_with_previous(results)
     save_report(results)
+    save_to_history(results)
     print("\nDone.")
 
 
