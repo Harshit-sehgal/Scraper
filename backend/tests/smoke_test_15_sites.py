@@ -196,6 +196,148 @@ SITES: list[SiteTest] = [
         ],
         min_expected=0,
     ),
+    # ── Expanded: 15 additional diverse sites ──
+    SiteTest(
+        name="Reuters World News",
+        category="news",
+        url="https://www.reuters.com/world/",
+        schema=[
+            SchemaField(name="headline", field_type=FieldType.STRING, description="News headline"),
+            SchemaField(name="timestamp", field_type=FieldType.STRING, description="Publication time"),
+        ],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="Wikipedia Python",
+        category="content",
+        url="https://en.wikipedia.org/wiki/Python_(programming_language)",
+        schema=[
+            SchemaField(name="heading", field_type=FieldType.STRING, description="Page heading"),
+            SchemaField(name="paragraph", field_type=FieldType.STRING, description="Content paragraph"),
+        ],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="StackOverflow Questions",
+        category="listing",
+        url="https://stackoverflow.com/questions?tab=newest",
+        schema=[
+            SchemaField(name="title", field_type=FieldType.STRING, description="Question title"),
+            SchemaField(name="votes", field_type=FieldType.INTEGER, description="Vote count"),
+        ],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="GitHub Trending",
+        category="listing",
+        url="https://github.com/trending",
+        schema=[
+            SchemaField(name="repo", field_type=FieldType.STRING, description="Repository name"),
+            SchemaField(name="description", field_type=FieldType.STRING, description="Repo description"),
+        ],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="IMDb Top 250",
+        category="ecommerce",
+        url="https://www.imdb.com/chart/top/",
+        schema=[
+            SchemaField(name="title", field_type=FieldType.STRING, description="Movie title"),
+            SchemaField(name="rating", field_type=FieldType.STRING, description="IMDb rating"),
+        ],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="BBC News",
+        category="news",
+        url="https://www.bbc.com/news",
+        schema=[
+            SchemaField(name="headline", field_type=FieldType.STRING, description="News headline"),
+            SchemaField(name="summary", field_type=FieldType.STRING, description="Article summary"),
+        ],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="AllRecipes",
+        category="listing",
+        url="https://www.allrecipes.com/recipes/",
+        schema=[
+            SchemaField(name="title", field_type=FieldType.STRING, description="Recipe title"),
+            SchemaField(name="rating", field_type=FieldType.STRING, description="Recipe rating"),
+        ],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="Goodreads Popular",
+        category="listing",
+        url="https://www.goodreads.com/list/show/1.Best_Books_Ever",
+        schema=[
+            SchemaField(name="title", field_type=FieldType.STRING, description="Book title"),
+            SchemaField(name="author", field_type=FieldType.STRING, description="Author name"),
+        ],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="Xe Currency Table",
+        category="table",
+        url="https://www.xe.com/currencytables/",
+        schema=[
+            SchemaField(name="currency", field_type=FieldType.STRING, description="Currency name"),
+            SchemaField(name="rate", field_type=FieldType.STRING, description="Exchange rate"),
+        ],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="Python Docs",
+        category="content",
+        url="https://docs.python.org/3/library/index.html",
+        schema=[
+            SchemaField(name="module", field_type=FieldType.STRING, description="Module name"),
+            SchemaField(name="summary", field_type=FieldType.STRING, description="Module summary"),
+        ],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="arXiv CS Papers",
+        category="listing",
+        url="https://arxiv.org/list/cs.AI/recent",
+        schema=[
+            SchemaField(name="title", field_type=FieldType.STRING, description="Paper title"),
+            SchemaField(name="authors", field_type=FieldType.STRING, description="Author list"),
+        ],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="HTTPBin Status 200",
+        category="empty",
+        url="https://httpbin.org/status/200",
+        schema=[SchemaField(name="data", field_type=FieldType.STRING)],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="HTTPBin Status 404",
+        category="empty",
+        url="https://httpbin.org/status/404",
+        schema=[SchemaField(name="data", field_type=FieldType.STRING)],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="Robots Blocked (YouTube)",
+        category="blocked",
+        url="https://www.youtube.com/results?search_query=python",
+        schema=[SchemaField(name="title", field_type=FieldType.STRING)],
+        min_expected=0,
+    ),
+    SiteTest(
+        name="JSONPlaceholder Posts",
+        category="api",
+        url="https://jsonplaceholder.typicode.com/posts",
+        schema=[
+            SchemaField(name="title", field_type=FieldType.STRING),
+            SchemaField(name="body", field_type=FieldType.STRING),
+        ],
+        min_expected=0,
+    ),
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
