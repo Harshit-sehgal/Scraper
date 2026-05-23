@@ -60,7 +60,7 @@ async def test_network_timeout_recovery():
     original_execute = RecoveryExecutor.execute
     recovery_executed = []
 
-    async def mock_execute(self, plan, context):
+    async def mock_execute(self, plan, context, attempt_ctx=None):
         if plan.primary_action == RecoveryAction.INCREASE_TIMEOUT:
             recovery_executed.append(plan.primary_action)
             # Simulate recovery resolving the network timeout failure
@@ -116,7 +116,7 @@ async def test_browser_crash_recovery():
     original_execute = RecoveryExecutor.execute
     recovery_executed = []
 
-    async def mock_execute(self, plan, context):
+    async def mock_execute(self, plan, context, attempt_ctx=None):
         if plan.primary_action == RecoveryAction.ROTATE_PROXY:
             recovery_executed.append(plan.primary_action)
             # Simulate browser recycle / restart by turning off crash simulator
@@ -174,7 +174,7 @@ async def test_selector_decay_rediscovery():
     original_execute = RecoveryExecutor.execute
     recovery_executed = []
 
-    async def mock_execute(self, plan, context):
+    async def mock_execute(self, plan, context, attempt_ctx=None):
         if plan.primary_action == RecoveryAction.FORCE_REDISCOVERY:
             recovery_executed.append(plan.primary_action)
             # Turn off SELECTOR_POISONING on retry
@@ -217,7 +217,7 @@ async def test_anti_bot_proxy_rotation():
     original_execute = RecoveryExecutor.execute
     proxy_rotated = []
 
-    async def mock_execute(self, plan, context):
+    async def mock_execute(self, plan, context, attempt_ctx=None):
         if plan.primary_action == RecoveryAction.ROTATE_PROXY:
             proxy_rotated.append(plan.primary_action)
             # Resolve chaos anti bot block
@@ -269,7 +269,7 @@ async def test_concurrency_reduction_under_resource_exhaustion():
     original_execute = RecoveryExecutor.execute
     concurrency_reduced = []
     
-    async def mock_execute(self, plan, context):
+    async def mock_execute(self, plan, context, attempt_ctx=None):
         if plan.primary_action == RecoveryAction.REDUCE_CONCURRENCY:
             concurrency_reduced.append(plan.primary_action)
             # Resolve the failure mode on the escalated try

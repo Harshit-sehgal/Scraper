@@ -24,7 +24,7 @@ from typing import Any, Dict, Optional
 
 from app.failure_classification import classify_failure, FailureCategory
 from app.config import settings
-from app.recovery_strategies import get_recovery_strategist, get_recovery_executor
+from app.recovery_strategies import get_recovery_strategist, get_recovery_executor, AttemptContext
 from app.selector_memory import get_selector_memory
 from app.domain_intelligence import get_domain_intelligence
 from app.models import SchemaField
@@ -80,6 +80,7 @@ async def scrape_url_with_recovery(
     start_time = time.time()
     attempt = 0
     last_error: Optional[Exception] = None
+    attempt_ctx = AttemptContext()
     
     while attempt < max_recovery_attempts:
         attempt += 1
@@ -177,10 +178,16 @@ async def scrape_url_with_recovery(
                 "url": url,
                 "attempt": attempt,
                 "world_state": world_state,
-            })
+            }, attempt_ctx=attempt_ctx)
             
             if not success:
                 logger.warning("Recovery action %s failed for %s", plan.primary_action.value, url)
+            
+            # Apply attempt context changes for next scrape
+            if attempt_ctx.bypass_selector_memory:
+                selector_memory.force_cleanup()
+            if attempt_ctx.force_llm_discovery and selectors_map:
+                selectors_map = None  # Force fresh discovery on retry
             
             # Exponential backoff
             await asyncio.sleep(plan.backoff_seconds)

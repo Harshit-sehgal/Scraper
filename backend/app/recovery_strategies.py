@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from enum import Enum
 from typing import Callable, Any, Optional
 
@@ -61,11 +61,33 @@ class RecoveryPlan:
     failure_category: FailureCategory
     primary_action: RecoveryAction
     secondary_actions: list[RecoveryAction]  # Escalation path
-    parameters: dict[str, Any]  # Action-specific params
-    max_retry_attempts: int  # Total retries for this action
-    backoff_seconds: float  # Time to wait before retry
-    should_escalate: bool  # Whether to try secondary actions if primary fails
-    reason: str  # Why this recovery plan was chosen
+    parameters: dict[str, Any] = field(default_factory=dict)
+    max_retry_attempts: int = 1
+    backoff_seconds: float = 1.0
+    should_escalate: bool = False
+    reason: str = ""
+
+
+@dataclass
+class AttemptContext:
+    """Mutable context mutated by recovery handlers and consumed by the next scrape attempt.
+    
+    Each recovery handler reads/writes fields here. The scraper reads this context
+    before the next attempt and adjusts its behavior accordingly.
+    """
+    timeout_ms: int | None = None
+    hydration_wait_ms: int | None = None
+    fetch_strategy: str | None = None
+    bypass_selector_memory: bool = False
+    force_llm_discovery: bool = False
+    prefer_httpx: bool = False
+    reduce_concurrency: bool = False
+    proxy_profile: str | None = None
+    search_params: dict[str, str] | None = None
+    extra_headers: dict[str, str] = field(default_factory=dict)
+    skip_networkidle: bool = False
+    scroll_attempts: int | None = None
+    anti_bot_stealth: bool = False
     
     def to_dict(self) -> dict:
         result = asdict(self)
@@ -421,16 +443,18 @@ class RecoveryExecutor:
         self,
         plan: RecoveryPlan,
         context: dict[str, Any],
+        attempt_ctx: AttemptContext | None = None,
     ) -> bool:
-        """Execute a recovery plan.
+        """Execute a recovery plan, mutating attempt_ctx for the next scrape.
         
         Args:
             plan: The recovery plan to execute
             context: Execution context (url, html, schema_fields, etc.)
-            
-        Returns:
-            True if recovery succeeded, False otherwise
+            attempt_ctx: Mutable context that handlers modify for the next attempt.
+                         Changes here are consumed by the scraper before retry.
         """
+        if attempt_ctx is None:
+            attempt_ctx = AttemptContext()
         # Apply backoff if specified
         if plan.backoff_seconds > 0:
             logger.info(
@@ -448,7 +472,7 @@ class RecoveryExecutor:
         handler = self.action_handlers.get(plan.primary_action)
         if handler:
             try:
-                result = await handler(plan.parameters, context)
+                result = await handler(plan.parameters, context, attempt_ctx)
                 if result:
                     logger.info("Recovery successful: %s", plan.primary_action.value)
                     return True
@@ -464,7 +488,7 @@ class RecoveryExecutor:
                 handler = self.action_handlers.get(secondary_action)
                 if handler:
                     try:
-                        result = await handler(plan.parameters, context)
+                        result = await handler(plan.parameters, context, attempt_ctx)
                         if result:
                             logger.info("Recovery successful via escalation: %s", secondary_action.value)
                             return True
