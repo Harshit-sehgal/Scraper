@@ -369,20 +369,20 @@ async def scrape_url(
 
         # Collect page evidence for zero-result classification
         evidence = collect_page_evidence(html, url=url)
-        visible_text_content = evidence.visible_text_length > 0 and evidence.visible_text_length > 200 or ""
+        visible_text = ""
 
         # Classify the zero-result using the dedicated classifier
         zero_classification = classify_zero_result(
             acquisition_lineage={"state": fetch_method},
             session_detection=session_detection,
-            empty_check=empty_check,
+            empty_check=empty_check.to_dict() if empty_check is not None and hasattr(empty_check, 'to_dict') else None,
             anti_bot_score=anti_bot,
             final_url=url,
             html=html,
-            visible_text=visible_text_content if visible_text_content else "",
-            detected_forms=len(evidence.forms),
-            detected_containers=len(evidence.candidate_containers),
-            raw_candidate_count=len(evidence.candidate_containers),
+            visible_text=visible_text,
+            detected_forms=evidence.forms if evidence else None,
+            detected_containers=len(evidence.candidate_containers) if evidence else 0,
+            raw_candidate_count=len(evidence.candidate_containers) if evidence else 0,
             schema_fields=[f.name for f in schema_fields],
         )
 

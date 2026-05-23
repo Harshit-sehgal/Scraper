@@ -166,11 +166,11 @@ def collect_page_evidence(
     if title_tag:
         evidence.title = title_tag.get_text(strip=True)
     canonical = soup.find("link", rel="canonical")
-    if canonical:
-        evidence.canonical_url = canonical.get("href", "")
+    if canonical and hasattr(canonical, 'get'):
+        evidence.canonical_url = str(canonical.get("href", ""))
     meta_desc = soup.find("meta", attrs={"name": "description"})
-    if meta_desc:
-        evidence.meta_description = meta_desc.get("content", "")
+    if meta_desc and hasattr(meta_desc, 'get'):
+        evidence.meta_description = str(meta_desc.get("content", ""))
 
     # ── DOM node count ───────────────────────────────────────────────
     evidence.dom_node_count = len(soup.find_all(True))
@@ -364,9 +364,9 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
 
     # Next.js __NEXT_DATA__
     next_data = soup.find("script", id="__NEXT_DATA__")
-    if next_data and next_data.string:
+    if next_data and hasattr(next_data, 'string') and next_data.string:
         try:
-            data = json.loads(next_data.string)
+            data = json.loads(str(next_data.string))
             # Extract props and state
             props = data.get("props", {})
             page_props = props.get("pageProps", {})
@@ -503,10 +503,11 @@ def _discover_candidate_containers(soup: BeautifulSoup) -> list[CandidateContain
                 containers.append(container)
 
     # Score and sort containers
-    for c in containers:
-        c.record_score = _compute_container_score(c)
+    for container in containers:
+        if isinstance(container, CandidateContainer):
+            container.record_score = _compute_container_score(container)
 
-    containers.sort(key=lambda c: c.record_score, reverse=True)
+    containers.sort(key=lambda c: c.record_score if isinstance(c, CandidateContainer) else 0.0, reverse=True)
     return containers
 
 

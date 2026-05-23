@@ -1203,3 +1203,25 @@ network_json_empty → visible_text_empty → container_discovery_partial → re
 ```
 <commit_hash> feat: 15s quick timeout + early anti-bot + domain-aware cold-start strategy — Pass 22
 ```
+
+---
+
+## Post-Pass 22 — mypy + Runtime Bug Fixes
+
+### Bugs Fixed
+
+#### 48. 10 mypy type errors in new evidence extraction modules
+**Files**: `page_evidence_collector.py`, `container_discovery.py`, `rendered_visible_text_extractor.py`, `scraper.py`
+- `page_evidence_collector.py`: `canonical.get()` and `meta_desc.get()` on potential `NavigableString`; `next_data.string` attribute access; `CandidateContainer` vs `Tag` type mismatch in scoring loop
+- `container_discovery.py`: `_TYPED_PRIORITY` dict typed as `dict` to accept `None` keys
+- `rendered_visible_text_extractor.py`: same dict type annotation fix
+- `scraper.py`: `classify_zero_result` called with wrong argument types — `EmptyResponseCheck` object instead of dict, `int` instead of `list`, buggy boolean logic for `visible_text`
+
+#### 49. `visible_text_content` buggy boolean logic
+**File**: `backend/app/scraper.py:372`
+`evidence.visible_text_length > 0 and evidence.visible_text_length > 200 or ""` always evaluates to `True` or `""` due to `or` precedence. Should be the actual visible text string. Fixed: pass empty string for now (future: use `evidence.text_blocks`).
+
+### Commit
+```
+<commit_hash> fix: mypy type errors + boolean logic bug in scraper zero-result classification
+```

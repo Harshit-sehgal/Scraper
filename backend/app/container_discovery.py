@@ -447,7 +447,7 @@ def _extract_record_from_element(
         return False
 
     # Process fields in order: typed fields first, string/org last
-    _TYPED_PRIORITY = {
+    _TYPED_PRIORITY: dict = {
         FieldType.EMAIL: 0,
         FieldType.PHONE: 0,
         FieldType.URL: 0,
