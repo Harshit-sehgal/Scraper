@@ -261,6 +261,7 @@ async def orchestrate_extraction(
         evidence.hydration_data if evidence else {},
         schema_fields,
         url=url,
+        network_payloads=evidence.network_json if evidence else None,
     )
     if network_results:
         scores = [r.get("record_score", 0.0) for r in network_results]

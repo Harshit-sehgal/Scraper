@@ -31,6 +31,7 @@ def extract_from_network(
     hydration_data: dict[str, Any],
     schema_fields: list,
     url: str = "",
+    network_payloads: list[dict] | None = None,
 ) -> list[dict]:
     """Try to extract structured records from page hydration / network data.
 
@@ -38,14 +39,30 @@ def extract_from_network(
         hydration_data: The hydration_data dict collected by page_evidence_collector.
         schema_fields: Schema fields to map extracted values to.
         url: The page URL (for context).
+        network_payloads: Optional list of captured network JSON payloads from
+                          browser network interception (fetch/XHR/GraphQL responses).
 
     Returns:
         List of extracted records aligned to schema fields, or empty list.
     """
-    if not hydration_data or not schema_fields:
+    if not schema_fields:
         return []
 
     records: list[dict] = []
+
+    # Priority 0: Network payloads (actual API responses captured via Playwright)
+    # These are the most reliable source when available.
+    if network_payloads:
+        extracted = _extract_records_from_payloads(network_payloads, schema_fields)
+        if extracted:
+            logger.info(
+                "[NetworkExtractor] Extracted %d records from %d browser network payloads",
+                len(extracted), len(network_payloads),
+            )
+            records.extend(extracted)
+
+    if not hydration_data:
+        return records
 
     # Priority 1: JSON-LD structured data
     jsonld = hydration_data.get("jsonld", [])
@@ -752,6 +769,56 @@ def _extract_from_apollo_state(
 # ---------------------------------------------------------------------------
 # Deduplication
 # ---------------------------------------------------------------------------
+
+def _extract_records_from_payloads(
+    payloads: list[dict],
+    schema_fields: list,
+) -> list[dict]:
+    """Try to extract structured records from captured network payloads.
+
+    Uses the generic extraction logic to map JSON keys to schema fields.
+    Each payload is treated as a potential source of records.
+
+    Args:
+        payloads: List of captured network payloads (from browser_network_capture).
+        schema_fields: Schema fields to map to.
+
+    Returns:
+        List of extracted records, or empty list.
+    """
+    if not payloads or not schema_fields:
+        return []
+
+    records: list[dict] = []
+
+    for payload in payloads:
+        body = payload.get("body")
+        if not isinstance(body, (dict, list)):
+            continue
+
+        # Try deep search for record arrays (nested JSON traversal)
+        if isinstance(body, dict):
+            extracted = _extract_from_nested_json(body, schema_fields)
+            if extracted:
+                records.extend(extracted)
+                continue
+
+            # Try direct key mapping
+            record = _map_json_keys_to_schema(body, schema_fields)
+            if record and any(v for v in record.values() if v not in (None, "", [])):
+                records.append(record)
+
+        elif isinstance(body, list):
+            for item in body:
+                if isinstance(item, dict):
+                    if _is_record_like(item, schema_fields):
+                        record = _map_json_keys_to_schema(item, schema_fields)
+                        if record and any(v for v in record.values() if v not in (None, "", [])):
+                            records.append(record)
+
+    # Deduplicate
+    return _deduplicate_records(records)
+
 
 def _deduplicate_records(records: list[dict]) -> list[dict]:
     """Remove duplicate records based on field value similarity."""

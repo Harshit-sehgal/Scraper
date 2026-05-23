@@ -27,6 +27,8 @@ from typing import Any
 
 from bs4 import BeautifulSoup, Tag
 
+from app.browser_network_capture import get_captures
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -251,6 +253,12 @@ def collect_page_evidence(
     # ── Network JSON ─────────────────────────────────────────────────
     if network_json:
         evidence.network_json = network_json[:20]
+    elif url:
+        # Check the browser network capture registry for this URL
+        captured = get_captures(url)
+        if captured:
+            evidence.network_json = captured[:20]
+            logger.debug("[PageEvidence] Found %d captured network payloads for %s", len(captured[:20]), url)
 
     # ── Candidate containers ─────────────────────────────────────────
     containers = _discover_candidate_containers(soup)

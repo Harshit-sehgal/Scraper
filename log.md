@@ -865,15 +865,68 @@ Only findings were in `config.py` (tunable settings) and `selector_profiles/*.js
 
 ---
 
+## Pass 17 — Browser Network Capture via Playwright Response Interception
+
+### New Module
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `backend/app/browser_network_capture.py` | ~240 | Playwright response interception capturing fetch/XHR/GraphQL JSON responses during page loads. Global URL-keyed registry with `setup_network_capture()`, `store_captures()`, `get_captures()`, `clear()` |
+
+### Modified Files
+
+| File | Changes |
+|------|---------|
+| `backend/app/html_utils.py` | Wires `setup_network_capture()` before page navigation and `store_captures()` after page content is retrieved in `fetch_page_content()` |
+| `backend/app/page_evidence_collector.py` | `collect_page_evidence()` auto-checks the capture registry for network JSON payloads when `network_json` not explicitly passed |
+| `backend/app/network_extractor.py` | Added `network_payloads` parameter to `extract_from_network()` — processed as Priority 0 (before hydration data). Added `_extract_records_from_payloads()` for extracting structured records from network payloads. All circular imports eliminated |
+| `backend/app/extraction_orchestrator.py` | Passes `evidence.network_json` to `extract_from_network()` |
+| `backend/app/scraper.py` | Calls `clear()` on the capture registry after orchestration to release memory |
+
+### Architecture
+
+```
+Playwright goto()
+  ↓
+setup_network_capture(page)  ← registers response listener
+  ↓
+page.goto(), page.content(), etc.  ← captures fire in background
+  ↓
+store_captures(url, captured)  ← stores in global registry
+  ↓
+collect_page_evidence()  ← auto-retrieves from registry
+  ↓
+extract_from_network()  ← Priority 0: processes via generic JSON extraction
+  ↓
+clear(url)  ← release capture buffer in scraper
+```
+
+### Circular Import Fix
+
+Moved `extract_records_from_payloads` from `browser_network_capture.py` into `network_extractor.py` (as `_extract_records_from_payloads`). Eliminated cross-module dependency — `browser_network_capture.py` no longer imports from `network_extractor`. Both modules load cleanly, no lazy imports needed.
+
+### Validation
+
+| Check | Result |
+|-------|--------|
+| `python -m pyflakes` (all 6 modified/new files) | **0 issues** |
+| Module imports | **all clean** (no circular deps) |
+| Unit tests (128 fast tests) | **all passed** |
+
+### Commit
+```
+<commit> feat: browser network capture via Playwright response interception — Pass 17
+```
+
+---
+
 ## What Needs to Be Done
 
 ### Short-term (stability)
-- [ ] Text-ordering bias in classification assignment — airline names after cities get wrong field
 - [ ] Fix anti-bot detection on yelp/indeed/ebay/walmart — requires proxy rotation or stealth improvements
 - [ ] Reduce timeout rate on JS-heavy pages — `deep_scan` mode should handle these but needs testing
 
 ### Medium-term (feature completeness)
-- [ ] Actual XHR/network interception in Playwright for real API payload capture
 - [ ] Bounding-box-based spatial card grouping using Playwright coordinates
 - [ ] Parallel extraction for multi-URL jobs to reduce total job time
 - [ ] 15-site smoke test report with new extraction pipeline

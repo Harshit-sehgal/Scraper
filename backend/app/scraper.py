@@ -604,4 +604,8 @@ async def scrape_url(
     except Exception as e:
         logger.debug("[PredictiveAdaptation] Self-tuning failed: %s", e)
 
+    # Cleanup: Release browser network capture buffer for this URL
+    from app.browser_network_capture import clear as clear_network_captures
+    clear_network_captures(url)
+
     return results

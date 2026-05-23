@@ -14,6 +14,7 @@ from app.semantic_segmentation import segment_single_text, is_likely_noise_field
 from app.browser_pool import get_browser_pool
 from app.domain_intelligence import get_domain_intelligence
 from app.strategy_evolution import FetchStrategy
+from app.browser_network_capture import setup_network_capture, store_captures
 
 EMPTY_TOKENS = {"-", "n/a", "na", "null", "none", "", "not available", "empty", "0", "false", "undefined"}
 PLACEHOLDER_PHRASES = {"no data", "not specified", "coming soon", "tbd", "unknown"}
@@ -307,6 +308,7 @@ async def fetch_page_content(
 
     # 2. Playwright-based strategies
     page = None
+    network_payloads = []  # Pre-initialize for safety
     js_render_delay_ms = 0.0
     method_used = strategy.value
     
@@ -328,6 +330,9 @@ async def fetch_page_content(
                 await route.continue_()
 
         await page.route("**/*", _route_filter)
+
+        # Set up network response interception for API/XHR JSON capture
+        network_payloads = await setup_network_capture(page)
 
         # Phase 1: Try networkidle
         try:
@@ -413,6 +418,15 @@ async def fetch_page_content(
             await asyncio.sleep(settings.PAGE_FALLBACK_EXTRA_WAIT)
 
         html = await page.content()
+
+        # Store captured network payloads for later extraction
+        if network_payloads:
+            store_captures(url, network_payloads)
+            logger.info(
+                "[BrowserNetwork] Captured %d network payloads from %s",
+                len(network_payloads), url,
+            )
+
         return html, js_render_delay_ms, method_used, 0
     except Exception as e:
         html_content = ""
