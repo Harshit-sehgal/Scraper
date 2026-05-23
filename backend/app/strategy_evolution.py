@@ -30,6 +30,37 @@ from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
+# ── Known difficult domains for cold-start strategy selection ──────────
+# Domains identified from 15-site smoke test and operational experience.
+# Anti-bot heavy: known to block automated requests aggressively.
+ANTIBOT_HEAVY_DOMAINS: set[str] = {
+    "yelp.com", "www.yelp.com",
+    "indeed.com", "www.indeed.com",
+    "ebay.com", "www.ebay.com",
+    "walmart.com", "www.walmart.com",
+}
+# JS-heavy / timeout-prone: pages that take very long to reach networkidle
+# or require significant JS execution. Prefer lightweight Playwright mode
+# (domcontentloaded) to avoid timeout penalties.
+JS_HEAVY_DOMAINS: set[str] = {
+    "booking.com", "www.booking.com",
+    "espn.com", "www.espn.com",
+    "github.com", "www.github.com",
+}
+
+
+def _match_domain_set(domain: str, domain_set: set[str]) -> bool:
+    """Check if domain or any parent domain matches the set."""
+    if not domain:
+        return False
+    domain = domain.lower().strip()
+    if domain in domain_set:
+        return True
+    parts = domain.split(".")
+    if len(parts) >= 2:
+        return ".".join(parts[-2:]) in domain_set
+    return False
+
 
 class FetchStrategy(str, Enum):
     """Available fetch strategies."""
@@ -262,7 +293,26 @@ class StrategyEvolutionEngine:
         total_attempts = sum(s.success_count + s.failure_count for s in state.strategies.values())
         
         if total_attempts < self.min_samples_for_recommendation:
-            # Cold start: check anti-bot risk if known
+            # Cold start: check for known difficult domains first
+            if _match_domain_set(domain, ANTIBOT_HEAVY_DOMAINS):
+                return StrategyRecommendation(
+                    recommended_strategy=FetchStrategy.PLAYWRIGHT_STEALTH,
+                    alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],
+                    reason="Cold start: domain known for anti-bot — using stealth mode",
+                    confidence=0.7,
+                    estimated_success_rate=0.4,
+                )
+
+            if _match_domain_set(domain, JS_HEAVY_DOMAINS):
+                return StrategyRecommendation(
+                    recommended_strategy=FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT,
+                    alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],
+                    reason="Cold start: domain known JS-heavy — lightweight avoids networkidle timeout",
+                    confidence=0.6,
+                    estimated_success_rate=0.5,
+                )
+
+            # Cold start: check anti-bot risk if known from domain intelligence
             try:
                 from app.domain_intelligence import get_domain_intelligence
                 intel = get_domain_intelligence().get_intelligence(domain)
@@ -305,7 +355,29 @@ class StrategyEvolutionEngine:
         
         best_strategy = state.get_best_strategy()
         best_perf = state.strategies[best_strategy]
-        
+
+        # Timeout-aware: if PLAYWRIGHT_FULL has timeout errors, prefer LIGHTWEIGHT
+        full_perf = state.strategies.get(FetchStrategy.PLAYWRIGHT_FULL)
+        if full_perf and full_perf.failure_count > 0:
+            timeout_count = full_perf.error_patterns.get("TimeoutError", 0) + full_perf.error_patterns.get("asyncio.TimeoutError", 0)
+            if timeout_count >= 2 and best_strategy == FetchStrategy.PLAYWRIGHT_FULL:
+                lightweight_perf = state.strategies.get(FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT)
+                if lightweight_perf and lightweight_perf.success_count > 0:
+                    return StrategyRecommendation(
+                        recommended_strategy=FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT,
+                        alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],
+                        reason=f"Timeout-aware: PLAYWRIGHT_FULL had {timeout_count} timeouts, LIGHTWEIGHT has {lightweight_perf.success_count} successes",
+                        confidence=0.7,
+                        estimated_success_rate=lightweight_perf.success_rate,
+                    )
+                return StrategyRecommendation(
+                    recommended_strategy=FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT,
+                    alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],
+                    reason=f"Timeout-aware: PLAYWRIGHT_FULL had {timeout_count} timeouts, switching to LIGHTWEIGHT",
+                    confidence=0.6,
+                    estimated_success_rate=0.4,
+                )
+
         # If best strategy is still poor, try STEALTH
         if best_perf.success_rate < 0.3 and best_strategy != FetchStrategy.PLAYWRIGHT_STEALTH:
             return StrategyRecommendation(

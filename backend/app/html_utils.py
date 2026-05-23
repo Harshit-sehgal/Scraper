@@ -334,11 +334,14 @@ async def fetch_page_content(
         # Set up network response interception for API/XHR JSON capture
         network_payloads = await setup_network_capture(page)
 
-        # Phase 1: Try networkidle
+        # Phase 1: Try networkidle with quick timeout for faster failure detection
         try:
             wait_until = "networkidle" if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT else "domcontentloaded"
-            await page.goto(url, wait_until=wait_until, timeout=settings.PLAYWRIGHT_TIMEOUT)  # type: ignore[arg-type]
-            
+            # Use a short initial timeout (15s) for networkidle — if the page takes longer,
+            # we fall through to domcontentloaded + anti-bot check rather than blocking for 45s
+            initial_timeout = min(settings.PLAYWRIGHT_TIMEOUT, 15000)
+            await page.goto(url, wait_until=wait_until, timeout=initial_timeout)  # type: ignore[arg-type]
+
             # Phase 79: Adaptive hydration and scroll from domain intelligence
             intel = get_domain_intelligence().get_intelligence(url)
 
@@ -357,11 +360,10 @@ async def fetch_page_content(
             avg_stabilization = telemetry.get_avg_stabilization(domain)
             stabilization_start = time.time()
             settle_timeout = intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
-            settle_timeout = max(settle_timeout, 3.0) 
-            
-            min_wait_ms = 2500 
+            settle_timeout = max(settle_timeout, 3.0)
+
+            min_wait_ms = 2500
             try:
-                # Stabilization logic (omitted for brevity in replace, but should be complete in real file)
                 await page.wait_for_function(
                     f"""() => {{
                          const body = document.body;
@@ -369,7 +371,7 @@ async def fetch_page_content(
                          const start = Date.now();
                          let lastHtml = body.innerHTML;
                          let stableSince = Date.now();
-                         
+
                          return new Promise(resolve => {{
                              const interval = setInterval(() => {{
                                  const currentHtml = document.body ? document.body.innerHTML : lastHtml;
@@ -413,9 +415,28 @@ async def fetch_page_content(
                 await asyncio.sleep(settings.POST_SCROLL_RESET_DELAY)
 
         except Exception as e:
-            logger.warning("[Scraper] %s slow load for %s: %s. Continuing with fallback", strategy.value, url, e)
+            # Before falling back, check partial HTML for anti-bot signals
+            try:
+                partial_html = await page.content()
+                from app.scrape_telemetry import detect_anti_bot
+                if detect_anti_bot(partial_html) > 0.5:
+                    logger.warning(
+                        "[Scraper] Anti-bot detected during initial %s for %s — aborting early",
+                        wait_until, url,
+                    )
+                    raise ValueError(f"Anti-bot challenge detected during {wait_until}: {e}")
+            except ValueError:
+                raise  # Re-raise anti-bot detection so scraper records the proper failure reason
+            except Exception:
+                pass
+
+            logger.warning(
+                "[Scraper] %s slow load for %s: %s. Falling to domcontentloaded",
+                strategy.value, url, e,
+            )
             await page.wait_for_load_state("domcontentloaded")
-            await asyncio.sleep(settings.PAGE_FALLBACK_EXTRA_WAIT)
+            # Reduced fallback wait: 2s instead of 5s — JS has already had time to start
+            await asyncio.sleep(min(settings.PAGE_FALLBACK_EXTRA_WAIT, 2.0))
 
         html = await page.content()
 

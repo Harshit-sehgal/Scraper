@@ -1154,3 +1154,52 @@ network_json_empty → visible_text_empty → container_discovery_partial → re
 - [ ] User-defined selector profiles via the UI (not just JSON files)
 - [ ] Adaptive extraction learning — remember which selectors worked per domain
 - [ ] Schema auto-detection from URL analysis results
+
+---
+
+## Pass 22 — Faster Timeout Detection & Domain-Aware Strategy Evolution
+
+### Changes
+
+#### 1. Quicker Playwright timeout with early anti-bot detection
+**File**: `backend/app/html_utils.py`
+- Reduced initial `networkidle` timeout from 45s → 15s for faster failure detection
+- On timeout, checks **partial HTML** for anti-bot signals via `detect_anti_bot()`
+  before falling through to `domcontentloaded` — catches blocks immediately
+- Reduced extra wait after `domcontentloaded` fallback from 5s → 2s
+
+#### 2. Domain-aware cold-start strategy selection
+**File**: `backend/app/strategy_evolution.py`
+- Added `ANTIBOT_HEAVY_DOMAINS` set (`yelp.com`, `indeed.com`, `ebay.com`, `walmart.com`)
+  — cold-start recommends `PLAYWRIGHT_STEALTH` for these domains
+- Added `JS_HEAVY_DOMAINS` set (`booking.com`, `espn.com`, `github.com`)
+  — cold-start recommends `PLAYWRIGHT_LIGHTWEIGHT` (uses `domcontentloaded` not `networkidle`)
+- Added `_match_domain_set()` helper that handles `www.` prefix and subdomain matching
+
+#### 3. Timeout-aware strategy evolution
+**File**: `backend/app/strategy_evolution.py`
+- After 2+ timeout errors on `PLAYWRIGHT_FULL`, automatically switches to
+  `PLAYWRIGHT_LIGHTWEIGHT` which uses `domcontentloaded` instead of `networkidle`
+- If `PLAYWRIGHT_LIGHTWEIGHT` has prior successes, includes that in the recommendation
+
+### What This Fixes
+
+| Problem | Before | After |
+|---------|--------|-------|
+| Timeout detection | Waited full 45s for `networkidle` before checking anti-bot | 15s quick timeout + immediate anti-bot check |
+| Anti-bot blocks | Only detected AFTER full page load & timeout | Detected during initial load via partial HTML |
+| Cold-start for known difficult domains | Always defaulted to `PLAYWRIGHT_FULL` | Yelp/Indeed → STEALTH; Booking/ESPN → LIGHTWEIGHT |
+| Repeated timeouts | No learning — kept retrying same strategy | After 2+ timeouts, automatically switches to LIGHTWEIGHT |
+
+### Validation
+
+| Check | Result |
+|-------|--------|
+| `python -m pyflakes` (both modified files) | **0 issues** |
+| Unit tests (148 fast tests) | **all passed** |
+| Code review | **clean** — no regressions |
+
+### Commit
+```
+<commit_hash> feat: 15s quick timeout + early anti-bot + domain-aware cold-start strategy — Pass 22
+```
