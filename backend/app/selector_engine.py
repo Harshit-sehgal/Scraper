@@ -320,10 +320,13 @@ def _field_matches_classification(field_name: str, classification: str) -> bool:
         "name": ("airline", "name", "title", "carrier", "operator", "provider", "company"),
         "location": ("city", "location", "place", "area", "departure_city", "arrival_city", "origin", "destination"),
         "code": ("code", "flight_number", "airport_code", "identifier", "ref", "sku"),
+        "text": (),  # matched via field ordering priority — STRING fields can match text
     }
     keywords = mapping.get(classification, ())
     if classification == "code":
         keywords = keywords + mapping.get("location", ())
+    if not keywords and classification == "text":
+        return True
     return any(kw in n for kw in keywords)
 
 

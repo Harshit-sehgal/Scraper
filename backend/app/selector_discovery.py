@@ -279,6 +279,52 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
     }
 
 
+def _compute_ui_noise_score(elements: list, texts: list[str]) -> float:
+    """Score how likely a container candidate is to be UI chrome vs data.
+    
+    Uses structural signals — no domain-specific phrases:
+    - High link/button ratio → likely nav/sidebar
+    - Short average text length → likely menu/filter labels
+    - Low percent of elements with price/date signals → likely non-data
+    - High ratio of elements near nav/header/footer tags → likely chrome
+    
+    Returns 0.0 (definitely data) to 1.0 (definitely UI chrome).
+    """
+    if not elements or not texts:
+        return 1.0
+    import re as _re
+    n = len(texts)
+    avg_len = sum(len(t) for t in texts) / max(n, 1)
+    link_ratio = sum(1 for el in elements if el.name == 'a') / max(n, 1)
+    form_ratio = sum(1 for el in elements if el.name in ('input', 'select', 'button', 'textarea')) / max(n, 1)
+    short_text_ratio = sum(1 for t in texts if len(t) < 15) / max(n, 1)
+    price_or_date_ratio = sum(
+        1 for t in texts
+        if _re.search(r"[\$£€¥₹]\s*\d+|\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)
+    ) / max(n, 1)
+    low_diversity = 1.0 if len(set(t[:20] for t in texts)) < max(n * 0.3, 2) else 0.0
+    near_chrome = 0
+    for el in elements:
+        p = el.parent
+        for _ in range(3):
+            if not p or not hasattr(p, 'name'):
+                break
+            if p.name in ('nav', 'header', 'footer', 'aside'):
+                near_chrome += 1
+                break
+            p = p.parent if hasattr(p, 'parent') else None
+    near_chrome_ratio = near_chrome / max(n, 1)
+    score = (
+        link_ratio * 0.3 +
+        form_ratio * 0.2 +
+        short_text_ratio * 0.3 +
+        (1.0 - price_or_date_ratio) * 0.4 +
+        low_diversity * 0.2 +
+        near_chrome_ratio * 0.3
+    )
+    return min(max(score, 0.0), 1.0)
+
+
 def _discover_direct_repeating_elements(soup) -> list[dict]:
     """Find elements that repeat with the same class across the page.
     
@@ -321,12 +367,8 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:
             if _re.search(r"\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)
         )
         text_diversity = len(set(t[:40] for t in non_empty))
-        ui_noise = sum(
-            1 for t in non_empty
-            if any(w in t.lower() for w in ("sign out", "sign in", "contact us", "select your language",
-                "privacy policy", "terms of service", "write to us", "my booking", "my account"))
-        )
-        if ui_noise > len(non_empty) * 0.3:
+        ui_noise_score = _compute_ui_noise_score(elements, non_empty)
+        if ui_noise_score > 0.6:
             continue
         if data_signals + date_signals < 2:
             continue
