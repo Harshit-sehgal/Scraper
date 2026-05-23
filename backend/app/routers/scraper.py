@@ -85,10 +85,18 @@ async def get_legacy_domain_health():
 async def get_scraper_stats():
     """Return aggregated scraper performance statistics."""
     telemetry = get_scrape_telemetry()
+    recent_latency = telemetry.get_recent(10)
+    recent_success = telemetry.get_recent(20)
     return {
         "confidence_histogram": telemetry.get_confidence_histogram(),
-        "recent_latency_avg": sum(t["fetch_ms"] for t in telemetry.get_recent(10)) / 10 if telemetry._history else 0,
-        "recent_success_rate": sum(1 for t in telemetry.get_recent(20) if not t["fallback_triggered"]) / 20 if telemetry._history else 1.0,
+        "recent_latency_avg": (
+            sum(float(t.get("fetch_ms", 0) or 0) for t in recent_latency) / len(recent_latency)
+            if recent_latency else 0
+        ),
+        "recent_success_rate": (
+            sum(1 for t in recent_success if not t.get("fallback_triggered", False)) / len(recent_success)
+            if recent_success else 1.0
+        ),
     }
 
 

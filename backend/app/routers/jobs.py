@@ -5,6 +5,7 @@ from typing import Callable
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.config import settings
 from app.discovery import discover_urls, infer_source_metadata
 from app.filters import process_results
 from app.models import (
@@ -259,8 +260,8 @@ def create_jobs_router(
         for row in job.results:
             row["scraped_at"] = scraped_at
 
-        # Save back to disk if they remain above 1,000, or if it was loaded from disk and is still above 1000
-        if len(job.results) > 1000:
+        # Save back to disk if results remain above the configured in-memory threshold.
+        if len(job.results) > settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD:
             from app.utils.job_results_store import save_job_results_to_disk
             file_path = save_job_results_to_disk(job.id, job.results)
             job.results_on_disk = True

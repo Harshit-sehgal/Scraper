@@ -17,7 +17,6 @@ This integrates with:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from typing import Any, Dict, Optional
@@ -31,6 +30,29 @@ from app.models import SchemaField
 from app.acquisition_state import AcquisitionLineage, AcquisitionState
 
 logger = logging.getLogger(__name__)
+
+
+def _recommended_action_for_state(state: AcquisitionState) -> str:
+    if state == AcquisitionState.SESSION_EXPIRED:
+        return "provide_search_params"
+    if state == AcquisitionState.ANTI_BOT_BLOCKED:
+        return "use_authorized_access_or_retry_later"
+    if state == AcquisitionState.EMPTY_RESPONSE:
+        return "check_login_js_or_cookie_wall"
+    return "inspect_failure_telemetry"
+
+
+def _acquisition_state_for_failure(failure_category: str | None) -> AcquisitionState:
+    category = (failure_category or "").lower()
+    if any(key in category for key in ("anti_bot", "captcha", "banned", "rate_limited")):
+        return AcquisitionState.ANTI_BOT_BLOCKED
+    if "session" in category:
+        return AcquisitionState.SESSION_EXPIRED
+    if any(key in category for key in ("empty", "no_records", "zero_records", "selector", "low_quality")):
+        return AcquisitionState.EMPTY_RESPONSE
+    if "timeout" in category:
+        return AcquisitionState.EMPTY_RESPONSE
+    return AcquisitionState.EMPTY_RESPONSE
 
 
 async def scrape_url_with_recovery(
@@ -84,6 +106,13 @@ async def scrape_url_with_recovery(
     attempt_ctx = AttemptContext()
     
     while attempt < max_recovery_attempts:
+        if attempt_ctx.skip_url:
+            recovery_stats["final_failure_category"] = "skipped_url"
+            break
+        if attempt_ctx.abort_domain or attempt_ctx.skip_domain:
+            recovery_stats["final_failure_category"] = "skipped_domain"
+            break
+
         attempt += 1
         recovery_stats["attempts"] += 1
         
@@ -225,6 +254,13 @@ async def scrape_url_with_recovery(
             if not success:
                 logger.warning("Recovery action %s failed for %s", plan.primary_action.value, url)
             
+            if attempt_ctx.skip_url:
+                recovery_stats["final_failure_category"] = "skipped_url"
+                break
+            if attempt_ctx.abort_domain or attempt_ctx.skip_domain:
+                recovery_stats["final_failure_category"] = "skipped_domain"
+                break
+
             # Apply attempt context changes for next scrape
             if attempt_ctx.bypass_selector_memory:
                 selector_memory.force_cleanup()
@@ -237,29 +273,23 @@ async def scrape_url_with_recovery(
 
     # Build acquisition lineage for failed scrape
     failure_category = recovery_stats.get("final_failure_category", "unknown")
-    state_map = {
-        "zero_records_extracted": AcquisitionState.EMPTY_RESPONSE,
-        "anti_bot": AcquisitionState.ANTI_BOT_BLOCKED,
-        "session_expired": AcquisitionState.SESSION_EXPIRED,
-        "timeout": AcquisitionState.SESSION_EXPIRED,
-    }
-    state = AcquisitionState.EMPTY_RESPONSE
-    for key, mapped_state in state_map.items():
-        if failure_category and key in failure_category:
-            state = mapped_state
-            break
+    state = _acquisition_state_for_failure(failure_category)
+
+    from app.scrape_telemetry import get_scrape_telemetry
+    last_event = get_scrape_telemetry().get_last_for_url(url)
+    event_dict = last_event.to_dict() if last_event else {}
 
     lineage = AcquisitionLineage(
         original_url=url,
         final_url=url,
-        state=AcquisitionState.SESSION_EXPIRED,
-        message="Session-bound URL expired",
-        fetch_method="unknown",
-        session_bound=True,
-        anti_bot_score=0.0,
+        state=state,
+        message=f"Final failure category: {failure_category}",
+        fetch_method=event_dict.get("fetch_method", "unknown") or "unknown",
+        session_bound=(state == AcquisitionState.SESSION_EXPIRED),
+        anti_bot_score=float(event_dict.get("anti_bot_score", 0.0) or 0.0),
         data_evidence_score=0.0,
         user_message="",
-        recommended_next_action="provide_search_params",
+        recommended_next_action=_recommended_action_for_state(state),
     )
     lineage.user_message = lineage.get_user_message()
     recovery_stats["acquisition_lineage"] = lineage.to_dict()

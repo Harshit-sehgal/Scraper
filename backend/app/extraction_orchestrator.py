@@ -209,6 +209,9 @@ async def orchestrate_extraction(
     The cascade falls back to regex if provided selectors fail.
     """
     memory = get_selector_memory()
+    force_container_discovery = bool(
+        provided_selectors and provided_selectors.get("force_container_discovery")
+    )
 
     gate_threshold = max(
         min_record_score * settings.SCORE_GATE_THRESHOLD_FACTOR, 
@@ -288,7 +291,12 @@ async def orchestrate_extraction(
     # ── Layer 1: Provided Selectors (from URL Analysis) ───────────────
     # If the user analyzed the URL via the URL Analyzer, we have pre-discovered
     # CSS selectors. Try these first — they skip memory and LLM discovery.
-    if provided_selectors and provided_selectors.get("item_container") and provided_selectors.get("fields"):
+    if (
+        not force_container_discovery
+        and provided_selectors
+        and provided_selectors.get("item_container")
+        and provided_selectors.get("fields")
+    ):
         logger.info("[Orchestrator] Trying provided selectors from URL analysis for %s", url)
         provided_results = _multi_pass_extraction(
             html, schema_fields, provided_selectors,
@@ -312,9 +320,22 @@ async def orchestrate_extraction(
                 provenance_builder.add_fallback_step("provided_selectors_empty")
 
     # ── Layer 2: Selector Memory ───────────────────────────────────────
-    # If force_llm_discovery or bypass_selector_memory is set, skip memory
-    remembered_selectors = memory.get_selectors(url) if not (provided_selectors and provided_selectors.get("force_skip_memory")) else None
-    if provided_selectors and provided_selectors.get("force_llm_discovery"):
+    # If force_llm_discovery, bypass_selector_memory, or force_container_discovery is set, skip memory.
+    skip_memory = bool(
+        provided_selectors
+        and (
+            provided_selectors.get("force_skip_memory")
+            or provided_selectors.get("bypass_selector_memory")
+            or provided_selectors.get("force_llm_discovery")
+            or force_container_discovery
+        )
+    )
+    remembered_selectors = None if skip_memory else memory.get_selectors(url)
+    if force_container_discovery:
+        logger.info("[Orchestrator] Recovery requested force_container_discovery — skipping selectors, memory, and LLM discovery")
+        if provenance_builder:
+            provenance_builder.add_fallback_step("force_container_discovery")
+    elif provided_selectors and provided_selectors.get("force_llm_discovery"):
         remembered_selectors = None
         logger.info("[Orchestrator] Recovery requested force_llm_discovery — skipping memory and profiles")
         if provenance_builder:
@@ -359,16 +380,18 @@ async def orchestrate_extraction(
                     logger.warning("[Orchestrator] Failed to dispatch selector failure event: %s", e)
 
     # ── Layer 3: LLM Discovery ─────────────────────────────────────────
-    logger.info("[Orchestrator] Initiating LLM discovery for %s", url)
-    
-    # Get learned motifs if world_state is available
-    solidified_motifs = None
-    if world_state:
-        solidified_motifs = world_state.solidified_motifs
-        if solidified_motifs:
-            logger.info("[Orchestrator] Using %d learned motifs for discovery guidance", len(solidified_motifs))
-    
-    discovered_selectors = await discover_selectors(html, schema_fields, solidified_motifs=solidified_motifs)
+    discovered_selectors = None
+    if not force_container_discovery:
+        logger.info("[Orchestrator] Initiating LLM discovery for %s", url)
+        
+        # Get learned motifs if world_state is available
+        solidified_motifs = None
+        if world_state:
+            solidified_motifs = world_state.solidified_motifs
+            if solidified_motifs:
+                logger.info("[Orchestrator] Using %d learned motifs for discovery guidance", len(solidified_motifs))
+        
+        discovered_selectors = await discover_selectors(html, schema_fields, solidified_motifs=solidified_motifs)
     
     if discovered_selectors and discovered_selectors.get("item_container"):
         # Phase 81: Semantic Alignment Pass + Multi-Pass Extraction
@@ -538,7 +561,6 @@ def _detect_field_swaps(
         return likely_swaps
 
     # Value-aware swap detection
-    import re
     swaps: dict[str, str] = {}
     
     for field in fields:

@@ -289,8 +289,8 @@ def run_test_job(mode: str = "manual"):
             ],
             "source_policy": "all_sources",
         }
-        print(f"  Mode:        Manual (single URL)")
-        print(f"  URL:         https://irishinterior.com/contact-us/")
+        print("  Mode:        Manual (single URL)")
+        print("  URL:         https://irishinterior.com/contact-us/")
     else:
         payload = {
             "name": f"Auto Test ({datetime.now().strftime('%H:%M:%S')})",
@@ -305,9 +305,9 @@ def run_test_job(mode: str = "manual"):
             "max_pages": 1,
             "source_policy": "all_sources",
         }
-        print(f"  Mode:        Auto (discovery + scrape)")
-        print(f"  Topic:       interior designers in Chennai")
-        print(f"  Max Pages:   1")
+        print("  Mode:        Auto (discovery + scrape)")
+        print("  Topic:       interior designers in Chennai")
+        print("  Max Pages:   1")
 
     print()
     print("  Creating job...", end=" ", flush=True)
@@ -357,7 +357,7 @@ def run_test_job(mode: str = "manual"):
             print(f"  Duration:    {elapsed}s")
 
             if logs:
-                print(f"  Logs:")
+                print("  Logs:")
                 for log in logs[-5:]:
                     msg = log.get("message", "") if isinstance(log, dict) else str(log)
                     print(f"    • {msg}")

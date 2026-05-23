@@ -305,12 +305,20 @@ async def fetch_page_content(
     else:
         strategy = preferred_method
 
+    if anti_bot_stealth and strategy in (FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT):
+        strategy = FetchStrategy.PLAYWRIGHT_STEALTH
+
     # ── Phase 80: Granular Strategy Execution ──
     
     # 1. HTTPX-based strategies
     if strategy in [FetchStrategy.HTTPX_BASIC, FetchStrategy.HTTPX_WITH_UA, FetchStrategy.HTTPX_SMART, FetchStrategy.HYBRID]:
         try:
-            html, delay, method, retries = await _fetch_with_httpx(url, strategy=strategy)
+            html, delay, method, retries = await _fetch_with_httpx(
+                url,
+                strategy=strategy,
+                extra_headers=extra_headers,
+                timeout_ms=timeout_ms,
+            )
             if html:
                 # Basic anti-bot check on httpx result
                 from app.scrape_telemetry import detect_anti_bot
@@ -333,6 +341,8 @@ async def fetch_page_content(
         # Pass strategy to get_context for specialized setup
         context = await pool.get_context(domain, strategy=strategy)
         page = await context.new_page()
+        if extra_headers:
+            await page.set_extra_http_headers(extra_headers)
 
         # Phase 80: Lightweight mode filters more resources
         async def _route_filter(route):
@@ -497,7 +507,12 @@ async def fetch_page_content(
             raise ValueError(f"Anti-bot challenge detected: {e}")
 
         logger.error("[Scraper] %s failed for %s: %s. Final fallback to httpx_basic", strategy.value, url, e)
-        return await _fetch_with_httpx(url, strategy=FetchStrategy.HTTPX_BASIC)
+        return await _fetch_with_httpx(
+            url,
+            strategy=FetchStrategy.HTTPX_BASIC,
+            extra_headers=extra_headers,
+            timeout_ms=timeout_ms,
+        )
     finally:
         if page:
             try:
@@ -507,8 +522,10 @@ async def fetch_page_content(
 
 
 async def _fetch_with_httpx(
-    url: str, 
-    strategy: FetchStrategy = FetchStrategy.HTTPX_BASIC
+    url: str,
+    strategy: FetchStrategy = FetchStrategy.HTTPX_BASIC,
+    extra_headers: dict[str, str] | None = None,
+    timeout_ms: int | None = None,
 ) -> tuple[str, float, str, int]:
     """Internal helper for httpx fetching with retries."""
     method_used = strategy.value
@@ -528,8 +545,12 @@ async def _fetch_with_httpx(
             # Minimal headers for basic fetch
             headers = {"User-Agent": settings.HTTPX_BASIC_USER_AGENT}
         
+    if extra_headers:
+        headers.update(extra_headers)
+
+    timeout_seconds = (timeout_ms / 1000.0) if timeout_ms is not None else settings.REQUEST_TIMEOUT
     async with httpx.AsyncClient(
-        timeout=httpx.Timeout(settings.REQUEST_TIMEOUT),
+        timeout=httpx.Timeout(timeout_seconds),
         headers=headers,
         follow_redirects=True,
     ) as client:

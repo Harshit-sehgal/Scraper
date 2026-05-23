@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import TYPE_CHECKING
 from bs4 import BeautifulSoup
 
 from urllib.parse import urljoin, urlparse
@@ -53,6 +54,9 @@ from app.compound_record_assembler import assemble_compound_records
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from app.recovery_strategies import AttemptContext
+
 # Re-export for backwards compatibility (used by routers/jobs.py and services/job_runner.py)
 from app.cleaning_engine import ai_clean_and_align_records  # noqa: F401
 from app.insight_engine import generate_data_insight, suggest_schema_from_intent, suggest_schema_from_intent_sync  # noqa: F401
@@ -79,7 +83,7 @@ async def scrape_url(
     world_state=None,
     selectors_map: dict | None = None,
     search_params: dict[str, str] | None = None,
-    attempt_ctx = None,
+    attempt_ctx: "AttemptContext | None" = None,
 ) -> list[dict]:
     """Orchestrate the full extraction flow for a single URL."""
     from app.recovery_strategies import AttemptContext
@@ -111,12 +115,7 @@ async def scrape_url(
         return []
 
     # ── Step 1: Try profile-based extraction first ──────────────────
-    # If recovery requested force_llm_discovery, skip profiles entirely
-    skip_profiles = attempt_ctx and attempt_ctx.force_llm_discovery
-    if skip_profiles:
-        logger.info("[Recovery] force_llm_discovery set — skipping profile-based extraction")
-
-    # Transfer recovery flags to selectors_map so orchestrator can consume them
+    # Transfer recovery flags to selectors_map so orchestrator can consume them.
     if attempt_ctx:
         if selectors_map is None:
             selectors_map = {}
@@ -124,6 +123,14 @@ async def scrape_url(
             selectors_map["force_llm_discovery"] = True
         if attempt_ctx.bypass_selector_memory:
             selectors_map["bypass_selector_memory"] = True
+        if attempt_ctx.force_container_discovery:
+            selectors_map["force_container_discovery"] = True
+
+    # If recovery requested force_llm_discovery, skip profiles entirely.
+    # A normal AttemptContext should not disable profile extraction.
+    skip_profiles = bool(attempt_ctx and attempt_ctx.force_llm_discovery)
+    if skip_profiles:
+        logger.info("[Recovery] force_llm_discovery set — skipping profile-based extraction")
         matched_profile = None
         profile_results = None
     else:
@@ -196,6 +203,7 @@ async def scrape_url(
             skip_networkidle=attempt_ctx.skip_networkidle if attempt_ctx else False,
             scroll_attempts=attempt_ctx.scroll_attempts if attempt_ctx else None,
             anti_bot_stealth=attempt_ctx.anti_bot_stealth if attempt_ctx else False,
+            extra_headers=attempt_ctx.extra_headers if attempt_ctx else None,
         )
         fetch_ms = (time.time() - fetch_start) * 1000
         fetch_success = True

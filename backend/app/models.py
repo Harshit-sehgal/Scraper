@@ -20,6 +20,16 @@ RESERVED_FIELD_NAMES: frozenset = frozenset({
     "_extraction_method",
     "_ai_source_structured",
     "_calibrated_confidence",
+    "source_url",
+    "source_type",
+    "source_trust_score",
+    "scraped_at",
+    "record_score",
+    "_source_url",
+    "_field_provenance",
+    "_zero_result_failure",
+    "_element_text",
+    "_record_id",
 })
 
 
@@ -119,6 +129,24 @@ class SchemaSuggestionRequest(BaseModel):
     max_fields: int = Field(8, ge=1, le=20, description="Maximum number of fields to generate")
 
 
+class SelectorMap(BaseModel):
+    """Validated selector map produced by URL analysis."""
+
+    item_container: str = Field("", max_length=500)
+    fields: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_fields(self):
+        if len(self.fields) > 50:
+            raise ValueError("selectors_map.fields must have at most 50 entries")
+        for name, selector in self.fields.items():
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("selectors_map.fields keys must be non-empty strings")
+            if not isinstance(selector, str) or len(selector) > 500:
+                raise ValueError("selectors_map field selectors must be strings up to 500 characters")
+        return self
+
+
 class JobCreate(BaseModel):
     """Request body to create a new scraping job."""
     name: str = Field(..., description="Human-readable job name")
@@ -170,16 +198,13 @@ class JobCreate(BaseModel):
             # Auto mode always discovers URLs itself.
             self.urls = []
 
-        # Validate selectors_map size if present
+        # Validate selectors_map shape if present while keeping the external API as a dict.
         if self.selectors_map:
+            if not isinstance(self.selectors_map, dict):
+                raise ValueError("selectors_map must be an object")
             if len(self.selectors_map) > 20:
                 raise ValueError("selectors_map must have at most 20 keys")
-            fields = self.selectors_map.get("fields", {})
-            if fields and len(fields) > 50:
-                raise ValueError("selectors_map.fields must have at most 50 entries")
-            container = self.selectors_map.get("item_container", "")
-            if container and len(container) > 500:
-                raise ValueError("selectors_map.item_container must be at most 500 characters")
+            self.selectors_map = SelectorMap.model_validate(self.selectors_map).model_dump()
 
         return self
 

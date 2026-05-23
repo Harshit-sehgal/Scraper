@@ -8,7 +8,6 @@ import logging
 from app.models import FieldType, SchemaField
 from app.scraper import scrape_url
 from app.benchmark_accuracy import calculate_extraction_accuracy
-from app.config import settings
 
 URL = "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html"
 

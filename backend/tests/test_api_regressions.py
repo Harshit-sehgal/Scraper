@@ -138,6 +138,7 @@ def test_quality_report_exposes_overall_score():
     assert 0.0 <= report["overall_score"] <= 1.0
     assert "coverage_ratio" in report
     assert "avg_source_trust_score" in report
+    assert report["ai_source_prediction"]["ai_row_rate"] == 0.5
 
 
 def test_quality_report_empty_results_scores_zero():
@@ -158,6 +159,23 @@ def test_quality_report_empty_results_scores_zero():
     assert report["final_records"] == 0
     assert report["coverage_ratio"] == 0.0
     assert report["overall_score"] == 0.0
+
+
+def test_scraper_stats_uses_observed_sample_counts(client):
+    from app.scrape_telemetry import get_scrape_telemetry
+
+    telemetry = get_scrape_telemetry()
+    telemetry.clear()
+    telemetry.record("https://one.example", fetch_ms=100, fallback_triggered=False)
+    telemetry.record("https://two.example", fetch_ms=300, fallback_triggered=True)
+
+    resp = client.get("/api/scraper/stats")
+
+    telemetry.clear()
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["recent_latency_avg"] == 200
+    assert body["recent_success_rate"] == 0.5
 
 
 def test_prune_history_stores_keeps_active_and_recent_terminal(monkeypatch):

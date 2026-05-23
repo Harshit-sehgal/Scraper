@@ -161,12 +161,25 @@ class AcquisitionLineage(BaseModel):
         }
 
         return {
+            "state": self.state.value,
             "redirected": redirected,
             "redirect_type": redirect_type_map.get(self.state, "none"),
             "message": self.message,
             "user_message": self.get_user_message(),
             "original_url": self.original_url,
             "final_url": self.final_url,
+            "fetch_method": self.fetch_method,
+            "recovery_method": self.recovery_method,
+            "recovered_url": self.recovered_url,
+            "session_bound": self.session_bound,
+            "ephemeral_params": self.ephemeral_params,
+            "data_evidence_score": self.data_evidence_score,
+            "network_payloads_found": self.network_payloads_found,
+            "forms_detected": self.forms_detected,
+            "containers_detected": self.containers_detected,
+            "anti_bot_score": self.anti_bot_score,
+            "visible_text_length": self.visible_text_length,
+            "recommended_next_action": self.recommended_next_action,
         }
 
     @classmethod
