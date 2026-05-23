@@ -39,7 +39,7 @@ async def run_job(
 
     _add_job_log(job, f"Initializing job: {job.name}", persist_fn=persist_state_fn)
 
-    all_raw_results = []
+    all_raw_results: list[dict] = []
     urls_with_records = 0
     warnings: list[str] = []
     ai_source_prediction = {
@@ -139,6 +139,7 @@ async def run_job(
             async with job_lock:
                 completed_count += 1
                 job.progress_current = completed_count
+                persist_state_fn()
 
         async def _safe_warning(msg: str):
             async with job_lock:
@@ -150,6 +151,7 @@ async def run_job(
             elapsed = time.monotonic() - started_at
             if elapsed > max_job_runtime_seconds:
                 await _safe_warning(f"Job runtime limit reached at {int(elapsed)}s; partial results returned.")
+                await _mark_completed()
                 return idx, [], False, {}
 
             async with semaphore:
@@ -217,8 +219,14 @@ async def run_job(
                     await _mark_completed()
                     return idx, [], False, {}
 
-        tasks = [_scrape_single_url(idx, url) for idx, url in enumerate(job.urls, start=1)]
-        scraped = await asyncio.gather(*tasks)
+        scrape_tasks = [
+            asyncio.create_task(_scrape_single_url(idx, url))
+            for idx, url in enumerate(job.urls, start=1)
+        ]
+        scraped_raw = await asyncio.gather(*scrape_tasks, return_exceptions=True)
+        scraped: list[tuple[int, list[dict], bool, dict]] = [
+            r for r in scraped_raw if isinstance(r, tuple) and len(r) == 4
+        ]
 
         for idx, results, success, meta in sorted(scraped, key=lambda x: x[0]):
             if success:
