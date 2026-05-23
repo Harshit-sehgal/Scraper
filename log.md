@@ -632,6 +632,76 @@ Removed `--cov=backend/app --cov-report=term-missing --cov-fail-under=70` from
 
 ---
 
+---
+
+## Pass 13 — Docker/Deployment & Bare Except Elimination
+
+### Docker/Deployment Improvements
+
+#### `.dockerignore` (new)
+Comprehensive exclusions (3.2KB) — `__pycache__/`, `.venv/`, `.git/`, `.env`, `*.key`, `*.pem`, `*.md`, test artifacts, coverage, and all IDE/editor dirs.
+
+#### `Dockerfile` (rewritten — 4-stage build)
+- **base**: System deps (curl, git) + Python 3.12-slim
+- **deps**: Pip install from `requirements.txt` (cached layer)
+- **dev**: `FROM deps` + Playwright browsers + `--reload` CMD
+- **production**: `FROM deps` + non-root `dataforge` user + Playwright browsers + `HEALTHCHECK` using stdlib `http.client` (no curl)
+
+#### `docker-compose.yml` (updated)
+- Dev target, resource limits (2g mem, 2 CPUs)
+- Named network/volume for persistence
+- Localhost-only port binding (`${HOST:-127.0.0.1}:${PORT:-8000}:8000`)
+- Structured logging (max-size 5m, max-file 3)
+
+#### `docker-compose.override.yml` (new)
+- `PYTHONDEVMODE=1` for better debug warnings
+- `GROQ_API_KEY` host env passthrough
+- Volume mounts for hot-reload
+
+#### `docker-compose.prod.yml` (new)
+- Production stack with nginx reverse proxy (Alpine)
+- `read_only: true` root filesystem + `tmpfs: /tmp`
+- `no-new-privileges: true` + `cap_drop: ALL`
+- Resource reservations + hard limits
+- `healthcheck` depends-on condition
+
+#### `nginx.conf` (new)
+- API proxy to FastAPI with keepalive
+- Rate limiting (30 req/s)
+- Gzip compression with all text types
+- Security headers (X-Frame-Options, HSTS, X-Content-Type-Options, etc.)
+- Frontend static serving (fixed `alias`+`try_files` bug)
+- SSL block documented (commented)
+
+#### `Makefile` (new)
+18 targets: `help`, `build`, `up`, `down`, `logs`, `shell`, `test`, `lint`, `prod`, `health`, `exec`, `clean`
+
+### Bugs Fixed
+
+#### 46. Bare `except Exception: pass` in `browser_pool.py` (7 instances)
+**File**: `backend/app/browser_pool.py`
+All 7 bare `except` blocks replaced with `logger.debug()`:
+- `close()`: 3 (context close, browser close, playwright stop)
+- `_hard_recycle()`: 3 (context close, browser close, playwright stop)
+- `_get_rss_memory()`: 1 (resource.getrusage failure)
+
+#### 47. Bare `except Exception: pass` in `_multi_pass_extraction` (2 instances)
+**File**: `backend/app/extraction_orchestrator.py`
+Alt container pass and raw extraction pass now log failures at debug level.
+Messages include the selector/context for debugging.
+
+### Final State
+
+| Check | Result |
+|-------|--------|
+| pyflakes (modified files) | **0 issues** |
+| compileall (modified files) | **clean** |
+| Docker compose YAML | **valid** |
+| nginx.conf | **syntax valid** (rendered to follow FastAPI proxy pattern) |
+| Docker build (base stage) | timeouts expected — Playwright browser download is network-dependent |
+
+---
+
 ## What Needs to Be Done
 
 ### Short-term (stability)

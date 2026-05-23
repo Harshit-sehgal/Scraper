@@ -158,8 +158,8 @@ def _multi_pass_extraction(
                 )
                 if isinstance(alt_result, list) and alt_result:
                     passes.append(alt_result)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("[Orchestrator] Alt container pass failed for %s: %s", alt_sel, e)
     
     # Pass 3: Raw extraction without container (extract from full page)
     if not pass1 or (passes and len(passes) == 1):
@@ -174,8 +174,8 @@ def _multi_pass_extraction(
                 for rec in aligned:
                     rec["record_score"] = score_record_quality(rec, schema_fields)
                 passes.append([r for r in aligned if r.get("record_score", 0) > 0])
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("[Orchestrator] Raw extraction pass failed: %s", e)
     
     # Merge all passes
     return _merge_composite_records(passes, schema_fields)

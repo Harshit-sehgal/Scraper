@@ -238,23 +238,23 @@ class BrowserPool:
             for ctx in list(self._contexts.values()):
                 try:
                     await ctx.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("[BrowserPool] Failed to close context during close(): %s", e)
             self._contexts.clear()
             self._context_use_count.clear()
             
             if self._browser:
                 try:
                     await self._browser.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("[BrowserPool] Failed to close browser during close(): %s", e)
                 self._browser = None
             
             if self._playwright:
                 try:
                     await self._playwright.stop()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("[BrowserPool] Failed to stop playwright during close(): %s", e)
                 self._playwright = None
             
             self.active_contexts = 0
@@ -265,7 +265,8 @@ class BrowserPool:
         import resource
         try:
             return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
-        except Exception:
+        except Exception as e:
+            logger.debug("[BrowserPool] Failed to get RSS memory: %s", e)
             return 0
 
     def _should_recycle(self) -> bool:
@@ -302,23 +303,23 @@ class BrowserPool:
         for ctx in list(self._contexts.values()):
             try:
                 await ctx.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("[BrowserPool] Failed to close context during hard recycle: %s", e)
         self._contexts.clear()
         self._context_use_count.clear()
         
         if self._browser:
             try:
                 await self._browser.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("[BrowserPool] Failed to close browser during hard recycle: %s", e)
             self._browser = None
         
         if self._playwright:
             try:
                 await self._playwright.stop()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("[BrowserPool] Failed to stop playwright during hard recycle: %s", e)
             self._playwright = None
             
         self.active_contexts = 0

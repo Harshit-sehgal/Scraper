@@ -1,0 +1,93 @@
+# =============================================================================
+# DataForge Scraper — Docker Build Context Ignore
+# =============================================================================
+# Files/directories excluded from `docker build` context.
+# Reduces build time and prevents secrets from leaking into the image.
+# =============================================================================
+
+# ─── Version Control ───────────────────────────────────────────────────────
+.git/
+.gitignore
+.gitattributes
+
+# ─── Local Environment ─────────────────────────────────────────────────────
+.env
+.env.*.local
+*.pem
+*.key
+
+# ─── Python Bytecode & Caches ──────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ─── Virtual Environments ──────────────────────────────────────────────────
+.venv/
+venv/
+env/
+backend/.venv/
+backend/venv/
+backend/env/
+
+# ─── IDE & Editor ──────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ─── AI / Agent Artifacts ──────────────────────────────────────────────────
+.agents/
+.commandcode/
+.codex/
+.antigravitycli/
+
+# ─── Documentation (not needed at runtime) ─────────────────────────────────
+*.md
+ARCHITECTURE_LAWS.md
+ARCHITECTURE.md
+data_flow_diagrams.md
+*.pdf
+*.svg
+
+# ─── Test Artifacts ────────────────────────────────────────────────────────
+.coverage
+coverage_report/
+htmlcov/
+*.xml
+backend/.coverage
+backend/data/
+*.csv
+*.xlsx
+
+# ─── CI/CD ──────────────────────────────────────────────────────────────────
+.github/
+
+# ─── Node / Frontend (built assets only) ───────────────────────────────────
+frontend/node_modules/
+frontend/package-lock.json
+frontend/yarn.lock
+frontend/.next/
+frontend/dist/
+
+# ─── Reports & Logs ────────────────────────────────────────────────────────
+log.md
+server.log
+*.log
+DEEPSCAN_REPORT.md
+PHASE_*.md
+FINAL_MATURITY_REPORT.md
+RECOVERY_FRAMEWORK.md
+SCRAPER_DOSSIER.md
+dependency_graph.txt
+layer_dependencies.md
+component_matrix.csv
+CURRENT_STATE.md
+SEMANTIC_PHYSICS_API.md
+INFLECTION_POINT_ROADMAP.md
+GEMINI.md
