@@ -304,7 +304,10 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:
         non_empty = [t for t in texts if len(t) > 20]
         if len(non_empty) < 3:
             continue
-        avg_text_len = sum(len(t) for t in non_empty) / len(non_empty)
+        empty_ratio = (len(texts) - len(non_empty)) / max(len(texts), 1)
+        if empty_ratio > 0.3:
+            continue
+        avg_text_len = sum(len(t) for t in texts) / max(len(texts), 1)
         data_signals = sum(
             1 for t in non_empty
             if _re.search(r"[\$£€¥₹]\s*\d+", t)
@@ -316,7 +319,7 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:
         text_diversity = len(set(t[:40] for t in non_empty))
         if data_signals + date_signals < 2:
             continue
-        score = len(elements) * 2 + data_signals * 2 + date_signals * 2 + avg_text_len * 0.03 + text_diversity * 2
+        score = len(elements) * 0.5 + data_signals * 2 + date_signals * 2 + avg_text_len * 0.05 + text_diversity * 2
         if avg_text_len < 50:
             continue
         candidates.append({
