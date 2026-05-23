@@ -125,99 +125,80 @@ async def run_job(
             job.progress_current = 0
         _add_job_log(job, f"Scraping started ({len(job.urls)} URLs queue)", persist_fn=persist_state_fn)
 
-        for idx, url in enumerate(job.urls, start=1):
-            if job.cancel_requested:
-                mark_job_canceled(job)
-                _add_job_log(job, f"Job canceled during scraping (at URL {idx})", level="warning", persist_fn=persist_state_fn)
-                return
+        semaphore = asyncio.Semaphore(settings.JOB_MAX_PARALLEL_URLS)
 
+        async def _scrape_single_url(idx: int, url: str) -> tuple[int, list[dict], bool]:
+            if job.cancel_requested:
+                return idx, [], False
             elapsed = time.monotonic() - started_at
             if elapsed > max_job_runtime_seconds:
-                warnings.append(
-                    f"Job runtime limit reached at {int(elapsed)}s; partial results returned."
-                )
-                _add_job_log(job, f"Runtime limit reached ({int(elapsed)}s), stopping early", level="warning")
-                logging.warning("Job %s: Runtime limit reached after %ds", job_id, int(elapsed))
-                break
+                warnings.append(f"Job runtime limit reached at {int(elapsed)}s; partial results returned.")
+                return idx, [], False
 
-            _add_job_log(job, f"Scraping ({idx}/{len(job.urls)}): {url}", persist_fn=persist_state_fn)
-            if job.mode == ScrapeMode.AUTO:
-                job.progress_current = 1 + idx
-            else:
-                job.progress_current = idx
-            
-            from app.semantic_world_state import get_world_state
-            ws = get_world_state()
-            with ws.transaction(f"scrape:{url}"):
-                try:
-                    reset_llm_call_count()
-                    results, recovery_stats = await asyncio.wait_for(
-                        scrape_url_with_recovery(
-                            url, 
-                            job.schema_fields, 
-                            min_record_score=job.min_record_score, 
-                            user_intent=job.intent, 
-                            world_state=ws,
-                            max_recovery_attempts=settings.MAX_RECOVERY_ATTEMPTS,
-                            selectors_map=job.selectors_map,
-                            search_params=job.search_params,
-                        ),
-                        timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
-                    )
-                    job.total_llm_calls += get_llm_call_count()
-                    ai_source_prediction["sources_attempted"] += 1
-                    
-                    if recovery_stats["recovery_attempts"] > 0:
-                        actions = ", ".join(recovery_stats["recovery_actions_taken"])
-                        _add_job_log(job, f"Recovery applied to {url}: {actions}", level="info")
-                    
-                    ai_structured_rows_for_source = 0
-                    
-                    # Build URL metadata lookup map once per URL (instead of per record)
-                    url_metadata = None
-                    if job.discovered_urls:
-                        url_metadata = next((d for d in job.discovered_urls if d.get("url") == url), None)
-                    
-                    for record in results:
-                        if record.pop("_ai_source_structured", False):
-                            ai_structured_rows_for_source += 1
-                        record["source_url"] = url
-                        source_type = "unknown"
-                        source_trust_score = 0.4
+            async with semaphore:
+                _add_job_log(job, f"Scraping ({idx}/{len(job.urls)}): {url}", persist_fn=persist_state_fn)
+                if job.mode == ScrapeMode.AUTO:
+                    job.progress_current = idx
+                else:
+                    job.progress_current = idx
 
-                        # Use pre-computed URL metadata (O(1) instead of O(n) lookup per record)
-                        if url_metadata:
-                            source_type = str(url_metadata.get("source_type") or "unknown")
-                            source_trust_score = safe_score(url_metadata.get("source_trust_score") or 0.4)
-                        else:
+                from app.semantic_world_state import get_world_state
+                ws = get_world_state()
+                with ws.transaction(f"scrape:{url}"):
+                    try:
+                        reset_llm_call_count()
+                        results, recovery_stats = await asyncio.wait_for(
+                            scrape_url_with_recovery(
+                                url, job.schema_fields,
+                                min_record_score=job.min_record_score,
+                                user_intent=job.intent, world_state=ws,
+                                max_recovery_attempts=settings.MAX_RECOVERY_ATTEMPTS,
+                                selectors_map=job.selectors_map,
+                                search_params=job.search_params,
+                            ),
+                            timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
+                        )
+                        job.total_llm_calls += get_llm_call_count()
+
+                        if recovery_stats.get("recovery_attempts", 0) > 0:
+                            actions = ", ".join(recovery_stats.get("recovery_actions_taken", []))
+                            _add_job_log(job, f"Recovery applied to {url}: {actions}", level="info")
+
+                        for record in results:
+                            if record.pop("_ai_source_structured", False):
+                                pass
+                            record["source_url"] = url
                             inferred = infer_source_metadata(url=url)
-                            source_type = str(inferred.get("source_type") or "unknown")
-                            source_trust_score = safe_score(inferred.get("source_trust_score") or 0.4)
+                            record["source_type"] = str(inferred.get("source_type") or "unknown")
+                            record["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
 
-                        record["source_type"] = source_type
-                        record["source_trust_score"] = round(source_trust_score, 3)
+                        _add_job_log(job, f"Extracted {len(results)} raw records from {url}")
+                        persist_state_fn()
+                        return idx, results, True
+                    except asyncio.TimeoutError:
+                        _add_job_log(job, f"Timeout on {url}", level="warning", persist_fn=persist_state_fn)
+                        logging.warning("Job %s: Timeout for %s", job_id, url)
+                        warnings.append(f"URL timeout skipped ({idx}/{len(job.urls)}): {url}")
+                        return idx, [], False
+                    except Exception as e:
+                        logging.exception("Job %s: URL scrape failed: %s", job_id, url)
+                        _add_job_log(job, f"Failed to scrape {url}: {type(e).__name__}", level="warning", persist_fn=persist_state_fn)
+                        warnings.append(f"URL scrape failed ({idx}/{len(job.urls)}): {url} ({type(e).__name__})")
+                        return idx, [], False
 
+        tasks = [_scrape_single_url(idx, url) for idx, url in enumerate(job.urls, start=1)]
+        scraped = await asyncio.gather(*tasks)
+
+        for idx, results, success in sorted(scraped, key=lambda x: x[0]):
+            if success:
+                all_raw_results.extend(results)
+                if len(results) > 0:
+                    urls_with_records += 1
+                    ai_source_prediction["sources_attempted"] += 1
                     ai_source_prediction["records_processed"] += len(results)
-                    ai_source_prediction["records_ai_structured"] += ai_structured_rows_for_source
-                    if ai_structured_rows_for_source > 0:
-                        ai_source_prediction["sources_with_ai_structuring"] += 1
-
-                    all_raw_results.extend(results)
-                    if len(results) > 0:
-                        urls_with_records += 1
-                    _add_job_log(job, f"Extracted {len(results)} raw records from {url}")
-                    persist_state_fn()
-                except asyncio.TimeoutError:
-                    msg = f"URL timeout skipped ({idx}/{len(job.urls)}): {url}"
-                    warnings.append(msg)
-                    _add_job_log(job, f"Timeout on {url}", level="warning", persist_fn=persist_state_fn)
-                    logging.warning("Job %s: %s", job_id, msg)
-                except Exception as e:
-                    logging.exception("Job %s: URL scrape failed: %s", job_id, url)
-                    msg = f"URL scrape failed ({idx}/{len(job.urls)}): {url}"
-                    warnings.append(f"{msg} ({type(e).__name__})")
-                    _add_job_log(job, f"Failed to scrape {url}: {type(e).__name__}", level="warning", persist_fn=persist_state_fn)
-                    continue
+            if job.cancel_requested:
+                mark_job_canceled(job)
+                return
 
         run_global_ai_structuring = (
             bool(all_raw_results)

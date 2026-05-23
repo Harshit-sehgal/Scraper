@@ -260,6 +260,8 @@ class Settings(BaseSettings):
     # ─── Crawl Policy (operational governance) ─────────────────────────────
     CRAWL_MAX_TOTAL_CONCURRENCY: int = 10
     """Absolute cap on global parallel fetches."""
+    JOB_MAX_PARALLEL_URLS: int = 3
+    """Max URLs processed in parallel within a single job."""
     CRAWL_PER_DOMAIN_CONCURRENCY: int = 2
     """Max concurrent fetches per domain."""
     CRAWL_DEFAULT_DELAY_SECONDS: float = 1.0
