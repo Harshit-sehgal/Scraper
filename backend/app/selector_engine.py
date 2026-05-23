@@ -192,6 +192,20 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
                 for match in re_mod.finditer(pat, full_text, re_mod.IGNORECASE):
                     if not _is_span_used(match.start(), match.end()):
                         all_matches.append(match)
+            if not all_matches:
+                ancestor = node.parent
+                for _ in range(3):
+                    if not ancestor or not hasattr(ancestor, 'get_text'):
+                        break
+                    anc_text = ancestor.get_text(separator=" ", strip=True)
+                    if anc_text and anc_text != full_text:
+                        for pat in patterns:
+                            for match in re_mod.finditer(pat, anc_text, re_mod.IGNORECASE):
+                                if not _is_span_used(match.start(), match.end()):
+                                    all_matches.append(match)
+                    if all_matches:
+                        break
+                    ancestor = ancestor.parent if hasattr(ancestor, 'parent') else None
             if all_matches:
                 chosen = all_matches[-1] if use_last else all_matches[0]
                 used_spans.append((chosen.start(), chosen.end()))
