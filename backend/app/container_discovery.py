@@ -417,6 +417,11 @@ def _extract_record_from_element(
 
     This is a universal text-based extractor. It looks at the text content
     of the element and assigns values to schema fields based on pattern type.
+
+    Uses stateful span tracking to ensure each text span is consumed by only
+    one field. Fields named "origin"/"departure"/"from" get the first matching
+    value; fields named "destination"/"arrival"/"return"/"to_" get the last.
+    String/organization fields are processed last so typed fields get first pick.
     """
     record: dict = {}
     full_text = element.get_text(separator=" ", strip=True)
@@ -428,146 +433,288 @@ def _extract_record_from_element(
         if t and len(t) > 1:
             text_snippets.append(t)
 
-    # Extract field values by pattern type
-    for field in schema_fields:
-        value = _extract_field_value(field, full_text, text_snippets)
+    # Collect all pattern matches with positions first (pass 1)
+    matches_by_type = _collect_all_pattern_matches(full_text)
+
+    # Assign values to fields using used_spans tracking (pass 2)
+    used_spans: list[tuple[int, int]] = []
+    used_snippet_indices: set[int] = set()
+
+    def _is_span_used(start: int, end: int) -> bool:
+        for us, ue in used_spans:
+            if start < ue and end > us:
+                return True
+        return False
+
+    # Process fields in order: typed fields first, string/org last
+    _TYPED_PRIORITY = {
+        FieldType.EMAIL: 0,
+        FieldType.PHONE: 0,
+        FieldType.URL: 0,
+        FieldType.CURRENCY: 1,
+        FieldType.DATE: 1,
+    }
+
+    # Sort schema fields: typed first, then location/code, then string/org last
+    sorted_fields = sorted(
+        enumerate(schema_fields),
+        key=lambda item: (
+            _TYPED_PRIORITY.get(item[1].field_type if hasattr(item[1], 'field_type') else None, 3),
+            # Within same priority, fields with "use_last" semantics go second
+            0 if not any(w in (item[1].name or "").lower() for w in ("return", "arrival", "arrive", "dest", "to_")) else 1,
+        )
+    )
+
+    for idx, field in sorted_fields:
+        field_type = field.field_type if hasattr(field, 'field_type') else FieldType.STRING
+        field_name = field.name.lower() if hasattr(field, 'name') else ""
+        field_desc = field.description.lower() if hasattr(field, 'description') else ""
+
+        value = _extract_field_value_stateful(
+            field_type, field_name, field_desc,
+            full_text, text_snippets,
+            matches_by_type, used_spans, used_snippet_indices,
+        )
         if value:
             record[field.name] = value
 
     return record
 
 
-def _extract_field_value(
-    field,
+def _collect_all_pattern_matches(
+    full_text: str,
+) -> dict:
+    """Pass 1: Collect ALL pattern matches from the text, organized by type.
+
+    Returns a dict:
+    {
+        "email": [(match, start, end), ...],
+        "phone": [(match, start, end), ...],
+        "currency": [(match, start, end), ...],
+        "date": [(match, start, end), ...],
+        "time": [(match, start, end), ...],
+        "code": [(match, start, end), ...],
+        "organization": [(match, start, end), ...],
+    }
+    """
+    matches: dict[str, list[tuple[str, int, int]]] = {
+        "email": [],
+        "phone": [],
+        "url": [],
+        "currency": [],
+        "date": [],
+        "time": [],
+        "code": [],
+        "organization": [],
+    }
+
+    # ── Email ─────────────────────────────────────────────────
+    for m in re.finditer(r'[\w.+-]+@[\w-]+\.[\w.-]+', full_text):
+        validated = _valid_email(m.group(0))
+        if validated:
+            matches["email"].append((validated, m.start(), m.end()))
+
+    # ── Phone ─────────────────────────────────────────────────
+    phone_pattern = re.compile(r'\+?\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}')
+    for m in phone_pattern.finditer(full_text):
+        validated = _valid_phone(m.group(0))
+        if validated:
+            matches["phone"].append((validated, m.start(), m.end()))
+
+    # ── URL ───────────────────────────────────────────────────
+    url_pattern = re.compile(r'https?://[^\s<>"\'\]\)]+')
+    for m in url_pattern.finditer(full_text):
+        matches["url"].append((m.group(0), m.start(), m.end()))
+
+    # ── Currency / Price ──────────────────────────────────────
+    currency_pattern = re.compile(r'[\$\€\£\¥\₹]\s*\d+[\d,.]*')
+    for m in currency_pattern.finditer(full_text):
+        matches["currency"].append((m.group(0).replace(" ", ""), m.start(), m.end()))
+
+    # ── Date ──────────────────────────────────────────────────
+    date_patterns = [
+        re.compile(r'\d{4}-\d{2}-\d{2}'),
+        re.compile(r'\d{1,2}/\d{1,2}/\d{2,4}'),
+        re.compile(r'(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}', re.I),
+    ]
+    for dp in date_patterns:
+        for m in dp.finditer(full_text):
+            matches["date"].append((m.group(0), m.start(), m.end()))
+
+    # ── Time ──────────────────────────────────────────────────
+    time_pattern = re.compile(r'\d{1,2}:\d{2}\s*(?:am|pm)?', re.I)
+    for m in time_pattern.finditer(full_text):
+        matches["time"].append((m.group(0), m.start(), m.end()))
+
+    # ── Location codes (3-letter uppercase codes) ────────────────
+    skip_codes = {"THE", "AND", "FOR", "ALL", "ANY", "NEW", "OLD", "OUT", "TOP", "BIG", "GET", "HOW", "ARE", "NOT", "CAN", "WAS", "OFF", "YOU", "HAS", "ITS", "BUT", "NOW", "MAY", "JAN", "FEB", "MAR", "APR", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
+    for m in re.finditer(r'\b[A-Z]{3}\b', full_text):
+        if m.group(0) not in skip_codes:
+            matches["code"].append((m.group(0), m.start(), m.end()))
+
+    # ── Organization / Brand (capitalized multi-word names) ──────
+    # Scan full_text (not snippets) so positions are in full_text coordinate system
+    org_pattern = re.compile(r'\b([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+){1,4})\b')
+    for m in org_pattern.finditer(full_text):
+        val = m.group(1).strip()
+        # Skip common non-org patterns
+        if val.lower() not in ("departure", "return", "outbound", "inbound", "arrival", "duration", "total amount", "booking details"):
+            matches["organization"].append((val, m.start(), m.end()))
+
+    # Deduplicate each list (same value, keep first occurrence)
+    for key in matches:
+        seen = set()
+        unique = []
+        for val, start, end in matches[key]:
+            if val not in seen:
+                seen.add(val)
+                unique.append((val, start, end))
+        matches[key] = unique
+
+    return matches
+
+
+def _extract_field_value_stateful(
+    field_type,
+    field_name: str,
+    field_desc: str,
     full_text: str,
     snippets: list[str],
+    matches_by_type: dict,
+    used_spans: list[tuple[int, int]],
+    used_snippet_indices: set[int],
 ) -> str | None:
-    """Extract a single field value from text using pattern matching.
+    """Extract a field value using stateful span tracking.
 
-    Uses field type to determine which patterns to match.
+    Consumes matches from matches_by_type so subsequent fields get
+    different matches. Uses use_last heuristic for paired fields.
     """
-    field_type = field.field_type if hasattr(field, 'field_type') else FieldType.STRING
-    field_name = field.name.lower() if hasattr(field, 'name') else ""
-    field_desc = field.description.lower() if hasattr(field, 'description') else ""
+    def _consume_match(matches: list) -> str | None:
+        """Pop the next available match, respecting use_last."""
+        use_last = any(w in field_name for w in ("return", "arrival", "arrive", "end", "to_", "dest"))
+        # Also: "destination" → use last, "origin" → use first
+        if field_name in ("destination", "arrival", "arrival_city", "arrival_airport"):
+            use_last = True
+        if field_name in ("origin", "source", "departure", "departure_city", "departure_airport"):
+            use_last = False
+
+        if use_last:
+            # Try from end to find an unused span
+            for i in range(len(matches) - 1, -1, -1):
+                val, start, end = matches[i]
+                if not _is_span_used(start, end):
+                    matches.pop(i)
+                    used_spans.append((start, end))
+                    return val
+        else:
+            # Try from start to find an unused span
+            for i in range(len(matches)):
+                val, start, end = matches[i]
+                if not _is_span_used(start, end):
+                    matches.pop(i)
+                    used_spans.append((start, end))
+                    return val
+        return None
+
+    def _is_span_used(start: int, end: int) -> bool:
+        for us, ue in used_spans:
+            if start < ue and end > us:
+                return True
+        return False
+
+    def _consume_snippet() -> str | None:
+        """Pop the next unused snippet."""
+        for i, snippet in enumerate(snippets):
+            if i not in used_snippet_indices:
+                # Skip noise snippets
+                lower = snippet.lower()
+                if any(nav in lower for nav in ["click", "sign", "login", "subscribe", "privacy", "terms", "copyright"]):
+                    used_snippet_indices.add(i)
+                    continue
+                if len(snippet) >= 3:
+                    used_snippet_indices.add(i)
+                    return snippet.strip()
+        return None
 
     # ── Email ──────────────────────────────────────────────────────────
     if field_type == FieldType.EMAIL:
-        for snippet in snippets:
-            email_match = re.search(r'[\w.+-]+@[\w-]+\.[\w.-]+', snippet)
-            if email_match:
-                validated = _valid_email(email_match.group(0))
-                if validated:
-                    return validated
-        # Fallback: check full text
-        email_match = re.search(r'[\w.+-]+@[\w-]+\.[\w.-]+', full_text)
-        if email_match:
-            validated = _valid_email(email_match.group(0))
-            if validated:
-                return validated
-        return None
+        return _consume_match(matches_by_type["email"])
 
     # ── Phone ──────────────────────────────────────────────────────────
     if field_type == FieldType.PHONE:
-        phone_pattern = re.compile(r'\+?\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}')
-        match = phone_pattern.search(full_text)
-        if match:
-            validated = _valid_phone(match.group(0))
-            if validated:
-                return validated
-        return None
+        return _consume_match(matches_by_type["phone"])
 
     # ── URL ────────────────────────────────────────────────────────────
     if field_type == FieldType.URL:
-        url_pattern = re.compile(r'https?://[^\s<>"\'\]\)]+')
-        match = url_pattern.search(full_text)
-        if match:
-            return match.group(0)
-        return None
+        return _consume_match(matches_by_type["url"])
 
     # ── Currency / Price ───────────────────────────────────────────────
     if field_type == FieldType.CURRENCY:
-        currency_pattern = re.compile(r'[\$\€\£\¥\₹]\s*\d+[\d,.]*')
-        match = currency_pattern.search(full_text)
-        if match:
-            return match.group(0).replace(" ", "")
-        # Fallback: just a number preceded by "price" or "$"
+        result = _consume_match(matches_by_type["currency"])
+        if result:
+            return result
+        # Fallback: named price pattern
         alt_pattern = re.compile(r'(?:price|total|fare|cost)\s*:?\s*[\$\€\£\¥\₹]?\s*(\d+[\d,.]*)', re.I)
-        match = alt_pattern.search(full_text)
-        if match:
-            return match.group(1)
+        m = alt_pattern.search(full_text)
+        if m and not _is_span_used(m.start(), m.end()):
+            used_spans.append((m.start(), m.end()))
+            return m.group(1)
+        # Last resort: decimal number
+        num_m = re.search(r'(\d+\.\d{2})\b', full_text)
+        if num_m and not _is_span_used(num_m.start(), num_m.end()):
+            used_spans.append((num_m.start(), num_m.end()))
+            symbol_match = re.search(r'[\$\€\£\¥\₹]', full_text[:num_m.start() + 10])
+            symbol = symbol_match.group(0) if symbol_match else ""
+            return f"{symbol}{num_m.group(1)}" if symbol else num_m.group(1)
         return None
 
     # ── Date ───────────────────────────────────────────────────────────
     if field_type == FieldType.DATE:
-        date_patterns = [
-            re.compile(r'\d{4}-\d{2}-\d{2}'),
-            re.compile(r'\d{1,2}/\d{1,2}/\d{2,4}'),
-            re.compile(r'(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}', re.I),
-        ]
-        for pattern in date_patterns:
-            match = pattern.search(full_text)
-            if match:
-                return match.group(0)
-        return None
+        return _consume_match(matches_by_type["date"])
 
     # ── Time ───────────────────────────────────────────────────────────
-    # Only match exact "time" field names, not "timezone", "timeout", "timeline"
     time_field_names = {"time", "departure_time", "arrival_time", "start_time", "end_time", "duration", "travel_time"}
-    if field_type in (FieldType.STRING, ) and (field_name in time_field_names or field_name.endswith("_time")):
-        time_pattern = re.compile(r'\d{1,2}:\d{2}\s*(?:am|pm)?', re.I)
-        match = time_pattern.search(full_text)
-        if match:
-            return match.group(0)
-        return None
+    if field_type in (FieldType.STRING,) and (field_name in time_field_names or field_name.endswith("_time")):
+        return _consume_match(matches_by_type["time"])
 
-    # ── Location / Code (3-letter codes like MIA, JFK) ────────────────
+    # ── Location / Code ────────────────────────────────────────────────
     if field_type == FieldType.LOCATION or "location" in field_name or "code" in field_name:
-        code_pattern = re.compile(r'\b[A-Z]{3}\b')
-        matches = code_pattern.findall(full_text)
-        if matches:
-            # Return the first unique code
-            return matches[0]
-        return None
+        return _consume_match(matches_by_type["code"])
 
-    # ── Organization / Brand / Carrier (generic) ─────────────────────
+    # ── Organization / Brand / Name ────────────────────────────────────
     org_field_names = {"organization", "company", "carrier", "airline", "brand", "vendor", "provider", "name", "title"}
     if field_name in org_field_names or any(fn in field_name for fn in ["company", "carrier", "airline", "vendor", "brand", "organization"]):
-        # Look for capitalized org/brand patterns in snippets
-        for snippet in snippets:
-            # Match any capitalized multi-word name (2-5 words) that could be an organization
-            org_pattern = re.compile(r'\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,4})\b')
-            match = org_pattern.search(snippet)
-            if match:
-                return match.group(1).strip()
-        return None
+        result = _consume_match(matches_by_type["organization"])
+        if result:
+            return result
+        # Check if any remaining snippet looks like an org name
+        return _consume_snippet()
 
-    # ── Unhandled field type ────────────────────────────────────────────
+    # ── Unhandled ──────────────────────────────────────────────────────
     logger.debug(
         "[ContainerDiscovery] No extraction logic for field '%s' with type %s",
         field_name, field_type,
     )
 
-    # ── String / Text (default) ────────────────────────────────────────
+    # ── String (default) ───────────────────────────────────────────────
     if field_type == FieldType.STRING:
-        # Try to find most relevant text snippet
-        # Look for a label match first
+        # Try to find text matching field name or description
         label_words = set(field_name.split("_") + field_desc.split()[:3])
-        if label_words:
-            for snippet in snippets:
-                s_lower = snippet.lower()
-                if any(w in s_lower for w in label_words if len(w) > 2):
-                    if len(snippet) >= 3 and len(snippet) <= 200:
-                        return snippet.strip()
+        label_words = {w for w in label_words if len(w) > 2}
 
-        # Fallback: return first non-empty text snippet that seems meaningful
-        for snippet in snippets:
-            if len(snippet) >= 3 and len(snippet) <= 200:
-                # Skip pure navigation/noise
-                lower = snippet.lower()
-                if any(nav in lower for nav in ["click", "sign", "login", "subscribe", "privacy", "terms"]):
-                    continue
-                return snippet.strip()
+        for i, snippet in enumerate(snippets):
+            if i in used_snippet_indices:
+                continue
+            s_lower = snippet.lower()
+            if any(w in s_lower for w in label_words):
+                if len(snippet) >= 3 and len(snippet) <= 200:
+                    used_snippet_indices.add(i)
+                    return snippet.strip()
 
+        # Fallback: best remaining snippet
+        best = _consume_snippet()
+        if best:
+            return best
         return None
 
     return None
