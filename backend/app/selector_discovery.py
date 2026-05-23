@@ -236,6 +236,11 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
         parent_css = _build_css_for_element(parent)
         if not parent_css:
             continue
+        if len(parent.find_all(True)) > 0:
+            from bs4 import BeautifulSoup as _BS
+            parent_page_matches = len(soup.select(parent_css))
+            if parent_page_matches < 2:
+                continue
         data_signal_count = sum(
             1 for c in siblings
             for t in [c.get_text(separator=" ", strip=True)]
