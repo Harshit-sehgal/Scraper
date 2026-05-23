@@ -30,37 +30,6 @@ from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
-# ── Known difficult domains for cold-start strategy selection ──────────
-# Domains identified from 15-site smoke test and operational experience.
-# Anti-bot heavy: known to block automated requests aggressively.
-ANTIBOT_HEAVY_DOMAINS: set[str] = {
-    "yelp.com", "www.yelp.com",
-    "indeed.com", "www.indeed.com",
-    "ebay.com", "www.ebay.com",
-    "walmart.com", "www.walmart.com",
-}
-# JS-heavy / timeout-prone: pages that take very long to reach networkidle
-# or require significant JS execution. Prefer lightweight Playwright mode
-# (domcontentloaded) to avoid timeout penalties.
-JS_HEAVY_DOMAINS: set[str] = {
-    "booking.com", "www.booking.com",
-    "espn.com", "www.espn.com",
-    "github.com", "www.github.com",
-}
-
-
-def _match_domain_set(domain: str, domain_set: set[str]) -> bool:
-    """Check if domain or any parent domain matches the set."""
-    if not domain:
-        return False
-    domain = domain.lower().strip()
-    if domain in domain_set:
-        return True
-    parts = domain.split(".")
-    if len(parts) >= 2:
-        return ".".join(parts[-2:]) in domain_set
-    return False
-
 
 class FetchStrategy(str, Enum):
     """Available fetch strategies."""
@@ -293,26 +262,7 @@ class StrategyEvolutionEngine:
         total_attempts = sum(s.success_count + s.failure_count for s in state.strategies.values())
         
         if total_attempts < self.min_samples_for_recommendation:
-            # Cold start: check for known difficult domains first
-            if _match_domain_set(domain, ANTIBOT_HEAVY_DOMAINS):
-                return StrategyRecommendation(
-                    recommended_strategy=FetchStrategy.PLAYWRIGHT_STEALTH,
-                    alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],
-                    reason="Cold start: domain known for anti-bot — using stealth mode",
-                    confidence=0.7,
-                    estimated_success_rate=0.4,
-                )
-
-            if _match_domain_set(domain, JS_HEAVY_DOMAINS):
-                return StrategyRecommendation(
-                    recommended_strategy=FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT,
-                    alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],
-                    reason="Cold start: domain known JS-heavy — lightweight avoids networkidle timeout",
-                    confidence=0.6,
-                    estimated_success_rate=0.5,
-                )
-
-            # Cold start: check anti-bot risk if known from domain intelligence
+            # Cold start: use dynamic evidence, not domain-name lists
             try:
                 from app.domain_intelligence import get_domain_intelligence
                 intel = get_domain_intelligence().get_intelligence(domain)
