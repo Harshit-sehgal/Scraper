@@ -386,7 +386,7 @@ def _build_css_for_element(el) -> str | None:
         return f"#{el['id']}"
     classes = el.get("class")
     if classes:
-        cls_sel = ".".join(f".{c}" for c in classes[:2])
+        cls_sel = "".join(f".{c}" for c in classes[:2])
         if el.name not in ("div", "span", "html", "body"):
             return f"{el.name}{cls_sel}"
         return cls_sel
