@@ -1023,6 +1023,39 @@ now that `_element_text` is embedded in records directly. Simplified to
 
 ---
 
+## Pass 21 — Type/Lint Cleanup: Unused Import & Missing Annotation
+
+### Bugs Fixed
+
+#### 55. Unused `BeautifulSoup as _BS` import in `_discover_selectors_from_dom`
+**File**: `backend/app/selector_discovery.py:240`
+Inline `from bs4 import BeautifulSoup as _BS` was imported but never used —
+the next line used `soup.select(parent_css)` instead. The module-level
+`from bs4 import BeautifulSoup` import already serves all functions. Caused
+pyflakes error.
+
+#### 56. Missing type annotation for `keys` in `_count_field_matches`
+**File**: `backend/app/network_extractor.py:560`
+`keys = set()` without annotation caused mypy `var-annotated` error. Fixed to
+`keys: set[str] = set()` — correct since `.update()` adds dict keys and `&`
+intersects with `set[str]`.
+
+### Final State
+
+| Check | Result |
+|-------|--------|
+| `python -m pyflakes` (all of `app/`) | **0 issues** |
+| `python -m mypy` (all of `app/` w/o --ignore-missing-imports) | **0 errors** |
+| Unit tests (128 fast tests) | **all passed** |
+| Frontend JS | **valid** |
+
+### Commit
+```
+<commit_hash> fix: remove unused BeautifulSoup import + add missing type annotation — Pass 21
+```
+
+---
+
 ## Pass 20 — 15-Site Universal Extraction Smoke Test
 
 ### Test Overview
@@ -1116,11 +1149,6 @@ network_json_empty → visible_text_empty → container_discovery_partial → re
 ### Medium-term (feature completeness)
 - [ ] Bounding-box-based spatial card grouping using Playwright coordinates
 - [ ] Parallel extraction for multi-URL jobs to reduce total job time
-
-### Long-term (product)
-- [ ] User-defined selector profiles via the UI (not just JSON files)
-- [ ] Adaptive extraction learning — remember which selectors worked per domain
-- [ ] Schema auto-detection from URL analysis results
 
 ### Long-term (product)
 - [ ] User-defined selector profiles via the UI (not just JSON files)

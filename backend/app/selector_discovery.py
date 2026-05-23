@@ -237,7 +237,6 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
         if not parent_css:
             continue
         if len(parent.find_all(True)) > 0:
-            from bs4 import BeautifulSoup as _BS
             parent_page_matches = len(soup.select(parent_css))
             if parent_page_matches < 2:
                 continue

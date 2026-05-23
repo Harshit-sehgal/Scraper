@@ -557,7 +557,7 @@ def _is_record_like(item: dict, schema_fields: list) -> bool:
 
 def _count_field_matches(records: list[dict], schema_fields: list) -> int:
     """Count how many schema field names appear as keys in the records."""
-    keys = set()
+    keys: set[str] = set()
     for r in records:
         keys.update(r.keys())
     schema_names = {f.name.lower() for f in schema_fields}
