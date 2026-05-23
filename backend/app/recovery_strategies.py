@@ -55,7 +55,6 @@ class RecoveryAction(str, Enum):
 
 
 @dataclass
-@dataclass
 class RecoveryPlan:
     """Plan for recovering from a specific failure."""
     

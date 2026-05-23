@@ -79,6 +79,7 @@ async def scrape_url(
     world_state=None,
     selectors_map: dict | None = None,
     search_params: dict[str, str] | None = None,
+    attempt_ctx = None,
 ) -> list[dict]:
     """Orchestrate the full extraction flow for a single URL."""
     if min_record_score is None:
@@ -161,8 +162,11 @@ async def scrape_url(
     retry_count = 0
     try:
         fetch_start = time.time()
+        fetch_strategy = recommended_strategy
+        if attempt_ctx and getattr(attempt_ctx, 'fetch_strategy', None):
+            fetch_strategy = attempt_ctx.fetch_strategy
         html, js_render_delay, fetch_method, retry_count = await fetch_page_content(
-            url, preferred_method=recommended_strategy
+            url, preferred_method=fetch_strategy
         )
         fetch_ms = (time.time() - fetch_start) * 1000
         fetch_success = True

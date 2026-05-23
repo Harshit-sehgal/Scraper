@@ -61,7 +61,7 @@ async def handle_backoff_and_slow(params: dict[str, Any], context: dict[str, Any
 
 async def handle_increase_hydration_wait(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
     """Increase the time waited for JS hydration."""
-    extra_ms = params.get("extra_wait_ms", 5000)
+    extra_ms = params.get("extra_delay_ms", 5000)
     max_wait = params.get("max_hydration_wait", 30000)
     logger.info("Increasing hydration wait by %dms (max %dms)", extra_ms, max_wait)
     if attempt_ctx:
@@ -138,41 +138,40 @@ async def handle_force_rediscovery_with_swap_detection(
 
 
 async def handle_lower_score_threshold(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
-    """Lower quality score threshold for extracted records.
-    
-    Parameters:
-        - score_multiplier: Multiply quality scores by this (default 0.8)
-    """
+    """Lower quality score threshold for extracted records."""
     score_multiplier = params.get("score_multiplier", 0.8)
-    
     logger.info("Recovery action: lowering quality threshold (multiplier=%.1f)", score_multiplier)
-    
-    # This would be applied to the next extraction round
-    # The context could track this adjustment
+    if attempt_ctx:
+        attempt_ctx.reduce_concurrency = True
     return True
 
 
 async def handle_retry_with_field_focus(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
-    """Retry with focus on critical fields only.
-    
-    Parameters:
-        - focus_fields: Which fields to focus on (default None = all)
-    """
+    """Retry with focus on critical fields only."""
     logger.info("Recovery action: retry with field focus strategy")
-    
-    # This would affect the next extraction attempt
+    if attempt_ctx:
+        attempt_ctx.force_llm_discovery = True
+        attempt_ctx.bypass_selector_memory = True
     return True
 
 
 async def handle_escalate_to_llm(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
-    """Escalate to LLM-based discovery.
-    
-    Parameters:
-        - force_llm_discovery: Force LLM (default True)
-    """
+    """Escalate to LLM-based discovery."""
     logger.info("Recovery action: escalating to LLM-based discovery")
-    
-    # Next extraction would use LLM discovery instead of cached selectors
+    if attempt_ctx:
+        attempt_ctx.force_llm_discovery = True
+        attempt_ctx.bypass_selector_memory = True
+    return True
+
+
+async def handle_abort_domain(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+    """Stop scraping a domain temporarily."""
+    skip_minutes = params.get("skip_domain_minutes", 60)
+    url = context.get("url")
+    logger.warning("Recovery action: aborting domain %s for %d minutes", url, skip_minutes)
+    if attempt_ctx:
+        attempt_ctx.reduce_concurrency = True
+        attempt_ctx.fetch_strategy = "httpx_basic"
     return True
 
 
@@ -181,24 +180,6 @@ async def handle_use_httpx_fallback(params: dict[str, Any], context: dict[str, A
     if attempt_ctx:
         attempt_ctx.prefer_httpx = True
         attempt_ctx.fetch_strategy = "httpx_basic"
-    return True
-
-
-async def handle_abort_domain(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
-    """Stop scraping a domain temporarily.
-    
-    Parameters:
-        - skip_domain_minutes: Minutes to skip (default 60)
-    """
-    skip_minutes = params.get("skip_domain_minutes", 60)
-    url = context.get("url")
-    
-    logger.warning(
-        "Recovery action: aborting domain %s for %d minutes",
-        url, skip_minutes
-    )
-    
-    # This would be tracked in domain_intelligence for blocking
     return True
 
 

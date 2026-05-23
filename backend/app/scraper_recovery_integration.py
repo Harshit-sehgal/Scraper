@@ -115,6 +115,7 @@ async def scrape_url_with_recovery(
                     world_state=world_state,
                     selectors_map=selectors_map,
                     search_params=search_params,
+                    attempt_ctx=attempt_ctx,
                 )
             
             # Since scrape_url catches exceptions and returns [], 
