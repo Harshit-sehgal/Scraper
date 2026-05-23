@@ -96,6 +96,15 @@ class AcquisitionLineage(BaseModel):
     # User-friendly message with actionable guidance
     user_message: str = ""
 
+    # Evidence-based acquisition quality signals
+    data_evidence_score: float = 0.0
+    network_payloads_found: int = 0
+    forms_detected: int = 0
+    containers_detected: int = 0
+    anti_bot_score: float = 0.0
+    visible_text_length: int = 0
+    recommended_next_action: str = ""
+
     def get_user_message(self) -> str:
         """Generate a user-friendly message with actionable guidance.
 

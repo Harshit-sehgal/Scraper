@@ -2013,6 +2013,24 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
     acquisition_lineage.session_bound = bool(session_detection.get("is_session_bound", False))  # type: ignore[assignment]
     acquisition_lineage.ephemeral_params = list(session_detection.get("ephemeral_params") or [])  # type: ignore[assignment,arg-type]
 
+    # Enrich lineage with evidence-based quality signals
+    acquisition_lineage.data_evidence_score = round(
+        1.0 if content_quality.get("has_data_containers") else 0.0
+        + (0.5 if not empty_check.is_empty else 0.0)
+        - anti_bot_score * 0.3
+    ) / 1.5
+    acquisition_lineage.anti_bot_score = round(anti_bot_score, 3)
+    acquisition_lineage.containers_detected = content_quality.get("data_container_count", 0)
+    acquisition_lineage.forms_detected = 1 if (search_form or {}).get("detected") else 0
+    acquisition_lineage.network_payloads_found = 0
+    if not acquisition_lineage.recommended_next_action:
+        if empty_check.is_empty and anti_bot_score > 0.5:
+            acquisition_lineage.recommended_next_action = "try_browser_mode_or_search_params"
+        elif session_detection.get("is_session_bound"):
+            acquisition_lineage.recommended_next_action = "provide_search_params"
+        elif not content_quality.get("has_data_containers"):
+            acquisition_lineage.recommended_next_action = "try_deep_scan_mode"
+
     # If the page is effectively empty, update the acquisition state
     if empty_check.is_empty and acquisition_lineage.state == AcquisitionState.DIRECT:
         acquisition_lineage.state = AcquisitionState.EMPTY_RESPONSE
