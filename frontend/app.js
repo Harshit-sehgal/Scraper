@@ -358,7 +358,7 @@ async function pollJob(id) {
             refreshJobs();
             if (j.status === 'completed') toast(`"${j.name}" done — ${j.filtered_records} records`, 'success');
             else if (j.status === 'degraded') toast(`"${j.name}" finished with partial results — ${j.filtered_records} records`, 'info');
-            else if (j.status === 'empty_result') toast(`"${j.name}" finished — no records extracted`, 'info');
+            else if (j.status === 'empty_result') toast(`"${j.name}" finished — 0 records. ${j.error || 'Page may be empty, blocked, or require JS rendering.'}`, 'warning');
             else if (j.status === 'canceled') toast(`"${j.name}" canceled`, 'info');
             else toast(`"${j.name}" failed: ${j.error}`, 'error');
         }
@@ -490,6 +490,23 @@ async function viewResults(id) {
         const j = await r.json();
         document.getElementById('res-title').textContent = j.name;
         document.getElementById('res-meta').textContent = `${j.filtered_records} records extracted (${j.total_records} total)`;
+        
+        // Show warning banner for degraded/empty results
+        const warnBanner = document.getElementById('result-warning');
+        if (warnBanner) {
+            if (j.status === 'empty_result') {
+                warnBanner.innerHTML = `⚠️ No records extracted. ${j.error || 'The page may be session-bound, blocked, empty, or require JavaScript rendering.'}`;
+                warnBanner.className = 'banner banner-warning';
+                warnBanner.style.display = 'block';
+            } else if (j.status === 'degraded') {
+                warnBanner.innerHTML = `⚠️ ${j.error || 'Some URLs produced no results.'}`;
+                warnBanner.className = 'banner banner-warning';
+                warnBanner.style.display = 'block';
+            } else {
+                warnBanner.style.display = 'none';
+            }
+        }
+        
         document.getElementById('export-group').style.display = j.results.length ? 'flex' : 'none';
         const tableWrap = document.querySelector('#view-results .table-wrap');
         if (tableWrap) tableWrap.scrollLeft = 0;
