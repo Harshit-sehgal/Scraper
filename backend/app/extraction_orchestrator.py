@@ -3,9 +3,11 @@ Extraction Orchestrator — Manages the multi-layered extraction fallback cascad
 
 Layers:
   1. Selector Profiles (JSON)
-  2. Selector Memory (Persistent cache)
-  3. LLM Discovery (Generative)
-  4. Regex Fallback (Structural pattern matching)
+  2. Provided Selectors (URL Analysis)
+  3. Selector Memory (Persistent cache)
+  4. LLM Discovery (Generative)
+  5. Container Discovery (Universal evidence-based)
+  6. Regex Fallback (Structural pattern matching)
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from app.selector_memory import get_selector_memory
 from app.selector_discovery import discover_selectors
 from app.selector_engine import apply_selectors, extract_with_regex
 from app.extraction_provenance import ProvenanceBuilder, ExtractionMethod
+from app.container_discovery import multi_pass_container_extraction, classify_container_failure
 
 logger = logging.getLogger(__name__)
 
@@ -355,10 +358,49 @@ async def orchestrate_extraction(
                 if provenance_builder:
                     provenance_builder.add_fallback_step("discovery_low_quality")
 
-    # ── Layer 4: Regex Fallback ────────────────────────────────────────
+    # ── Layer 4: Container Discovery (Universal evidence-based) ────────
+    logger.info("[Orchestrator] Trying universal container discovery for %s", url)
+    container_result = await multi_pass_container_extraction(
+        html, schema_fields, url=url, user_intent=user_intent,
+    )
+    if container_result.all_passed and container_result.final_records:
+        logger.info(
+            "[Orchestrator] Container discovery SUCCESS (%d records from %s)",
+            container_result.total_records, container_result.best_selector,
+        )
+        _record_field_provenance(container_result.final_records, ExtractionMethod.DISCOVERY)
+        return ExtractionResult(
+            container_result.final_records, "container_discovery",
+            selector_success=True,
+            selectors={"item_container": container_result.best_selector},
+        )
+    elif container_result.final_records:
+        logger.info(
+            "[Orchestrator] Container discovery PARTIAL (%d low-quality records)",
+            container_result.total_records,
+        )
+        # Keep partial results as potential fallback
+        _record_field_provenance(container_result.final_records, ExtractionMethod.DISCOVERY)
+        if provenance_builder:
+            provenance_builder.add_fallback_step("container_discovery_partial")
+    else:
+        failure = classify_container_failure(container_result)
+        logger.info("[Orchestrator] Container discovery failed: %s", failure["failure_class"])
+        if provenance_builder:
+            provenance_builder.add_error(f"container_discovery: {failure['failure_class']}")
+
+    # ── Layer 5: Regex Fallback ──────────────────────────────────────────
     logger.info("[Orchestrator] Falling back to regex extraction for %s", url)
     regex_results = extract_with_regex(html, schema_fields, base_url=url)
     _record_field_provenance(regex_results, ExtractionMethod.REGEX)
+    
+    # If container discovery found partial results, prefer them over regex
+    # (container discovery has better structural understanding)
+    if container_result.final_records:
+        if provenance_builder:
+            provenance_builder.add_fallback_step("container_discovery_partial_result")
+        return ExtractionResult(container_result.final_records, "container_discovery")
+    
     if provenance_builder:
         provenance_builder.add_fallback_step("regex_fallback")
     return ExtractionResult(regex_results, "regex")

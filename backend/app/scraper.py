@@ -47,6 +47,9 @@ from app.crawl_frontier import get_crawl_frontier
 from app.selector_decay_predictor import get_selector_decay_predictor
 from app.domain_evolution_model import get_domain_evolution_model
 from app.self_tuning_extraction import get_self_tuning_controller
+from app.zero_result_classifier import classify_zero_result
+from app.page_evidence_collector import collect_page_evidence
+from app.compound_record_assembler import assemble_compound_records
 
 logger = logging.getLogger(__name__)
 
@@ -354,29 +357,65 @@ async def scrape_url(
     except Exception as e:
         logger.debug("[Scraper] Link discovery skipped for %s: %s", url, e)
 
-    # ── Failure Classification & Regression Capture ────────────────
-    # classification may have been set in except block above
-    if not results and not classification:
-        # Extraction returned nothing — classify the failure
-        classification = classify_failure(
-            telemetry={
-                "fetch_method": fetch_method,
-                "dom_nodes": dom_nodes,
-                "anti_bot_score": anti_bot,
-                "selector_hit_rate": 0.0,
-                "fallback_usage": ext_result.method,
-            },
+    # ── Zero-Result Classification & Failure Classification ────────────
+    zero_classification = None
+    if not results:
+        # Check for session-bound URL signals
+        from app.session_url_detector import detect_session_params
+        session_detection = detect_session_params(url) if url else None
+        from app.empty_response_detector import detect_empty_response
+        empty_check = detect_empty_response(html) if html else None
+
+        # Collect page evidence for zero-result classification
+        evidence = collect_page_evidence(html, url=url)
+        visible_text_content = evidence.visible_text_length > 0 and evidence.visible_text_length > 200 or ""
+
+        # Classify the zero-result using the dedicated classifier
+        zero_classification = classify_zero_result(
+            acquisition_lineage={"state": fetch_method},
+            session_detection=session_detection,
+            empty_check=empty_check,
+            anti_bot_score=anti_bot,
+            final_url=url,
             html=html,
-            extraction_result={
-                "method": ext_result.method,
-                "records": [],
-                "selector_success": ext_result.selector_success,
-            },
-            fetch_method=fetch_method,
+            visible_text=visible_text_content if visible_text_content else "",
+            detected_forms=len(evidence.forms),
+            detected_containers=len(evidence.candidate_containers),
+            raw_candidate_count=len(evidence.candidate_containers),
+            schema_fields=[f.name for f in schema_fields],
         )
-        if classification:
-            provenance_builder.add_error(f"No records: {classification.recovery_strategy}")
-            update_domain_with_failure(get_domain_intelligence(), url, classification)
+
+        # Classification may have been set in except block above, only classify if not
+        if not classification:
+            classification = classify_failure(
+                telemetry={
+                    "fetch_method": fetch_method,
+                    "dom_nodes": dom_nodes,
+                    "anti_bot_score": anti_bot,
+                    "selector_hit_rate": 0.0,
+                    "fallback_usage": ext_result.method,
+                },
+                html=html,
+                extraction_result={
+                    "method": ext_result.method,
+                    "records": [],
+                    "selector_success": ext_result.selector_success,
+                },
+                fetch_method=fetch_method,
+            )
+            if classification:
+                provenance_builder.add_error(f"No records: {classification.recovery_strategy}")
+                update_domain_with_failure(get_domain_intelligence(), url, classification)
+
+        # Log zero-result classification for diagnostics
+        if zero_classification:
+            logger.info(
+                "[ZeroResult] %s — %s (confidence=%.2f)",
+                zero_classification.failure_class,
+                zero_classification.user_message,
+                zero_classification.confidence,
+            )
+            provenance_builder.add_error(f"Zero-result: {zero_classification.failure_class} ({zero_classification.recommended_action})")
 
         # Phase 85: Capture regression for autonomous benchmark evolution
         if classification:
@@ -410,6 +449,23 @@ async def scrape_url(
                 schema_fields=[f.name for f in schema_fields],
                 force=True,
             )
+
+    # ── Compound Record Assembly ────────────────────────────────────
+    # Detect and assemble compound records if results contain internal segments
+    if results and len(results) >= 1:
+        from app.page_evidence_collector import collect_page_evidence
+        evidence = collect_page_evidence(html, url=url)
+        # Build a mapping of record index to original element text for compound detection
+        full_texts: dict[str, str] = {}
+        for i, r in enumerate(results):
+            combined = " ".join(str(v) for v in r.values() if isinstance(v, str) and len(v) > 1)
+            if combined:
+                full_texts[str(i)] = combined
+        if full_texts:
+            assembled = assemble_compound_records(results, full_texts)
+            if assembled != results:
+                logger.info("[Scraper] Assembled %d compound records from %d raw records", len(assembled), len(results))
+                results = assembled
 
     # ── Post-Extraction Processing ────────────────────────────────
 

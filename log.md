@@ -722,9 +722,110 @@ Messages include the selector/context for debugging.
 
 ---
 
+## Pass 14 — Universal Evidence-Based Extraction Pipeline
+
+### New Modules
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `backend/app/page_evidence_collector.py` | ~530 | Collects all page evidence: visible text blocks, candidate containers, tables, links, buttons, forms, images, patterns, hydration scripts, structure classification, record estimation |
+| `backend/app/container_discovery.py` | ~420 | Universal container discovery with refined scoring, multi-pass extraction fallback, and failure classification. No domain-specific selectors or logic |
+| `backend/app/compound_record_assembler.py` | ~350 | Detects internal segments inside result containers using generic patterns (labels, whitespace separation, repeated date/value clusters). Assembles compound records with shared fields |
+
+### Modified Files
+
+| File | Changes |
+|------|---------|
+| `backend/app/extraction_orchestrator.py` | Added container discovery as a new orchestration layer between LLM discovery and regex fallback. Classifies failures (js_render_required, selector_failure, partial_extraction) |
+| `backend/app/scraper.py` | Wired zero-result classification into scrape pipeline. Added compound record assembly as post-processing step. Consolidated truthfulness logic |
+
+### Key Design Decisions
+
+1. **Zero domain-specific code**: No hardcoded airline names, store names, URL routes, or website-specific selectors in any of the new modules
+2. **Generic container scoring**: Refined heuristic scores containers using text density, pattern diversity (price+date+location+org), label-value pairs, repeated structure, sibling similarity, and action elements — all universal signals
+3. **Multi-pass fallback**: Tries up to 5 ranked containers, accepting the first that produces good-quality records (avg quality ≥ 0.3, ≥ 3 records)
+4. **Compound record assembly by evidence, not domain**: Detects segments via generic labels ("Departure"/"Return"/"Leg 1"/"Segment") or via repeated date/value clusters and whitespace-separated blocks — works for flights, hotels, jobs, ecommerce, and any listing with internal structure
+5. **Evidence collection before extraction**: `page_evidence_collector` builds a complete `PageEvidence` dataclass before any extraction decisions are made, enabling downstream modules to use visual and structural context
+
+### Code Review Fixes
+
+- Fixed brace-depth counting in hydration data extraction (single-level `{[^}]+}` → depth-aware)
+- Fixed empty tables access in `_classify_page_structure` and `_estimate_record_count`
+- Fixed fragile time field detection (substring match → exact set membership)
+- Replaced flight-specific repeated-group pattern with generic date/value cluster detection
+- Made organization detection universal (capitalized multi-word names) instead of airline-specific
+- Fixed stale function-level imports shadowing module-level ones
+- Cleaned up unused imports
+
+### Validation
+
+| Check | Result |
+|-------|--------|
+| `python -m pyflakes` (new + modified files) | **0 issues** |
+| `python -m pytest tests/` (excluding E2E API test) | **1220 passed** |
+| New module imports | **all clean** (no circular deps, no missing deps) |
+
+### Commit
+```
+<commit_hash> feat: universal evidence-based extraction — page evidence collector, container discovery, compound record assembler
+```
+
+---
+
+## What Needs to Be Done
+
+### Short-term (stability)
+- [x] Page evidence collection for rendered DOM
+- [x] Universal container discovery with multi-pass fallback
+- [x] Compound record assembly (generic segment detection)
+- [ ] Text-ordering bias in classification assignment — airline names after cities get wrong field
+- [ ] Fix anti-bot detection on yelp/indeed/ebay/walmart — requires proxy rotation or stealth improvements
+- [ ] Reduce timeout rate on JS-heavy pages — `deep_scan` mode should handle these but needs testing
+
+### Medium-term (feature completeness)
+- [ ] Network/XHR JSON extraction as primary source when available
+- [ ] Rendered visible-text fallback using Playwright bounding boxes
+- [ ] Parallel extraction for multi-URL jobs to reduce total job time
+- [ ] 15-site smoke test report with new extraction pipeline
+
+### Long-term (product)
+- [ ] User-defined selector profiles via the UI (not just JSON files)
+- [ ] Adaptive extraction learning — remember which selectors worked per domain
+- [ ] Schema auto-detection from URL analysis results
+
+---
+
 ## Future Scope
 
 1. **Proxy Rotation & Stealth** — Enable proxy rotation by default for `deep_scan` mode.
+   Anti-bot sites (yelp, indeed, ebay, walmart) currently return empty — with proxies
+   and rotating user agents, extraction success rate would increase significantly.
+
+2. **LLM-Based Field Alignment** — When profile field names don't match schema fields,
+   use LLM to semantically map them (e.g., "origin" → "departure_city"). Currently
+   skipped, losing potentially valuable profile data.
+
+3. **Network/XHR Extraction** — Capture browser fetch/XHR JSON responses and hydration
+   data, then use structured payloads as the primary extraction source when available.
+   This would dramatically improve accuracy on modern API-driven sites.
+
+4. **Rendered Visible-Text Fallback** — Use Playwright-rendered DOM with bounding boxes
+   to group visible blocks into visual cards and extract records by proximity/labels.
+   This catches content that CSS selectors miss on JS-heavy pages.
+
+5. **Semantic Field Name Detection** — Infer field names from value patterns instead of
+   relying on LLM to name them. e.g., if a value matches `[A-Z]{3}` pattern,
+   auto-suggest "airport_code" rather than "string_3".
+
+6. **Confidence-Based Record Deduplication** — Current dedup is all-or-nothing.
+   Near-duplicate records with high confidence should be merged rather than dropped.
+
+7. **Streaming Extraction** — For large pages (100+ records), stream results to the
+   frontend as they're extracted instead of waiting for the full job to complete.
+
+8. **Internationalization** — Date formats (DD/MM/YYYY vs MM/DD/YYYY), currency
+   symbols (₹, ¥, €), and address formats vary by region. Locale-aware extraction
+   would improve accuracy for non-US/non-UK sites.
    Anti-bot sites (yelp, indeed, ebay, walmart) currently return empty — with proxies
    and rotating user agents, extraction success rate would increase significantly.
 
