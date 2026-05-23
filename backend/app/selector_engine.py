@@ -402,13 +402,13 @@ def extract_raw_from_selectors(
                 try:
                     target = node.select_one(sel)
                     if target:
-                        ftype = None
+                        node_ftype: FieldType | None = None
                         if isinstance(sel_entry, dict) and sel_entry.get("type"):
                             try:
-                                ftype = FieldType(sel_entry["type"])
+                                node_ftype = FieldType(sel_entry["type"])
                             except ValueError:
-                                ftype = None
-                        val = _read_node_value(target, ftype, key)
+                                node_ftype = None
+                        val = _read_node_value(target, node_ftype, key)
                 except Exception as e:
                     logger.debug("[SelectorEngine] Invalid selector '%s' for %s: %s", sel, key, e)
             else:
