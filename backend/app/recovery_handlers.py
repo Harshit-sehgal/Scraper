@@ -87,55 +87,6 @@ async def handle_reduce_concurrency(params: dict[str, Any], context: dict[str, A
     return True
 
 
-async def handle_increase_hydration_wait(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
-    """Increase wait time for page hydration.
-    
-    Parameters:
-        - extra_delay_ms: Additional delay (default 5000)
-        - max_hydration_wait: Maximum total wait (default 30000)
-    """
-    extra_delay_ms = params.get("extra_delay_ms", 5000)
-    
-    logger.info("Increasing hydration wait by %d ms", extra_delay_ms)
-    
-    # This would be applied to the next fetch_page_content call
-    # Context could track this for subsequent retries
-    delay_seconds = extra_delay_ms / 1000.0
-    await asyncio.sleep(delay_seconds)
-    
-    return True
-
-
-async def handle_increase_timeout(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
-    """Increase timeout for page fetch.
-    
-    Parameters:
-        - timeout_ms: New timeout value (default 30000)
-    """
-    timeout_ms = params.get("timeout_ms", 30000)
-    
-    logger.info("Recovery action: increasing timeout to %d ms", timeout_ms)
-    
-    # This adjustment would be applied by the calling code
-    # when retrying the fetch
-    return True
-
-
-async def handle_reduce_concurrency(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
-    """Reduce browser concurrency to prevent starvation.
-    
-    Parameters:
-        - max_contexts: Maximum concurrent browser contexts (default 3)
-    """
-    max_contexts = params.get("max_contexts", 3)
-    
-    logger.info("Recovery action: reducing concurrency to %d contexts", max_contexts)
-    
-    # This would be signaled to browser_pool.py
-    # For now, just log the action
-    return True
-
-
 async def handle_retry_with_dns_flush(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
     """Retry with DNS cache flush.
     

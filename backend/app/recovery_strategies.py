@@ -55,26 +55,30 @@ class RecoveryAction(str, Enum):
 
 
 @dataclass
+@dataclass
 class RecoveryPlan:
     """Plan for recovering from a specific failure."""
     
     failure_category: FailureCategory
     primary_action: RecoveryAction
-    secondary_actions: list[RecoveryAction]  # Escalation path
+    secondary_actions: list[RecoveryAction] = field(default_factory=list)
     parameters: dict[str, Any] = field(default_factory=dict)
     max_retry_attempts: int = 1
     backoff_seconds: float = 1.0
     should_escalate: bool = False
     reason: str = ""
 
+    def to_dict(self) -> dict:
+        result = asdict(self)
+        result["failure_category"] = self.failure_category.value
+        result["primary_action"] = self.primary_action.value
+        result["secondary_actions"] = [a.value for a in self.secondary_actions]
+        return result
+
 
 @dataclass
 class AttemptContext:
-    """Mutable context mutated by recovery handlers and consumed by the next scrape attempt.
-    
-    Each recovery handler reads/writes fields here. The scraper reads this context
-    before the next attempt and adjusts its behavior accordingly.
-    """
+    """Mutable context mutated by recovery handlers and consumed by the next scrape attempt."""
     timeout_ms: int | None = None
     hydration_wait_ms: int | None = None
     fetch_strategy: str | None = None
@@ -88,13 +92,6 @@ class AttemptContext:
     skip_networkidle: bool = False
     scroll_attempts: int | None = None
     anti_bot_stealth: bool = False
-    
-    def to_dict(self) -> dict:
-        result = asdict(self)
-        result["failure_category"] = self.failure_category.value
-        result["primary_action"] = self.primary_action.value
-        result["secondary_actions"] = [a.value for a in self.secondary_actions]
-        return result
 
 
 class RecoveryStrategist:
