@@ -795,58 +795,90 @@ Messages include the selector/context for debugging.
 
 ---
 
-## Future Scope
+---
 
-1. **Proxy Rotation & Stealth** — Enable proxy rotation by default for `deep_scan` mode.
-   Anti-bot sites (yelp, indeed, ebay, walmart) currently return empty — with proxies
-   and rotating user agents, extraction success rate would increase significantly.
+## Pass 15 — Network/JSON Extraction & Rendered Visible-Text Fallback
 
-2. **LLM-Based Field Alignment** — When profile field names don't match schema fields,
-   use LLM to semantically map them (e.g., "origin" → "departure_city"). Currently
-   skipped, losing potentially valuable profile data.
+### New Modules
 
-3. **Network/XHR Extraction** — Capture browser fetch/XHR JSON responses and hydration
-   data, then use structured payloads as the primary extraction source when available.
-   This would dramatically improve accuracy on modern API-driven sites.
+| File | Lines | Purpose |
+|------|-------|---------|
+| `backend/app/network_extractor.py` | ~240 | Extracts structured records from JSON-LD, Next.js `__NEXT_DATA__`, `window.__INITIAL_STATE__`, Apollo cache. Generic JSON key-to-schema alignment + schema.org type handlers (Product, Offer, Flight, Hotel, Restaurant, JobPosting, Event, LocalBusiness, Book, Movie) |
+| `backend/app/rendered_visible_text_extractor.py` | ~280 | Groups visible text blocks into visual cards using parent-path proximity heuristics. Detects repeated card patterns. Extracts field values via type-aware pattern matching with spatial-layout awareness |
 
-4. **Rendered Visible-Text Fallback** — Use Playwright-rendered DOM with bounding boxes
-   to group visible blocks into visual cards and extract records by proximity/labels.
-   This catches content that CSS selectors miss on JS-heavy pages.
+### Modified Files
 
-5. **Semantic Field Name Detection** — Infer field names from value patterns instead of
-   relying on LLM to name them. e.g., if a value matches `[A-Z]{3}` pattern,
-   auto-suggest "airport_code" rather than "string_3".
+| File | Changes |
+|------|---------|
+| `backend/app/extraction_orchestrator.py` | Added Layer 0 (network/JSON extraction as highest-priority source) and Layer 6 (rendered visible-text extraction as fallback after container discovery). Added evidence-completeness logging for debug visibility |
 
-6. **Confidence-Based Record Deduplication** — Current dedup is all-or-nothing.
-   Near-duplicate records with high confidence should be merged rather than dropped.
+### Layer Priority
 
-7. **Streaming Extraction** — For large pages (100+ records), stream results to the
-   frontend as they're extracted instead of waiting for the full job to complete.
+```
+0. Network/JSON Extraction (highest priority)
+   ↓ if empty or low quality
+1. Provided Selectors (URL Analysis)
+   ↓
+2. Selector Memory (Persistent cache)
+   ↓
+3. LLM Discovery (Generative)
+   ↓
+4. Container Discovery (Universal evidence-based)
+   ↓
+5. Rendered Visible-Text Extraction (fallback)
+   ↓
+6. Regex Fallback (last resort)
+```
 
-8. **Internationalization** — Date formats (DD/MM/YYYY vs MM/DD/YYYY), currency
-   symbols (₹, ¥, €), and address formats vary by region. Locale-aware extraction
-   would improve accuracy for non-US/non-UK sites.
-   Anti-bot sites (yelp, indeed, ebay, walmart) currently return empty — with proxies
-   and rotating user agents, extraction success rate would increase significantly.
+### Key Design Decisions
 
-2. **LLM-Based Field Alignment** — When profile field names don't match schema fields,
-   use LLM to semantically map them (e.g., "origin" → "departure_city"). Currently
-   skipped, losing potentially valuable profile data.
+1. **Network extraction works from inline hydration data, not XHR captures.** The current implementation parses `<script>` tags containing JSON-LD, Next.js state, and `__INITIAL_STATE__`. Actual Playwright-based XHR/fetch interception is a future enhancement requiring browser-level event capture.
 
-3. **Multi-Pass Container Discovery** — When the first container produces 0 records,
-   try alternative containers from the discovery candidate list instead of falling
-   through to regex. The candidate list already exists, it's just not retried.
+2. **Quality gate for network results.** Network results must meet a minimum quality threshold (avg score ≥ gate_threshold) before being accepted; low-quality results fall through to DOM-based extraction.
 
-4. **Semantic Field Name Detection** — Infer field names from value patterns instead of
-   relying on LLM to name them. e.g., if a value matches `[A-Z]{3}` pattern,
-   auto-suggest "airport_code" rather than "string_3".
+3. **Visible-text extraction uses DOM order as a proxy for spatial layout.** True bounding-box-based spatial grouping requires Playwright integration; the current approach groups by parent-path similarity and document order, which works for single-column layouts.
 
-5. **Confidence-Based Record Deduplication** — Current dedup is all-or-nothing.
-   Near-duplicate records with high confidence should be merged rather than dropped.
+4. **Evidence completeness logging added.** The orchestrator now logs how many visible blocks, tables, containers, and patterns were found, and whether hydration data exists — so debug output shows exactly why a layer was skipped.
 
-6. **Streaming Extraction** — For large pages (100+ records), stream results to the
-   frontend as they're extracted instead of waiting for the full job to complete.
+### Hardcoded-Value Audit
 
-7. **Internationalization** — Date formats (DD/MM/YYYY vs MM/DD/YYYY), currency
-   symbols (₹, ¥, €), and address formats vary by region. Locale-aware extraction
-   would improve accuracy for non-US/non-UK sites.
+```
+grep for domain names in backend/app: 0 results (clean)
+grep for route patterns (search/id, flight-result, airline, etc.): 0 results in runtime code
+grep for store/website names in backend/app: 0 results in runtime code
+```
+
+Only findings were in `config.py` (tunable settings) and `selector_profiles/*.json` (config data) — both expected.
+
+### Validation
+
+| Check | Result |
+|-------|--------|
+| `python -m pyflakes` (all new + modified files) | **0 issues** |
+| `python -m pytest tests/` (excluding E2E API test) | **all passed** |
+| New module imports | **all clean** |
+
+### Commit
+```
+<commit_hash> feat: network/JSON extraction + rendered visible-text fallback — Pass 15
+```
+
+---
+
+## What Needs to Be Done
+
+### Short-term (stability)
+- [ ] Text-ordering bias in classification assignment — airline names after cities get wrong field
+- [ ] Fix anti-bot detection on yelp/indeed/ebay/walmart — requires proxy rotation or stealth improvements
+- [ ] Reduce timeout rate on JS-heavy pages — `deep_scan` mode should handle these but needs testing
+
+### Medium-term (feature completeness)
+- [ ] Actual XHR/network interception in Playwright for real API payload capture
+- [ ] Bounding-box-based spatial card grouping using Playwright coordinates
+- [ ] Parallel extraction for multi-URL jobs to reduce total job time
+- [ ] 15-site smoke test report with new extraction pipeline
+
+### Long-term (product)
+- [ ] User-defined selector profiles via the UI (not just JSON files)
+- [ ] Adaptive extraction learning — remember which selectors worked per domain
+- [ ] Schema auto-detection from URL analysis results

@@ -2,12 +2,14 @@
 Extraction Orchestrator — Manages the multi-layered extraction fallback cascade.
 
 Layers:
+  0. Network / JSON (Hydration, JSON-LD, Next.js state, Apollo cache)
   1. Selector Profiles (JSON)
   2. Provided Selectors (URL Analysis)
   3. Selector Memory (Persistent cache)
   4. LLM Discovery (Generative)
   5. Container Discovery (Universal evidence-based)
-  6. Regex Fallback (Structural pattern matching)
+  6. Rendered Visible-Text Extraction (Spatial card grouping)
+  7. Regex Fallback (Structural pattern matching)
 """
 
 from __future__ import annotations
@@ -20,6 +22,9 @@ from app.selector_discovery import discover_selectors
 from app.selector_engine import apply_selectors, extract_with_regex
 from app.extraction_provenance import ProvenanceBuilder, ExtractionMethod
 from app.container_discovery import multi_pass_container_extraction, classify_container_failure
+from app.network_extractor import extract_from_network
+from app.rendered_visible_text_extractor import extract_from_visible_blocks
+from app.page_evidence_collector import collect_page_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -233,6 +238,52 @@ async def orchestrate_extraction(
                     confidence=record.get("record_score", 0.5),
                 )
     
+    # ── Layer 0: Network / JSON Extraction (highest priority) ─────────
+    # Before trying any DOM-based selectors, check if structured data is
+    # available in script tags, hydration state, JSON-LD, or network payloads.
+    # This is the most reliable source when available.
+    logger.info("[Orchestrator] Trying network/JSON extraction for %s", url)
+    evidence = collect_page_evidence(html, url=url)
+    if evidence:
+        logger.info(
+            "[Orchestrator] Page evidence: %d visible blocks, %d tables, %d containers, %d patterns, hydration=%s",
+            len(evidence.visible_blocks or []),
+            len(evidence.tables or []),
+            len(evidence.candidate_containers or []),
+            len(evidence.patterns or []),
+            bool(evidence.hydration_data),
+        )
+        if not evidence.hydration_data:
+            logger.info("[Orchestrator] No hydration data in page evidence — network layer will be skipped")
+    else:
+        logger.info("[Orchestrator] No page evidence collected — network layer will be skipped")
+    network_results = extract_from_network(
+        evidence.hydration_data if evidence else {},
+        schema_fields,
+        url=url,
+    )
+    if network_results:
+        scores = [r.get("record_score", 0.0) for r in network_results]
+        avg_score = sum(scores) / len(scores) if scores else 0.0
+        if avg_score >= gate_threshold:
+            logger.info(
+                "[Orchestrator] Network/JSON extraction SUCCESS (%d records, avg score: %.2f)",
+                len(network_results), avg_score,
+            )
+            _record_field_provenance(network_results, ExtractionMethod.DISCOVERY)
+            return ExtractionResult(network_results, "network_json", selector_success=True)
+        else:
+            logger.info(
+                "[Orchestrator] Network/JSON extraction LOW QUALITY (avg score: %.2f), falling through",
+                avg_score,
+            )
+            if provenance_builder:
+                provenance_builder.add_fallback_step("network_json_low_quality")
+    else:
+        logger.info("[Orchestrator] Network/JSON extraction returned no results, falling through")
+        if provenance_builder:
+            provenance_builder.add_fallback_step("network_json_empty")
+
     # Phase 79/80: Strategy Self-Selection
     # ── Layer 2: Provided Selectors (from URL Analysis) ───────────────
     # If the user analyzed the URL via the URL Analyzer, we have pre-discovered
@@ -389,7 +440,35 @@ async def orchestrate_extraction(
         if provenance_builder:
             provenance_builder.add_error(f"container_discovery: {failure['failure_class']}")
 
-    # ── Layer 5: Regex Fallback ──────────────────────────────────────────
+    # ── Layer 6: Rendered Visible-Text Extraction ────────────────────────
+    # Try grouping visible text blocks into visual cards and extracting
+    # from the rendered layout. This works when CSS selectors miss content
+    # but the text is present in the rendered DOM.
+    logger.info("[Orchestrator] Trying rendered visible-text extraction for %s", url)
+    visible_results = extract_from_visible_blocks(html, schema_fields, url=url)
+    if visible_results:
+        scores = [r.get("record_score", 0.0) for r in visible_results]
+        avg_score = sum(scores) / len(scores) if scores else 0.0
+        if avg_score >= gate_threshold:
+            logger.info(
+                "[Orchestrator] Visible-text extraction SUCCESS (%d records, avg score: %.2f)",
+                len(visible_results), avg_score,
+            )
+            _record_field_provenance(visible_results, ExtractionMethod.REGEX)
+            return ExtractionResult(visible_results, "visible_text", selector_success=False)
+        else:
+            logger.info(
+                "[Orchestrator] Visible-text extraction LOW QUALITY (avg score: %.2f)",
+                avg_score,
+            )
+            if provenance_builder:
+                provenance_builder.add_fallback_step("visible_text_low_quality")
+    else:
+        logger.info("[Orchestrator] Visible-text extraction returned no results")
+        if provenance_builder:
+            provenance_builder.add_fallback_step("visible_text_empty")
+
+    # ── Layer 7: Regex Fallback ──────────────────────────────────────────
     logger.info("[Orchestrator] Falling back to regex extraction for %s", url)
     regex_results = extract_with_regex(html, schema_fields, base_url=url)
     _record_field_provenance(regex_results, ExtractionMethod.REGEX)
