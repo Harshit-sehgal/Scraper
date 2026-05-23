@@ -294,7 +294,6 @@ def _compute_ui_noise_score(elements: list, texts: list[str]) -> float:
         return 1.0
     import re as _re
     n = len(texts)
-    avg_len = sum(len(t) for t in texts) / max(n, 1)
     link_ratio = sum(1 for el in elements if el.name == 'a') / max(n, 1)
     form_ratio = sum(1 for el in elements if el.name in ('input', 'select', 'button', 'textarea')) / max(n, 1)
     short_text_ratio = sum(1 for t in texts if len(t) < 15) / max(n, 1)

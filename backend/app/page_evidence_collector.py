@@ -42,6 +42,10 @@ class VisibleTextBlock:
     tag: str
     parent_path: str
     visible: bool = True
+    x_position: float = 0.0
+    y_position: float = 0.0
+    width: float = 0.0
+    height: float = 0.0
     container_id: str = ""
     nearby_text: list[str] = field(default_factory=list)
     pattern_type: str = ""  # "price", "date", "email", "phone", "currency", "url", "time", "location", "organization", "name", "code", etc.
@@ -104,6 +108,7 @@ class PageEvidence:
     html_length: int = 0
     visible_text_length: int = 0
     dom_node_count: int = 0
+    bounding_boxes: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         result = asdict(self)
@@ -143,6 +148,7 @@ def collect_page_evidence(
     html: str,
     url: str = "",
     network_json: list[dict] | None = None,
+    bounding_boxes: list[dict] | None = None,
 ) -> PageEvidence:
     """Collect all useful evidence from a page's HTML.
 
@@ -254,11 +260,13 @@ def collect_page_evidence(
     if network_json:
         evidence.network_json = network_json[:20]
     elif url:
-        # Check the browser network capture registry for this URL
         captured = get_captures(url)
         if captured:
             evidence.network_json = captured[:20]
             logger.debug("[PageEvidence] Found %d captured network payloads for %s", len(captured[:20]), url)
+
+    if bounding_boxes:
+        evidence.bounding_boxes = bounding_boxes[:500]
 
     # ── Candidate containers ─────────────────────────────────────────
     containers = _discover_candidate_containers(soup)

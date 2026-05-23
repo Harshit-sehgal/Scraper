@@ -91,6 +91,46 @@ CARD_Y_SPACING = 60.0
 # Main public API
 # ---------------------------------------------------------------------------
 
+async def capture_bounding_boxes(page) -> list[dict]:
+    """Capture bounding boxes of visible text elements using Playwright JS.
+    
+    Returns a list of dicts with: text, tag, x, y, width, height, visible.
+    Only captures leaf text elements that are in the viewport and visible.
+    """
+    try:
+        boxes = await page.evaluate("""() => {
+            const results = [];
+            const all = document.querySelectorAll('*');
+            const vh = window.innerHeight;
+            for (const el of all) {
+                const tag = el.tagName;
+                if (['SCRIPT','STYLE','NOSCRIPT','SVG','META','LINK'].includes(tag)) continue;
+                const childEls = el.querySelectorAll('*');
+                if (childEls.length > 0) continue; // Only leaf elements
+                const text = el.textContent?.trim();
+                if (!text || text.length < 2 || text.length > 300) continue;
+                const rect = el.getBoundingClientRect();
+                if (rect.width < 1 || rect.height < 1) continue;
+                if (rect.y > vh * 3) continue; // Skip elements far below viewport
+                const style = window.getComputedStyle(el);
+                if (style.display === 'none' || style.visibility === 'hidden') continue;
+                results.push({
+                    text: text.slice(0, 200),
+                    tag: tag.toLowerCase(),
+                    x: Math.round(rect.x),
+                    y: Math.round(rect.y),
+                    w: Math.round(rect.width),
+                    h: Math.round(rect.height),
+                    visible: true
+                });
+            }
+            return results;
+        }""")
+        return boxes if isinstance(boxes, list) else []
+    except Exception:
+        return []
+
+
 def extract_from_visible_blocks(
     html: str,
     schema_fields: list,
@@ -159,32 +199,64 @@ def extract_from_visible_blocks(
 # ---------------------------------------------------------------------------
 
 def _group_into_cards(evidence: PageEvidence) -> CardGroupingResult:
-    """Group visible text blocks into visual cards by structural parent containers.
-
-    Uses the block's parent_path to cluster blocks into card-like groups.
-    Blocks under the same container sub-tree (depth <= 3) form one card.
-    Structural boundaries (shallow-to-deep path transitions, repeated
-    container patterns) separate cards.
-
-    NOTE: This groups by DOM structure, not spatial layout. Blocks that are
-    visually adjacent but in different DOM branches may end up in different
-    groups. True spatial grouping requires Playwright bounding box data.
+    """Group visible text blocks into visual cards.
+    
+    Uses bounding-box spatial proximity when available, falls back to
+    DOM parent-path grouping.
     """
     blocks = evidence.text_blocks
     if not blocks:
         return CardGroupingResult(cards=[], card_count=0, has_repeated_structure=False, cluster_signature="")
 
-    # ── Strategy: Group by container prefix at depth 3 ────────────────
-    # Each block has a parent_path like "html/body/div/div[2]/section/span"
-    # We group by a prefix that represents the card-level container.
-    # The prefix depth is adaptive: use depth 3 (2 tag levels) for most pages.
+    if evidence.bounding_boxes:
+        return _group_by_spatial_proximity(blocks, evidence.bounding_boxes)
+
+    return _group_by_dom_structure(blocks)
+
+
+def _group_by_spatial_proximity(blocks: list[VisibleTextBlock], boxes: list[dict]) -> CardGroupingResult:
+    """Group text blocks into visual cards using y-position proximity."""
+    if not blocks:
+        return CardGroupingResult(cards=[], card_count=0, has_repeated_structure=False, cluster_signature="")
+    
+    text_to_box = {b.get("text", "").strip(): b for b in boxes if "text" in b}
+    for block in blocks:
+        bt = block.text.strip()
+        if bt in text_to_box:
+            block.y_position = text_to_box[bt].get("y", block.y_position)
+    
+    sorted_blocks = sorted(blocks, key=lambda b: b.y_position)
+    
+    Y_TOLERANCE: float = 30.0
+    cards: list[VisualCard] = []
+    current: list[VisibleTextBlock] = []
+    last_y = -Y_TOLERANCE - 1
+    
+    for block in sorted_blocks:
+        if block.y_position - last_y > Y_TOLERANCE:
+            if current and _is_meaningful_card(current):
+                cards.append(_build_card(current, len(cards)))
+            current = []
+        current.append(block)
+        last_y = block.y_position
+    if current and _is_meaningful_card(current):
+        cards.append(_build_card(current, len(cards)))
+    
+    has_repeat = _detect_repeated_patterns(cards)
+    sig = _build_cluster_signature(cards) if has_repeat else ""
+    return CardGroupingResult(cards=cards, card_count=len(cards),
+                              has_repeated_structure=has_repeat, cluster_signature=sig)
+
+
+def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResult:
+    """Group by DOM parent path when bounding boxes are unavailable."""
+    if not blocks:
+        return CardGroupingResult(cards=[], card_count=0, has_repeated_structure=False, cluster_signature="")
 
     def _container_prefix(path: str, depth: int = 3) -> str:
-        """Extract the first `depth` levels of a parent path."""
         parts = path.split("/")
         return "/".join(parts[:min(depth, len(parts))])
 
-    # First pass: group blocks by container prefix depth 3
     groups: dict[str, list[VisibleTextBlock]] = {}
     for block in blocks:
         prefix = _container_prefix(block.parent_path, 3)
