@@ -920,6 +920,49 @@ Moved `extract_records_from_payloads` from `browser_network_capture.py` into `ne
 
 ---
 
+## Pass 18 — Orchestrator Bug Fix, Zero-Result Truthfulness, Hardcoded-Value Audit
+
+### Bugs Fixed
+
+#### 49. `evidence.visible_blocks` → `evidence.text_blocks`
+**File**: `backend/app/extraction_orchestrator.py:250`
+The `PageEvidence` dataclass field is `text_blocks`, not `visible_blocks`.
+This would have raised an `AttributeError` at runtime the first time the
+orchestrator logged evidence stats for a page with no hydration data.
+
+#### 50. Zero-result failure class now explicitly tracked
+**File**: `backend/app/scraper.py`
+Added `zero_result_failure_class` variable to capture the zero-result classifier's
+failure class (visible_data_not_extracted, session_bound_url, js_render_required,
+anti_bot_block, selector_failure, schema_mismatch, genuinely_empty).
+Logged explicitly before returning empty results. Telemetry already records
+`failure_category` from the failure_classification module.
+
+### Hardcoded-Value Audit
+
+Scanned `backend/app/*.py` for domain names, airline names, store names, and
+route-specific logic:
+- **0 domain names in runtime code** ✓
+- **0 airline/store/website names** ✓
+- Profile files (`selector_profiles/*.json`) are config data — expected
+- `config.py` `DISCOVERY_DIRECTORY_DOMAINS` is a tunable setting — acceptable
+- All runtime extraction logic is domain-agnostic ✓
+
+### Validation
+
+| Check | Result |
+|-------|--------|
+| `python -m pyflakes` (extraction_orchestrator, scraper) | **0 issues** |
+| Unit tests (128 fast tests) | **all passed** |
+| Code review | **clean** — no regressions |
+
+### Commit
+```
+<commit> fix: orchestrator visible_blocks attribute error + zero-result truthfulness logging — Pass 18
+```
+
+---
+
 ## What Needs to Be Done
 
 ### Short-term (stability)

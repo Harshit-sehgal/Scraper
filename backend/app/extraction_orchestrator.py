@@ -247,7 +247,7 @@ async def orchestrate_extraction(
     if evidence:
         logger.info(
             "[Orchestrator] Page evidence: %d visible blocks, %d tables, %d containers, %d patterns, hydration=%s",
-            len(evidence.visible_blocks or []),
+            len(evidence.text_blocks or []),
             len(evidence.tables or []),
             len(evidence.candidate_containers or []),
             len(evidence.patterns or []),

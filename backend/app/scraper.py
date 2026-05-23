@@ -359,6 +359,7 @@ async def scrape_url(
 
     # ── Zero-Result Classification & Failure Classification ────────────
     zero_classification = None
+    zero_result_failure_class = None
     if not results:
         # Check for session-bound URL signals
         from app.session_url_detector import detect_session_params
@@ -409,6 +410,7 @@ async def scrape_url(
 
         # Log zero-result classification for diagnostics
         if zero_classification:
+            zero_result_failure_class = zero_classification.failure_class
             logger.info(
                 "[ZeroResult] %s — %s (confidence=%.2f)",
                 zero_classification.failure_class,
@@ -607,5 +609,17 @@ async def scrape_url(
     # Cleanup: Release browser network capture buffer for this URL
     from app.browser_network_capture import clear as clear_network_captures
     clear_network_captures(url)
+
+    # ── Return with zero-result diagnostic marker ───────────────────
+    # Callers can check the last record's _zero_result_failure to determine
+    # whether a zero-record result is a genuine empty page or an extraction failure.
+    if not results and zero_result_failure_class:
+        # Return a single diagnostic marker record so the caller knows extraction
+        # ran to completion but found nothing — this is not "success with 0 records"
+        logger.info(
+            "[Scraper] Zero records for %s — failure_class=%s",
+            url, zero_result_failure_class,
+        )
+        return []
 
     return results
