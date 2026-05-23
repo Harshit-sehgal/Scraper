@@ -249,6 +249,7 @@ async def scrape_url_with_recovery(
                 "url": url,
                 "attempt": attempt,
                 "world_state": world_state,
+                "min_record_score": min_record_score or settings.DEFAULT_MIN_RECORD_SCORE,
             }, attempt_ctx=attempt_ctx)
             
             if not success:

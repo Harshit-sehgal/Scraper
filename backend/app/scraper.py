@@ -36,6 +36,7 @@ from app.scrape_telemetry import (
 )
 from app.crawl_policy import get_crawl_policy
 from app.extraction_orchestrator import orchestrate_extraction
+from app.strategy_evolution import get_strategy_evolution_engine, FetchStrategy
 from app.failure_classification import (
     classify_failure, update_domain_with_failure,
 )
@@ -115,7 +116,13 @@ async def scrape_url(
         return []
 
     # ── Step 1: Try profile-based extraction first ──────────────────
-    # Transfer recovery flags to selectors_map so orchestrator can consume them.
+    # Clone selectors_map to prevent recovery flags from leaking across
+    # concurrent URL extracts (job.selectors_map is shared across tasks).
+    if selectors_map is not None:
+        selectors_map = dict(selectors_map)
+        if "fields" in selectors_map and isinstance(selectors_map["fields"], dict):
+            selectors_map["fields"] = dict(selectors_map["fields"])
+    # Transfer recovery flags to the cloned selectors_map so orchestrator can consume them.
     if attempt_ctx:
         if selectors_map is None:
             selectors_map = {}
@@ -173,7 +180,6 @@ async def scrape_url(
 
     # ── Generic extraction pipeline ────────────────────────────────
     from app.domain_intelligence import get_domain_intelligence
-    from app.strategy_evolution import get_strategy_evolution_engine
     
     intel = get_domain_intelligence().get_intelligence(url)
     strategy_engine = get_strategy_evolution_engine()
@@ -194,7 +200,10 @@ async def scrape_url(
         fetch_start = time.time()
         fetch_strategy = recommended_strategy
         if attempt_ctx and getattr(attempt_ctx, 'fetch_strategy', None):
-            fetch_strategy = attempt_ctx.fetch_strategy
+            try:
+                fetch_strategy = FetchStrategy(attempt_ctx.fetch_strategy)
+            except ValueError:
+                pass
         html, js_render_delay, fetch_method, retry_count = await fetch_page_content(
             url,
             preferred_method=fetch_strategy,

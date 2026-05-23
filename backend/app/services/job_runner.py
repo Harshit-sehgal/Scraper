@@ -132,9 +132,13 @@ async def run_job(
             async with job_lock:
                 _add_job_log(job, message, level=level, persist_fn=persist_state_fn)
 
-        async def _safe_progress(idx: int):
+        completed_count = 0
+
+        async def _mark_completed():
+            nonlocal completed_count
             async with job_lock:
-                job.progress_current = idx
+                completed_count += 1
+                job.progress_current = completed_count
 
         async def _safe_warning(msg: str):
             async with job_lock:
@@ -150,7 +154,6 @@ async def run_job(
 
             async with semaphore:
                 await _safe_log(f"Scraping ({idx}/{len(job.urls)}): {url}")
-                await _safe_progress(idx)
 
                 from app.semantic_world_state import get_world_state
                 ws = get_world_state()
@@ -199,16 +202,19 @@ async def run_job(
                     await _safe_log(f"Extracted {len(results)} raw records from {url}")
                     async with job_lock:
                         persist_state_fn()
+                    await _mark_completed()
                     return idx, results, True, url_meta
                 except asyncio.TimeoutError:
                     await _safe_log(f"Timeout on {url}", level="warning")
                     logging.warning("Job %s: Timeout for %s", job_id, url)
                     await _safe_warning(f"URL timeout skipped ({idx}/{len(job.urls)}): {url}")
+                    await _mark_completed()
                     return idx, [], False, {}
                 except Exception as e:
                     logging.exception("Job %s: URL scrape failed: %s", job_id, url)
                     await _safe_log(f"Failed to scrape {url}: {type(e).__name__}", level="warning")
                     await _safe_warning(f"URL scrape failed ({idx}/{len(job.urls)}): {url} ({type(e).__name__})")
+                    await _mark_completed()
                     return idx, [], False, {}
 
         tasks = [_scrape_single_url(idx, url) for idx, url in enumerate(job.urls, start=1)]
