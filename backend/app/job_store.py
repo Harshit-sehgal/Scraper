@@ -427,5 +427,4 @@ def shutdown() -> None:
 
 def reset_job_store_for_tests() -> None:
     """Reset the database path migration cache for tests."""
-    global _MIGRATIONS_RUN_FOR
     _MIGRATIONS_RUN_FOR.clear()

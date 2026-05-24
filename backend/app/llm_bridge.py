@@ -333,7 +333,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
     try:
         def _run_g4f_text():
             try:
-                from g4f.client import Client
+                from g4f.client import Client  # type: ignore[import-untyped]
             except ImportError:
                 logging.warning("g4f not installed — skipping g4f text fallback")
                 return None
