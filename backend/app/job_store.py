@@ -93,7 +93,7 @@ def _job_from_raw(raw: dict) -> dict:
     return out
 
 
-def _job_to_row(job: Job, table: str = "jobs") -> dict:
+def _job_to_row(job: Job) -> dict:
     """Convert a Job model to a flat row dict for SQLite storage."""
     return {
         "id": job.id,
@@ -377,7 +377,7 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
         try:
             conn.execute("DELETE FROM jobs")
             for job in jobs_store.values():
-                row = _job_to_row(job, "jobs")
+                row = _job_to_row(job)
                 columns = ", ".join(row.keys())
                 placeholders = ", ".join("?" for _ in row)
                 conn.execute(
@@ -387,7 +387,7 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
 
             conn.execute("DELETE FROM recycle_bin")
             for job in recycle_bin_store.values():
-                row = _job_to_row(job, "recycle_bin")
+                row = _job_to_row(job)
                 columns = ", ".join(row.keys())
                 placeholders = ", ".join("?" for _ in row)
                 conn.execute(
@@ -408,7 +408,7 @@ def persist_state_single(job: Job) -> None:
     with _DB_LOCK:
         conn = _get_connection()
         try:
-            row = _job_to_row(job, "jobs")
+            row = _job_to_row(job)
             columns = ", ".join(row.keys())
             placeholders = ", ".join("?" for _ in row)
             values = list(row.values())
