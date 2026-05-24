@@ -12,12 +12,8 @@ from app.services.state import prune_history_stores
 @pytest.fixture(autouse=True)
 def mock_ai_clean_and_align(monkeypatch):
     async def fake_ai_clean_and_align(records, schema, **kwargs):
-        has_groq = bool(os.getenv("GROQ_API_KEY"))
-        for r in records:
-            if has_groq:
-                r["_ai_source_structured"] = True
         return records, {
-            "applied": has_groq,
+            "applied": False,
             "quality_filtered_after_ai": 0,
             "input_records": len(records),
             "output_records": len(records),
@@ -722,3 +718,50 @@ def test_delete_active_job_returns_409(client):
     resp_success = client.delete(f"/api/jobs/{job_id}")
     assert resp_success.status_code == 200
     assert resp_success.json()["message"] == "Job moved to recycle bin"
+
+
+def test_quality_report_ai_not_applied():
+    report = build_quality_report(
+        raw_results=[
+            {"record_score": 0.6, "source_trust_score": 0.8},
+            {"record_score": 0.4, "source_trust_score": 0.6},
+        ],
+        post_filter_count=2,
+        post_radius_count=2,
+        radius_report={"applied": False, "reason": "not_configured"},
+        final_results=[
+            {"record_score": 0.6, "source_trust_score": 0.8},
+            {"record_score": 0.4, "source_trust_score": 0.6},
+        ],
+        min_record_score=0.35,
+        type_integrity_report={"total_type_mismatches": 0, "records_with_type_mismatch": 0},
+        source_breakdown={"official": 1, "directory": 1, "social": 0, "search_result": 0, "unknown": 0},
+        ai_source_prediction={"records_processed": 2, "records_ai_structured": 0},
+        ai_structuring_report={"applied": False},
+        warnings=[],
+    )
+    assert report["ai_source_prediction"]["ai_row_rate"] == 0.0
+
+
+def test_quality_report_ai_applied():
+    report = build_quality_report(
+        raw_results=[
+            {"record_score": 0.6, "source_trust_score": 0.8},
+            {"record_score": 0.4, "source_trust_score": 0.6},
+        ],
+        post_filter_count=2,
+        post_radius_count=2,
+        radius_report={"applied": False, "reason": "not_configured"},
+        final_results=[
+            {"record_score": 0.6, "source_trust_score": 0.8},
+            {"record_score": 0.4, "source_trust_score": 0.6},
+        ],
+        min_record_score=0.35,
+        type_integrity_report={"total_type_mismatches": 0, "records_with_type_mismatch": 0},
+        source_breakdown={"official": 1, "directory": 1, "social": 0, "search_result": 0, "unknown": 0},
+        ai_source_prediction={"records_processed": 2, "records_ai_structured": 1},
+        ai_structuring_report={"applied": True},
+        warnings=[],
+    )
+    assert report["ai_source_prediction"]["ai_row_rate"] == 0.5
+

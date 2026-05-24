@@ -86,7 +86,11 @@ def _maybe_migrate_from_json(conn: sqlite3.Connection) -> None:
 
 def _job_from_raw(raw: dict) -> dict:
     """Convert a raw JSON job dict to the format expected by _row_to_job."""
-    return raw
+    out = dict(raw)
+    for field in ["urls", "schema_fields", "filters", "results", "logs", "warnings", "quality_report", "discovered_urls", "selectors_map", "search_params"]:
+        if field in out and not isinstance(out[field], str):
+            out[field] = json.dumps(out[field])
+    return out
 
 
 def _job_to_row(job: Job, table: str = "jobs") -> dict:

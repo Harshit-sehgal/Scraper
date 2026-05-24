@@ -266,3 +266,190 @@ def test_schema_invalidation_and_recreation(monkeypatch):
     finally:
         if db_path.exists():
             db_path.unlink()
+
+
+def test_save_and_load_job_from_sqlite(monkeypatch):
+    """Verify full serialization and deserialization cycle of all Job fields using save_state and load_state."""
+    import json
+    from app.job_store import load_state, save_state, reset_job_store_for_tests
+    from app.config import settings
+    from app.models import Job, JobStatus, ScrapeMode, SchemaField, FieldType
+    
+    reset_job_store_for_tests()
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = Path(tmp.name)
+        
+    try:
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_path))
+        
+        job = Job(
+            id="job-full-serde",
+            name="Full Serde Scraper",
+            status=JobStatus.COMPLETED,
+            mode=ScrapeMode.AUTO,
+            topic="flights",
+            intent="find cheap flights",
+            urls=["https://example.com/flights"],
+            schema_fields=[SchemaField(name="price", field_type=FieldType.CURRENCY)],
+            results=[{"price": "$200"}],
+            total_records=1,
+            filtered_records=1,
+            total_llm_calls=3,
+            estimated_cost_usd=0.07,
+            cancel_requested=False,
+        )
+        
+        jobs_store = {job.id: job}
+        recycle_bin_store = {}
+        
+        save_state(jobs_store, recycle_bin_store)
+        
+        loaded_jobs, loaded_recycle, _ = load_state()
+        
+        assert job.id in loaded_jobs
+        loaded_job = loaded_jobs[job.id]
+        
+        assert loaded_job.name == job.name
+        assert loaded_job.status == job.status
+        assert loaded_job.mode == job.mode
+        assert loaded_job.topic == job.topic
+        assert loaded_job.intent == job.intent
+        assert loaded_job.urls == job.urls
+        assert [f.name for f in loaded_job.schema_fields] == ["price"]
+        assert loaded_job.results == job.results
+        assert loaded_job.total_records == job.total_records
+        assert loaded_job.filtered_records == job.filtered_records
+        assert loaded_job.total_llm_calls == job.total_llm_calls
+        assert loaded_job.estimated_cost_usd == job.estimated_cost_usd
+        assert loaded_job.cancel_requested == job.cancel_requested
+        
+    finally:
+        if db_path.exists():
+            db_path.unlink()
+
+
+def test_running_job_marked_failed_after_restart(monkeypatch):
+    """Verify that jobs in PENDING/DISCOVERING/RUNNING state are transitioned to FAILED with a restart error when loaded on restart."""
+    from app.job_store import load_state, save_state, reset_job_store_for_tests
+    from app.config import settings
+    from app.models import Job, JobStatus
+    
+    reset_job_store_for_tests()
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = Path(tmp.name)
+        
+    try:
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_path))
+        
+        job_running = Job(
+            id="job-running-restart",
+            name="Running Scraper",
+            status=JobStatus.RUNNING,
+            urls=["https://example.com"],
+            schema_fields=[]
+        )
+        
+        jobs_store = {job_running.id: job_running}
+        recycle_bin_store = {}
+        
+        save_state(jobs_store, recycle_bin_store)
+        
+        loaded_jobs, _, _ = load_state()
+        
+        assert job_running.id in loaded_jobs
+        loaded = loaded_jobs[job_running.id]
+        assert loaded.status == JobStatus.FAILED
+        assert "Recovered after restart" in loaded.error
+        
+    finally:
+        if db_path.exists():
+            db_path.unlink()
+
+
+def test_persist_state_single_updates_only_one_job(monkeypatch):
+    """Verify that persist_state_single only updates the single target job row and does not affect other jobs."""
+    from app.job_store import save_state, persist_state_single, reset_job_store_for_tests
+    from app.config import settings
+    from app.models import Job, JobStatus
+    
+    reset_job_store_for_tests()
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = Path(tmp.name)
+        
+    try:
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_path))
+        monkeypatch.setattr("app.job_store._get_db_path", lambda: db_path)
+        
+        j1 = Job(id="j1", name="Job 1", status=JobStatus.COMPLETED, urls=["https://url1"], schema_fields=[])
+        j2 = Job(id="j2", name="Job 2", status=JobStatus.PENDING, urls=["https://url2"], schema_fields=[])
+        
+        save_state({j1.id: j1, j2.id: j2}, {})
+        
+        # Modify j1 only and persist single
+        j1.status = JobStatus.FAILED
+        j1.error = "Forced fail"
+        persist_state_single(j1)
+        
+        # Verify db contents directly
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        
+        r1 = dict(conn.execute("SELECT * FROM jobs WHERE id = ?", ("j1",)).fetchone())
+        r2 = dict(conn.execute("SELECT * FROM jobs WHERE id = ?", ("j2",)).fetchone())
+        conn.close()
+        
+        assert r1["status"] == "failed"
+        assert r1["error"] == "Forced fail"
+        
+        # Ensure j2 remained untouched
+        assert r2["status"] == "pending"
+        assert r2["error"] == ""
+        
+    finally:
+        if db_path.exists():
+            db_path.unlink()
+
+
+def test_json_to_sqlite_migration_imports_existing_jobs(monkeypatch):
+    """Verify that if a legacy JSON state file is present, it is successfully imported into a fresh SQLite database on load."""
+    import json
+    from app.job_store import load_state, reset_job_store_for_tests
+    from app.config import settings
+    from app.models import Job, JobStatus
+    
+    reset_job_store_for_tests()
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp_db:
+        db_path = Path(tmp_db.name)
+    json_path = db_path.with_suffix(".json")
+    
+    try:
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_path))
+        
+        # Write mock legacy JSON state
+        legacy_data = {
+            "jobs": [
+                {
+                    "id": "legacy-j1",
+                    "name": "Legacy 1",
+                    "status": "completed",
+                    "urls": ["https://legacy"],
+                    "schema_fields": []
+                }
+            ],
+            "recycle_bin": []
+        }
+        json_path.write_text(json.dumps(legacy_data))
+        
+        # Load state: this should trigger json migration
+        loaded_jobs, _, _ = load_state()
+        
+        assert "legacy-j1" in loaded_jobs
+        assert loaded_jobs["legacy-j1"].name == "Legacy 1"
+        assert loaded_jobs["legacy-j1"].status == JobStatus.COMPLETED
+        
+    finally:
+        if db_path.exists():
+            db_path.unlink()
+        if json_path.exists():
+            json_path.unlink()
+

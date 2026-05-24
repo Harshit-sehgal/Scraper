@@ -100,7 +100,8 @@ def create_jobs_router(
                     save_job_results_to_disk(job.id, results_list)
                 else:
                     job.results = results_list
-                persist_state_fn()
+                from app.job_store import persist_state_single
+                persist_state_single(job)
                 
         dumped = job.model_dump()
         dumped["results"] = results_list
@@ -134,7 +135,8 @@ def create_jobs_router(
             min_record_score=job_data.min_record_score,
         )
         jobs_store[job.id] = job
-        persist_state_fn()
+        from app.job_store import persist_state_single
+        persist_state_single(job)
         schedule_task_fn(run_job_coro_fn(job.id))
         return {"job_id": job.id, "status": job.status.value}
 
@@ -156,7 +158,8 @@ def create_jobs_router(
         if job.status == JobStatus.PENDING:
             mark_job_canceled(job, "Canceled before execution.")
 
-        persist_state_fn()
+        from app.job_store import persist_state_single
+        persist_state_single(job)
         return {
             "job_id": job.id,
             "status": job.status.value,
@@ -319,7 +322,8 @@ def create_jobs_router(
             "warnings": reclean_warnings,
         }
         job.quality_report = quality
-        persist_state_fn()
+        from app.job_store import persist_state_single
+        persist_state_single(job)
 
         return {
             "job_id": job.id,

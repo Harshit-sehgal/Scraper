@@ -75,7 +75,8 @@ async def run_job(
         mark_job_canceled(job, "Canceled before execution.")
         if persist_state_single_critical_fn:
             persist_state_single_critical_fn()
-        persist_state_fn()
+        else:
+            persist_state_fn()
         return
 
     try:
@@ -115,7 +116,8 @@ async def run_job(
                     _add_job_log(job, "Job canceled during discovery", level="warning", persist_fn=persist_job_state_fn)
                     if persist_state_single_critical_fn:
                         persist_state_single_critical_fn()
-                    persist_state_fn()
+                    else:
+                        persist_state_fn()
                 else:
                     job.status = JobStatus.FAILED
                     job.error = "Could not discover any URLs for this topic"
@@ -123,7 +125,8 @@ async def run_job(
                     _add_job_log(job, "Discovery failed: No URLs found", level="error", persist_fn=persist_job_state_fn)
                     if persist_state_single_critical_fn:
                         persist_state_single_critical_fn()
-                    persist_state_fn()
+                    else:
+                        persist_state_fn()
                 return
 
             _add_job_log(job, f"Discovered {len(job.urls)} potential source URLs", persist_fn=persist_job_state_fn)
@@ -136,7 +139,8 @@ async def run_job(
                 _add_job_log(job, "Job canceled after discovery", level="warning", persist_fn=persist_job_state_fn)
                 if persist_state_single_critical_fn:
                     persist_state_single_critical_fn()
-                persist_state_fn()
+                else:
+                    persist_state_fn()
                 return
 
         job.status = JobStatus.RUNNING
@@ -324,9 +328,10 @@ async def run_job(
                         task.cancel()
                 scraped_raw = await asyncio.gather(*scrape_tasks, return_exceptions=True)
                 mark_job_canceled(job)
-                persist_state_fn()
                 if persist_state_single_critical_fn:
                     persist_state_single_critical_fn()
+                else:
+                    persist_state_fn()
                 return
 
             await asyncio.sleep(0.25)
@@ -339,9 +344,10 @@ async def run_job(
         for idx, results, success, meta in sorted(scraped, key=lambda x: x[0]):
             if job.cancel_requested:
                 mark_job_canceled(job)
-                persist_state_fn()
                 if persist_state_single_critical_fn:
                     persist_state_single_critical_fn()
+                else:
+                    persist_state_fn()
                 return
             if success:
                 all_raw_results.extend(results)
@@ -610,4 +616,5 @@ async def run_job(
             logging.error("Job %s: Failed: %s", job_id, e)
         if persist_state_single_critical_fn:
             persist_state_single_critical_fn()
-        persist_state_fn()
+        else:
+            persist_state_fn()
