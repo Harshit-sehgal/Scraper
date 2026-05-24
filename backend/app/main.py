@@ -268,6 +268,16 @@ async def _periodic_gossip_propagation():
 
 
 async def _run_job_wrapper(job_id: str):
+    from app.job_store import persist_state_single
+    
+    def _persist_single_wrapper():
+        job = jobs_store.get(job_id)
+        if job:
+            try:
+                persist_state_single(job)
+            except Exception as e:
+                logger.error("Failed to persist single job %s: %s", job_id, e)
+
     await run_job(
         job_id=job_id,
         jobs_store=jobs_store,
@@ -277,6 +287,7 @@ async def _run_job_wrapper(job_id: str):
         per_url_scrape_timeout_seconds=CONFIG["per_url_timeout_seconds"],
         ai_structuring_timeout_seconds=CONFIG["ai_structuring_timeout_seconds"],
         insight_timeout_seconds=CONFIG["insight_timeout_seconds"],
+        persist_state_single_fn=_persist_single_wrapper,
     )
 
 

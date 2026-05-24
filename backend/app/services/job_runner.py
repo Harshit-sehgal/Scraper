@@ -17,10 +17,12 @@ from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
 from app.llm_bridge import get_llm_call_count, reset_llm_call_count
 
-def _add_job_log(job, message: str, level: str = "info", persist_fn=None):
+def _add_job_log(job, message: str, level: str = "info", persist_fn=None, persist_single_fn=None):
     from app.models import LogEntry
     job.logs.append(LogEntry(message=message, level=level))
-    if persist_fn:
+    if persist_single_fn:
+        persist_single_fn()
+    elif persist_fn:
         persist_fn()
 
 async def run_job(
@@ -32,12 +34,13 @@ async def run_job(
     per_url_scrape_timeout_seconds: int,
     ai_structuring_timeout_seconds: int,
     insight_timeout_seconds: int,
+    persist_state_single_fn=None,
 ):
     job = jobs_store.get(job_id)
     if not job:
         return
 
-    _add_job_log(job, f"Initializing job: {job.name}", persist_fn=persist_state_fn)
+    _add_job_log(job, f"Initializing job: {job.name}", persist_fn=persist_state_fn, persist_single_fn=persist_state_single_fn)
 
     all_raw_results: list[dict] = []
     urls_with_records = 0
@@ -130,7 +133,7 @@ async def run_job(
 
         async def _safe_log(message: str, level: str = "info"):
             async with job_lock:
-                _add_job_log(job, message, level=level, persist_fn=persist_state_fn)
+                _add_job_log(job, message, level=level, persist_fn=persist_state_fn, persist_single_fn=persist_state_single_fn)
 
         completed_count = 0
 
@@ -139,7 +142,10 @@ async def run_job(
             async with job_lock:
                 completed_count += 1
                 job.progress_current = completed_count
-                persist_state_fn()
+                if persist_state_single_fn:
+                    persist_state_single_fn()
+                else:
+                    persist_state_fn()
 
         async def _safe_warning(msg: str):
             async with job_lock:
@@ -203,7 +209,10 @@ async def run_job(
 
                     await _safe_log(f"Extracted {len(results)} raw records from {url}")
                     async with job_lock:
-                        persist_state_fn()
+                        if persist_state_single_fn:
+                            persist_state_single_fn()
+                        else:
+                            persist_state_fn()
                     await _mark_completed()
                     return idx, results, True, url_meta
                 except asyncio.CancelledError:

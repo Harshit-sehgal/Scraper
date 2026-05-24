@@ -248,11 +248,17 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
             current = 1
 
         if current < 2:
-            # Preserve existing recycle_bin data during migration
+            # Preserve existing recycle_bin data dynamically during migration
             try:
-                existing = conn.execute("SELECT id, name, status, mode, topic, urls, created_at FROM recycle_bin").fetchall()
+                # 1. Identify existing columns of the old recycle_bin table
+                cursor = conn.execute("PRAGMA table_info(recycle_bin)")
+                existing_cols = [r["name"] for r in cursor.fetchall()]
+                # 2. Fetch all existing records and convert each sqlite3.Row to a dict immediately
+                existing = [dict(row) for row in conn.execute("SELECT * FROM recycle_bin").fetchall()]
             except Exception:
+                existing_cols = []
                 existing = []
+
             conn.execute("DROP TABLE IF EXISTS recycle_bin")
             conn.execute("""
                 CREATE TABLE recycle_bin (
@@ -290,13 +296,22 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                     search_params_json TEXT DEFAULT '{}'
                 )
             """)
-            if existing:
-                for row in existing:
-                    cols = "id, name, status, mode, topic, urls, created_at"
-                    vals = "?, ?, ?, ?, ?, ?, ?"
-                    conn.execute(f"INSERT OR IGNORE INTO recycle_bin ({cols}) VALUES ({vals})",
-                                 [row["id"], row["name"], row["status"], row.get("mode", "manual"),
-                                  row.get("topic", ""), row.get("urls", "[]"), row.get("created_at", "")])
+
+            if existing and existing_cols:
+                # 3. Identify new columns of the recreated recycle_bin table
+                cursor = conn.execute("PRAGMA table_info(recycle_bin)")
+                new_cols = [r["name"] for r in cursor.fetchall()]
+                # 4. Filter for overlapping columns
+                overlapping_cols = [col for col in existing_cols if col in new_cols]
+                if overlapping_cols:
+                    cols_str = ", ".join(overlapping_cols)
+                    placeholders = ", ".join("?" for _ in overlapping_cols)
+                    for r in existing:
+                        vals = [r.get(col) for col in overlapping_cols]
+                        conn.execute(
+                            f"INSERT OR IGNORE INTO recycle_bin ({cols_str}) VALUES ({placeholders})",
+                            vals
+                        )
             current = 2
 
         conn.execute("DELETE FROM schema_version")
