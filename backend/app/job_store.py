@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 _DB_LOCK = Lock()
 _DB_PATH: Path | None = None
 _CURRENT_SCHEMA_VERSION = 2
+_MIGRATIONS_RUN = False
 
 
 def _get_db_path() -> Path:
@@ -38,13 +39,16 @@ def _get_db_path() -> Path:
 
 
 def _get_connection() -> sqlite3.Connection:
+    global _MIGRATIONS_RUN
     path = _get_db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path), timeout=10)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
-    _run_migrations(conn)
+    if not _MIGRATIONS_RUN:
+        _run_migrations(conn)
+        _MIGRATIONS_RUN = True
     return conn
 
 
@@ -400,7 +404,6 @@ def persist_state_single(job: Job) -> None:
     with _DB_LOCK:
         conn = _get_connection()
         try:
-            _run_migrations(conn)
             row = _job_to_row(job, "jobs")
             columns = ", ".join(row.keys())
             placeholders = ", ".join("?" for _ in row)
