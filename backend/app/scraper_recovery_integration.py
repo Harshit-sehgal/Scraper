@@ -217,7 +217,7 @@ async def scrape_url_with_recovery(
             classification = classify_failure(
                 error_message=error_msg,
                 telemetry=event_dict,
-                html=None, # We don't have HTML here, scrape_url doesn't return it
+                html=getattr(results, "html", None) if 'results' in locals() else None,
             )
             recovery_stats["failure_classifications"].append(classification.to_dict())
             recovery_stats["final_failure_category"] = classification.category.value

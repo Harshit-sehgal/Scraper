@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from bs4 import BeautifulSoup
 
 from urllib.parse import urljoin, urlparse
@@ -54,6 +54,23 @@ from app.page_evidence_collector import collect_page_evidence
 from app.compound_record_assembler import assemble_compound_records
 
 logger = logging.getLogger(__name__)
+
+class ScrapeAttemptResult(list):
+    """Subclass of list that holds metadata about a scrape attempt."""
+    def __init__(
+        self,
+        records: list[dict],
+        html: str | None = None,
+        telemetry: Any = None,
+        extraction_method: str | None = None,
+        zero_result_classification: Any = None,
+    ):
+        super().__init__(records)
+        self.html = html
+        self.telemetry = telemetry
+        self.extraction_method = extraction_method
+        self.zero_result_classification = zero_result_classification
+
 
 if TYPE_CHECKING:
     from app.recovery_strategies import AttemptContext
@@ -113,7 +130,7 @@ async def scrape_url(
             error=blocked_reason,
             fetch_ms=(time.time() - start_time) * 1000,
         )
-        return []
+        return ScrapeAttemptResult([], html=None, telemetry=telemetry, extraction_method=None, zero_result_classification=None)
 
     # ── Step 1: Try profile-based extraction first ──────────────────
     # Clone selectors_map to prevent recovery flags from leaking across
@@ -142,7 +159,11 @@ async def scrape_url(
         profile_results = None
     else:
         matched_profile = match_profile_for_url(url)
-        profile_results = await try_profile_extraction(url, max_wait=settings.PROFILE_MAX_WAIT)
+        try:
+            profile_results = await try_profile_extraction(url, max_wait=settings.PROFILE_MAX_WAIT)
+        except Exception as e:
+            policy.record_result(url, success=False)
+            raise e
     if profile_results is not None:
         logger.info(
             "Profile-based extraction returned %d records for %s",
@@ -174,7 +195,8 @@ async def scrape_url(
                     records_final=len(results),
                     fetch_ms=(time.time() - start_time) * 1000,
                 )
-                return results
+                policy.record_result(url, success=True)
+                return ScrapeAttemptResult(results, html=None, telemetry=telemetry, extraction_method="profile", zero_result_classification=None)
 
         logger.info("Profile matched but returned 0 records, falling through to generic pipeline")
 
@@ -246,7 +268,8 @@ async def scrape_url(
             schema_fields=[f.name for f in schema_fields],
         )
 
-        return []
+        policy.record_result(url, success=False)
+        return ScrapeAttemptResult([], html=None, telemetry=telemetry, extraction_method=fetch_method, zero_result_classification=None)
 
     policy.record_result(url, success=fetch_success)
 
@@ -662,6 +685,18 @@ async def scrape_url(
             "[Scraper] Zero records for %s — failure_class=%s (not returning marker record)",
             url, zero_result_failure_class,
         )
-        return []
+        return ScrapeAttemptResult(
+            [],
+            html=html,
+            telemetry=telemetry,
+            extraction_method=ext_result.method if 'ext_result' in locals() else None,
+            zero_result_classification=zero_classification,
+        )
 
-    return results
+    return ScrapeAttemptResult(
+        results,
+        html=html,
+        telemetry=telemetry,
+        extraction_method=ext_result.method if 'ext_result' in locals() else None,
+        zero_result_classification=zero_classification,
+    )

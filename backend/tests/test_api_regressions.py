@@ -669,3 +669,31 @@ def test_cancel_check_before_all_done_avoids_race(monkeypatch):
     # the watcher itself doesn't spuriously cancel via the loop.
     assert finished.status in {JobStatus.COMPLETED, JobStatus.EMPTY_RESULT, JobStatus.CANCELED}, \
         f"Expected COMPLETED, EMPTY_RESULT, or CANCELED, got {finished.status}"
+
+
+def test_delete_active_job_returns_409(client):
+    payload = {
+        "name": "delete-active-test",
+        "mode": "manual",
+        "urls": ["https://example.com"],
+        "schema_fields": [{"name": "company_name", "field_type": "string", "required": True}],
+    }
+    r = client.post("/api/jobs", json=payload)
+    assert r.status_code == 200
+    job_id = r.json()["job_id"]
+
+    # Manually force job to RUNNING state
+    main_mod.jobs_store[job_id].status = JobStatus.RUNNING
+
+    # Attempting to delete the active job should return 409
+    resp = client.delete(f"/api/jobs/{job_id}")
+    assert resp.status_code == 409
+    assert "Cannot delete/recycle an active job" in resp.json()["detail"]
+
+    # Mark the job canceled (terminal status)
+    main_mod.jobs_store[job_id].status = JobStatus.CANCELED
+
+    # Delete should now succeed
+    resp_success = client.delete(f"/api/jobs/{job_id}")
+    assert resp_success.status_code == 200
+    assert resp_success.json()["message"] == "Job moved to recycle bin"

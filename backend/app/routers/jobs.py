@@ -333,6 +333,12 @@ def create_jobs_router(
     async def delete_job(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
+        job = jobs_store[job_id]
+        if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot delete/recycle an active job. Cancel the job first."
+            )
         recycle_bin_store[job_id] = jobs_store.pop(job_id)
         persist_state_fn()
         return {"message": "Job moved to recycle bin"}

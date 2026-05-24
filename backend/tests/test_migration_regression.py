@@ -135,10 +135,10 @@ def test_persist_state_single(monkeypatch):
 def test_migrations_cached_per_db_path(monkeypatch):
     """Verify that migrations are correctly cached per database path when STATE_FILE_PATH changes."""
     from app.config import settings
-    from app.job_store import _get_connection, _MIGRATIONS_RUN_FOR
+    from app.job_store import _get_connection, _MIGRATIONS_RUN_FOR, reset_job_store_for_tests
     
     # Reset migration cache for the test
-    _MIGRATIONS_RUN_FOR.clear()
+    reset_job_store_for_tests()
     
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp1, \
          tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp2:

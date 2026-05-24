@@ -423,3 +423,9 @@ def flush_state() -> None:
 def shutdown() -> None:
     """Clean shutdown — ensure all connections are closed."""
     logger.info("SQLite job store shutdown complete")
+
+
+def reset_job_store_for_tests() -> None:
+    """Reset the database path migration cache for tests."""
+    global _MIGRATIONS_RUN_FOR
+    _MIGRATIONS_RUN_FOR.clear()

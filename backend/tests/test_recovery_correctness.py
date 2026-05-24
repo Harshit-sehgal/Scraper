@@ -246,3 +246,59 @@ def test_selectors_map_rejects_malformed_shapes():
 def test_schema_rejects_runtime_metadata_field_names():
     with pytest.raises(Exception):
         SchemaField(name="record_score", field_type=FieldType.FLOAT)
+
+
+@pytest.mark.asyncio
+async def test_crawl_policy_active_counter_never_leaks_on_fetch_failure(monkeypatch):
+    from app import scraper
+    from app.crawl_policy import get_crawl_policy
+    
+    # Get active crawl policy and reset it
+    policy = get_crawl_policy()
+    policy.reset_domain("https://example.com/fail-fetch")
+    
+    # Assert initial state
+    assert policy._domains["example.com"].active_fetches == 0
+    
+    # Simulate fetch throwing an exception
+    async def fake_fetch(*args, **kwargs):
+        raise RuntimeError("simulated fetch crash")
+        
+    monkeypatch.setattr(scraper, "fetch_page_content", fake_fetch)
+    
+    # Call scrape_url (should handle error and return [])
+    results = await scraper.scrape_url(
+        "https://example.com/fail-fetch",
+        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+    )
+    
+    assert results == []
+    # Assert counter decremented back to 0!
+    assert policy._domains["example.com"].active_fetches == 0
+
+
+@pytest.mark.asyncio
+async def test_scrape_attempt_result_exposes_html_and_telemetry(monkeypatch):
+    from app import scraper
+    from app.crawl_policy import get_crawl_policy
+    
+    # Reset domain crawl pacing to prevent blocks
+    policy = get_crawl_policy()
+    policy.reset_domain("https://unique-subclass.example.com/")
+    
+    async def fake_fetch(*args, **kwargs):
+        return "<html><body><h1>Example</h1></body></html>", "playwright_full", 123.0, 0.0
+        
+    monkeypatch.setattr(scraper, "fetch_page_content", fake_fetch)
+    
+    results = await scraper.scrape_url(
+        "https://unique-subclass.example.com/test-result-subclass",
+        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+    )
+    
+    # Assert result is indeed a list subclass with extra metadata
+    assert isinstance(results, list)
+    assert hasattr(results, "html")
+    assert results.html == "<html><body><h1>Example</h1></body></html>"
+    assert hasattr(results, "telemetry")
+    assert results.telemetry is not None

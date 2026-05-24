@@ -202,6 +202,36 @@ async def setup_network_capture(page) -> list[dict]:
             if _is_empty_payload(body):
                 return
 
+            # Enforce temporary count cap in live capture
+            if len(captured) >= _MAX_PAYLOADS_PER_URL:
+                logger.debug(
+                    "[BrowserNetwork] Live capture payload count cap (%d) reached, skipping %s",
+                    _MAX_PAYLOADS_PER_URL, _truncate_url(url)
+                )
+                return
+
+            # Estimate total bytes of existing captured payloads
+            import json
+            total_bytes = 0
+            for p in captured:
+                try:
+                    total_bytes += len(json.dumps(p, ensure_ascii=False, default=str))
+                except Exception:
+                    total_bytes += 1024
+
+            # Estimate new payload size
+            try:
+                new_bytes = len(json.dumps(body, ensure_ascii=False, default=str))
+            except Exception:
+                new_bytes = 1024
+
+            if total_bytes + new_bytes > _MAX_BYTES_PER_URL:
+                logger.debug(
+                    "[BrowserNetwork] Live capture byte cap (%.1f MB) reached, skipping %s",
+                    _MAX_BYTES_PER_URL / (1024 * 1024), _truncate_url(url)
+                )
+                return
+
             payload = {
                 "url": url,
                 "method": req.method,
