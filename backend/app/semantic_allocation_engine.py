@@ -17,7 +17,7 @@ Role-type compatibility is derived geometrically from the Role Manifold.
 
 import random
 from copy import deepcopy
-from typing import List, Set, Tuple
+from typing import Any, List, Set, Tuple
 
 from app.semantic_ir import (
     AllocationGraph,
@@ -54,10 +54,10 @@ def _adaptive_exclusion_threshold() -> float:
     """Exclusion threshold with hysteresis + temperature modulation."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
-    # Read-only access to smoothed metrics updated during evolution
-    base = getattr(ws.metrics, "_smoothed_structural", 0.4)
-    temp = ws.metrics.semantic_temperature
-    conv = ws.metrics.integrity_score
+    metrics: Any = ws.metrics  # type: ignore[has-type]
+    base: float = float(getattr(metrics, "_smoothed_structural", 0.4))
+    temp: float = float(metrics.semantic_temperature)
+    conv: float = float(metrics.integrity_score)
     # Stress (temp) increases threshold; Convergence (trust) decreases it
     result = base + (temp - 0.5) * 0.2 - (conv - 0.5) * 0.15
     return max(0.2, min(0.6, result))
@@ -67,10 +67,10 @@ def _adaptive_runtime_exclusion_threshold() -> float:
     """Exclusion threshold with hysteresis + temperature + convergence."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
-    # Read-only access to smoothed metrics updated during evolution
-    base = getattr(ws.metrics, "_smoothed_runtime", 0.3)
-    temp = ws.metrics.semantic_temperature
-    conv = ws.metrics.integrity_score
+    metrics: Any = ws.metrics  # type: ignore[has-type]
+    base: float = float(getattr(metrics, "_smoothed_runtime", 0.3))
+    temp: float = float(metrics.semantic_temperature)
+    conv: float = float(metrics.integrity_score)
     # Stress (temp) increases threshold; Convergence (trust) decreases it
     result = base + (temp - 0.5) * 0.15 - (conv - 0.5) * 0.1
     return max(0.15, min(0.5, result))
