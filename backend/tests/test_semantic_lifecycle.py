@@ -289,6 +289,111 @@ class TestBestEffortRollback:
 
         assert get_active_transaction() is None
 
+    def test_transaction_context_resets_if_commit_fails(self):
+        """If a subsystem's commit() raises, the transaction context must reset.
+        Additionally, rollback must be attempted on all subsystems that have it."""
+        ws = SemanticWorldState()
+
+        # Make _manifold.commit raise
+        original_commit = ws._manifold.commit
+        original_rollback = ws._manifold.rollback
+        commit_called = False
+
+        def failing_commit():
+            nonlocal commit_called
+            commit_called = True
+            raise RuntimeError("commit simulated failure")
+
+        ws._manifold.commit = failing_commit
+
+        try:
+            with pytest.raises(RuntimeError, match="commit simulated failure"):
+                with ws.transaction("test_commit_fail"):
+                    pass  # Body succeeds, commit fails
+            # Context must be reset
+            assert get_active_transaction() is None, (
+                "Transaction context was not reset after commit failure"
+            )
+            assert commit_called, "commit() should have been called"
+        finally:
+            ws._manifold.commit = original_commit
+            ws._manifold.rollback = original_rollback
+
+    def test_rollback_failure_does_not_mask_original_exception(self):
+        """When a subsystem rollback fails, the ORIGINAL exception
+        (not the rollback exception) must be raised to the caller."""
+        ws = SemanticWorldState()
+
+        # Make _manifold.commit raise one error, and make rollback
+        # raise a different error. The caller should get the commit error.
+        original_commit = ws._manifold.commit
+        original_rollback = ws._manifold.rollback
+
+        def failing_commit():
+            raise RuntimeError("COMMIT_ERROR")
+
+        def failing_rollback():
+            raise RuntimeError("ROLLBACK_ERROR")
+
+        ws._manifold.commit = failing_commit
+        ws._manifold.rollback = failing_rollback
+
+        try:
+            with pytest.raises(RuntimeError, match="COMMIT_ERROR"):
+                with ws.transaction("test_mask"):
+                    pass
+            # The rollback error (ROLLBACK_ERROR) must NOT mask COMMIT_ERROR
+        finally:
+            ws._manifold.commit = original_commit
+            ws._manifold.rollback = original_rollback
+
+        assert get_active_transaction() is None
+
+    def test_all_subsystems_attempt_rollback_even_if_one_fails(self):
+        """When one subsystem rollback fails, the remaining subsystems
+        must still have their rollback() called."""
+        ws = SemanticWorldState()
+
+        # Track which subsystems had rollback called
+        rollback_called: dict[str, bool] = {}
+        originals = {}
+        state_attrs = {
+            'topology': ws._topology,
+            'energy': ws._energy,
+            'manifold': ws._manifold,
+            'motif': ws._motif,
+            'history': ws._history,
+        }
+
+        for name, obj in state_attrs.items():
+            if hasattr(obj, 'rollback'):
+                originals[name] = obj.rollback
+                def make_tracker(name_):
+                    def tracked_rollback():
+                        rollback_called[name_] = True
+                        # Make the second subsystem fail
+                        if name_ == list(state_attrs.keys())[1]:
+                            raise RuntimeError(f"rollback failed for {name_}")
+                        return originals[name_]() if hasattr(originals[name_], '__call__') else None
+                    return tracked_rollback
+                obj.rollback = make_tracker(name)
+
+        try:
+            with pytest.raises(RuntimeError, match="original body error"):
+                with ws.transaction("test_all_attempted"):
+                    raise RuntimeError("original body error")
+        finally:
+            for name, obj in state_attrs.items():
+                if name in originals:
+                    obj.rollback = originals[name]
+
+        # All subsystems should have had rollback attempted
+        for name in state_attrs:
+            assert rollback_called.get(name, False), (
+                f"rollback not attempted for {name}"
+            )
+        assert get_active_transaction() is None
+
 
 # ─── Test 6: Metrics Protocol is compatible with EnergyState ─────────────
 

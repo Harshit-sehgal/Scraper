@@ -86,6 +86,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
         # Idempotent close guard
         self._closed: bool = False
+        self._subscribed_to_dispatcher: bool = False
 
         # Substrate Branching (Phase 39)
         self._parent_node_id: Optional[str] = None
@@ -96,20 +97,25 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         from app.semantic_events import SemanticEventType
         self._dispatcher = get_dispatcher()
         self._dispatcher.subscribe(SemanticEventType.FIELD_WAVE, self._on_field_wave)
+        self._subscribed_to_dispatcher = True
 
     def close(self) -> None:
         """Unsubscribe from dispatcher and clean up resources.
 
-        Idempotent: safe to call multiple times.
+        Idempotent and safe to call multiple times:
+        - Subsequent calls return immediately.
+        - Unsubscribe failures are logged but never raised.
         """
         if getattr(self, '_closed', False):
             return
         self._closed = True
         from app.semantic_events import SemanticEventType
-        try:
-            self._dispatcher.unsubscribe(SemanticEventType.FIELD_WAVE, self._on_field_wave)
-        except Exception:
-            pass
+        if self._subscribed_to_dispatcher:
+            try:
+                self._dispatcher.unsubscribe(SemanticEventType.FIELD_WAVE, self._on_field_wave)
+                self._subscribed_to_dispatcher = False
+            except Exception as exc:
+                logger.debug("Failed to unsubscribe from dispatcher in close(): %s", exc)
 
     # ─── Public Getters & Identifiers ─────────────────────────────────────
 

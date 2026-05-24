@@ -431,6 +431,111 @@ def shutdown() -> None:
     logger.info("SQLite job store shutdown complete")
 
 
+def get_storage_health() -> dict:
+    """Check that SQLite storage is reachable and schema is valid.
+
+    Returns a dict with:
+    - ok: True if all checks pass
+    - schema_version: current schema version (0 if missing)
+    - expected_version: latest schema version
+    - error: error message if any check fails
+    """
+    try:
+        conn = _get_connection()
+        conn.row_factory = sqlite3.Row
+        schema_row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
+        schema_version = schema_row[0] if schema_row and schema_row[0] is not None else 0
+        jobs_ok = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone() is not None
+        recycle_ok = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='recycle_bin'").fetchone() is not None
+        conn.close()
+
+        if schema_version == 0:
+            return {
+                "ok": False,
+                "error": "Schema version table is empty or missing",
+                "schema_version": 0,
+                "expected_version": _CURRENT_SCHEMA_VERSION,
+            }
+        if schema_version < _CURRENT_SCHEMA_VERSION:
+            return {
+                "ok": False,
+                "error": f"Schema version {schema_version} is older than expected {_CURRENT_SCHEMA_VERSION}",
+                "schema_version": schema_version,
+                "expected_version": _CURRENT_SCHEMA_VERSION,
+            }
+        if not jobs_ok:
+            return {
+                "ok": False,
+                "error": "jobs table is missing",
+                "schema_version": schema_version,
+                "expected_version": _CURRENT_SCHEMA_VERSION,
+            }
+        if not recycle_ok:
+            return {
+                "ok": False,
+                "error": "recycle_bin table is missing",
+                "schema_version": schema_version,
+                "expected_version": _CURRENT_SCHEMA_VERSION,
+            }
+
+        return {
+            "ok": True,
+            "schema_version": schema_version,
+            "expected_version": _CURRENT_SCHEMA_VERSION,
+        }
+    except Exception as e:
+        logger.error("Storage health check failed: %s", e)
+        return {
+            "ok": False,
+            "error": str(e),
+            "schema_version": 0,
+            "expected_version": _CURRENT_SCHEMA_VERSION,
+        }
+
+
+def get_storage_status() -> dict:
+    """Return detailed storage backend status.
+
+    Returns:
+        backend: Always "sqlite"
+        db_path: Path to the database file
+        schema_version: Current schema version
+        latest_schema_version: Expected schema version
+        job_count: Number of jobs in the jobs table
+        recycle_bin_count: Number of jobs in recycle_bin
+        wal_mode: Whether WAL journaling is active
+    """
+    try:
+        conn = _get_connection()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
+        schema_version = row[0] if row and row[0] is not None else 0
+        job_count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        recycle_count = conn.execute("SELECT COUNT(*) FROM recycle_bin").fetchone()[0]
+        wal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+        conn.close()
+        db_path = _get_db_path()
+        return {
+            "backend": "sqlite",
+            "db_path": str(db_path),
+            "schema_version": schema_version,
+            "latest_schema_version": _CURRENT_SCHEMA_VERSION,
+            "job_count": job_count,
+            "recycle_bin_count": recycle_count,
+            "wal_mode": wal_mode,
+        }
+    except Exception as e:
+        return {
+            "backend": "sqlite",
+            "error": str(e),
+            "schema_version": 0,
+            "latest_schema_version": _CURRENT_SCHEMA_VERSION,
+            "job_count": -1,
+            "recycle_bin_count": -1,
+            "wal_mode": "unknown",
+        }
+
+
 def reset_job_store_for_tests() -> None:
     """Reset the database path migration cache for tests."""
     _MIGRATIONS_RUN_FOR.clear()

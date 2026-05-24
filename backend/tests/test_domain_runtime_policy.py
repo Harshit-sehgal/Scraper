@@ -42,20 +42,17 @@ class TestDomainRuntimePolicy:
     def test_record_failure_triggers_cooldown_after_limit(self):
         policy = DomainRuntimePolicy()
         url = _make_url()
-        # Default cooldown limit is 3
-        policy.record_failure(url)
-        assert policy.can_fetch(url)
-        policy.record_failure(url)
-        assert policy.can_fetch(url)
-        policy.record_failure(url)
-        assert not policy.can_fetch(url)
+        # With weighted failures: 2 strong failures (1.0 each) = 2.0 >= 2.0 threshold
+        policy.record_failure(url, failure_type="blocked")
+        assert policy.can_fetch(url), "1 strong failure should not trigger cooldown"
+        policy.record_failure(url, failure_type="blocked")
+        assert not policy.can_fetch(url), "2 strong failures should trigger cooldown"
 
     def test_cooldown_expires(self):
         policy = DomainRuntimePolicy()
         url = _make_url()
-        policy.record_failure(url)
-        policy.record_failure(url)
-        policy.record_failure(url)
+        policy.record_failure(url, failure_type="blocked")
+        policy.record_failure(url, failure_type="blocked")
         assert not policy.can_fetch(url)
         # Fast-forward past cooldown
         entry = policy.get_or_create(url)
@@ -157,32 +154,33 @@ class TestDomainRuntimePolicy:
 
     def test_multiple_domains_tracked_independently(self):
         policy = DomainRuntimePolicy()
-        policy.record_failure(_make_url("a.com"))
-        policy.record_failure(_make_url("a.com"))
-        policy.record_failure(_make_url("a.com"))
-        policy.record_failure(_make_url("b.com"))
+        # a.com gets 2 strong failures → cooldown
+        policy.record_failure(_make_url("a.com"), failure_type="blocked")
+        policy.record_failure(_make_url("a.com"), failure_type="blocked")
+        # b.com gets 1 strong failure + 1 success → no cooldown
+        policy.record_failure(_make_url("b.com"), failure_type="blocked")
         policy.record_success(_make_url("b.com"))
-        assert not policy.can_fetch(_make_url("a.com"))
-        assert policy.can_fetch(_make_url("b.com"))
+        assert not policy.can_fetch(_make_url("a.com")), "a.com should be in cooldown"
+        assert policy.can_fetch(_make_url("b.com")), "b.com should not be in cooldown"
 
 
 class TestDomainCooldownIntegration:
     """Tests for domain cooldown preventing future scrape attempts."""
 
     def test_cooldown_blocks_consecutive_scrapes(self):
-        """After hitting the failure limit, can_fetch returns False."""
+        """After hitting the failure pressure threshold, can_fetch returns False."""
         policy = DomainRuntimePolicy()
         url = _make_url("blocked-domain.com")
-        for _ in range(3):
-            policy.record_failure(url)
-        assert not policy.can_fetch(url), "Cooldown should block further fetch attempts"
+        policy.record_failure(url, failure_type="blocked")  # +1.0
+        policy.record_failure(url, failure_type="blocked")  # +1.0 → 2.0 >= 2.0
+        assert not policy.can_fetch(url), "Cooldown should block further fetch attempts after 2 strong failures"
 
     def test_cooldown_expires_and_allows_scrape(self):
         """After cooldown expires, can_fetch returns True again."""
         policy = DomainRuntimePolicy()
         url = _make_url("recovered-domain.com")
-        for _ in range(3):
-            policy.record_failure(url)
+        policy.record_failure(url, failure_type="blocked")
+        policy.record_failure(url, failure_type="blocked")
         # Simulate cooldown expiration
         entry = policy.get_or_create(url)
         entry.cooldown_until = 0.0
@@ -192,25 +190,21 @@ class TestDomainCooldownIntegration:
         """A successful fetch resets the failure counter, preventing cooldown."""
         policy = DomainRuntimePolicy()
         url = _make_url("success-reset.com")
-        policy.record_failure(url)
-        policy.record_failure(url)
-        policy.record_success(url)
-        # Should be able to fetch (failures reset to 0)
-        assert policy.can_fetch(url), "Success should reset failure counter"
-        # Should not enter cooldown after only 1 more failure
-        policy.record_failure(url)
-        assert policy.can_fetch(url), "1 failure after reset should not trigger cooldown"
-        policy.record_failure(url)
-        assert policy.can_fetch(url), "2 failures after reset should not trigger cooldown"
-        policy.record_failure(url)
-        assert not policy.can_fetch(url), "3 failures after reset should trigger cooldown"
+        # Use strong failures for reliable pressure
+        policy.record_failure(url, failure_type="blocked")  # +1.0
+        policy.record_failure(url, failure_type="blocked")  # +1.0 → should trigger cooldown (2.0)
+        policy.record_success(url)  # -0.5 → 1.5
+        assert policy.can_fetch(url), "Success should reduce failure pressure below threshold"
+        # Two more strong failures should retrigger cooldown
+        policy.record_failure(url, failure_type="blocked")  # +1.0 → 2.5
+        assert not policy.can_fetch(url), "Additional failures after success reset should trigger cooldown"
 
     def test_recommended_action_during_cooldown(self):
         """recommended_action returns truthful retry_later during cooldown."""
         policy = DomainRuntimePolicy()
         url = _make_url("cooling-domain.com")
-        for _ in range(3):
-            policy.record_failure(url)
+        policy.record_failure(url, failure_type="timeout")  # +1.0
+        policy.record_failure(url, failure_type="timeout")  # +1.0 → 2.0
         action = policy.recommended_action(url)
         assert "retry_later" in action, f"Expected retry_later in recommended_action, got: {action}"
 
@@ -229,8 +223,8 @@ class TestDomainCooldownIntegration:
         """get_summary should report positive cooldown_remaining for cooling domains."""
         policy = DomainRuntimePolicy()
         url = _make_url("cooling-summary.com")
-        for _ in range(3):
-            policy.record_failure(url)
+        policy.record_failure(url, failure_type="timeout")  # +1.0
+        policy.record_failure(url, failure_type="timeout")  # +1.0 → 2.0
         summary = policy.get_summary()
         domain_key = "cooling-summary.com"
         assert domain_key in summary

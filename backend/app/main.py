@@ -353,99 +353,39 @@ async def health():
 async def ready():
     """Readiness probe — checks that SQLite storage is reachable and healthy.
 
-    Validates:
-    - schema_version table exists and version >= _CURRENT_SCHEMA_VERSION
-    - jobs table exists
-    - recycle_bin table exists
-
-    Returns 503 if any check fails.
+    Delegates to job_store.get_storage_health() for the actual checks,
+    and job_store.get_storage_status() for job/recycle counts.
+    Returns 503 if schema is missing or outdated.
     """
-    import sqlite3
-    from app.job_store import _get_db_path, _CURRENT_SCHEMA_VERSION
-    try:
-        db_path = _get_db_path()
-        conn = sqlite3.connect(str(db_path), timeout=5)
-        conn.row_factory = sqlite3.Row
-
-        # Check schema_version table
-        schema_row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
-        schema_version = schema_row[0] if schema_row and schema_row[0] is not None else 0
-        if schema_version == 0:
-            conn.close()
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "not_ready",
-                    "error": "Schema version table is empty or missing",
-                    "schema_version": 0,
-                    "expected_version": _CURRENT_SCHEMA_VERSION,
-                },
-            )
-        if schema_version < _CURRENT_SCHEMA_VERSION:
-            conn.close()
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "not_ready",
-                    "error": f"Schema version {schema_version} is older than expected {_CURRENT_SCHEMA_VERSION}",
-                    "schema_version": schema_version,
-                    "expected_version": _CURRENT_SCHEMA_VERSION,
-                },
-            )
-
-        # Check jobs table
-        job_count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
-
-        # Check recycle_bin table
-        recycle_count = conn.execute("SELECT COUNT(*) FROM recycle_bin").fetchone()[0]
-
-        conn.close()
-        return {
-            "status": "ready",
-            "storage": "ok",
-            "migrations": "ok",
-            "schema_version": schema_version,
-            "db_path": str(db_path),
-            "job_count": job_count,
-            "recycle_bin_count": recycle_count,
-        }
-    except Exception as e:
-        logger.error("Readiness check failed: %s", e)
+    from app.job_store import get_storage_health, get_storage_status
+    health = get_storage_health()
+    if not health["ok"]:
         return JSONResponse(
             status_code=503,
-            content={"status": "not_ready", "error": str(e)},
+            content={
+                "status": "not_ready",
+                "error": health.get("error", "Unknown storage health issue"),
+                "schema_version": health.get("schema_version", 0),
+                "expected_version": health.get("expected_version", 0),
+            },
         )
+    status = get_storage_status()
+    return {
+        "status": "ready",
+        "storage": "ok",
+        "migrations": "ok",
+        "schema_version": health["schema_version"],
+        "db_path": status.get("db_path", ""),
+        "job_count": status.get("job_count", -1),
+        "recycle_bin_count": status.get("recycle_bin_count", -1),
+    }
 
 
 @app.get("/api/system/storage/status")
 async def storage_status():
-    """Detailed storage backend status."""
-    from app.job_store import _get_db_path, _CURRENT_SCHEMA_VERSION
-    import sqlite3
-    try:
-        db_path = _get_db_path()
-        conn = sqlite3.connect(str(db_path), timeout=5)
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
-        schema_version = row[0] if row and row[0] is not None else 0
-        job_count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
-        recycle_count = conn.execute("SELECT COUNT(*) FROM recycle_bin").fetchone()[0]
-        wal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
-        conn.close()
-        return {
-            "backend": "sqlite",
-            "db_path": str(db_path),
-            "schema_version": schema_version,
-            "latest_schema_version": _CURRENT_SCHEMA_VERSION,
-            "job_count": job_count,
-            "recycle_bin_count": recycle_count,
-            "wal_mode": wal_mode,
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)},
-        )
+    """Detailed storage backend status — delegates to job_store.get_storage_status()."""
+    from app.job_store import get_storage_status
+    return get_storage_status()
 
 
 @app.get("/api/system/status")

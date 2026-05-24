@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 import time
+from urllib.parse import urlparse
 
 from app.config import settings
 from app.discovery import discover_urls, infer_source_metadata
@@ -189,14 +190,17 @@ async def run_job(
                 await _safe_warning(
                     f"URL skipped due to domain cooldown ({idx}/{len(job.urls)}): {url}"
                 )
+                cooldown_remaining = policy.remaining_cooldown(url)
+                domain_key = urlparse(url).netloc.lower()
                 lineage = AcquisitionLineage(
                     original_url=url,
                     final_url=url,
                     state=AcquisitionState.DOMAIN_COOLDOWN,
                     fetch_method="skipped",
+                    recovery_method="domain_runtime_policy",
                     anti_bot_score=0.0,
                     data_evidence_score=0.0,
-                    user_message=f"Domain in cooldown: {rec_action}",
+                    user_message=f"Domain '{domain_key}' in cooldown for {cooldown_remaining:.0f}s — {rec_action}",
                     recommended_next_action=rec_action,
                 )
                 url_meta = {
@@ -208,15 +212,17 @@ async def run_job(
                 return idx, [], False, url_meta
 
             # ── Domain-level concurrency ──────────────────────────────────
-            from urllib.parse import urlparse
             domain = urlparse(url).netloc.lower()
             if domain not in domain_semaphores:
                 max_parallel = policy.get_or_create(url).max_parallel
                 domain_semaphores[domain] = asyncio.Semaphore(max_parallel)
             domain_sem = domain_semaphores[domain]
 
-            async with domain_sem, semaphore:
-                await _safe_log(f"Scraping ({idx}/{len(job.urls)}): {url}")
+            # Global capacity is reserved first, then domain-level capacity,
+            # to avoid holding a scarce domain slot while waiting for global capacity.
+            async with semaphore:
+                async with domain_sem:
+                    await _safe_log(f"Scraping ({idx}/{len(job.urls)}): {url}")
 
                 from app.semantic_world_state import get_world_state
                 ws = get_world_state()
