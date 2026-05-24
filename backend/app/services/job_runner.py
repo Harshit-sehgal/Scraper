@@ -40,7 +40,11 @@ async def run_job(
     if not job:
         return
 
-    _add_job_log(job, f"Initializing job: {job.name}", persist_fn=persist_state_fn, persist_single_fn=persist_state_single_fn)
+    # Optimize persistence: redirect all state saves to single-row updates if available
+    if persist_state_single_fn:
+        persist_state_fn = persist_state_single_fn
+
+    _add_job_log(job, f"Initializing job: {job.name}", persist_fn=persist_state_fn)
 
     all_raw_results: list[dict] = []
     urls_with_records = 0

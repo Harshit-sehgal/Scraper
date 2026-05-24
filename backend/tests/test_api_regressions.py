@@ -566,7 +566,7 @@ def test_cancel_during_run_sets_canceled_and_persists_state(monkeypatch):
 
     persist_called = [False]
 
-    def tracking_persist():
+    def tracking_persist(*args, **kwargs):
         persist_called[0] = True
 
     # Simulate a long-running scrape that gives us time to cancel
@@ -580,6 +580,7 @@ def test_cancel_during_run_sets_canceled_and_persists_state(monkeypatch):
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", slow_scrape_url)
     monkeypatch.setattr("app.scraper.generate_data_insight", fake_generate_data_insight)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", tracking_persist)
+    monkeypatch.setattr(main_mod, "_persist_single_wrapper", tracking_persist)
 
     job = Job(
         id="job-cancel-during-scrape",

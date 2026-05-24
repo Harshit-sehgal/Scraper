@@ -178,3 +178,91 @@ def test_migrations_cached_per_db_path(monkeypatch):
             db_path1.unlink()
         if db_path2.exists():
             db_path2.unlink()
+
+
+def test_progress_persistence_without_full_state_rewrite(monkeypatch):
+    """Verify that run_job uses single-row persistence instead of full state saves."""
+    import asyncio
+    from app.services.job_runner import run_job
+    from app.models import Job, JobStatus
+
+    # Counter to verify which persistence functions were called
+    full_state_writes = 0
+    single_row_writes = 0
+
+    def mock_persist_state():
+        nonlocal full_state_writes
+        full_state_writes += 1
+
+    def mock_persist_single():
+        nonlocal single_row_writes
+        single_row_writes += 1
+
+    # Define minimal job and store
+    job_id = "test-job-hot-updates"
+    job = Job(
+        id=job_id,
+        name="Hot Update Test",
+        status=JobStatus.PENDING,
+        urls=["https://example.com"],
+        schema_fields=[],
+        filters=[]
+    )
+    jobs_store = {job_id: job}
+
+    # Let's mock scrape_url_with_recovery to return result immediately
+    async def mock_scrape_url_with_recovery(*args, **kwargs):
+        from app.scraper import ScrapeAttemptResult
+        return ScrapeAttemptResult([], html="<html></html>", telemetry={})
+
+    monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", mock_scrape_url_with_recovery)
+
+    # Let's run run_job with the mocks
+    asyncio.run(run_job(
+        job_id=job_id,
+        jobs_store=jobs_store,
+        persist_state_fn=mock_persist_state,
+        max_discovery_urls=5,
+        max_job_runtime_seconds=5,
+        per_url_scrape_timeout_seconds=5,
+        ai_structuring_timeout_seconds=5,
+        insight_timeout_seconds=5,
+        persist_state_single_fn=mock_persist_single,
+    ))
+
+    # Assert that single-row writes were called (for progress/log updates) and full-state writes were NOT called!
+    assert single_row_writes > 0
+    assert full_state_writes == 0
+
+
+def test_schema_invalidation_and_recreation(monkeypatch):
+    """Verify that _get_connection correctly handles SQLite database recreation when cached."""
+    from app.job_store import _get_connection, reset_job_store_for_tests
+    from app.config import settings
+
+    reset_job_store_for_tests()
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = Path(tmp.name)
+
+    try:
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_path))
+
+        # 1. Establish connection (runs migrations)
+        conn = _get_connection()
+        conn.close()
+
+        # 2. Delete the database file (as in dynamic developer/test file removal)
+        db_path.unlink()
+
+        # 3. Establish connection again. Because _MIGRATIONS_RUN_FOR holds the path,
+        # it would skip migrations unless it verifies the schema exists in the DB.
+        conn = _get_connection()
+        # Verify schema is recreated successfully
+        row = conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
+        assert row is not None
+        assert row[0] == 2
+        conn.close()
+
+    finally:
+        if db_path.exists():
+            db_path.unlink()

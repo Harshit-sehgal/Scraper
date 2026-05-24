@@ -40,7 +40,13 @@ def _get_connection() -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
-    if path not in _MIGRATIONS_RUN_FOR:
+    
+    # Check if database tables are actually present to handle dynamic dev/test deletions
+    has_schema = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'"
+    ).fetchone()
+    
+    if path not in _MIGRATIONS_RUN_FOR or not has_schema:
         _run_migrations(conn)
         _MIGRATIONS_RUN_FOR.add(path)
     return conn
