@@ -115,7 +115,6 @@ class TestDashboard:
     def test_dashboard_returns_all_sections(self, client):
         with (
             patch("app.routers.operator.get_governance_dashboard") as mock_dash,
-            patch("app.routers.operator.get_resource_governor") as mock_gov,
             patch("app.routers.operator.get_domain_health_monitor") as mock_monitor,
             patch("app.routers.operator.get_browser_pool") as mock_pool,
             patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry,
@@ -130,10 +129,6 @@ class TestDashboard:
                 },
             }
             mock_dash.return_value = dash_instance
-
-            # Mock resource governor
-            gov_instance = MagicMock()
-            mock_gov.return_value = gov_instance
 
             # Mock domain health monitor
             monitor_instance = MagicMock()

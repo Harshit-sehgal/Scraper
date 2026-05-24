@@ -21,7 +21,6 @@ from app.visualization import (
     OperatorMode,
     get_governance_dashboard,
 )
-from app.resource_governor import get_resource_governor
 from app.degradation_predictor import get_degradation_predictor
 from app.domain_health_alerts import get_domain_health_monitor
 from app.browser_pool import get_browser_pool
@@ -117,7 +116,6 @@ async def get_system_dashboard():
     """
     dashboard = get_governance_dashboard()
     governance = dashboard.get_governance_summary()
-    resource_gov = get_resource_governor()
 
     # Domain health summary
     monitor = get_domain_health_monitor()
