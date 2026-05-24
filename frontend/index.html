@@ -25,6 +25,7 @@
                     <button class="tab" data-view="new" id="tab-new">New</button>
                     <button class="tab recycle-tab" data-view="recycle" id="tab-recycle">Recycle Bin</button>
                     <button class="tab cognition-tab" data-view="cognition" id="tab-cognition">Cognition</button>
+                    <button class="tab dashboard-tab" data-view="dashboard" id="tab-dashboard">Dashboard</button>
                 </nav>
             </div>
             <div class="topbar-right">
@@ -115,6 +116,106 @@
                 <div class="list" id="recycle-list">
                     <div class="empty" id="empty-recycle-state">
                         <p>Recycle bin is empty</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- VIEW: Dashboard                      -->
+        <!-- ═══════════════════════════════════ -->
+        <section class="view" id="view-dashboard">
+            <div class="container">
+                <div class="page-head">
+                    <div>
+                        <h1>Operations Dashboard</h1>
+                        <p class="subtle">Real-time system health, operator mode, degradation predictions</p>
+                    </div>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn primary small" onclick="refreshDashboard()">Refresh ↻</button>
+                    </div>
+                </div>
+
+                <!-- Mode Switcher -->
+                <div class="dash-card mode-card">
+                    <div class="dash-card-header">
+                        <span class="dash-card-title">⚙️ Operator Mode</span>
+                        <span class="dash-badge" id="dash-current-mode">loading...</span>
+                    </div>
+                    <div class="mode-switcher">
+                        <button class="mode-btn" data-mode="production" onclick="switchOperatorMode('production')">Production</button>
+                        <button class="mode-btn" data-mode="benchmark" onclick="switchOperatorMode('benchmark')">Benchmark</button>
+                        <button class="mode-btn" data-mode="forensic" onclick="switchOperatorMode('forensic')">Forensic</button>
+                        <button class="mode-btn" data-mode="stealth" onclick="switchOperatorMode('stealth')">Stealth</button>
+                        <button class="mode-btn" data-mode="low_cost" onclick="switchOperatorMode('low_cost')">Low Cost</button>
+                    </div>
+                    <div id="mode-feedback" class="mode-feedback hidden"></div>
+                </div>
+
+                <!-- Health KPIs Row -->
+                <div class="kpi-row" id="dash-kpi-row">
+                    <div class="kpi"><span class="kpi-val" id="dash-status-val">—</span><span class="kpi-label">Status</span></div>
+                    <div class="kpi"><span class="kpi-val" id="dash-success-rate">—</span><span class="kpi-label">Success Rate</span></div>
+                    <div class="kpi"><span class="kpi-val" id="dash-active-browsers">—</span><span class="kpi-label">Active Browsers</span></div>
+                    <div class="kpi"><span class="kpi-val" id="dash-domains-degraded">—</span><span class="kpi-label">Degraded Domains</span></div>
+                </div>
+
+                <!-- Two-column layout -->
+                <div class="row-2" style="margin-top: 1.5rem;">
+                    <!-- Left: Governance Dashboard -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <span class="dash-card-title">📊 System Governance</span>
+                        </div>
+                        <div id="dash-governance" class="dash-card-body">
+                            <div class="dash-loading">Loading governance data...</div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Domain Health -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <span class="dash-card-title">🌐 Domain Health</span>
+                        </div>
+                        <div id="dash-domains" class="dash-card-body">
+                            <div class="dash-loading">Loading domain data...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Degradation Predictions -->
+                <div class="dash-card" style="margin-top: 1.5rem;">
+                    <div class="dash-card-header">
+                        <span class="dash-card-title">🔮 Degradation Predictions</span>
+                        <span class="dash-badge" id="dash-systemic-risk">—</span>
+                    </div>
+                    <div id="dash-predictions" class="dash-card-body">
+                        <div class="dash-loading">Loading predictions...</div>
+                    </div>
+                </div>
+
+                <!-- Telemetry Stats -->
+                <div class="dash-card" style="margin-top: 1.5rem;">
+                    <div class="dash-card-header">
+                        <span class="dash-card-title">📈 Recent Telemetry</span>
+                    </div>
+                    <div id="dash-telemetry" class="dash-card-body">
+                        <div class="dash-loading">Loading telemetry...</div>
+                    </div>
+                </div>
+
+                <!-- Quick Links -->
+                <div class="dash-card" style="margin-top: 1.5rem;">
+                    <div class="dash-card-header">
+                        <span class="dash-card-title">📖 Quick Reference</span>
+                    </div>
+                    <div class="dash-card-body" style="display:flex; gap:1rem; flex-wrap:wrap; padding:1rem;">
+                        <a href="/api/system/status" target="_blank" class="btn ghost small">System Status API</a>
+                        <a href="/api/operator/health" target="_blank" class="btn ghost small">Health API</a>
+                        <a href="/api/operator/dashboard" target="_blank" class="btn ghost small">Dashboard API</a>
+                        <a href="/api/operator/predictions" target="_blank" class="btn ghost small">Predictions API</a>
+                        <a href="/api/system/topology" target="_blank" class="btn ghost small">Topology API</a>
+                        <a href="/docs" target="_blank" class="btn ghost small">API Docs</a>
                     </div>
                 </div>
             </div>

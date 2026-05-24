@@ -1295,6 +1295,288 @@ tr:hover td {
     border-bottom: 1px solid rgba(173, 96, 83, 0.1);
 }
 
+/* ═══════════════════════════════════════════
+   Dashboard Styles
+   ═══════════════════════════════════════════ */
+
+.dash-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 18px rgba(20, 40, 32, 0.05);
+    overflow: hidden;
+}
+
+.dash-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(90deg, #edf7f4 0%, #f4faef 100%);
+}
+
+.dash-card-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+    letter-spacing: 0.03em;
+}
+
+.dash-card-body {
+    padding: 0.6rem;
+}
+
+.dash-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.2rem 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.dash-badge.risk-critical {
+    background: #fef2f2;
+    color: var(--danger);
+}
+
+.dash-badge.risk-high {
+    background: #fef8e8;
+    color: #c7851b;
+}
+
+.dash-badge.risk-medium {
+    background: #fdf6e5;
+    color: #8a5a10;
+}
+
+.dash-badge.risk-low {
+    background: #ecfdf5;
+    color: var(--success);
+}
+
+.mode-card {
+    margin-bottom: 1.5rem;
+}
+
+.mode-switcher {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0.8rem 1rem;
+    flex-wrap: wrap;
+}
+
+.mode-btn {
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--bg-soft);
+    color: var(--ink-soft);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.mode-btn:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.mode-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    box-shadow: 0 4px 12px rgba(22, 139, 127, 0.3);
+}
+
+.mode-feedback {
+    padding: 0.5rem 1rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.mode-feedback-success {
+    color: var(--success);
+}
+
+.mode-feedback-error {
+    color: var(--danger);
+}
+
+.dash-loading {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 0.82rem;
+}
+
+.dash-empty {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 0.8rem;
+}
+
+.dash-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+}
+
+.dash-metric {
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg-soft);
+}
+
+.dash-metric-label {
+    display: block;
+    font-size: 0.67rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    font-weight: 700;
+    margin-bottom: 0.15rem;
+}
+
+.dash-metric-val {
+    display: block;
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    color: var(--ink-strong);
+    font-weight: 600;
+}
+
+.dash-health-bar {
+    margin-top: 0.6rem;
+    padding: 0 0.5rem;
+}
+
+.dash-health-bar-track {
+    height: 8px;
+    border-radius: 99px;
+    overflow: hidden;
+    display: flex;
+    background: #eaf1e8;
+}
+
+.dash-health-fill {
+    height: 100%;
+    transition: width 0.4s ease;
+}
+
+.dash-health-healthy {
+    background: var(--success);
+}
+
+.dash-health-degrading {
+    background: var(--warning);
+}
+
+.dash-health-bad {
+    background: var(--danger);
+}
+
+.dash-prediction {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+    transition: box-shadow 0.15s ease;
+}
+
+.dash-prediction:hover {
+    box-shadow: 0 2px 10px rgba(20, 40, 32, 0.08);
+}
+
+.dash-prediction-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.7rem;
+    background: #f7fbf8;
+    border-bottom: 1px solid var(--line);
+}
+
+.dash-prediction-domain {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--ink-strong);
+    font-family: var(--mono);
+}
+
+.dash-prediction-risk {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    letter-spacing: 0.05em;
+}
+
+.dash-prediction-body {
+    padding: 0.5rem 0.7rem;
+}
+
+.dash-prediction-detail {
+    display: flex;
+    gap: 0.8rem;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    flex-wrap: wrap;
+}
+
+.dash-prediction-detail strong {
+    color: var(--ink-main);
+}
+
+.dash-prediction-timer {
+    margin-top: 0.3rem;
+    font-size: 0.75rem;
+    color: var(--warning);
+    font-weight: 600;
+}
+
+.dash-prediction-evidence {
+    margin-top: 0.3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+}
+
+.dash-prediction-actions {
+    margin-top: 0.4rem;
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 860px) {
+    .dash-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .mode-switcher {
+        gap: 0.3rem;
+    }
+
+    .mode-btn {
+        font-size: 0.68rem;
+        padding: 0.3rem 0.55rem;
+    }
+}
+
 /* ── Acquisition Pipeline Banner ── */
 .acquisition-banner {
     margin: 0.4rem 0 0.8rem;

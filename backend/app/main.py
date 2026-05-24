@@ -306,6 +306,9 @@ app.include_router(
 
 app.include_router(scraper_router)
 
+from app.routers.operator import router as operator_router
+app.include_router(operator_router)
+
 
 # ─── Routes ──────────────────────────────────────────────────────────────
 
