@@ -43,6 +43,7 @@ def _get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(str(path), timeout=10)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.row_factory = sqlite3.Row
     _run_migrations(conn)
     return conn
 
@@ -82,132 +83,6 @@ def _maybe_migrate_from_json(conn: sqlite3.Connection) -> None:
 def _job_from_raw(raw: dict) -> dict:
     """Convert a raw JSON job dict to the format expected by _row_to_job."""
     return raw
-
-
-def _run_migrations(conn: sqlite3.Connection) -> None:
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS schema_version (
-            version INTEGER PRIMARY KEY
-        )
-    """)
-    row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
-    current = row[0] if row and row[0] is not None else 0
-
-    if current < 1:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS jobs (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                mode TEXT NOT NULL DEFAULT 'manual',
-                topic TEXT DEFAULT '',
-                intent TEXT DEFAULT '',
-                urls TEXT NOT NULL DEFAULT '[]',
-                schema_fields TEXT NOT NULL DEFAULT '[]',
-                filters TEXT DEFAULT '[]',
-                results TEXT DEFAULT '[]',
-                logs TEXT DEFAULT '[]',
-                total_records INTEGER DEFAULT 0,
-                filtered_records INTEGER DEFAULT 0,
-                total_llm_calls INTEGER DEFAULT 0,
-                error TEXT DEFAULT '',
-                warnings TEXT DEFAULT '',
-                quality_report TEXT DEFAULT '{}',
-                analysis TEXT DEFAULT '',
-                discovered_urls TEXT DEFAULT '[]',
-                selectors_map TEXT DEFAULT '{}',
-                search_params TEXT DEFAULT '{}',
-                max_pages INTEGER DEFAULT 0,
-                progress_current INTEGER DEFAULT 0,
-                progress_total INTEGER DEFAULT 0,
-                estimated_cost_usd REAL DEFAULT 0,
-                cancel_requested INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT '',
-                completed_at TEXT DEFAULT '',
-                min_record_score REAL DEFAULT 0.35,
-                acquisition_mode TEXT DEFAULT 'standard',
-                search_params_json TEXT DEFAULT '{}'
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS recycle_bin (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                status TEXT NOT NULL,
-                mode TEXT NOT NULL DEFAULT 'manual',
-                topic TEXT DEFAULT '',
-                intent TEXT DEFAULT '',
-                urls TEXT NOT NULL DEFAULT '[]',
-                schema_fields TEXT NOT NULL DEFAULT '[]',
-                filters TEXT DEFAULT '[]',
-                results TEXT DEFAULT '[]',
-                logs TEXT DEFAULT '[]',
-                total_records INTEGER DEFAULT 0,
-                filtered_records INTEGER DEFAULT 0,
-                total_llm_calls INTEGER DEFAULT 0,
-                error TEXT DEFAULT '',
-                warnings TEXT DEFAULT '',
-                quality_report TEXT DEFAULT '{}',
-                analysis TEXT DEFAULT '',
-                discovered_urls TEXT DEFAULT '[]',
-                selectors_map TEXT DEFAULT '{}',
-                search_params TEXT DEFAULT '{}',
-                max_pages INTEGER DEFAULT 0,
-                progress_current INTEGER DEFAULT 0,
-                progress_total INTEGER DEFAULT 0,
-                estimated_cost_usd REAL DEFAULT 0,
-                cancel_requested INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT '',
-                completed_at TEXT DEFAULT '',
-                deleted_at TEXT DEFAULT '',
-                min_record_score REAL DEFAULT 0.35,
-                acquisition_mode TEXT DEFAULT 'standard',
-                search_params_json TEXT DEFAULT '{}'
-            )
-        """)
-        conn.execute("INSERT INTO schema_version (version) VALUES (1)")
-        current = 1
-
-    if current < 2:
-        conn.execute("DROP TABLE IF EXISTS recycle_bin")
-        conn.execute("""
-            CREATE TABLE recycle_bin (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                status TEXT NOT NULL,
-                mode TEXT NOT NULL DEFAULT 'manual',
-                topic TEXT DEFAULT '',
-                intent TEXT DEFAULT '',
-                urls TEXT NOT NULL DEFAULT '[]',
-                schema_fields TEXT NOT NULL DEFAULT '[]',
-                filters TEXT DEFAULT '[]',
-                results TEXT DEFAULT '[]',
-                logs TEXT DEFAULT '[]',
-                total_records INTEGER DEFAULT 0,
-                filtered_records INTEGER DEFAULT 0,
-                total_llm_calls INTEGER DEFAULT 0,
-                error TEXT DEFAULT '',
-                warnings TEXT DEFAULT '',
-                quality_report TEXT DEFAULT '{}',
-                analysis TEXT DEFAULT '',
-                discovered_urls TEXT DEFAULT '[]',
-                selectors_map TEXT DEFAULT '{}',
-                search_params TEXT DEFAULT '{}',
-                max_pages INTEGER DEFAULT 0,
-                progress_current INTEGER DEFAULT 0,
-                progress_total INTEGER DEFAULT 0,
-                estimated_cost_usd REAL DEFAULT 0,
-                cancel_requested INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT '',
-                completed_at TEXT DEFAULT '',
-                deleted_at TEXT DEFAULT '',
-                min_record_score REAL DEFAULT 0.35,
-                acquisition_mode TEXT DEFAULT 'standard',
-                search_params_json TEXT DEFAULT '{}'
-            )
-        """)
-        conn.execute("INSERT INTO schema_version (version) VALUES (2)")
-        current = 2
 
 
 def _job_to_row(job: Job, table: str = "jobs") -> dict:
@@ -288,6 +163,148 @@ def _row_to_job(row: dict) -> Job | None:
         return None
 
 
+def _run_migrations(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER PRIMARY KEY
+        )
+    """)
+    row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
+    current = row[0] if row and row[0] is not None else 0
+
+    if current < _CURRENT_SCHEMA_VERSION:
+        if current < 1:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS jobs (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    mode TEXT NOT NULL DEFAULT 'manual',
+                    topic TEXT DEFAULT '',
+                    intent TEXT DEFAULT '',
+                    urls TEXT NOT NULL DEFAULT '[]',
+                    schema_fields TEXT NOT NULL DEFAULT '[]',
+                    filters TEXT DEFAULT '[]',
+                    results TEXT DEFAULT '[]',
+                    logs TEXT DEFAULT '[]',
+                    total_records INTEGER DEFAULT 0,
+                    filtered_records INTEGER DEFAULT 0,
+                    total_llm_calls INTEGER DEFAULT 0,
+                    error TEXT DEFAULT '',
+                    warnings TEXT DEFAULT '',
+                    quality_report TEXT DEFAULT '{}',
+                    analysis TEXT DEFAULT '',
+                    discovered_urls TEXT DEFAULT '[]',
+                    selectors_map TEXT DEFAULT '{}',
+                    search_params TEXT DEFAULT '{}',
+                    max_pages INTEGER DEFAULT 0,
+                    progress_current INTEGER DEFAULT 0,
+                    progress_total INTEGER DEFAULT 0,
+                    estimated_cost_usd REAL DEFAULT 0,
+                    cancel_requested INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT '',
+                    completed_at TEXT DEFAULT '',
+                    min_record_score REAL DEFAULT 0.35,
+                    acquisition_mode TEXT DEFAULT 'standard',
+                    search_params_json TEXT DEFAULT '{}'
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS recycle_bin (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    mode TEXT NOT NULL DEFAULT 'manual',
+                    topic TEXT DEFAULT '',
+                    intent TEXT DEFAULT '',
+                    urls TEXT NOT NULL DEFAULT '[]',
+                    schema_fields TEXT NOT NULL DEFAULT '[]',
+                    filters TEXT DEFAULT '[]',
+                    results TEXT DEFAULT '[]',
+                    logs TEXT DEFAULT '[]',
+                    total_records INTEGER DEFAULT 0,
+                    filtered_records INTEGER DEFAULT 0,
+                    total_llm_calls INTEGER DEFAULT 0,
+                    error TEXT DEFAULT '',
+                    warnings TEXT DEFAULT '',
+                    quality_report TEXT DEFAULT '{}',
+                    analysis TEXT DEFAULT '',
+                    discovered_urls TEXT DEFAULT '[]',
+                    selectors_map TEXT DEFAULT '{}',
+                    search_params TEXT DEFAULT '{}',
+                    max_pages INTEGER DEFAULT 0,
+                    progress_current INTEGER DEFAULT 0,
+                    progress_total INTEGER DEFAULT 0,
+                    estimated_cost_usd REAL DEFAULT 0,
+                    cancel_requested INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT '',
+                    completed_at TEXT DEFAULT '',
+                    deleted_at TEXT DEFAULT '',
+                    min_record_score REAL DEFAULT 0.35,
+                    acquisition_mode TEXT DEFAULT 'standard',
+                    search_params_json TEXT DEFAULT '{}'
+                )
+            """)
+            current = 1
+
+        if current < 2:
+            # Preserve existing recycle_bin data during migration
+            try:
+                existing = conn.execute("SELECT id, name, status, mode, topic, urls, created_at FROM recycle_bin").fetchall()
+            except Exception:
+                existing = []
+            conn.execute("DROP TABLE IF EXISTS recycle_bin")
+            conn.execute("""
+                CREATE TABLE recycle_bin (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    mode TEXT NOT NULL DEFAULT 'manual',
+                    topic TEXT DEFAULT '',
+                    intent TEXT DEFAULT '',
+                    urls TEXT NOT NULL DEFAULT '[]',
+                    schema_fields TEXT NOT NULL DEFAULT '[]',
+                    filters TEXT DEFAULT '[]',
+                    results TEXT DEFAULT '[]',
+                    logs TEXT DEFAULT '[]',
+                    total_records INTEGER DEFAULT 0,
+                    filtered_records INTEGER DEFAULT 0,
+                    total_llm_calls INTEGER DEFAULT 0,
+                    error TEXT DEFAULT '',
+                    warnings TEXT DEFAULT '',
+                    quality_report TEXT DEFAULT '{}',
+                    analysis TEXT DEFAULT '',
+                    discovered_urls TEXT DEFAULT '[]',
+                    selectors_map TEXT DEFAULT '{}',
+                    search_params TEXT DEFAULT '{}',
+                    max_pages INTEGER DEFAULT 0,
+                    progress_current INTEGER DEFAULT 0,
+                    progress_total INTEGER DEFAULT 0,
+                    estimated_cost_usd REAL DEFAULT 0,
+                    cancel_requested INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT '',
+                    completed_at TEXT DEFAULT '',
+                    deleted_at TEXT DEFAULT '',
+                    min_record_score REAL DEFAULT 0.35,
+                    acquisition_mode TEXT DEFAULT 'standard',
+                    search_params_json TEXT DEFAULT '{}'
+                )
+            """)
+            if existing:
+                for row in existing:
+                    cols = "id, name, status, mode, topic, urls, created_at"
+                    vals = "?, ?, ?, ?, ?, ?, ?"
+                    conn.execute(f"INSERT OR IGNORE INTO recycle_bin ({cols}) VALUES ({vals})",
+                                 [row["id"], row["name"], row["status"], row.get("mode", "manual"),
+                                  row.get("topic", ""), row.get("urls", "[]"), row.get("created_at", "")])
+            current = 2
+
+        conn.execute("DELETE FROM schema_version")
+        conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
+        conn.commit()
+        logger.info("SQLite schema migrated to version %d", current)
+
+
 def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
     """Load jobs and recycle bin from SQLite."""
     with _DB_LOCK:
@@ -307,7 +324,6 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
                 if job:
                     recycle_bin_store[job.id] = job
 
-            # Mark in-progress jobs as failed on recovery
             for job in jobs_store.values():
                 if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
                     job.status = JobStatus.FAILED
@@ -315,7 +331,6 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
                     job.completed_at = datetime.datetime.now().isoformat()
                     job.cancel_requested = False
 
-            # Load world state from JSON file (kept separate for size)
             world_state_data = None
             try:
                 ws_path = _get_db_path().parent / "world_state.json"
@@ -337,7 +352,6 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
     with _DB_LOCK:
         conn = _get_connection()
         try:
-
             conn.execute("DELETE FROM jobs")
             for job in jobs_store.values():
                 row = _job_to_row(job, "jobs")
@@ -383,6 +397,8 @@ def persist_state_single(job: Job) -> None:
             conn.commit()
         except Exception:
             conn.rollback()
+            logger.exception("Failed to persist single job %s", job.id)
+            raise
         finally:
             conn.close()
 
