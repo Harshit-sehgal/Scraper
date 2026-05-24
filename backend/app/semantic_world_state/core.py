@@ -1,14 +1,11 @@
 import logging
 import time
-import uuid
-import threading
 from copy import deepcopy
 from collections import Counter
-from typing import Dict, List, Tuple, Optional, Any, Set, Callable, TYPE_CHECKING
+from typing import Dict, List, Optional, Any, Set, Callable
 from contextlib import contextmanager
 
 from app.transaction_context import active_transaction
-from app.core_types import FieldConflictRegion
 from app.invariant_firewall import requires_invariants
 
 from app.semantic_world_state.locks import NonBlockingRLock
@@ -19,9 +16,6 @@ from app.semantic_world_state.metrics import MetricsMixin
 from app.semantic_world_state.topology import TopologyMixin
 
 logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from app.observability import GovernanceSnapshot
 
 class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMixin, TopologyMixin):
     """
@@ -99,6 +93,14 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         from app.semantic_events import SemanticEventType
         self._dispatcher = get_dispatcher()
         self._dispatcher.subscribe(SemanticEventType.FIELD_WAVE, self._on_field_wave)
+
+    def close(self) -> None:
+        """Unsubscribe from dispatcher and clean up resources."""
+        from app.semantic_events import SemanticEventType
+        try:
+            self._dispatcher.unsubscribe(SemanticEventType.FIELD_WAVE, self._on_field_wave)
+        except Exception:
+            pass
 
     # ─── Public Getters & Identifiers ─────────────────────────────────────
 
@@ -205,13 +207,11 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         }
         token = active_transaction.set(tx_ctx)
 
-        # Initialize staging areas
-        for s in states:
-            if hasattr(s, 'begin_transaction'):
-                s.begin_transaction()
-
         start_time = time.time()
         try:
+            for s in states:
+                if hasattr(s, 'begin_transaction'):
+                    s.begin_transaction()
             yield self
 
             # 2. Commit Phase (Requires Global Lock)

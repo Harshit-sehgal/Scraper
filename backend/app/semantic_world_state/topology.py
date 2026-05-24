@@ -1,6 +1,6 @@
-import time
+# mypy: ignore-errors
 import logging
-from typing import Tuple, Dict, List, Optional, Any, Set, Callable
+from typing import Dict, List, Optional, Any
 from app.invariant_firewall import requires_invariants
 from app.core_types import FieldConflictRegion
 

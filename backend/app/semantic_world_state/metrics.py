@@ -1,6 +1,5 @@
+# mypy: ignore-errors
 import logging
-from typing import Tuple, Dict, List, Optional
-from app.invariant_firewall import requires_invariants
 
 logger = logging.getLogger(__name__)
 

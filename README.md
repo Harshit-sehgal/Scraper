@@ -128,9 +128,9 @@ DataForge Studio exposes a rich, RESTful API interface for programmatic jobs and
 
 For developers and researchers interested in the under-the-hood intelligence layer, DataForge Studio uses a **topology-native dynamical system** to align extracted meaning. This is detailed in our custom `GEMINI.md` ontology:
 
-1. **Unified Semantic World State**: A canonical substrate in `app/semantic_world_state.py` that serves as the single source of truth for all cognition engines.
+1. **Unified Semantic World State**: A canonical substrate in `app/semantic_world_state/` that serves as the single source of truth for all cognition engines.
 2. **Meaning from Topology**: Meaning emerges from relational graph energy and stability, not simple regex matching.
 3. **Contradiction-Aware Reasoning**: Semantic conflicts propagate as energy pressure through the graph via `ExclusionEdge` topology.
 4. **Adaptive Memory**: Structural motifs are reinforced by extraction successes and decayed by time/neglect to counter element change (selector decay).
 
-For deep structural details and research notes, see [ARCHITECTURE.md](file:///home/harshit/Documents/Work/Money/scraper/backend/ARCHITECTURE.md) and [RESEARCH_NOTES.md](file:///home/harshit/Documents/Work/Money/scraper/backend/RESEARCH_NOTES.md).
+For deep structural details and research notes, see [ARCHITECTURE.md](backend/ARCHITECTURE.md) and [RESEARCH_NOTES.md](backend/RESEARCH_NOTES.md).

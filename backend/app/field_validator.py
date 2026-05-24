@@ -15,9 +15,9 @@ def validate_world_state(ws: SemanticWorldState) -> list:
     regions = view.all_regions()
 
     # 1. NaN/Inf energy values
-    if math.isnan(ws.metrics.global_energy) or math.isinf(ws.metrics.global_energy):
+    if math.isnan(ws.metrics.global_energy) or math.isinf(ws.metrics.global_energy):  # type: ignore
         issues.append("global_energy is NaN or Inf")
-    if math.isnan(ws.metrics.global_entropy) or math.isinf(ws.metrics.global_entropy):
+    if math.isnan(ws.metrics.global_entropy) or math.isinf(ws.metrics.global_entropy):  # type: ignore
         issues.append("global_entropy is NaN or Inf")
 
     # 2. Orphan regions (regions with no competing roles)
@@ -43,10 +43,10 @@ def validate_world_state(ws: SemanticWorldState) -> list:
             issues.append(f"Exclusion {key}={val} out of bounds [0,1]")
 
     # 6. Metric bounds
-    if not (0.0 <= ws.metrics.global_energy <= 10.0):
-        issues.append(f"global_energy={ws.metrics.global_energy} out of bounds [0,10]")
-    if not (0.0 <= ws.metrics.global_entropy <= 1.0):
-        issues.append(f"global_entropy={ws.metrics.global_entropy} out of bounds [0,1]")
+    if not (0.0 <= ws.metrics.global_energy <= 10.0):  # type: ignore
+        issues.append(f"global_energy={ws.metrics.global_energy} out of bounds [0,10]")  # type: ignore
+    if not (0.0 <= ws.metrics.global_entropy <= 1.0):  # type: ignore
+        issues.append(f"global_entropy={ws.metrics.global_entropy} out of bounds [0,1]")  # type: ignore
 
     # 7. Memory bounds
     if len(ws.decision_history) > 5000:

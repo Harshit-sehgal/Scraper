@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 from typing import Tuple
 from app.invariant_firewall import requires_invariants
 

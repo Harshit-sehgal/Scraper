@@ -23,6 +23,12 @@ class EventDispatcher:
         """Register a callback for a specific event type."""
         self.subscribers[event_type].append(callback)
 
+    def unsubscribe(self, event_type: SemanticEventType, callback: Callable):
+        """Remove a callback for a specific event type."""
+        subs = self.subscribers.get(event_type, [])
+        if callback in subs:
+            subs.remove(callback)
+
     def dispatch(self, event: SemanticEvent):
         """Propagate an event to all interested subscribers."""
         event.timestamp = time.time()
