@@ -1,10 +1,28 @@
 import asyncio
+import os
+import pytest
 
 from app import main as main_mod
 from app.discovery import SOURCE_TRUST_SCORE, infer_source_metadata
 from app.models import FieldType, Job, JobStatus, SchemaField, ScrapeMode
 from app.utils.quality import build_quality_report
 from app.services.state import prune_history_stores
+
+
+@pytest.fixture(autouse=True)
+def mock_ai_clean_and_align(monkeypatch):
+    async def fake_ai_clean_and_align(records, schema, **kwargs):
+        has_groq = bool(os.getenv("GROQ_API_KEY"))
+        for r in records:
+            if has_groq:
+                r["_ai_source_structured"] = True
+        return records, {
+            "applied": has_groq,
+            "quality_filtered_after_ai": 0,
+            "input_records": len(records),
+            "output_records": len(records),
+        }
+    monkeypatch.setattr("app.services.job_runner.ai_clean_and_align_records", fake_ai_clean_and_align)
 
 
 def test_system_status_shape(client):
