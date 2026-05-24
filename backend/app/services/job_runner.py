@@ -270,7 +270,7 @@ async def run_job(
 
                     # Attach acquisition lineage to each record so it's
                     # exposed in job results via the API
-                    lineage = recovery_stats.get("acquisition_lineage", {})
+                    lineage = recovery_stats.get("acquisition_lineage", {}).copy()
                     for record in results:
                         record["_acquisition_lineage"] = lineage
 

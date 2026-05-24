@@ -507,6 +507,35 @@ async function viewResults(id) {
                 warnBanner.style.display = 'none';
             }
         }
+
+        // ── Acquisition Lineage Summary ──
+        const lineageSummaryEl = document.getElementById('lineage-summary');
+        if (lineageSummaryEl) {
+            const resultsList = Array.isArray(j.results) ? j.results : [];
+            if (resultsList.length) {
+                // Collect unique acquisition states from records
+                const states = new Map();
+                resultsList.forEach(r => {
+                    const lin = r._acquisition_lineage;
+                    if (lin && lin.state) {
+                        const state = lin.state;
+                        states.set(state, (states.get(state) || 0) + 1);
+                    }
+                });
+                if (states.size) {
+                    const parts = [];
+                    states.forEach((count, state) => {
+                        parts.push(`${esc(state)}: ${count}`);
+                    });
+                    lineageSummaryEl.innerHTML = `📡 <strong>Acquisition:</strong> ${parts.join(' · ')}`;
+                    lineageSummaryEl.style.display = 'block';
+                } else {
+                    lineageSummaryEl.style.display = 'none';
+                }
+            } else {
+                lineageSummaryEl.style.display = 'none';
+            }
+        }
         
         document.getElementById('export-group').style.display = j.results.length ? 'flex' : 'none';
         const tableWrap = document.querySelector('#view-results .table-wrap');
@@ -714,6 +743,10 @@ function renderTable(results, emptyMessage = 'No results') {
     const discoveredKeys = [];
     results.forEach((row) => {
         Object.keys(row || {}).forEach((k) => {
+            // Skip internal system fields (starting with _) — they carry
+            // metadata like acquisition lineage, provenance, etc. and are
+            // not useful as display columns.
+            if (k.startsWith('_')) return;
             if (!seen.has(k)) {
                 seen.add(k);
                 discoveredKeys.push(k);
