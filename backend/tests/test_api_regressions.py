@@ -18,6 +18,12 @@ def test_system_status_shape(client):
     assert data["jobs"]["total"] == 0
 
 
+def test_healthcheck_route(client):
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
+
+
 def test_manual_mode_rejects_blank_urls(client):
     payload = {
         "name": "manual-invalid",

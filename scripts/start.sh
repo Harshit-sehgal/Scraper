@@ -28,7 +28,7 @@ if [ -z "$VENV_DIR" ]; then
     echo "❌ No virtual environment found. Create one first:"
     echo "   python3 -m venv .venv"
     echo "   source .venv/bin/activate"
-    echo "   pip install -r requirements.txt"
+    echo "   pip install -r backend/requirements.txt"
     exit 1
 fi
 
@@ -50,7 +50,7 @@ source "$VENV_DIR/bin/activate"
 # ─── Check key dependency ──────────────────────────────────────────────────
 if ! python -c "import fastapi" 2>/dev/null; then
     echo "❌ Dependencies not installed. Run:"
-    echo "   pip install -r requirements.txt"
+    echo "   pip install -r backend/requirements.txt"
     exit 1
 fi
 

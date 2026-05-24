@@ -330,6 +330,11 @@ async def root():
     return {"message": "DataForge API v2", "docs": "/docs", "dashboard": "/app"}
 
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
 @app.get("/api/system/status")
 async def system_status():
     from app.models import JobStatus

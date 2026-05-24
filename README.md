@@ -1,88 +1,81 @@
-# DataForge Studio — Semantic Cognition Substrate
+# DataForge Studio — Web Extraction & Resilient Crawling Platform
 
-DataForge Studio is a research-grade semantic cognition architecture designed for topology-driven web extraction.
+DataForge Studio is a FastAPI + Playwright web extraction platform that helps users extract structured data from websites using automatic selector discovery, fallback extraction, recovery logic, telemetry, and optional LLM-based schema cleaning.
 
-## Core Architectural Mandates
+Unlike basic scrapers, DataForge is built to be resilient, autonomous, and self-healing: it dynamically adapts to page changes, handles failures gracefully with automated recovery pipelines, and maintains a highly efficient, single-row SQLite state store.
 
-1.  **Unified Semantic World State**: A canonical substrate in `app/semantic_world_state.py` that serves as the single source of truth for all cognition engines.
-2.  **Meaning from Topology**: Meaning emerges from relational graph energy and stability, not adjacency or regex labels.
-3.  **Contradiction-Aware Reasoning**: Semantic conflicts propagate as energy pressure through the graph via `ExclusionEdge` topology.
-4.  **Continuous Evolution**: Inference is an iterative graph relaxation process that converges toward minimum energy equilibrium.
-5.  **Event-Driven Signal Propagation**: Instability triggers asynchronous updates through a decentralized event dispatcher.
-6.  **Adaptive Memory**: Structural motifs are reinforced by success and decayed by time/neglect.
+---
 
-## Brain Architecture
+## ⚡ Quick Start (5-Minute Demo)
 
-*   **Substrate Layer**: `SemanticWorldState` (Global persistent topology).
-*   **Cognition Layer**: `InferenceEngine` (Graph thermodynamics and energy minimization).
-*   **Signal Layer**: `EventDispatcher` & `GraphUpdateScheduler` (Topological signal propagation).
-*   **Memory Layer**: `MotifLearner` (Adaptive reinforcement/decay).
-*   **Observer Layer**: `TopologicalDiagnostics` (Uncertainty heatmaps and pressure fields).
-
-## Prerequisites
-
-- Python 3.10+
-- A [Groq](https://console.groq.com) API key for AI-powered structuring and insight generation
-
-## Quick Start
+Get up and running locally in just a few steps:
 
 ### 1. Environment Setup
-
 ```bash
-# Clone and enter the project
-cd scraper
+# Clone the repository
+git clone https://github.com/Harshit-sehgal/Scraper.git
+cd Scraper
 
-# Create virtual environment
+# Create and activate virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Copy the environment template and add your Groq API key
-cp .env.example .env
-# Edit .env: set GROQ_API_KEY=your_key_here
+# Install dependencies and Playwright browser binaries
+pip install -r backend/requirements.txt
+python -m playwright install chromium
 ```
 
-### 2. Start the Server
-
+### 2. Configure Environment
+Copy the environment template and configure your keys:
 ```bash
-# Option A: Using the startup script (recommended)
-./scripts/start.sh
-
-# Option B: Directly with uvicorn
-uvicorn backend.app.main:app --reload
+cp .env.example .env
+# Edit .env and set your GROQ_API_KEY (optional, fallback engines can run without it)
 ```
 
-### 3. Open the Dashboard
+### 3. Start the Server
+Start the development server using our helper script:
+```bash
+./scripts/start.sh
+```
 
-| URL | Description |
-|-----|-------------|
-| `http://localhost:8000/app` | DataForge Studio — Job management UI |
-| `http://localhost:8000/dashboard` | Semantic Reliability Dashboard (topology, telemetry, drift) |
-| `http://localhost:8000/docs` | Interactive API documentation (Swagger) |
+### 4. Create and Scrape a Job
+Open another terminal (with `.venv` activated) and run the manual test interface to quickly launch a demonstration extraction job:
+```bash
+python scripts/manual_test.py test-job
+```
+This will register and execute a live extraction job, showing real-time logs and progress on your terminal!
 
-## Manual Testing
+---
 
-The project includes a comprehensive CLI test tool for manual testing:
+## 🖥️ Interactive Dashboards
+
+Once the platform is running, access the user interfaces:
+
+| Interface | URL | Purpose |
+|-----|-------------|---------|
+| **DataForge Studio Dashboard** | `http://localhost:8000/app` | Visually manage, monitor, and run extraction jobs. |
+| **Semantic Reliability Dashboard** | `http://localhost:8000/dashboard` | View real-time crawler telemetry, selector drift metrics, and graph topology. |
+| **Interactive API Swagger Docs** | `http://localhost:8000/docs` | Standard FastAPI OpenAPI sandbox for developers. |
+
+---
+
+## 🛠️ Manual Testing CLI
+
+The project includes an interactive, rich CLI test tool for verification:
 
 ### Interactive Menu
-
 ```bash
 python scripts/manual_test.py
 ```
-
-This opens an interactive menu with options to:
-- Check server health and job counts
+This opens a terminal menu with quick options to:
+- Check server health, live jobs, and configuration limits
 - Explore the semantic field topology (regions, edges, clusters)
-- View observability telemetry and health index
-- Trigger the cognitive scheduler manually
-- Create and monitor a real scraping job (manual or auto mode)
+- View real-time observability telemetry and health index
+- Create and monitor a real scraping job (manual or auto/discovery mode)
 - Browse synthesized crystalline knowledge records
 - Run the full pytest suite
 
-### Quick Commands
-
+### Quick Command Line Actions
 ```bash
 # Quick health check
 python scripts/manual_test.py health
@@ -106,43 +99,38 @@ python scripts/manual_test.py all
 python scripts/manual_test.py tests
 ```
 
-## Manual Test Scripts
+---
 
-Dedicated test scripts are in `backend/tests/`:
+## ⚙️ REST API Endpoints
 
-```bash
-# API-based manual tests (requires running server)
-python backend/tests/manual_test_api.py
-python backend/tests/manual_run_manual_test.py
-
-# Workflow tests (create, delete, recycle)
-python backend/tests/manual_test_workflow.py
-```
-
-## Verification
-
-Run the full cognitive stability suite:
-```bash
-.venv/bin/pytest backend/tests/ -v
-```
-
-## API Endpoints
+DataForge Studio exposes a rich, RESTful API interface for programmatic jobs and system diagnostics:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/system/status` | Server status, job counts, runtime config |
-| GET | `/api/system/topology` | Full semantic field state (regions, edges, clusters) |
-| GET | `/api/system/observability` | Telemetry, health index, heatmaps |
-| GET | `/api/system/crystalline` | Synthesized knowledge records |
-| GET | `/api/system/export/knowledge` | Export knowledge manifold |
-| POST | `/api/jobs` | Create a new scraping job |
-| GET | `/api/jobs/{id}` | Get job status and results |
-| DELETE | `/api/jobs/{id}` | Delete a job (moves to recycle bin) |
-| GET | `/api/recycle_bin` | List deleted jobs |
-| POST | `/api/recycle_bin/{id}/restore` | Restore a deleted job |
-| DELETE | `/api/recycle_bin/{id}` | Permanently delete a job |
-| POST | `/api/system/scheduler/step` | Trigger cognitive scheduler |
-| POST | `/api/system/refactor/compress` | Trigger manifold compression |
-| GET | `/api/system/search?query=...` | Topological search |
-| POST | `/api/system/merge/knowledge` | Merge external knowledge |
+| GET | `/health` | Production-grade lightweight health check endpoint. |
+| GET | `/api/system/status` | Server status, job counts, and runtime config. |
+| GET | `/api/system/topology` | Full semantic field state (regions, edges, clusters). |
+| GET | `/api/system/observability` | Telemetry, health index, and drift heatmaps. |
+| GET | `/api/system/crystalline` | Synthesized knowledge records. |
+| GET | `/api/system/export/knowledge`| Export knowledge manifold. |
+| POST | `/api/jobs` | Create a new scraping / extraction job. |
+| GET | `/api/jobs/{id}` | Get status and results for a job. |
+| DELETE | `/api/jobs/{id}` | Delete a job (moves it to the recycle bin). |
+| GET | `/api/recycle_bin` | List deleted jobs. |
+| POST | `/api/recycle_bin/{id}/restore`| Restore a deleted job. |
+| DELETE | `/api/recycle_bin/{id}` | Permanently delete a job. |
+| POST | `/api/system/scheduler/step` | Trigger cognitive scheduler manually. |
+| GET | `/api/system/search?query=...`| Topological search. |
 
+---
+
+## 🧠 Cognitive Substrate & Research Layer (Advanced)
+
+For developers and researchers interested in the under-the-hood intelligence layer, DataForge Studio uses a **topology-native dynamical system** to align extracted meaning. This is detailed in our custom `GEMINI.md` ontology:
+
+1. **Unified Semantic World State**: A canonical substrate in `app/semantic_world_state.py` that serves as the single source of truth for all cognition engines.
+2. **Meaning from Topology**: Meaning emerges from relational graph energy and stability, not simple regex matching.
+3. **Contradiction-Aware Reasoning**: Semantic conflicts propagate as energy pressure through the graph via `ExclusionEdge` topology.
+4. **Adaptive Memory**: Structural motifs are reinforced by extraction successes and decayed by time/neglect to counter element change (selector decay).
+
+For deep structural details and research notes, see [ARCHITECTURE.md](file:///home/harshit/Documents/Work/Money/scraper/backend/ARCHITECTURE.md) and [RESEARCH_NOTES.md](file:///home/harshit/Documents/Work/Money/scraper/backend/RESEARCH_NOTES.md).

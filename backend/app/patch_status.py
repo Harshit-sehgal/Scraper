@@ -43,9 +43,19 @@ def check_all_fixes() -> dict:
     results['integrity_score property (energy_state.py)'] = 'def integrity_score' in content_energy
 
     # 5. capture_pre_allocation_field has schema expansion
-    path_ws = os.path.join(base_dir, 'semantic_world_state.py')
-    with open(path_ws) as f:
-        content_ws = f.read()
+    ws_dir = os.path.join(base_dir, 'semantic_world_state')
+    content_ws = ""
+    if os.path.isdir(ws_dir):
+        for root, _, files in os.walk(ws_dir):
+            for fname in files:
+                if fname.endswith(".py"):
+                    with open(os.path.join(root, fname)) as f:
+                        content_ws += f.read() + "\n"
+    else:
+        path_ws = os.path.join(base_dir, 'semantic_world_state.py')
+        if os.path.exists(path_ws):
+            with open(path_ws) as f:
+                content_ws = f.read()
     results['capture schema expansion'] = 'ROLE_EXCLUSIVITY' in content_ws and 'for ra, rb in ROLE_EXCLUSIVITY' in content_ws
 
     # 6. Missing methods
