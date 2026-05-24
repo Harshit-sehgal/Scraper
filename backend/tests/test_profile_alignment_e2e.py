@@ -1,4 +1,8 @@
-"""Live E2E: profile extraction + schema alignment (requires network + Playwright + GROQ_API_KEY)."""
+"""Live E2E: profile extraction + schema alignment (requires network + Playwright + GROQ_API_KEY).
+
+CI skips these tests by default. Run manually with:
+    RUN_LIVE_LLM_TESTS=1 pytest backend/tests/test_profile_alignment_e2e.py -q
+"""
 
 from __future__ import annotations
 
@@ -10,6 +14,12 @@ from app.data_utils import align_profile_keys_to_schema
 from app.models import FieldType, SchemaField
 from app.scraper import scrape_url
 from app.selector_profiles.loader import _load_all_profiles, match_profile_for_url, try_profile_extraction
+
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("RUN_LIVE_LLM_TESTS"),
+    reason="Live Groq tests are optional. Set RUN_LIVE_LLM_TESTS=1 to run.",
+)
 
 
 def _profile_search_url(domain: str) -> str:

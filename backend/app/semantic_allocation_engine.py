@@ -17,7 +17,7 @@ Role-type compatibility is derived geometrically from the Role Manifold.
 
 import random
 from copy import deepcopy
-from typing import Any, List, Set, Tuple
+from typing import List, Protocol, Set, Tuple
 
 from app.semantic_ir import (
     AllocationGraph,
@@ -50,12 +50,24 @@ def reset_role_engine():
 from app.field_laws import ROLE_EXCLUSIVITY
 
 
+class _SemanticMetricsProtocol(Protocol):
+    """Typed interface for the metrics-like object accessed via ws.metrics.
+
+    Replaces unchecked 'Any' with an explicit protocol so mypy can validate
+    attribute access without needing type: ignore comments.
+    """
+    _smoothed_structural: float
+    _smoothed_runtime: float
+    semantic_temperature: float
+    integrity_score: float
+
+
 def _adaptive_exclusion_threshold() -> float:
     """Exclusion threshold with hysteresis + temperature modulation."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
-    metrics: Any = ws.metrics  # type: ignore[has-type]
-    base: float = float(getattr(metrics, "_smoothed_structural", 0.4))
+    metrics: _SemanticMetricsProtocol = ws.metrics  # type: ignore[has-type]
+    base: float = float(metrics._smoothed_structural)
     temp: float = float(metrics.semantic_temperature)
     conv: float = float(metrics.integrity_score)
     # Stress (temp) increases threshold; Convergence (trust) decreases it
@@ -67,8 +79,8 @@ def _adaptive_runtime_exclusion_threshold() -> float:
     """Exclusion threshold with hysteresis + temperature + convergence."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
-    metrics: Any = ws.metrics  # type: ignore[has-type]
-    base: float = float(getattr(metrics, "_smoothed_runtime", 0.3))
+    metrics: _SemanticMetricsProtocol = ws.metrics  # type: ignore[has-type]
+    base: float = float(metrics._smoothed_runtime)
     temp: float = float(metrics.semantic_temperature)
     conv: float = float(metrics.integrity_score)
     # Stress (temp) increases threshold; Convergence (trust) decreases it

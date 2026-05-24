@@ -207,8 +207,8 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         }
         token = active_transaction.set(tx_ctx)
 
-        start_time = time.time()
         try:
+            start_time = time.time()
             for s in states:
                 if hasattr(s, 'begin_transaction'):
                     s.begin_transaction()

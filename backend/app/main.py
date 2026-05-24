@@ -267,7 +267,15 @@ async def _periodic_gossip_propagation():
             logger.debug("Gossip propagation skipped: %s", e)
 
 
-def _persist_single_wrapper(job_id: str) -> None:
+def _persist_single_wrapper(job_id: str, critical: bool = False) -> None:
+    """Persist a single job to SQLite.
+
+    Args:
+        job_id: The job ID to persist.
+        critical: If True, re-raise on failure. Use for terminal states
+            (completed, failed, canceled, degraded, empty_result).
+            If False (default), log and swallow. Use for hot-path progress updates.
+    """
     from app.job_store import persist_state_single
     job = jobs_store.get(job_id)
     if job:
@@ -275,6 +283,8 @@ def _persist_single_wrapper(job_id: str) -> None:
             persist_state_single(job)
         except Exception as e:
             logger.error("Failed to persist single job %s: %s", job_id, e)
+            if critical:
+                raise
 
 
 async def _run_job_wrapper(job_id: str):
@@ -287,7 +297,10 @@ async def _run_job_wrapper(job_id: str):
         per_url_scrape_timeout_seconds=CONFIG["per_url_timeout_seconds"],
         ai_structuring_timeout_seconds=CONFIG["ai_structuring_timeout_seconds"],
         insight_timeout_seconds=CONFIG["insight_timeout_seconds"],
-        persist_state_single_fn=lambda: _persist_single_wrapper(job_id),
+        # Non-critical: hot-path progress/log persistence is best-effort
+        persist_state_single_fn=lambda: _persist_single_wrapper(job_id, critical=False),
+        # Critical: terminal state single-row persistence must not be silently lost
+        persist_state_single_critical_fn=lambda: _persist_single_wrapper(job_id, critical=True),
     )
 
 
@@ -332,7 +345,64 @@ async def root():
 
 @app.get("/health")
 async def health():
+    """Liveness probe — always returns 200 if the process is alive."""
     return {"status": "ok"}
+
+
+@app.get("/ready")
+async def ready():
+    """Readiness probe — checks that SQLite storage is reachable and healthy."""
+    import sqlite3
+    from app.job_store import _get_db_path
+    try:
+        db_path = _get_db_path()
+        conn = sqlite3.connect(str(db_path), timeout=5)
+        cur = conn.execute("SELECT 1")
+        cur.fetchone()
+        conn.close()
+        return {
+            "status": "ready",
+            "storage": "ok",
+            "migrations": "ok",
+            "db_path": str(db_path),
+        }
+    except Exception as e:
+        logger.error("Readiness check failed: %s", e)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "error": str(e)},
+        )
+
+
+@app.get("/api/system/storage/status")
+async def storage_status():
+    """Detailed storage backend status."""
+    from app.job_store import _get_db_path, _CURRENT_SCHEMA_VERSION
+    import sqlite3
+    try:
+        db_path = _get_db_path()
+        conn = sqlite3.connect(str(db_path), timeout=5)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
+        schema_version = row[0] if row and row[0] is not None else 0
+        job_count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        recycle_count = conn.execute("SELECT COUNT(*) FROM recycle_bin").fetchone()[0]
+        wal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+        conn.close()
+        return {
+            "backend": "sqlite",
+            "db_path": str(db_path),
+            "schema_version": schema_version,
+            "latest_schema_version": _CURRENT_SCHEMA_VERSION,
+            "job_count": job_count,
+            "recycle_bin_count": recycle_count,
+            "wal_mode": wal_mode,
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)},
+        )
 
 
 @app.get("/api/system/status")

@@ -16,6 +16,8 @@ def get_world_state() -> SemanticWorldState:
 def reset_world_state():
     """Reset the global world state singleton (for testing)."""
     global _world_state
+    if _world_state is not None:
+        _world_state.close()
     _world_state = None
     
     # Also reset dependent singletons to avoid stale subscriptions/state

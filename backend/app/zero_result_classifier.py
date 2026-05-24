@@ -185,9 +185,12 @@ def _build(failure_class: str, confidence: float) -> ZeroResultClassification:
 
 
 def _has_auth_patterns(text: str) -> bool:
+    """Check text for authentication-related patterns using word-boundary matching."""
+    import re
     text_lower = text.lower()
     for pattern in settings.ZERO_RESULT_AUTH_PATTERNS:
-        if pattern in text_lower:
+        # Use word boundaries to avoid false positives (e.g. "design in" matching "sign in")
+        if re.search(r'\b' + re.escape(pattern) + r'\b', text_lower):
             return True
     return False
 

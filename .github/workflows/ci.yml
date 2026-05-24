@@ -7,6 +7,74 @@ on:
     branches: [main]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pyflakes autoflake
+      - name: Lint with pyflakes
+        run: python -m pyflakes backend/app backend/tests
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-typecheck-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install mypy types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
+      - name: Type check with mypy
+        run: python -m mypy backend/app --ignore-missing-imports
+
+  arch-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-arch-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+      - name: Run Architecture Validation
+        run: python architecture_validator.py
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -25,7 +93,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          key: ${{ runner.os }}-pip-test-${{ hashFiles('backend/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -33,21 +101,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
-          pip install pytest-cov mypy pyflakes autoflake types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings g4f
+          pip install pytest-cov g4f
 
       - name: Install Playwright browsers
         run: |
           python -m playwright install --with-deps chromium
 
-      - name: Lint with pyflakes
-        run: python -m pyflakes backend/app backend/tests
-
-      - name: Type check with mypy
-        run: python -m mypy backend/app --ignore-missing-imports
-
-      - name: Run Architecture Validation
-        run: python architecture_validator.py
-
-      - name: Test with pytest
+      - name: Test with pytest (with coverage)
         working-directory: backend
-        run: PYTHONPATH=. python -m pytest -q -o "addopts="
+        run: |
+          PYTHONPATH=. python -m pytest -q -o "addopts=" --cov=app --cov-fail-under=70

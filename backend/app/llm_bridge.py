@@ -100,6 +100,15 @@ async def _call_openai_compatible_json(
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
+            # Respect retry-after header for 429 rate limits
+            if isinstance(error, httpx.HTTPStatusError) and error.response is not None and error.response.status_code == 429:
+                retry_after = error.response.headers.get("retry-after")
+                if retry_after:
+                    try:
+                        await asyncio.sleep(float(retry_after))
+                        continue
+                    except (ValueError, TypeError):
+                        pass
             await asyncio.sleep(backoff_seconds * attempt)
 
     if last_error:
@@ -136,6 +145,15 @@ async def _call_openai_compatible_text(
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
+            # Respect retry-after header for 429 rate limits
+            if isinstance(error, httpx.HTTPStatusError) and error.response is not None and error.response.status_code == 429:
+                retry_after = error.response.headers.get("retry-after")
+                if retry_after:
+                    try:
+                        await asyncio.sleep(float(retry_after))
+                        continue
+                    except (ValueError, TypeError):
+                        pass
             await asyncio.sleep(backoff_seconds * attempt)
 
     if last_error:

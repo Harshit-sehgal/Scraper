@@ -25,6 +25,7 @@ from app.recovery_strategies import (
 )
 from app.proxy_manager import get_proxy_manager
 from app.selector_memory import get_selector_memory
+from app.domain_runtime_policy import get_domain_runtime_policy
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,9 @@ async def handle_backoff_and_slow(params: dict[str, Any], context: dict[str, Any
     delay_seconds = delay_ms / 1000.0
     logger.info("Backoff: waiting %.1f seconds, then slowing to %.1f speed", delay_seconds, slow_factor)
     await asyncio.sleep(delay_seconds)
+    url = context.get("url", "")
+    if url:
+        get_domain_runtime_policy().set_reduce_concurrency(url)
     if attempt_ctx:
         attempt_ctx.reduce_concurrency = True
         attempt_ctx.timeout_ms = int(params.get("timeout_ms", 40000))
@@ -82,8 +86,11 @@ async def handle_increase_timeout(params: dict[str, Any], context: dict[str, Any
 
 
 async def handle_reduce_concurrency(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
-    """Reduce concurrent fetches."""
-    logger.info("Reducing concurrency for %s", context.get("url", ""))
+    """Reduce concurrent fetches and update domain runtime policy."""
+    url = context.get("url", "")
+    logger.info("Reducing concurrency for %s", url)
+    if url:
+        get_domain_runtime_policy().set_reduce_concurrency(url)
     if attempt_ctx:
         attempt_ctx.reduce_concurrency = True
     return True
@@ -179,6 +186,8 @@ async def handle_abort_domain(params: dict[str, Any], context: dict[str, Any], a
     skip_minutes = params.get("skip_domain_minutes", 60)
     url = context.get("url")
     logger.warning("Recovery action: aborting domain %s for %d minutes", url, skip_minutes)
+    if url:
+        get_domain_runtime_policy().set_abort_domain(url)
     if attempt_ctx:
         attempt_ctx.abort_domain = True
         # Do NOT switch to httpx_basic — aborted domains should be skipped, not retried
@@ -201,11 +210,13 @@ async def handle_use_httpx_fallback(params: dict[str, Any], context: dict[str, A
 async def handle_skip_domain(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
     """Skip domain permanently (for this job).
     
-    Parameters:
-        None
+    Also records an abort in the domain runtime policy so future scheduling
+    is aware of the skip.
     """
     url = context.get("url")
     logger.warning("Recovery action: skipping domain %s", url)
+    if url:
+        get_domain_runtime_policy().set_abort_domain(url)
     
     if attempt_ctx:
         from urllib.parse import urlparse
