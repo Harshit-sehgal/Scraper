@@ -56,20 +56,57 @@ from app.compound_record_assembler import assemble_compound_records
 logger = logging.getLogger(__name__)
 
 class ScrapeAttemptResult(list):
-    """Subclass of list that holds metadata about a scrape attempt."""
+    """Subclass of list that holds rich metadata about a scrape attempt.
+
+    Behaves as a plain list of records for backward compatibility while
+    carrying context about how the page was fetched, extracted, and classified.
+    """
     def __init__(
         self,
         records: list[dict],
         html: str | None = None,
-        telemetry: Any = None,
+        final_url: str | None = None,
+        fetch_method: str | None = None,
         extraction_method: str | None = None,
+        telemetry: Any = None,
         zero_result_classification: Any = None,
+        acquisition_lineage: dict | None = None,
+        anti_bot_score: float = 0.0,
+        data_evidence_score: float = 0.0,
+        recommended_next_action: str = "",
+        warnings: list[str] | None = None,
     ):
         super().__init__(records)
         self.html = html
-        self.telemetry = telemetry
+        self.final_url = final_url
+        self.fetch_method = fetch_method
         self.extraction_method = extraction_method
+        self.telemetry = telemetry
         self.zero_result_classification = zero_result_classification
+        self.acquisition_lineage = acquisition_lineage
+        self.anti_bot_score = anti_bot_score
+        self.data_evidence_score = data_evidence_score
+        self.recommended_next_action = recommended_next_action
+        self.warnings = warnings or []
+
+    def to_telemetry_dict(self) -> dict:
+        """Return scrape metadata as a dict for diagnostics."""
+        return {
+            "records": len(self),
+            "html_length": len(self.html) if self.html else 0,
+            "final_url": self.final_url,
+            "fetch_method": self.fetch_method,
+            "extraction_method": self.extraction_method,
+            "anti_bot_score": self.anti_bot_score,
+            "data_evidence_score": self.data_evidence_score,
+            "recommended_next_action": self.recommended_next_action,
+            "zero_result_classification": (
+                self.zero_result_classification.to_dict()
+                if self.zero_result_classification
+                else None
+            ),
+            "warnings": self.warnings,
+        }
 
 
 if TYPE_CHECKING:
@@ -81,6 +118,8 @@ from app.insight_engine import generate_data_insight, suggest_schema_from_intent
 
 __all__ = [
     "scrape_url",
+    "scrape_url_attempt",
+    "ScrapeAttemptResult",
     "ai_clean_and_align_records",
     "generate_data_insight",
     "suggest_schema_from_intent",
@@ -93,6 +132,116 @@ def _limit_source_records(records: list[dict], schema_fields: list[SchemaField])
     return _base_limit_source_records(records, schema_fields, max_records=settings.MAX_RECORDS_PER_SOURCE)
 
 
+def _build_acquisition_lineage_from_result(
+    url: str,
+    result: ScrapeAttemptResult,
+    state: str = "direct",
+    recovery_method: str | None = None,
+) -> dict:
+    """Build an acquisition lineage dict from a ScrapeAttemptResult."""
+    return {
+        "state": state,
+        "original_url": url,
+        "final_url": result.final_url or url,
+        "fetch_method": result.fetch_method or "",
+        "extraction_method": result.extraction_method or "",
+        "recovery_method": recovery_method,
+        "anti_bot_score": result.anti_bot_score,
+        "data_evidence_score": result.data_evidence_score,
+        "recommended_next_action": result.recommended_next_action,
+        "records": len(result),
+        "html_length": len(result.html) if result.html else 0,
+        "zero_result_classification": (
+            result.zero_result_classification.to_dict()
+            if result.zero_result_classification
+            else None
+        ),
+    }
+
+
+async def scrape_url_attempt(
+    url: str,
+    schema_fields: list[SchemaField],
+    min_record_score: float | None = None,
+    user_intent: str = "",
+    world_state=None,
+    selectors_map: dict | None = None,
+    search_params: dict[str, str] | None = None,
+    attempt_ctx: "AttemptContext | None" = None,
+) -> ScrapeAttemptResult:
+    """
+    Scrape a single URL and return an enriched ScrapeAttemptResult
+    with full metadata (HTML, telemetry, acquisition lineage, zero-result
+    classification, and warnings).
+
+    This is the preferred entry point for callers that need rich diagnostics.
+    ``scrape_url()`` is a backward-compatible wrapper that also returns
+    a ScrapeAttemptResult (a ``list`` subclass).
+    """
+    from app.recovery_strategies import AttemptContext as AttemptContextType
+    if attempt_ctx is not None and not isinstance(attempt_ctx, AttemptContextType):
+        attempt_ctx = None
+
+    raw = await scrape_url(
+        url, schema_fields,
+        min_record_score=min_record_score,
+        user_intent=user_intent,
+        world_state=world_state,
+        selectors_map=selectors_map,
+        search_params=search_params,
+        attempt_ctx=attempt_ctx,
+    )
+
+    # Safely extract records and metadata — handles both ScrapeAttemptResult
+    # and plain list (e.g. when monkeypatched in tests).
+    records = list(raw)
+    result_html: str | None = getattr(raw, "html", None)
+    result_fetch_method: str | None = getattr(raw, "fetch_method", None)
+    result_extraction_method: str | None = getattr(raw, "extraction_method", None)
+    result_telemetry: Any = getattr(raw, "telemetry", None)
+    result_zero_classification: Any = getattr(raw, "zero_result_classification", None)
+    result_anti_bot_score: float = getattr(raw, "anti_bot_score", 0.0)
+    result_data_evidence_score: float = getattr(raw, "data_evidence_score", 0.0)
+    result_recommended_action: str = getattr(raw, "recommended_next_action", "")
+    result_warnings: list[str] = getattr(raw, "warnings", [])
+
+    # Determine state for acquisition lineage
+    state = "direct"
+    if result_zero_classification:
+        cls = result_zero_classification.failure_class
+        if cls in ("anti_bot_block",):
+            state = "anti_bot_blocked"
+        elif cls in ("empty_response",):
+            state = "empty_response"
+        elif cls in ("session_bound_url", "search_replay_required"):
+            state = "session_expired"
+        elif cls in ("js_render_required",):
+            state = "empty_response"
+    elif not records and not result_zero_classification:
+        state = "empty_response"
+
+    # Build the enriched result with all metadata
+    result = ScrapeAttemptResult(
+        records,
+        html=result_html,
+        final_url=url,
+        fetch_method=result_fetch_method,
+        extraction_method=result_extraction_method,
+        telemetry=result_telemetry,
+        zero_result_classification=result_zero_classification,
+        anti_bot_score=result_anti_bot_score,
+        data_evidence_score=result_data_evidence_score,
+        recommended_next_action=result_recommended_action,
+        warnings=result_warnings,
+    )
+    # Build acquisition lineage from the enriched result
+    result.acquisition_lineage = _build_acquisition_lineage_from_result(
+        url=url, result=result, state=state,
+    )
+
+    return result
+
+
 async def scrape_url(
     url: str,
     schema_fields: list[SchemaField],
@@ -103,7 +252,15 @@ async def scrape_url(
     search_params: dict[str, str] | None = None,
     attempt_ctx: "AttemptContext | None" = None,
 ) -> list[dict]:
-    """Orchestrate the full extraction flow for a single URL."""
+    """Orchestrate the full extraction flow for a single URL.
+
+    Returns a ``ScrapeAttemptResult`` (a ``list`` subclass) that behaves as
+    a plain ``list[dict]`` for backward compatibility while carrying
+    metadata attributes (html, telemetry, acquisition_lineage, etc.).
+
+    For callers that need the richest possible metadata, use
+    ``scrape_url_attempt()`` instead.
+    """
     from app.recovery_strategies import AttemptContext
     if attempt_ctx is not None and not isinstance(attempt_ctx, AttemptContext):
         attempt_ctx = None  # Safety: only accept proper AttemptContext
@@ -113,7 +270,7 @@ async def scrape_url(
     if attempt_ctx and attempt_ctx.min_record_score_override is not None:
         min_record_score = attempt_ctx.min_record_score_override
         logger.info("[Recovery] Using min_record_score override: %.2f", min_record_score)
-        
+
     logger.info("Fetching: %s", url)
     telemetry = get_scrape_telemetry()
     from app.llm_bridge import reset_llm_call_count, get_llm_call_count
@@ -130,7 +287,16 @@ async def scrape_url(
             error=blocked_reason,
             fetch_ms=(time.time() - start_time) * 1000,
         )
-        return ScrapeAttemptResult([], html=None, telemetry=telemetry, extraction_method=None, zero_result_classification=None)
+        return ScrapeAttemptResult(
+            [],
+            html=None,
+            final_url=url,
+            telemetry=telemetry,
+            extraction_method=None,
+            zero_result_classification=None,
+            recommended_next_action="resolve_crawl_restrictions",
+            warnings=[f"Crawl policy blocked: {blocked_reason}"],
+        )
 
     # ── Step 1: Try profile-based extraction first ──────────────────
     # Clone selectors_map to prevent recovery flags from leaking across
@@ -196,7 +362,16 @@ async def scrape_url(
                     fetch_ms=(time.time() - start_time) * 1000,
                 )
                 policy.record_result(url, success=True)
-                return ScrapeAttemptResult(results, html=None, telemetry=telemetry, extraction_method="profile", zero_result_classification=None)
+                return ScrapeAttemptResult(
+                    results,
+                    html=None,
+                    final_url=url,
+                    fetch_method="profile",
+                    telemetry=telemetry,
+                    extraction_method="profile",
+                    zero_result_classification=None,
+                    data_evidence_score=min(1.0, len(results) / 10.0),
+                )
 
         logger.info("Profile matched but returned 0 records, falling through to generic pipeline")
 
@@ -269,7 +444,24 @@ async def scrape_url(
         )
 
         policy.record_result(url, success=False)
-        return ScrapeAttemptResult([], html=None, telemetry=telemetry, extraction_method=fetch_method, zero_result_classification=None)
+        recommended_next_action = ""
+        if classification:
+            from app.recovery_strategies import RecoveryAction
+            try:
+                recommended_next_action = RecoveryAction(classification.recovery_strategy).value
+            except (ValueError, AttributeError):
+                recommended_next_action = classification.recovery_strategy
+        return ScrapeAttemptResult(
+            [],
+            html=None,
+            final_url=url,
+            fetch_method=fetch_method,
+            telemetry=telemetry,
+            extraction_method=fetch_method,
+            zero_result_classification=None,
+            recommended_next_action=recommended_next_action,
+            warnings=[f"Fetch failed: {e}"],
+        )
 
     policy.record_result(url, success=fetch_success)
 
@@ -685,18 +877,30 @@ async def scrape_url(
             "[Scraper] Zero records for %s — failure_class=%s (not returning marker record)",
             url, zero_result_failure_class,
         )
+        recommended_next_action = ""
+        if zero_classification:
+            recommended_next_action = zero_classification.recommended_action
         return ScrapeAttemptResult(
             [],
             html=html,
+            final_url=url,
+            fetch_method=fetch_method,
             telemetry=telemetry,
             extraction_method=ext_result.method if 'ext_result' in locals() else None,
             zero_result_classification=zero_classification,
+            anti_bot_score=anti_bot,
+            recommended_next_action=recommended_next_action,
         )
 
+    data_evidence_score = min(1.0, len(results) / 10.0) if results else 0.0
     return ScrapeAttemptResult(
         results,
         html=html,
+        final_url=url,
+        fetch_method=fetch_method,
         telemetry=telemetry,
         extraction_method=ext_result.method if 'ext_result' in locals() else None,
         zero_result_classification=zero_classification,
+        anti_bot_score=anti_bot,
+        data_evidence_score=data_evidence_score,
     )
