@@ -5,15 +5,12 @@ average scrape time, recovery success, and cancellation response time across bot
 live sites and local edge-case fixtures.
 """
 
-import asyncio
 import time
 import pytest
 from pathlib import Path
-from app.models import Job, JobStatus, SchemaField, FieldType, ScrapeMode
+from app.models import Job, JobStatus, SchemaField, FieldType
 from app.zero_result_classifier import classify_zero_result
 from app.empty_response_detector import detect_empty_response
-from app.utils.quality import build_quality_report
-from app.acquisition_state import AcquisitionLineage, AcquisitionState
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "pages"
 

@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 from app.models import Job
 
 class JobRepository(ABC):

@@ -270,7 +270,6 @@ def test_schema_invalidation_and_recreation(monkeypatch):
 
 def test_save_and_load_job_from_sqlite(monkeypatch):
     """Verify full serialization and deserialization cycle of all Job fields using save_state and load_state."""
-    import json
     from app.job_store import load_state, save_state, reset_job_store_for_tests
     from app.config import settings
     from app.models import Job, JobStatus, ScrapeMode, SchemaField, FieldType
@@ -415,7 +414,7 @@ def test_json_to_sqlite_migration_imports_existing_jobs(monkeypatch):
     import json
     from app.job_store import load_state, reset_job_store_for_tests
     from app.config import settings
-    from app.models import Job, JobStatus
+    from app.models import JobStatus
     
     reset_job_store_for_tests()
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp_db:
