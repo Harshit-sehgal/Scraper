@@ -268,10 +268,16 @@ async def run_job(
                         record["source_type"] = str(inferred.get("source_type") or "unknown")
                         record["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
 
+                    # Attach acquisition lineage to each record so it's
+                    # exposed in job results via the API
+                    lineage = recovery_stats.get("acquisition_lineage", {})
+                    for record in results:
+                        record["_acquisition_lineage"] = lineage
+
                     url_meta = {
                         "ai_structured_count": ai_structured_count,
                         "attempted": True,
-                        "acquisition_lineage": recovery_stats.get("acquisition_lineage", {}),
+                        "acquisition_lineage": lineage,
                     }
 
                     await _safe_log(f"Extracted {len(results)} raw records from {url}")
