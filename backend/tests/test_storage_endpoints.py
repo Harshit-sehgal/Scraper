@@ -51,6 +51,74 @@ class TestReadyEndpoint:
         assert "db_path" in data
         assert data["db_path"].endswith(".db")
 
+    def test_ready_includes_schema_version(self):
+        """/ready should include schema_version >= 2."""
+        response = client.get("/ready")
+        data = response.json()
+        assert "schema_version" in data
+        assert data["schema_version"] >= 2
+
+    def test_ready_includes_job_and_recycle_counts(self):
+        """/ready should include job_count and recycle_bin_count."""
+        response = client.get("/ready")
+        data = response.json()
+        assert "job_count" in data
+        assert data["job_count"] >= 0
+        assert "recycle_bin_count" in data
+        assert data["recycle_bin_count"] >= 0
+
+
+class TestDomainPolicyEndpoint:
+    """Tests for the /api/system/domain-policy endpoint."""
+
+    def test_domain_policy_returns_dict(self):
+        """Domain policy endpoint should return a dict."""
+        response = client.get("/api/system/domain-policy")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, dict)
+
+    def test_domain_policy_includes_domain_keys(self):
+        """After recording failures, the endpoint should include that domain."""
+        from app.domain_runtime_policy import get_domain_runtime_policy
+        from app.domain_runtime_policy import reset_domain_runtime_policy
+        reset_domain_runtime_policy()
+        policy = get_domain_runtime_policy()
+        policy.record_failure("https://test-domain-policy.com/page")
+        response = client.get("/api/system/domain-policy")
+        data = response.json()
+        assert "test-domain-policy.com" in data
+
+    def test_domain_policy_includes_recommended_action(self):
+        """Each domain entry should include a recommended_action."""
+        from app.domain_runtime_policy import get_domain_runtime_policy
+        from app.domain_runtime_policy import reset_domain_runtime_policy
+        reset_domain_runtime_policy()
+        policy = get_domain_runtime_policy()
+        policy.record_failure("https://test-action.com/page")
+        response = client.get("/api/system/domain-policy")
+        data = response.json()
+        entry = data.get("test-action.com", {})
+        assert "recommended_action" in entry
+        assert isinstance(entry["recommended_action"], str)
+
+    def test_domain_policy_fields(self):
+        """Each domain entry should have the expected fields."""
+        from app.domain_runtime_policy import reset_domain_runtime_policy
+        reset_domain_runtime_policy()
+        from app.domain_runtime_policy import get_domain_runtime_policy
+        policy = get_domain_runtime_policy()
+        policy.record_failure("https://test-fields.com/page")
+        policy.record_success("https://test-fields-ok.com/page")
+        response = client.get("/api/system/domain-policy")
+        data = response.json()
+        for domain_key, entry in data.items():
+            assert "max_parallel" in entry
+            assert "cooldown_remaining" in entry
+            assert "recent_failures" in entry
+            assert "total_attempts" in entry
+            assert "recommended_action" in entry
+
 
 class TestStorageStatusEndpoint:
     """Tests for the /api/system/storage/status endpoint."""

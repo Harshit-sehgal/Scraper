@@ -164,3 +164,74 @@ class TestDomainRuntimePolicy:
         policy.record_success(_make_url("b.com"))
         assert not policy.can_fetch(_make_url("a.com"))
         assert policy.can_fetch(_make_url("b.com"))
+
+
+class TestDomainCooldownIntegration:
+    """Tests for domain cooldown preventing future scrape attempts."""
+
+    def test_cooldown_blocks_consecutive_scrapes(self):
+        """After hitting the failure limit, can_fetch returns False."""
+        policy = DomainRuntimePolicy()
+        url = _make_url("blocked-domain.com")
+        for _ in range(3):
+            policy.record_failure(url)
+        assert not policy.can_fetch(url), "Cooldown should block further fetch attempts"
+
+    def test_cooldown_expires_and_allows_scrape(self):
+        """After cooldown expires, can_fetch returns True again."""
+        policy = DomainRuntimePolicy()
+        url = _make_url("recovered-domain.com")
+        for _ in range(3):
+            policy.record_failure(url)
+        # Simulate cooldown expiration
+        entry = policy.get_or_create(url)
+        entry.cooldown_until = 0.0
+        assert policy.can_fetch(url), "After cooldown expires, URL should be fetchable again"
+
+    def test_success_resets_cooldown(self):
+        """A successful fetch resets the failure counter, preventing cooldown."""
+        policy = DomainRuntimePolicy()
+        url = _make_url("success-reset.com")
+        policy.record_failure(url)
+        policy.record_failure(url)
+        policy.record_success(url)
+        # Should be able to fetch (failures reset to 0)
+        assert policy.can_fetch(url), "Success should reset failure counter"
+        # Should not enter cooldown after only 1 more failure
+        policy.record_failure(url)
+        assert policy.can_fetch(url), "1 failure after reset should not trigger cooldown"
+        policy.record_failure(url)
+        assert policy.can_fetch(url), "2 failures after reset should not trigger cooldown"
+        policy.record_failure(url)
+        assert not policy.can_fetch(url), "3 failures after reset should trigger cooldown"
+
+    def test_recommended_action_during_cooldown(self):
+        """recommended_action returns truthful retry_later during cooldown."""
+        policy = DomainRuntimePolicy()
+        url = _make_url("cooling-domain.com")
+        for _ in range(3):
+            policy.record_failure(url)
+        action = policy.recommended_action(url)
+        assert "retry_later" in action, f"Expected retry_later in recommended_action, got: {action}"
+
+    def test_recommended_action_during_antibot_cooldown(self):
+        """recommended_action includes authorized_access hint during anti-bot cooldown."""
+        policy = DomainRuntimePolicy()
+        url = _make_url("antibot-cooling.com")
+        for _ in range(3):
+            policy.record_failure(url, failure_type="anti_bot_blocked")
+        action = policy.recommended_action(url)
+        assert "authorized_access" in action, (
+            f"Expected authorized_access hint in recommended_action, got: {action}"
+        )
+
+    def test_get_summary_includes_cooldown_remaining(self):
+        """get_summary should report positive cooldown_remaining for cooling domains."""
+        policy = DomainRuntimePolicy()
+        url = _make_url("cooling-summary.com")
+        for _ in range(3):
+            policy.record_failure(url)
+        summary = policy.get_summary()
+        domain_key = "cooling-summary.com"
+        assert domain_key in summary
+        assert summary[domain_key]["cooldown_remaining"] > 0.0

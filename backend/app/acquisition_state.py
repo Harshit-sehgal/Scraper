@@ -57,6 +57,9 @@ class AcquisitionState(str, Enum):
     # Cross-domain navigation (not flagged as a redirect)
     CROSS_DOMAIN = "cross_domain"
 
+    # Domain in cooldown — skipped due to DomainRuntimePolicy
+    DOMAIN_COOLDOWN = "domain_cooldown"
+
 
 class AcquisitionLineage(BaseModel):
     """Tracks the full provenance of how a URL was acquired and processed.
@@ -116,6 +119,7 @@ class AcquisitionLineage(BaseModel):
 
         messages = {
             AcquisitionState.DIRECT: "Page loaded successfully.",
+            AcquisitionState.DOMAIN_COOLDOWN: "The domain is in cooldown due to recent failures. The URL was skipped to respect rate limits and avoid anti-bot escalation.",
             AcquisitionState.REDIRECTED: "The URL was redirected from the original to a new location. Data was extracted from the final page.",
             AcquisitionState.HOMEPAGE_REDIRECT: "The URL redirected to the homepage. The original page may have moved or the session may have expired.",
             AcquisitionState.SESSION_EXPIRED: "The session for this URL has expired. The page redirected to a homepage or landing page instead of showing results.",
@@ -158,6 +162,7 @@ class AcquisitionLineage(BaseModel):
             AcquisitionState.ANTI_BOT_BLOCKED: "none",
             AcquisitionState.PATH_CHANGED: "path_changed",
             AcquisitionState.CROSS_DOMAIN: "none",
+            AcquisitionState.DOMAIN_COOLDOWN: "none",
         }
 
         return {

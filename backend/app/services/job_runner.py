@@ -145,6 +145,8 @@ async def run_job(
         _add_job_log(job, f"Scraping started ({len(job.urls)} URLs queue)", persist_fn=persist_job_state_fn)
 
         semaphore = asyncio.Semaphore(settings.JOB_MAX_PARALLEL_URLS)
+        # Per-domain semaphores for domain-level concurrency control
+        domain_semaphores: dict[str, asyncio.Semaphore] = {}
         job_lock = asyncio.Lock()
 
         async def _safe_log(message: str, level: str = "info"):
@@ -173,7 +175,47 @@ async def run_job(
                 await _mark_completed()
                 return idx, [], False, {}
 
-            async with semaphore:
+            # ── DomainRuntimePolicy check ─────────────────────────────────
+            from app.domain_runtime_policy import get_domain_runtime_policy
+            from app.acquisition_state import AcquisitionLineage, AcquisitionState
+            policy = get_domain_runtime_policy()
+
+            if not policy.can_fetch(url):
+                rec_action = policy.recommended_action(url)
+                await _safe_log(
+                    f"Skipping ({idx}/{len(job.urls)}): {url} — domain in cooldown ({rec_action})",
+                    level="warning",
+                )
+                await _safe_warning(
+                    f"URL skipped due to domain cooldown ({idx}/{len(job.urls)}): {url}"
+                )
+                lineage = AcquisitionLineage(
+                    original_url=url,
+                    final_url=url,
+                    state=AcquisitionState.DOMAIN_COOLDOWN,
+                    fetch_method="skipped",
+                    anti_bot_score=0.0,
+                    data_evidence_score=0.0,
+                    user_message=f"Domain in cooldown: {rec_action}",
+                    recommended_next_action=rec_action,
+                )
+                url_meta = {
+                    "ai_structured_count": 0,
+                    "attempted": False,
+                    "acquisition_lineage": lineage.to_dict(),
+                }
+                await _mark_completed()
+                return idx, [], False, url_meta
+
+            # ── Domain-level concurrency ──────────────────────────────────
+            from urllib.parse import urlparse
+            domain = urlparse(url).netloc.lower()
+            if domain not in domain_semaphores:
+                max_parallel = policy.get_or_create(url).max_parallel
+                domain_semaphores[domain] = asyncio.Semaphore(max_parallel)
+            domain_sem = domain_semaphores[domain]
+
+            async with domain_sem, semaphore:
                 await _safe_log(f"Scraping ({idx}/{len(job.urls)}): {url}")
 
                 from app.semantic_world_state import get_world_state
@@ -191,6 +233,12 @@ async def run_job(
                         ),
                         timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
                     )
+
+                    # Record success if results were extracted
+                    if results:
+                        policy.record_success(url)
+                    else:
+                        policy.record_failure(url, failure_type="zero_records_extracted")
 
                     # Integrate results into world state in a short transaction
                     # (do NOT hold the transaction across the network scrape)
@@ -226,15 +274,18 @@ async def run_job(
                     await _mark_completed()
                     return idx, results, True, url_meta
                 except asyncio.CancelledError:
+                    policy.record_failure(url, failure_type="canceled")
                     await _safe_log(f"Canceled scrape for {url}", level="warning")
                     raise
                 except asyncio.TimeoutError:
+                    policy.record_failure(url, failure_type="timeout")
                     await _safe_log(f"Timeout on {url}", level="warning")
                     logging.warning("Job %s: Timeout for %s", job_id, url)
                     await _safe_warning(f"URL timeout skipped ({idx}/{len(job.urls)}): {url}")
                     await _mark_completed()
                     return idx, [], False, {}
                 except Exception as e:
+                    policy.record_failure(url, failure_type=type(e).__name__)
                     logging.exception("Job %s: URL scrape failed: %s", job_id, url)
                     await _safe_log(f"Failed to scrape {url}: {type(e).__name__}", level="warning")
                     await _safe_warning(f"URL scrape failed ({idx}/{len(job.urls)}): {url} ({type(e).__name__})")

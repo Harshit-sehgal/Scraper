@@ -84,6 +84,9 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         self._journal_capacity: int = 1000 # Default (Phase 55)
         self._evolved_schema: Set[str] = set()
 
+        # Idempotent close guard
+        self._closed: bool = False
+
         # Substrate Branching (Phase 39)
         self._parent_node_id: Optional[str] = None
         self._branch_label: Optional[str] = None
@@ -95,7 +98,13 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         self._dispatcher.subscribe(SemanticEventType.FIELD_WAVE, self._on_field_wave)
 
     def close(self) -> None:
-        """Unsubscribe from dispatcher and clean up resources."""
+        """Unsubscribe from dispatcher and clean up resources.
+
+        Idempotent: safe to call multiple times.
+        """
+        if getattr(self, '_closed', False):
+            return
+        self._closed = True
         from app.semantic_events import SemanticEventType
         try:
             self._dispatcher.unsubscribe(SemanticEventType.FIELD_WAVE, self._on_field_wave)
@@ -271,11 +280,30 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                 })
 
         except Exception as e:
-            # Rollback staged changes
+            # Best-effort rollback: if one subsystem fails to rollback,
+            # log it and continue rolling back the others. Preserve the
+            # original exception and re-raise it.
+            rollback_errors: list[str] = []
             for s in states:
                 if hasattr(s, 'rollback'):
-                    s.rollback()
-            logger.error(f"State transaction [{label}] failed on node [{self.node_id}] (Trace: {tx_ctx['trace_id']}), rolled back: {e}")
+                    try:
+                        s.rollback()
+                    except Exception as rb_err:
+                        rb_msg = f"{type(s).__name__}.rollback(): {rb_err}"
+                        rollback_errors.append(rb_msg)
+                        logger.error(
+                            "Rollback failed for subsystem %s during transaction [%s]: %s",
+                            type(s).__name__, label, rb_err,
+                        )
+            if rollback_errors:
+                logger.error(
+                    "State transaction [%s] rollback had %d subsystem error(s): %s",
+                    label, len(rollback_errors), "; ".join(rollback_errors),
+                )
+            logger.error(
+                "State transaction [%s] failed on node [%s] (Trace: %s), rolled back: %s",
+                label, self.node_id, tx_ctx['trace_id'], e,
+            )
             raise
         finally:
             active_transaction.reset(token)

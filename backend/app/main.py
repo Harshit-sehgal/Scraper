@@ -351,20 +351,63 @@ async def health():
 
 @app.get("/ready")
 async def ready():
-    """Readiness probe — checks that SQLite storage is reachable and healthy."""
+    """Readiness probe — checks that SQLite storage is reachable and healthy.
+
+    Validates:
+    - schema_version table exists and version >= _CURRENT_SCHEMA_VERSION
+    - jobs table exists
+    - recycle_bin table exists
+
+    Returns 503 if any check fails.
+    """
     import sqlite3
-    from app.job_store import _get_db_path
+    from app.job_store import _get_db_path, _CURRENT_SCHEMA_VERSION
     try:
         db_path = _get_db_path()
         conn = sqlite3.connect(str(db_path), timeout=5)
-        cur = conn.execute("SELECT 1")
-        cur.fetchone()
+        conn.row_factory = sqlite3.Row
+
+        # Check schema_version table
+        schema_row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
+        schema_version = schema_row[0] if schema_row and schema_row[0] is not None else 0
+        if schema_version == 0:
+            conn.close()
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "not_ready",
+                    "error": "Schema version table is empty or missing",
+                    "schema_version": 0,
+                    "expected_version": _CURRENT_SCHEMA_VERSION,
+                },
+            )
+        if schema_version < _CURRENT_SCHEMA_VERSION:
+            conn.close()
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "not_ready",
+                    "error": f"Schema version {schema_version} is older than expected {_CURRENT_SCHEMA_VERSION}",
+                    "schema_version": schema_version,
+                    "expected_version": _CURRENT_SCHEMA_VERSION,
+                },
+            )
+
+        # Check jobs table
+        job_count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+
+        # Check recycle_bin table
+        recycle_count = conn.execute("SELECT COUNT(*) FROM recycle_bin").fetchone()[0]
+
         conn.close()
         return {
             "status": "ready",
             "storage": "ok",
             "migrations": "ok",
+            "schema_version": schema_version,
             "db_path": str(db_path),
+            "job_count": job_count,
+            "recycle_bin_count": recycle_count,
         }
     except Exception as e:
         logger.error("Readiness check failed: %s", e)
@@ -549,6 +592,24 @@ async def system_observability():
             "levels": {r: ws.get_role_level(r) for r in ws.role_manifold},
         },
     }
+
+
+@app.get("/api/system/domain-policy")
+async def system_domain_policy():
+    """Return the current domain runtime policy summaries."""
+    from app.domain_runtime_policy import get_domain_runtime_policy
+    policy = get_domain_runtime_policy()
+    summary = policy.get_summary()
+    # Add recommended_action for each domain
+    result = {}
+    for domain_key, entry_data in summary.items():
+        # Build a representative URL for the recommended_action query
+        sample_url = f"https://{domain_key}/"
+        result[domain_key] = {
+            **entry_data,
+            "recommended_action": policy.recommended_action(sample_url),
+        }
+    return result
 
 
 @app.get("/api/system/acquisition/telemetry")

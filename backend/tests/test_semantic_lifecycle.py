@@ -168,7 +168,129 @@ class TestBackwardCompatibility:
         assert "overall_health" in health
 
 
-# ─── Test 4: Metrics Protocol is compatible with EnergyState ─────────────
+# ─── Test 4: SemanticWorldState.close() idempotency ─────────────────────
+
+
+class TestCloseIdempotency:
+    """Verify that close() is idempotent and safe to call multiple times."""
+
+    def test_close_can_be_called_multiple_times(self):
+        """Calling close() twice should not raise."""
+        ws = SemanticWorldState()
+        ws.close()
+        # Second call must not raise
+        ws.close()
+
+    def test_close_sets_closed_flag(self):
+        """After close(), _closed should be True."""
+        ws = SemanticWorldState()
+        assert not ws._closed
+        ws.close()
+        assert ws._closed
+
+    def test_close_removes_subscriber_only_once(self):
+        """Calling close() multiple times should not cause subscriber errors."""
+        ws = SemanticWorldState()
+        ws.close()
+        ws.close()
+        ws.close()
+        # A new close shouldn't error
+        ws.close()
+
+    def test_reset_world_state_with_close(self):
+        """reset_world_state should handle close() cleanly."""
+        from app.semantic_world_state import reset_world_state, get_world_state
+        ws1 = get_world_state()
+        ws1.close()  # Close manually
+        # reset_world_state should not error even if close was already called
+        reset_world_state()
+        ws2 = get_world_state()
+        assert ws2 is not None
+        assert ws2 is not ws1
+
+    def test_operations_after_close(self):
+        """Basic operations should still work after close()."""
+        ws = SemanticWorldState()
+        ws.close()
+        # close() only unsubscribes, doesn't clear state
+        assert hasattr(ws, 'transaction')
+        assert hasattr(ws, 'get_cognitive_health')
+
+
+# ─── Test 5: Best-effort rollback behavior ──────────────────────────────
+
+
+class TestBestEffortRollback:
+    """Verify that transaction rollback is best-effort: if a subsystem
+    rollback fails, the others still roll back and the original exception
+    is re-raised."""
+
+    def test_best_effort_rollback_logs_and_continues(self):
+        """If one subsystem's rollback fails, others should still roll back."""
+        ws = SemanticWorldState()
+
+        # Make _manifold.rollback raise
+        original_rollback = ws._manifold.rollback
+
+        def failing_rollback():
+            raise RuntimeError("rollback simulated failure")
+
+        ws._manifold.rollback = failing_rollback
+
+        try:
+            with pytest.raises(RuntimeError, match="original error"):
+                with ws.transaction("test_best_effort"):
+                    raise RuntimeError("original error")
+        finally:
+            ws._manifold.rollback = original_rollback
+
+        # After the exception, the context var must still be reset
+        assert get_active_transaction() is None, (
+            "Transaction context was not reset despite rollback error"
+        )
+
+    def test_best_effort_all_rollbacks_fail(self):
+        """If ALL subsystem rollbacks fail, the original exception is still re-raised."""
+        ws = SemanticWorldState()
+
+        # Save originals
+        originals = {}
+        state_attrs = {
+            'topology': ws._topology,
+            'energy': ws._energy,
+            'instability': ws._instability,
+            'manifold': ws._manifold,
+            'motif': ws._motif,
+            'transition': ws._transition,
+            'intent': ws._intent,
+            'action': ws._action,
+            'abstraction': ws._abstraction,
+            'observability': ws._observability,
+            'history': ws._history,
+        }
+
+        for name, obj in state_attrs.items():
+            if hasattr(obj, 'rollback'):
+                originals[name] = obj.rollback
+                def make_failing(name_):
+                    def failing():
+                        raise RuntimeError(f"rollback failed for {name_}")
+                    return failing
+                obj.rollback = make_failing(name)
+
+        try:
+            with pytest.raises(RuntimeError, match="test all fail"):
+                with ws.transaction("test_all_fail"):
+                    raise RuntimeError("test all fail")
+        finally:
+            for name, obj in state_attrs.items():
+                if name in originals:
+                    obj.rollback = originals[name]
+
+        assert get_active_transaction() is None
+
+
+# ─── Test 6: Metrics Protocol is compatible with EnergyState ─────────────
 
 
 class TestMetricsProtocol:
