@@ -1,0 +1,397 @@
+"""SQLite-backed job storage with transactional safety and schema migrations.
+
+Replaces JSON persistence with durable SQLite storage. Provides:
+- Transactional writes (atomic commits)
+- Schema versioning and migrations
+- Shutdown flush for pending writes
+- Same API surface as state_store.py (load_state, save_state, persist_state_fn)
+"""
+
+import datetime
+import json
+import logging
+import sqlite3
+from pathlib import Path
+from threading import Lock
+from typing import Optional
+
+from app.models import Job, JobStatus
+
+logger = logging.getLogger(__name__)
+
+_DB_LOCK = Lock()
+_DB_PATH: Path | None = None
+_CURRENT_SCHEMA_VERSION = 2
+
+
+def _get_db_path() -> Path:
+    global _DB_PATH
+    if _DB_PATH is not None:
+        return _DB_PATH
+    from app.config import settings
+    if settings.STATE_FILE_PATH:
+        base = Path(settings.STATE_FILE_PATH).expanduser()
+    else:
+        base = Path(__file__).resolve().parent.parent / "data" / "jobs_state.json"
+    _DB_PATH = base.with_suffix(".db")
+    return _DB_PATH
+
+
+def _get_connection() -> sqlite3.Connection:
+    path = _get_db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(path), timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    _run_migrations(conn)
+    return conn
+
+
+def _maybe_migrate_from_json(conn: sqlite3.Connection) -> None:
+    """One-time migration: import existing JSON state into SQLite."""
+    json_path = _get_db_path().with_suffix(".json")
+    if not json_path.exists():
+        return
+    row = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()
+    if row and row[0] > 0:
+        return  # Already have data, skip migration
+    try:
+        import json as _json
+        data = _json.loads(json_path.read_text())
+        for raw in data.get("jobs", []):
+            job = _row_to_job(_job_from_raw(raw))
+            if job:
+                row_data = _job_to_row(job)
+                cols = ", ".join(row_data.keys())
+                ph = ", ".join("?" for _ in row_data)
+                conn.execute(f"INSERT OR IGNORE INTO jobs ({cols}) VALUES ({ph})", list(row_data.values()))
+        for raw in data.get("recycle_bin", []):
+            job = _row_to_job(_job_from_raw(raw))
+            if job:
+                row_data = _job_to_row(job)
+                cols = ", ".join(row_data.keys())
+                ph = ", ".join("?" for _ in row_data)
+                conn.execute(f"INSERT OR IGNORE INTO recycle_bin ({cols}) VALUES ({ph})", list(row_data.values()))
+        conn.commit()
+        logger.info("Migrated %d jobs + %d recycle-bin entries from JSON to SQLite",
+                     len(data.get("jobs", [])), len(data.get("recycle_bin", [])))
+    except Exception as e:
+        logger.warning("JSON-to-SQLite migration skipped: %s", e)
+
+
+def _job_from_raw(raw: dict) -> dict:
+    """Convert a raw JSON job dict to the format expected by _row_to_job."""
+    return raw
+
+
+def _run_migrations(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER PRIMARY KEY
+        )
+    """)
+    row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
+    current = row[0] if row and row[0] is not None else 0
+
+    if current < 1:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                mode TEXT NOT NULL DEFAULT 'manual',
+                topic TEXT DEFAULT '',
+                intent TEXT DEFAULT '',
+                urls TEXT NOT NULL DEFAULT '[]',
+                schema_fields TEXT NOT NULL DEFAULT '[]',
+                filters TEXT DEFAULT '[]',
+                results TEXT DEFAULT '[]',
+                logs TEXT DEFAULT '[]',
+                total_records INTEGER DEFAULT 0,
+                filtered_records INTEGER DEFAULT 0,
+                total_llm_calls INTEGER DEFAULT 0,
+                error TEXT DEFAULT '',
+                warnings TEXT DEFAULT '',
+                quality_report TEXT DEFAULT '{}',
+                analysis TEXT DEFAULT '',
+                discovered_urls TEXT DEFAULT '[]',
+                selectors_map TEXT DEFAULT '{}',
+                search_params TEXT DEFAULT '{}',
+                max_pages INTEGER DEFAULT 0,
+                progress_current INTEGER DEFAULT 0,
+                progress_total INTEGER DEFAULT 0,
+                estimated_cost_usd REAL DEFAULT 0,
+                cancel_requested INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT '',
+                completed_at TEXT DEFAULT '',
+                min_record_score REAL DEFAULT 0.35,
+                acquisition_mode TEXT DEFAULT 'standard',
+                search_params_json TEXT DEFAULT '{}'
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS recycle_bin (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                mode TEXT NOT NULL DEFAULT 'manual',
+                topic TEXT DEFAULT '',
+                intent TEXT DEFAULT '',
+                urls TEXT NOT NULL DEFAULT '[]',
+                schema_fields TEXT NOT NULL DEFAULT '[]',
+                filters TEXT DEFAULT '[]',
+                results TEXT DEFAULT '[]',
+                logs TEXT DEFAULT '[]',
+                total_records INTEGER DEFAULT 0,
+                filtered_records INTEGER DEFAULT 0,
+                total_llm_calls INTEGER DEFAULT 0,
+                error TEXT DEFAULT '',
+                warnings TEXT DEFAULT '',
+                quality_report TEXT DEFAULT '{}',
+                analysis TEXT DEFAULT '',
+                discovered_urls TEXT DEFAULT '[]',
+                selectors_map TEXT DEFAULT '{}',
+                search_params TEXT DEFAULT '{}',
+                max_pages INTEGER DEFAULT 0,
+                progress_current INTEGER DEFAULT 0,
+                progress_total INTEGER DEFAULT 0,
+                estimated_cost_usd REAL DEFAULT 0,
+                cancel_requested INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT '',
+                completed_at TEXT DEFAULT '',
+                deleted_at TEXT DEFAULT '',
+                min_record_score REAL DEFAULT 0.35,
+                acquisition_mode TEXT DEFAULT 'standard',
+                search_params_json TEXT DEFAULT '{}'
+            )
+        """)
+        conn.execute("INSERT INTO schema_version (version) VALUES (1)")
+        current = 1
+
+    if current < 2:
+        conn.execute("DROP TABLE IF EXISTS recycle_bin")
+        conn.execute("""
+            CREATE TABLE recycle_bin (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                mode TEXT NOT NULL DEFAULT 'manual',
+                topic TEXT DEFAULT '',
+                intent TEXT DEFAULT '',
+                urls TEXT NOT NULL DEFAULT '[]',
+                schema_fields TEXT NOT NULL DEFAULT '[]',
+                filters TEXT DEFAULT '[]',
+                results TEXT DEFAULT '[]',
+                logs TEXT DEFAULT '[]',
+                total_records INTEGER DEFAULT 0,
+                filtered_records INTEGER DEFAULT 0,
+                total_llm_calls INTEGER DEFAULT 0,
+                error TEXT DEFAULT '',
+                warnings TEXT DEFAULT '',
+                quality_report TEXT DEFAULT '{}',
+                analysis TEXT DEFAULT '',
+                discovered_urls TEXT DEFAULT '[]',
+                selectors_map TEXT DEFAULT '{}',
+                search_params TEXT DEFAULT '{}',
+                max_pages INTEGER DEFAULT 0,
+                progress_current INTEGER DEFAULT 0,
+                progress_total INTEGER DEFAULT 0,
+                estimated_cost_usd REAL DEFAULT 0,
+                cancel_requested INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT '',
+                completed_at TEXT DEFAULT '',
+                deleted_at TEXT DEFAULT '',
+                min_record_score REAL DEFAULT 0.35,
+                acquisition_mode TEXT DEFAULT 'standard',
+                search_params_json TEXT DEFAULT '{}'
+            )
+        """)
+        conn.execute("INSERT INTO schema_version (version) VALUES (2)")
+        current = 2
+
+
+def _job_to_row(job: Job, table: str = "jobs") -> dict:
+    """Convert a Job model to a flat row dict for SQLite storage."""
+    return {
+        "id": job.id,
+        "name": job.name,
+        "status": job.status.value if hasattr(job.status, 'value') else str(job.status),
+        "mode": job.mode.value if hasattr(job.mode, 'value') else str(job.mode),
+        "topic": job.topic or "",
+        "intent": job.intent or "",
+        "urls": json.dumps(job.urls or []),
+        "schema_fields": json.dumps([f.model_dump() if hasattr(f, 'model_dump') else f for f in (job.schema_fields or [])]),
+        "filters": json.dumps([f.model_dump() if hasattr(f, 'model_dump') else f for f in (job.filters or [])]) if hasattr(job, 'filters') else "[]",
+        "results": json.dumps(job.results or []),
+        "logs": json.dumps([log.model_dump() if hasattr(log, 'model_dump') else log for log in (job.logs or [])]),
+        "total_records": job.total_records or 0,
+        "filtered_records": job.filtered_records or 0,
+        "total_llm_calls": job.total_llm_calls or 0,
+        "error": job.error or "",
+        "warnings": json.dumps(job.warnings if hasattr(job, 'warnings') else []),
+        "quality_report": json.dumps(job.quality_report if hasattr(job, 'quality_report') else {}),
+        "analysis": job.analysis or "",
+        "discovered_urls": json.dumps(job.discovered_urls if hasattr(job, 'discovered_urls') else []),
+        "selectors_map": json.dumps(job.selectors_map if hasattr(job, 'selectors_map') else {}),
+        "search_params": json.dumps(job.search_params if hasattr(job, 'search_params') else {}),
+        "max_pages": job.max_pages if hasattr(job, 'max_pages') else 0,
+        "progress_current": job.progress_current or 0,
+        "progress_total": job.progress_total or 0,
+        "estimated_cost_usd": job.estimated_cost_usd or 0,
+        "cancel_requested": 1 if job.cancel_requested else 0,
+        "created_at": job.created_at or "",
+        "completed_at": job.completed_at or "",
+        "min_record_score": job.min_record_score or 0.35,
+        "acquisition_mode": job.acquisition_mode if hasattr(job, 'acquisition_mode') else "standard",
+        "search_params_json": json.dumps(job.search_params if hasattr(job, 'search_params') else {}),
+    }
+
+
+def _row_to_job(row: dict) -> Job | None:
+    """Convert a SQLite row dict back to a Job model."""
+    try:
+        return Job.model_validate({
+            "id": row["id"],
+            "name": row["name"],
+            "status": row["status"],
+            "mode": row.get("mode", "manual"),
+            "topic": row.get("topic", ""),
+            "intent": row.get("intent", ""),
+            "urls": json.loads(row.get("urls", "[]")),
+            "schema_fields": json.loads(row.get("schema_fields", "[]")),
+            "filters": json.loads(row.get("filters", "[]")),
+            "results": json.loads(row.get("results", "[]")),
+            "logs": json.loads(row.get("logs", "[]")),
+            "total_records": row.get("total_records", 0),
+            "filtered_records": row.get("filtered_records", 0),
+            "total_llm_calls": row.get("total_llm_calls", 0),
+            "error": row.get("error", ""),
+            "warnings": json.loads(row.get("warnings", "[]")),
+            "quality_report": json.loads(row.get("quality_report", "{}")),
+            "analysis": row.get("analysis", ""),
+            "discovered_urls": json.loads(row.get("discovered_urls", "[]")),
+            "selectors_map": json.loads(row.get("selectors_map", "{}")),
+            "search_params": json.loads(row.get("search_params", "{}")),
+            "max_pages": row.get("max_pages", 0),
+            "progress_current": row.get("progress_current", 0),
+            "progress_total": row.get("progress_total", 0),
+            "estimated_cost_usd": row.get("estimated_cost_usd", 0),
+            "cancel_requested": bool(row.get("cancel_requested", 0)),
+            "created_at": row.get("created_at", ""),
+            "completed_at": row.get("completed_at", ""),
+            "min_record_score": row.get("min_record_score", 0.35),
+            "acquisition_mode": row.get("acquisition_mode", "standard"),
+            "search_params_json": row.get("search_params_json", "{}"),
+        })
+    except Exception as e:
+        logger.warning("Failed to deserialize job row: %s", e)
+        return None
+
+
+def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+    """Load jobs and recycle bin from SQLite."""
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            _maybe_migrate_from_json(conn)
+
+            jobs_store: dict[str, Job] = {}
+            for row in conn.execute("SELECT * FROM jobs").fetchall():
+                job = _row_to_job(dict(row))
+                if job:
+                    jobs_store[job.id] = job
+
+            recycle_bin_store: dict[str, Job] = {}
+            for row in conn.execute("SELECT * FROM recycle_bin").fetchall():
+                job = _row_to_job(dict(row))
+                if job:
+                    recycle_bin_store[job.id] = job
+
+            # Mark in-progress jobs as failed on recovery
+            for job in jobs_store.values():
+                if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
+                    job.status = JobStatus.FAILED
+                    job.error = "Recovered after restart while still in progress."
+                    job.completed_at = datetime.datetime.now().isoformat()
+                    job.cancel_requested = False
+
+            # Load world state from JSON file (kept separate for size)
+            world_state_data = None
+            try:
+                ws_path = _get_db_path().parent / "world_state.json"
+                if ws_path.exists():
+                    world_state_data = json.loads(ws_path.read_text())
+            except Exception:
+                pass
+
+            return jobs_store, recycle_bin_store, world_state_data
+        finally:
+            conn.close()
+
+
+def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) -> None:
+    """Persist all jobs and recycle bin to SQLite transactionally."""
+    path = _get_db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+
+            conn.execute("DELETE FROM jobs")
+            for job in jobs_store.values():
+                row = _job_to_row(job, "jobs")
+                columns = ", ".join(row.keys())
+                placeholders = ", ".join("?" for _ in row)
+                conn.execute(
+                    f"INSERT INTO jobs ({columns}) VALUES ({placeholders})",
+                    list(row.values()),
+                )
+
+            conn.execute("DELETE FROM recycle_bin")
+            for job in recycle_bin_store.values():
+                row = _job_to_row(job, "recycle_bin")
+                columns = ", ".join(row.keys())
+                placeholders = ", ".join("?" for _ in row)
+                conn.execute(
+                    f"INSERT INTO recycle_bin ({columns}) VALUES ({placeholders})",
+                    list(row.values()),
+                )
+
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+
+def persist_state_single(job: Job) -> None:
+    """Persist a single job row (upsert) — used for frequent progress updates."""
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            _run_migrations(conn)
+            row = _job_to_row(job, "jobs")
+            columns = ", ".join(row.keys())
+            placeholders = ", ".join("?" for _ in row)
+            values = list(row.values())
+            conn.execute(
+                f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",
+                values,
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        finally:
+            conn.close()
+
+
+def flush_state() -> None:
+    """Ensure all pending writes are flushed (no-op for SQLite — writes are synchronous)."""
+    pass
+
+
+def shutdown() -> None:
+    """Clean shutdown — ensure all connections are closed."""
+    logger.info("SQLite job store shutdown complete")

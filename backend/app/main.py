@@ -26,7 +26,8 @@ from app.routers.exports import create_exports_router
 from app.routers.scraper import router as scraper_router
 from app.services.job_runner import run_job
 from app.services.state import persist_state
-from app.state_store import load_state, get_state_file_path
+from app.state_store import get_state_file_path
+from app.job_store import load_state
 from app.rate_limiter import RateLimiterMiddleware
 
 

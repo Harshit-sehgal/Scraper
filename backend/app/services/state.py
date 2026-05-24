@@ -1,4 +1,4 @@
-from app.state_store import save_state
+from app.job_store import save_state as _save_state
 from app.models import JobStatus
 
 def prune_history_stores(jobs_store: dict, recycle_bin_store: dict, max_job_history: int, max_recycle_bin_history: int):
@@ -41,4 +41,4 @@ def prune_history_stores(jobs_store: dict, recycle_bin_store: dict, max_job_hist
 
 def persist_state(jobs_store: dict, recycle_bin_store: dict, max_job_history: int, max_recycle_bin_history: int):
     prune_history_stores(jobs_store, recycle_bin_store, max_job_history, max_recycle_bin_history)
-    save_state(jobs_store=jobs_store, recycle_bin_store=recycle_bin_store)
+    _save_state(jobs_store=jobs_store, recycle_bin_store=recycle_bin_store)
