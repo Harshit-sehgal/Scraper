@@ -1,9 +1,7 @@
 """Tests for the DegradationPredictor."""
 from __future__ import annotations
 
-import math
 import time
-import pytest
 from app.degradation_predictor import (
     DegradationPredictor,
     Prediction,
@@ -465,8 +463,8 @@ class TestDegradationPredictor:
 
         # We can verify _determine_health_trend logic through predictions
         report_bad = predictor.predict([], {"bad.com": trend_all_bad})
-        report_good = predictor.predict([], {"good.com": trend_all_good})
-        report_mixed = predictor.predict([], {"mixed.com": trend_mixed})
+        predictor.predict([], {"good.com": trend_all_good})
+        predictor.predict([], {"mixed.com": trend_mixed})
 
         # Bad domain should have predictions with declining health trend
         bad_health_trends = {p.health_score_trend for p in report_bad.predictions}
