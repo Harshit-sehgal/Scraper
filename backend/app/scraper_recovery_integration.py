@@ -169,10 +169,11 @@ async def scrape_url_with_recovery(
 
             # Build acquisition lineage for successful scrape
             from app.scrape_telemetry import get_scrape_telemetry
-            last_event = get_scrape_telemetry().get_last_for_url(url)
+            telemetry = get_scrape_telemetry()
+            last_event = telemetry.get_last_for_url(url)
             event_dict = last_event.to_dict() if last_event else {}
-            anti_bot_score = event_dict.get("anti_bot_score", 0.0)
-            fetch_method = event_dict.get("fetch_method", "")
+            anti_bot_score = float(event_dict.get("anti_bot_score", 0.0) or 0.0)
+            fetch_method = str(event_dict.get("fetch_method", "") or "")
 
             # If recovery was used, note it in the lineage
             if attempt > 1:
@@ -189,7 +190,7 @@ async def scrape_url_with_recovery(
                 original_url=url,
                 final_url=url,
                 state=state,
-                fetch_method=fetch_method or event_dict.get("fetch_method", "playwright_full"),
+                fetch_method=fetch_method or "playwright_full",
                 anti_bot_score=anti_bot_score,
                 data_evidence_score=min(1.0, len(results) / 10.0) if results else 0.0,
                 user_message=user_message,
@@ -197,8 +198,10 @@ async def scrape_url_with_recovery(
             )
             recovery_stats["acquisition_lineage"] = lineage.to_dict()
 
-            logger.info("Scrape succeeded on attempt %d for %s (got %d records)", 
-                       attempt, url, len(results))
+            logger.info(
+                "Scrape succeeded on attempt %d for %s (got %d records, state=%s, anti_bot=%.2f)",
+                attempt, url, len(results), state.value if hasattr(state, 'value') else str(state), anti_bot_score,
+            )
             return results, recovery_stats
             
         except Exception as e:

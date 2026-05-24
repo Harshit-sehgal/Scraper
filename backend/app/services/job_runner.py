@@ -206,6 +206,9 @@ async def run_job(
                         persist_state_fn()
                     await _mark_completed()
                     return idx, results, True, url_meta
+                except asyncio.CancelledError:
+                    await _safe_log(f"Canceled scrape for {url}", level="warning")
+                    raise
                 except asyncio.TimeoutError:
                     await _safe_log(f"Timeout on {url}", level="warning")
                     logging.warning("Job %s: Timeout for %s", job_id, url)
@@ -223,12 +226,37 @@ async def run_job(
             asyncio.create_task(_scrape_single_url(idx, url))
             for idx, url in enumerate(job.urls, start=1)
         ]
+
+        # Active cancellation watcher — polls cancel_requested while tasks run
+        # so in-flight scrapes are interrupted promptly instead of waiting
+        # for all tasks to finish before checking the cancel flag.
+        # NOTE: check all(done) BEFORE cancel_requested to avoid a tight race
+        # where all tasks finish and cancel is flagged in the same polling cycle.
+        while True:
+            if all(task.done() for task in scrape_tasks):
+                break
+
+            if job.cancel_requested:
+                for task in scrape_tasks:
+                    if not task.done():
+                        task.cancel()
+                scraped_raw = await asyncio.gather(*scrape_tasks, return_exceptions=True)
+                mark_job_canceled(job)
+                persist_state_fn()
+                return
+
+            await asyncio.sleep(0.25)
+
         scraped_raw = await asyncio.gather(*scrape_tasks, return_exceptions=True)
         scraped: list[tuple[int, list[dict], bool, dict]] = [
             r for r in scraped_raw if isinstance(r, tuple) and len(r) == 4
         ]
 
         for idx, results, success, meta in sorted(scraped, key=lambda x: x[0]):
+            if job.cancel_requested:
+                mark_job_canceled(job)
+                persist_state_fn()
+                return
             if success:
                 all_raw_results.extend(results)
                 if len(results) > 0:
@@ -238,9 +266,6 @@ async def run_job(
                     ai_source_prediction["records_ai_structured"] += meta.get("ai_structured_count", 0)
                     if meta.get("ai_structured_count", 0) > 0:
                         ai_source_prediction["sources_with_ai_structuring"] += 1
-            if job.cancel_requested:
-                mark_job_canceled(job)
-                return
 
         run_global_ai_structuring = (
             bool(all_raw_results)
@@ -430,12 +455,16 @@ async def run_job(
 
         # Bound memory footprint if results > 1000
         if len(job.results) > settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD:
-            from app.utils.job_results_store import save_job_results_to_disk
-            file_path = save_job_results_to_disk(job.id, job.results)
-            job.results_on_disk = True
-            job.results_file_path = file_path
-            job.results = []
-            _add_job_log(job, f"Job results bounded and offloaded to disk due to size (>{settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD} records).")
+            try:
+                from app.utils.job_results_store import save_job_results_to_disk
+                file_path = save_job_results_to_disk(job.id, job.results)
+                job.results_on_disk = True
+                job.results_file_path = file_path
+                job.results = []
+                _add_job_log(job, f"Job results bounded and offloaded to disk due to size (>{settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD} records).")
+            except Exception as e:
+                logging.exception("Job %s: Failed to offload results to disk: %s", job_id, e)
+                _add_job_log(job, f"Failed to offload results to disk: {e}", level="warning")
 
         total_urls = len(job.urls)
         if total_urls == 0:
