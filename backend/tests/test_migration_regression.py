@@ -130,3 +130,51 @@ def test_persist_state_single(monkeypatch):
     finally:
         if db_path.exists():
             db_path.unlink()
+
+
+def test_migrations_cached_per_db_path(monkeypatch):
+    """Verify that migrations are correctly cached per database path when STATE_FILE_PATH changes."""
+    from app.config import settings
+    from app.job_store import _get_connection, _MIGRATIONS_RUN_FOR
+    
+    # Reset migration cache for the test
+    _MIGRATIONS_RUN_FOR.clear()
+    
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp1, \
+         tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp2:
+        db_path1 = Path(tmp1.name)
+        db_path2 = Path(tmp2.name)
+        
+    try:
+        # DB 1 setup: change settings.STATE_FILE_PATH dynamically
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_path1))
+        
+        # Connect to DB 1: this should run migrations
+        conn1 = _get_connection()
+        conn1.close()
+        
+        assert db_path1 in _MIGRATIONS_RUN_FOR
+        assert db_path2 not in _MIGRATIONS_RUN_FOR
+        
+        # DB 2 setup: change settings.STATE_FILE_PATH dynamically
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_path2))
+        
+        # Connect to DB 2: this should run migrations again for the new path
+        conn2 = _get_connection()
+        conn2.close()
+        
+        assert db_path2 in _MIGRATIONS_RUN_FOR
+        
+        # Verify that schema version tables were created in both databases
+        for path in [db_path1, db_path2]:
+            conn = sqlite3.connect(str(path))
+            row = conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
+            assert row is not None
+            assert row[0] == 2
+            conn.close()
+            
+    finally:
+        if db_path1.exists():
+            db_path1.unlink()
+        if db_path2.exists():
+            db_path2.unlink()

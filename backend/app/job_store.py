@@ -20,35 +20,29 @@ from app.models import Job, JobStatus
 logger = logging.getLogger(__name__)
 
 _DB_LOCK = Lock()
-_DB_PATH: Path | None = None
 _CURRENT_SCHEMA_VERSION = 2
-_MIGRATIONS_RUN = False
+_MIGRATIONS_RUN_FOR: set[Path] = set()
 
 
 def _get_db_path() -> Path:
-    global _DB_PATH
-    if _DB_PATH is not None:
-        return _DB_PATH
     from app.config import settings
     if settings.STATE_FILE_PATH:
         base = Path(settings.STATE_FILE_PATH).expanduser()
     else:
         base = Path(__file__).resolve().parent.parent / "data" / "jobs_state.json"
-    _DB_PATH = base.with_suffix(".db")
-    return _DB_PATH
+    return base.with_suffix(".db")
 
 
 def _get_connection() -> sqlite3.Connection:
-    global _MIGRATIONS_RUN
     path = _get_db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path), timeout=10)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
-    if not _MIGRATIONS_RUN:
+    if path not in _MIGRATIONS_RUN_FOR:
         _run_migrations(conn)
-        _MIGRATIONS_RUN = True
+        _MIGRATIONS_RUN_FOR.add(path)
     return conn
 
 
