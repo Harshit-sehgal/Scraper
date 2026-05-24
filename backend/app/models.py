@@ -20,6 +20,7 @@ RESERVED_FIELD_NAMES: frozenset = frozenset({
     "_extraction_method",
     "_ai_source_structured",
     "_calibrated_confidence",
+    "_acquisition_lineage",
     "source_url",
     "source_type",
     "source_trust_score",

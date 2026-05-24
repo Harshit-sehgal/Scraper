@@ -7,6 +7,25 @@ from openpyxl import Workbook
 
 from app.utils.export import safe_export_filename
 
+
+def _user_fieldnames(results_list: list[dict]) -> list[str]:
+    """Return field names from the first record, filtering out internal system fields (keys starting with ``_``).
+
+    When no schema is defined, we fall back to the keys of the first result
+    record.  Internal metadata fields (``_acquisition_lineage``,
+    ``_provenance``, …) are stripped so they never leak into user-facing
+    exports.
+    """
+    if not results_list:
+        return []
+    return [k for k in results_list[0].keys() if not k.startswith("_")]
+
+
+def _strip_system_fields(records: list[dict]) -> list[dict]:
+    """Return a deep-ish copy of *records* with all keys starting with ``_`` removed."""
+    return [{k: v for k, v in r.items() if not k.startswith("_")} for r in records]
+
+
 def create_exports_router(jobs_store: dict):
     router = APIRouter()
 
@@ -28,7 +47,7 @@ def create_exports_router(jobs_store: dict):
         if job.schema_fields:
             fieldnames = [f.name for f in job.schema_fields]
         else:
-            fieldnames = list(results_list[0].keys())
+            fieldnames = _user_fieldnames(results_list)
         writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
         for row in results_list:
@@ -62,7 +81,8 @@ def create_exports_router(jobs_store: dict):
         if not results_list:
             raise HTTPException(status_code=400, detail="No results to export")
 
-        json_content = json.dumps(results_list, indent=2)
+        cleaned = _strip_system_fields(results_list)
+        json_content = json.dumps(cleaned, indent=2)
         return Response(
             content=json_content,
             media_type="application/json",
@@ -92,7 +112,7 @@ def create_exports_router(jobs_store: dict):
         if job.schema_fields:
             fieldnames = [f.name for f in job.schema_fields]
         else:
-            fieldnames = list(results_list[0].keys())
+            fieldnames = _user_fieldnames(results_list)
 
         # Write headers
         for col_num, header in enumerate(fieldnames, 1):
