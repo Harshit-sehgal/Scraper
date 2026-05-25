@@ -20,11 +20,13 @@ from app.routers.jobs import create_jobs_router
 from app.routers.exports import create_exports_router
 from app.routers.scraper import router as scraper_router
 from app.services.job_runner import run_job
-from app.services.state import persist_state
 from app.state_store import get_state_file_path
 from app.storage_interface import get_job_repository
 
-job_repo = get_job_repository()
+# Repository is resolved lazily inside lifespan() so that env vars can be
+# patched during tests before startup. The module-level variable is set
+# during startup and referenced by route handlers.
+job_repo = None
 from app.rate_limiter import RateLimiterMiddleware
 
 
@@ -153,6 +155,10 @@ async def lifespan(app: FastAPI):
         "max_job_history": settings.MAX_JOB_HISTORY,
         "max_recycle_bin_history": settings.MAX_RECYCLE_BIN_HISTORY,
     }
+
+    # Resolve the repository lazily so env vars can be patched before startup.
+    global job_repo
+    job_repo = get_job_repository()
 
     # Durable job store & semantic field state — single DB read on startup
     # Use the repository factory to support SQLite or Postgres transparently
@@ -302,12 +308,8 @@ async def _run_job_wrapper(job_id: str):
 
 
 def _persist_state_wrapper():
-    persist_state(
-        jobs_store=jobs_store,
-        recycle_bin_store=recycle_bin_store,
-        max_job_history=CONFIG["max_job_history"],
-        max_recycle_bin_history=CONFIG["max_recycle_bin_history"],
-    )
+    repo = get_job_repository()
+    repo.save_all(jobs=jobs_store, recycle_bin=recycle_bin_store)
 
 
 # Include Routers
@@ -348,14 +350,19 @@ async def health():
 
 @app.get("/ready")
 async def ready():
-    """Readiness probe — checks that SQLite storage is reachable and healthy.
+    """Readiness probe — checks that the configured storage backend is reachable.
 
-    Delegates to job_store.get_storage_health() for the actual checks,
-    and job_store.get_storage_status() for job/recycle counts.
-    Returns 503 if schema is missing or outdated.
+    Uses the active JobRepository's health_check() if available (Postgres),
+    otherwise falls back to SQLite storage health (SQLite).
+    Returns 503 if the backend is unhealthy.
     """
-    from app.job_store import get_storage_health, get_storage_status
-    health = get_storage_health()
+    repo = get_job_repository()
+    if hasattr(repo, "health_check"):
+        health = repo.health_check()
+    else:
+        from app.job_store import get_storage_health
+        health = get_storage_health()
+
     if not health["ok"]:
         return JSONResponse(
             status_code=503,
@@ -366,21 +373,33 @@ async def ready():
                 "expected_version": health.get("expected_version", 0),
             },
         )
-    status = get_storage_status()
+
+    backend = getattr(repo, "backend", "sqlite")
     return {
         "status": "ready",
+        "backend": backend,
         "storage": "ok",
         "migrations": "ok",
-        "schema_version": health["schema_version"],
-        "db_path": status.get("db_path", ""),
-        "job_count": status.get("job_count", -1),
-        "recycle_bin_count": status.get("recycle_bin_count", -1),
+        "schema_version": health.get("schema_version", 0),
+        "job_count": health.get("job_count", len(jobs_store)),
+        "recycle_bin_count": health.get("recycle_bin_count", len(recycle_bin_store)),
     }
 
 
 @app.get("/api/system/storage/status")
 async def storage_status():
-    """Detailed storage backend status — delegates to job_store.get_storage_status()."""
+    """Detailed storage backend status — uses the active JobRepository."""
+    repo = get_job_repository()
+    if hasattr(repo, "health_check"):
+        health = repo.health_check()
+        return {
+            "backend": "postgres",
+            "ok": health.get("ok", False),
+            "schema_version": health.get("schema_version", 0),
+            "expected_version": health.get("expected_version", 0),
+            "job_count": health.get("job_count", 0),
+            "recycle_bin_count": health.get("recycle_bin_count", 0),
+        }
     from app.job_store import get_storage_status
     return get_storage_status()
 

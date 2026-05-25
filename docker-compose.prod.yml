@@ -30,8 +30,10 @@ services:
       - .env
     environment:
       - DATAFORGE_ENV=production
-      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      - DATAFORGE_STORAGE_BACKEND=postgres
+      - DATAFORGE_DATABASE_URL=postgresql://dataforge:${DATAFORGE_DB_PASSWORD:-dataforge}@postgres:5432/dataforge
       - DATAFORGE_WORKER_QUEUE=true
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
       - TMPDIR=/tmp
     volumes:
       - dataforge_data:/app/backend/data
@@ -75,6 +77,9 @@ services:
       - .env
     environment:
       - DATAFORGE_ENV=production
+      - DATAFORGE_STORAGE_BACKEND=postgres
+      - DATAFORGE_DATABASE_URL=postgresql://dataforge:${DATAFORGE_DB_PASSWORD:-dataforge}@postgres:5432/dataforge
+      - DATAFORGE_WORKER_QUEUE=true
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
       - TMPDIR=/tmp
       - DATAFORGE_WORKER=true

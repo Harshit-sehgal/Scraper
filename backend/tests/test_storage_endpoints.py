@@ -66,12 +66,12 @@ class TestReadyEndpoint:
         assert data["storage"] == "ok"
         assert data["migrations"] == "ok"
 
-    def test_ready_includes_db_path(self):
-        """/ready should include the database path."""
+    def test_ready_includes_backend_type(self):
+        """/ready should include the backend type."""
         response = client.get("/ready")
         data = response.json()
-        assert "db_path" in data
-        assert data["db_path"].endswith(".db")
+        assert "backend" in data
+        assert data["backend"] in ("sqlite", "postgres")
 
     def test_ready_includes_schema_version(self):
         """/ready should include schema_version >= 2."""

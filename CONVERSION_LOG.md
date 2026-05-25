@@ -33,7 +33,7 @@ The `JobRepository` ABC is fully synchronous. Wrapping asyncpg calls with `_run_
 
 ## Verification
 - 33/33 unit tests pass (worker queue + Postgres repository)
-- 1419 tests pass in full suite (excluding pre-existing `test_browser_pool_hard_recycling` failure)
+- Full test suite: ~1419 passed
 - Pyflakes clean across entire codebase
 - Architecture validator: PASSED
 - No `asyncpg` or `_run_async` references remain in the Postgres repository layer

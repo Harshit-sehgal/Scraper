@@ -1,7 +1,5 @@
 from app.storage_interface import get_job_repository
 
-_default_repo = get_job_repository()
-
 
 def prune_history_stores(jobs_store: dict, recycle_bin_store: dict, max_job_history: int, max_recycle_bin_history: int):
     from app.models import JobStatus
@@ -44,4 +42,5 @@ def prune_history_stores(jobs_store: dict, recycle_bin_store: dict, max_job_hist
 
 def persist_state(jobs_store: dict, recycle_bin_store: dict, max_job_history: int, max_recycle_bin_history: int):
     prune_history_stores(jobs_store, recycle_bin_store, max_job_history, max_recycle_bin_history)
-    _default_repo.save_all(jobs=jobs_store, recycle_bin=recycle_bin_store)
+    repo = get_job_repository()
+    repo.save_all(jobs=jobs_store, recycle_bin=recycle_bin_store)
