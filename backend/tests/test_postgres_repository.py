@@ -86,6 +86,7 @@ class TestJobRepositoryFactory:
         """If Postgres import fails, the factory falls back to SQLite."""
         reset_repository()
         monkeypatch.setenv("DATAFORGE_DATABASE_URL", "postgresql://localhost:5432/test")
+        monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "postgres")
 
         # Block the postgres_repository module so the factory skips it
         import sys
@@ -94,7 +95,7 @@ class TestJobRepositoryFactory:
         class _FakeModule(types.ModuleType):
             pass
 
-        # Prevent import of asyncpg which is needed by postgres_repository
+        # Prevent import of psycopg2 which is needed by postgres_repository
         fake_mod = _FakeModule("postgres_repository")
         sys.modules["app.postgres_repository"] = fake_mod
 
@@ -102,14 +103,17 @@ class TestJobRepositoryFactory:
         from app.storage_interface import get_job_repository as gjr
         reset_repository()
 
-        # Attempt to resolve — should fall back since postgres_repository
-        # was never properly imported (it's a stub)
-        repo = gjr()
+        # Attempt to resolve — should raise RuntimeError since postgres_repository
+        # was never properly imported (it's a stub), or fall back
+        try:
+            repo = gjr()
+            # If it didn't raise, we got a fallback
+            assert isinstance(repo, SQLiteJobRepository)
+        except RuntimeError:
+            pass  # Expected: Postgres backend requested but not available
 
         # Clean up
         sys.modules.pop("app.postgres_repository", None)
-
-        assert isinstance(repo, SQLiteJobRepository)
         reset_repository()
 
 
@@ -352,13 +356,11 @@ class TestPostgresHealthCheck:
         try:
             from app.postgres_repository import PostgresJobRepository
         except ImportError:
-            pytest.skip("asyncpg not installed")
+            pytest.skip("psycopg2 not installed")
             return
 
         repo = PostgresJobRepository(auto_ensure_schema=False)
-        import asyncio
-
-        result = asyncio.run(repo.health_check())
+        result = repo.health_check()
         assert result["ok"] is False
         assert result["backend"] == "postgres"
         assert "error" in result

@@ -116,7 +116,7 @@ def get_job_repository() -> JobRepository:
         except Exception as e:
             raise RuntimeError(
                 f"Failed to create PostgresJobRepository: {e}. "
-                "Install asyncpg: pip install asyncpg"
+                "Install psycopg2-binary: pip install psycopg2-binary"
             ) from e
 
     repo = SQLiteJobRepository()
@@ -138,8 +138,7 @@ def reset_repository():
         if hasattr(_repository_instance, "__class__") and "PostgresJobRepository" in type(_repository_instance).__name__:
             try:
                 from app.postgres_repository import shutdown_postgres
-                import asyncio
-                asyncio.run(shutdown_postgres())
+                shutdown_postgres()
             except Exception:
                 pass
     _repository_instance = None

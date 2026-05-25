@@ -672,12 +672,19 @@ def get_worker_queue(db_path: Optional[Path] = None) -> WorkerQueue:
 
     Args:
         db_path: Optional custom database path (used by tests).
+            If provided and differs from the cached instance's path,
+            a new instance is created (respects test isolation boundaries).
     """
     global _queue_instance
     if _queue_instance is None:
         with _queue_lock:
             if _queue_instance is None:
                 _queue_instance = WorkerQueue(db_path=db_path)
+    elif db_path is not None:
+        # If a specific db_path is requested and differs from the
+        # cached instance, create a dedicated instance for the caller.
+        if _queue_instance._db_path != db_path:
+            return WorkerQueue(db_path=db_path)
     return _queue_instance
 
 

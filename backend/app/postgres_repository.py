@@ -1,7 +1,7 @@
-"""Production-grade Postgres-backed JobRepository implementation.
+"""Production-grade Postgres-backed JobRepository implementation (synchronous psycopg2).
 
 Provides:
-- Connection pooling via asyncpg
+- Connection pooling via psycopg2.pool.ThreadedConnectionPool
 - Schema auto-migration
 - Transactional batch writes
 - Same interface as SQLiteJobRepository (via JobRepository ABC)
@@ -9,16 +9,20 @@ Provides:
 
 Usage:
     repo = PostgresJobRepository()
-    jobs, recycle, ws = await repo.load_all()
-    await repo.save_all(jobs, recycle)
+    jobs, recycle, ws = repo.load_all()
 """
 
-import asyncio
 import datetime
 import json
 import logging
 import os
-from typing import Optional
+import threading
+from contextlib import contextmanager
+from typing import Iterator, Optional
+
+import psycopg2
+from psycopg2 import pool as pg_pool
+from psycopg2.extras import RealDictCursor
 
 from app.models import Job, JobStatus
 from app.storage_interface import JobRepository
@@ -26,6 +30,13 @@ from app.storage_interface import JobRepository
 logger = logging.getLogger(__name__)
 
 _CURRENT_SCHEMA_VERSION = 1
+
+# ───────────────────────────────────────────────────────────────────────
+# Connection pool (thread-safe, synchronous)
+# ───────────────────────────────────────────────────────────────────────
+
+_pool: Optional[pg_pool.ThreadedConnectionPool] = None
+_pool_lock = threading.Lock()
 
 
 def _get_database_url() -> str:
@@ -40,8 +51,219 @@ def _get_database_url() -> str:
         pass
     if url:
         return url
-    # Sensible local default for development
     return "postgresql://dataforge:dataforge@localhost:5432/dataforge"
+
+
+def _get_pool() -> pg_pool.ThreadedConnectionPool:
+    """Get or create the psycopg2 connection pool."""
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                dsn = _get_database_url()
+                _pool = pg_pool.ThreadedConnectionPool(
+                    minconn=2,
+                    maxconn=10,
+                    dsn=dsn,
+                )
+                logger.info("Created psycopg2 pool for %s", dsn.split("@")[-1] if "@" in dsn else dsn)
+    return _pool
+
+
+def _close_pool():
+    """Close the connection pool."""
+    global _pool
+    if _pool is not None:
+        with _pool_lock:
+            pool = _pool
+            _pool = None
+            if pool is not None:
+                pool.closeall()
+                logger.info("Closed psycopg2 pool")
+
+
+@contextmanager
+def _conn() -> Iterator[psycopg2.extensions.connection]:
+    """Acquire a connection from the pool (context manager)."""
+    pool = _get_pool()
+    conn = pool.getconn()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        pool.putconn(conn)
+
+
+def _fetch_all(conn, sql: str, params=None) -> list[dict]:
+    """Execute a query and return all rows as dicts."""
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(sql, params or ())
+        return [dict(r) for r in cur.fetchall()]
+
+
+def _fetch_one(conn, sql: str, params=None) -> Optional[dict]:
+    """Execute a query and return the first row as a dict, or None."""
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(sql, params or ())
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
+def _execute(conn, sql: str, params=None):
+    """Execute a statement and return the cursor (for rowcount)."""
+    with conn.cursor() as cur:
+        cur.execute(sql, params or ())
+        return cur
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Schema management
+# ───────────────────────────────────────────────────────────────────────
+
+_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS schema_version (
+    version INTEGER PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS jobs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    mode TEXT NOT NULL DEFAULT 'manual',
+    topic TEXT DEFAULT '',
+    intent TEXT DEFAULT '',
+    urls TEXT NOT NULL DEFAULT '[]',
+    schema_fields TEXT NOT NULL DEFAULT '[]',
+    filters TEXT DEFAULT '[]',
+    results TEXT DEFAULT '[]',
+    logs TEXT DEFAULT '[]',
+    total_records INTEGER DEFAULT 0,
+    filtered_records INTEGER DEFAULT 0,
+    total_llm_calls INTEGER DEFAULT 0,
+    error TEXT DEFAULT '',
+    warnings TEXT DEFAULT '',
+    quality_report TEXT DEFAULT '{}',
+    analysis TEXT DEFAULT '',
+    discovered_urls TEXT DEFAULT '[]',
+    selectors_map TEXT DEFAULT '{}',
+    search_params TEXT DEFAULT '{}',
+    max_pages INTEGER DEFAULT 0,
+    progress_current INTEGER DEFAULT 0,
+    progress_total INTEGER DEFAULT 0,
+    estimated_cost_usd REAL DEFAULT 0,
+    cancel_requested BOOLEAN DEFAULT FALSE,
+    created_at TEXT DEFAULT '',
+    completed_at TEXT DEFAULT '',
+    min_record_score REAL DEFAULT 0.35,
+    acquisition_mode TEXT DEFAULT 'standard',
+    location TEXT DEFAULT '',
+    preferred_domain TEXT DEFAULT '',
+    source_policy TEXT DEFAULT 'all_sources',
+    max_per_domain INTEGER DEFAULT 4,
+    origin_location TEXT DEFAULT '',
+    max_distance_km REAL DEFAULT NULL,
+    pagination BOOLEAN DEFAULT FALSE,
+    deduplicate BOOLEAN DEFAULT TRUE,
+    deduplicate_field TEXT DEFAULT '',
+    started_at TEXT DEFAULT '',
+    results_on_disk BOOLEAN DEFAULT FALSE,
+    results_file_path TEXT DEFAULT '',
+    updated_at TEXT DEFAULT '',
+    deleted_at TEXT DEFAULT NULL
+);
+"""
+
+
+def _ensure_schema():
+    """Run schema migrations to ensure tables exist and are up to date."""
+    with _conn() as conn:
+        _execute(conn, """
+            CREATE TABLE IF NOT EXISTS schema_version (
+                version INTEGER PRIMARY KEY
+            )
+        """)
+        row = _fetch_one(conn, "SELECT MAX(version) AS version FROM schema_version")
+        current = row["version"] if row and row.get("version") is not None else 0
+
+        if current < _CURRENT_SCHEMA_VERSION:
+            if current < 1:
+                _execute(conn, """
+                    CREATE TABLE IF NOT EXISTS jobs (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'pending'
+                    )
+                """)
+
+                columns = [
+                    "mode TEXT DEFAULT 'manual'",
+                    "topic TEXT DEFAULT ''",
+                    "intent TEXT DEFAULT ''",
+                    "urls TEXT DEFAULT '[]'",
+                    "schema_fields TEXT DEFAULT '[]'",
+                    "filters TEXT DEFAULT '[]'",
+                    "results TEXT DEFAULT '[]'",
+                    "logs TEXT DEFAULT '[]'",
+                    "total_records INTEGER DEFAULT 0",
+                    "filtered_records INTEGER DEFAULT 0",
+                    "total_llm_calls INTEGER DEFAULT 0",
+                    "error TEXT DEFAULT ''",
+                    "warnings TEXT DEFAULT ''",
+                    "quality_report TEXT DEFAULT '{}'",
+                    "analysis TEXT DEFAULT ''",
+                    "discovered_urls TEXT DEFAULT '[]'",
+                    "selectors_map TEXT DEFAULT '{}'",
+                    "search_params TEXT DEFAULT '{}'",
+                    "max_pages INTEGER DEFAULT 0",
+                    "progress_current INTEGER DEFAULT 0",
+                    "progress_total INTEGER DEFAULT 0",
+                    "estimated_cost_usd REAL DEFAULT 0",
+                    "cancel_requested BOOLEAN DEFAULT FALSE",
+                    "created_at TEXT DEFAULT ''",
+                    "completed_at TEXT DEFAULT ''",
+                    "min_record_score REAL DEFAULT 0.35",
+                    "acquisition_mode TEXT DEFAULT 'standard'",
+                    "location TEXT DEFAULT ''",
+                    "preferred_domain TEXT DEFAULT ''",
+                    "source_policy TEXT DEFAULT 'all_sources'",
+                    "max_per_domain INTEGER DEFAULT 4",
+                    "origin_location TEXT DEFAULT ''",
+                    "max_distance_km REAL DEFAULT NULL",
+                    "pagination BOOLEAN DEFAULT FALSE",
+                    "deduplicate BOOLEAN DEFAULT TRUE",
+                    "deduplicate_field TEXT DEFAULT ''",
+                    "started_at TEXT DEFAULT ''",
+                    "results_on_disk BOOLEAN DEFAULT FALSE",
+                    "results_file_path TEXT DEFAULT ''",
+                    "updated_at TEXT DEFAULT ''",
+                    "deleted_at TEXT DEFAULT NULL",
+                ]
+                for col_def in columns:
+                    try:
+                        _execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
+                    except Exception:
+                        pass
+
+                for idx_sql in [
+                    "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
+                    "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC)",
+                ]:
+                    try:
+                        _execute(conn, idx_sql)
+                    except Exception:
+                        pass
+
+            _execute(conn, "DELETE FROM schema_version")
+            _execute(conn, "INSERT INTO schema_version (version) VALUES (%s)", (_CURRENT_SCHEMA_VERSION,))
+            logger.info("Postgres schema migrated to version %d", _CURRENT_SCHEMA_VERSION)
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Serialization helpers
+# ───────────────────────────────────────────────────────────────────────
 
 
 def _job_to_row(job: Job) -> dict:
@@ -168,331 +390,58 @@ def _row_to_job(row: dict) -> Optional[Job]:
 
 
 # ───────────────────────────────────────────────────────────────────────
-# Connection pool singleton
-# ───────────────────────────────────────────────────────────────────────
-
-_pool = None
-_pool_lock = asyncio.Lock()
-
-
-async def _get_pool():
-    """Get or create the asyncpg connection pool."""
-    global _pool
-    if _pool is None:
-        async with _pool_lock:
-            if _pool is None:
-                import asyncpg
-                dsn = _get_database_url()
-                _pool = await asyncpg.create_pool(
-                    dsn=dsn,
-                    min_size=2,
-                    max_size=10,
-                    command_timeout=30,
-                )
-                logger.info("Created asyncpg pool for %s", dsn.split("@")[-1] if "@" in dsn else dsn)
-    return _pool
-
-
-async def _close_pool():
-    """Close the connection pool."""
-    global _pool
-    if _pool is not None:
-        pool = _pool
-        _pool = None
-        await pool.close()
-        logger.info("Closed asyncpg pool")
-
-
-# ───────────────────────────────────────────────────────────────────────
-# Schema management
-# ───────────────────────────────────────────────────────────────────────
-
-_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS schema_version (
-    version INTEGER PRIMARY KEY
-);
-
-CREATE TABLE IF NOT EXISTS jobs (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',
-    mode TEXT NOT NULL DEFAULT 'manual',
-    topic TEXT DEFAULT '',
-    intent TEXT DEFAULT '',
-    urls TEXT NOT NULL DEFAULT '[]',
-    schema_fields TEXT NOT NULL DEFAULT '[]',
-    filters TEXT DEFAULT '[]',
-    results TEXT DEFAULT '[]',
-    logs TEXT DEFAULT '[]',
-    total_records INTEGER DEFAULT 0,
-    filtered_records INTEGER DEFAULT 0,
-    total_llm_calls INTEGER DEFAULT 0,
-    error TEXT DEFAULT '',
-    warnings TEXT DEFAULT '',
-    quality_report TEXT DEFAULT '{}',
-    analysis TEXT DEFAULT '',
-    discovered_urls TEXT DEFAULT '[]',
-    selectors_map TEXT DEFAULT '{}',
-    search_params TEXT DEFAULT '{}',
-    max_pages INTEGER DEFAULT 0,
-    progress_current INTEGER DEFAULT 0,
-    progress_total INTEGER DEFAULT 0,
-    estimated_cost_usd REAL DEFAULT 0,
-    cancel_requested BOOLEAN DEFAULT FALSE,
-    created_at TEXT DEFAULT '',
-    completed_at TEXT DEFAULT '',
-    min_record_score REAL DEFAULT 0.35,
-    acquisition_mode TEXT DEFAULT 'standard',
-    location TEXT DEFAULT '',
-    preferred_domain TEXT DEFAULT '',
-    source_policy TEXT DEFAULT 'all_sources',
-    max_per_domain INTEGER DEFAULT 4,
-    origin_location TEXT DEFAULT '',
-    max_distance_km REAL DEFAULT NULL,
-    pagination BOOLEAN DEFAULT FALSE,
-    deduplicate BOOLEAN DEFAULT TRUE,
-    deduplicate_field TEXT DEFAULT '',
-    started_at TEXT DEFAULT '',
-    results_on_disk BOOLEAN DEFAULT FALSE,
-    results_file_path TEXT DEFAULT '',
-    updated_at TEXT DEFAULT '',
-    deleted_at TEXT DEFAULT NULL
-);
-
-CREATE TABLE IF NOT EXISTS recycle_bin (
-    LIKE jobs INCLUDING ALL
-);
-
-CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
-CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_recycle_bin_created_at ON recycle_bin(created_at DESC);
-"""
-
-
-async def _ensure_schema():
-    """Run schema migrations to ensure tables exist and are up to date."""
-    pool = await _get_pool()
-    async with pool.acquire() as conn:
-        # Create schema_version table if missing
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS schema_version (
-                version INTEGER PRIMARY KEY
-            )
-        """)
-        row = await conn.fetchrow("SELECT MAX(version) FROM schema_version")
-        current = row[0] if row and row[0] is not None else 0
-
-        if current < _CURRENT_SCHEMA_VERSION:
-            if current < 1:
-                # Create jobs table
-                await conn.execute("""
-                    CREATE TABLE IF NOT EXISTS jobs (
-                        id TEXT PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        status TEXT NOT NULL DEFAULT 'pending'
-                    )
-                """)
-                # Add all columns — we use a single migration for v1
-                columns = [
-                    "mode TEXT DEFAULT 'manual'",
-                    "topic TEXT DEFAULT ''",
-                    "intent TEXT DEFAULT ''",
-                    "urls TEXT DEFAULT '[]'",
-                    "schema_fields TEXT DEFAULT '[]'",
-                    "filters TEXT DEFAULT '[]'",
-                    "results TEXT DEFAULT '[]'",
-                    "logs TEXT DEFAULT '[]'",
-                    "total_records INTEGER DEFAULT 0",
-                    "filtered_records INTEGER DEFAULT 0",
-                    "total_llm_calls INTEGER DEFAULT 0",
-                    "error TEXT DEFAULT ''",
-                    "warnings TEXT DEFAULT ''",
-                    "quality_report TEXT DEFAULT '{}'",
-                    "analysis TEXT DEFAULT ''",
-                    "discovered_urls TEXT DEFAULT '[]'",
-                    "selectors_map TEXT DEFAULT '{}'",
-                    "search_params TEXT DEFAULT '{}'",
-                    "max_pages INTEGER DEFAULT 0",
-                    "progress_current INTEGER DEFAULT 0",
-                    "progress_total INTEGER DEFAULT 0",
-                    "estimated_cost_usd REAL DEFAULT 0",
-                    "cancel_requested BOOLEAN DEFAULT FALSE",
-                    "created_at TEXT DEFAULT ''",
-                    "completed_at TEXT DEFAULT ''",
-                    "min_record_score REAL DEFAULT 0.35",
-                    "acquisition_mode TEXT DEFAULT 'standard'",
-                    "location TEXT DEFAULT ''",
-                    "preferred_domain TEXT DEFAULT ''",
-                    "source_policy TEXT DEFAULT 'all_sources'",
-                    "max_per_domain INTEGER DEFAULT 4",
-                    "origin_location TEXT DEFAULT ''",
-                    "max_distance_km REAL DEFAULT NULL",
-                    "pagination BOOLEAN DEFAULT FALSE",
-                    "deduplicate BOOLEAN DEFAULT TRUE",
-                    "deduplicate_field TEXT DEFAULT ''",
-                    "started_at TEXT DEFAULT ''",
-                    "results_on_disk BOOLEAN DEFAULT FALSE",
-                    "results_file_path TEXT DEFAULT ''",
-                    "updated_at TEXT DEFAULT ''",
-                    "deleted_at TEXT DEFAULT NULL",
-                ]
-                for col_def in columns:
-                    try:
-                        await conn.execute(f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
-                    except Exception:
-                        # Column may already exist — ignore
-                        pass
-
-                # Create recycle_bin with same schema
-                try:
-                    await conn.execute("""
-                        CREATE TABLE IF NOT EXISTS recycle_bin (
-                            LIKE jobs INCLUDING ALL
-                        )
-                    """)
-                except Exception:
-                    # Fallback: create recycle_bin manually
-                    await conn.execute("""
-                        CREATE TABLE IF NOT EXISTS recycle_bin (
-                            id TEXT PRIMARY KEY,
-                            name TEXT NOT NULL,
-                            status TEXT NOT NULL DEFAULT 'pending',
-                            mode TEXT DEFAULT 'manual',
-                            topic TEXT DEFAULT '',
-                            intent TEXT DEFAULT '',
-                            urls TEXT DEFAULT '[]',
-                            schema_fields TEXT DEFAULT '[]',
-                            filters TEXT DEFAULT '[]',
-                            results TEXT DEFAULT '[]',
-                            logs TEXT DEFAULT '[]',
-                            total_records INTEGER DEFAULT 0,
-                            filtered_records INTEGER DEFAULT 0,
-                            total_llm_calls INTEGER DEFAULT 0,
-                            error TEXT DEFAULT '',
-                            warnings TEXT DEFAULT '',
-                            quality_report TEXT DEFAULT '{}',
-                            analysis TEXT DEFAULT '',
-                            discovered_urls TEXT DEFAULT '[]',
-                            selectors_map TEXT DEFAULT '{}',
-                            search_params TEXT DEFAULT '{}',
-                            max_pages INTEGER DEFAULT 0,
-                            progress_current INTEGER DEFAULT 0,
-                            progress_total INTEGER DEFAULT 0,
-                            estimated_cost_usd REAL DEFAULT 0,
-                            cancel_requested BOOLEAN DEFAULT FALSE,
-                            created_at TEXT DEFAULT '',
-                            completed_at TEXT DEFAULT '',
-                            min_record_score REAL DEFAULT 0.35,
-                            acquisition_mode TEXT DEFAULT 'standard',
-                            deleted_at TEXT DEFAULT ''
-                        )
-                    """)
-
-                # Create indexes
-                for idx_sql in [
-                    "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
-                    "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC)",
-                    "CREATE INDEX IF NOT EXISTS idx_recycle_bin_created_at ON recycle_bin(created_at DESC)",
-                ]:
-                    try:
-                        await conn.execute(idx_sql)
-                    except Exception:
-                        pass
-
-            await conn.execute("DELETE FROM schema_version")
-            await conn.execute("INSERT INTO schema_version (version) VALUES ($1)", _CURRENT_SCHEMA_VERSION)
-            logger.info("Postgres schema migrated to version %d", _CURRENT_SCHEMA_VERSION)
-
-
-# ───────────────────────────────────────────────────────────────────────
-# Repository implementation
+# Repository implementation (fully synchronous)
 # ───────────────────────────────────────────────────────────────────────
 
 
 class PostgresJobRepository(JobRepository):
-    """Production-grade Postgres-backed JobRepository.
+    """Production-grade Postgres-backed JobRepository using synchronous psycopg2.
 
-    Uses asyncpg for async connection pooling and transactional safety.
-    Falls back gracefully if Postgres is unavailable (use SQLiteRepository instead).
+    Uses psycopg2.pool.ThreadedConnectionPool for thread-safe connection management.
+    Schema auto-migration runs on first access.
     """
 
     def __init__(self, auto_ensure_schema: bool = True):
         self._auto_ensure_schema = auto_ensure_schema
         self._schema_ensured = False
 
-    async def _ensure(self):
+    def _ensure(self):
         if self._auto_ensure_schema and not self._schema_ensured:
-            await _ensure_schema()
+            _ensure_schema()
             self._schema_ensured = True
 
-    # ─── Sync-compatible wrappers (for legacy callers) ─────────────────
+    # ─── Repository interface (sync, no async wrappers needed) ──────────
 
     def load_jobs(self) -> dict[str, Job]:
-        return self._run_async(self._load_jobs_impl())
+        self._ensure()
+        with _conn() as conn:
+            rows = _fetch_all(conn, "SELECT * FROM jobs WHERE deleted_at IS NULL")
+            jobs: dict[str, Job] = {}
+            for row in rows:
+                job = _row_to_job(row)
+                if job:
+                    jobs[job.id] = job
+            return jobs
 
     def load_recycle_bin(self) -> dict[str, Job]:
-        return self._run_async(self._load_recycle_bin_impl())
+        self._ensure()
+        with _conn() as conn:
+            rows = _fetch_all(conn, "SELECT * FROM recycle_bin")
+            jobs: dict[str, Job] = {}
+            for row in rows:
+                job = _row_to_job(row)
+                if job:
+                    jobs[job.id] = job
+            return jobs
 
     def load_all(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
-        return self._run_async(self._load_all_impl())
-
-    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job]) -> None:
-        self._run_async(self._save_all_impl(jobs, recycle_bin))
-
-    def save_single(self, job: Job) -> None:
-        self._run_async(self._save_single_impl(job))
-
-    @staticmethod
-    def _run_async(coro):
-        """Run an async coroutine synchronously (for callers that expect sync)."""
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # We're inside an async context — create a new task
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    future = pool.submit(asyncio.run, coro)
-                    return future.result()
-            else:
-                return asyncio.run(coro)
-        except RuntimeError:
-            return asyncio.run(coro)
-
-    # ─── Async implementations ─────────────────────────────────────────
-
-    async def _load_jobs_impl(self) -> dict[str, Job]:
-        await self._ensure()
-        pool = await _get_pool()
-        async with pool.acquire() as conn:
-            rows = await conn.fetch("SELECT * FROM jobs WHERE deleted_at IS NULL")
-            jobs: dict[str, Job] = {}
-            for row in rows:
-                job = _row_to_job(dict(row))
-                if job:
-                    jobs[job.id] = job
-            return jobs
-
-    async def _load_recycle_bin_impl(self) -> dict[str, Job]:
-        await self._ensure()
-        pool = await _get_pool()
-        async with pool.acquire() as conn:
-            rows = await conn.fetch("SELECT * FROM recycle_bin")
-            jobs: dict[str, Job] = {}
-            for row in rows:
-                job = _row_to_job(dict(row))
-                if job:
-                    jobs[job.id] = job
-            return jobs
-
-    async def _load_all_impl(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
-        await self._ensure()
-        pool = await _get_pool()
-        async with pool.acquire() as conn:
+        self._ensure()
+        with _conn() as conn:
             # Load jobs
-            job_rows = await conn.fetch("SELECT * FROM jobs WHERE deleted_at IS NULL")
+            job_rows = _fetch_all(conn, "SELECT * FROM jobs WHERE deleted_at IS NULL")
             jobs_store: dict[str, Job] = {}
             for row in job_rows:
-                job = _row_to_job(dict(row))
+                job = _row_to_job(row)
                 if job:
                     jobs_store[job.id] = job
 
@@ -507,79 +456,82 @@ class PostgresJobRepository(JobRepository):
                     job.cancel_requested = False
                     dirty_ids.append(job.id)
 
-            # Persist recovery to DB — do not rely on in-memory-only changes
+            # Persist recovery to DB
             if dirty_ids:
-                await conn.execute(
+                _execute(
+                    conn,
                     """UPDATE jobs
                        SET status = 'failed',
                            error = 'Recovered after restart while still in progress.',
-                           completed_at = $1,
+                           completed_at = %s,
                            cancel_requested = FALSE
-                       WHERE id = ANY($2::text[])""",
-                    now_iso, dirty_ids,
+                       WHERE id = ANY(%s)""",
+                    (now_iso, dirty_ids),
                 )
                 logger.info("Recovered %d in-progress job(s) in Postgres", len(dirty_ids))
 
             # Load recycle bin
-            recycle_rows = await conn.fetch("SELECT * FROM recycle_bin")
+            recycle_rows = _fetch_all(conn, "SELECT * FROM recycle_bin")
             recycle_store: dict[str, Job] = {}
             for row in recycle_rows:
-                job = _row_to_job(dict(row))
+                job = _row_to_job(row)
                 if job:
                     recycle_store[job.id] = job
 
-            world_state_data = None
-            return jobs_store, recycle_store, world_state_data
+            return jobs_store, recycle_store, None
 
-    async def _save_all_impl(self, jobs: dict[str, Job], recycle_bin: dict[str, Job]) -> None:
-        await self._ensure()
-        pool = await _get_pool()
-        async with pool.acquire() as conn:
-            async with conn.transaction():
-                # Clear and re-insert jobs
-                await conn.execute("DELETE FROM jobs WHERE deleted_at IS NULL")
-                for job in jobs.values():
-                    row = _job_to_row(job)
-                    cols = ", ".join(row.keys())
-                    ph = ", ".join(f"${i+1}" for i in range(len(row)))
-                    await conn.execute(
-                        f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET updated_at = EXCLUDED.updated_at",
-                        *row.values(),
-                    )
+    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job]) -> None:
+        self._ensure()
+        with _conn() as conn:
+            # Clear and re-insert jobs
+            _execute(conn, "DELETE FROM jobs WHERE deleted_at IS NULL")
+            for job in jobs.values():
+                row = _job_to_row(job)
+                cols = ", ".join(row.keys())
+                ph = ", ".join("%s" for _ in row)
+                update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in row.keys() if k != "id")
+                _execute(
+                    conn,
+                    f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",
+                    list(row.values()),
+                )
 
-                # Clear and re-insert recycle bin
-                await conn.execute("DELETE FROM recycle_bin")
-                for job in recycle_bin.values():
-                    row = _job_to_row(job)
-                    row["deleted_at"] = datetime.datetime.now().isoformat()
-                    cols = ", ".join(row.keys())
-                    ph = ", ".join(f"${i+1}" for i in range(len(row)))
-                    await conn.execute(
-                        f"INSERT INTO recycle_bin ({cols}) VALUES ({ph}) ON CONFLICT (id) DO NOTHING",
-                        *row.values(),
-                    )
+            # Clear and re-insert recycle bin
+            _execute(conn, "DELETE FROM recycle_bin")
+            for job in recycle_bin.values():
+                row = _job_to_row(job)
+                row["deleted_at"] = datetime.datetime.now().isoformat()
+                cols = ", ".join(row.keys())
+                ph = ", ".join("%s" for _ in row)
+                _execute(
+                    conn,
+                    f"INSERT INTO recycle_bin ({cols}) VALUES ({ph}) ON CONFLICT (id) DO NOTHING",
+                    list(row.values()),
+                )
 
-    async def _save_single_impl(self, job: Job) -> None:
-        await self._ensure()
-        pool = await _get_pool()
-        async with pool.acquire() as conn:
+    def save_single(self, job: Job) -> None:
+        self._ensure()
+        with _conn() as conn:
             row = _job_to_row(job)
             cols = ", ".join(row.keys())
-            ph = ", ".join(f"${i+1}" for i in range(len(row)))
+            ph = ", ".join("%s" for _ in row)
             update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in row.keys() if k != "id")
-            await conn.execute(
+            _execute(
+                conn,
                 f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",
-                *row.values(),
+                list(row.values()),
             )
 
-    async def health_check(self) -> dict:
+    def health_check(self) -> dict:
         """Check Postgres connectivity and schema health."""
         try:
-            pool = await _get_pool()
-            async with pool.acquire() as conn:
-                version = await conn.fetchval("SELECT MAX(version) FROM schema_version")
-                job_count = await conn.fetchval("SELECT COUNT(*) FROM jobs WHERE deleted_at IS NULL")
-                recycle_count = await conn.fetchval("SELECT COUNT(*) FROM recycle_bin")
+            with _conn() as conn:
+                row = _fetch_one(conn, "SELECT MAX(version) AS version FROM schema_version")
+                version = row["version"] if row else 0
+                count_row = _fetch_one(conn, "SELECT COUNT(*) AS cnt FROM jobs WHERE deleted_at IS NULL")
+                job_count = count_row["cnt"] if count_row else 0
+                recycle_row = _fetch_one(conn, "SELECT COUNT(*) AS cnt FROM recycle_bin")
+                recycle_count = recycle_row["cnt"] if recycle_row else 0
                 return {
                     "ok": True,
                     "backend": "postgres",
@@ -599,16 +551,16 @@ class PostgresJobRepository(JobRepository):
             }
 
 
-async def create_postgres_repository() -> PostgresJobRepository:
+def create_postgres_repository() -> PostgresJobRepository:
     """Factory: create and return a ready-to-use PostgresJobRepository."""
     repo = PostgresJobRepository()
-    await repo._ensure()
+    repo._ensure()
     return repo
 
 
-async def shutdown_postgres():
+def shutdown_postgres():
     """Close the Postgres connection pool."""
-    await _close_pool()
+    _close_pool()
 
 
 def verify_postgres_connectivity() -> dict:
@@ -618,29 +570,18 @@ def verify_postgres_connectivity() -> dict:
     never leaked on failure or left open if the caller falls back to SQLite.
 
     Returns a dict with 'ok': True/False and optional 'error' message.
-    Used by the repository factory (get_job_repository) at startup.
     """
     try:
         dsn = _get_database_url()
-        import asyncpg
-
-        def _probe() -> bool:
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                conn = loop.run_until_complete(asyncpg.connect(dsn=dsn, timeout=10))
-                try:
-                    val = loop.run_until_complete(conn.fetchval("SELECT 1"))
-                    return val == 1
-                finally:
-                    loop.run_until_complete(conn.close())
-            finally:
-                loop.close()
-
-        ok = _probe()
-        return {"ok": ok} if ok else {"ok": False, "error": "Postgres SELECT 1 returned unexpected result"}
+        conn = psycopg2.connect(dsn, connect_timeout=10)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                val = cur.fetchone()[0]
+                return {"ok": val == 1}
+        finally:
+            conn.close()
     except ImportError as e:
-        return {"ok": False, "error": f"asyncpg not installed: {e}"}
+        return {"ok": False, "error": f"psycopg2 not installed: {e}"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
