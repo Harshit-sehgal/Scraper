@@ -22,9 +22,9 @@ from app.scraper import (
 )
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
-from app.storage_interface import SQLiteJobRepository
+from app.storage_interface import get_job_repository
 
-_job_repo = SQLiteJobRepository()
+_job_repo = get_job_repository()
 
 def create_jobs_router(
     jobs_store: dict,
@@ -112,6 +112,8 @@ def create_jobs_router(
 
     @router.post("/api/jobs")
     async def create_job(job_data: JobCreate):
+        import os
+
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
         urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
 
@@ -140,7 +142,31 @@ def create_jobs_router(
         jobs_store[job.id] = job
         from app.job_store import persist_state_single
         persist_state_single(job)
-        schedule_task_fn(run_job_coro_fn(job.id))
+
+        # If DATAFORGE_WORKER_QUEUE is set, enqueue the job for async processing
+        worker_queue_enabled = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
+        if worker_queue_enabled and worker_queue_enabled.lower() in ("1", "true", "yes"):
+            try:
+                from app.worker_queue import get_worker_queue, Priority
+                queue = get_worker_queue()
+                task_id = await queue.enqueue(
+                    task_type="scrape_job",
+                    payload={"job_id": job.id},
+                    priority=Priority.NORMAL,
+                    task_id=job.id,
+                )
+                logging.getLogger(__name__).info(
+                    "Job %s enqueued to worker queue (task=%s)", job.id, task_id
+                )
+            except Exception as e:
+                logging.getLogger(__name__).warning(
+                    "Failed to enqueue job %s to worker queue, falling back to inline: %s",
+                    job.id, e,
+                )
+                schedule_task_fn(run_job_coro_fn(job.id))
+        else:
+            schedule_task_fn(run_job_coro_fn(job.id))
+
         return {"job_id": job.id, "status": job.status.value}
 
     @router.post("/api/jobs/{job_id}/cancel")

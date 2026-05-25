@@ -1,6 +1,10 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import Optional
+
 from app.models import Job
+
+logger = logging.getLogger(__name__)
 
 class JobRepository(ABC):
     """Generic repository interface to support SQLite, Postgres, or other databases.
@@ -62,3 +66,50 @@ class SQLiteJobRepository(JobRepository):
         from app.job_store import persist_state_single
         persist_state_single(job)
 
+
+# ───────────────────────────────────────────────────────────────────────
+# Repository resolver factory
+# ───────────────────────────────────────────────────────────────────────
+
+
+def get_job_repository() -> JobRepository:
+    """Resolve the appropriate JobRepository based on configuration.
+
+    Returns:
+        PostgresJobRepository if DATAFORGE_DATABASE_URL is set,
+        otherwise SQLiteJobRepository.
+
+    The repository is cached as a module-level singleton so that
+    all callers share the same instance.
+    """
+    import os
+
+    global _repository_instance
+    if _repository_instance is not None:
+        return _repository_instance
+
+    database_url = os.getenv("DATAFORGE_DATABASE_URL", "").strip()
+    if database_url:
+        try:
+            from app.postgres_repository import PostgresJobRepository
+            repo = PostgresJobRepository()
+            _repository_instance = repo
+            logger.info("Using PostgresJobRepository (DATAFORGE_DATABASE_URL set)")
+            return repo
+        except Exception as e:
+            logger.warning(
+                "Failed to create PostgresJobRepository, falling back to SQLite: %s", e
+            )
+
+    repo = SQLiteJobRepository()
+    _repository_instance = repo
+    return repo
+
+
+_repository_instance: JobRepository | None = None
+
+
+def reset_repository():
+    """Reset the cached repository instance (for testing)."""
+    global _repository_instance
+    _repository_instance = None

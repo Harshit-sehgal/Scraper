@@ -38,6 +38,20 @@ Start the development server using our helper script:
 ./scripts/start.sh
 ```
 
+### Production Deployment
+For production, use the Docker stack (see [backend/README_DEPLOYMENT.md](backend/README_DEPLOYMENT.md)):
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+This includes:
+- **PostgreSQL** for durable storage (or SQLite if not configured)
+- **Worker Queue** for async job processing
+- **Nginx** reverse proxy
+- **Prometheus + Grafana** monitoring stack
+
+Set `DATAFORGE_DATABASE_URL` to switch to Postgres, and `DATAFORGE_WORKER_QUEUE=true` to enable the async worker queue.
+
 ### 4. Create and Scrape a Job
 Open another terminal (with `.venv` activated) and run the manual test interface to quickly launch a demonstration extraction job:
 ```bash

@@ -1,121 +1,199 @@
-# DataForge SQLite Storage & Deployment Architecture
+# DataForge Storage & Deployment Architecture
 
-DataForge uses a transactional, high-performance SQLite backend configured with Write-Ahead Logging (WAL) for safe, concurrent multi-process scraping operations.
+DataForge supports **two storage backends** (SQLite and PostgreSQL) selected automatically at runtime, plus an **async worker queue** for production job processing and a **Prometheus/Grafana monitoring stack**.
 
 ---
 
-## 1. Local Deployment Guide
+## 1. Storage Backends
 
-To deploy the DataForge scraper platform locally, follow these structured steps:
+DataForge uses a repository pattern (`JobRepository` ABC in `app/storage_interface.py`) that automatically resolves the backend:
+
+```python
+from app.storage_interface import get_job_repository
+repo = get_job_repository()  # Returns PostgresJobRepository or SQLiteJobRepository
+```
+
+### SQLite (default)
+A transactional, high-performance SQLite backend configured with Write-Ahead Logging (WAL) for safe, concurrent multi-process scraping operations.
+
+**When to use:** Development, single-instance deployments, low-to-medium traffic.
+
+### PostgreSQL (production)
+Set `DATAFORGE_DATABASE_URL=postgresql://...` to enable the asyncpg-backed Postgres repository. Provides connection pooling, better concurrency, and production durability.
+
+**When to use:** Production deployments, high traffic, multi-worker setups.
+
+---
+
+## 2. Local Deployment Guide
 
 ### Prerequisites
 - Python 3.11 or 3.12
 - SQLite 3 (pre-installed on most platforms)
+- Playwright browsers: `python -m playwright install chromium`
 
 ### Setup & Installation
 
-1. **Clone & Setup Virtual Environment**
-   ```bash
-   cd backend
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-2. **Configure Environment Variables**
-   Create a `.env` file in the `backend/` directory:
-   ```env
-   # Storage Configuration
-   DATAFORGE_STATE_FILE=data/jobs_state.json
-   
-   # LLM Credentials (Optional for local benchmark)
-   GROQ_API_KEY=your_key_here
-   
-   # Costs per operation
-   COST_PER_LLM_CALL=0.01
-   COST_PER_URL_SCRAPE=0.02
-   ```
+### Configure Environment
 
-3. **Start the FastAPI Web App**
-   ```bash
-   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-   ```
+Create a `.env` file in the `backend/` directory:
+```env
+# Storage (SQLite default, or set DATAFORGE_DATABASE_URL for Postgres)
+DATAFORGE_STATE_FILE=data/jobs_state.json
+
+# LLM Credentials (optional, fallback engines work without)
+GROQ_API_KEY=your_key_here
+```
+
+### Start the Server
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
 
 ---
 
-## 2. SQLite Database & Storage Engine
+## 3. SQLite Storage Engine
 
-### WAL (Write-Ahead Logging) Optimization
-SQLite is configured by default to use **WAL mode**. WAL offers significantly faster write concurrency and transactional performance:
-- Readers do not block writers.
-- Writers do not block readers.
-- Writes are performed atomically, preventing database corruption during hard scrapers restarts or system crashes.
+### WAL Mode
+SQLite uses **WAL mode** by default for:
+- Readers do not block writers
+- Writers do not block readers
+- Atomic writes prevent corruption during crashes
 
-### Automatic JSON-to-SQLite Migration
-If you are upgrading a legacy DataForge installation that used a `jobs_state.json` file:
-- On startup, the SQLite engine automatically detects the legacy JSON file.
-- It parses and migrates all existing job records and recycle bin logs directly into the fresh SQLite database.
-- Legacy list/dict structures (like URLs and results) are safely converted into dynamic, queryable SQLite schema fields.
+### Auto-Migration from JSON
+Legacy JSON state files (`jobs_state.json`) are automatically detected and migrated to SQLite on first startup.
 
-### Customizing the DB Location
-By default, the database is stored alongside the state file under `backend/data/jobs_state.db`. You can customize this by changing `DATAFORGE_STATE_FILE` in your `.env` or system environment:
+### Custom DB Path
 ```bash
 export DATAFORGE_STATE_FILE="/custom/path/to/my_state.json"
-# The system will automatically resolve the DB path to "/custom/path/to/my_state.db"
+# DB resolves to "/custom/path/to/my_state.db"
 ```
 
-### Health Monitoring & Integrity
-DataForge exposes the following status and readiness endpoints:
-1. **`/api/system/status`**: Returns `"status": "online"` along with job counts, runtime limits, and active database state details.
-2. **`/api/system/storage/status`**: Exposes details about the SQLite storage engine (WAL mode, migrations status, database path, etc.).
-3. **`/ready`**: Returns `"status": "ready"` once FastAPI startup checks and recovery rehydrations complete.
+### Backup & Restore
+```bash
+# Online hot-backup
+sqlite3 data/jobs_state.db ".backup data/jobs_state_backup.db"
+
+# Restore
+cp data/jobs_state_backup.db data/jobs_state.db
+rm -f data/jobs_state.db-shm data/jobs_state.db-wal
+```
 
 ---
 
-## 3. Production Staging Checklist
+## 4. PostgreSQL Deployment
 
-Before promoting DataForge Scraper from staging to production, verify that all items on this checklist are fully satisfied:
+### Enable Postgres
+Set the following environment variable:
+```bash
+export DATAFORGE_DATABASE_URL="postgresql://dataforge:password@host:5432/dataforge"
+```
 
-- [ ] **SQLite WAL Mode Enabled**: Confirm readers and writers do not block each other by running database concurrency checks.
-- [ ] **DATAFORGE_STATE_FILE Configuration**: Set to a persistent disk path (e.g., in Docker volumes) to avoid state loss on container restart.
-- [ ] **Health Check `/api/system/status` Healthy**: Query the status endpoint and ensure it reports `status: "online"`.
-- [ ] **Readiness Check `/ready` Ready**: Query `/ready` and verify it reports `status: "ready"`.
-- [ ] **Cancellation Test Passed**: Verify that in-flight jobs stop immediately and update their status to `CANCELED` when cancel is requested.
-- [ ] **Restart Recovery Test Passed**: Confirm active jobs are cleanly transitioned to `FAILED` with a recovery log when database connection starts after an ungraceful termination.
-- [ ] **Benchmark Suite Passed**: Run `.venv/bin/pytest backend/tests/test_benchmark_suite.py` to ensure high extraction success (>85%) and 100% zero-result truthfulness.
-- [ ] **Isolated LLM Tests**: Ensure no live Groq API keys are needed to run regression checks (environment variable mocks must remain deterministic).
-- [ ] **Logs Directory Writable**: Ensure path configurations for logging files are fully writable by the running user/process.
-- [ ] **Results Offload Directory Writable**: Verify that folders for exported scrapings have the necessary read/write permissions.
+The system automatically switches to `PostgresJobRepository`. If Postgres is unreachable, it gracefully falls back to SQLite.
+
+### Docker Postgres Setup
+When using `docker-compose.prod.yml`, Postgres starts automatically with:
+- Health checks
+- Persistent volume (`postgres_data`)
+- Init scripts from `backend/init-db/`
 
 ---
 
-## 4. SQLite Backup and Restore Operations
+## 5. Worker Queue
 
-SQLite databases in production require safe, online hot-backups to prevent locks and corruption during active scrapers. Follow these guidelines to safely back up and restore your SQLite database:
+The async worker queue (`app/worker_queue.py`) enables background job processing:
 
-### Safe Online Hot-Backup (Recommended)
+### Enable Worker Queue
+```bash
+export DATAFORGE_WORKER_QUEUE=true
+```
 
-Since DataForge runs in WAL mode, running `cp` directly on the database file is unsafe as active transactions may be committed or in-progress. Instead, use SQLite's official online backup API:
+When enabled, jobs are enqueued to SQLite-backed persistent queue instead of running inline. A separate worker process picks up and executes tasks:
 
 ```bash
-# Safely perform an online hot-backup of the live database
-sqlite3 data/jobs_state.db ".backup data/jobs_state_backup.db"
+python scripts/run_worker.py          # 4 workers
+python scripts/run_worker.py --workers 8   # Scale up
+python scripts/run_worker.py --once        # Single task, then exit
 ```
 
-This command is non-blocking:
-- Active network scraping writes can continue seamlessly.
-- Active readers can read without interruptions.
+### Queue Features
+- Priority levels (critical, high, normal, low, background)
+- Automatic retries with exponential backoff (30s, 60s, 120s...)
+- Dead letter queue for permanently failed tasks
+- Graceful shutdown with in-flight draining
+- Observability via `get_status()`
 
-### Restore Procedure
+### Docker Worker
+In `docker-compose.prod.yml`, the `worker` service runs `scripts/run_worker.py` alongside the API server.
 
-To restore from a backup:
-1. Stop the DataForge FastAPI service container/process.
-2. Replace the main database file with the backup:
-   ```bash
-   cp data/jobs_state_backup.db data/jobs_state.db
-   ```
-3. Remove any left-over WAL journal files to ensure a clean boot state:
-   ```bash
-   rm -f data/jobs_state.db-shm data/jobs_state.db-wal
-   ```
-4. Restart the FastAPI service. DataForge will automatically connect and resume operations using the restored state.
+---
+
+## 6. Production Docker Stack
+
+### Full Production Stack
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+This starts:
+| Service | Container | Description |
+|---------|-----------|-------------|
+| `dataforge` | API Server | FastAPI application (Gunicorn+Uvicorn) |
+| `worker` | Worker | Background job processor |
+| `postgres` | PostgreSQL 16 | Production database |
+| `nginx` | Nginx 1.27 | Reverse proxy with static file serving |
+| `prometheus` | Prometheus | Metrics collection |
+| `grafana` | Grafana 11 | Metrics visualization |
+
+### Health Checks
+```bash
+curl http://localhost:8000/health          # Liveness
+curl http://localhost:8000/ready           # Readiness
+curl http://localhost:8000/api/system/status # System summary
+```
+
+---
+
+## 7. Monitoring Stack
+
+### Prometheus
+Configuration: `prometheus.yml`
+- Scrapes metrics from dataforge:8000 every 15s
+- Retains data for 30 days
+- Supports live config reload
+
+### Grafana
+Provisioned dashboards at `grafana/dashboards/dataforge_overview.json`:
+- System status, active jobs, queue depth
+- Request rates, memory usage, error rates
+- LLM call tracking
+
+Start the full stack with:
+```bash
+docker compose -f docker-compose.prod.yml up -d prometheus grafana
+```
+
+Grafana is accessible at `http://localhost:3000` (default: admin/admin).
+
+---
+
+## 8. Production Staging Checklist
+
+- [ ] **SQLite WAL Mode** or **PostgreSQL connection pool** healthy
+- [ ] **DATAFORGE_STATE_FILE** or **DATAFORGE_DATABASE_URL** configured
+- [ ] **Health `/health`** returns `{"status": "ok"}`
+- [ ] **Readiness `/ready`** returns `{"status": "ready"}`
+- [ ] **System status `/api/system/status`** returns `{"status": "online"}`
+- [ ] **Cancellation**: In-flight jobs update to `CANCELED` immediately
+- [ ] **Restart Recovery**: Active jobs transition to `FAILED` with recovery log
+- [ ] **Benchmark Suite**: `pytest backend/tests/test_benchmark_suite.py` passes
+- [ ] **Isolated Tests**: No live API keys needed for regression checks
+- [ ] **Worker Queue**: `DATAFORGE_WORKER_QUEUE=true` enqueues jobs correctly

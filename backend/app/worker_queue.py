@@ -1,0 +1,673 @@
+"""Persistent Worker Queue — async job processing with SQLite-backed persistence.
+
+Provides:
+- Durable task persistence (survives crashes)
+- Priority levels (critical, high, normal, low, background)
+- Automatic retries with exponential backoff
+- Dead letter queue for permanently failed tasks
+- Per-task timeout enforcement
+- Graceful shutdown with in-flight task draining
+- Observability endpoints for monitoring
+
+Usage:
+    queue = get_worker_queue()
+    await queue.enqueue("scrape_job", {"job_id": "abc"}, priority=Priority.HIGH)
+    task = await queue.dequeue()
+    await queue.complete(task.id)
+"""
+
+import asyncio
+import datetime
+import json
+import logging
+import sqlite3
+import threading
+import time
+import uuid
+from enum import IntEnum, StrEnum
+from pathlib import Path
+from typing import Callable, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class Priority(IntEnum):
+    """Task priority levels. Lower number = higher priority."""
+    CRITICAL = 0
+    HIGH = 1
+    NORMAL = 2
+    LOW = 3
+    BACKGROUND = 4
+
+
+class TaskStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    RETRYING = "retrying"
+    DEAD_LETTER = "dead_letter"
+    CANCELLED = "cancelled"
+
+
+class QueueTask:
+    """A single task in the worker queue."""
+
+    __slots__ = (
+        "id", "type", "payload", "priority", "status",
+        "created_at", "started_at", "completed_at",
+        "attempts", "max_attempts", "last_error",
+        "scheduled_at", "timeout_seconds",
+    )
+
+    def __init__(
+        self,
+        task_type: str,
+        payload: Optional[dict] = None,
+        priority: Priority = Priority.NORMAL,
+        max_attempts: int = 3,
+        timeout_seconds: int = 300,
+        task_id: Optional[str] = None,
+        scheduled_at: Optional[str] = None,
+    ):
+        self.id = task_id or str(uuid.uuid4())
+        self.type = task_type
+        self.payload = payload or {}
+        self.priority = priority
+        self.status = TaskStatus.PENDING
+        self.created_at = datetime.datetime.now().isoformat()
+        self.started_at: Optional[str] = None
+        self.completed_at: Optional[str] = None
+        self.attempts = 0
+        self.max_attempts = max_attempts
+        self.last_error: Optional[str] = None
+        self.scheduled_at = scheduled_at or self.created_at
+        self.timeout_seconds = timeout_seconds
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "type": self.type,
+            "payload": self.payload,
+            "priority": int(self.priority),
+            "status": self.status,
+            "created_at": self.created_at,
+            "started_at": self.started_at,
+            "completed_at": self.completed_at,
+            "attempts": self.attempts,
+            "max_attempts": self.max_attempts,
+            "last_error": self.last_error,
+            "scheduled_at": self.scheduled_at,
+            "timeout_seconds": self.timeout_seconds,
+        }
+
+    @staticmethod
+    def from_dict(d: dict) -> "QueueTask":
+        task = QueueTask(
+            task_type=d["type"],
+            payload=d.get("payload", {}),
+            priority=Priority(d.get("priority", 2)),
+            max_attempts=d.get("max_attempts", 3),
+            timeout_seconds=d.get("timeout_seconds", 300),
+            task_id=d.get("id"),
+            scheduled_at=d.get("scheduled_at"),
+        )
+        task.status = d.get("status", TaskStatus.PENDING)
+        task.created_at = d.get("created_at", task.created_at)
+        task.started_at = d.get("started_at")
+        task.completed_at = d.get("completed_at")
+        task.attempts = d.get("attempts", 0)
+        task.last_error = d.get("last_error")
+        return task
+
+
+# ───────────────────────────────────────────────────────────────────────
+# SQLite-backed queue storage
+# ───────────────────────────────────────────────────────────────────────
+
+def _get_db_path() -> Path:
+    """Resolve the queue database path."""
+    data_dir = Path(__file__).resolve().parent.parent / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir / "worker_queue.db"
+
+
+_DB_LOCK = threading.Lock()
+
+
+def _get_connection() -> sqlite3.Connection:
+    """Get a SQLite connection with WAL mode."""
+    path = _get_db_path()
+    conn = sqlite3.connect(str(path), timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _ensure_schema():
+    """Create the queue tables if they don't exist."""
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id TEXT PRIMARY KEY,
+                    type TEXT NOT NULL,
+                    payload TEXT NOT NULL DEFAULT '{}',
+                    priority INTEGER NOT NULL DEFAULT 2,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at TEXT NOT NULL,
+                    started_at TEXT,
+                    completed_at TEXT,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    max_attempts INTEGER NOT NULL DEFAULT 3,
+                    last_error TEXT,
+                    scheduled_at TEXT NOT NULL,
+                    timeout_seconds INTEGER NOT NULL DEFAULT 300
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_tasks_status_priority
+                    ON tasks(status, priority);
+
+                CREATE INDEX IF NOT EXISTS idx_tasks_scheduled
+                    ON tasks(scheduled_at);
+
+                CREATE TABLE IF NOT EXISTS task_history (
+                    id TEXT PRIMARY KEY,
+                    type TEXT NOT NULL,
+                    payload TEXT NOT NULL DEFAULT '{}',
+                    priority INTEGER NOT NULL DEFAULT 2,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    started_at TEXT,
+                    completed_at TEXT,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    max_attempts INTEGER NOT NULL DEFAULT 3,
+                    last_error TEXT,
+                    finished_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_task_history_type
+                    ON task_history(type);
+
+                CREATE INDEX IF NOT EXISTS idx_task_history_finished
+                    ON task_history(finished_at DESC);
+            """)
+            conn.commit()
+        finally:
+            conn.close()
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Worker Queue
+# ───────────────────────────────────────────────────────────────────────
+
+
+class WorkerQueue:
+    """Persistent worker queue with priority, retries, and dead letter support."""
+
+    def __init__(self, max_concurrency: int = 5, poll_interval: float = 1.0):
+        self._max_concurrency = max_concurrency
+        self._poll_interval = poll_interval
+        self._running = False
+        self._worker_task: Optional[asyncio.Task] = None
+        self._in_flight: dict[str, asyncio.Task] = {}
+        self._handlers: dict[str, Callable] = {}
+        self._in_flight_lock = asyncio.Lock()
+        _ensure_schema()
+
+    # ─── Task registration ─────────────────────────────────────────────
+
+    def register_handler(self, task_type: str, handler: Callable):
+        """Register an async handler function for a task type.
+
+        The handler receives (task: QueueTask) and should return True on success.
+        """
+        self._handlers[task_type] = handler
+
+    # ─── Task lifecycle ────────────────────────────────────────────────
+
+    async def enqueue(
+        self,
+        task_type: str,
+        payload: Optional[dict] = None,
+        priority: Priority = Priority.NORMAL,
+        max_attempts: int = 3,
+        timeout_seconds: int = 300,
+        task_id: Optional[str] = None,
+        scheduled_at: Optional[str] = None,
+    ) -> str:
+        """Add a new task to the queue. Returns the task ID."""
+        task = QueueTask(
+            task_type=task_type,
+            payload=payload,
+            priority=priority,
+            max_attempts=max_attempts,
+            timeout_seconds=timeout_seconds,
+            task_id=task_id,
+            scheduled_at=scheduled_at,
+        )
+
+        async with self._in_flight_lock:
+            conn = _get_connection()
+            try:
+                conn.execute(
+                    """INSERT OR IGNORE INTO tasks
+                       (id, type, payload, priority, status, created_at,
+                        scheduled_at, attempts, max_attempts, timeout_seconds)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        task.id, task.type, json.dumps(task.payload),
+                        int(task.priority), task.status, task.created_at,
+                        task.scheduled_at, task.attempts,
+                        task.max_attempts, task.timeout_seconds,
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+        return task.id
+
+    async def dequeue(self, timeout: float = 5.0) -> Optional[QueueTask]:
+        """Dequeue the highest-priority pending task.
+
+        Blocks up to *timeout* seconds if the queue is empty.
+        Returns None if the timeout expires.
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            task = self._dequeue_one()
+            if task:
+                return task
+            await asyncio.sleep(0.25)
+        return None
+
+    def _dequeue_one(self) -> Optional[QueueTask]:
+        """Synchronous dequeue from SQLite with priority ordering."""
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                row = conn.execute(
+                    """SELECT * FROM tasks
+                       WHERE status = 'pending'
+                         AND scheduled_at <= datetime('now')
+                       ORDER BY priority ASC, created_at ASC
+                       LIMIT 1"""
+                ).fetchone()
+
+                if row is None:
+                    return None
+
+                task_data = dict(row)
+                task = QueueTask.from_dict({
+                    **task_data,
+                    "payload": json.loads(task_data["payload"]),
+                })
+                task.status = TaskStatus.RUNNING
+                task.started_at = datetime.datetime.now().isoformat()
+                task.attempts += 1
+
+                conn.execute(
+                    "UPDATE tasks SET status = ?, started_at = ?, attempts = ? WHERE id = ?",
+                    (task.status, task.started_at, task.attempts, task.id),
+                )
+                conn.commit()
+
+                return task
+            finally:
+                conn.close()
+
+    async def complete(self, task_id: str, result: Optional[dict] = None):
+        """Mark a task as completed successfully."""
+        now = datetime.datetime.now().isoformat()
+        async with self._in_flight_lock:
+            conn = _get_connection()
+            try:
+                # Fetch task for history
+                row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+                if row:
+                    task_data = dict(row)
+                    # Archive to history
+                    conn.execute(
+                        """INSERT OR REPLACE INTO task_history
+                           (id, type, payload, priority, status, created_at,
+                            started_at, completed_at, attempts, max_attempts,
+                            last_error, finished_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            task_data["id"], task_data["type"],
+                            task_data["payload"], task_data["priority"],
+                            TaskStatus.COMPLETED, task_data["created_at"],
+                            task_data["started_at"], now,
+                            task_data["attempts"], task_data["max_attempts"],
+                            json.dumps(result) if result else None,
+                            now,
+                        ),
+                    )
+                    # Remove from active queue
+                    conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+
+                conn.commit()
+            finally:
+                conn.close()
+
+    async def fail(
+        self,
+        task_id: str,
+        error: str,
+        retry: bool = True,
+    ):
+        """Mark a task as failed. Retries if attempts remain."""
+        now = datetime.datetime.now().isoformat()
+        async with self._in_flight_lock:
+            conn = _get_connection()
+            try:
+                row = conn.execute(
+                    "SELECT attempts, max_attempts FROM tasks WHERE id = ?",
+                    (task_id,),
+                ).fetchone()
+
+                if row:
+                    attempts = row["attempts"]
+                    max_attempts = row["max_attempts"]
+
+                    if retry and attempts < max_attempts:
+                        # Schedule retry with exponential backoff
+                        backoff = min(2 ** (attempts - 1) * 30, 3600)  # 30s, 60s, 120s, ... 1h max
+                        retry_at = (datetime.datetime.now() + datetime.timedelta(seconds=backoff)).isoformat()
+                        conn.execute(
+                            "UPDATE tasks SET status = ?, last_error = ?, scheduled_at = ? WHERE id = ?",
+                            (TaskStatus.RETRYING, error, retry_at, task_id),
+                        )
+                        logger.info(
+                            "Task %s failed (attempt %d/%d). Retrying in %ds: %s",
+                            task_id, attempts, max_attempts, backoff, error,
+                        )
+                    else:
+                        # Move to dead letter queue (archive)
+                        task_data = dict(conn.execute(
+                            "SELECT * FROM tasks WHERE id = ?", (task_id,)
+                        ).fetchone())
+                        conn.execute(
+                            """INSERT OR REPLACE INTO task_history
+                               (id, type, payload, priority, status, created_at,
+                                started_at, completed_at, attempts, max_attempts,
+                                last_error, finished_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (
+                                task_data["id"], task_data["type"],
+                                task_data["payload"], task_data["priority"],
+                                TaskStatus.DEAD_LETTER, task_data["created_at"],
+                                task_data["started_at"], now,
+                                task_data["attempts"], task_data["max_attempts"],
+                                error, now,
+                            ),
+                        )
+                        conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+                        logger.warning(
+                            "Task %s moved to dead letter after %d attempts: %s",
+                            task_id, attempts, error,
+                        )
+
+                conn.commit()
+            finally:
+                conn.close()
+
+    async def cancel(self, task_id: str) -> bool:
+        """Cancel a pending task. Returns True if cancelled."""
+        async with self._in_flight_lock:
+            conn = _get_connection()
+            try:
+                cursor = conn.execute(
+                    "UPDATE tasks SET status = ? WHERE id = ? AND status = 'pending'",
+                    (TaskStatus.CANCELLED, task_id),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            finally:
+                conn.close()
+
+    # ─── Worker loop ───────────────────────────────────────────────────
+
+    async def start(self):
+        """Start the background worker loop with recovery of stuck tasks."""
+        if self._running:
+            return
+        # Recover any tasks that were stuck in 'running' state from a previous crash
+        self._recover_stuck_tasks()
+        self._running = True
+        self._worker_task = asyncio.create_task(self._worker_loop())
+        logger.info(
+            "Worker queue started: max_concurrency=%d, poll_interval=%.1fs",
+            self._max_concurrency, self._poll_interval,
+        )
+
+    def _recover_stuck_tasks(self):
+        """Reset any tasks stuck in 'running' state back to 'pending' for retry."""
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                stuck = conn.execute(
+                    "SELECT COUNT(*) FROM tasks WHERE status = 'running'"
+                ).fetchone()[0]
+                if stuck:
+                    conn.execute(
+                        "UPDATE tasks SET status = 'pending', started_at = NULL, "
+                        "attempts = attempts + 1, last_error = 'Recovered after worker restart' "
+                        "WHERE status = 'running'"
+                    )
+                    conn.commit()
+                    logger.info("Recovered %d stuck task(s) from previous worker crash", stuck)
+            finally:
+                conn.close()
+
+    async def stop(self, drain: bool = True):
+        """Stop the worker loop. Optionally drain in-flight tasks."""
+        self._running = False
+        if self._worker_task:
+            self._worker_task.cancel()
+            try:
+                await self._worker_task
+            except asyncio.CancelledError:
+                pass
+
+        if drain:
+            await self._drain_in_flight()
+
+        logger.info("Worker queue stopped (drained=%s)", drain)
+
+    async def _worker_loop(self):
+        """Main worker loop: dequeue and dispatch tasks."""
+        while self._running:
+            try:
+                # Check concurrency limit
+                async with self._in_flight_lock:
+                    active = len(self._in_flight)
+                if active >= self._max_concurrency:
+                    await asyncio.sleep(self._poll_interval)
+                    continue
+
+                # Dequeue a task
+                task = await self.dequeue(timeout=self._poll_interval)
+                if task is None:
+                    continue
+
+                # Dispatch
+                t = asyncio.create_task(self._execute_task(task))
+
+                async with self._in_flight_lock:
+                    self._in_flight[task.id] = t
+
+                t.add_done_callback(lambda _: asyncio.ensure_future(
+                    self._cleanup_in_flight(task.id)
+                ))
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("Worker loop error: %s", e, exc_info=True)
+                await asyncio.sleep(1)
+
+    async def _execute_task(self, task: QueueTask):
+        """Execute a single task with timeout."""
+        handler = self._handlers.get(task.type)
+        if handler is None:
+            logger.warning("No handler registered for task type: %s", task.type)
+            await self.complete(task.id, {"warning": f"No handler for {task.type}"})
+            return
+
+        try:
+            result = await asyncio.wait_for(
+                handler(task),
+                timeout=task.timeout_seconds,
+            )
+            if result is False:
+                await self.fail(task.id, "Handler returned False", retry=True)
+            else:
+                await self.complete(task.id, result)
+        except asyncio.TimeoutError:
+            await self.fail(task.id, f"Timeout after {task.timeout_seconds}s", retry=True)
+        except Exception as e:
+            await self.fail(task.id, f"{type(e).__name__}: {e}", retry=True)
+
+    async def _cleanup_in_flight(self, task_id: str):
+        """Remove a task from the in-flight tracker."""
+        async with self._in_flight_lock:
+            self._in_flight.pop(task_id, None)
+
+    async def _drain_in_flight(self):
+        """Wait for all in-flight tasks to complete."""
+        async with self._in_flight_lock:
+            tasks = list(self._in_flight.values())
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    # ─── Observability ─────────────────────────────────────────────────
+
+    def get_status(self) -> dict:
+        """Return queue status for monitoring."""
+        conn = _get_connection()
+        try:
+            pending = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE status = 'pending'"
+            ).fetchone()[0]
+            running = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE status = 'running'"
+            ).fetchone()[0]
+            retrying = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE status = 'retrying'"
+            ).fetchone()[0]
+            dead_letter = conn.execute(
+                "SELECT COUNT(*) FROM task_history WHERE status = 'dead_letter'"
+            ).fetchone()[0]
+            completed_24h = conn.execute(
+                """SELECT COUNT(*) FROM task_history
+                   WHERE finished_at >= datetime('now', '-1 day')"""
+            ).fetchone()[0]
+
+            # Top pending by priority
+            top_pending = conn.execute(
+                """SELECT id, type, priority, created_at, attempts
+                   FROM tasks WHERE status = 'pending'
+                   ORDER BY priority ASC, created_at ASC LIMIT 10"""
+            ).fetchall()
+
+            return {
+                "pending": pending,
+                "running": running,
+                "retrying": retrying,
+                "dead_letter": dead_letter,
+                "completed_24h": completed_24h,
+                "max_concurrency": self._max_concurrency,
+                "in_flight": len(self._in_flight),
+                "next_tasks": [dict(r) for r in top_pending],
+            }
+        finally:
+            conn.close()
+
+    def get_dead_letter_queue(self, limit: int = 50) -> list[dict]:
+        """Return dead letter queue entries."""
+        conn = _get_connection()
+        try:
+            rows = conn.execute(
+                """SELECT * FROM task_history
+                   WHERE status = 'dead_letter'
+                   ORDER BY finished_at DESC LIMIT ?""",
+                (limit,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
+    def retry_dead_letter(self, task_id: str) -> bool:
+        """Re-queue a dead letter task."""
+        conn = _get_connection()
+        try:
+            row = conn.execute(
+                "SELECT * FROM task_history WHERE id = ? AND status = 'dead_letter'",
+                (task_id,),
+            ).fetchone()
+            if row is None:
+                return False
+
+            task_data = dict(row)
+            conn.execute(
+                """INSERT INTO tasks
+                   (id, type, payload, priority, status, created_at,
+                    scheduled_at, attempts, max_attempts, timeout_seconds)
+                   VALUES (?, ?, ?, ?, 'pending', ?, datetime('now'), 0, ?, ?)""",
+                (
+                    task_data["id"], task_data["type"],
+                    task_data["payload"], task_data["priority"],
+                    task_data["created_at"],
+                    task_data["max_attempts"], task_data["timeout_seconds"],
+                ),
+            )
+            conn.execute(
+                "DELETE FROM task_history WHERE id = ? AND status = 'dead_letter'",
+                (task_id,),
+            )
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    def clear_completed_history(self, older_than_days: int = 7):
+        """Clean up old completed task history."""
+        conn = _get_connection()
+        try:
+            conn.execute(
+                """DELETE FROM task_history
+                   WHERE finished_at < datetime('now', ?)
+                   AND status IN ('completed', 'dead_letter')""",
+                (f"-{older_than_days} days",),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Global singleton
+# ───────────────────────────────────────────────────────────────────────
+
+_queue_instance: Optional[WorkerQueue] = None
+_queue_lock = threading.Lock()
+
+
+def get_worker_queue() -> WorkerQueue:
+    """Get or create the global WorkerQueue instance."""
+    global _queue_instance
+    if _queue_instance is None:
+        with _queue_lock:
+            if _queue_instance is None:
+                _queue_instance = WorkerQueue()
+    return _queue_instance
+
+
+def reset_worker_queue():
+    """Reset the global queue instance (for testing)."""
+    global _queue_instance
+    _queue_instance = None

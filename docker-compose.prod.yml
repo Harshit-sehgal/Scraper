@@ -34,7 +34,9 @@ services:
       - TMPDIR=/tmp
     volumes:
       - dataforge_data:/app/backend/data
-    depends_on: []
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import http.client; http.client.HTTPConnection('localhost', 8000).request('GET', '/health')"]
@@ -56,6 +58,79 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=256m
+    networks:
+      - dataforge-net
+
+  # ─── Worker Queue ────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: dataforge:latest
+    container_name: dataforge-worker
+    command: ["python", "scripts/run_worker.py"]
+    env_file:
+      - .env
+    environment:
+      - DATAFORGE_ENV=production
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      - TMPDIR=/tmp
+      - DATAFORGE_WORKER=true
+    volumes:
+      - dataforge_data:/app/backend/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+          cpus: "4"
+        reservations:
+          memory: 1g
+          cpus: "1"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m
+    networks:
+      - dataforge-net
+
+  # ─── PostgreSQL ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: dataforge-postgres
+    expose:
+      - "5432"
+    environment:
+      - POSTGRES_USER=dataforge
+      - POSTGRES_PASSWORD=${DATAFORGE_DB_PASSWORD:-dataforge}
+      - POSTGRES_DB=dataforge
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init-db:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dataforge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1"
+        reservations:
+          memory: 256m
+          cpus: "0.25"
+    security_opt:
+      - no-new-privileges:true
     networks:
       - dataforge-net
 
@@ -83,9 +158,68 @@ services:
     networks:
       - dataforge-net
 
+  # ─── Monitoring (Prometheus + Grafana) ───────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: dataforge-prometheus
+    expose:
+      - "9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.25"
+    networks:
+      - dataforge-net
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: dataforge-grafana
+    expose:
+      - "3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.25"
+    networks:
+      - dataforge-net
+
 volumes:
   dataforge_data:
     name: dataforge_scraper_data
+  postgres_data:
+    name: dataforge_postgres_data
+  prometheus_data:
+    name: dataforge_prometheus_data
+  grafana_data:
+    name: dataforge_grafana_data
 
 networks:
   dataforge-net:
