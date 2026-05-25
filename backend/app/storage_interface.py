@@ -76,7 +76,8 @@ def get_job_repository() -> JobRepository:
     """Resolve the appropriate JobRepository based on configuration.
 
     Returns:
-        PostgresJobRepository if DATAFORGE_DATABASE_URL is set,
+        PostgresJobRepository if DATAFORGE_STORAGE_BACKEND=postgres is set
+        (and DATAFORGE_DATABASE_URL points to a running instance),
         otherwise SQLiteJobRepository.
 
     The repository is cached as a module-level singleton so that
@@ -88,18 +89,35 @@ def get_job_repository() -> JobRepository:
     if _repository_instance is not None:
         return _repository_instance
 
-    database_url = os.getenv("DATAFORGE_DATABASE_URL", "").strip()
-    if database_url:
+    storage_backend = os.getenv("DATAFORGE_STORAGE_BACKEND", "sqlite").strip().lower()
+
+    if storage_backend == "postgres":
+        database_url = os.getenv("DATAFORGE_DATABASE_URL", "").strip()
+        if not database_url:
+            raise RuntimeError(
+                "DATAFORGE_STORAGE_BACKEND=postgres requires DATAFORGE_DATABASE_URL "
+                "to be set. Example: postgresql://user:pass@host:5432/dataforge"
+            )
         try:
-            from app.postgres_repository import PostgresJobRepository
+            from app.postgres_repository import PostgresJobRepository, verify_postgres_connectivity
+            connectivity = verify_postgres_connectivity()
+            if not connectivity.get("ok"):
+                raise RuntimeError(
+                    f"Postgres connectivity check failed: {connectivity.get('error', 'unknown error')}. "
+                    "Cannot use Postgres backend. Check DATAFORGE_DATABASE_URL and ensure "
+                    "the database is running."
+                )
             repo = PostgresJobRepository()
             _repository_instance = repo
-            logger.info("Using PostgresJobRepository (DATAFORGE_DATABASE_URL set)")
+            logger.info("Using PostgresJobRepository (explicit STORAGE_BACKEND=postgres)")
             return repo
+        except RuntimeError:
+            raise
         except Exception as e:
-            logger.warning(
-                "Failed to create PostgresJobRepository, falling back to SQLite: %s", e
-            )
+            raise RuntimeError(
+                f"Failed to create PostgresJobRepository: {e}. "
+                "Install asyncpg: pip install asyncpg"
+            ) from e
 
     repo = SQLiteJobRepository()
     _repository_instance = repo
@@ -110,6 +128,18 @@ _repository_instance: JobRepository | None = None
 
 
 def reset_repository():
-    """Reset the cached repository instance (for testing)."""
+    """Reset the cached repository instance (for testing).
+
+    If a PostgresJobRepository was cached, also closes the asyncpg pool
+    to prevent connection leaks.
+    """
     global _repository_instance
+    if _repository_instance is not None:
+        if hasattr(_repository_instance, "__class__") and "PostgresJobRepository" in type(_repository_instance).__name__:
+            try:
+                from app.postgres_repository import shutdown_postgres
+                import asyncio
+                asyncio.run(shutdown_postgres())
+            except Exception:
+                pass
     _repository_instance = None

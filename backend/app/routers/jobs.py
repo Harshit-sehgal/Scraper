@@ -24,7 +24,11 @@ from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
 from app.storage_interface import get_job_repository
 
-_job_repo = get_job_repository()
+
+def _save_job(job) -> None:
+    """Persist a single job through the configured repository."""
+    get_job_repository().save_single(job)
+
 
 def create_jobs_router(
     jobs_store: dict,
@@ -103,8 +107,7 @@ def create_jobs_router(
                     save_job_results_to_disk(job.id, results_list)
                 else:
                     job.results = results_list
-                from app.job_store import persist_state_single
-                persist_state_single(job)
+                _save_job(job)
                 
         dumped = job.model_dump()
         dumped["results"] = results_list
@@ -140,8 +143,7 @@ def create_jobs_router(
             min_record_score=job_data.min_record_score,
         )
         jobs_store[job.id] = job
-        from app.job_store import persist_state_single
-        persist_state_single(job)
+        _save_job(job)
 
         # If DATAFORGE_WORKER_QUEUE is set, enqueue the job for async processing
         worker_queue_enabled = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
@@ -187,8 +189,7 @@ def create_jobs_router(
         if job.status == JobStatus.PENDING:
             mark_job_canceled(job, "Canceled before execution.")
 
-        from app.job_store import persist_state_single
-        persist_state_single(job)
+        _save_job(job)
         return {
             "job_id": job.id,
             "status": job.status.value,
@@ -351,8 +352,7 @@ def create_jobs_router(
             "warnings": reclean_warnings,
         }
         job.quality_report = quality
-        from app.job_store import persist_state_single
-        persist_state_single(job)
+        _save_job(job)
 
         return {
             "job_id": job.id,

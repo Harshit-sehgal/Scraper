@@ -498,12 +498,27 @@ class PostgresJobRepository(JobRepository):
 
             # Recover in-progress jobs (same as SQLite behavior)
             now_iso = datetime.datetime.now().isoformat()
+            dirty_ids = []
             for job in list(jobs_store.values()):
                 if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
                     job.status = JobStatus.FAILED
                     job.error = "Recovered after restart while still in progress."
                     job.completed_at = now_iso
                     job.cancel_requested = False
+                    dirty_ids.append(job.id)
+
+            # Persist recovery to DB — do not rely on in-memory-only changes
+            if dirty_ids:
+                await conn.execute(
+                    """UPDATE jobs
+                       SET status = 'failed',
+                           error = 'Recovered after restart while still in progress.',
+                           completed_at = $1,
+                           cancel_requested = FALSE
+                       WHERE id = ANY($2::text[])""",
+                    now_iso, dirty_ids,
+                )
+                logger.info("Recovered %d in-progress job(s) in Postgres", len(dirty_ids))
 
             # Load recycle bin
             recycle_rows = await conn.fetch("SELECT * FROM recycle_bin")
@@ -594,3 +609,38 @@ async def create_postgres_repository() -> PostgresJobRepository:
 async def shutdown_postgres():
     """Close the Postgres connection pool."""
     await _close_pool()
+
+
+def verify_postgres_connectivity() -> dict:
+    """Synchronously verify Postgres is reachable before activating the repository.
+
+    Uses a standalone connection (not the shared pool) so the pool is
+    never leaked on failure or left open if the caller falls back to SQLite.
+
+    Returns a dict with 'ok': True/False and optional 'error' message.
+    Used by the repository factory (get_job_repository) at startup.
+    """
+    try:
+        dsn = _get_database_url()
+        import asyncpg
+
+        def _probe() -> bool:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                conn = loop.run_until_complete(asyncpg.connect(dsn=dsn, timeout=10))
+                try:
+                    val = loop.run_until_complete(conn.fetchval("SELECT 1"))
+                    return val == 1
+                finally:
+                    loop.run_until_complete(conn.close())
+            finally:
+                loop.close()
+
+        ok = _probe()
+        return {"ok": ok} if ok else {"ok": False, "error": "Postgres SELECT 1 returned unexpected result"}
+    except ImportError as e:
+        return {"ok": False, "error": f"asyncpg not installed: {e}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}

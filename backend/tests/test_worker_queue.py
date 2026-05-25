@@ -139,7 +139,7 @@ class TestWorkerQueueRetries:
     """Retry and dead letter tests."""
 
     def test_fail_moves_to_retry(self, tmp_path):
-        """Failing a task with retries remaining schedules a retry."""
+        """Failing a task with retries remaining sets it back to pending with future scheduled_at."""
         queue, _ = _make_queue(tmp_path)
 
         task_id = asyncio.run(queue.enqueue("test_task", {}, max_attempts=3))
@@ -148,9 +148,11 @@ class TestWorkerQueueRetries:
 
         asyncio.run(queue.fail(task_id, "Temporary error", retry=True))
 
-        # Task should still exist (as retrying)
+        # Task should still exist as pending (with future scheduled_at for backoff)
         status = queue.get_status()
-        assert status["retrying"] >= 1
+        assert status["pending"] >= 1, "Retry task should be pending, not retrying"
+        assert status["running"] == 0
+        assert status["retrying"] == 0
 
     def test_fail_exhausts_retries_moves_to_dead_letter(self, tmp_path):
         """Failing a task after exhausting all retries moves it to dead letter."""
@@ -165,6 +167,30 @@ class TestWorkerQueueRetries:
 
         status = queue.get_status()
         assert status["dead_letter"] >= 1
+
+    def test_retry_task_becomes_dequeueable_after_backoff(self, tmp_path):
+        """A retried task is set back to pending with future scheduled_at and
+        is dequeuable once scheduled_at <= now."""
+        queue, _ = _make_queue(tmp_path)
+
+        task_id = asyncio.run(queue.enqueue("test_task", {}, max_attempts=3))
+        task = asyncio.run(queue.dequeue(timeout=1.0))
+        assert task is not None
+
+        asyncio.run(queue.fail(task_id, "Temporary error", retry=True))
+
+        # Force scheduled_at to now so the task is immediately eligible
+        conn = queue._conn()
+        conn.execute(
+            "UPDATE tasks SET scheduled_at = datetime('now', 'localtime') WHERE id = ?",
+            (task_id,),
+        )
+        conn.commit()
+        conn.close()
+
+        retried = asyncio.run(queue.dequeue(timeout=1.0))
+        assert retried is not None, "Retried task should be dequeuable after backoff"
+        assert retried.id == task_id
 
     def test_retry_dead_letter(self, tmp_path):
         """A dead letter task can be re-queued."""
@@ -217,7 +243,8 @@ class TestWorkerQueueStartupRecovery:
         recovered = asyncio.run(queue2.dequeue(timeout=1.0))
         assert recovered is not None, "Recovered task should be dequeueable"
         assert recovered.id == task_id
-        assert recovered.attempts == 3  # 1 (first dequeue) + 1 (recovery increment) + 1 (second dequeue)
+        # attempts = 1 (first dequeue) + 1 (second dequeue) — no more recovery increment
+        assert recovered.attempts == 2
 
 
 class TestWorkerQueueObservability:

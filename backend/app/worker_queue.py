@@ -380,11 +380,12 @@ class WorkerQueue:
 
                     if retry and attempts < max_attempts:
                         # Schedule retry with exponential backoff
+                        # Set status back to PENDING so _dequeue_one picks it up.
                         backoff = min(2 ** (attempts - 1) * 30, 3600)
                         retry_at = (datetime.datetime.now() + datetime.timedelta(seconds=backoff)).strftime('%Y-%m-%d %H:%M:%S')
                         conn.execute(
                             "UPDATE tasks SET status = ?, last_error = ?, scheduled_at = ? WHERE id = ?",
-                            (TaskStatus.RETRYING, error, retry_at, task_id),
+                            (TaskStatus.PENDING, error, retry_at, task_id),
                         )
                         logger.info(
                             "Task %s failed (attempt %d/%d). Retrying in %ds: %s",
@@ -458,9 +459,11 @@ class WorkerQueue:
                     "SELECT COUNT(*) FROM tasks WHERE status = 'running'"
                 ).fetchone()[0]
                 if stuck:
+                    # Do NOT increment attempts here — attempts are incremented
+                    # only when _dequeue_one() hands the task to a worker.
                     conn.execute(
                         "UPDATE tasks SET status = 'pending', started_at = NULL, "
-                        "attempts = attempts + 1, last_error = 'Recovered after worker restart' "
+                        "last_error = 'Recovered after worker restart' "
                         "WHERE status = 'running'"
                     )
                     conn.commit()
