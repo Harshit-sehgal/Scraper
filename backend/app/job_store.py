@@ -111,7 +111,7 @@ def _job_to_row(job: Job) -> dict:
         "filtered_records": job.filtered_records or 0,
         "total_llm_calls": job.total_llm_calls or 0,
         "error": job.error if job.error is not None else "",
-        "warnings": "[]",
+        "warnings": json.dumps(getattr(job, "warnings", None) or []),
         "quality_report": json.dumps(job.quality_report if hasattr(job, 'quality_report') else {}),
         "analysis": job.analysis if job.analysis is not None else "",
         "discovered_urls": json.dumps(job.discovered_urls if hasattr(job, 'discovered_urls') else []),
@@ -125,7 +125,10 @@ def _job_to_row(job: Job) -> dict:
         "created_at": job.created_at or "",
         "completed_at": job.completed_at if job.completed_at is not None else "",
         "min_record_score": job.min_record_score if job.min_record_score is not None else 0.35,
-        "acquisition_mode": "standard",
+        "acquisition_mode": (
+            getattr(getattr(job, "acquisition_mode", None), "value", None)
+            or str(getattr(job, "acquisition_mode", None) or "standard")
+        ),
         "search_params_json": json.dumps(job.search_params if job.search_params is not None else {}),
         "location": job.location or "",
         "preferred_domain": job.preferred_domain or "",
@@ -193,6 +196,12 @@ def _row_to_job(row: dict) -> Job | None:
             "results_on_disk": bool(row.get("results_on_disk", 0)),
             "results_file_path": row.get("results_file_path") if row.get("results_file_path") else None,
         })
+        # Restore fields that may exist on future/extended Job models (forward-compat guard).
+        if hasattr(job, "warnings"):
+            object.__setattr__(job, "warnings", json.loads(row.get("warnings", "[]")))
+        if hasattr(job, "acquisition_mode"):
+            object.__setattr__(job, "acquisition_mode", row.get("acquisition_mode", "standard"))
+        return job
     except Exception as e:
         logger.warning("Failed to deserialize job row: %s", e)
         return None

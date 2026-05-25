@@ -279,11 +279,10 @@ def _persist_single_wrapper(job_id: str, critical: bool = False) -> None:
             (completed, failed, canceled, degraded, empty_result).
             If False (default), log and swallow. Use for hot-path progress updates.
     """
-    from app.job_store import persist_state_single
     job = jobs_store.get(job_id)
     if job:
         try:
-            persist_state_single(job)
+            job_repo.save_single(job)
         except Exception as e:
             logger.error("Failed to persist single job %s: %s", job_id, e)
             if critical:

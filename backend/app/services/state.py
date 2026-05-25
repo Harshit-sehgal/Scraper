@@ -1,5 +1,7 @@
-from app.job_store import save_state as _save_state
+from app.storage_interface import SQLiteJobRepository
 from app.models import JobStatus
+
+_default_repo = SQLiteJobRepository()
 
 def prune_history_stores(jobs_store: dict, recycle_bin_store: dict, max_job_history: int, max_recycle_bin_history: int):
     from app.utils.job_results_store import delete_job_results_from_disk
@@ -41,4 +43,4 @@ def prune_history_stores(jobs_store: dict, recycle_bin_store: dict, max_job_hist
 
 def persist_state(jobs_store: dict, recycle_bin_store: dict, max_job_history: int, max_recycle_bin_history: int):
     prune_history_stores(jobs_store, recycle_bin_store, max_job_history, max_recycle_bin_history)
-    _save_state(jobs_store=jobs_store, recycle_bin_store=recycle_bin_store)
+    _default_repo.save_all(jobs=jobs_store, recycle_bin=recycle_bin_store)

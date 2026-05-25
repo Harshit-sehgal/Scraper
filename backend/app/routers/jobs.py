@@ -22,6 +22,9 @@ from app.scraper import (
 )
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
+from app.storage_interface import SQLiteJobRepository
+
+_job_repo = SQLiteJobRepository()
 
 def create_jobs_router(
     jobs_store: dict,
