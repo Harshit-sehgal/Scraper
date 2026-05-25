@@ -6,10 +6,12 @@ Extracted from scraper.py to isolate LLM-related orchestration.
 
 from __future__ import annotations
 
+import re
 import logging
 import time
 from typing import Any
 from collections import Counter
+from bs4 import BeautifulSoup
 from app.config import settings
 from app.html_utils import clean_html_for_selectors
 from app.llm_bridge import llm_json, reset_llm_call_count
@@ -492,9 +494,6 @@ def _infer_field_selectors_from_container(container_sel: str, html: str, schema_
 
 
 # ─── URL Analyzer — Auto-Detect Fields from a URL ────────────────────────
-
-import re  # noqa: E402
-from bs4 import BeautifulSoup  # noqa: E402
 
 
 # ─── Redirect Detection ────────────────────────────────────────────────

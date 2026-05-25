@@ -7,14 +7,15 @@ from bs4 import BeautifulSoup
 import httpx
 
 from app.config import settings
+from app.models import SchemaField, FieldType
+from app.semantic_segmentation import segment_single_text, is_likely_noise_field
+from app.browser_pool import get_browser_pool
+from app.domain_intelligence import get_domain_intelligence
+from app.strategy_evolution import FetchStrategy
+from app.browser_network_capture import setup_network_capture, store_captures
 
 logger = logging.getLogger(__name__)
-from app.models import SchemaField, FieldType  # noqa: E402
-from app.semantic_segmentation import segment_single_text, is_likely_noise_field  # noqa: E402
-from app.browser_pool import get_browser_pool  # noqa: E402
-from app.domain_intelligence import get_domain_intelligence  # noqa: E402
-from app.strategy_evolution import FetchStrategy  # noqa: E402
-from app.browser_network_capture import setup_network_capture, store_captures  # noqa: E402
+
 
 EMPTY_TOKENS = {"-", "n/a", "na", "null", "none", "", "not available", "empty", "0", "false", "undefined"}
 PLACEHOLDER_PHRASES = {"no data", "not specified", "coming soon", "tbd", "unknown"}
