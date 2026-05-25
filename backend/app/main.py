@@ -159,11 +159,9 @@ async def lifespan(app: FastAPI):
         "max_recycle_bin_history": settings.MAX_RECYCLE_BIN_HISTORY,
     }
 
-    # Durable job store & semantic field state
-    loaded_jobs = job_repo.load_jobs()
-    loaded_recycle = job_repo.load_recycle_bin()
+    # Durable job store & semantic field state — single DB read on startup
     from app.job_store import load_state
-    _, _, world_state_data = load_state()
+    loaded_jobs, loaded_recycle, world_state_data = load_state()
     jobs_store.clear()
     jobs_store.update(loaded_jobs)
     recycle_bin_store.clear()

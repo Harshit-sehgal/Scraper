@@ -113,8 +113,8 @@ if TYPE_CHECKING:
     from app.recovery_strategies import AttemptContext
 
 # Re-export for backwards compatibility (used by routers/jobs.py and services/job_runner.py)
-from app.cleaning_engine import ai_clean_and_align_records  # noqa: F401
-from app.insight_engine import generate_data_insight, suggest_schema_from_intent, suggest_schema_from_intent_sync  # noqa: F401
+from app.cleaning_engine import ai_clean_and_align_records  # noqa: F401, E402
+from app.insight_engine import generate_data_insight, suggest_schema_from_intent, suggest_schema_from_intent_sync  # noqa: F401, E402
 
 __all__ = [
     "scrape_url",

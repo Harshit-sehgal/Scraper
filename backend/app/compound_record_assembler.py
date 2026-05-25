@@ -111,9 +111,9 @@ def detect_segments(element_text: str) -> list[dict[str, Any]]:
 
     # Strategy 1: Label-separated segments
     # Look for common segment separators in the text
-    lines = [l.strip() for l in element_text.split("\n") if l.strip()]
+    lines = [line.strip() for line in element_text.split("\n") if line.strip()]
     if not lines:
-        lines = [l.strip() for l in re.split(r'\s{2,}', element_text) if l.strip()]
+        lines = [line.strip() for line in re.split(r'\s{2,}', element_text) if line.strip()]
 
     current_segment: dict[str, Any] | None = None
     segment_idx = 0

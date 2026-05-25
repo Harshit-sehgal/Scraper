@@ -116,9 +116,9 @@ class GlobalCognitiveScheduler:
 
 
 # Legacy scheduler — kept for backward compatibility
-from app.semantic_events import SemanticEvent, SemanticEventType
-from app.event_dispatcher import get_dispatcher
-from app.semantic_world_state import get_world_state
+from app.semantic_events import SemanticEvent, SemanticEventType  # noqa: E402
+from app.event_dispatcher import get_dispatcher  # noqa: E402
+from app.semantic_world_state import get_world_state  # noqa: E402
 
 
 class GraphUpdateScheduler:

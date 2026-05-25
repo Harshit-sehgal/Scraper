@@ -47,7 +47,7 @@ def reset_role_engine():
 # Exclusivity constraints — now defined in field_laws.py to prevent
 # upward dependency from core_types.py to this allocation engine.
 # Imported here for backward compatibility and local usage.
-from app.field_laws import ROLE_EXCLUSIVITY
+from app.field_laws import ROLE_EXCLUSIVITY  # noqa: E402
 
 
 class _SemanticMetricsProtocol(Protocol):

@@ -212,16 +212,16 @@ def build_quality_report(
     # Build acquisition summary from per-URL lineages
     acquisition_summary: dict = {
         "per_url": acquisition_lineages or [],
-        "direct": sum(1 for l in (acquisition_lineages or []) if l.get("state") == "direct"),
-        "recovered": sum(1 for l in (acquisition_lineages or []) if l.get("state") == "recovered"),
-        "session_expired": sum(1 for l in (acquisition_lineages or []) if "session" in l.get("state", "") or "recovery" in l.get("state", "")),
-        "anti_bot_blocked": sum(1 for l in (acquisition_lineages or []) if l.get("state") == "anti_bot_blocked"),
-        "empty_response": sum(1 for l in (acquisition_lineages or []) if l.get("state") in ("empty_response", "no_search_form")),
+        "direct": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") == "direct"),
+        "recovered": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") == "recovered"),
+        "session_expired": sum(1 for lin in (acquisition_lineages or []) if "session" in lin.get("state", "") or "recovery" in lin.get("state", "")),
+        "anti_bot_blocked": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") == "anti_bot_blocked"),
+        "empty_response": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") in ("empty_response", "no_search_form")),
     }
     # Summarize recommended next actions
     next_actions: dict[str, int] = {}
-    for l in (acquisition_lineages or []):
-        action = l.get("recommended_next_action", "") or ""
+    for lin in (acquisition_lineages or []):
+        action = lin.get("recommended_next_action", "") or ""
         if action:
             next_actions[action] = next_actions.get(action, 0) + 1
     acquisition_summary["recommended_next_actions"] = next_actions

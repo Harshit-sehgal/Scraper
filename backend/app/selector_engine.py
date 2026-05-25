@@ -3,13 +3,13 @@ import logging
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
-from app.models import SchemaField, FieldType
-from app.html_utils import (
+from app.models import SchemaField, FieldType  # noqa: E402
+from app.html_utils import (  # noqa: E402
     _compact_text,
     _extract_contacts_from_node, _sanitize_field_value,
     _enrich_record_contacts, _apply_page_level_contact_fallback
 )
-from app.config import settings
+from app.config import settings  # noqa: E402
 
 def _detect_table_headers(html: str) -> list[dict]:
     """Detect table/grid headers from HTML to understand column semantics."""

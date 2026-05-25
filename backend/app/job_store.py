@@ -110,23 +110,23 @@ def _job_to_row(job: Job) -> dict:
         "total_records": job.total_records or 0,
         "filtered_records": job.filtered_records or 0,
         "total_llm_calls": job.total_llm_calls or 0,
-        "error": job.error or "",
-        "warnings": json.dumps(job.warnings if hasattr(job, 'warnings') else []),
+        "error": job.error if job.error is not None else "",
+        "warnings": "[]",
         "quality_report": json.dumps(job.quality_report if hasattr(job, 'quality_report') else {}),
-        "analysis": job.analysis or "",
+        "analysis": job.analysis if job.analysis is not None else "",
         "discovered_urls": json.dumps(job.discovered_urls if hasattr(job, 'discovered_urls') else []),
         "selectors_map": json.dumps(job.selectors_map if hasattr(job, 'selectors_map') else {}),
-        "search_params": json.dumps(job.search_params if hasattr(job, 'search_params') else {}),
+        "search_params": json.dumps(job.search_params if job.search_params is not None else {}),
         "max_pages": job.max_pages if hasattr(job, 'max_pages') else 0,
         "progress_current": job.progress_current or 0,
         "progress_total": job.progress_total or 0,
         "estimated_cost_usd": job.estimated_cost_usd or 0,
         "cancel_requested": 1 if job.cancel_requested else 0,
         "created_at": job.created_at or "",
-        "completed_at": job.completed_at or "",
-        "min_record_score": job.min_record_score or 0.35,
-        "acquisition_mode": job.acquisition_mode if hasattr(job, 'acquisition_mode') else "standard",
-        "search_params_json": json.dumps(job.search_params if hasattr(job, 'search_params') else {}),
+        "completed_at": job.completed_at if job.completed_at is not None else "",
+        "min_record_score": job.min_record_score if job.min_record_score is not None else 0.35,
+        "acquisition_mode": "standard",
+        "search_params_json": json.dumps(job.search_params if job.search_params is not None else {}),
         "location": job.location or "",
         "preferred_domain": job.preferred_domain or "",
         "source_policy": job.source_policy.value if hasattr(job.source_policy, 'value') else str(job.source_policy),
@@ -136,9 +136,9 @@ def _job_to_row(job: Job) -> dict:
         "pagination": 1 if job.pagination else 0,
         "deduplicate": 1 if job.deduplicate else 0,
         "deduplicate_field": job.deduplicate_field or "",
-        "started_at": job.started_at or "",
+        "started_at": job.started_at if job.started_at is not None else "",
         "results_on_disk": 1 if job.results_on_disk else 0,
-        "results_file_path": job.results_file_path or "",
+        "results_file_path": job.results_file_path if job.results_file_path is not None else "",
     }
 
 
@@ -166,23 +166,20 @@ def _row_to_job(row: dict) -> Job | None:
             "total_records": row.get("total_records", 0),
             "filtered_records": row.get("filtered_records", 0),
             "total_llm_calls": row.get("total_llm_calls", 0),
-            "error": row.get("error", ""),
-            "warnings": json.loads(row.get("warnings", "[]")),
+            "error": row.get("error") or None,
             "quality_report": json.loads(row.get("quality_report", "{}")),
-            "analysis": row.get("analysis", ""),
+            "analysis": row.get("analysis") or None,
             "discovered_urls": json.loads(row.get("discovered_urls", "[]")),
             "selectors_map": json.loads(row.get("selectors_map", "{}")),
-            "search_params": json.loads(row.get("search_params", "{}")),
+            "search_params": json.loads(row.get("search_params", "{}")) or None,
             "max_pages": row.get("max_pages", 0),
             "progress_current": row.get("progress_current", 0),
             "progress_total": row.get("progress_total", 0),
             "estimated_cost_usd": row.get("estimated_cost_usd", 0),
             "cancel_requested": bool(row.get("cancel_requested", 0)),
             "created_at": row.get("created_at", ""),
-            "completed_at": row.get("completed_at", ""),
+            "completed_at": row.get("completed_at") or None,
             "min_record_score": row.get("min_record_score", 0.35),
-            "acquisition_mode": row.get("acquisition_mode", "standard"),
-            "search_params_json": row.get("search_params_json", "{}"),
             "location": row.get("location", ""),
             "preferred_domain": row.get("preferred_domain", ""),
             "source_policy": sp,
@@ -392,7 +389,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
             # Dynamically add any missing columns in both tables to prevent data-loss or crashes in existing databases
             for table_name in ["jobs", "recycle_bin"]:
                 cursor = conn.execute(f"PRAGMA table_info({table_name})")
-                existing_cols = {r["name"] for r in cursor.fetchall()}
+                v3_cols: set[str] = {r["name"] for r in cursor.fetchall()}
                 new_fields = {
                     "location": "TEXT DEFAULT ''",
                     "preferred_domain": "TEXT DEFAULT ''",
@@ -408,7 +405,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                     "results_file_path": "TEXT DEFAULT ''",
                 }
                 for col_name, col_def in new_fields.items():
-                    if col_name not in existing_cols:
+                    if col_name not in v3_cols:
                         conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_def}")
             current = 3
 

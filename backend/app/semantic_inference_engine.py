@@ -201,7 +201,7 @@ class RoleEmbeddingEngine:
         # Scale by pressure [0.5, 2.0] and stability (1.0 - certainty)
         return base_rate * (0.5 + pressure * 1.5) * (1.0 - certainty)
 
-    def learn_from_allocation(self, role: str, token_type: SemanticType, token_raw: str, success: bool, delta: float = 0.05, coherence: float = 1.0):
+    def learn_from_allocation(self, role: str, token_type: SemanticType, _token_raw: str, success: bool, delta: float = 0.05, coherence: float = 1.0):
         """Apply learning force directly to the manifold."""
         if coherence < 0.6:
             return

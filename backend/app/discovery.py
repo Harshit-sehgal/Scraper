@@ -10,9 +10,9 @@ from typing import Optional
 from urllib.parse import urlparse, urlunparse
 
 try:
-    from ddgs import DDGS
+    from ddgs import DDGS  # type: ignore[assignment]
 except ImportError:
-    from duckduckgo_search import DDGS
+    from duckduckgo_search import DDGS  # type: ignore[assignment]
 
 from app.async_utils import run_sync_in_thread
 from app.config import settings

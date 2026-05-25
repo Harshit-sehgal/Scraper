@@ -68,7 +68,7 @@ def _should_retry_http_error(error: Exception) -> bool:
     return any(token in text for token in ["429", "timed out", "connection", "temporary"])
 
 
-from app.config import settings
+from app.config import settings  # noqa: E402
 
 async def _call_openai_compatible_json(
     endpoint: str,

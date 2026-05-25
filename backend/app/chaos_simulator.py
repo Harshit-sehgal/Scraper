@@ -198,7 +198,7 @@ class ChaosSimulator:
         self.logger.error(f"System did not recover from {failure_mode.value} within {timeout}s")
         return False
     
-    def _is_system_healthy(self, previous_failure: FailureMode) -> bool:
+    def _is_system_healthy(self, _previous_failure: FailureMode) -> bool:
         """Check if system is healthy after failure"""
         try:
             from app.domain_health_alerts import get_domain_health_monitor

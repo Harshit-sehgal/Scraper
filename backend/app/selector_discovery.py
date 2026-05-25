@@ -493,8 +493,8 @@ def _infer_field_selectors_from_container(container_sel: str, html: str, schema_
 
 # ─── URL Analyzer — Auto-Detect Fields from a URL ────────────────────────
 
-import re
-from bs4 import BeautifulSoup
+import re  # noqa: E402
+from bs4 import BeautifulSoup  # noqa: E402
 
 
 # ─── Redirect Detection ────────────────────────────────────────────────
