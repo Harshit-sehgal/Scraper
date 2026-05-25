@@ -256,6 +256,7 @@ async def test_crawl_policy_active_counter_never_leaks_on_fetch_failure(monkeypa
     # Get active crawl policy and reset it
     policy = get_crawl_policy()
     policy.reset_domain("https://example.com/fail-fetch")
+    monkeypatch.setattr(policy, "_respect_robots", False)
     
     # Assert initial state
     assert policy._domains["example.com"].active_fetches == 0
@@ -285,11 +286,18 @@ async def test_scrape_attempt_result_exposes_html_and_telemetry(monkeypatch):
     # Reset domain crawl pacing to prevent blocks
     policy = get_crawl_policy()
     policy.reset_domain("https://unique-subclass.example.com/")
+    monkeypatch.setattr(policy, "_respect_robots", False)
     
     async def fake_fetch(*args, **kwargs):
-        return "<html><body><h1>Example</h1></body></html>", "playwright_full", 123.0, 0.0
+        return "<html><body><h1>Example</h1></body></html>", 0.0, "playwright_full", 0
+
+    async def fake_orchestrate(*args, **kwargs):
+        from app.extraction_orchestrator import ExtractionResult
+
+        return ExtractionResult([], "regex")
         
     monkeypatch.setattr(scraper, "fetch_page_content", fake_fetch)
+    monkeypatch.setattr(scraper, "orchestrate_extraction", fake_orchestrate)
     
     results = await scraper.scrape_url(
         "https://unique-subclass.example.com/test-result-subclass",

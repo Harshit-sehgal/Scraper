@@ -1,11 +1,13 @@
 """Tests for the operator router: mode switching, dashboard, predictions."""
 from __future__ import annotations
 
+import asyncio
+
+import httpx
 import pytest
 from unittest.mock import patch, MagicMock
 
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 from app.routers.operator import router as operator_router
 from app.visualization import OperatorMode
@@ -14,6 +16,27 @@ from app.visualization import OperatorMode
 # ─────────────────────────────────────────────────────────────────────
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────
+
+
+class LocalASGIClient:
+    """Small sync wrapper around httpx ASGITransport that avoids TestClient threads."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def _request(self, method: str, url: str, **kwargs):
+        transport = httpx.ASGITransport(app=self.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+            return await ac.request(method, url, **kwargs)
+
+    def request(self, method: str, url: str, **kwargs):
+        return asyncio.run(self._request(method, url, **kwargs))
+
+    def get(self, url: str, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url: str, **kwargs):
+        return self.request("POST", url, **kwargs)
 
 
 @pytest.fixture
@@ -25,7 +48,7 @@ def app():
 
 @pytest.fixture
 def client(app):
-    return TestClient(app)
+    return LocalASGIClient(app)
 
 
 # ─────────────────────────────────────────────────────────────────────

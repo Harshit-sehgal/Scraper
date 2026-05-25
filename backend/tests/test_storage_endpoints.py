@@ -1,6 +1,9 @@
 """Tests for storage/health/readiness endpoints."""
 
-from fastapi.testclient import TestClient
+import asyncio
+
+import httpx
+
 from app.main import app
 
 # Module-level in-memory job overrides —
@@ -8,7 +11,26 @@ from app.main import app
 # only check liveness/readiness which does not depend
 # on the in-memory store being populated.
 
-client = TestClient(app)
+
+class LocalASGIClient:
+    """Small sync wrapper around httpx ASGITransport that avoids TestClient threads."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def _request(self, method: str, url: str, **kwargs):
+        transport = httpx.ASGITransport(app=self.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+            return await ac.request(method, url, **kwargs)
+
+    def request(self, method: str, url: str, **kwargs):
+        return asyncio.run(self._request(method, url, **kwargs))
+
+    def get(self, url: str, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+
+client = LocalASGIClient(app)
 
 
 class TestHealthEndpoint:

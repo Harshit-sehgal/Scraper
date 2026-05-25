@@ -185,6 +185,7 @@ def test_progress_persistence_without_full_state_rewrite(monkeypatch):
     import asyncio
     from app.services.job_runner import run_job
     from app.models import Job, JobStatus
+    from app.domain_runtime_policy import reset_domain_runtime_policy
 
     # Counter to verify which persistence functions were called
     full_state_writes = 0
@@ -214,21 +215,31 @@ def test_progress_persistence_without_full_state_rewrite(monkeypatch):
     async def mock_scrape_url_with_recovery(*args, **kwargs):
         return [{"title": "Test record"}], {"acquisition_lineage": {}, "recovery_attempts": 0}
 
+    async def mock_generate_data_insight(*args, **kwargs):
+        return "Mock insight."
+
+    reset_domain_runtime_policy()
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", mock_scrape_url_with_recovery)
+    monkeypatch.setattr("app.scraper.generate_data_insight", mock_generate_data_insight)
+    monkeypatch.setattr("app.services.job_runner.load_semantic_state", lambda: None)
+    monkeypatch.setattr("app.services.job_runner.save_semantic_state", lambda: None)
 
     # Let's run run_job with the mocks
-    asyncio.run(run_job(
-        job_id=job_id,
-        jobs_store=jobs_store,
-        persist_state_fn=mock_persist_state,
-        max_discovery_urls=5,
-        max_job_runtime_seconds=5,
-        per_url_scrape_timeout_seconds=5,
-        ai_structuring_timeout_seconds=5,
-        insight_timeout_seconds=5,
-        persist_state_single_fn=mock_persist_single,
-        persist_state_single_critical_fn=mock_persist_single,
-    ))
+    try:
+        asyncio.run(run_job(
+            job_id=job_id,
+            jobs_store=jobs_store,
+            persist_state_fn=mock_persist_state,
+            max_discovery_urls=5,
+            max_job_runtime_seconds=5,
+            per_url_scrape_timeout_seconds=5,
+            ai_structuring_timeout_seconds=5,
+            insight_timeout_seconds=5,
+            persist_state_single_fn=mock_persist_single,
+            persist_state_single_critical_fn=mock_persist_single,
+        ))
+    finally:
+        reset_domain_runtime_policy()
 
     # Assert that the job successfully completed
     assert job.status == JobStatus.COMPLETED
@@ -461,9 +472,10 @@ def test_same_domain_concurrency_respected(monkeypatch):
     import asyncio
     from app.services.job_runner import run_job
     from app.models import Job, JobStatus
-    from app.domain_runtime_policy import get_domain_runtime_policy
+    from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
 
     # Configure the test domain to have max_parallel = 1
+    reset_domain_runtime_policy()
     policy = get_domain_runtime_policy()
     policy.get_or_create("https://testdomain.com/1").max_parallel = 1
 
@@ -480,7 +492,13 @@ def test_same_domain_concurrency_respected(monkeypatch):
         active_scrapes -= 1
         return [{"title": "Record"}], {"acquisition_lineage": {}, "recovery_attempts": 0}
 
+    async def mock_generate_data_insight(*args, **kwargs):
+        return "Mock insight."
+
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", mock_scrape_url_with_recovery)
+    monkeypatch.setattr("app.scraper.generate_data_insight", mock_generate_data_insight)
+    monkeypatch.setattr("app.services.job_runner.load_semantic_state", lambda: None)
+    monkeypatch.setattr("app.services.job_runner.save_semantic_state", lambda: None)
 
     # We create a job with 3 URLs of the SAME domain
     job = Job(
@@ -497,16 +515,19 @@ def test_same_domain_concurrency_respected(monkeypatch):
     )
 
     # Run the job
-    asyncio.run(run_job(
-        job_id=job.id,
-        jobs_store={job.id: job},
-        persist_state_fn=lambda: None,
-        max_discovery_urls=5,
-        max_job_runtime_seconds=5,
-        per_url_scrape_timeout_seconds=5,
-        ai_structuring_timeout_seconds=5,
-        insight_timeout_seconds=5,
-    ))
+    try:
+        asyncio.run(run_job(
+            job_id=job.id,
+            jobs_store={job.id: job},
+            persist_state_fn=lambda: None,
+            max_discovery_urls=5,
+            max_job_runtime_seconds=5,
+            per_url_scrape_timeout_seconds=5,
+            ai_structuring_timeout_seconds=5,
+            insight_timeout_seconds=5,
+        ))
+    finally:
+        reset_domain_runtime_policy()
 
     # Since same domain has max_parallel = 1, the active_scrapes must never exceed 1!
     assert max_active_scrapes == 1
@@ -604,5 +625,3 @@ def test_offloaded_results_survive_restart(monkeypatch):
     finally:
         if db_path.exists():
             db_path.unlink()
-
-

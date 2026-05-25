@@ -23,8 +23,12 @@ from app.job_store import (
 @pytest.fixture()
 def isolated_db(tmp_path, monkeypatch):
     """Point job_store at a fresh temp DB for each test."""
+    from app.config import settings
+
     db_file = tmp_path / "test_jobs.db"
-    monkeypatch.setenv("DATAFORGE_STATE_FILE", str(db_file.with_suffix(".json")))
+    state_file = db_file.with_suffix(".json")
+    monkeypatch.setenv("DATAFORGE_STATE_FILE", str(state_file))
+    monkeypatch.setattr(settings, "STATE_FILE_PATH", str(state_file))
     reset_job_store_for_tests()
     yield db_file
     reset_job_store_for_tests()
@@ -46,6 +50,65 @@ def _roundtrip(job: Job) -> Job:
     result = _row_to_job(row)
     assert result is not None, "Deserialization returned None"
     return result
+
+
+def _make_parity_job() -> Job:
+    from app.models import FilterRule, LogEntry, SchemaField
+
+    return Job(
+        id="job-field-parity",
+        name="parity-test",
+        mode=ScrapeMode.AUTO,
+        intent="find all products",
+        urls=["https://example.com/products", "https://example.com/shop"],
+        topic="e-commerce products",
+        location="New York",
+        preferred_domain="example.com",
+        source_policy=SourcePolicy.ALL_SOURCES,
+        max_per_domain=3,
+        origin_location="40.7128,-74.0060",
+        max_distance_km=50.0,
+        schema_fields=[SchemaField(name="price", field_type="number")],
+        filters=[FilterRule(field_name="price", operator="greater_than", value="10")],
+        pagination=True,
+        max_pages=5,
+        deduplicate=False,
+        deduplicate_field="url",
+        min_record_score=0.7,
+        selectors_map={"https://example.com": [".product"]},
+        search_params={"q": "laptop", "page": "1"},
+        cancel_requested=True,
+        status=JobStatus.DEGRADED,
+        created_at="2026-05-25T09:59:00",
+        started_at="2026-05-25T10:00:00",
+        completed_at="2026-05-25T10:05:00",
+        total_records=42,
+        filtered_records=38,
+        error="partial scrape warning",
+        results=[{"name": "Widget", "price": 9.99}],
+        analysis="High quality results",
+        discovered_urls=[{"url": "https://example.com/p/1", "score": 0.9}],
+        quality_report={"score": 0.95, "issues": []},
+        estimated_cost_usd=0.05,
+        total_llm_calls=3,
+        logs=[
+            LogEntry(
+                timestamp="2026-05-25T10:00:01",
+                level="info",
+                message="started",
+            )
+        ],
+        progress_current=42,
+        progress_total=42,
+        results_on_disk=True,
+        results_file_path="/tmp/results.gz",
+        warnings=["warning1"],
+        acquisition_mode="aggressive",
+    )
+
+
+def _assert_job_field_parity(restored: Job, expected: Job) -> None:
+    assert restored.model_dump(mode="json") == expected.model_dump(mode="json")
 
 
 # ---------------------------------------------------------------------------
@@ -143,94 +206,21 @@ def test_sqlite_acquisition_mode_not_overwritten_on_save(isolated_db):
 
 def test_sqlite_full_job_field_parity(isolated_db):
     """Every important Job field survives a _job_to_row → _row_to_job round-trip."""
-    from app.models import SchemaField, FilterRule, LogEntry
-
-    job = Job(
-        name="parity-test",
-        mode=ScrapeMode.AUTO,
-        intent="find all products",
-        urls=["https://example.com/products", "https://example.com/shop"],
-        topic="e-commerce products",
-        location="New York",
-        preferred_domain="example.com",
-        source_policy=SourcePolicy.ALL_SOURCES,
-        max_per_domain=3,
-        origin_location="40.7128,-74.0060",
-        max_distance_km=50.0,
-        schema_fields=[SchemaField(name="price", field_type="number")],
-        filters=[FilterRule(field_name="price", operator="greater_than", value="10")],
-        pagination=True,
-        max_pages=5,
-        deduplicate=False,
-        deduplicate_field="url",
-        min_record_score=0.7,
-        selectors_map={"https://example.com": [".product"]},
-        search_params={"q": "laptop", "page": "1"},
-        cancel_requested=False,
-        status=JobStatus.COMPLETED,
-        started_at="2026-05-25T10:00:00",
-        completed_at="2026-05-25T10:05:00",
-        total_records=42,
-        filtered_records=38,
-        error=None,
-        results=[{"name": "Widget", "price": 9.99}],
-        analysis="High quality results",
-        discovered_urls=[{"url": "https://example.com/p/1", "score": 0.9}],
-        quality_report={"score": 0.95, "issues": []},
-        estimated_cost_usd=0.05,
-        total_llm_calls=3,
-        logs=[LogEntry(level="info", message="started")],
-        progress_current=42,
-        progress_total=42,
-        results_on_disk=True,
-        results_file_path="/tmp/results.gz",
-        warnings=["warning1"],
-        acquisition_mode="aggressive",
-    )
-
+    job = _make_parity_job()
     restored = _roundtrip(job)
+    _assert_job_field_parity(restored, job)
 
-    assert restored.name == job.name
-    assert restored.mode == job.mode
-    assert restored.intent == job.intent
-    assert restored.urls == job.urls
-    assert restored.topic == job.topic
-    assert restored.location == job.location
-    assert restored.preferred_domain == job.preferred_domain
-    assert restored.source_policy == job.source_policy
-    assert restored.max_per_domain == job.max_per_domain
-    assert restored.origin_location == job.origin_location
-    assert restored.max_distance_km == job.max_distance_km
-    assert len(restored.schema_fields) == 1
-    assert restored.schema_fields[0].name == "price"
-    assert len(restored.filters) == 1
-    assert restored.filters[0].field_name == "price"
-    assert restored.pagination == job.pagination
-    assert restored.max_pages == job.max_pages
-    assert restored.deduplicate == job.deduplicate
-    assert restored.deduplicate_field == job.deduplicate_field
-    assert restored.min_record_score == job.min_record_score
-    assert restored.selectors_map == job.selectors_map
-    assert restored.search_params == job.search_params
-    assert restored.cancel_requested == job.cancel_requested
-    assert restored.status == job.status
-    assert restored.started_at == job.started_at
-    assert restored.completed_at == job.completed_at
-    assert restored.total_records == job.total_records
-    assert restored.filtered_records == job.filtered_records
-    assert restored.error == job.error
-    assert restored.results == job.results
-    assert restored.analysis == job.analysis
-    assert restored.discovered_urls == job.discovered_urls
-    assert restored.quality_report == job.quality_report
-    assert restored.estimated_cost_usd == job.estimated_cost_usd
-    assert restored.total_llm_calls == job.total_llm_calls
-    assert len(restored.logs) == 1
-    assert restored.logs[0].message == "started"
-    assert restored.progress_current == job.progress_current
-    assert restored.progress_total == job.progress_total
-    assert restored.results_on_disk == job.results_on_disk
-    assert restored.results_file_path == job.results_file_path
+
+def test_sqlite_full_job_field_parity_via_db(isolated_db):
+    """Every important Job field survives a real save_state → load_state round-trip."""
+    job = _make_parity_job()
+
+    save_state({job.id: job}, {})
+    jobs, _, _ = load_state()
+
+    restored = jobs.get(job.id)
+    assert restored is not None
+    _assert_job_field_parity(restored, job)
     assert restored.warnings == ["warning1"]
     assert restored.acquisition_mode == "aggressive"
 

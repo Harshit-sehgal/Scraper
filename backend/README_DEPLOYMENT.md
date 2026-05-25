@@ -17,7 +17,7 @@ To deploy the DataForge scraper platform locally, follow these structured steps:
 1. **Clone & Setup Virtual Environment**
    ```bash
    cd backend
-   python -m venv .venv
+   python3 -m venv .venv
    source .venv/bin/activate
    pip install -r requirements.txt
    ```
