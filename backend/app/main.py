@@ -272,7 +272,10 @@ async def _periodic_gossip_propagation():
 
 
 def _persist_single_wrapper(job_id: str, critical: bool = False) -> None:
-    """Persist a single job to SQLite.
+    """Persist a single job to the configured backend.
+
+    Resolves the repository lazily via get_job_repository() so this works
+    before lifespan runs (e.g. in tests).
 
     Args:
         job_id: The job ID to persist.
@@ -283,7 +286,7 @@ def _persist_single_wrapper(job_id: str, critical: bool = False) -> None:
     job = jobs_store.get(job_id)
     if job:
         try:
-            job_repo.save_single(job)
+            get_job_repository().save_single(job)
         except Exception as e:
             logger.error("Failed to persist single job %s: %s", job_id, e)
             if critical:
