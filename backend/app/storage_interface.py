@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 from app.models import Job
 
 class JobRepository(ABC):
@@ -15,6 +16,11 @@ class JobRepository(ABC):
     @abstractmethod
     def load_recycle_bin(self) -> dict[str, Job]:
         """Load all deleted/recycled jobs from the persistent store."""
+        pass
+        
+    @abstractmethod
+    def load_all(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+        """Load active jobs, recycled jobs, and world state in a single DB read pass."""
         pass
         
     @abstractmethod
@@ -43,6 +49,10 @@ class SQLiteJobRepository(JobRepository):
         from app.job_store import load_state
         _, recycle, _ = load_state()
         return recycle
+
+    def load_all(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+        from app.job_store import load_state
+        return load_state()
         
     def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job]) -> None:
         from app.job_store import save_state
@@ -51,3 +61,4 @@ class SQLiteJobRepository(JobRepository):
     def save_single(self, job: Job) -> None:
         from app.job_store import persist_state_single
         persist_state_single(job)
+

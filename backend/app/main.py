@@ -160,8 +160,7 @@ async def lifespan(app: FastAPI):
     }
 
     # Durable job store & semantic field state — single DB read on startup
-    from app.job_store import load_state
-    loaded_jobs, loaded_recycle, world_state_data = load_state()
+    loaded_jobs, loaded_recycle, world_state_data = job_repo.load_all()
     jobs_store.clear()
     jobs_store.update(loaded_jobs)
     recycle_bin_store.clear()

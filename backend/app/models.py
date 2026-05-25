@@ -271,4 +271,7 @@ class Job(BaseModel):
     progress_total: int = 0
     results_on_disk: bool = Field(default=False, description="Whether results are stored in a compressed disk file")
     results_file_path: Optional[str] = Field(default=None, description="Path to the compressed results file")
+    warnings: list[str] = Field(default_factory=list, description="Job warning logs and anomaly reports")
+    acquisition_mode: str = Field(default="standard", description="Acquisition mode: standard, aggressive, or deep_scan")
+
 

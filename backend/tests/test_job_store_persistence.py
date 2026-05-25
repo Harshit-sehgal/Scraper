@@ -1,13 +1,14 @@
 """Regression tests for job_store.py field persistence.
 
 Covers:
-- warnings field round-trip (was hardcoded to "[]")
-- acquisition_mode field round-trip (was hardcoded to "standard")
+- warnings field round-trip (fully typed Pydantic field)
+- acquisition_mode field round-trip (fully typed Pydantic field)
 - Full field parity: every important Job field survives save → load
 """
 
 import os
 import tempfile
+import json
 from pathlib import Path
 
 import pytest
@@ -62,40 +63,30 @@ def test_sqlite_preserves_job_warnings_empty(isolated_db):
 
 
 def test_sqlite_preserves_job_warnings_with_data(isolated_db):
-    """If Job gains a warnings field, its value is persisted (not overwritten with [])."""
-    job = _make_job()
-    # Simulate a future Job that has warnings
-    object.__setattr__(job, "warnings", ["selector drift detected", "low confidence"])
+    """Warnings field value is persisted (not overwritten with [])."""
+    job = _make_job(warnings=["selector drift detected", "low confidence"])
     row = _job_to_row(job)
-    import json
     assert json.loads(row["warnings"]) == ["selector drift detected", "low confidence"]
 
 
 def test_sqlite_preserves_job_warnings_restored(isolated_db):
-    """warnings stored in the row are restored onto the job if the field exists."""
-    job = _make_job()
-    object.__setattr__(job, "warnings", ["w1", "w2"])
+    """warnings stored in the row are restored onto the job."""
+    job = _make_job(warnings=["w1", "w2"])
     row = _job_to_row(job)
     restored = _row_to_job(row)
     assert restored is not None
-    # If Job has warnings, it should be restored; if not, the row value is still correct
-    import json
     assert json.loads(row["warnings"]) == ["w1", "w2"]
-    if hasattr(restored, "warnings"):
-        assert restored.warnings == ["w1", "w2"]
+    assert restored.warnings == ["w1", "w2"]
 
 
 def test_sqlite_warnings_via_db(isolated_db):
     """End-to-end: warnings survive save_state → load_state."""
-    job = _make_job(status=JobStatus.COMPLETED)
-    object.__setattr__(job, "warnings", ["test warning"])
+    job = _make_job(status=JobStatus.COMPLETED, warnings=["test warning"])
     save_state({job.id: job}, {})
     jobs, _, _ = load_state()
     loaded = jobs.get(job.id)
-    # Job was marked FAILED on recovery (was COMPLETED so no recovery), check it loaded
     assert loaded is not None
-    if hasattr(loaded, "warnings"):
-        assert loaded.warnings == ["test warning"]
+    assert loaded.warnings == ["test warning"]
 
 
 # ---------------------------------------------------------------------------
@@ -111,8 +102,7 @@ def test_sqlite_preserves_acquisition_mode_default(isolated_db):
 
 def test_sqlite_preserves_acquisition_mode_custom_string(isolated_db):
     """A string acquisition_mode is persisted as-is."""
-    job = _make_job()
-    object.__setattr__(job, "acquisition_mode", "deep_crawl")
+    job = _make_job(acquisition_mode="deep_crawl")
     row = _job_to_row(job)
     assert row["acquisition_mode"] == "deep_crawl"
 
@@ -125,34 +115,29 @@ def test_sqlite_preserves_acquisition_mode_enum(isolated_db):
         STANDARD = "standard"
         AGGRESSIVE = "aggressive"
 
-    job = _make_job()
-    object.__setattr__(job, "acquisition_mode", AcquisitionMode.AGGRESSIVE)
+    job = _make_job(acquisition_mode=AcquisitionMode.AGGRESSIVE)
     row = _job_to_row(job)
     assert row["acquisition_mode"] == "aggressive"
 
 
 def test_sqlite_preserves_acquisition_mode_restored(isolated_db):
-    """acquisition_mode stored in the row is restored onto the job if the field exists."""
-    job = _make_job()
-    object.__setattr__(job, "acquisition_mode", "deep_crawl")
+    """acquisition_mode stored in the row is restored onto the job."""
+    job = _make_job(acquisition_mode="deep_crawl")
     row = _job_to_row(job)
     restored = _row_to_job(row)
     assert restored is not None
     assert row["acquisition_mode"] == "deep_crawl"
-    if hasattr(restored, "acquisition_mode"):
-        assert restored.acquisition_mode == "deep_crawl"
+    assert restored.acquisition_mode == "deep_crawl"
 
 
 def test_sqlite_acquisition_mode_not_overwritten_on_save(isolated_db):
     """Saving a job with a non-standard mode does not reset it to 'standard'."""
-    job = _make_job(status=JobStatus.COMPLETED)
-    object.__setattr__(job, "acquisition_mode", "aggressive")
+    job = _make_job(status=JobStatus.COMPLETED, acquisition_mode="aggressive")
     save_state({job.id: job}, {})
     jobs, _, _ = load_state()
     loaded = jobs.get(job.id)
     assert loaded is not None
-    if hasattr(loaded, "acquisition_mode"):
-        assert loaded.acquisition_mode == "aggressive"
+    assert loaded.acquisition_mode == "aggressive"
 
 
 # ---------------------------------------------------------------------------
@@ -202,9 +187,9 @@ def test_sqlite_full_job_field_parity(isolated_db):
         progress_total=42,
         results_on_disk=True,
         results_file_path="/tmp/results.gz",
+        warnings=["warning1"],
+        acquisition_mode="aggressive",
     )
-    object.__setattr__(job, "warnings", ["warning1"])
-    object.__setattr__(job, "acquisition_mode", "aggressive")
 
     restored = _roundtrip(job)
 
@@ -249,10 +234,8 @@ def test_sqlite_full_job_field_parity(isolated_db):
     assert restored.progress_total == job.progress_total
     assert restored.results_on_disk == job.results_on_disk
     assert restored.results_file_path == job.results_file_path
-    if hasattr(restored, "warnings"):
-        assert restored.warnings == ["warning1"]
-    if hasattr(restored, "acquisition_mode"):
-        assert restored.acquisition_mode == "aggressive"
+    assert restored.warnings == ["warning1"]
+    assert restored.acquisition_mode == "aggressive"
 
 
 # ---------------------------------------------------------------------------
