@@ -6,10 +6,7 @@ Covers:
 - Full field parity: every important Job field survives save → load
 """
 
-import os
-import tempfile
 import json
-from pathlib import Path
 
 import pytest
 

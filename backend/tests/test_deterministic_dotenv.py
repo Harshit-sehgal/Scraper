@@ -1,8 +1,6 @@
 import os
-import sys
 import importlib
 from pathlib import Path
-import pytest
 
 def test_deterministic_dotenv_loading(tmp_path, monkeypatch):
     """Verify that importing/reloading app package loads backend/.env even when CWD is changed."""
