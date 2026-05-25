@@ -9,7 +9,10 @@ from collections import defaultdict
 from typing import Optional
 from urllib.parse import urlparse, urlunparse
 
-from ddgs import DDGS
+try:
+    from ddgs import DDGS
+except ImportError:
+    from duckduckgo_search import DDGS
 
 from app.async_utils import run_sync_in_thread
 from app.config import settings

@@ -16,10 +16,11 @@ FROM python:3.12-slim AS base
 WORKDIR /app
 
 # Environment defaults (overridable at runtime)
-ENV PYTHONPATH=/app \
+ENV PYTHONPATH=/app/backend \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Runtime system libraries for Playwright/Chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -62,18 +63,18 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 3: Production (minimal, secure)
 # ─────────────────────────────────────────────────────────────────────────────
 FROM deps AS production
 
-# Install Playwright browsers (only chromium, minimal deps)
-RUN playwright install chromium 2>&1 | tail -3
-
 # Create non-root user
 RUN groupadd -r dataforge && useradd -r -g dataforge -d /app -s /usr/sbin/nologin dataforge
+
+# Install Playwright browsers (only chromium, minimal deps)
+RUN mkdir -p /ms-playwright && playwright install chromium 2>&1 | tail -3 && chown -R dataforge:dataforge /ms-playwright
 
 # Copy application code
 COPY backend/ backend/
@@ -90,4 +91,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 EXPOSE 8000
 
 # Production: no --reload, info-level logs
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]

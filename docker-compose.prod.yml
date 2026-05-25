@@ -30,6 +30,8 @@ services:
       - .env
     environment:
       - DATAFORGE_ENV=production
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      - TMPDIR=/tmp
     volumes:
       - dataforge_data:/app/backend/data
     depends_on: []
