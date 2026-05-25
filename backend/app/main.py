@@ -8,11 +8,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Any
 
-# Load .env before any app imports that read env vars at module level
-from dotenv import load_dotenv
-load_dotenv()
-
-# ruff: noqa: E402
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
