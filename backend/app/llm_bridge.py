@@ -229,7 +229,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
     try:
         def _run_g4f_json():
             try:
-                from g4f.client import Client  # type: ignore[import-untyped]
+                from g4f.client import Client  # type: ignore
             except ImportError:
                 logging.warning("g4f not installed — skipping g4f JSON fallback")
                 return None

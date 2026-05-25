@@ -126,8 +126,8 @@ def _job_to_row(job: Job) -> dict:
         "completed_at": job.completed_at if job.completed_at is not None else "",
         "min_record_score": job.min_record_score if job.min_record_score is not None else 0.35,
         "acquisition_mode": (
-            job.acquisition_mode.value
-            if hasattr(getattr(job, "acquisition_mode", None), "value")
+            getattr(job.acquisition_mode, "value")
+            if hasattr(job.acquisition_mode, "value")
             else str(job.acquisition_mode or "standard")
         ),
         "search_params_json": json.dumps(job.search_params if job.search_params is not None else {}),
