@@ -25,9 +25,8 @@ from app.html_utils import (
     _is_empty_value, fetch_page_content, _boost_contacts_with_page_html,
 )
 from app.models import SchemaField
-from app.semantic_pipeline import run_pipeline
 from app.data_utils import (
-    _dedupe_records, _limit_source_records as _base_limit_source_records,
+    _limit_source_records as _base_limit_source_records,
     process_raw_records,
 )
 from app.selector_profiles.loader import try_profile_extraction, match_profile_for_url
