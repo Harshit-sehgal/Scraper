@@ -7,12 +7,33 @@ import httpx
 import pytest
 
 
+def pytest_addoption(parser):
+    """Register the --run-postgres CLI flag."""
+    parser.addoption(
+        "--run-postgres",
+        action="store_true",
+        default=False,
+        help="Run tests marked with @pytest.mark.postgres (requires Docker + testcontainers).",
+    )
+
+
 def pytest_configure(config):
     """Register custom markers to avoid PytestUnknownMarkWarning."""
     config.addinivalue_line(
         "markers",
         "postgres: tests that require a running Postgres instance (via testcontainers). Skipped by default.",
     )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip tests marked 'postgres' unless --run-postgres is provided."""
+    if config.getoption("--run-postgres", default=False):
+        return  # Don't skip anything
+
+    skip_postgres = pytest.mark.skip(reason="need --run-postgres to run (Postgres integration tests)")
+    for item in items:
+        if "postgres" in item.keywords:
+            item.add_marker(skip_postgres)
 
 
 ROOT = Path(__file__).resolve().parents[2]

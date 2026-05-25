@@ -1,0 +1,13 @@
+# =============================================================================
+# DataForge Scraper — Development Dependencies
+# =============================================================================
+# Install:  pip install -r backend/requirements-dev.txt
+# Run:      pytest -q -m "not postgres"
+# Postgres: pytest --run-postgres -m postgres -v
+# =============================================================================
+
+-r requirements.txt
+
+# ─── Optional Test Dependencies ──────────────────────────────────────────
+testcontainers[postgres]>=4.0.0
+pytest-cov>=5.0.0

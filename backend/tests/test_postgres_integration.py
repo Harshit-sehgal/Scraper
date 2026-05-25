@@ -76,6 +76,42 @@ class TestPostgresJobRepositoryIntegration:
         assert health["backend"] == "postgres"
         assert health["schema_version"] >= 1
 
+    def test_health_check_on_fresh_empty_db(self, postgres_container):
+        """health_check works on a fresh DB where no schema has been created yet."""
+        from app.postgres_repository import PostgresJobRepository
+
+        reset_repository()
+        fresh_repo = PostgresJobRepository()
+        # Don't call _ensure() — let health_check handle it
+        health = fresh_repo.health_check()
+        assert health["ok"] is True, f"Health check on fresh DB failed: {health}"
+        assert health["backend"] == "postgres"
+        assert health["schema_version"] >= 1
+        assert health["job_count"] == 0
+        assert health["recycle_bin_count"] == 0
+
+    def test_recycle_bin_table_exists_after_schema_creation(self, postgres_container):
+        """recycle_bin table is explicitly created in the Postgres schema."""
+        from app.postgres_repository import PostgresJobRepository, _conn, _fetch_one
+
+        reset_repository()
+        repo = PostgresJobRepository()
+        repo._ensure()
+
+        # Verify the table exists by querying its structure
+        with _conn() as conn:
+            row = _fetch_one(
+                conn,
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_name = 'recycle_bin'",
+            )
+            assert row is not None, "recycle_bin table does not exist in Postgres schema"
+
+        # Also verify we can insert and read from it
+        repo.save_all({}, {"test-id": Job(id="test-id", name="Recycle Test", urls=["https://example.com"])})
+        _, recycle, _ = repo.load_all()
+        assert "test-id" in recycle
+
     def test_factory_returns_postgres(self, postgres_container):
         """Factory returns PostgresJobRepository when configured."""
         from app.postgres_repository import PostgresJobRepository

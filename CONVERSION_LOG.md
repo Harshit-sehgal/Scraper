@@ -46,5 +46,42 @@ Run with:
 pytest -m postgres -v
 ```
 
+## Architecture Status (Current Production Truth)
+
+| Component | Backend | Status |
+|-----------|---------|--------|
+| **Job repository** | SQLite | Production-ready (staging, single-server) |
+| **Job repository** | Postgres | Experimental (opt-in via `DATAFORGE_STORAGE_BACKEND=postgres`) |
+| **Worker queue** | SQLite | Always SQLite-backed (even in Postgres mode). Requires shared volume between API + worker containers. |
+| **Semantic world state** | SQLite | Only SQLite mode persists world state. Postgres returns `None` (not yet implemented). |
+
+### Running Tests
+
+```bash
+# Quick run (exclude Postgres integration tests)
+pytest -q -m "not postgres"
+
+# Full Postgres integration tests (requires Docker)
+pytest --run-postgres -m postgres -v
+```
+
+### Known Limitations
+
+1. **Postgres mode is opt-in, experimental** — requires both `DATAFORGE_STORAGE_BACKEND=postgres` and `DATAFORGE_DATABASE_URL`. Startup validates connectivity before activating.
+2. **Worker queue is always SQLite** — even in Postgres mode, pending worker tasks live in `worker_queue.db`. API and worker containers must share the same `backend/data/` volume.
+3. **No Postgres world-state** — `PostgresJobRepository.load_all()` returns `None` for world state. Only SQLite persists it.
+4. **No multi-container queue** — For scale-out, the SQLite queue should be moved into Postgres (or Redis/RQ/Arq).
+5. **Postgres integration tests require Docker** — gated behind `--run-postgres` flag, skipped by default.
+
+### 120/100 Roadmap
+- ✅ SQLite single-server: ~97/100 (staging-ready)
+- ✅ Worker retry semantics: fixed
+- ✅ Repository interface: clean, no bypass
+- 🟡 Postgres job repo: ~75/100 (experimental, functional but limited)
+- ❌ Postgres queue backend: not implemented (SQLite only)
+- ❌ Postgres world-state: not implemented
+- ❌ Multi-container scale-out: requires queue + world-state in shared DB
+
 ## Future Considerations
 - If async support is needed in the future, consider making the entire `JobRepository` ABC async and updating all callers, rather than using sync wrappers around an async driver.
+- Worker queue should eventually be moved to Postgres (when `DATAFORGE_STORAGE_BACKEND=postgres`) or to Redis/RQ/Arq for multi-container scale.

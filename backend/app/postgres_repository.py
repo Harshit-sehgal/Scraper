@@ -123,59 +123,6 @@ def _execute(conn, sql: str, params=None):
 # Schema management
 # ───────────────────────────────────────────────────────────────────────
 
-_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS schema_version (
-    version INTEGER PRIMARY KEY
-);
-
-CREATE TABLE IF NOT EXISTS jobs (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',
-    mode TEXT NOT NULL DEFAULT 'manual',
-    topic TEXT DEFAULT '',
-    intent TEXT DEFAULT '',
-    urls TEXT NOT NULL DEFAULT '[]',
-    schema_fields TEXT NOT NULL DEFAULT '[]',
-    filters TEXT DEFAULT '[]',
-    results TEXT DEFAULT '[]',
-    logs TEXT DEFAULT '[]',
-    total_records INTEGER DEFAULT 0,
-    filtered_records INTEGER DEFAULT 0,
-    total_llm_calls INTEGER DEFAULT 0,
-    error TEXT DEFAULT '',
-    warnings TEXT DEFAULT '',
-    quality_report TEXT DEFAULT '{}',
-    analysis TEXT DEFAULT '',
-    discovered_urls TEXT DEFAULT '[]',
-    selectors_map TEXT DEFAULT '{}',
-    search_params TEXT DEFAULT '{}',
-    max_pages INTEGER DEFAULT 0,
-    progress_current INTEGER DEFAULT 0,
-    progress_total INTEGER DEFAULT 0,
-    estimated_cost_usd REAL DEFAULT 0,
-    cancel_requested BOOLEAN DEFAULT FALSE,
-    created_at TEXT DEFAULT '',
-    completed_at TEXT DEFAULT '',
-    min_record_score REAL DEFAULT 0.35,
-    acquisition_mode TEXT DEFAULT 'standard',
-    location TEXT DEFAULT '',
-    preferred_domain TEXT DEFAULT '',
-    source_policy TEXT DEFAULT 'all_sources',
-    max_per_domain INTEGER DEFAULT 4,
-    origin_location TEXT DEFAULT '',
-    max_distance_km REAL DEFAULT NULL,
-    pagination BOOLEAN DEFAULT FALSE,
-    deduplicate BOOLEAN DEFAULT TRUE,
-    deduplicate_field TEXT DEFAULT '',
-    started_at TEXT DEFAULT '',
-    results_on_disk BOOLEAN DEFAULT FALSE,
-    results_file_path TEXT DEFAULT '',
-    updated_at TEXT DEFAULT '',
-    deleted_at TEXT DEFAULT NULL
-);
-"""
-
 
 def _ensure_schema():
     """Run schema migrations to ensure tables exist and are up to date."""
@@ -246,6 +193,56 @@ def _ensure_schema():
                         _execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
                     except Exception:
                         pass
+
+                # Create recycle_bin table explicitly (not using CREATE TABLE ... LIKE)
+                _execute(conn, """
+                    CREATE TABLE IF NOT EXISTS recycle_bin (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'pending',
+                        mode TEXT NOT NULL DEFAULT 'manual',
+                        topic TEXT DEFAULT '',
+                        intent TEXT DEFAULT '',
+                        urls TEXT NOT NULL DEFAULT '[]',
+                        schema_fields TEXT NOT NULL DEFAULT '[]',
+                        filters TEXT DEFAULT '[]',
+                        results TEXT DEFAULT '[]',
+                        logs TEXT DEFAULT '[]',
+                        total_records INTEGER DEFAULT 0,
+                        filtered_records INTEGER DEFAULT 0,
+                        total_llm_calls INTEGER DEFAULT 0,
+                        error TEXT DEFAULT '',
+                        warnings TEXT DEFAULT '',
+                        quality_report TEXT DEFAULT '{}',
+                        analysis TEXT DEFAULT '',
+                        discovered_urls TEXT DEFAULT '[]',
+                        selectors_map TEXT DEFAULT '{}',
+                        search_params TEXT DEFAULT '{}',
+                        max_pages INTEGER DEFAULT 0,
+                        progress_current INTEGER DEFAULT 0,
+                        progress_total INTEGER DEFAULT 0,
+                        estimated_cost_usd REAL DEFAULT 0,
+                        cancel_requested BOOLEAN DEFAULT FALSE,
+                        created_at TEXT DEFAULT '',
+                        completed_at TEXT DEFAULT '',
+                        min_record_score REAL DEFAULT 0.35,
+                        acquisition_mode TEXT DEFAULT 'standard',
+                        location TEXT DEFAULT '',
+                        preferred_domain TEXT DEFAULT '',
+                        source_policy TEXT DEFAULT 'all_sources',
+                        max_per_domain INTEGER DEFAULT 4,
+                        origin_location TEXT DEFAULT '',
+                        max_distance_km REAL DEFAULT NULL,
+                        pagination BOOLEAN DEFAULT FALSE,
+                        deduplicate BOOLEAN DEFAULT TRUE,
+                        deduplicate_field TEXT DEFAULT '',
+                        started_at TEXT DEFAULT '',
+                        results_on_disk BOOLEAN DEFAULT FALSE,
+                        results_file_path TEXT DEFAULT '',
+                        updated_at TEXT DEFAULT '',
+                        deleted_at TEXT DEFAULT NULL
+                    )
+                """)
 
                 for idx_sql in [
                     "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
@@ -525,6 +522,7 @@ class PostgresJobRepository(JobRepository):
     def health_check(self) -> dict:
         """Check Postgres connectivity and schema health."""
         try:
+            self._ensure()
             with _conn() as conn:
                 row = _fetch_one(conn, "SELECT MAX(version) AS version FROM schema_version")
                 version = row["version"] if row else 0
