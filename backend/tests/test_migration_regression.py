@@ -170,7 +170,7 @@ def test_migrations_cached_per_db_path(monkeypatch):
             conn = sqlite3.connect(str(path))
             row = conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
             assert row is not None
-            assert row[0] == 2
+            assert row[0] == 3
             conn.close()
             
     finally:
@@ -263,7 +263,7 @@ def test_schema_invalidation_and_recreation(monkeypatch):
         # Verify schema is recreated successfully
         row = conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
         assert row is not None
-        assert row[0] == 2
+        assert row[0] == 3
         conn.close()
 
     finally:
@@ -511,5 +511,98 @@ def test_same_domain_concurrency_respected(monkeypatch):
     # Since same domain has max_parallel = 1, the active_scrapes must never exceed 1!
     assert max_active_scrapes == 1
     assert job.status == JobStatus.COMPLETED
+
+
+def test_sqlite_preserves_all_job_fields(monkeypatch):
+    """Verify that all Job model fields (e.g. location, source_policy, results_on_disk, etc.) are fully preserved in SQLite."""
+    from app.job_store import load_state, save_state, reset_job_store_for_tests
+    from app.config import settings
+    from app.models import Job, JobStatus, SourcePolicy
+    
+    reset_job_store_for_tests()
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = Path(tmp.name)
+        
+    try:
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_path))
+        
+        job = Job(
+            id="job-all-fields-serde",
+            name="All Fields Scraper",
+            status=JobStatus.COMPLETED,
+            location="London, UK",
+            preferred_domain="example.co.uk",
+            source_policy=SourcePolicy.OFFICIAL_ONLY,
+            max_per_domain=12,
+            origin_location="New York",
+            max_distance_km=25.5,
+            pagination=True,
+            deduplicate=False,
+            deduplicate_field="email",
+            started_at="2026-05-25T12:00:00",
+            results_on_disk=True,
+            results_file_path="/tmp/results.json.gz"
+        )
+        
+        save_state({job.id: job}, {})
+        
+        loaded_jobs, _, _ = load_state()
+        assert job.id in loaded_jobs
+        loaded = loaded_jobs[job.id]
+        
+        assert loaded.location == "London, UK"
+        assert loaded.preferred_domain == "example.co.uk"
+        assert loaded.source_policy == SourcePolicy.OFFICIAL_ONLY
+        assert loaded.max_per_domain == 12
+        assert loaded.origin_location == "New York"
+        assert loaded.max_distance_km == 25.5
+        assert loaded.pagination is True
+        assert loaded.deduplicate is False
+        assert loaded.deduplicate_field == "email"
+        assert loaded.started_at == "2026-05-25T12:00:00"
+        assert loaded.results_on_disk is True
+        assert loaded.results_file_path == "/tmp/results.json.gz"
+        
+    finally:
+        if db_path.exists():
+            db_path.unlink()
+
+
+def test_offloaded_results_survive_restart(monkeypatch):
+    """Verify that offloaded results settings survive reboot/recovery status transitions safely."""
+    from app.job_store import load_state, save_state, reset_job_store_for_tests
+    from app.config import settings
+    from app.models import Job, JobStatus
+    
+    reset_job_store_for_tests()
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = Path(tmp.name)
+        
+    try:
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_path))
+        
+        job = Job(
+            id="job-offload-survive",
+            name="Offloaded Job",
+            status=JobStatus.RUNNING,
+            results_on_disk=True,
+            results_file_path="/tmp/offloaded_records.json.gz",
+            results=[]
+        )
+        
+        save_state({job.id: job}, {})
+        
+        # Load state triggers restart transition to FAILED
+        loaded_jobs, _, _ = load_state()
+        
+        assert job.id in loaded_jobs
+        loaded = loaded_jobs[job.id]
+        assert loaded.status == JobStatus.FAILED
+        assert loaded.results_on_disk is True
+        assert loaded.results_file_path == "/tmp/offloaded_records.json.gz"
+        
+    finally:
+        if db_path.exists():
+            db_path.unlink()
 
 

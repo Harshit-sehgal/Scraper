@@ -237,7 +237,7 @@ class Settings(BaseSettings):
     MOTIF_PRUNE_THRESHOLD: float = 0.2
 
     # ─── Paths ─────────────────────────────────────────────────────────────
-    SEMANTIC_STATE_PATH: str = "./backend/data/semantic_state.json"
+    SEMANTIC_STATE_PATH: str = "data/semantic_state.json"
     STATE_FILE_PATH: str = ""
     """Override for jobs_state.json path. Empty = use default ./backend/data/jobs_state.json"""
 

@@ -35,6 +35,8 @@ def get_canonical_cache_path() -> str:
 
 def _acquire_lock():
     path = _get_lock_path()
+    if os.path.dirname(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
     fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
     fcntl.flock(fd, fcntl.LOCK_EX)
     return fd

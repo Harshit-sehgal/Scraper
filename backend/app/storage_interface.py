@@ -26,3 +26,28 @@ class JobRepository(ABC):
     def save_single(self, job: Job) -> None:
         """Atomically upsert or save a single job's status, progress, or logs."""
         pass
+
+
+class SQLiteJobRepository(JobRepository):
+    """SQLite-backed implementation of the JobRepository interface.
+    
+    Delegates to the optimized app.job_store functions.
+    """
+    
+    def load_jobs(self) -> dict[str, Job]:
+        from app.job_store import load_state
+        jobs, _, _ = load_state()
+        return jobs
+        
+    def load_recycle_bin(self) -> dict[str, Job]:
+        from app.job_store import load_state
+        _, recycle, _ = load_state()
+        return recycle
+        
+    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job]) -> None:
+        from app.job_store import save_state
+        save_state(jobs, recycle_bin)
+        
+    def save_single(self, job: Job) -> None:
+        from app.job_store import persist_state_single
+        persist_state_single(job)

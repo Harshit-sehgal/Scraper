@@ -27,7 +27,9 @@ from app.routers.scraper import router as scraper_router
 from app.services.job_runner import run_job
 from app.services.state import persist_state
 from app.state_store import get_state_file_path
-from app.job_store import load_state
+from app.storage_interface import SQLiteJobRepository
+
+job_repo = SQLiteJobRepository()
 from app.rate_limiter import RateLimiterMiddleware
 
 
@@ -158,7 +160,10 @@ async def lifespan(app: FastAPI):
     }
 
     # Durable job store & semantic field state
-    loaded_jobs, loaded_recycle, world_state_data = load_state()
+    loaded_jobs = job_repo.load_jobs()
+    loaded_recycle = job_repo.load_recycle_bin()
+    from app.job_store import load_state
+    _, _, world_state_data = load_state()
     jobs_store.clear()
     jobs_store.update(loaded_jobs)
     recycle_bin_store.clear()

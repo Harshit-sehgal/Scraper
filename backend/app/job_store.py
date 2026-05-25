@@ -15,12 +15,12 @@ from pathlib import Path
 from threading import Lock
 from typing import Optional
 
-from app.models import Job, JobStatus
+from app.models import Job, JobStatus, SourcePolicy
 
 logger = logging.getLogger(__name__)
 
 _DB_LOCK = Lock()
-_CURRENT_SCHEMA_VERSION = 2
+_CURRENT_SCHEMA_VERSION = 3
 _MIGRATIONS_RUN_FOR: set[Path] = set()
 
 
@@ -127,12 +127,30 @@ def _job_to_row(job: Job) -> dict:
         "min_record_score": job.min_record_score or 0.35,
         "acquisition_mode": job.acquisition_mode if hasattr(job, 'acquisition_mode') else "standard",
         "search_params_json": json.dumps(job.search_params if hasattr(job, 'search_params') else {}),
+        "location": job.location or "",
+        "preferred_domain": job.preferred_domain or "",
+        "source_policy": job.source_policy.value if hasattr(job.source_policy, 'value') else str(job.source_policy),
+        "max_per_domain": job.max_per_domain or 4,
+        "origin_location": job.origin_location or "",
+        "max_distance_km": job.max_distance_km,
+        "pagination": 1 if job.pagination else 0,
+        "deduplicate": 1 if job.deduplicate else 0,
+        "deduplicate_field": job.deduplicate_field or "",
+        "started_at": job.started_at or "",
+        "results_on_disk": 1 if job.results_on_disk else 0,
+        "results_file_path": job.results_file_path or "",
     }
 
 
 def _row_to_job(row: dict) -> Job | None:
     """Convert a SQLite row dict back to a Job model."""
     try:
+        source_policy_str = row.get("source_policy", "all_sources")
+        try:
+            sp = SourcePolicy(source_policy_str)
+        except Exception:
+            sp = SourcePolicy.ALL_SOURCES
+
         return Job.model_validate({
             "id": row["id"],
             "name": row["name"],
@@ -165,6 +183,18 @@ def _row_to_job(row: dict) -> Job | None:
             "min_record_score": row.get("min_record_score", 0.35),
             "acquisition_mode": row.get("acquisition_mode", "standard"),
             "search_params_json": row.get("search_params_json", "{}"),
+            "location": row.get("location", ""),
+            "preferred_domain": row.get("preferred_domain", ""),
+            "source_policy": sp,
+            "max_per_domain": row.get("max_per_domain", 4),
+            "origin_location": row.get("origin_location", ""),
+            "max_distance_km": row.get("max_distance_km"),
+            "pagination": bool(row.get("pagination", 0)),
+            "deduplicate": bool(row.get("deduplicate", 1)),
+            "deduplicate_field": row.get("deduplicate_field", ""),
+            "started_at": row.get("started_at") if row.get("started_at") else None,
+            "results_on_disk": bool(row.get("results_on_disk", 0)),
+            "results_file_path": row.get("results_file_path") if row.get("results_file_path") else None,
         })
     except Exception as e:
         logger.warning("Failed to deserialize job row: %s", e)
@@ -214,7 +244,19 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                     completed_at TEXT DEFAULT '',
                     min_record_score REAL DEFAULT 0.35,
                     acquisition_mode TEXT DEFAULT 'standard',
-                    search_params_json TEXT DEFAULT '{}'
+                    search_params_json TEXT DEFAULT '{}',
+                    location TEXT DEFAULT '',
+                    preferred_domain TEXT DEFAULT '',
+                    source_policy TEXT DEFAULT 'all_sources',
+                    max_per_domain INTEGER DEFAULT 4,
+                    origin_location TEXT DEFAULT '',
+                    max_distance_km REAL DEFAULT NULL,
+                    pagination INTEGER DEFAULT 0,
+                    deduplicate INTEGER DEFAULT 1,
+                    deduplicate_field TEXT DEFAULT '',
+                    started_at TEXT DEFAULT '',
+                    results_on_disk INTEGER DEFAULT 0,
+                    results_file_path TEXT DEFAULT ''
                 )
             """)
             conn.execute("""
@@ -250,7 +292,19 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                     deleted_at TEXT DEFAULT '',
                     min_record_score REAL DEFAULT 0.35,
                     acquisition_mode TEXT DEFAULT 'standard',
-                    search_params_json TEXT DEFAULT '{}'
+                    search_params_json TEXT DEFAULT '{}',
+                    location TEXT DEFAULT '',
+                    preferred_domain TEXT DEFAULT '',
+                    source_policy TEXT DEFAULT 'all_sources',
+                    max_per_domain INTEGER DEFAULT 4,
+                    origin_location TEXT DEFAULT '',
+                    max_distance_km REAL DEFAULT NULL,
+                    pagination INTEGER DEFAULT 0,
+                    deduplicate INTEGER DEFAULT 1,
+                    deduplicate_field TEXT DEFAULT '',
+                    started_at TEXT DEFAULT '',
+                    results_on_disk INTEGER DEFAULT 0,
+                    results_file_path TEXT DEFAULT ''
                 )
             """)
             current = 1
@@ -301,7 +355,19 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                     deleted_at TEXT DEFAULT '',
                     min_record_score REAL DEFAULT 0.35,
                     acquisition_mode TEXT DEFAULT 'standard',
-                    search_params_json TEXT DEFAULT '{}'
+                    search_params_json TEXT DEFAULT '{}',
+                    location TEXT DEFAULT '',
+                    preferred_domain TEXT DEFAULT '',
+                    source_policy TEXT DEFAULT 'all_sources',
+                    max_per_domain INTEGER DEFAULT 4,
+                    origin_location TEXT DEFAULT '',
+                    max_distance_km REAL DEFAULT NULL,
+                    pagination INTEGER DEFAULT 0,
+                    deduplicate INTEGER DEFAULT 1,
+                    deduplicate_field TEXT DEFAULT '',
+                    started_at TEXT DEFAULT '',
+                    results_on_disk INTEGER DEFAULT 0,
+                    results_file_path TEXT DEFAULT ''
                 )
             """)
 
@@ -321,6 +387,30 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                             vals
                         )
             current = 2
+
+        if current < 3:
+            # Dynamically add any missing columns in both tables to prevent data-loss or crashes in existing databases
+            for table_name in ["jobs", "recycle_bin"]:
+                cursor = conn.execute(f"PRAGMA table_info({table_name})")
+                existing_cols = {r["name"] for r in cursor.fetchall()}
+                new_fields = {
+                    "location": "TEXT DEFAULT ''",
+                    "preferred_domain": "TEXT DEFAULT ''",
+                    "source_policy": "TEXT DEFAULT 'all_sources'",
+                    "max_per_domain": "INTEGER DEFAULT 4",
+                    "origin_location": "TEXT DEFAULT ''",
+                    "max_distance_km": "REAL DEFAULT NULL",
+                    "pagination": "INTEGER DEFAULT 0",
+                    "deduplicate": "INTEGER DEFAULT 1",
+                    "deduplicate_field": "TEXT DEFAULT ''",
+                    "started_at": "TEXT DEFAULT ''",
+                    "results_on_disk": "INTEGER DEFAULT 0",
+                    "results_file_path": "TEXT DEFAULT ''",
+                }
+                for col_name, col_def in new_fields.items():
+                    if col_name not in existing_cols:
+                        conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_def}")
+            current = 3
 
         conn.execute("DELETE FROM schema_version")
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
