@@ -85,3 +85,36 @@ Before promoting DataForge Scraper from staging to production, verify that all i
 - [x] **Isolated LLM Tests**: Ensure no live Groq API keys are needed to run regression checks (environment variable mocks must remain deterministic).
 - [x] **Logs Directory Writable**: Ensure path configurations for logging files are fully writable by the running user/process.
 - [x] **Results Offload Directory Writable**: Verify that folders for exported scrapings have the necessary read/write permissions.
+
+---
+
+## 4. SQLite Backup and Restore Operations
+
+SQLite databases in production require safe, online hot-backups to prevent locks and corruption during active scrapers. Follow these guidelines to safely back up and restore your SQLite database:
+
+### Safe Online Hot-Backup (Recommended)
+
+Since DataForge runs in WAL mode, running `cp` directly on the database file is unsafe as active transactions may be committed or in-progress. Instead, use SQLite's official online backup API:
+
+```bash
+# Safely perform an online hot-backup of the live database
+sqlite3 data/jobs_state.db ".backup data/jobs_state_backup.db"
+```
+
+This command is non-blocking:
+- Active network scraping writes can continue seamlessly.
+- Active readers can read without interruptions.
+
+### Restore Procedure
+
+To restore from a backup:
+1. Stop the DataForge FastAPI service container/process.
+2. Replace the main database file with the backup:
+   ```bash
+   cp data/jobs_state_backup.db data/jobs_state.db
+   ```
+3. Remove any left-over WAL journal files to ensure a clean boot state:
+   ```bash
+   rm -f data/jobs_state.db-shm data/jobs_state.db-wal
+   ```
+4. Restart the FastAPI service. DataForge will automatically connect and resume operations using the restored state.
