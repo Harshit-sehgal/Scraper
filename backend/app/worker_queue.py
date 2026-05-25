@@ -75,7 +75,7 @@ class QueueTask:
         self.payload = payload or {}
         self.priority = priority
         self.status = TaskStatus.PENDING
-        self.created_at = datetime.datetime.now().isoformat()
+        self.created_at = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.started_at: Optional[str] = None
         self.completed_at: Optional[str] = None
         self.attempts = 0
@@ -135,9 +135,9 @@ def _get_db_path() -> Path:
 _DB_LOCK = threading.Lock()
 
 
-def _get_connection() -> sqlite3.Connection:
+def _get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     """Get a SQLite connection with WAL mode."""
-    path = _get_db_path()
+    path = db_path or _get_db_path()
     conn = sqlite3.connect(str(path), timeout=10)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -145,10 +145,10 @@ def _get_connection() -> sqlite3.Connection:
     return conn
 
 
-def _ensure_schema():
+def _ensure_schema(db_path: Optional[Path] = None):
     """Create the queue tables if they don't exist."""
     with _DB_LOCK:
-        conn = _get_connection()
+        conn = _get_connection(db_path=db_path)
         try:
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS tasks (
@@ -207,15 +207,20 @@ def _ensure_schema():
 class WorkerQueue:
     """Persistent worker queue with priority, retries, and dead letter support."""
 
-    def __init__(self, max_concurrency: int = 5, poll_interval: float = 1.0):
+    def __init__(self, max_concurrency: int = 5, poll_interval: float = 1.0, db_path: Optional[Path] = None):
         self._max_concurrency = max_concurrency
         self._poll_interval = poll_interval
+        self._db_path = db_path
         self._running = False
         self._worker_task: Optional[asyncio.Task] = None
         self._in_flight: dict[str, asyncio.Task] = {}
         self._handlers: dict[str, Callable] = {}
         self._in_flight_lock = asyncio.Lock()
-        _ensure_schema()
+        _ensure_schema(db_path=self._db_path)
+
+    def _conn(self) -> sqlite3.Connection:
+        """Get a connection to this instance's database."""
+        return _get_connection(db_path=self._db_path)
 
     # ─── Task registration ─────────────────────────────────────────────
 
@@ -250,7 +255,7 @@ class WorkerQueue:
         )
 
         async with self._in_flight_lock:
-            conn = _get_connection()
+            conn = self._conn()
             try:
                 conn.execute(
                     """INSERT OR IGNORE INTO tasks
@@ -287,12 +292,12 @@ class WorkerQueue:
     def _dequeue_one(self) -> Optional[QueueTask]:
         """Synchronous dequeue from SQLite with priority ordering."""
         with _DB_LOCK:
-            conn = _get_connection()
+            conn = self._conn()
             try:
                 row = conn.execute(
                     """SELECT * FROM tasks
                        WHERE status = 'pending'
-                         AND scheduled_at <= datetime('now')
+                         AND scheduled_at <= datetime('now', 'localtime')
                        ORDER BY priority ASC, created_at ASC
                        LIMIT 1"""
                 ).fetchone()
@@ -306,7 +311,7 @@ class WorkerQueue:
                     "payload": json.loads(task_data["payload"]),
                 })
                 task.status = TaskStatus.RUNNING
-                task.started_at = datetime.datetime.now().isoformat()
+                task.started_at = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 task.attempts += 1
 
                 conn.execute(
@@ -321,9 +326,9 @@ class WorkerQueue:
 
     async def complete(self, task_id: str, result: Optional[dict] = None):
         """Mark a task as completed successfully."""
-        now = datetime.datetime.now().isoformat()
+        now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         async with self._in_flight_lock:
-            conn = _get_connection()
+            conn = self._conn()
             try:
                 # Fetch task for history
                 row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
@@ -360,9 +365,9 @@ class WorkerQueue:
         retry: bool = True,
     ):
         """Mark a task as failed. Retries if attempts remain."""
-        now = datetime.datetime.now().isoformat()
+        now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         async with self._in_flight_lock:
-            conn = _get_connection()
+            conn = self._conn()
             try:
                 row = conn.execute(
                     "SELECT attempts, max_attempts FROM tasks WHERE id = ?",
@@ -375,8 +380,8 @@ class WorkerQueue:
 
                     if retry and attempts < max_attempts:
                         # Schedule retry with exponential backoff
-                        backoff = min(2 ** (attempts - 1) * 30, 3600)  # 30s, 60s, 120s, ... 1h max
-                        retry_at = (datetime.datetime.now() + datetime.timedelta(seconds=backoff)).isoformat()
+                        backoff = min(2 ** (attempts - 1) * 30, 3600)
+                        retry_at = (datetime.datetime.now() + datetime.timedelta(seconds=backoff)).strftime('%Y-%m-%d %H:%M:%S')
                         conn.execute(
                             "UPDATE tasks SET status = ?, last_error = ?, scheduled_at = ? WHERE id = ?",
                             (TaskStatus.RETRYING, error, retry_at, task_id),
@@ -418,7 +423,7 @@ class WorkerQueue:
     async def cancel(self, task_id: str) -> bool:
         """Cancel a pending task. Returns True if cancelled."""
         async with self._in_flight_lock:
-            conn = _get_connection()
+            conn = self._conn()
             try:
                 cursor = conn.execute(
                     "UPDATE tasks SET status = ? WHERE id = ? AND status = 'pending'",
@@ -447,7 +452,7 @@ class WorkerQueue:
     def _recover_stuck_tasks(self):
         """Reset any tasks stuck in 'running' state back to 'pending' for retry."""
         with _DB_LOCK:
-            conn = _get_connection()
+            conn = self._conn()
             try:
                 stuck = conn.execute(
                     "SELECT COUNT(*) FROM tasks WHERE status = 'running'"
@@ -548,7 +553,7 @@ class WorkerQueue:
 
     def get_status(self) -> dict:
         """Return queue status for monitoring."""
-        conn = _get_connection()
+        conn = self._conn()
         try:
             pending = conn.execute(
                 "SELECT COUNT(*) FROM tasks WHERE status = 'pending'"
@@ -589,7 +594,7 @@ class WorkerQueue:
 
     def get_dead_letter_queue(self, limit: int = 50) -> list[dict]:
         """Return dead letter queue entries."""
-        conn = _get_connection()
+        conn = self._conn()
         try:
             rows = conn.execute(
                 """SELECT * FROM task_history
@@ -603,7 +608,7 @@ class WorkerQueue:
 
     def retry_dead_letter(self, task_id: str) -> bool:
         """Re-queue a dead letter task."""
-        conn = _get_connection()
+        conn = self._conn()
         try:
             row = conn.execute(
                 "SELECT * FROM task_history WHERE id = ? AND status = 'dead_letter'",
@@ -613,6 +618,8 @@ class WorkerQueue:
                 return False
 
             task_data = dict(row)
+            # task_history may not have timeout_seconds column
+            timeout = task_data.get("timeout_seconds", 300)
             conn.execute(
                 """INSERT INTO tasks
                    (id, type, payload, priority, status, created_at,
@@ -622,7 +629,7 @@ class WorkerQueue:
                     task_data["id"], task_data["type"],
                     task_data["payload"], task_data["priority"],
                     task_data["created_at"],
-                    task_data["max_attempts"], task_data["timeout_seconds"],
+                    task_data["max_attempts"], timeout,
                 ),
             )
             conn.execute(
@@ -636,7 +643,7 @@ class WorkerQueue:
 
     def clear_completed_history(self, older_than_days: int = 7):
         """Clean up old completed task history."""
-        conn = _get_connection()
+        conn = self._conn()
         try:
             conn.execute(
                 """DELETE FROM task_history
@@ -657,13 +664,17 @@ _queue_instance: Optional[WorkerQueue] = None
 _queue_lock = threading.Lock()
 
 
-def get_worker_queue() -> WorkerQueue:
-    """Get or create the global WorkerQueue instance."""
+def get_worker_queue(db_path: Optional[Path] = None) -> WorkerQueue:
+    """Get or create the global WorkerQueue instance.
+
+    Args:
+        db_path: Optional custom database path (used by tests).
+    """
     global _queue_instance
     if _queue_instance is None:
         with _queue_lock:
             if _queue_instance is None:
-                _queue_instance = WorkerQueue()
+                _queue_instance = WorkerQueue(db_path=db_path)
     return _queue_instance
 
 
