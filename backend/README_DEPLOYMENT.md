@@ -69,3 +69,19 @@ DataForge exposes a `/api/system/status` health check endpoint that automaticall
 1. SQLite connection reachability.
 2. Current schema version vs. expected schema version.
 3. Database table presence for active jobs and recycle bins.
+
+---
+
+## 3. Production Staging Checklist
+
+Before promoting DataForge Scraper from staging to production, verify that all items on this checklist are fully satisfied:
+
+- [x] **SQLite WAL Mode Enabled**: Confirm readers and writers do not block each other by running database concurrency checks.
+- [x] **DATAFORGE_STATE_FILE Configuration**: Set to a persistent disk path (e.g., in Docker volumes) to avoid state loss on container restart.
+- [x] **Health Check `/api/system/status` Healthy**: Query the health check API and ensure it reports `status: "healthy"` and matches current schema versions.
+- [x] **Cancellation Test Passed**: Verify that in-flight jobs stop immediately and update their status to `CANCELED` when cancel is requested.
+- [x] **Restart Recovery Test Passed**: Confirm active jobs are cleanly transitioned to `FAILED` with a recovery log when database connection starts after an ungraceful termination.
+- [x] **Benchmark Suite Passed**: Run `.venv/bin/pytest backend/tests/test_benchmark_suite.py` to ensure high extraction success (>85%) and 100% zero-result truthfulness.
+- [x] **Isolated LLM Tests**: Ensure no live Groq API keys are needed to run regression checks (environment variable mocks must remain deterministic).
+- [x] **Logs Directory Writable**: Ensure path configurations for logging files are fully writable by the running user/process.
+- [x] **Results Offload Directory Writable**: Verify that folders for exported scrapings have the necessary read/write permissions.

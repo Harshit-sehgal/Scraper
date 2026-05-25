@@ -212,8 +212,7 @@ def test_progress_persistence_without_full_state_rewrite(monkeypatch):
 
     # Let's mock scrape_url_with_recovery to return result immediately
     async def mock_scrape_url_with_recovery(*args, **kwargs):
-        from app.scraper import ScrapeAttemptResult
-        return ScrapeAttemptResult([], html="<html></html>", telemetry={})
+        return [{"title": "Test record"}], {"acquisition_lineage": {}, "recovery_attempts": 0}
 
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", mock_scrape_url_with_recovery)
 
@@ -228,7 +227,11 @@ def test_progress_persistence_without_full_state_rewrite(monkeypatch):
         ai_structuring_timeout_seconds=5,
         insight_timeout_seconds=5,
         persist_state_single_fn=mock_persist_single,
+        persist_state_single_critical_fn=mock_persist_single,
     ))
+
+    # Assert that the job successfully completed
+    assert job.status == JobStatus.COMPLETED
 
     # Assert that single-row writes were called (for progress/log updates) and full-state writes were NOT called!
     assert single_row_writes > 0
@@ -451,4 +454,62 @@ def test_json_to_sqlite_migration_imports_existing_jobs(monkeypatch):
             db_path.unlink()
         if json_path.exists():
             json_path.unlink()
+
+
+def test_same_domain_concurrency_respected(monkeypatch):
+    """Verify that domain-level concurrency max_parallel limit is respected when scraping multiple same-domain URLs."""
+    import asyncio
+    from app.services.job_runner import run_job
+    from app.models import Job, JobStatus
+    from app.domain_runtime_policy import get_domain_runtime_policy
+
+    # Configure the test domain to have max_parallel = 1
+    policy = get_domain_runtime_policy()
+    policy.get_or_create("https://testdomain.com/1").max_parallel = 1
+
+    concurrency_record = []
+    active_scrapes = 0
+    max_active_scrapes = 0
+
+    async def mock_scrape_url_with_recovery(*args, **kwargs):
+        nonlocal active_scrapes, max_active_scrapes
+        active_scrapes += 1
+        max_active_scrapes = max(max_active_scrapes, active_scrapes)
+        concurrency_record.append(active_scrapes)
+        await asyncio.sleep(0.05)  # Simulate network delay
+        active_scrapes -= 1
+        return [{"title": "Record"}], {"acquisition_lineage": {}, "recovery_attempts": 0}
+
+    monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", mock_scrape_url_with_recovery)
+
+    # We create a job with 3 URLs of the SAME domain
+    job = Job(
+        id="domain-concurrency-job",
+        name="Domain Concurrency",
+        status=JobStatus.PENDING,
+        urls=[
+            "https://testdomain.com/1",
+            "https://testdomain.com/2",
+            "https://testdomain.com/3",
+        ],
+        schema_fields=[],
+        filters=[]
+    )
+
+    # Run the job
+    asyncio.run(run_job(
+        job_id=job.id,
+        jobs_store={job.id: job},
+        persist_state_fn=lambda: None,
+        max_discovery_urls=5,
+        max_job_runtime_seconds=5,
+        per_url_scrape_timeout_seconds=5,
+        ai_structuring_timeout_seconds=5,
+        insight_timeout_seconds=5,
+    ))
+
+    # Since same domain has max_parallel = 1, the active_scrapes must never exceed 1!
+    assert max_active_scrapes == 1
+    assert job.status == JobStatus.COMPLETED
+
 

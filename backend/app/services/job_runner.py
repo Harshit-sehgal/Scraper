@@ -228,85 +228,85 @@ async def run_job(
                 async with domain_sem:
                     await _safe_log(f"Scraping ({idx}/{len(job.urls)}): {url}")
 
-                from app.semantic_world_state import get_world_state
-                ws = get_world_state()
-                try:
-                    reset_llm_call_count()
-                    results, recovery_stats = await asyncio.wait_for(
-                        scrape_url_with_recovery(
-                            url, job.schema_fields,
-                            min_record_score=job.min_record_score,
-                            user_intent=job.intent, world_state=ws,
-                            max_recovery_attempts=settings.MAX_RECOVERY_ATTEMPTS,
-                            selectors_map=job.selectors_map,
-                            search_params=job.search_params,
-                        ),
-                        timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
-                    )
+                    from app.semantic_world_state import get_world_state
+                    ws = get_world_state()
+                    try:
+                        reset_llm_call_count()
+                        results, recovery_stats = await asyncio.wait_for(
+                            scrape_url_with_recovery(
+                                url, job.schema_fields,
+                                min_record_score=job.min_record_score,
+                                user_intent=job.intent, world_state=ws,
+                                max_recovery_attempts=settings.MAX_RECOVERY_ATTEMPTS,
+                                selectors_map=job.selectors_map,
+                                search_params=job.search_params,
+                            ),
+                            timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
+                        )
 
-                    # Record success if results were extracted
-                    if results:
-                        policy.record_success(url)
-                    else:
-                        policy.record_failure(url, failure_type="zero_records_extracted")
+                        # Record success if results were extracted
+                        if results:
+                            policy.record_success(url)
+                        else:
+                            policy.record_failure(url, failure_type="zero_records_extracted")
 
-                    # Integrate results into world state in a short transaction
-                    # (do NOT hold the transaction across the network scrape)
-                    async with job_lock:
-                        job.total_llm_calls += get_llm_call_count()
+                        # Integrate results into world state in a short transaction
+                        # (do NOT hold the transaction across the network scrape)
+                        async with job_lock:
+                            job.total_llm_calls += get_llm_call_count()
 
-                    with ws.transaction(f"integrate_scrape:{url}"):
-                        pass  # Future: integrate semantic/motif/world-state updates here
+                        with ws.transaction(f"integrate_scrape:{url}"):
+                            pass  # Future: integrate semantic/motif/world-state updates here
 
-                    if recovery_stats.get("recovery_attempts", 0) > 0:
-                        actions = ", ".join(recovery_stats.get("recovery_actions_taken", []))
-                        await _safe_log(f"Recovery applied to {url}: {actions}", level="info")
+                        if recovery_stats.get("recovery_attempts", 0) > 0:
+                            actions = ", ".join(recovery_stats.get("recovery_actions_taken", []))
+                            await _safe_log(f"Recovery applied to {url}: {actions}", level="info")
 
-                    # Count AI-structured records
-                    ai_structured_count = 0
-                    for record in results:
-                        if record.pop("_ai_source_structured", False):
-                            ai_structured_count += 1
-                        record["source_url"] = url
-                        inferred = infer_source_metadata(url=url)
-                        record["source_type"] = str(inferred.get("source_type") or "unknown")
-                        record["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
+                        # Count AI-structured records
+                        ai_structured_count = 0
+                        for record in results:
+                            if record.pop("_ai_source_structured", False):
+                                ai_structured_count += 1
+                            record["source_url"] = url
+                            inferred = infer_source_metadata(url=url)
+                            record["source_type"] = str(inferred.get("source_type") or "unknown")
+                            record["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
 
-                    # Attach acquisition lineage to each record so it's
-                    # exposed in job results via the API
-                    lineage = recovery_stats.get("acquisition_lineage", {}).copy()
-                    for record in results:
-                        record["_acquisition_lineage"] = lineage
+                        # Attach acquisition lineage to each record so it's
+                        # exposed in job results via the API
+                        lineage = recovery_stats.get("acquisition_lineage", {}).copy()
+                        for record in results:
+                            record["_acquisition_lineage"] = lineage
 
-                    url_meta = {
-                        "ai_structured_count": ai_structured_count,
-                        "attempted": True,
-                        "acquisition_lineage": lineage,
-                    }
+                        url_meta = {
+                            "ai_structured_count": ai_structured_count,
+                            "attempted": True,
+                            "acquisition_lineage": lineage,
+                        }
 
-                    await _safe_log(f"Extracted {len(results)} raw records from {url}")
-                    async with job_lock:
-                        persist_job_state_fn()
-                    await _mark_completed()
-                    return idx, results, True, url_meta
-                except asyncio.CancelledError:
-                    policy.record_failure(url, failure_type="canceled")
-                    await _safe_log(f"Canceled scrape for {url}", level="warning")
-                    raise
-                except asyncio.TimeoutError:
-                    policy.record_failure(url, failure_type="timeout")
-                    await _safe_log(f"Timeout on {url}", level="warning")
-                    logging.warning("Job %s: Timeout for %s", job_id, url)
-                    await _safe_warning(f"URL timeout skipped ({idx}/{len(job.urls)}): {url}")
-                    await _mark_completed()
-                    return idx, [], False, {}
-                except Exception as e:
-                    policy.record_failure(url, failure_type=type(e).__name__)
-                    logging.exception("Job %s: URL scrape failed: %s", job_id, url)
-                    await _safe_log(f"Failed to scrape {url}: {type(e).__name__}", level="warning")
-                    await _safe_warning(f"URL scrape failed ({idx}/{len(job.urls)}): {url} ({type(e).__name__})")
-                    await _mark_completed()
-                    return idx, [], False, {}
+                        await _safe_log(f"Extracted {len(results)} raw records from {url}")
+                        async with job_lock:
+                            persist_job_state_fn()
+                        await _mark_completed()
+                        return idx, results, True, url_meta
+                    except asyncio.CancelledError:
+                        policy.record_failure(url, failure_type="canceled")
+                        await _safe_log(f"Canceled scrape for {url}", level="warning")
+                        raise
+                    except asyncio.TimeoutError:
+                        policy.record_failure(url, failure_type="timeout")
+                        await _safe_log(f"Timeout on {url}", level="warning")
+                        logging.warning("Job %s: Timeout for %s", job_id, url)
+                        await _safe_warning(f"URL timeout skipped ({idx}/{len(job.urls)}): {url}")
+                        await _mark_completed()
+                        return idx, [], False, {}
+                    except Exception as e:
+                        policy.record_failure(url, failure_type=type(e).__name__)
+                        logging.exception("Job %s: URL scrape failed: %s", job_id, url)
+                        await _safe_log(f"Failed to scrape {url}: {type(e).__name__}", level="warning")
+                        await _safe_warning(f"URL scrape failed ({idx}/{len(job.urls)}): {url} ({type(e).__name__})")
+                        await _mark_completed()
+                        return idx, [], False, {}
 
         scrape_tasks = [
             asyncio.create_task(_scrape_single_url(idx, url))
