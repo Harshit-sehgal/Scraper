@@ -6,6 +6,15 @@ from pathlib import Path
 import httpx
 import pytest
 
+
+def pytest_configure(config):
+    """Register custom markers to avoid PytestUnknownMarkWarning."""
+    config.addinivalue_line(
+        "markers",
+        "postgres: tests that require a running Postgres instance (via testcontainers). Skipped by default.",
+    )
+
+
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = ROOT / "backend"
 if str(BACKEND_ROOT) not in sys.path:
