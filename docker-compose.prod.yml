@@ -31,6 +31,7 @@ services:
     environment:
       - DATAFORGE_ENV=production
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      - DATAFORGE_WORKER_QUEUE=true
       - TMPDIR=/tmp
     volumes:
       - dataforge_data:/app/backend/data

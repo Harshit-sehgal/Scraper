@@ -42,7 +42,7 @@ async def scrape_job_handler(task) -> dict:
         raise ValueError(f"No job_id in task payload: {task}")
 
     repo = get_job_repository()
-    jobs_store = repo.load_jobs()
+    jobs_store, recycle_bin_store, _ = repo.load_all()
 
     job = jobs_store.get(job_id)
     if not job:
@@ -53,14 +53,14 @@ async def scrape_job_handler(task) -> dict:
     await run_job(
         job_id=job_id,
         jobs_store=jobs_store,
-        persist_state_fn=lambda: repo.save_all(jobs_store, {}),
+        persist_state_fn=lambda: repo.save_all(jobs_store, recycle_bin_store),
         max_discovery_urls=settings.MAX_DISCOVERY_URLS,
         max_job_runtime_seconds=settings.MAX_JOB_RUNTIME_SECONDS,
         per_url_scrape_timeout_seconds=settings.PER_URL_TIMEOUT_SECONDS,
         ai_structuring_timeout_seconds=settings.AI_STRUCTURING_TIMEOUT_SECONDS,
         insight_timeout_seconds=settings.INSIGHT_TIMEOUT_SECONDS,
-        persist_state_single_fn=lambda: repo.save_single(job),
-        persist_state_single_critical_fn=lambda: repo.save_single(job),
+        persist_state_single_fn=lambda: repo.save_single(jobs_store[job_id]),
+        persist_state_single_critical_fn=lambda: repo.save_single(jobs_store[job_id]),
     )
 
     return {
@@ -103,13 +103,16 @@ async def main():
     )
 
     if args.once:
-        # Single-task mode: enqueue a test task and wait
+        # Single-task mode: enqueue one specific job and wait
+        job_id = os.getenv("DATAFORGE_JOB_ID")
+        if not job_id:
+            raise SystemExit("DATAFORGE_JOB_ID is required when using --once")
         task_id = await queue.enqueue(
             "scrape_job",
-            {"job_id": os.getenv("DATAFORGE_JOB_ID", "")},
+            {"job_id": job_id},
             priority=Priority.HIGH,
         )
-        logger.info("Enqueued single task: %s", task_id)
+        logger.info("Enqueued single task: %s (job_id=%s)", task_id, job_id)
         await asyncio.sleep(300)  # Wait up to 5 minutes
     else:
         # Continuous mode: run until shutdown
