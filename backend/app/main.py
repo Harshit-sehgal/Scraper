@@ -278,7 +278,10 @@ MAX_BODY_SIZE = 5 * 1024 * 1024  # 5MB
 @app.middleware("http")
 async def body_size_middleware(request: Request, call_next):
     """Limit request body size to prevent abuse."""
+    request.state.body_limit_exceeded = False
+
     if request.method in ("POST", "PUT", "PATCH") and request.url.path.startswith("/api/"):
+        # 1. Fast-path check on Content-Length header
         content_length = request.headers.get("content-length")
         if content_length:
             try:
@@ -289,8 +292,46 @@ async def body_size_middleware(request: Request, call_next):
                     )
             except (ValueError, TypeError):
                 pass
-    response = await call_next(request)
-    return response
+
+        # 2. Wrap Starlette receive callable to dynamically enforce size limit for chunked/streamed bodies
+        original_receive = request.receive
+        bytes_received = 0
+
+        async def custom_receive():
+            nonlocal bytes_received
+            message = await original_receive()
+            if message.get("type") == "http.request":
+                body = message.get("body", b"")
+                bytes_received += len(body)
+                if bytes_received > MAX_BODY_SIZE:
+                    request.state.body_limit_exceeded = True
+                    raise ValueError("Body size limit exceeded")
+            return message
+
+        request._receive = custom_receive
+
+    try:
+        response = await call_next(request)
+        if getattr(request.state, "body_limit_exceeded", False):
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Request body too large (max 5MB)"},
+            )
+        return response
+    except ValueError as exc:
+        if str(exc) == "Body size limit exceeded" or getattr(request.state, "body_limit_exceeded", False):
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Request body too large (max 5MB)"},
+            )
+        raise exc
+    except Exception as exc:
+        if getattr(request.state, "body_limit_exceeded", False):
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Request body too large (max 5MB)"},
+            )
+        raise exc
 
 
 # ─── API Key Auth Middleware ────────────────────────────────────────────────

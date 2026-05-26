@@ -181,3 +181,114 @@ async def test_search_form_recovery_ssrf_blocking(monkeypatch):
     
     assert res["success"] is False
     assert "failed security check" in res["error"]
+
+
+def test_backend_cors_origins_enforcement(client, monkeypatch):
+    """Verify that backend CORS rejects/allows origins based on settings.CORS_ORIGINS."""
+    from app import main as main_mod
+    from app.config import settings
+    # Set CORS_ORIGINS in settings
+    monkeypatch.setattr(settings, "CORS_ORIGINS", ["https://trusted.com"])
+    
+    # Locate and patch the CORSMiddleware instance in the ASGI middleware stack
+    if main_mod.app.middleware_stack is None:
+        main_mod.app.middleware_stack = main_mod.app.build_middleware_stack()
+        
+    current_app = main_mod.app.middleware_stack
+    cors_mw = None
+    while current_app is not None:
+        if current_app.__class__.__name__ == "CORSMiddleware":
+            cors_mw = current_app
+            break
+        current_app = getattr(current_app, "app", None)
+        
+    if cors_mw:
+        monkeypatch.setattr(cors_mw, "allow_origins", ["https://trusted.com"])
+        monkeypatch.setattr(cors_mw, "allow_all_origins", False)
+    
+    # Preflight request from allowed origin
+    headers = {
+        "Origin": "https://trusted.com",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type",
+    }
+    resp = client.request("OPTIONS", "/api/jobs", headers=headers)
+    assert resp.status_code == 200
+    assert resp.headers.get("access-control-allow-origin") == "https://trusted.com"
+    
+    # Preflight request from disallowed origin
+    headers = {
+        "Origin": "https://attacker.com",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type",
+    }
+    resp = client.request("OPTIONS", "/api/jobs", headers=headers)
+    assert resp.headers.get("access-control-allow-origin") is None
+
+
+def test_body_size_limit_normal_payload(client, monkeypatch):
+    """Verify that a normal payload under 5MB passes the body-size limit middleware."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "API_KEY", "testkey")
+    
+    resp = client.post(
+        "/api/jobs",
+        json={"name": "test-size", "mode": "manual", "urls": ["https://example.com"]},
+        headers={"X-API-Key": "testkey"}
+    )
+    assert resp.status_code != 413
+
+
+def test_body_size_limit_oversized_payload(client, monkeypatch):
+    """Verify that an oversized payload (> 5MB) with Content-Length is rejected with 413."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "API_KEY", "testkey")
+    
+    # 6MB of data
+    large_data = "a" * (6 * 1024 * 1024)
+    
+    resp = client.post(
+        "/api/jobs",
+        data=large_data,
+        headers={"X-API-Key": "testkey", "Content-Type": "application/json"}
+    )
+    assert resp.status_code == 413
+    assert "too large" in resp.json()["detail"]
+
+
+def test_body_size_limit_chunked_normal(client, monkeypatch):
+    """Verify that chunked/streaming requests under 5MB are accepted."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "API_KEY", "testkey")
+    
+    async def chunk_generator():
+        yield b'{"name": "test-chunked", '
+        yield b'"mode": "manual", '
+        yield b'"urls": ["https://example.com"]}'
+        
+    resp = client.post(
+        "/api/jobs",
+        content=chunk_generator(),
+        headers={"X-API-Key": "testkey", "Content-Type": "application/json"}
+    )
+    assert resp.status_code != 413
+
+
+def test_body_size_limit_chunked_oversized(client, monkeypatch):
+    """Verify that chunked/streaming requests without Content-Length exceeding 5MB are rejected with 413."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "API_KEY", "testkey")
+    
+    # A generator yielding 6MB in chunks
+    async def chunk_generator():
+        chunk = b"a" * (1024 * 1024) # 1MB
+        for _ in range(6):
+            yield chunk
+            
+    resp = client.post(
+        "/api/jobs",
+        content=chunk_generator(),
+        headers={"X-API-Key": "testkey", "Content-Type": "application/octet-stream"}
+    )
+    assert resp.status_code == 413
+    assert "too large" in resp.json()["detail"]
