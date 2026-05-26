@@ -20,3 +20,15 @@ server.log
 .coverage
 backend/.coverage
 .commandcode/
+
+# Runtime databases
+backend/app/data/*.db
+backend/data/*.db
+data/*.db
+*.sqlite
+*.sqlite3
+
+# Runtime/test lock artifacts
+backend/tests/*.json.lock
+data/*.json.lock
+backend/app/data/*.lock

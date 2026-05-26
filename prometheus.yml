@@ -36,16 +36,13 @@ scrape_configs:
       - targets: ['localhost:9090']
 
   # ─── DataForge Application Metrics ──────────────────────────────────
-  # Disabled until a /metrics endpoint is implemented.
-  # To enable, add prometheus_client dependency and register a /metrics
-  # route in app/main.py.
-  # - job_name: 'dataforge'
-  #   metrics_path: '/metrics'
-  #   static_configs:
-  #     - targets: ['dataforge:8000']
-  #       labels:
-  #         service: 'scraper'
-  #         component: 'api'
+  - job_name: 'dataforge'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['dataforge:8000']
+        labels:
+          service: 'scraper'
+          component: 'api'
 
   # ─── PostgreSQL Exporter (if enabled) ───────────────────────────────
   # Disabled until a postgres-exporter service is added to

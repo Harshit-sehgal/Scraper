@@ -208,21 +208,21 @@ async def lifespan(app: FastAPI):
                 logger.info("Semantic world state persisted to repository on shutdown")
             except Exception as e:
                 logger.warning("Failed to persist world state on shutdown: %s", e)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to check repository support for world state during shutdown: %s", e)
 
     # Flush any pending background state writes
     try:
         from app.state_store import flush_state_writes
         flush_state_writes()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to flush state writes during shutdown: %s", e)
 
     # Close Postgres connection pool if active
     try:
         shutdown_postgres()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to close Postgres connection pool during shutdown: %s", e)
 
 
 def _schedule_background_task(coro):

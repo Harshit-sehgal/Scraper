@@ -69,4 +69,5 @@ echo "║  Docs:      http://localhost:$PORT/docs                      "
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 
-exec uvicorn backend.app.main:app --reload --host "$HOST" --port "$PORT" --log-level info
+export PYTHONPATH="$PROJECT_DIR/backend:${PYTHONPATH:-}"
+exec uvicorn app.main:app --reload --host "$HOST" --port "$PORT" --log-level info

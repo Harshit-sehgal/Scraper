@@ -9,6 +9,23 @@ from typing import Any, Callable, Dict, List, Set, Tuple, Optional
 from dataclasses import dataclass
 from app.core_types import FieldConflictRegion, MAX_COUPLING_TRANSFER
 from app.transaction_context import active_transaction
+import ast
+
+def parse_topology_key(raw: str) -> tuple[str, str]:
+    try:
+        value = ast.literal_eval(raw)
+    except (SyntaxError, ValueError, TypeError):
+        raise ValueError(f"Invalid topology key format: {raw!r}")
+
+    if (
+        not isinstance(value, tuple)
+        or len(value) != 2
+        or not all(isinstance(item, str) for item in value)
+    ):
+        raise ValueError(f"Invalid topology key structure: {raw!r}")
+
+    return value
+
 
 class ConflictError(Exception):
     """Raised when an optimistic concurrency conflict is detected."""
@@ -2224,8 +2241,8 @@ class TopologyState:
                     else:
                         # Assume it's repr of a tuple, convert back
                         try:
-                            target[eval(k)] = v
-                        except (ValueError, SyntaxError):
+                            target[parse_topology_key(k)] = v
+                        except ValueError:
                             target[tuple(k.split("|"))] = v
                 else:
                     # Already a tuple/list
@@ -2303,8 +2320,8 @@ class TopologyState:
             else:
                 # New format: "('a', 'b')"
                 try:
-                    pair = eval(key_str)
-                except (ValueError, SyntaxError):
+                    pair = parse_topology_key(key_str)
+                except ValueError:
                     pass
             
             if pair:

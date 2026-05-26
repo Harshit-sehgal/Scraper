@@ -51,7 +51,8 @@ def _get_database_url() -> str:
     try:
         from app.config import settings
         url = getattr(settings, "DATABASE_URL", "")
-    except Exception:
+    except (ImportError, AttributeError):
+        # Settings might not be initialized yet or DATABASE_URL attribute is absent; fallback to env/development defaults
         pass
     if url:
         return url

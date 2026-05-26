@@ -90,15 +90,21 @@ jobs:
       - name: Validate production env checker
         run: |
           # Test that check_prod_env.py validates DATAFORGE_ENV=production
-          python3 -c "
-import sys
-sys.path.insert(0, 'backend')
-from scripts.check_prod_env import check_env
-assert check_env('production') == True
-assert check_env('development') == False
-assert check_env('test') == False
-print('env validation: OK')
-"
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, 'backend')
+          from scripts.check_prod_env import check_env
+
+          assert check_env('production') is True
+          assert check_env('development') is False
+          assert check_env('test') is False
+
+          print('env validation: OK')
+          PY
+
+      - name: Validate shell scripts
+        run: |
+          bash -n scripts/start.sh
 
   test:
     runs-on: ubuntu-latest
@@ -147,20 +153,20 @@ print('env validation: OK')
           cache-to: type=gha,mode=max
       - name: Verify worker script exists in image
         run: |
-          docker run --rm dataforge:ci-test python -c "
-import os, sys
-sys.path.insert(0, '/app/backend')
-# Verify scripts/ exists in the image
-scripts_dir = os.path.join('/app', 'scripts')
-assert os.path.isdir(scripts_dir), f'scripts/ directory not found at {scripts_dir}'
-worker_path = os.path.join(scripts_dir, 'run_worker.py')
-assert os.path.isfile(worker_path), f'run_worker.py not found at {worker_path}'
-print(f'Worker script confirmed: {worker_path}')
-# Verify key app modules import correctly
-from app.worker_queue import WorkerQueue, get_worker_queue, Priority
-print('worker_queue: OK')
-from app.storage_interface import JobRepository, get_job_repository
-print('storage_interface: OK')
-from app.config import settings
-print(f'config: OK (env={settings.ENV})')
-"
+          docker run -i --rm dataforge:ci-test python - <<'PY'
+          import os, sys
+          sys.path.insert(0, '/app/backend')
+          # Verify scripts/ exists in the image
+          scripts_dir = os.path.join('/app', 'scripts')
+          assert os.path.isdir(scripts_dir), f'scripts/ directory not found at {scripts_dir}'
+          worker_path = os.path.join(scripts_dir, 'run_worker.py')
+          assert os.path.isfile(worker_path), f'run_worker.py not found at {worker_path}'
+          print(f'Worker script confirmed: {worker_path}')
+          # Verify key app modules import correctly
+          from app.worker_queue import WorkerQueue, get_worker_queue, Priority
+          print('worker_queue: OK')
+          from app.storage_interface import JobRepository, get_job_repository
+          print('storage_interface: OK')
+          from app.config import settings
+          print(f'config: OK (env={settings.ENV})')
+          PY

@@ -1,7 +1,45 @@
 import pytest
+import socket
 from pathlib import Path
 from app import main as main_mod
 from app.models import Job, JobStatus, ScrapeMode
+
+@pytest.fixture(autouse=True)
+def mock_dns_resolution(monkeypatch):
+    """Mock socket.getaddrinfo to make tests DNS-independent and prevent external lookups,
+    while correctly simulating public IP resolution for test domains.
+    """
+    original_getaddrinfo = socket.getaddrinfo
+    
+    def dummy_getaddrinfo(host, port, *args, **kwargs):
+        # 1. Simulate exact DNS failures if the test specifically expects/seeks a lookup failure
+        if host == "unresolvable-domain.xyz":
+            raise socket.gaierror(-2, "Name or service not known")
+            
+        # 2. Return loopback for localhost
+        if host in ("localhost", "127.0.0.1", "::1"):
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", port or 0))]
+            
+        # 3. Return private IPs for internal test names
+        if host in ("nginx", "host.docker.internal"):
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("172.16.0.2", port or 0))]
+            
+        # 4. Return metadata IP for metadata endpoints
+        if host == "169.254.169.254":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("169.254.169.254", port or 0))]
+            
+        # 5. Return public IPs for standard public domains used in tests
+        if host in ("example.com", "google.com", "trusted.com", "attacker.com"):
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", port or 0))]
+            
+        # Fallback to original, or resolve safely to a public IP to keep the test robust
+        try:
+            return original_getaddrinfo(host, port, *args, **kwargs)
+        except Exception:
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", port or 0))]
+            
+    monkeypatch.setattr(socket, "getaddrinfo", dummy_getaddrinfo)
+
 
 def test_nginx_blocks_metrics_and_docs():
     """Verify that operational metrics and FastAPI docs are explicitly returned as 404 in public Nginx."""
