@@ -10,7 +10,8 @@ const API = (() => {
     const { protocol, hostname, port, origin } = window.location;
     if (protocol === 'http:' || protocol === 'https:') {
         // In local multi-port dev, frontend often runs on 3000/5173 while API is on 8000.
-        if ((hostname === 'localhost' || hostname === '127.0.0.1') && port !== '8000') {
+        // Do NOT use separate API port for nginx port 80 (production) — use same-origin.
+        if ((hostname === 'localhost' || hostname === '127.0.0.1') && ['3000', '5173'].includes(port)) {
             return 'http://127.0.0.1:8000';
         }
         return origin;
@@ -18,6 +19,42 @@ const API = (() => {
     // file:// or unknown protocol fallback for local static preview.
     return 'http://127.0.0.1:8000';
 })();
+
+// ═══════════════════════════════════════════
+// API Key Management (for production auth)
+// ═══════════════════════════════════════════
+
+function getApiKey() {
+    try { return localStorage.getItem('dataforge_api_key') || ''; } catch { return ''; }
+}
+
+function setApiKey(key) {
+    try { localStorage.setItem('dataforge_api_key', key); } catch { /* ignore storage errors */ }
+}
+
+function showApiKeyPrompt() {
+    const current = getApiKey();
+    const key = prompt('Enter your DataForge API key:', current);
+    if (key !== null) {
+        setApiKey(key.trim());
+        if (key.trim()) {
+            toast('API key set', 'success');
+            refreshSystemStatus();
+            refreshJobs();
+        }
+    }
+}
+
+// Central fetch wrapper that attaches X-API-Key header for API calls
+async function apiFetch(url, options = {}) {
+    const headers = { ...(options.headers || {}) };
+    const key = getApiKey();
+    if (key && (url.startsWith(API + '/api/') || url.startsWith('/api/'))) {
+        headers['X-API-Key'] = key;
+    }
+    return fetch(url, { ...options, headers });
+}
+
 const UI_STATE_KEY = 'dataforge_ui_state_v1';
 let currentJobId = null;
 let currentMode = "manual";
@@ -103,7 +140,7 @@ function setEngineStatus(text, offline = false) {
 
 async function refreshSystemStatus() {
     try {
-        const r = await fetch(`${API}/api/system/status`);
+        const r = await apiFetch(`${API}/api/system/status`);
         if (!r.ok) throw new Error('status unavailable');
         const data = await r.json();
         const active = Number((data.jobs || {}).active || 0);
@@ -193,7 +230,7 @@ function onGlobalKeydown(e) {
 
 async function refreshJobs() {
     try {
-        const res = await fetch(`${API}/api/jobs`);
+        const res = await apiFetch(`${API}/api/jobs`);
         const data = await res.json();
         jobsCache = Array.isArray(data.jobs) ? data.jobs : [];
         renderJobs(applyJobFilters(jobsCache));
@@ -323,7 +360,7 @@ function renderJobs(jobs) {
 
 async function pollJob(id) {
     try {
-        const r = await fetch(`${API}/api/jobs/${id}`);
+        const r = await apiFetch(`${API}/api/jobs/${id}`);
         if (!r.ok) return;
         const j = await r.json();
 
@@ -369,7 +406,7 @@ async function pollJob(id) {
 async function cancelJob(id) {
     if (!confirm('Cancel this running job?')) return;
     try {
-        const r = await fetch(`${API}/api/jobs/${id}/cancel`, { method: 'POST' });
+        const r = await apiFetch(`${API}/api/jobs/${id}/cancel`, { method: 'POST' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Cancel failed');
         toast(data.message || 'Cancellation requested', 'info');
@@ -382,7 +419,7 @@ async function cancelJob(id) {
 async function deleteJob(id) {
     if (!confirm('Delete this job?')) return;
     try {
-        const r = await fetch(`${API}/api/jobs/${id}`, { method: 'DELETE' });
+        const r = await apiFetch(`${API}/api/jobs/${id}`, { method: 'DELETE' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Delete failed');
         toast('Job deleted');
@@ -397,7 +434,7 @@ async function clearTerminalJobs() {
     if (!confirm(`Clear completed/failed/canceled jobs and keep the latest ${keepRecent}?`)) return;
 
     try {
-        const r = await fetch(`${API}/api/jobs/cleanup/terminal?keep_recent=${keepRecent}`, { method: 'DELETE' });
+        const r = await apiFetch(`${API}/api/jobs/cleanup/terminal?keep_recent=${keepRecent}`, { method: 'DELETE' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Terminal cleanup failed');
         toast(data.message || 'Terminal jobs cleared', 'info');
@@ -409,7 +446,7 @@ async function clearTerminalJobs() {
 
 async function refreshRecycleBin() {
     try {
-        const r = await fetch(`${API}/api/recycle_bin`);
+        const r = await apiFetch(`${API}/api/recycle_bin`);
         if (!r.ok) throw new Error('Failed to load recycle bin');
         const data = await r.json();
         const jobs = Array.isArray(data.jobs) ? data.jobs : [];
@@ -444,7 +481,7 @@ async function refreshRecycleBin() {
 
 async function restoreJob(id) {
     try {
-        const r = await fetch(`${API}/api/recycle_bin/${id}/restore`, { method: 'POST' });
+        const r = await apiFetch(`${API}/api/recycle_bin/${id}/restore`, { method: 'POST' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Restore failed');
         toast('Job restored');
@@ -457,7 +494,7 @@ async function restoreJob(id) {
 async function hardDeleteJob(id) {
     if (!confirm('Permanently delete this job? This cannot be undone.')) return;
     try {
-        const r = await fetch(`${API}/api/recycle_bin/${id}`, { method: 'DELETE' });
+        const r = await apiFetch(`${API}/api/recycle_bin/${id}`, { method: 'DELETE' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Permanent delete failed');
         toast('Job permanently deleted', 'error');
@@ -471,7 +508,7 @@ async function clearRecycleBin() {
     if (!confirm('Empty entire recycle bin? This cannot be undone.')) return;
 
     try {
-        const r = await fetch(`${API}/api/recycle_bin`, { method: 'DELETE' });
+        const r = await apiFetch(`${API}/api/recycle_bin`, { method: 'DELETE' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Failed to clear recycle bin');
         toast(data.message || 'Recycle bin cleared', 'info');
@@ -487,7 +524,7 @@ async function viewResults(id) {
     currentJobId = id;
     switchView('results');
     try {
-        const r = await fetch(`${API}/api/jobs/${id}`);
+        const r = await apiFetch(`${API}/api/jobs/${id}`);
         const j = await r.json();
         document.getElementById('res-title').textContent = j.name;
         document.getElementById('res-meta').textContent = `${j.filtered_records} records extracted (${j.total_records} total)`;
@@ -784,7 +821,7 @@ async function recleanCurrentJob() {
     }
 
     try {
-        const res = await fetch(`${API}/api/jobs/${currentJobId}/reclean`, { method: 'POST' });
+        const res = await apiFetch(`${API}/api/jobs/${currentJobId}/reclean`, { method: 'POST' });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.detail || 'Re-clean failed');
 
@@ -801,9 +838,56 @@ async function recleanCurrentJob() {
     }
 }
 
-function exportCSV() { if (currentJobId) window.open(`${API}/api/jobs/${currentJobId}/export/csv`); }
-function exportJSON() { if (currentJobId) window.open(`${API}/api/jobs/${currentJobId}/export/json`); }
-function exportExcel() { if (currentJobId) window.open(`${API}/api/jobs/${currentJobId}/export/excel`); }
+async function exportCSV() {
+    if (!currentJobId) return;
+    try {
+        const res = await apiFetch(`${API}/api/jobs/${currentJobId}/export/csv`);
+        if (!res.ok) { toast('CSV export failed', 'error'); return; }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `job-${currentJobId}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        toast(`CSV export error: ${e.message}`, 'error');
+    }
+}
+
+async function exportJSON() {
+    if (!currentJobId) return;
+    try {
+        const res = await apiFetch(`${API}/api/jobs/${currentJobId}/export/json`);
+        if (!res.ok) { toast('JSON export failed', 'error'); return; }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `job-${currentJobId}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        toast(`JSON export error: ${e.message}`, 'error');
+    }
+}
+
+async function exportExcel() {
+    if (!currentJobId) return;
+    try {
+        const res = await apiFetch(`${API}/api/jobs/${currentJobId}/export/excel`);
+        if (!res.ok) { toast('Excel export failed', 'error'); return; }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `job-${currentJobId}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        toast(`Excel export error: ${e.message}`, 'error');
+    }
+}
 
 // ─── Form: Init ───
 
@@ -891,7 +975,7 @@ async function suggestSchemaFromIntent() {
     btn.innerHTML = '<span class="spinner"></span> Suggesting...';
 
     try {
-        const res = await fetch(`${API}/api/schema/suggest`, {
+        const res = await apiFetch(`${API}/api/schema/suggest`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ intent, max_fields: 8 })
@@ -1030,7 +1114,7 @@ async function previewDiscovery() {
     preview.innerHTML = '<div class="disc-loading"><span class="spinner"></span> Discovering URLs...</div>';
 
     try {
-        const res = await fetch(`${API}/api/discover`, {
+        const res = await apiFetch(`${API}/api/discover`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1101,7 +1185,7 @@ async function analyzeURL() {
     const timeoutId = setTimeout(() => controller.abort(), 130_000);
 
     try {
-        const res = await fetch(`${API}/api/url/analyze`, {
+        const res = await apiFetch(`${API}/api/url/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url }),
@@ -1435,7 +1519,7 @@ async function submitJob(e) {
     btn.innerHTML = '<span class="spinner"></span> Starting...';
 
     try {
-        const res = await fetch(`${API}/api/jobs`, {
+        const res = await apiFetch(`${API}/api/jobs`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1461,7 +1545,7 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 
 async function refreshCognition() {
     try {
-        const res = await fetch(`${API}/api/system/topology`);
+        const res = await apiFetch(`${API}/api/system/topology`);
         if (!res.ok) throw new Error('Topology unavailable');
         const data = await res.json();
 
@@ -1564,10 +1648,10 @@ async function refreshDashboard() {
     try {
         // Fetch all dashboard data in parallel
         const [modeRes, dashRes, healthRes, predRes] = await Promise.all([
-            fetch(`${API}/api/operator/mode`).catch(() => null),
-            fetch(`${API}/api/operator/dashboard`).catch(() => null),
-            fetch(`${API}/api/operator/health`).catch(() => null),
-            fetch(`${API}/api/operator/predictions`).catch(() => null),
+            apiFetch(`${API}/api/operator/mode`).catch(() => null),
+            apiFetch(`${API}/api/operator/dashboard`).catch(() => null),
+            apiFetch(`${API}/api/operator/health`).catch(() => null),
+            apiFetch(`${API}/api/operator/predictions`).catch(() => null),
         ]);
 
         const modeData = modeRes?.ok ? await modeRes.json() : null;
@@ -1818,7 +1902,7 @@ async function switchOperatorMode(mode) {
     }
 
     try {
-        const res = await fetch(`${API}/api/operator/mode`, {
+        const res = await apiFetch(`${API}/api/operator/mode`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ mode })

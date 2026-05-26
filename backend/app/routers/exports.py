@@ -26,6 +26,24 @@ def _strip_system_fields(records: list[dict]) -> list[dict]:
     return [{k: v for k, v in r.items() if not k.startswith("_")} for r in records]
 
 
+_DANGEROUS_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _safe_cell(value):
+    """Escape spreadsheet formula-injection prefixes so exported CSV/Excel files
+    do not execute malicious formulas when opened in Excel, Sheets, or LibreOffice.
+
+    If *value* is a string that starts with a dangerous prefix (``=``, ``+``, ``-``,
+    ``@``, tab, or carriage return), prepend a single quote so the spreadsheet
+    software treats it as plain text.
+
+    Non-string values are returned unchanged.
+    """
+    if isinstance(value, str) and value.startswith(_DANGEROUS_PREFIXES):
+        return "'" + value
+    return value
+
+
 def create_exports_router(jobs_store: dict):
     router = APIRouter()
 
@@ -55,9 +73,9 @@ def create_exports_router(jobs_store: dict):
             for k in fieldnames:
                 v = row.get(k)
                 if isinstance(v, list):
-                    flat_row[k] = ", ".join(str(i) for i in v)
+                    flat_row[k] = _safe_cell(", ".join(str(i) for i in v))
                 else:
-                    flat_row[k] = v
+                    flat_row[k] = _safe_cell(v)
             writer.writerow(flat_row)
 
         output.seek(0)
@@ -123,7 +141,9 @@ def create_exports_router(jobs_store: dict):
             for col_num, field in enumerate(fieldnames, 1):
                 value = row.get(field)
                 if isinstance(value, list):
-                    value = ", ".join(str(i) for i in value if i is not None)
+                    value = _safe_cell(", ".join(str(i) for i in value if i is not None))
+                else:
+                    value = _safe_cell(value)
                 ws.cell(row=row_num, column=col_num, value=value)
 
         # Save to bytes

@@ -202,11 +202,25 @@ def create_jobs_router(
         if job.status == JobStatus.PENDING:
             mark_job_canceled(job, "Canceled before execution.")
 
+        # Cancel the queued task if worker queue is enabled
+        import os as _os
+        worker_queue_enabled = _os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
+        if worker_queue_enabled and worker_queue_enabled.lower() in ("1", "true", "yes"):
+            try:
+                from app.worker_queue import get_worker_queue
+                queue = get_worker_queue()
+                await queue.cancel(job_id)
+            except Exception as e:
+                logging.getLogger(__name__).warning(
+                    "Failed to cancel queued task for job %s: %s", job_id, e,
+                )
+
         _save_job(job)
         return {
             "job_id": job.id,
             "status": job.status.value,
             "cancel_requested": True,
+            "cancel_queued_task": True,
             "message": "Cancellation requested",
         }
 

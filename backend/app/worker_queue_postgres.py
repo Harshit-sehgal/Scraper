@@ -502,7 +502,7 @@ class PostgresWorkerQueue:
                 }
         except Exception as e:
             logger.error("Failed to get Postgres queue status: %s", e)
-            return {"error": str(e), "pending": 0, "running": 0}
+            return {"ok": False, "backend": "postgres", "error": str(e), "pending": 0, "running": 0}
 
     def get_dead_letter_queue(self, limit: int = 50) -> list[dict]:
         """Return dead letter queue entries."""

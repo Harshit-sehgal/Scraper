@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.scrape_telemetry import get_scrape_telemetry
@@ -58,11 +58,15 @@ async def get_current_mode():
 
 
 @router.post("/mode")
-async def set_operator_mode(body: ModeBody):
+async def set_operator_mode(request: Request, body: ModeBody):
     """Switch the system to a different operator mode.
 
     Dynamically adjusts runtime settings (timeout, settle delay,
     stealth mode, etc.) for the selected operational profile.
+
+    Requires admin-level privileges — this operation is powerful and can
+    switch the runtime into stealth/forensic/benchmark modes that bypass
+    normal timing and anti-bot limits.
 
     Modes:
       - production: High-yield throughput, stable data capture
@@ -74,6 +78,17 @@ async def set_operator_mode(body: ModeBody):
     Args:
         body.mode: One of 'production', 'benchmark', 'forensic', 'stealth', 'low_cost'.
     """
+    from app.config import settings
+    import secrets
+    if settings.ADMIN_API_KEY:
+        provided = request.headers.get("X-Admin-Key", "")
+        if not secrets.compare_digest(provided, settings.ADMIN_API_KEY):
+            raise HTTPException(
+                status_code=403,
+                detail="Admin API key required (X-Admin-Key header). This endpoint is powerful and can "
+                       "switch the runtime into stealth/forensic/benchmark modes.",
+            )
+
     mode = body.mode
     try:
         target_mode = OperatorMode(mode.lower())

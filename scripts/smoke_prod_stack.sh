@@ -5,9 +5,13 @@
 # Proves the actual production stack boots correctly, not just unit tests.
 #
 # Usage:
-#   export DATAFORGE_API_KEY="your-key-here"
-#   export DATAFORGE_DB_PASSWORD="your-password-here"
+#   python3 scripts/check_prod_env.py --env-file .env   # pre-flight
 #   bash scripts/smoke_prod_stack.sh
+#
+# This script does NOT source .env directly (fragile with special chars).
+# Instead it reads values through a tiny Python helper so passwords with
+# shell-special characters ($, !, quotes, #) and JSON array values work
+# correctly.
 #
 # Exit codes:
 #   0 — All smoke tests passed
@@ -37,6 +41,34 @@ echo "  DataForge Production Docker Smoke Test"
 echo "======================================================================"
 echo ""
 
+# ─── Safe env value reader ────────────────────────────────────────────────
+# Read a single env var using Python's dotenv parsing so shell-special
+# characters ($, !, `, #, quotes) and JSON array values are handled safely.
+_get_env() {
+    local key="$1"
+    local default="${2:-}"
+    python3 -c "
+import json, sys
+try:
+    from dotenv import dotenv_values
+    vals = dotenv_values('.env')
+except ImportError:
+    try:
+        from pathlib import Path
+        vals = {}
+        for line in Path('.env').read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if '=' in line:
+                k, _, v = line.partition('=')
+                vals[k.strip()] = v.strip().strip('\"').strip(\"'\")
+    except Exception:
+        vals = {}
+print(vals.get('${key}', '${default}'))
+"
+}
+
 # ───── Step 0: Pre-flight checks ──────────────────────────────────────────
 echo "─── Step 0: Pre-flight checks ────────────────────────────────────────"
 
@@ -46,10 +78,8 @@ if [ ! -f ".env" ]; then
 fi
 echo -e "  $PASS  .env file exists"
 
-# Source .env for variables used in checks
-set -a
-source .env
-set +a
+# Read env values safely through Python
+DATAFORGE_API_KEY="$(_get_env DATAFORGE_API_KEY)"
 
 if [ -z "${DATAFORGE_API_KEY:-}" ]; then
     echo -e "  $FAIL  DATAFORGE_API_KEY is not set in .env"
@@ -99,13 +129,13 @@ docker compose -f docker-compose.prod.yml up -d 2>&1
 echo -e "  $INFO  Waiting for services to start (30s)..."
 sleep 30
 
-# Check all containers are running
-for svc in dataforge worker postgres nginx; do
+# Check all containers are running (including monitoring services)
+for svc in dataforge worker postgres nginx prometheus grafana; do
     if docker compose -f docker-compose.prod.yml ps "$svc" --format json 2>/dev/null | grep -q '"State":"running"'; then
         echo -e "  $PASS  $svc is running"
     else
         echo -e "  $FAIL  $svc is not running"
-        docker compose -f docker-compose.prod.yml logs "$svc" --tail=20 2>&1
+        docker compose -f docker-compose.prod.yml logs "$svc" --tail=20 2>&1 || true
         ALL_PASS=false
     fi
 done
@@ -123,16 +153,18 @@ else
     ALL_PASS=false
 fi
 
-# /ready — readiness with backend=postgres
+# /ready — readiness: in production the endpoint returns only {"status":"ready"}
+# to avoid leaking backend/schema details. We check only status=='ready' here.
+# Backend verification is done via the authenticated /api/system/storage/status.
 READY=$(curl -s http://localhost/ready 2>/dev/null || echo '{"status":"unreachable"}')
-if echo "$READY" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ready'; assert d.get('backend')=='postgres'" 2>/dev/null; then
-    echo -e "  $PASS  /ready returns ready+postgres"
+if echo "$READY" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ready'" 2>/dev/null; then
+    echo -e "  $PASS  /ready returns ready"
 else
     echo -e "  $FAIL  /ready returned: $READY"
     ALL_PASS=false
 fi
 
-# ───── Step 6: API system status ──────────────────────────────────────────
+# ───── Step 6: API authenticated endpoints ────────────────────────────────
 echo ""
 echo "─── Step 6: API authenticated endpoints ──────────────────────────────"
 
@@ -175,19 +207,28 @@ echo ""
 echo "─── Step 8: Verify job lifecycle ─────────────────────────────────────"
 
 if [ -n "$JOB_ID" ]; then
-    # Wait for worker to process the job
-    echo -e "  $INFO  Waiting for worker to process the job (15s)..."
-    sleep 15
+    # Poll for up to 90 seconds for the job to reach a terminal status
+    echo -e "  $INFO  Waiting for worker to process the job (polling up to 90s)..."
+    TERMINAL_STATUSES="^(completed|degraded|empty_result|failed|canceled)$"
+    JOB_REACHED_TERMINAL=false
+    POLL_DEADLINE=$((SECONDS + 90))
+    while [ $SECONDS -lt $POLL_DEADLINE ]; do
+        JOB_STATUS=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" \
+            "http://localhost/api/jobs/$JOB_ID" 2>/dev/null || echo '{"status":"unreachable"}')
+        STATUS_VALUE=$(echo "$JOB_STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))" 2>/dev/null || echo "unknown")
+        
+        if echo "$STATUS_VALUE" | grep -qE "$TERMINAL_STATUSES"; then
+            echo -e "  $PASS  Job reached terminal status: $STATUS_VALUE"
+            JOB_REACHED_TERMINAL=true
+            break
+        fi
+        echo -e "  $INFO  Job status: $STATUS_VALUE — still waiting..."
+        sleep 5
+    done
 
-    JOB_STATUS=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" \
-        "http://localhost/api/jobs/$JOB_ID" 2>/dev/null || echo '{"status":"unreachable"}')
-    
-    STATUS_VALUE=$(echo "$JOB_STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))" 2>/dev/null || echo "unknown")
-    
-    if echo "$STATUS_VALUE" | grep -qE "^(completed|degraded|empty_result)$"; then
-        echo -e "  $PASS  Job reached terminal status: $STATUS_VALUE"
-    else
-        echo -e "  $INFO  Job status: $STATUS_VALUE (not yet terminal; may be expected for mocked scrape)"
+    if [ "$JOB_REACHED_TERMINAL" = false ]; then
+        echo -e "  $FAIL  Job did not reach terminal status within 90 seconds (last status: ${STATUS_VALUE:-unknown})"
+        ALL_PASS=false
     fi
 fi
 
@@ -195,7 +236,7 @@ fi
 echo ""
 echo "─── Step 9: Worker logs (last 20 lines) ──────────────────────────────"
 
-docker compose -f docker-compose.prod.yml logs worker --tail=20 2>&1
+docker compose -f docker-compose.prod.yml logs worker --tail=20 2>&1 || true
 
 # ───── Summary ────────────────────────────────────────────────────────────
 echo ""
@@ -208,7 +249,8 @@ if [ "$ALL_PASS" = true ]; then
     echo "    - FastAPI (dataforge): OK"
     echo "    - Worker queue: OK"
     echo "    - PostgreSQL: OK"
-    echo "    - Monitoring (Prometheus/Grafana): running"
+    echo "    - Prometheus: OK"
+    echo "    - Grafana: OK"
     echo "======================================================================"
     exit 0
 else
