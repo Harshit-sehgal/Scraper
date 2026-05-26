@@ -138,7 +138,6 @@ def create_jobs_router(
                 from app.utils.job_results_store import save_job_results_to_disk
                 save_job_results_to_disk(job.id, results_list)
             _save_job(job)
-            persist_state_fn()
 
         return {"message": "Metadata backfilled successfully", "updated": updated}
 
@@ -461,11 +460,9 @@ def create_jobs_router(
             if jid in keep_ids:
                 continue
             job = jobs_store.get(jid)
-            file_path = job.results_file_path if job else None
             repo.move_to_recycle_bin(jid)
             if jid in jobs_store:
                 recycle_bin_store[jid] = jobs_store.pop(jid)
-            delete_job_results_from_disk(jid, file_path)
             removed += 1
 
         return {

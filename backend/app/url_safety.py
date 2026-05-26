@@ -42,9 +42,12 @@ def validate_public_http_url(url: str) -> None:
     hostname_lower = hostname.lower()
     
     # 1. Allowlist override check (for local integration / Docker smoke test)
-    allowed_hosts = [h.strip().lower() for h in settings.ALLOWED_INTERNAL_HOSTS.split(",") if h.strip()]
-    if hostname_lower in allowed_hosts:
-        return
+    import os
+    is_smoke = os.getenv("DATAFORGE_SMOKE_TEST_MODE", "").lower() in ("true", "1", "yes")
+    if is_smoke:
+        allowed_hosts = [h.strip().lower() for h in settings.ALLOWED_INTERNAL_HOSTS.split(",") if h.strip()]
+        if hostname_lower in allowed_hosts:
+            return
         
     # 2. Reject explicit loopback/internal names
     if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):
@@ -63,8 +66,10 @@ def validate_public_http_url(url: str) -> None:
                 raise ValueError(
                     f"URL hostname '{hostname}' resolves to restricted IP {ip} — rejected for security (SSRF protection)."
                 )
-    except (socket.gaierror, OSError):
-        # If DNS resolution fails, we let it pass validation. 
-        # No SSRF is possible if the hostname cannot be resolved, and the 
-        # actual fetching attempt downstream will naturally fail with a connection error.
+    except (socket.gaierror, OSError) as e:
+        is_production = settings.ENV.lower() in ("production", "staging")
+        if is_production and not is_smoke:
+            raise ValueError(
+                f"URL hostname '{hostname}' could not be resolved (DNS failure) — rejected in production for security."
+            )
         pass

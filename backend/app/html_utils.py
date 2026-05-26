@@ -353,6 +353,14 @@ async def fetch_page_content(
 
         # Phase 80: Lightweight mode filters more resources
         async def _route_filter(route):
+            req_url = route.request.url
+            try:
+                _validate_url_safe(req_url)
+            except ValueError as e:
+                logger.warning("[SSRF] Playwright request to %s rejected: %s", req_url, e)
+                await route.abort()
+                return
+
             abort_types = {"image", "media", "font"}
             if strategy == FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
                 abort_types.update({"stylesheet", "other"})
@@ -539,18 +547,6 @@ async def fetch_page_content(
             except Exception:
                 pass
 
-
-async def _check_redirect_targets(client: httpx.AsyncClient, url: str) -> None:
-    """Follow redirects and validate the final URL is not a private/internal target."""
-    try:
-        resp = await client.get(url, follow_redirects=True, timeout=10.0)
-        final_url = str(resp.url)
-        _validate_url_safe(final_url)
-    except httpx.TimeoutException:
-        # Timeout following redirects isn't an SSRF risk
-        pass
-    except Exception:
-        raise
 
 
 async def _fetch_with_httpx(

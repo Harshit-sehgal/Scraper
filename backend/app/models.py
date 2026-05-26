@@ -13,19 +13,6 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
-# ─── SSRF protection: block internal/private network targets ─────────────
-# Resolved IPs in these ranges will be rejected during URL validation.
-_PRIVATE_IP_PREFIXES: tuple = (
-    "127.", "10.", "169.254.", "172.16.", "172.17.", "172.18.", "172.19.",
-    "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
-    "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
-    "192.168.", "0.",
-)
-
-
-def _is_private_ip(ip_str: str) -> bool:
-    """Return True if the IP is in a private, loopback, or link-local range."""
-    return ip_str.startswith(_PRIVATE_IP_PREFIXES)
 
 
 # Field names reserved for system/metadata use — cannot be used as schema field names
@@ -222,23 +209,6 @@ class JobCreate(BaseModel):
                 raise ValueError("selectors_map must have at most 20 keys")
             self.selectors_map = SelectorMap.model_validate(self.selectors_map).model_dump()
 
-        # ── SSRF: block private/internal targets ──────────────────────────
-        cleaned_urls = [u.strip() for u in self.urls if str(u or "").strip()]
-        for url in cleaned_urls:
-            parsed = urlparse(url)
-            hostname = parsed.hostname or ""
-            # Reject bare IPv4 loopback
-            if hostname in ("localhost", "127.0.0.1", "0.0.0.0", "[::1]"):
-                raise ValueError(f"URL target '{url}' is a loopback address — rejected for security")
-            # Reject private IP ranges (try to resolve, but also check literal)
-            # For literal IPs, check immediately
-            import re as _re
-            ip_match = _re.match(r"^(\d{1,3}\.){3}\d{1,3}$", hostname)
-            if ip_match and _is_private_ip(hostname):
-                raise ValueError(f"URL target '{url}' is a private/internal IP address — rejected for security")
-            # Reject common metadata/cloud IPs
-            if hostname == "169.254.169.254":
-                raise ValueError(f"URL target '{url}' is a cloud metadata endpoint — rejected for security")
 
         # ── search_params limits ──────────────────────────────────────────
         if self.search_params is not None:
