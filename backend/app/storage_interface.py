@@ -95,11 +95,24 @@ class SQLiteJobRepository(JobRepository):
         persist_state_single(job)
 
     def save_world_state(self, payload: dict) -> None:
-        """Save semantic world state to the SQLite world_state.json file."""
+        """Save semantic world state to the SQLite world_state.json file atomically."""
         import json
+        import tempfile
+        import os
         from app.job_store import _get_db_path
         ws_path = _get_db_path().parent / "world_state.json"
-        ws_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+        # Write to a temp file first, then atomic rename to prevent partial writes.
+        tmp_dir = ws_path.parent
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".json.tmp",
+            dir=str(tmp_dir),
+            delete=False,
+        ) as f:
+            f.write(json.dumps(payload, ensure_ascii=False, indent=2))
+            tmp_path = f.name
+        os.replace(tmp_path, str(ws_path))
 
     def load_world_state(self) -> Optional[dict]:
         """Load semantic world state from the SQLite world_state.json file."""

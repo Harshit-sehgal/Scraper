@@ -12,11 +12,30 @@ function setDashboardApiKey(key) {
     try { localStorage.setItem("dataforge_api_key", key); } catch {}
 }
 
+let dashboardApiLast403 = 0;
+
 async function dashboardApiFetch(url, options = {}) {
     const headers = { ...(options.headers || {}) };
     const key = getDashboardApiKey();
     if (key && url.includes("/api/")) headers["X-API-Key"] = key;
-    return fetch(url, { ...options, headers });
+    try {
+        const res = await fetch(url, { ...options, headers });
+        // Auto-prompt on 403: API key may be missing or invalid
+        if (res.status === 403) {
+            const now = Date.now();
+            if (now - dashboardApiLast403 > 15000) {
+                dashboardApiLast403 = now;
+                const current = getDashboardApiKey();
+                const newKey = prompt("API key required. Enter your DataForge API key:", current);
+                if (newKey !== null) {
+                    setDashboardApiKey(newKey.trim());
+                }
+            }
+        }
+        return res;
+    } catch (err) {
+        throw err;
+    }
 }
 
 // Configurable API base — supports window.DATAFORGE_API_BASE override, same as app.js

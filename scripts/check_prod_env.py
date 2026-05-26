@@ -15,8 +15,6 @@ Exit codes:
 
 import argparse
 import json
-import os
-import re
 import sys
 from pathlib import Path
 
@@ -167,6 +165,42 @@ def check_worker_queue(value: str) -> bool:
     return True
 
 
+def check_queue_backend(value: str) -> bool:
+    """Validate DATAFORGE_QUEUE_BACKEND is 'postgres'."""
+    if value.lower() != "postgres":
+        print(
+            f"  [FAIL]  DATAFORGE_QUEUE_BACKEND={value!r}. "
+            "Production requires 'postgres'."
+        )
+        return False
+    return True
+
+
+def check_grafana_password(value: str) -> bool:
+    """Validate GRAFANA_PASSWORD is not a default/placeholder value."""
+    default_values = {
+        "admin",
+        "password",
+        "grafana",
+        "change-me",
+        "change-me-to-a-strong-password",
+    }
+    if value.lower() in default_values:
+        print(
+            f"  [FAIL]  GRAFANA_PASSWORD={_mask_value('GRAFANA_PASSWORD', value)} "
+            "is a known default/placeholder value. "
+            "Set a strong, unique Grafana admin password."
+        )
+        return False
+    if len(value) < 8:
+        print(
+            f"  [FAIL]  GRAFANA_PASSWORD is too short ({len(value)} chars). "
+            "Must be at least 8 characters."
+        )
+        return False
+    return True
+
+
 def check_database_url(value: str) -> bool:
     """Validate DATAFORGE_DATABASE_URL is a postgresql:// URL."""
     if not value.startswith(("postgresql://", "postgres://")):
@@ -242,7 +276,7 @@ def check_env(value: str) -> bool:
 def main() -> int:
     args = parse_args()
     env_path = Path(args.env_file).expanduser().resolve()
-    print(f"DataForge Production Environment Check")
+    print("DataForge Production Environment Check")
     print(f"  Env file: {env_path}")
     print()
 
@@ -264,9 +298,22 @@ def main() -> int:
          "Must be a postgresql:// URL matching docker-compose.prod.yml"),
         ("DATAFORGE_WORKER_QUEUE", True, check_worker_queue,
          "Must be 'true' for production"),
+        ("DATAFORGE_QUEUE_BACKEND", True, check_queue_backend,
+         "Must be 'postgres' for production — set DATAFORGE_QUEUE_BACKEND=postgres"),
         ("DATAFORGE_ENV", True, check_env,
          "Must be set to 'production'"),
     ]
+
+    # ── Optional but recommended ─────────────────────────────────────────
+    recommended = [
+        ("GRAFANA_PASSWORD", False, check_grafana_password,
+         "Set a strong Grafana admin password (reject: admin, password, grafana, change-me)"),
+    ]
+
+    for name, required, validator, hint in recommended:
+        passed = check_var(env, name, required=required, validator=validator, hint=hint)
+        if not passed:
+            all_pass = False
 
     for name, required, validator, hint in checks:
         passed = check_var(env, name, required=required, validator=validator, hint=hint)

@@ -65,6 +65,8 @@ function showAdminKeyPrompt() {
     }
 }
 
+let lastApi403 = 0;
+
 // Central fetch wrapper that attaches X-API-Key header for API calls
 async function apiFetch(url, options = {}) {
     // Destructure `admin` out of options to avoid mutating the caller's object
@@ -84,8 +86,13 @@ async function apiFetch(url, options = {}) {
     try {
         const res = await fetch(url, { ...rest, headers });
         // Auto-prompt on 403: API key may be missing or expired
+        // Throttled to once per 15s to avoid spamming on polling cycles
         if (res.status === 403 && !admin) {
-            showApiKeyPrompt();
+            const now = Date.now();
+            if (now - lastApi403 > 15000) {
+                lastApi403 = now;
+                showApiKeyPrompt();
+            }
         }
         return res;
     } catch (err) {
