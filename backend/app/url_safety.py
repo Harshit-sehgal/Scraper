@@ -53,11 +53,20 @@ def validate_public_http_url(url: str) -> None:
     if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):
         raise ValueError(f"URL hostname '{hostname}' is a restricted local loopback target.")
         
-    # 3. Reject cloud metadata endpoints specifically
+    # 3. Reject cloud metadata endpoints specifically (check BEFORE generic internal TLDs
+    #    so metadata.google.internal gets a specific error message)
     if hostname_lower in ("169.254.169.254", "metadata.google.internal", "instance-data"):
         raise ValueError(f"URL hostname '{hostname}' is a restricted cloud metadata endpoint.")
+
+    # 4. Reject internal TLDs (misconfiguration / SSRF trick)
+    internal_tlds = (".local", ".internal", ".lan", ".corp")
+    for tld in internal_tlds:
+        if hostname_lower.endswith(tld):
+            raise ValueError(
+                f"URL hostname '{hostname}' uses internal TLD '{tld}' which is restricted for security."
+            )
         
-    # 4. Try DNS resolution to check resolved IPs
+    # 5. Try DNS resolution to check resolved IPs
     try:
         addrs = socket.getaddrinfo(hostname, None)
         for addr in addrs:
@@ -72,4 +81,5 @@ def validate_public_http_url(url: str) -> None:
             raise ValueError(
                 f"URL hostname '{hostname}' could not be resolved (DNS failure) — rejected in production for security."
             )
+        # In dev/test, unresolved hostnames that are not internal TLDs are allowed through
         pass

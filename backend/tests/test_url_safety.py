@@ -101,6 +101,160 @@ def test_validate_public_http_url_allowlist(monkeypatch):
     validate_public_http_url("http://nginx/smoke/records.html")
     validate_public_http_url("https://smoke-host/index.html")
 
+# ── IPv6 private range tests ────────────────────────────────────────────
+
+def test_is_safe_ip_ipv6_ranges():
+    """IPv6 private, link-local, loopback, and multicast ranges are rejected."""
+    # Unique Local Address (ULA) — fc00::/7 — considered private by ipaddress
+    assert is_safe_ip("fc00::1") is False
+    assert is_safe_ip("fd00::dead:beef") is False
+    # Link-local — fe80::/10
+    assert is_safe_ip("fe80::1") is False
+    assert is_safe_ip("fe80::dead:beef") is False
+    # Loopback — ::1
+    assert is_safe_ip("::1") is False
+    # Public IPv6 should be safe
+    assert is_safe_ip("2001:4860:4860::8888") is True
+    assert is_safe_ip("2606:4700:4700::1111") is True
+
+
+def test_is_safe_ip_ipv4_mapped_ipv6():
+    """IPv4-mapped IPv6 addresses are correctly classified for unsafe ranges.
+
+    Note: On Python < 3.12, the entire ::ffff:0:0/96 range is considered
+    "reserved", so we only assert unsafe addresses are caught.
+    """
+    # ::ffff:127.0.0.1 is loopback
+    assert is_safe_ip("::ffff:127.0.0.1") is False
+    # ::ffff:192.168.1.1 is private
+    assert is_safe_ip("::ffff:192.168.1.1") is False
+    # ::ffff:10.0.0.1 is private
+    assert is_safe_ip("::ffff:10.0.0.1") is False
+    # ::ffff:169.254.169.254 is link-local
+    assert is_safe_ip("::ffff:169.254.169.254") is False
+
+
+def test_validate_private_ip_explicit_urls():
+    """Private IP ranges blocked when used as explicit URL hosts."""
+    for host in ("10.0.0.1", "172.16.0.1", "192.168.1.1"):
+        with pytest.raises(ValueError, match="restricted IP"):
+            validate_public_http_url(f"http://{host}")
+
+
+def test_validate_internal_tlds():
+    """Internal TLDs .local, .internal, .lan, .corp are rejected."""
+    # These should be rejected regardless of DNS resolution (before DNS check)
+    for tld_host in ("somehost.local", "internal.host.internal", "server.lan", "company.corp"):
+        with pytest.raises(ValueError, match="internal TLD"):
+            validate_public_http_url(f"http://{tld_host}/path")
+
+    # Internal TLD with subdomain
+    with pytest.raises(ValueError, match="internal TLD"):
+        validate_public_http_url("http://mail.server.local")
+
+    # Regular .com, .org, etc. should pass DNS check (or fail closed)
+    # We just verify they don't get the internal TLD error
+    try:
+        validate_public_http_url("http://example.com")
+    except ValueError as e:
+        assert "internal TLD" not in str(e)
+
+
+def test_validate_credentials_in_url():
+    """Credentials embedded in URLs are rejected when host is unsafe."""
+    # user@127.0.0.1 — the @ is parsed as username, host remains 127.0.0.1
+    with pytest.raises(ValueError, match="restricted local loopback target"):
+        validate_public_http_url("http://user@127.0.0.1/")
+
+    # user:pass@127.0.0.1
+    with pytest.raises(ValueError, match="restricted local loopback target"):
+        validate_public_http_url("http://user:pass@127.0.0.1/")
+
+    # user@localhost
+    with pytest.raises(ValueError, match="restricted local loopback target"):
+        validate_public_http_url("http://user@localhost/")
+
+    # user@public.com@127.0.0.1 — urlparse treats as user=user@public.com, host=127.0.0.1
+    with pytest.raises(ValueError, match="restricted local loopback target"):
+        validate_public_http_url("http://user@public.com@127.0.0.1/")
+
+
+def test_validate_unresolved_host_in_dev(monkeypatch):
+    """Unresolvable hostnames pass through in development mode."""
+    monkeypatch.setattr(settings, "ENV", "development")
+
+    def mock_getaddrinfo_fail(host, port, *args, **kwargs):
+        raise socket.gaierror(-2, "Name or service not known")
+    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_fail)
+
+    # Should not raise in development
+    validate_public_http_url("http://some-nonexistent-host-xyz.com/path")
+
+
+def test_validate_resolved_private_ip_via_dns_ipv6(monkeypatch):
+    """Hostname resolving to IPv6 private address is rejected."""
+    # Use a non-internal-TLD hostname so DNS resolution kicks in
+    def mock_getaddrinfo_v6(host, port, *args, **kwargs):
+        return [
+            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("fc00::1", 80, 0, 0)),
+        ]
+    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_v6)
+
+    with pytest.raises(ValueError, match="resolves to restricted IP"):
+        validate_public_http_url("http://ula-host.example.com")
+
+    def mock_getaddrinfo_v6_linklocal(host, port, *args, **kwargs):
+        return [
+            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("fe80::1", 80, 0, 0)),
+        ]
+    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_v6_linklocal)
+
+    with pytest.raises(ValueError, match="resolves to restricted IP"):
+        validate_public_http_url("http://link-local-host.example.com")
+
+
+def test_validate_resolved_private_ip_via_dns_decimal_ip(monkeypatch):
+    """Hostname that resolves to a decimal/hex IP representation via DNS is rejected.
+
+    On Linux, decimal IPs like 2130706433 resolve to 127.0.0.1 via DNS.
+    We test this by monkeypatching getaddrinfo to simulate the resolution.
+    """
+    # Simulate decimal IP resolution (2130706433 = 127.0.0.1)
+    def mock_getaddrinfo_decimal(host, port, *args, **kwargs):
+        if host == "2130706433":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 80))]
+        raise socket.gaierror(-2, "Name or service not known")
+    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_decimal)
+
+    with pytest.raises(ValueError, match="restricted IP"):
+        validate_public_http_url("http://2130706433/")
+
+    # Simulate hex IP resolution (0x7f000001 = 127.0.0.1)
+    def mock_getaddrinfo_hex(host, port, *args, **kwargs):
+        if host == "0x7f000001":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 80))]
+        raise socket.gaierror(-2, "Name or service not known")
+    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_hex)
+
+    with pytest.raises(ValueError, match="restricted IP"):
+        validate_public_http_url("http://0x7f000001/")
+
+
+def test_validate_redirect_to_private_ranges(monkeypatch):
+    """Ensure redirects to various private ranges are caught via the final URL validation."""
+    # 10.0.0.0/8
+    with pytest.raises(ValueError, match="restricted IP"):
+        validate_public_http_url("http://10.0.0.1/path")
+    # 169.254.169.254 (cloud metadata)
+    with pytest.raises(ValueError, match="restricted cloud metadata endpoint"):
+        validate_public_http_url("http://169.254.169.254/latest/meta-data")
+    # 0.0.0.0
+    with pytest.raises(ValueError, match="restricted local loopback target"):
+        validate_public_http_url("http://0.0.0.0/something")
+
+
+# ── HTTPX redirect integration tests ────────────────────────────────────
+
 import httpx
 from app.html_utils import _fetch_with_httpx
 
@@ -136,3 +290,60 @@ async def test_fetch_redirect_to_private_ip(monkeypatch):
 
     with pytest.raises(ValueError, match="restricted local loopback target"):
         await _fetch_with_httpx("http://public-site.com/start-url")
+
+
+@pytest.mark.asyncio
+async def test_fetch_redirect_to_cloud_metadata(monkeypatch):
+    """Redirect to 169.254.169.254 (cloud metadata) is caught."""
+    class MockResponse:
+        def __init__(self, url, status_code, headers, is_redirect=False):
+            self.url = httpx.URL(url)
+            self.status_code = status_code
+            self.headers = headers
+            self.is_redirect = is_redirect
+
+        def raise_for_status(self):
+            pass
+
+    async def mock_get(self, url, *args, **kwargs):
+        if "public-site" in str(url):
+            return MockResponse(
+                url="http://public-site.com/start",
+                status_code=302,
+                headers={"location": "http://169.254.169.254/latest/meta-data/"},
+                is_redirect=True
+            )
+        return MockResponse(
+            url="http://169.254.169.254/latest/meta-data/",
+            status_code=200,
+            headers={},
+            is_redirect=False
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
+
+    with pytest.raises(ValueError, match="restricted cloud metadata endpoint"):
+        await _fetch_with_httpx("http://public-site.com/start")
+
+
+# ── Smoke mode allowlist extras ─────────────────────────────────────────
+
+def test_smoke_mode_internal_tld_allowed(monkeypatch):
+    """Internal TLDs are still rejected even in smoke mode (separate from ALLOWED_INTERNAL_HOSTS)."""
+    monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "true")
+    monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "nginx,smoke-host")
+    monkeypatch.setattr(settings, "ENV", "production")
+
+    # Internal TLD .local should still be rejected even in smoke mode
+    with pytest.raises(ValueError, match="internal TLD"):
+        validate_public_http_url("http://something.local/path")
+
+    # But explicit allowlist hosts still work
+    def mock_getaddrinfo_nginx(host, port, *args, **kwargs):
+        if host == "nginx":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("172.18.0.10", 80))]
+        raise socket.gaierror(-2, "Name or service not known")
+    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_nginx)
+
+    # nginx is in allowed_internal_hosts, so it passes in smoke mode
+    validate_public_http_url("http://nginx/smoke/records.html")
