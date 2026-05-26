@@ -31,7 +31,7 @@ services:
     environment:
       - DATAFORGE_ENV=production
       - DATAFORGE_STORAGE_BACKEND=postgres
-      - DATAFORGE_DATABASE_URL=postgresql://dataforge:${DATAFORGE_DB_PASSWORD:-dataforge}@postgres:5432/dataforge
+      - DATAFORGE_DATABASE_URL=postgresql://dataforge:${DATAFORGE_DB_PASSWORD:?DATAFORGE_DB_PASSWORD is required}@postgres:5432/dataforge
       - DATAFORGE_WORKER_QUEUE=true
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
       - TMPDIR=/tmp
@@ -42,7 +42,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import http.client; http.client.HTTPConnection('localhost', 8000).request('GET', '/health')"]
+      test: ["CMD", "python", "-c", "import http.client; c=http.client.HTTPConnection('localhost', 8000); c.request('GET', '/ready'); r=c.getresponse(); exit(0 if r.status==200 else 1)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -78,7 +78,7 @@ services:
     environment:
       - DATAFORGE_ENV=production
       - DATAFORGE_STORAGE_BACKEND=postgres
-      - DATAFORGE_DATABASE_URL=postgresql://dataforge:${DATAFORGE_DB_PASSWORD:-dataforge}@postgres:5432/dataforge
+      - DATAFORGE_DATABASE_URL=postgresql://dataforge:${DATAFORGE_DB_PASSWORD:?DATAFORGE_DB_PASSWORD is required}@postgres:5432/dataforge
       - DATAFORGE_WORKER_QUEUE=true
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
       - TMPDIR=/tmp
@@ -114,7 +114,7 @@ services:
       - "5432"
     environment:
       - POSTGRES_USER=dataforge
-      - POSTGRES_PASSWORD=${DATAFORGE_DB_PASSWORD:-dataforge}
+      - POSTGRES_PASSWORD=${DATAFORGE_DB_PASSWORD:?DATAFORGE_DB_PASSWORD is required}
       - POSTGRES_DB=dataforge
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -197,7 +197,7 @@ services:
       - "3000"
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD is required}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_INSTALL_PLUGINS=grafana-piechart-panel
       - GF_AUTH_ANONYMOUS_ENABLED=false

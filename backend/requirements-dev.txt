@@ -8,6 +8,10 @@
 
 -r requirements.txt
 
+# ─── Testing (production reqs should not include these) ────────────────────
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
 # ─── Optional Test Dependencies ──────────────────────────────────────────
 testcontainers[postgres]>=4.0.0
 pytest-cov>=5.0.0

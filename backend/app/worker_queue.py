@@ -422,16 +422,37 @@ class WorkerQueue:
                 conn.close()
 
     async def cancel(self, task_id: str) -> bool:
-        """Cancel a pending task. Returns True if cancelled."""
+        """Cancel a pending task. Archives to task_history. Returns True if cancelled."""
+        now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         async with self._in_flight_lock:
             conn = self._conn()
             try:
-                cursor = conn.execute(
-                    "UPDATE tasks SET status = ? WHERE id = ? AND status = 'pending'",
-                    (TaskStatus.CANCELLED, task_id),
+                row = conn.execute(
+                    "SELECT * FROM tasks WHERE id = ? AND status = 'pending'",
+                    (task_id,),
+                ).fetchone()
+                if row is None:
+                    return False
+                task_data = dict(row)
+                # Archive to history before deleting
+                conn.execute(
+                    """INSERT OR REPLACE INTO task_history
+                       (id, type, payload, priority, status, created_at,
+                        started_at, completed_at, attempts, max_attempts,
+                        last_error, finished_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        task_data["id"], task_data["type"],
+                        task_data["payload"], task_data["priority"],
+                        TaskStatus.CANCELLED, task_data["created_at"],
+                        task_data.get("started_at"), now,
+                        task_data["attempts"], task_data["max_attempts"],
+                        "Cancelled by user", now,
+                    ),
                 )
+                conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
                 conn.commit()
-                return cursor.rowcount > 0
+                return True
             finally:
                 conn.close()
 
@@ -522,8 +543,8 @@ class WorkerQueue:
         """Execute a single task with timeout."""
         handler = self._handlers.get(task.type)
         if handler is None:
-            logger.warning("No handler registered for task type: %s", task.type)
-            await self.complete(task.id, {"warning": f"No handler for {task.type}"})
+            logger.error("No handler registered for task type: %s", task.type)
+            await self.fail(task.id, f"No handler registered for task type: {task.type}", retry=False)
             return
 
         try:

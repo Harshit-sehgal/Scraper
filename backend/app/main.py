@@ -4,6 +4,7 @@ FastAPI Main Server — DataForge General-Purpose Web Scraper API.
 
 import asyncio
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Any
@@ -248,7 +249,7 @@ async def api_key_middleware(request: Request, call_next):
         is_docs_path = "/docs" in request.url.path or "/openapi" in request.url.path
         if not is_docs_path or settings.ENV.lower() == "production":
             api_key = request.headers.get("X-API-Key", "")
-            if api_key != settings.API_KEY:
+            if not secrets.compare_digest(api_key, settings.API_KEY):
                 return JSONResponse(
                     status_code=403,
                     content={"detail": "Invalid or missing API key. Provide X-API-Key header."},

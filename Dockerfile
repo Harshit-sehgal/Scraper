@@ -79,14 +79,15 @@ RUN mkdir -p /ms-playwright && playwright install chromium 2>&1 | tail -3 && cho
 # Copy application code
 COPY backend/ backend/
 COPY frontend/ frontend/
+COPY scripts/ scripts/
 
 # Security: drop root privileges
 RUN chown -R dataforge:dataforge /app
 USER dataforge
 
-# Health check
+# Health check — uses /ready (proves storage reachability, not just process alive)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD python -c "import http.client; http.client.HTTPConnection('localhost', 8000).request('GET', '/');" || exit 1
+    CMD python -c "import http.client; c=http.client.HTTPConnection('localhost', 8000); c.request('GET', '/ready'); r=c.getresponse(); exit(0 if r.status==200 else 1)" || exit 1
 
 EXPOSE 8000
 
