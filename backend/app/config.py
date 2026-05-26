@@ -403,6 +403,12 @@ class Settings(BaseSettings):
     SELECTOR_MIN_SEGMENT_LEN: int = 3
     """Min characters for extracted context segment."""
 
+    # ─── Queue Backend ─────────────────────────────────────────────────────
+    QUEUE_BACKEND: str = "sqlite"
+    """Worker queue backend: 'sqlite' (single-node) or 'postgres' (multi-node).
+    Postgres backend requires DATAFORGE_STORAGE_BACKEND=postgres and a running
+    Postgres instance available via DATAFORGE_DATABASE_URL."""
+
     # ─── Anti-Bot Detection ────────────────────────────────────────────────
     ANTIBOT_PLATFORM_MATCH_SCORE: float = 0.6
     """Score boost when platform matches expected pattern."""

@@ -33,6 +33,7 @@ services:
       - DATAFORGE_STORAGE_BACKEND=postgres
       - DATAFORGE_DATABASE_URL=postgresql://dataforge:${DATAFORGE_DB_PASSWORD:?DATAFORGE_DB_PASSWORD is required}@postgres:5432/dataforge
       - DATAFORGE_WORKER_QUEUE=true
+      - DATAFORGE_QUEUE_BACKEND=postgres
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
       - TMPDIR=/tmp
     volumes:
@@ -80,6 +81,7 @@ services:
       - DATAFORGE_STORAGE_BACKEND=postgres
       - DATAFORGE_DATABASE_URL=postgresql://dataforge:${DATAFORGE_DB_PASSWORD:?DATAFORGE_DB_PASSWORD is required}@postgres:5432/dataforge
       - DATAFORGE_WORKER_QUEUE=true
+      - DATAFORGE_QUEUE_BACKEND=postgres
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
       - TMPDIR=/tmp
       - DATAFORGE_WORKER=true

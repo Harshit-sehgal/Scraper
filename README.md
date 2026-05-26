@@ -52,6 +52,8 @@ This includes:
 
 Set `DATAFORGE_DATABASE_URL` to switch to Postgres, and `DATAFORGE_WORKER_QUEUE=true` to enable the async worker queue.
 
+**Queue Backend**: Set `DATAFORGE_QUEUE_BACKEND=postgres` to use Postgres-backed queue (recommended for multi-node production). Defaults to SQLite for single-node deployments.
+
 ### 4. Create and Scrape a Job
 Open another terminal (with `.venv` activated) and run the manual test interface to quickly launch a demonstration extraction job:
 ```bash
@@ -135,6 +137,7 @@ DataForge Studio exposes a rich, RESTful API interface for programmatic jobs and
 | DELETE | `/api/recycle_bin/{id}` | Permanently delete a job. |
 | POST | `/api/system/scheduler/step` | Trigger cognitive scheduler manually. |
 | GET | `/api/system/search?query=...`| Topological search. |
+| GET | `/metrics` | Prometheus metrics endpoint (job counts, queue depth, backend type) |
 
 ---
 

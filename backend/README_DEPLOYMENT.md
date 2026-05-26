@@ -34,10 +34,12 @@ The system returns `PostgresJobRepository` when both are set. If `DATAFORGE_STOR
 
 Postgres is backed by **psycopg2** (synchronous) with `ThreadedConnectionPool`. No async wrappers.
 
-**Limitations (Postgres mode):**
-- Worker queue remains SQLite-backed even when Postgres is active
-- Semantic world-state persistence is not yet implemented for Postgres
-- API and worker containers must share a volume for the SQLite worker queue
+**Postgres Mode Features:**
+- Worker queue can use Postgres backend via `DATAFORGE_QUEUE_BACKEND=postgres`
+- Semantic world-state persistence (load/save world state)
+- Savepoint-safe schema migrations (no transaction aborts on ALTER TABLE)
+- Individual repo operations: move_to_recycle_bin, restore, hard_delete, clear_terminal_jobs
+- Non-development environments require explicit `DATAFORGE_DATABASE_URL`
 
 **When to use:** Production deployments, high traffic, multi-worker setups.
 
@@ -162,26 +164,39 @@ When using `docker-compose.prod.yml`, Postgres starts automatically with:
 
 The API and worker services have `DATAFORGE_STORAGE_BACKEND=postgres` and `DATAFORGE_DATABASE_URL` set in their environment blocks, so production Docker always uses Postgres.
 
-**Known limitation:** Even in Postgres mode, the worker queue is still SQLite-backed (`backend/data/worker_queue.db`). The API and worker containers must share the `dataforge_data` volume. See section 6 for multi-node considerations.
+**Postgres queue:** Set `DATAFORGE_QUEUE_BACKEND=postgres` to use Postgres-backed queue (recommended for multi-node). See section 5 for details.
 
 ---
 
 ## 5. Worker Queue
 
-The async worker queue (`app/worker_queue.py`) enables background job processing. It is **always SQLite-backed**, even when the job repository uses Postgres.
+The async worker queue provides background job processing with two backends:
+
+| Backend | Env Var | Use Case |
+|---------|---------|----------|
+| SQLite (default) | `DATAFORGE_QUEUE_BACKEND=sqlite` | Single-node, development |
+| Postgres | `DATAFORGE_QUEUE_BACKEND=postgres` | Multi-node, production |
 
 ### Enable Worker Queue
 ```bash
 export DATAFORGE_WORKER_QUEUE=true
+export DATAFORGE_QUEUE_BACKEND=postgres  # recommended for production
 ```
 
-When enabled, jobs are enqueued to persistent queue instead of running inline. A separate worker process picks up and executes tasks:
+When enabled, jobs are enqueued to the persistent queue instead of running inline. A separate worker process picks up and executes tasks:
 
 ```bash
 python scripts/run_worker.py              # 4 workers
 python scripts/run_worker.py --workers 8  # Scale up
-python scripts/run_worker.py --once       # Requires DATAFORGE_JOB_ID
+python scripts/run_worker.py --once       # Polls until terminal state
 ```
+
+**Postgres-backed queue** (`app/worker_queue_postgres.py`) provides:
+- Same interface as SQLite queue (drop-in replacement via `get_worker_queue()` factory)
+- Share-nothing between workers — no shared volume required
+- `SKIP LOCKED` atomic dequeue for multi-node safety
+- In-flight task cancellation with history archiving
+- Stuck-task recovery on worker restart
 
 ### Queue Features
 - Priority levels (critical, high, normal, low, background)
@@ -189,9 +204,10 @@ python scripts/run_worker.py --once       # Requires DATAFORGE_JOB_ID
 - Dead letter queue for permanently failed tasks
 - Graceful shutdown with in-flight draining
 - Observability via `get_status()`
+- `timeout_seconds` preserved in task_history and retry_dead_letter
 
 ### Docker Worker
-In `docker-compose.prod.yml`, the `worker` service runs `scripts/run_worker.py` alongside the API server. Both mount the shared `dataforge_data` volume for the SQLite queue database.
+In `docker-compose.prod.yml`, the `worker` service runs `scripts/run_worker.py` alongside the API server. Both have `DATAFORGE_QUEUE_BACKEND=postgres` set so they share the Postgres queue without needing a shared volume.
 
 ---
 
@@ -212,7 +228,7 @@ This starts:
 | `prometheus` | Prometheus | Metrics collection |
 | `grafana` | Grafana 11 | Metrics visualization |
 
-**Important:** The production Docker stack configures Postgres + worker queue by default. The API service has `DATAFORGE_WORKER_QUEUE=true` so jobs are automatically enqueued. Both API and worker services mount `dataforge_data:/app/backend/data` for the SQLite worker queue.
+**Important:** The production Docker stack configures Postgres + worker queue by default. The API service has `DATAFORGE_WORKER_QUEUE=true` with `DATAFORGE_QUEUE_BACKEND=postgres`. Both API and worker services share the Postgres queue — no shared volume needed for the queue.
 
 ### Production Docker Smoke Test
 
@@ -235,14 +251,18 @@ The script:
 7. Creates a job via the API and verifies the worker processes it
 8. Displays worker logs
 
-### Single-Container Architecture Note
-The current production stack is **single-node**: the SQLite worker queue requires a shared filesystem between API and worker. True horizontal scaling requires moving the queue to Postgres or Redis (see section 8).
+### Multi-Node Architecture
+With `DATAFORGE_QUEUE_BACKEND=postgres`, the stack supports multi-node deployments:
+- Multiple API instances can share the same Postgres-backed queue
+- Workers can run on separate machines — no shared filesystem required
+- `SKIP LOCKED` ensures each task is dequeued exactly once
 
 ### Health Checks
 ```bash
 curl http://localhost:8000/health          # Liveness
-curl http://localhost:8000/ready           # Readiness (backend-aware)
+curl http://localhost:8000/ready           # Readiness (backend-aware, minimal in production)
 curl http://localhost:8000/api/system/storage/status # Backend type + health
+curl http://localhost:8000/metrics         # Prometheus metrics (job counts, queue depth, backend type)
 ```
 
 ---
@@ -291,6 +311,11 @@ Grafana is accessible at `http://localhost:3000` (default: admin/admin).
 - [ ] **Worker Queue**: Enqueues jobs correctly when `DATAFORGE_WORKER_QUEUE=true`
 - [ ] **In production, enqueue failure returns 503** (no silent inline fallback)
 - [ ] **API docs (`/docs`, `/openapi.json`) are protected behind API key in production**
+- [ ] **Admin API Key** protects powerful routes (`/api/system/merge`, `/api/system/scheduler`, etc.)
+- [ ] **Role-based API keys** — `X-API-Key` for operator routes, `X-Admin-Key` for admin routes
+- [ ] **Prometheus /metrics** returns job counts, queue depth, and backend type gauges
+- [ ] **CI pipeline** passes on main: lint, mypy, arch-validation, tests, Docker build
+- [ ] **Postgres-backed queue** — `DATAFORGE_QUEUE_BACKEND=postgres` for share-nothing multi-node
 - [ ] **Postgres Integration**: `pytest --run-postgres -m postgres -v` passes (requires Docker)
 - [ ] **Smoke Test**: `bash scripts/smoke_prod_stack.sh` passes
 
@@ -300,9 +325,9 @@ Grafana is accessible at `http://localhost:3000` (default: admin/admin).
 
 | Area | Limitation | Timeline |
 |------|------------|----------|
-| **Postgres world-state** | Semantic world-state is not persisted in Postgres mode | Future |
-| **Postgres-backed queue** | Worker queue is SQLite even with Postgres storage | Future |
-| **Multi-node scaling** | SQLite queue requires shared volume, not horizontally scalable | Future |
-| **Prometheus /metrics** | No `/metrics` endpoint in API yet | Future |
+| **Postgres world-state** | ✅ Resolved — world_state table with load/save methods | Done |
+| **Postgres-backed queue** | ✅ Resolved — PostgresWorkerQueue with factory dispatch | Done |
+| **Multi-node scaling** | ✅ Resolved — `SKIP LOCKED` atomic dequeue, share-nothing workers | Done |
+| **Prometheus /metrics** | ✅ Resolved — `/metrics` endpoint with job/queue/backend gauges | Done |
 | **PostgreSQL exporter** | No postgres-exporter container in compose | Future |
 | **nginx stub_status** | No nginx metrics endpoint configured | Future |

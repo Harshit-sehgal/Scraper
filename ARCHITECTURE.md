@@ -2,8 +2,8 @@
 
 **Purpose**: Single source of truth for DataForge system architecture  
 **Audience**: Engineers, operators, new team members  
-**Status**: Phase 5 Complete  
-**Last Updated**: May 21, 2026
+**Status**: Phase 5 Complete + Production Hardening  
+**Last Updated**: May 26, 2026
 
 ---
 
@@ -721,10 +721,15 @@ Memory Layer (depends on: all layers)
   - 35 tests (22 + 13), mypy clean
   - PLAYBOOKS.md with 6 issue resolution playbooks
 
-### Phase 6
-- [ ] Chaos engineering framework (planned)
-- [ ] Failure scenario library
-- [ ] Resource governance enforcement
+### Phase 6 (Production Hardening — Complete)
+- [x] Prometheus /metrics endpoint ✓
+- [x] Admin API key for powerful routes ✓
+- [x] Postgres world-state persistence ✓
+- [x] Postgres-backed worker queue (multi-node capable) ✓
+- [x] Role-based API keys (read-only, operator, admin) ✓
+- [x] secrets.compare_digest for timing-attack resistance ✓
+- [x] Rate limiter respects X-Forwarded-For header ✓
+- [x] CI pipeline (lint, typecheck, test, arch-validation, Docker build) ✓
 
 ### Phase 7
 - [ ] Production deployment guide

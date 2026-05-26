@@ -727,29 +727,45 @@ class WorkerQueue:
 
 
 # ───────────────────────────────────────────────────────────────────────
-# Global singleton
+# Global singleton & factory dispatch
 # ───────────────────────────────────────────────────────────────────────
 
 _queue_instance: Optional[WorkerQueue] = None
 _queue_lock = threading.Lock()
 
 
-def get_worker_queue(db_path: Optional[Path] = None) -> WorkerQueue:
+def get_worker_queue(
+    db_path: Optional[Path] = None,
+    backend: Optional[str] = None,
+) -> "WorkerQueue":
     """Get or create the global WorkerQueue instance.
 
     Args:
         db_path: Optional custom database path (used by tests).
             If provided and differs from the cached instance's path,
             a new instance is created (respects test isolation boundaries).
+        backend: Queue backend to use ('sqlite' or 'postgres').
+            If not set, uses DATAFORGE_QUEUE_BACKEND env var or defaults to 'sqlite'.
+
+    Returns:
+        WorkerQueue (SQLite) or PostgresWorkerQueue depending on backend.
     """
+    import os
+
+    # Resolve backend: explicit param > env var > default
+    resolved_backend = backend or os.getenv("DATAFORGE_QUEUE_BACKEND", "sqlite").strip().lower()
+
+    if resolved_backend == "postgres":
+        from app.worker_queue_postgres import get_postgres_worker_queue
+        return get_postgres_worker_queue()
+
+    # SQLite backend (default)
     global _queue_instance
     if _queue_instance is None:
         with _queue_lock:
             if _queue_instance is None:
                 _queue_instance = WorkerQueue(db_path=db_path)
     elif db_path is not None:
-        # If a specific db_path is requested and differs from the
-        # cached instance, create a dedicated instance for the caller.
         if _queue_instance._db_path != db_path:
             return WorkerQueue(db_path=db_path)
     return _queue_instance
@@ -759,3 +775,8 @@ def reset_worker_queue():
     """Reset the global queue instance (for testing)."""
     global _queue_instance
     _queue_instance = None
+    try:
+        from app.worker_queue_postgres import reset_postgres_worker_queue
+        reset_postgres_worker_queue()
+    except ImportError:
+        pass
