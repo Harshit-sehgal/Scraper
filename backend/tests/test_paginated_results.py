@@ -59,6 +59,29 @@ def test_get_job_results_pagination(client, seed_job_with_results):
     assert data2["offset"] == 5
     assert data2["results"][0]["title"] == "Result 5"
 
+
+def test_get_job_results_next_offset(client, seed_job_with_results):
+    """The next_offset cursor should be present when more results exist, None on last page."""
+    job = seed_job_with_results
+
+    # Page 1: offset=0, limit=10 — next_offset should be 10
+    r = client.get(f"/api/jobs/{job.id}/results?limit=10&offset=0")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["next_offset"] == 10
+
+    # Page 2: offset=10, limit=10 — next_offset should be None (last page)
+    r2 = client.get(f"/api/jobs/{job.id}/results?limit=10&offset=10")
+    assert r2.status_code == 200
+    data2 = r2.json()
+    assert data2["next_offset"] is None
+
+    # Exact boundary: offset=10, limit=5 — next_offset should be None (10+5 >= 15 total)
+    r3 = client.get(f"/api/jobs/{job.id}/results?limit=5&offset=10")
+    assert r3.status_code == 200
+    data3 = r3.json()
+    assert data3["next_offset"] is None
+
 def test_backfill_metadata_endpoint(client, seed_job_with_results):
     job = seed_job_with_results
     r = client.post(f"/api/jobs/{job.id}/backfill-metadata")

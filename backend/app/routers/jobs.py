@@ -111,12 +111,15 @@ def create_jobs_router(
             total = len(results_list)
             page = results_list[offset:offset + limit]
 
+        next_offset = offset + limit if (offset + limit) < total else None
+
         return {
             "job_id": job_id,
             "results": page,
             "total": total,
             "limit": limit,
             "offset": offset,
+            "next_offset": next_offset,
             "returned": len(page),
         }
 

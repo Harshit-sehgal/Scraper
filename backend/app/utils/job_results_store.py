@@ -127,6 +127,63 @@ def load_paginated_job_results_from_disk(
     return records, total_count
 
 
+def load_job_results_from_disk_safe(
+    job_id: str,
+    file_path: Optional[str] = None,
+) -> tuple[list[dict], Optional[str]]:
+    """
+    Load results from disk with graceful corruption handling.
+
+    Like `load_job_results_from_disk`, but instead of raising on corrupt data,
+    it returns a tuple of (records, warning_message). If the file is intact,
+    *warning_message* is None. If corruption is detected (e.g. truncated gzip,
+    invalid JSON on the last line), the partial results are returned along with
+    a descriptive warning so callers can decide how to proceed.
+
+    Returns:
+        tuple of (records: list[dict], warning: Optional[str])
+    """
+    if file_path:
+        path = Path(file_path)
+    else:
+        path = get_job_results_path(job_id)
+    if not path.exists():
+        return [], None
+
+    results = []
+    warning = None
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            for idx, line in enumerate(f, 1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    results.append(json.loads(line))
+                except json.JSONDecodeError as e:
+                    warning = (
+                        f"Corrupt record at line {idx} of results file for job {job_id}: "
+                        f"{e}. Returned {len(results)} partial records."
+                    )
+                    logger.warning("%s", warning)
+                    # Stop processing at first corrupt line — rest is unreliable
+                    break
+    except (gzip.BadGzipFile, EOFError, OSError) as e:
+        warning = (
+            f"Results file for job {job_id} is truncated or corrupt: {e}. "
+            f"Returned {len(results)} partial records."
+        )
+        logger.warning("%s", warning)
+    except Exception as e:
+        warning = (
+            f"Failed to read results file for job {job_id}: {e}. "
+            f"Returned {len(results)} partial records."
+        )
+        logger.warning("%s", warning)
+
+    return results, warning
+
+
 def delete_job_results_from_disk(job_id: str, file_path: Optional[str] = None) -> bool:
     """
     Delete the compressed results file from disk for a given job ID.

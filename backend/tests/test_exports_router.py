@@ -335,7 +335,11 @@ class TestExportWithoutSchema:
 
 
 class TestExportResultsOnDisk:
-    """When results_on_disk is True, exports should load from disk instead of memory."""
+    """When results_on_disk is True, exports should load from disk instead of memory.
+
+    CSV and JSON exports use ``load_paginated_job_results_from_disk`` for streaming,
+    while Excel uses ``load_job_results_from_disk_safe`` for corruption-tolerant loading.
+    """
 
     @pytest_asyncio.fixture
     async def disk_client(self):
@@ -345,7 +349,13 @@ class TestExportResultsOnDisk:
             {"city": "London", "temp": "15"},
             {"city": "Paris", "temp": "18"},
         ]
-        with patch("app.utils.job_results_store.load_job_results_from_disk", return_value=mock_on_disk_data):
+        with patch(
+            "app.utils.job_results_store.load_paginated_job_results_from_disk",
+            return_value=(mock_on_disk_data, 2),
+        ), patch(
+            "app.utils.job_results_store.load_job_results_from_disk_safe",
+            return_value=(mock_on_disk_data, None),
+        ):
             jobs_store: dict[str, Job] = {}
             router = create_exports_router(jobs_store)
             # Job has empty in-memory results but results_on_disk=True
@@ -382,6 +392,140 @@ class TestExportResultsOnDisk:
         resp = await disk_client.get("/api/jobs/disk-job/export/excel")
         assert resp.status_code == 200
         assert resp.content[:2] == b"PK"
+
+
+class TestExportResultsOnDiskExcelSafeLoading:
+    """Excel export uses ``load_job_results_from_disk_safe`` for corruption-tolerant loading."""
+
+    @pytest.mark.asyncio
+    async def test_excel_uses_safe_loader(self):
+        """Excel should call load_job_results_from_disk_safe, not load_job_results_from_disk."""
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["safe-excel"] = _make_job(
+            "safe-excel",
+            name="safe-test",
+            results=[],
+            results_on_disk=True,
+        )
+        test_app = FastAPI()
+        test_app.include_router(router)
+
+        with patch(
+            "app.utils.job_results_store.load_job_results_from_disk_safe",
+            return_value=([{"x": "1"}], None),
+        ):
+            transport = ASGITransport(app=test_app)
+            async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+                resp = await c.get("/api/jobs/safe-excel/export/excel")
+        assert resp.status_code == 200
+        assert resp.content[:2] == b"PK"
+
+    @pytest.mark.asyncio
+    async def test_excel_handles_corrupt_data_via_safe_loader(self):
+        """With a corruption warning from safe loader, Excel should still produce output."""
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["corrupt-excel"] = _make_job(
+            "corrupt-excel",
+            name="corrupt-test",
+            results=[],
+            results_on_disk=True,
+        )
+        test_app = FastAPI()
+        test_app.include_router(router)
+
+        with patch(
+            "app.utils.job_results_store.load_job_results_from_disk_safe",
+            return_value=([{"x": "partial"}], "Corrupt record at line 2"),
+        ):
+            transport = ASGITransport(app=test_app)
+            async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+                resp = await c.get("/api/jobs/corrupt-excel/export/excel")
+        assert resp.status_code == 200
+        assert resp.content[:2] == b"PK"
+
+
+class TestStreamingExportWithLargeDataset:
+    """When results_on_disk is True and dataset spans multiple pages, exports should stream."""
+
+    @pytest.mark.asyncio
+    async def test_csv_streams_multiple_pages(self):
+        """500-row dataset should produce all rows in CSV output."""
+        from httpx import ASGITransport, AsyncClient
+
+        large_data = [{"idx": i} for i in range(500)]
+
+        def _paginated_loader(job_id, limit=500, offset=0, file_path=None):
+            total = len(large_data)
+            page = large_data[offset:offset + limit]
+            return page, total
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["stream-csv"] = _make_job(
+            "stream-csv",
+            name="stream-test",
+            results=[],
+            results_on_disk=True,
+        )
+        test_app = FastAPI()
+        test_app.include_router(router)
+
+        with patch(
+            "app.utils.job_results_store.load_paginated_job_results_from_disk",
+            side_effect=_paginated_loader,
+        ):
+            transport = ASGITransport(app=test_app)
+            async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+                resp = await c.get("/api/jobs/stream-csv/export/csv")
+        assert resp.status_code == 200
+        text = resp.text
+        # Should contain all 500 rows plus header
+        lines = text.strip().split("\n")
+        assert len(lines) == 501  # header + 500 data rows
+        assert lines[1].strip() == "0"
+        assert lines[-1].strip() == "499"
+
+    @pytest.mark.asyncio
+    async def test_json_streams_multiple_pages(self):
+        """500-row dataset should produce all rows in JSON output."""
+        from httpx import ASGITransport, AsyncClient
+
+        large_data = [{"idx": i} for i in range(500)]
+
+        def _paginated_loader(job_id, limit=500, offset=0, file_path=None):
+            total = len(large_data)
+            page = large_data[offset:offset + limit]
+            return page, total
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["stream-json"] = _make_job(
+            "stream-json",
+            name="stream-test",
+            results=[],
+            results_on_disk=True,
+        )
+        test_app = FastAPI()
+        test_app.include_router(router)
+
+        with patch(
+            "app.utils.job_results_store.load_paginated_job_results_from_disk",
+            side_effect=_paginated_loader,
+        ):
+            transport = ASGITransport(app=test_app)
+            async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+                resp = await c.get("/api/jobs/stream-json/export/json")
+        assert resp.status_code == 200
+        data = json.loads(resp.content)
+        assert len(data) == 500
+        assert data[0]["idx"] == 0
+        assert data[499]["idx"] == 499
 
 
 # ─── Excel with None values in list fields ──────────────────────────
