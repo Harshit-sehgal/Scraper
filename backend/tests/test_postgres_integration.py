@@ -294,3 +294,144 @@ class TestPostgresJobRepositoryIntegration:
         jobs_after_recovery, _, _ = repo3.load_all()
         assert jobs_after_recovery["pg-rec-pending"].status == JobStatus.FAILED
         assert jobs_after_recovery["pg-rec-running"].status == JobStatus.FAILED
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Schema repair integration tests
+# ───────────────────────────────────────────────────────────────────────
+
+
+class TestPostgresSchemaRepairIntegration:
+    """Verifies schema repair logic against a real Postgres database."""
+
+    def _setup_v1_schema_no_recycle_bin(self, conn):
+        """Create a minimal v1 schema (schema_version=1, jobs table, NO recycle_bin)."""
+        with conn.cursor() as cur:
+            cur.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)")
+            cur.execute("DELETE FROM schema_version")
+            cur.execute("INSERT INTO schema_version (version) VALUES (1)")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS jobs (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    mode TEXT NOT NULL DEFAULT 'manual',
+                    urls TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT DEFAULT ''
+                )
+            """)
+        conn.commit()
+
+    def test_recycle_bin_created_when_missing_from_v1(self, postgres_container):
+        """
+        Given: schema_version=1, jobs table exists, recycle_bin is missing.
+        When: PostgresJobRepository is created and health_check() called.
+        Then: recycle_bin table is created, schema upgraded to version 2.
+        """
+        import psycopg2
+        from app.postgres_repository import _close_pool, _conn, _fetch_one, _execute
+        from app.postgres_repository import PostgresJobRepository
+        from app.storage_interface import reset_repository
+
+        dsn = os.environ["DATAFORGE_DATABASE_URL"]
+
+        # Clean any existing pool
+        _close_pool()
+
+        # Manually create v1 schema without recycle_bin
+        conn = psycopg2.connect(dsn)
+        try:
+            self._setup_v1_schema_no_recycle_bin(conn)
+        finally:
+            conn.close()
+
+        # Verify recycle_bin does NOT exist before repair
+        _close_pool()
+        with _conn() as c:
+            row = _fetch_one(
+                c,
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_name = 'recycle_bin'",
+            )
+            assert row is None, "recycle_bin should NOT exist before repair"
+
+        # Now create repository — repair should happen automatically
+        reset_repository()
+        repo = PostgresJobRepository()
+        health = repo.health_check()
+
+        assert health["ok"] is True, f"Health check failed: {health}"
+        assert health["schema_version"] == 2, f"Expected schema_version=2 after repair, got {health['schema_version']}"
+
+        # Verify recycle_bin table now exists
+        _close_pool()
+        with _conn() as c:
+            row = _fetch_one(
+                c,
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_name = 'recycle_bin'",
+            )
+            assert row is not None, "recycle_bin table should exist after repair"
+
+        # Verify we can insert into recycle_bin after repair
+        from app.models import Job, JobStatus
+        recycled = Job(
+            id="recycled-after-v1-repair",
+            name="V1 Repair Test",
+            urls=["https://example.com"],
+            status=JobStatus.COMPLETED,
+        )
+        repo.save_all({}, {recycled.id: recycled})
+        _, loaded_recycle, _ = repo.load_all()
+        assert recycled.id in loaded_recycle, "Recycle bin should accept entries after v1 repair"
+
+        _close_pool()
+        reset_repository()
+
+    def test_soft_deleted_job_restored_by_save_single(self, postgres_container):
+        """
+        Given: A job exists, is soft-deleted (moved to recycle bin).
+        When: save_single is called with an active job with the same ID.
+        Then: The job becomes visible again (deleted_at = NULL).
+        """
+        from app.postgres_repository import _close_pool
+        from app.postgres_repository import PostgresJobRepository
+        from app.storage_interface import reset_repository
+        from app.models import Job, JobStatus
+
+        _close_pool()
+        reset_repository()
+        repo = PostgresJobRepository()
+
+        # Create and save a job
+        job = Job(
+            id="soft-delete-restore-test",
+            name="To Be Deleted",
+            urls=["https://example.com"],
+            status=JobStatus.COMPLETED,
+        )
+        repo.save_single(job)
+
+        # Soft-delete: move to recycle bin
+        repo.save_all({}, {job.id: job})
+
+        # Verify it's gone from active
+        active, _, _ = repo.load_all()
+        assert job.id not in active, "Job should be hidden after soft delete"
+
+        # Save active job with same ID (simulating restore)
+        restored = Job(
+            id="soft-delete-restore-test",
+            name="Restored!",
+            urls=["https://example.com"],
+            status=JobStatus.PENDING,
+        )
+        repo.save_single(restored)
+
+        # Verify visible again
+        loaded, _, _ = repo.load_all()
+        assert restored.id in loaded, "Job should be visible after save_single over soft-deleted ID"
+        assert loaded[restored.id].name == "Restored!"
+
+        _close_pool()
+        reset_repository()
