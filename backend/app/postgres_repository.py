@@ -225,8 +225,11 @@ def _ensure_required_tables(conn):
     for col_def in _JOBS_COLUMNS_SQL:
         # Use savepoints so individual column failures don't abort the transaction
         try:
+            _execute(conn, "SAVEPOINT alter_jobs_col")
             _execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
+            _execute(conn, "RELEASE SAVEPOINT alter_jobs_col")
         except Exception:
+            _execute(conn, "ROLLBACK TO SAVEPOINT alter_jobs_col")
             pass
 
     _execute(conn, _build_create_recycle_bin_sql())
@@ -591,13 +594,12 @@ class PostgresJobRepository(JobRepository):
             # Upsert into recycle_bin
             cols_to_copy = [k for k in row.keys() if k != "deleted_at"]
             insert_cols = ", ".join(cols_to_copy)
-            insert_vals = ", ".join(f"%s" for _ in cols_to_copy)
-            row_data = {k: row[k] for k in cols_to_copy}
-            row_data["deleted_at"] = now
+            insert_vals = ", ".join("%s" for _ in cols_to_copy)
+            params = [row[k] for k in cols_to_copy] + [now]
             _execute(
                 conn,
                 f"INSERT INTO recycle_bin ({insert_cols}, deleted_at) VALUES ({insert_vals}, %s) ON CONFLICT (id) DO NOTHING",
-                list(row_data.values()) + [now],
+                params,
             )
             return True
 
@@ -614,9 +616,10 @@ class PostgresJobRepository(JobRepository):
             cols = [k for k in row.keys() if k != "deleted_at"]
             col_list = ", ".join(cols)
             ph = ", ".join("%s" for _ in cols)
+            update_parts = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "id")
             _execute(
                 conn,
-                f"INSERT INTO jobs ({col_list}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET deleted_at = NULL",
+                f"INSERT INTO jobs ({col_list}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET deleted_at = NULL, {update_parts}",
                 [row[k] for k in cols],
             )
             return True

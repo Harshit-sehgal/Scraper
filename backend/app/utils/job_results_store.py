@@ -86,13 +86,17 @@ def load_job_results_from_disk(job_id: str, file_path: Optional[str] = None) -> 
     return results
 
 
-def delete_job_results_from_disk(job_id: str) -> bool:
+def delete_job_results_from_disk(job_id: str, file_path: Optional[str] = None) -> bool:
     """
     Delete the compressed results file from disk for a given job ID.
     
+    If *file_path* is provided, it is used directly (supporting migrated or
+    externally stored result paths). Otherwise the path is recomputed from
+    the job ID using the standard path convention.
+    
     Returns True if the file was deleted, False otherwise.
     """
-    path = get_job_results_path(job_id)
+    path = Path(file_path) if file_path else get_job_results_path(job_id)
     if path.exists():
         try:
             path.unlink()

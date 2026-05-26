@@ -94,6 +94,25 @@ class SQLiteJobRepository(JobRepository):
         from app.job_store import persist_state_single
         persist_state_single(job)
 
+    def save_world_state(self, payload: dict) -> None:
+        """Save semantic world state to the SQLite world_state.json file."""
+        import json
+        from app.job_store import _get_db_path
+        ws_path = _get_db_path().parent / "world_state.json"
+        ws_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+
+    def load_world_state(self) -> Optional[dict]:
+        """Load semantic world state from the SQLite world_state.json file."""
+        import json
+        from app.job_store import _get_db_path
+        ws_path = _get_db_path().parent / "world_state.json"
+        if ws_path.exists():
+            try:
+                return json.loads(ws_path.read_text())
+            except Exception:
+                return None
+        return None
+
 
 # ───────────────────────────────────────────────────────────────────────
 # Repository resolver factory

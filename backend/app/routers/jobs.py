@@ -108,7 +108,7 @@ def create_jobs_router(
                 else:
                     job.results = results_list
                 _save_job(job)
-                
+
         dumped = job.model_dump()
         dumped["results"] = results_list
         return dumped
@@ -330,7 +330,7 @@ def create_jobs_router(
         else:
             if loaded_from_disk:
                 from app.utils.job_results_store import delete_job_results_from_disk
-                delete_job_results_from_disk(job.id)
+                delete_job_results_from_disk(job.id, job.results_file_path)
                 job.results_on_disk = False
                 job.results_file_path = None
 
@@ -428,8 +428,10 @@ def create_jobs_router(
         for jid, _ in terminal:
             if jid in keep_ids:
                 continue
+            job = jobs_store.get(jid)
+            file_path = job.results_file_path if job else None
             del jobs_store[jid]
-            delete_job_results_from_disk(jid)
+            delete_job_results_from_disk(jid, file_path)
             removed += 1
 
         if removed:

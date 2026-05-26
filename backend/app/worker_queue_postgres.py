@@ -224,7 +224,7 @@ class PostgresWorkerQueue:
                             row["priority"], row["created_at"],
                             row.get("started_at"),
                             row["attempts"], row["max_attempts"],
-                            json.dumps(result) if result else None,
+                            None,
                             row.get("timeout_seconds", 300),
                         ),
                     )
