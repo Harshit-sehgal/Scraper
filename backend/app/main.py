@@ -30,6 +30,7 @@ from app.storage_interface import get_job_repository
 job_repo = None
 from app.rate_limiter import RateLimiterMiddleware
 from app.postgres_repository import shutdown_postgres
+import time
 
 
 from enum import Enum
@@ -295,6 +296,26 @@ rate_limiter = RateLimiterMiddleware(
 app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limiter.middleware)
 
 
+# ─── Metrics / Request Latency Middleware ─────────────────────────────
+
+@app.middleware("http")
+async def latency_tracking_middleware(request: Request, call_next):
+    """Track API and metrics endpoint request durations for Prometheus export."""
+    path = request.url.path
+    # Only track API routes and the metrics endpoint itself
+    if path.startswith("/api/") or path == "/metrics" or path in ("/health", "/ready"):
+        start = time.time()
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            duration = time.time() - start
+            from app.metrics_collector import record_request_latency
+            record_request_latency(duration)
+    else:
+        return await call_next(request)
+
+
 # ─── Periodic Gossip State Propagation ───────────────────────────────
 
 async def _periodic_gossip_propagation():
@@ -400,33 +421,47 @@ async def ready():
 
     In production mode, returns minimal info to avoid leaking backend/schema details.
     """
+    start_time = time.time()
     repo = get_job_repository()
-    if hasattr(repo, "health_check"):
-        health = repo.health_check()
-    else:
-        from app.job_store import get_storage_health
-        health = get_storage_health()
+    try:
+        if hasattr(repo, "health_check"):
+            health = repo.health_check()
+        else:
+            from app.job_store import get_storage_health
+            health = get_storage_health()
 
-    if not health["ok"]:
+        duration = time.time() - start_time
+        from app.metrics_collector import record_health_check_latency as _rchl
+        _rchl(duration)
+
+        if not health["ok"]:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "not_ready", "error": health.get("error", "Backend unhealthy")},
+            )
+
+        # In production return minimal info to avoid leaking backend/schema details
+        if settings.ENV.lower() == "production":
+            return {"status": "ready"}
+
+        backend = getattr(repo, "backend", "sqlite")
+        return {
+            "status": "ready",
+            "backend": backend,
+            "storage": "ok",
+            "migrations": "ok",
+            "schema_version": health.get("schema_version", 0),
+            "job_count": health.get("job_count", len(jobs_store)),
+            "recycle_bin_count": health.get("recycle_bin_count", len(recycle_bin_store)),
+        }
+    except Exception as e:
+        duration = time.time() - start_time
+        from app.metrics_collector import record_health_check_latency
+        record_health_check_latency(duration)
         return JSONResponse(
             status_code=503,
-            content={"status": "not_ready", "error": health.get("error", "Backend unhealthy")},
+            content={"status": "not_ready", "error": str(e)},
         )
-
-    # In production return minimal info to avoid leaking backend/schema details
-    if settings.ENV.lower() == "production":
-        return {"status": "ready"}
-
-    backend = getattr(repo, "backend", "sqlite")
-    return {
-        "status": "ready",
-        "backend": backend,
-        "storage": "ok",
-        "migrations": "ok",
-        "schema_version": health.get("schema_version", 0),
-        "job_count": health.get("job_count", len(jobs_store)),
-        "recycle_bin_count": health.get("recycle_bin_count", len(recycle_bin_store)),
-    }
 
 
 @app.get("/api/system/storage/status")
@@ -981,23 +1016,46 @@ async def analyze_url(req: URLPreviewRequest):
 
 # ─── Prometheus /metrics endpoint ───────────────────────────────────────
 
+# ─── Prometheus Metrics State ──────────────────────────────────────────
+# Module-level collectors for runtime metrics.
+# Shared state is in app.metrics_collector to avoid circular imports with worker_queue.
+
 METRICS_COLLECTION_ERRORS = 0
 
+
 @app.get("/metrics")
-async def metrics():
+async def metrics(request: Request):
     """Prometheus-formatted metrics endpoint for DataForge scraper.
 
-    Exposes job counts, queue depth, and runtime stats in Prometheus text format.
+    Exposes job counts, queue depth, runtime stats, request latencies,
+    worker failure counts, and backend health check durations.
+
+    Protected by METRICS_TOKEN if configured (Bearer token or X-API-Key).
     """
+    # Auth check
+    if settings.METRICS_TOKEN:
+        auth_header = request.headers.get("Authorization", "")
+        api_key_header = request.headers.get("X-API-Key", "")
+        # Accept either Authorization: Bearer <token> or X-API-Key: <token>
+        bearer_token = ""
+        if auth_header.startswith("Bearer "):
+            bearer_token = auth_header[7:]
+        if not secrets.compare_digest(bearer_token, settings.METRICS_TOKEN) and \
+           not secrets.compare_digest(api_key_header, settings.METRICS_TOKEN):
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Invalid or missing metrics token. Provide Authorization: Bearer <token> or X-API-Key header."},
+            )
+
     global METRICS_COLLECTION_ERRORS
-    from prometheus_client import generate_latest, Gauge
+    from prometheus_client import generate_latest, Gauge, Histogram
     from prometheus_client.core import CollectorRegistry
     from fastapi.responses import Response
 
     # Clear registry to avoid duplicate registration errors on hot-reload
     registry = CollectorRegistry()
 
-    # Job counts by status
+    # ── Job counts by status ─────────────────────────────────────────────
     from app.models import JobStatus
     counts = {s.value: 0 for s in JobStatus}
     for job in jobs_store.values():
@@ -1020,7 +1078,7 @@ async def metrics():
         except (TypeError, ValueError):
             pass
 
-    # Repository backend type and collection health
+    # ── Repository backend ──────────────────────────────────────────────
     backend_ok = 1
     try:
         repo = get_job_repository()
@@ -1035,7 +1093,7 @@ async def metrics():
     backend_ok_gauge = Gauge("dataforge_backend_collection_ok", "Whether storage backend metrics collected successfully", registry=registry)
     backend_ok_gauge.set(backend_ok)
 
-    # Worker queue stats and collection health
+    # ── Worker queue stats ──────────────────────────────────────────────
     queue_ok = 1
     try:
         from app.worker_queue import get_worker_queue
@@ -1055,7 +1113,44 @@ async def metrics():
     queue_ok_gauge = Gauge("dataforge_queue_collection_ok", "Whether worker queue metrics collected successfully", registry=registry)
     queue_ok_gauge.set(queue_ok)
 
-    # Cumulative collection errors
+    # ── Worker failure counters ─────────────────────────────────────────
+    from app.metrics_collector import get_worker_failures
+    failures = get_worker_failures()
+    if failures:
+        failure_gauge = Gauge("dataforge_worker_failures_total", "Total worker failures by task type", ["task_type"], registry=registry)
+        for task_type, count in failures.items():
+            failure_gauge.labels(task_type=task_type).set(count)
+
+    # ── Request duration histogram ──────────────────────────────────────
+    from app.metrics_collector import get_request_latencies, get_health_check_latencies
+    if settings.METRICS_ENABLE_HISTOGRAMS:
+        req_latencies = get_request_latencies()
+        if req_latencies:
+            buckets = [float(b.strip()) for b in settings.METRICS_HISTOGRAM_BUCKETS.split(",") if b.strip()]
+            req_hist = Histogram(
+                "dataforge_request_duration_seconds",
+                "API request duration in seconds",
+                buckets=buckets,
+                registry=registry,
+            )
+            for v in req_latencies:
+                req_hist.observe(v)
+
+    # ── Backend health check latency histogram ──────────────────────────
+    if settings.METRICS_ENABLE_HISTOGRAMS:
+        health_latencies = get_health_check_latencies()
+        if health_latencies:
+            buckets = [float(b.strip()) for b in settings.METRICS_HISTOGRAM_BUCKETS.split(",") if b.strip()]
+            health_hist = Histogram(
+                "dataforge_backend_health_check_duration_seconds",
+                "Backend health check duration in seconds",
+                buckets=buckets,
+                registry=registry,
+            )
+            for v in health_latencies:
+                health_hist.observe(v)
+
+    # ── Cumulative collection errors ────────────────────────────────────
     error_total_gauge = Gauge("dataforge_metrics_collection_error_total", "Total collection errors encountered", registry=registry)
     error_total_gauge.set(METRICS_COLLECTION_ERRORS)
 

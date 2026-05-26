@@ -441,6 +441,12 @@ class WorkerQueue:
                         task_data = dict(conn.execute(
                             "SELECT * FROM tasks WHERE id = ?", (task_id,)
                         ).fetchone())
+                        # Record worker failure counter for metrics
+                        try:
+                            from app.metrics_collector import record_worker_failure
+                            record_worker_failure(task_data.get("type", "unknown"))
+                        except Exception:
+                            pass
                         conn.execute(
                             """INSERT OR REPLACE INTO task_history
                                (id, type, payload, priority, status, created_at,

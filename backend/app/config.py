@@ -251,10 +251,16 @@ class Settings(BaseSettings):
     """If set, all /api/* endpoints require X-API-Key header."""
     ADMIN_API_KEY: str = ""
     """If set, powerful admin routes (/api/system/merge, /api/system/scheduler, etc.) require this key."""
+    METRICS_TOKEN: str = ""
+    """If set, /metrics endpoint requires Authorization: Bearer <token> or X-API-Key header."""
     ALERT_WEBHOOK_URL: Optional[str] = None
     """URL to send webhook alerts for domain anti-bot level shifts."""
     CORS_ORIGINS: list[str] = ["*"]
     """Allowed origins for CORS. Defaults to '*' but should be locked down in production."""
+    METRICS_ENABLE_HISTOGRAMS: bool = True
+    """Enable request duration and operation latency histograms in /metrics output."""
+    METRICS_HISTOGRAM_BUCKETS: str = "0.01,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0,30.0,60.0,120.0"
+    """Comma-separated bucket boundaries for duration histograms (seconds)."""
     RATE_LIMIT_GLOBAL: str = "600/minute"
     """Global rate limit for /api/* endpoints (slowapi format). Empty = disabled."""
     RATE_LIMIT_JOB_CREATE: str = "10/minute"
