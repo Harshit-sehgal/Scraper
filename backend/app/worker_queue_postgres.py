@@ -11,18 +11,13 @@ Usage:
 """
 
 import asyncio
-import datetime
 import json
 import logging
 import threading
 import time
-import uuid
-from enum import IntEnum, StrEnum
 from typing import Callable, Optional
 
-import psycopg2
-
-from app.worker_queue import Priority, TaskStatus, QueueTask
+from app.worker_queue import Priority, QueueTask
 from app.postgres_repository import _conn, _execute, _fetch_all, _fetch_one
 
 logger = logging.getLogger(__name__)
@@ -203,7 +198,6 @@ class PostgresWorkerQueue:
 
     async def complete(self, task_id: str, result: Optional[dict] = None):
         """Mark a task as completed successfully."""
-        now = datetime.datetime.now()
         async with self._in_flight_lock:
             with _conn() as conn:
                 row = _fetch_one(conn, "SELECT * FROM queue_tasks WHERE id = %s", (task_id,))
@@ -234,7 +228,6 @@ class PostgresWorkerQueue:
         retry: bool = True,
     ):
         """Mark a task as failed. Retries if attempts remain."""
-        now = datetime.datetime.now()
         async with self._in_flight_lock:
             with _conn() as conn:
                 row = _fetch_one(
@@ -289,7 +282,6 @@ class PostgresWorkerQueue:
         """Cancel a task. Handles both pending and in-flight tasks.
         Returns True if cancelled.
         """
-        now = datetime.datetime.now()
         async with self._in_flight_lock:
             # Check in-flight tasks first
             if task_id in self._in_flight:
