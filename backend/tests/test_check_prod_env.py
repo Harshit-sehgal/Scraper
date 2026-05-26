@@ -168,6 +168,60 @@ class TestCheckProdEnvValidators:
         assert not mod.check_worker_queue("no")
         assert not mod.check_worker_queue("")
 
+    def test_check_database_url_accepts_postgresql(self):
+        """postgresql:// URLs should pass."""
+        mod = self._import_module()
+        assert mod.check_database_url("postgresql://user:pass@localhost:5432/db")
+        assert mod.check_database_url("postgres://user:pass@postgres:5432/db")
+
+    def test_check_database_url_rejects_non_postgres(self):
+        """Non-postgres URLs should fail."""
+        mod = self._import_module()
+        assert not mod.check_database_url("sqlite:///path/to/db")
+        assert not mod.check_database_url("mysql://user:pass@localhost/db")
+        assert not mod.check_database_url("")
+        assert not mod.check_database_url("not-a-url")
+
+    def test_check_api_key_rejects_default_placeholders(self):
+        """Known default API key values should fail."""
+        mod = self._import_module()
+        assert not mod.check_api_key("change-me"), "'change-me' should fail"
+        assert not mod.check_api_key("change-me-to-a-random-secret"), "default placeholder should fail"
+        assert not mod.check_api_key("dev-key"), "'dev-key' should fail"
+        assert not mod.check_api_key("test-key"), "'test-key' should fail"
+        assert not mod.check_api_key("your-api-key-here"), "placeholder should fail"
+
+    def test_check_api_key_rejects_short_keys(self):
+        """API keys shorter than 16 chars should fail."""
+        mod = self._import_module()
+        assert not mod.check_api_key("short")
+        assert not mod.check_api_key("123456789012345")
+
+    def test_check_api_key_accepts_strong_key(self):
+        """A strong, long API key should pass."""
+        mod = self._import_module()
+        assert mod.check_api_key("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4")
+
+    def test_check_db_password_rejects_default_placeholders(self):
+        """Known default DB password values should fail."""
+        mod = self._import_module()
+        assert not mod.check_db_password("dataforge"), "'dataforge' default should fail"
+        assert not mod.check_db_password("change-me"), "'change-me' should fail"
+        assert not mod.check_db_password("change-me-to-a-strong-password"), "default placeholder should fail"
+        assert not mod.check_db_password("password"), "'password' should fail"
+        assert not mod.check_db_password("postgres"), "'postgres' should fail"
+
+    def test_check_db_password_rejects_short_passwords(self):
+        """Passwords shorter than 8 chars should fail."""
+        mod = self._import_module()
+        assert not mod.check_db_password("short")
+        assert not mod.check_db_password("1234567")
+
+    def test_check_db_password_accepts_strong_password(self):
+        """A strong, unique password should pass."""
+        mod = self._import_module()
+        assert mod.check_db_password("secure-password-123!@#")
+
 
 class TestCheckProdEnvIntegration:
     """Integration tests exercising the full main() flow."""
@@ -190,19 +244,24 @@ class TestCheckProdEnvIntegration:
             "DATAFORGE_CORS_ORIGINS": '["https://myapp.example.com"]',
             "DATAFORGE_DB_PASSWORD": "secure-password-123",
             "DATAFORGE_STORAGE_BACKEND": "postgres",
+            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:secure-password-123@postgres:5432/dataforge",
             "DATAFORGE_WORKER_QUEUE": "true",
+            "DATAFORGE_ENV": "production",
         })
 
         env = mod.load_env_file(env_file)
         all_pass = True
-        for name, _, validator, _ in [
-            ("DATAFORGE_API_KEY", True, None, ""),
-            ("DATAFORGE_CORS_ORIGINS", True, mod.check_cors_origins, ""),
-            ("DATAFORGE_DB_PASSWORD", True, None, ""),
-            ("DATAFORGE_STORAGE_BACKEND", True, mod.check_storage_backend, ""),
-            ("DATAFORGE_WORKER_QUEUE", True, mod.check_worker_queue, ""),
-        ]:
-            passed = mod.check_var(env, name, required=True, validator=validator)
+        checks_list = [
+            ("DATAFORGE_API_KEY", True, mod.check_api_key),
+            ("DATAFORGE_CORS_ORIGINS", True, mod.check_cors_origins),
+            ("DATAFORGE_DB_PASSWORD", True, mod.check_db_password),
+            ("DATAFORGE_STORAGE_BACKEND", True, mod.check_storage_backend),
+            ("DATAFORGE_DATABASE_URL", True, mod.check_database_url),
+            ("DATAFORGE_WORKER_QUEUE", True, mod.check_worker_queue),
+            ("DATAFORGE_ENV", True, None),
+        ]
+        for name, required, validator in checks_list:
+            passed = mod.check_var(env, name, required=required, validator=validator)
             if not passed:
                 all_pass = False
 
@@ -216,42 +275,47 @@ class TestCheckProdEnvIntegration:
             "DATAFORGE_CORS_ORIGINS": '["*"]',
             "DATAFORGE_DB_PASSWORD": "secure-password-123",
             "DATAFORGE_STORAGE_BACKEND": "postgres",
+            "DATAFORGE_DATABASE_URL": "postgresql://user:pass@localhost/db",
             "DATAFORGE_WORKER_QUEUE": "true",
+            "DATAFORGE_ENV": "production",
         })
 
         env = mod.load_env_file(env_file)
         assert not mod.check_var(env, "DATAFORGE_CORS_ORIGINS", required=True, validator=mod.check_cors_origins)
 
     def test_rejects_default_api_key(self, env_file):
-        """Short/default API key should pass (no built-in minimum length) — just test it's not empty."""
+        """Default/placeholder API key should fail."""
         mod = self._import_module()
         _write_env(env_file, {
-            "DATAFORGE_API_KEY": "",
+            "DATAFORGE_API_KEY": "change-me-to-a-random-secret",
             "DATAFORGE_CORS_ORIGINS": '["https://myapp.example.com"]',
             "DATAFORGE_DB_PASSWORD": "secure-password-123",
             "DATAFORGE_STORAGE_BACKEND": "postgres",
+            "DATAFORGE_DATABASE_URL": "postgresql://user:pass@localhost/db",
             "DATAFORGE_WORKER_QUEUE": "true",
+            "DATAFORGE_ENV": "production",
         })
 
         env = mod.load_env_file(env_file)
-        # API_KEY is empty so check_var with required=True should fail
-        assert not mod.check_var(env, "DATAFORGE_API_KEY", required=True)
+        # check_api_key should reject the default placeholder
+        assert not mod.check_var(env, "DATAFORGE_API_KEY", required=True, validator=mod.check_api_key)
 
     def test_rejects_default_db_password(self, env_file):
-        """Default DB password should fail check."""
+        """Default DB password should fail with check_db_password."""
         mod = self._import_module()
         _write_env(env_file, {
             "DATAFORGE_API_KEY": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
             "DATAFORGE_CORS_ORIGINS": '["https://myapp.example.com"]',
             "DATAFORGE_DB_PASSWORD": "dataforge",
             "DATAFORGE_STORAGE_BACKEND": "postgres",
+            "DATAFORGE_DATABASE_URL": "postgresql://user:pass@localhost/db",
             "DATAFORGE_WORKER_QUEUE": "true",
+            "DATAFORGE_ENV": "production",
         })
 
-        # Note: check_prod_env doesn't have built-in "not default" validation,
-        # but we test that the base check passes (non-empty)
         env = mod.load_env_file(env_file)
-        assert mod.check_var(env, "DATAFORGE_DB_PASSWORD", required=True)
+        # check_db_password should reject the default 'dataforge' value
+        assert not mod.check_var(env, "DATAFORGE_DB_PASSWORD", required=True, validator=mod.check_db_password)
 
     def test_accepts_postgres_env(self, env_file):
         """All valid Postgres env vars should pass."""
@@ -261,15 +325,19 @@ class TestCheckProdEnvIntegration:
             "DATAFORGE_CORS_ORIGINS": '["https://app.example.com", "https://dashboard.example.com"]',
             "DATAFORGE_DB_PASSWORD": "strong-password-xyz",
             "DATAFORGE_STORAGE_BACKEND": "postgres",
+            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:strong-password-xyz@postgres:5432/dataforge",
             "DATAFORGE_WORKER_QUEUE": "true",
+            "DATAFORGE_ENV": "production",
         })
 
         env = mod.load_env_file(env_file)
         checks = [
-            mod.check_var(env, "DATAFORGE_API_KEY", required=True),
+            mod.check_var(env, "DATAFORGE_API_KEY", required=True, validator=mod.check_api_key),
             mod.check_var(env, "DATAFORGE_CORS_ORIGINS", required=True, validator=mod.check_cors_origins),
-            mod.check_var(env, "DATAFORGE_DB_PASSWORD", required=True),
+            mod.check_var(env, "DATAFORGE_DB_PASSWORD", required=True, validator=mod.check_db_password),
             mod.check_var(env, "DATAFORGE_STORAGE_BACKEND", required=True, validator=mod.check_storage_backend),
+            mod.check_var(env, "DATAFORGE_DATABASE_URL", required=True, validator=mod.check_database_url),
             mod.check_var(env, "DATAFORGE_WORKER_QUEUE", required=True, validator=mod.check_worker_queue),
+            mod.check_var(env, "DATAFORGE_ENV", required=True),
         ]
         assert all(checks), f"All checks should pass: {checks}"

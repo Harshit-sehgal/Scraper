@@ -26,7 +26,9 @@ REQUIRED_VARS = [
     "DATAFORGE_CORS_ORIGINS",
     "DATAFORGE_DB_PASSWORD",
     "DATAFORGE_STORAGE_BACKEND",
+    "DATAFORGE_DATABASE_URL",
     "DATAFORGE_WORKER_QUEUE",
+    "DATAFORGE_ENV",
 ]
 
 
@@ -165,6 +167,67 @@ def check_worker_queue(value: str) -> bool:
     return True
 
 
+def check_database_url(value: str) -> bool:
+    """Validate DATAFORGE_DATABASE_URL is a postgresql:// URL."""
+    if not value.startswith(("postgresql://", "postgres://")):
+        print(
+            f"  [FAIL]  DATAFORGE_DATABASE_URL={value!r}. "
+            "Must be a postgresql:// or postgres:// URL."
+        )
+        return False
+    return True
+
+
+def check_api_key(value: str) -> bool:
+    """Validate DATAFORGE_API_KEY is not a default/placeholder value."""
+    default_values = {
+        "change-me",
+        "change-me-to-a-random-secret",
+        "dev-key",
+        "test-key",
+        "your-api-key-here",
+    }
+    if value.lower() in default_values:
+        print(
+            f"  [FAIL]  DATAFORGE_API_KEY={_mask_value('DATAFORGE_API_KEY', value)} "
+            "is a known default/placeholder value. "
+            "Generate a strong random key with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+        return False
+    if len(value) < 16:
+        print(
+            f"  [FAIL]  DATAFORGE_API_KEY is too short ({len(value)} chars). "
+            "Must be at least 16 characters."
+        )
+        return False
+    return True
+
+
+def check_db_password(value: str) -> bool:
+    """Validate DATAFORGE_DB_PASSWORD is not a default/placeholder value."""
+    default_values = {
+        "dataforge",
+        "change-me",
+        "change-me-to-a-strong-password",
+        "password",
+        "postgres",
+    }
+    if value.lower() in default_values:
+        print(
+            f"  [FAIL]  DATAFORGE_DB_PASSWORD={_mask_value('DATAFORGE_DB_PASSWORD', value)} "
+            "is a known default/placeholder value. "
+            "Use a strong, unique password."
+        )
+        return False
+    if len(value) < 8:
+        print(
+            f"  [FAIL]  DATAFORGE_DB_PASSWORD is too short ({len(value)} chars). "
+            "Must be at least 8 characters."
+        )
+        return False
+    return True
+
+
 def main() -> int:
     args = parse_args()
     env_path = Path(args.env_file).expanduser().resolve()
@@ -178,28 +241,26 @@ def main() -> int:
 
     # ── Required vars ────────────────────────────────────────────────
     checks = [
-        ("DATAFORGE_API_KEY", True, None,
+        ("DATAFORGE_API_KEY", True, check_api_key,
          "Generate with: python3 -c \"import secrets; print(secrets.token_hex(32))\""),
         ("DATAFORGE_CORS_ORIGINS", True, check_cors_origins,
          "Must be a JSON array of origins, e.g. [\"https://yourdomain.com\"]"),
-        ("DATAFORGE_DB_PASSWORD", True, None,
+        ("DATAFORGE_DB_PASSWORD", True, check_db_password,
          "Must match POSTGRES_PASSWORD in docker-compose.prod.yml"),
         ("DATAFORGE_STORAGE_BACKEND", True, check_storage_backend,
          "Must be 'postgres' for production"),
+        ("DATAFORGE_DATABASE_URL", True, check_database_url,
+         "Must be a postgresql:// URL matching docker-compose.prod.yml"),
         ("DATAFORGE_WORKER_QUEUE", True, check_worker_queue,
          "Must be 'true' for production"),
+        ("DATAFORGE_ENV", True, None,
+         "Must be set to 'production'"),
     ]
 
     for name, required, validator, hint in checks:
         passed = check_var(env, name, required=required, validator=validator, hint=hint)
         if not passed:
             all_pass = False
-
-    # ── Optional but recommended ──────────────────────────────────────
-    print()
-    print("--- Optional checks ---")
-    for name in ["DATAFORGE_DATABASE_URL", "DATAFORGE_ENV"]:
-        check_var(env, name, required=False)
 
     # ── Summary ──────────────────────────────────────────────────────
     print()
