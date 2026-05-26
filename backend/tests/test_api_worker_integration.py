@@ -10,15 +10,12 @@ real browser/network dependencies.
 """
 
 import asyncio
-import json
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
 
-from app.main import app
 from app.models import Job, JobStatus
 from app.storage_interface import (
     SQLiteJobRepository,
@@ -164,7 +161,7 @@ class TestWorkerPicksQueuedJob:
         self, client, tmp_queue_db, monkeypatch
     ):
         """Worker should dequeue a job, process it, and update the repository."""
-        from app.worker_queue import Priority, get_worker_queue, reset_worker_queue
+        from app.worker_queue import get_worker_queue, reset_worker_queue
 
         reset_worker_queue()
         monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
@@ -245,7 +242,7 @@ class TestWorkerPicksQueuedJob:
 
     def test_worker_fails_fast_without_job_id(self, tmp_queue_db, monkeypatch):
         """Worker --once mode should fail fast if DATAFORGE_JOB_ID is missing."""
-        from app.worker_queue import get_worker_queue, reset_worker_queue
+        from app.worker_queue import reset_worker_queue
 
         reset_worker_queue()
         monkeypatch.delenv("DATAFORGE_JOB_ID", raising=False)
@@ -403,7 +400,6 @@ class TestWorkerPreservesRecycleBin:
     def test_worker_save_all_preserves_recycle_bin(self, tmp_path, monkeypatch):
         """save_all should preserve recycle_bin entries during full state writes."""
         from app.job_store import reset_job_store_for_tests
-        from app.main import jobs_store, recycle_bin_store
 
         # Point job store at a temp DB
         db_file = tmp_path / "test_jobs.db"

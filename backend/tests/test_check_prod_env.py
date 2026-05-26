@@ -1,6 +1,5 @@
 """Unit tests for scripts/check_prod_env.py — production environment validation."""
 
-import json
 import os
 import sys
 import tempfile

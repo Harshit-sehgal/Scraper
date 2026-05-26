@@ -449,8 +449,6 @@ class TestPostgresIntegration:
 
     def _setup_v1_schema(self, conn):
         """Create a minimal v1 schema (jobs table but no recycle_bin)."""
-        import psycopg2
-
         with conn.cursor() as cur:
             cur.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)")
             cur.execute("DELETE FROM schema_version")

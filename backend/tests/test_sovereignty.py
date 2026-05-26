@@ -147,8 +147,13 @@ def test_manifold_merge_sovereignty():
     
     # Call the merge logic
     from app.main import merge_knowledge
+    from unittest.mock import MagicMock
     import asyncio
-    asyncio.run(merge_knowledge(remote_data))
+    
+    mock_req = MagicMock()
+    mock_req.headers = {}
+    
+    asyncio.run(merge_knowledge(mock_req, remote_data))
     
     assert max(ws.role_manifold.get("price", [0])) > 0.5
     assert ws.learned_exclusions[("destination", "origin")] == 0.8
