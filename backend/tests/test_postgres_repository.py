@@ -348,6 +348,69 @@ class TestPostgresSerialization:
         assert result is None
 
 
+class TestPostgresSchemaRepair:
+    """Tests for Postgres schema repair logic (no DB connection required)."""
+
+    def _import(self):
+        """Import postgres module functions."""
+        try:
+            from app.postgres_repository import (
+                _ensure_required_tables,
+                _build_create_jobs_sql,
+                _build_create_recycle_bin_sql,
+            )
+            return _ensure_required_tables, _build_create_jobs_sql, _build_create_recycle_bin_sql
+        except ImportError:
+            pytest.skip("psycopg2 not installed")
+            return None, None, None
+
+    def test_build_create_jobs_includes_status_column(self):
+        """_build_create_jobs_sql produces valid SQL with all columns."""
+        _, build_jobs, _ = self._import()
+        if build_jobs is None:
+            return
+        sql = build_jobs()
+        assert "CREATE TABLE IF NOT EXISTS jobs" in sql
+        assert "id TEXT PRIMARY KEY" in sql
+        assert "name TEXT NOT NULL" in sql
+        assert "mode TEXT DEFAULT 'manual'" in sql
+        assert "cancel_requested" in sql
+        assert "source_policy" in sql
+
+    def test_build_create_recycle_includes_columns(self):
+        """_build_create_recycle_bin_sql produces valid SQL."""
+        _, _, build_recycle = self._import()
+        if build_recycle is None:
+            return
+        sql = build_recycle()
+        assert "CREATE TABLE IF NOT EXISTS recycle_bin" in sql
+        assert "id TEXT PRIMARY KEY" in sql
+        assert "name TEXT NOT NULL" in sql
+        assert "deleted_at" in sql
+
+    def test_ensure_required_tables_syntax_valid(self):
+        """_ensure_required_tables contains valid SQL syntax (no Postgres connection needed for this check)."""
+        ensure, build_jobs, build_recycle = self._import()
+        if ensure is None:
+            return
+        jobs_sql = build_jobs()
+        recycle_sql = build_recycle()
+        # Basic syntax verification: CREATE TABLE ... (
+        assert jobs_sql.count("CREATE TABLE") == 1
+        assert recycle_sql.count("CREATE TABLE") == 1
+        # Each opening paren has matching closing paren
+        assert jobs_sql.count("(") == jobs_sql.count(")")
+        assert recycle_sql.count("(") == recycle_sql.count(")")
+
+    def test_current_schema_version_is_2(self):
+        """_CURRENT_SCHEMA_VERSION is now 2 after the schema repair upgrade."""
+        try:
+            from app.postgres_repository import _CURRENT_SCHEMA_VERSION
+            assert _CURRENT_SCHEMA_VERSION >= 2
+        except ImportError:
+            pytest.skip("psycopg2 not installed")
+
+
 class TestPostgresHealthCheck:
     """Tests for health check (without Postgres connection)."""
 

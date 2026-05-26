@@ -29,7 +29,7 @@ from app.storage_interface import JobRepository
 
 logger = logging.getLogger(__name__)
 
-_CURRENT_SCHEMA_VERSION = 1
+_CURRENT_SCHEMA_VERSION = 2
 
 # ───────────────────────────────────────────────────────────────────────
 # Connection pool (thread-safe, synchronous)
@@ -124,8 +124,124 @@ def _execute(conn, sql: str, params=None):
 # ───────────────────────────────────────────────────────────────────────
 
 
+_JOBS_COLUMNS_SQL = [
+    "mode TEXT DEFAULT 'manual'",
+    "topic TEXT DEFAULT ''",
+    "intent TEXT DEFAULT ''",
+    "urls TEXT DEFAULT '[]'",
+    "schema_fields TEXT DEFAULT '[]'",
+    "filters TEXT DEFAULT '[]'",
+    "results TEXT DEFAULT '[]'",
+    "logs TEXT DEFAULT '[]'",
+    "total_records INTEGER DEFAULT 0",
+    "filtered_records INTEGER DEFAULT 0",
+    "total_llm_calls INTEGER DEFAULT 0",
+    "error TEXT DEFAULT ''",
+    "warnings TEXT DEFAULT ''",
+    "quality_report TEXT DEFAULT '{}'",
+    "analysis TEXT DEFAULT ''",
+    "discovered_urls TEXT DEFAULT '[]'",
+    "selectors_map TEXT DEFAULT '{}'",
+    "search_params TEXT DEFAULT '{}'",
+    "max_pages INTEGER DEFAULT 0",
+    "progress_current INTEGER DEFAULT 0",
+    "progress_total INTEGER DEFAULT 0",
+    "estimated_cost_usd REAL DEFAULT 0",
+    "cancel_requested BOOLEAN DEFAULT FALSE",
+    "created_at TEXT DEFAULT ''",
+    "completed_at TEXT DEFAULT ''",
+    "min_record_score REAL DEFAULT 0.35",
+    "acquisition_mode TEXT DEFAULT 'standard'",
+    "location TEXT DEFAULT ''",
+    "preferred_domain TEXT DEFAULT ''",
+    "source_policy TEXT DEFAULT 'all_sources'",
+    "max_per_domain INTEGER DEFAULT 4",
+    "origin_location TEXT DEFAULT ''",
+    "max_distance_km REAL DEFAULT NULL",
+    "pagination BOOLEAN DEFAULT FALSE",
+    "deduplicate BOOLEAN DEFAULT TRUE",
+    "deduplicate_field TEXT DEFAULT ''",
+    "started_at TEXT DEFAULT ''",
+    "results_on_disk BOOLEAN DEFAULT FALSE",
+    "results_file_path TEXT DEFAULT ''",
+    "updated_at TEXT DEFAULT ''",
+    "deleted_at TEXT DEFAULT NULL",
+]
+
+_JOBS_TABLE_SQL = """
+    CREATE TABLE IF NOT EXISTS jobs (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending'{extra_cols}
+    )
+"""
+
+_RECYCLE_BIN_SQL = """
+    CREATE TABLE IF NOT EXISTS recycle_bin (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        mode TEXT NOT NULL DEFAULT 'manual'{recycle_cols}
+    )
+"""
+
+
+def _build_create_jobs_sql() -> str:
+    """Build the full CREATE TABLE statement for the jobs table."""
+    cols = ""
+    for col_def in _JOBS_COLUMNS_SQL:
+        cols += f",\n        {col_def}"
+    return _JOBS_TABLE_SQL.format(extra_cols=cols)
+
+
+def _build_create_recycle_bin_sql() -> str:
+    """Build the full CREATE TABLE statement for the recycle_bin table."""
+    # recycle_bin uses the same columns as jobs, minus status (already in skeleton) plus deleted_at
+    cols = ""
+    for col_def in _JOBS_COLUMNS_SQL:
+        # Skip the fields already defined in the skeleton
+        if col_def.startswith("mode"):
+            continue
+        cols += f",\n        {col_def}"
+    return _RECYCLE_BIN_SQL.format(recycle_cols=cols)
+
+
+def _ensure_required_tables(conn):
+    """Create required tables if they do not exist. Runs on every schema check."""
+    _execute(conn, _build_create_jobs_sql())
+
+    # Add extra columns that may have been added in later migrations
+    for col_def in _JOBS_COLUMNS_SQL:
+        try:
+            _execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
+        except Exception:
+            pass
+
+    _execute(conn, _build_create_recycle_bin_sql())
+
+    for col_def in _JOBS_COLUMNS_SQL:
+        try:
+            _execute(conn, f"ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS {col_def}")
+        except Exception:
+            pass
+
+    for idx_sql in [
+        "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
+        "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC)",
+    ]:
+        try:
+            _execute(conn, idx_sql)
+        except Exception:
+            pass
+
+
 def _ensure_schema():
-    """Run schema migrations to ensure tables exist and are up to date."""
+    """Run schema migrations to ensure tables exist and are up to date.
+
+    Always runs _ensure_required_tables() to repair missing tables even when
+    schema_version is already current (handles databases created by older
+    broken versions that skipped recycle_bin creation).
+    """
     with _conn() as conn:
         _execute(conn, """
             CREATE TABLE IF NOT EXISTS schema_version (
@@ -135,127 +251,27 @@ def _ensure_schema():
         row = _fetch_one(conn, "SELECT MAX(version) AS version FROM schema_version")
         current = row["version"] if row and row.get("version") is not None else 0
 
+        # ── Repair step: always ensure required tables exist ─────────────
+        # This handles databases with schema_version = 1 that were created by
+        # an older broken version which may have skipped recycle_bin creation.
+        _ensure_required_tables(conn)
+
         if current < _CURRENT_SCHEMA_VERSION:
             if current < 1:
-                _execute(conn, """
-                    CREATE TABLE IF NOT EXISTS jobs (
-                        id TEXT PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        status TEXT NOT NULL DEFAULT 'pending'
-                    )
-                """)
+                # Version 0 -> 1: intentionally empty — _ensure_required_tables above
+                # already creates both tables with the full column set.
+                pass
 
-                columns = [
-                    "mode TEXT DEFAULT 'manual'",
-                    "topic TEXT DEFAULT ''",
-                    "intent TEXT DEFAULT ''",
-                    "urls TEXT DEFAULT '[]'",
-                    "schema_fields TEXT DEFAULT '[]'",
-                    "filters TEXT DEFAULT '[]'",
-                    "results TEXT DEFAULT '[]'",
-                    "logs TEXT DEFAULT '[]'",
-                    "total_records INTEGER DEFAULT 0",
-                    "filtered_records INTEGER DEFAULT 0",
-                    "total_llm_calls INTEGER DEFAULT 0",
-                    "error TEXT DEFAULT ''",
-                    "warnings TEXT DEFAULT ''",
-                    "quality_report TEXT DEFAULT '{}'",
-                    "analysis TEXT DEFAULT ''",
-                    "discovered_urls TEXT DEFAULT '[]'",
-                    "selectors_map TEXT DEFAULT '{}'",
-                    "search_params TEXT DEFAULT '{}'",
-                    "max_pages INTEGER DEFAULT 0",
-                    "progress_current INTEGER DEFAULT 0",
-                    "progress_total INTEGER DEFAULT 0",
-                    "estimated_cost_usd REAL DEFAULT 0",
-                    "cancel_requested BOOLEAN DEFAULT FALSE",
-                    "created_at TEXT DEFAULT ''",
-                    "completed_at TEXT DEFAULT ''",
-                    "min_record_score REAL DEFAULT 0.35",
-                    "acquisition_mode TEXT DEFAULT 'standard'",
-                    "location TEXT DEFAULT ''",
-                    "preferred_domain TEXT DEFAULT ''",
-                    "source_policy TEXT DEFAULT 'all_sources'",
-                    "max_per_domain INTEGER DEFAULT 4",
-                    "origin_location TEXT DEFAULT ''",
-                    "max_distance_km REAL DEFAULT NULL",
-                    "pagination BOOLEAN DEFAULT FALSE",
-                    "deduplicate BOOLEAN DEFAULT TRUE",
-                    "deduplicate_field TEXT DEFAULT ''",
-                    "started_at TEXT DEFAULT ''",
-                    "results_on_disk BOOLEAN DEFAULT FALSE",
-                    "results_file_path TEXT DEFAULT ''",
-                    "updated_at TEXT DEFAULT ''",
-                    "deleted_at TEXT DEFAULT NULL",
-                ]
-                for col_def in columns:
-                    try:
-                        _execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
-                    except Exception:
-                        pass
-
-                # Create recycle_bin table explicitly (not using CREATE TABLE ... LIKE)
-                _execute(conn, """
-                    CREATE TABLE IF NOT EXISTS recycle_bin (
-                        id TEXT PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        status TEXT NOT NULL DEFAULT 'pending',
-                        mode TEXT NOT NULL DEFAULT 'manual',
-                        topic TEXT DEFAULT '',
-                        intent TEXT DEFAULT '',
-                        urls TEXT NOT NULL DEFAULT '[]',
-                        schema_fields TEXT NOT NULL DEFAULT '[]',
-                        filters TEXT DEFAULT '[]',
-                        results TEXT DEFAULT '[]',
-                        logs TEXT DEFAULT '[]',
-                        total_records INTEGER DEFAULT 0,
-                        filtered_records INTEGER DEFAULT 0,
-                        total_llm_calls INTEGER DEFAULT 0,
-                        error TEXT DEFAULT '',
-                        warnings TEXT DEFAULT '',
-                        quality_report TEXT DEFAULT '{}',
-                        analysis TEXT DEFAULT '',
-                        discovered_urls TEXT DEFAULT '[]',
-                        selectors_map TEXT DEFAULT '{}',
-                        search_params TEXT DEFAULT '{}',
-                        max_pages INTEGER DEFAULT 0,
-                        progress_current INTEGER DEFAULT 0,
-                        progress_total INTEGER DEFAULT 0,
-                        estimated_cost_usd REAL DEFAULT 0,
-                        cancel_requested BOOLEAN DEFAULT FALSE,
-                        created_at TEXT DEFAULT '',
-                        completed_at TEXT DEFAULT '',
-                        min_record_score REAL DEFAULT 0.35,
-                        acquisition_mode TEXT DEFAULT 'standard',
-                        location TEXT DEFAULT '',
-                        preferred_domain TEXT DEFAULT '',
-                        source_policy TEXT DEFAULT 'all_sources',
-                        max_per_domain INTEGER DEFAULT 4,
-                        origin_location TEXT DEFAULT '',
-                        max_distance_km REAL DEFAULT NULL,
-                        pagination BOOLEAN DEFAULT FALSE,
-                        deduplicate BOOLEAN DEFAULT TRUE,
-                        deduplicate_field TEXT DEFAULT '',
-                        started_at TEXT DEFAULT '',
-                        results_on_disk BOOLEAN DEFAULT FALSE,
-                        results_file_path TEXT DEFAULT '',
-                        updated_at TEXT DEFAULT '',
-                        deleted_at TEXT DEFAULT NULL
-                    )
-                """)
-
-                for idx_sql in [
-                    "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
-                    "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC)",
-                ]:
-                    try:
-                        _execute(conn, idx_sql)
-                    except Exception:
-                        pass
+            if current < 2:
+                # Version 1 -> 2: intentionally empty — _ensure_required_tables above
+                # already ensures all columns and the recycle_bin table exist.
+                pass
 
             _execute(conn, "DELETE FROM schema_version")
             _execute(conn, "INSERT INTO schema_version (version) VALUES (%s)", (_CURRENT_SCHEMA_VERSION,))
             logger.info("Postgres schema migrated to version %d", _CURRENT_SCHEMA_VERSION)
+        else:
+            logger.debug("Postgres schema already at version %d", _CURRENT_SCHEMA_VERSION)
 
 
 # ───────────────────────────────────────────────────────────────────────

@@ -176,3 +176,107 @@ class TestStorageStatusEndpoint:
         data = response.json()
         assert "wal_mode" in data
         assert data["wal_mode"] == "wal"
+
+    def test_ready_reports_sqlite_backend(self):
+        """/ready should report sqlite backend when using SQLite."""
+        response = client.get("/ready")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["backend"] == "sqlite"
+
+    def test_storage_status_reports_sqlite(self):
+        """/api/system/storage/status should report sqlite backend when using SQLite."""
+        response = client.get("/api/system/storage/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["backend"] == "sqlite"
+        assert "db_path" in data
+        assert data["db_path"].endswith(".db")
+
+
+class TestReadyWithMockedPostgres:
+    """Tests for /ready and /storage/status when using a mocked Postgres repository."""
+
+    def _make_mock_postgres_repo(self, healthy: bool = True):
+        """Create a mock PostgresJobRepository-like object."""
+        from unittest.mock import MagicMock
+
+        mock_repo = MagicMock()
+        mock_repo.backend = "postgres"
+
+        if healthy:
+            mock_repo.health_check.return_value = {
+                "ok": True,
+                "backend": "postgres",
+                "schema_version": 2,
+                "expected_version": 2,
+                "job_count": 5,
+                "recycle_bin_count": 2,
+            }
+        else:
+            mock_repo.health_check.return_value = {
+                "ok": False,
+                "backend": "postgres",
+                "error": "Connection refused",
+                "schema_version": 0,
+                "expected_version": 2,
+            }
+        return mock_repo
+
+    def test_ready_reports_postgres_backend(self, monkeypatch):
+        """/ready should report postgres backend when Postgres repository is active."""
+        mock_repo = self._make_mock_postgres_repo(healthy=True)
+        monkeypatch.setattr(
+            "app.main.get_job_repository", lambda: mock_repo
+        )
+
+        response = client.get("/ready")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["backend"] == "postgres"
+        assert data["storage"] == "ok"
+        assert data["job_count"] == 5
+        assert data["recycle_bin_count"] == 2
+
+    def test_ready_returns_503_when_postgres_unhealthy(self, monkeypatch):
+        """/ready should return 503 when Postgres repository is unhealthy."""
+        mock_repo = self._make_mock_postgres_repo(healthy=False)
+        monkeypatch.setattr(
+            "app.main.get_job_repository", lambda: mock_repo
+        )
+
+        response = client.get("/ready")
+        assert response.status_code == 503
+        data = response.json()
+        assert data["status"] == "not_ready"
+        assert "error" in data
+
+    def test_storage_status_reports_postgres_counts(self, monkeypatch):
+        """/api/system/storage/status should report postgres backend with counts."""
+        mock_repo = self._make_mock_postgres_repo(healthy=True)
+        monkeypatch.setattr(
+            "app.main.get_job_repository", lambda: mock_repo
+        )
+
+        response = client.get("/api/system/storage/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["backend"] == "postgres"
+        assert data["ok"] is True
+        assert data["schema_version"] == 2
+        assert data["job_count"] == 5
+        assert data["recycle_bin_count"] == 2
+
+    def test_storage_status_reports_postgres_unhealthy(self, monkeypatch):
+        """/api/system/storage/status should report postgres as not ok when unhealthy."""
+        mock_repo = self._make_mock_postgres_repo(healthy=False)
+        monkeypatch.setattr(
+            "app.main.get_job_repository", lambda: mock_repo
+        )
+
+        response = client.get("/api/system/storage/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["backend"] == "postgres"
+        assert data["ok"] is False
+        assert "error" in data

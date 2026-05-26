@@ -134,6 +134,17 @@ export DATAFORGE_DATABASE_URL="postgresql://dataforge:password@host:5432/datafor
 
 Postgres mode is **explicit** — you must set both. If `DATAFORGE_STORAGE_BACKEND=postgres` is set and the database is unreachable, startup fails with a clear error. There is **no silent fallback** to SQLite.
 
+### Production Environment Validation
+
+Before starting the production stack (from the project root directory), validate configuration with:
+
+```bash
+python3 scripts/check_prod_env.py --env-file .env.production.example
+```
+
+The script checks required variables: `DATAFORGE_API_KEY`, `DATAFORGE_CORS_ORIGINS`, `DATAFORGE_DB_PASSWORD`,
+`DATAFORGE_STORAGE_BACKEND`, and `DATAFORGE_WORKER_QUEUE`.
+
 ### Docker Postgres Setup
 
 When using `docker-compose.prod.yml`, Postgres starts automatically with:

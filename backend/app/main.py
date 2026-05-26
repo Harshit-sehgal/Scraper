@@ -398,6 +398,7 @@ async def storage_status():
         return {
             "backend": "postgres",
             "ok": health.get("ok", False),
+            "error": health.get("error"),
             "schema_version": health.get("schema_version", 0),
             "expected_version": health.get("expected_version", 0),
             "job_count": health.get("job_count", 0),
