@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# DataForge Scraper — Repeatable SRE Smoke Test
+# DataForge Scraper — Repeatable SRE Quick Check
 # =============================================================================
 set -euo pipefail
 
@@ -48,8 +48,14 @@ else
     echo "✅ No unsafe eval() calls detected."
 fi
 
-echo "=== 5. Running Production Hardening Tests ==="
+echo "=== 5. Running Architecture Validator ==="
+$PYTHON_EXE architecture_validator.py
+
+echo "=== 6. Running Production Hardening Tests ==="
 cd backend
 PYTHONPATH=. $PYTHON_EXE -m pytest tests/test_production_hardening.py -q -o "addopts="
 
-echo "=== Smoke Test Complete — ALL CHECKS PASSED ==="
+echo "=== 7. Running Full pytest Suite ==="
+PYTHONPATH=. $PYTHON_EXE -m pytest -q -o "addopts="
+
+echo "=== SRE Quick Check Complete — ALL CHECKS PASSED ==="
