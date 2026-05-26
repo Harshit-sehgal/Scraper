@@ -158,7 +158,7 @@ _repository_instance: JobRepository | None = None
 def reset_repository():
     """Reset the cached repository instance (for testing).
 
-    If a PostgresJobRepository was cached, also closes the asyncpg pool
+    If a PostgresJobRepository was cached, also closes the psycopg2 pool
     to prevent connection leaks.
     """
     global _repository_instance

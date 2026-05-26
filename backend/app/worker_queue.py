@@ -112,7 +112,14 @@ class QueueTask:
             task_id=d.get("id"),
             scheduled_at=d.get("scheduled_at"),
         )
-        task.status = d.get("status", TaskStatus.PENDING)
+        raw_status = d.get("status", TaskStatus.PENDING)
+        if isinstance(raw_status, TaskStatus):
+            task.status = raw_status
+        else:
+            try:
+                task.status = TaskStatus(raw_status)
+            except ValueError:
+                task.status = TaskStatus.PENDING
         task.created_at = d.get("created_at", task.created_at)
         task.started_at = d.get("started_at")
         task.completed_at = d.get("completed_at")

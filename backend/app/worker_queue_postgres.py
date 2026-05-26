@@ -11,6 +11,7 @@ Usage:
 """
 
 import asyncio
+import datetime
 import json
 import logging
 import threading
@@ -138,12 +139,13 @@ class PostgresWorkerQueue:
                     """INSERT INTO queue_tasks
                        (id, type, payload, priority, status, created_at,
                         scheduled_at, attempts, max_attempts, timeout_seconds)
-                       VALUES (%s, %s, %s, %s, %s, NOW(), NOW(), %s, %s, %s)
+                       VALUES (%s, %s, %s, %s, %s, NOW(), %s, %s, %s, %s)
                        ON CONFLICT (id) DO NOTHING""",
                     (
                         task.id, task.type, json.dumps(task.payload),
                         int(task.priority), task.status,
-                        task.attempts, task.max_attempts, task.timeout_seconds,
+                        task.scheduled_at, task.attempts,
+                        task.max_attempts, task.timeout_seconds,
                     ),
                 )
 
@@ -186,6 +188,13 @@ class PostgresWorkerQueue:
 
                 if row is None:
                     return None
+
+                # Normalize Postgres datetime objects to strings for QueueTask compatibility
+                _ts_fields = ("created_at", "started_at", "completed_at", "scheduled_at", "finished_at")
+                for _f in _ts_fields:
+                    v = row.get(_f)
+                    if isinstance(v, (datetime.datetime, datetime.date)):
+                        row[_f] = v.strftime('%Y-%m-%d %H:%M:%S')
 
                 task = QueueTask.from_dict({
                     **row,
@@ -246,7 +255,7 @@ class PostgresWorkerQueue:
                         _execute(
                             conn,
                             "UPDATE queue_tasks SET status = 'pending', last_error = %s, "
-                            "scheduled_at = NOW() + INTERVAL '%s seconds' WHERE id = %s",
+                            "scheduled_at = NOW() + (%s * INTERVAL '1 second') WHERE id = %s",
                             (error, backoff, task_id),
                         )
                         logger.info(
@@ -554,7 +563,7 @@ class PostgresWorkerQueue:
                 _execute(
                     conn,
                     """DELETE FROM queue_task_history
-                       WHERE finished_at < NOW() - INTERVAL '%s days'
+                       WHERE finished_at < NOW() - (%s * INTERVAL '1 day')
                        AND status IN ('completed', 'dead_letter')""",
                     (older_than_days,),
                 )

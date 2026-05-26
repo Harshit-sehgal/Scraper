@@ -241,11 +241,19 @@ def _schedule_background_task(coro):
 
 
 # Create FastAPI app with lifespan
+# Disable interactive API docs in production to prevent schema leakage
+_docs_url = None if settings.ENV.lower() == "production" else "/docs"
+_redoc_url = None if settings.ENV.lower() == "production" else "/redoc"
+_openapi_url = None if settings.ENV.lower() == "production" else "/openapi.json"
+
 app = FastAPI(
     title="DataForge — General-Purpose Web Scraper",
     description="AI-powered scraper that extracts structured data from any website",
     version="2.0.0",
     lifespan=lifespan,
+    docs_url=_docs_url,
+    redoc_url=_redoc_url,
+    openapi_url=_openapi_url,
 )
 
 from fastapi.middleware.cors import CORSMiddleware
