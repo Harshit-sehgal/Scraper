@@ -453,13 +453,11 @@ def create_jobs_router(
         keep_ids = {jid for jid, _ in terminal[:keep_recent]}
 
         removed = 0
-        from app.utils.job_results_store import delete_job_results_from_disk
         repo = get_job_repository()
 
         for jid, _ in terminal:
             if jid in keep_ids:
                 continue
-            job = jobs_store.get(jid)
             repo.move_to_recycle_bin(jid)
             if jid in jobs_store:
                 recycle_bin_store[jid] = jobs_store.pop(jid)

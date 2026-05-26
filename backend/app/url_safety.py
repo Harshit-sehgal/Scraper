@@ -66,7 +66,7 @@ def validate_public_http_url(url: str) -> None:
                 raise ValueError(
                     f"URL hostname '{hostname}' resolves to restricted IP {ip} — rejected for security (SSRF protection)."
                 )
-    except (socket.gaierror, OSError) as e:
+    except (socket.gaierror, OSError):
         is_production = settings.ENV.lower() in ("production", "staging")
         if is_production and not is_smoke:
             raise ValueError(

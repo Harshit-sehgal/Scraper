@@ -8,7 +8,7 @@ import re
 import uuid
 from enum import Enum
 from typing import Optional
-from urllib.parse import urlparse
+
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 

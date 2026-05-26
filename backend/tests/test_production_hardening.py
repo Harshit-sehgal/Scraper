@@ -1,8 +1,6 @@
-import pytest
 from pathlib import Path
 from app import main as main_mod
 from app.models import Job, JobStatus, ScrapeMode
-from app.utils.job_results_store import get_job_results_path
 
 def test_nginx_blocks_metrics_and_docs():
     """Verify that operational metrics and FastAPI docs are explicitly returned as 404 in public Nginx."""

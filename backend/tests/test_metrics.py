@@ -1,4 +1,4 @@
-import pytest
+
 
 def test_metrics_endpoint(client):
     r = client.get("/metrics")
