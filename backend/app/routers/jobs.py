@@ -194,6 +194,13 @@ def create_jobs_router(
                         "Failed to enqueue job %s to worker queue in production: %s",
                         job.id, e,
                     )
+                    if job.id in jobs_store:
+                        del jobs_store[job.id]
+                    try:
+                        repo = get_job_repository()
+                        repo.hard_delete(job.id)
+                    except Exception:
+                        pass
                     raise HTTPException(
                         status_code=503,
                         detail=(

@@ -184,6 +184,7 @@ def check_grafana_password(value: str) -> bool:
         "grafana",
         "change-me",
         "change-me-to-a-strong-password",
+        "change-this-to-a-strong-password",
     }
     if value.lower() in default_values:
         print(
@@ -217,6 +218,7 @@ def check_api_key(value: str) -> bool:
     default_values = {
         "change-me",
         "change-me-to-a-random-secret",
+        "change-this-to-a-strong-password",
         "dev-key",
         "test-key",
         "your-api-key-here",
@@ -243,6 +245,7 @@ def check_db_password(value: str) -> bool:
         "dataforge",
         "change-me",
         "change-me-to-a-strong-password",
+        "change-this-to-a-strong-password",
         "password",
         "postgres",
     }

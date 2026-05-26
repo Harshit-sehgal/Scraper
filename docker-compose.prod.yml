@@ -36,6 +36,8 @@ services:
       - DATAFORGE_QUEUE_BACKEND=postgres
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
       - TMPDIR=/tmp
+      - DATAFORGE_SMOKE_TEST_MODE=${DATAFORGE_SMOKE_TEST_MODE:-false}
+      - DATAFORGE_ALLOWED_INTERNAL_HOSTS=${DATAFORGE_ALLOWED_INTERNAL_HOSTS:-}
     volumes:
       - dataforge_data:/app/backend/data
     depends_on:
@@ -85,6 +87,8 @@ services:
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
       - TMPDIR=/tmp
       - DATAFORGE_WORKER=true
+      - DATAFORGE_SMOKE_TEST_MODE=${DATAFORGE_SMOKE_TEST_MODE:-false}
+      - DATAFORGE_ALLOWED_INTERNAL_HOSTS=${DATAFORGE_ALLOWED_INTERNAL_HOSTS:-}
     volumes:
       - dataforge_data:/app/backend/data
     depends_on:

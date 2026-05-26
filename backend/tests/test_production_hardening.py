@@ -99,3 +99,29 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch):
     
     # Verify that a global save or persist_state was NOT triggered to prevent concurrency risk
     assert not persist_called, "Global persist_state was called, bringing back concurrency risk!"
+
+def test_create_job_enqueue_failure_cleanup(client, monkeypatch):
+    """Verify that if enqueue fails in production, the job is removed from memory and repository (not left orphaned)."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "ENV", "production")
+    monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
+    
+    # Mock enqueue to raise an error
+    class FailingQueue:
+        async def enqueue(self, *args, **kwargs):
+            raise Exception("Queue is dead")
+    monkeypatch.setattr("app.worker_queue.get_worker_queue", lambda: FailingQueue())
+    
+    payload = {
+        "name": "cleanup-on-enqueue-failure",
+        "mode": "manual",
+        "urls": ["https://example.com"],
+        "schema_fields": [{"name": "company_name", "field_type": "string", "required": True}],
+    }
+    
+    resp = client.post("/api/jobs", json=payload)
+    assert resp.status_code == 503
+    assert "Failed to enqueue job" in resp.json()["detail"]
+    
+    # Verify job is NOT in memory store
+    assert len(main_mod.jobs_store) == 0

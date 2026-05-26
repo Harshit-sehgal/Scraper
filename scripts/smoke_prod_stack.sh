@@ -125,6 +125,10 @@ fi
 echo ""
 echo "─── Step 4: Starting production stack ────────────────────────────────"
 
+# Enable smoke test bypass specifically for this run
+export DATAFORGE_SMOKE_TEST_MODE=true
+export DATAFORGE_ALLOWED_INTERNAL_HOSTS=nginx
+
 docker compose -f docker-compose.prod.yml up -d 2>&1
 echo -e "  $INFO  Waiting for services to start (30s)..."
 sleep 30
