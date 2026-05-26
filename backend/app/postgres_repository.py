@@ -339,6 +339,10 @@ def _job_to_row(job: Job) -> dict:
         "results_on_disk": job.results_on_disk,
         "results_file_path": job.results_file_path if job.results_file_path is not None else "",
         "updated_at": datetime.datetime.now().isoformat(),
+        # Explicitly set deleted_at = NULL for active jobs so that
+        # ON CONFLICT (id) DO UPDATE restores visibility of previously
+        # soft-deleted rows with the same ID.
+        "deleted_at": None,
     }
 
 

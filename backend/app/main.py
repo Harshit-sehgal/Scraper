@@ -28,6 +28,7 @@ from app.storage_interface import get_job_repository
 # during startup and referenced by route handlers.
 job_repo = None
 from app.rate_limiter import RateLimiterMiddleware
+from app.postgres_repository import shutdown_postgres
 
 
 from enum import Enum
@@ -193,6 +194,12 @@ async def lifespan(app: FastAPI):
     await asyncio.gather(*_background_tasks, return_exceptions=True)
     _background_tasks.clear()
     logger.info("Background tasks cleaned up")
+
+    # Close Postgres connection pool if active
+    try:
+        shutdown_postgres()
+    except Exception:
+        pass
 
 
 def _schedule_background_task(coro):
@@ -421,8 +428,12 @@ async def system_status():
     active = counts.get(JobStatus.PENDING.value, 0) + counts.get(JobStatus.DISCOVERING.value, 0) + counts.get(JobStatus.RUNNING.value, 0)
 
     from app.state_store import get_state_file_path
+    from app.storage_interface import get_job_repository
+    repo = get_job_repository()
+    backend = getattr(repo, "backend", "sqlite")
     return {
         "status": "online",
+        "backend": backend,
         "jobs": {
             "total": len(jobs_store),
             "active": active,

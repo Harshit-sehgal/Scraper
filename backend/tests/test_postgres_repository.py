@@ -21,9 +21,9 @@ from app.storage_interface import (
 )
 
 
-# ───────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 # Fixtures
-# ───────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 
 
 @pytest.fixture()
@@ -41,9 +41,9 @@ def isolated_db(tmp_path, monkeypatch):
     reset_job_store_for_tests()
 
 
-# ───────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 # Factory tests
-# ───────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 
 
 class TestJobRepositoryFactory:
@@ -88,38 +88,31 @@ class TestJobRepositoryFactory:
         monkeypatch.setenv("DATAFORGE_DATABASE_URL", "postgresql://localhost:5432/test")
         monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "postgres")
 
-        # Block the postgres_repository module so the factory skips it
         import sys
         import types
 
         class _FakeModule(types.ModuleType):
             pass
 
-        # Prevent import of psycopg2 which is needed by postgres_repository
         fake_mod = _FakeModule("postgres_repository")
         sys.modules["app.postgres_repository"] = fake_mod
 
-        # Force a fresh resolve
         from app.storage_interface import get_job_repository as gjr
         reset_repository()
 
-        # Attempt to resolve — should raise RuntimeError since postgres_repository
-        # was never properly imported (it's a stub), or fall back
         try:
             repo = gjr()
-            # If it didn't raise, we got a fallback
             assert isinstance(repo, SQLiteJobRepository)
         except RuntimeError:
             pass  # Expected: Postgres backend requested but not available
 
-        # Clean up
         sys.modules.pop("app.postgres_repository", None)
         reset_repository()
 
 
-# ───────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 # SQLite repository tests
-# ───────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 
 
 class TestSQLiteJobRepository:
@@ -148,8 +141,6 @@ class TestSQLiteJobRepository:
 
         assert job.id in loaded_jobs
         assert loaded_jobs[job.id].name == "Repo Test"
-        # load_state recovers PENDING to FAILED (crash restart semantics)
-        # so we just check it's not empty
         assert len(loaded_recycle) == 0
         reset_job_store_for_tests()
 
@@ -188,7 +179,6 @@ class TestSQLiteJobRepository:
 
         repo.save_all({job.id: job}, {})
 
-        # Update the job status and save single
         job.status = JobStatus.COMPLETED
         repo.save_single(job)
 
@@ -216,25 +206,23 @@ class TestSQLiteJobRepository:
         reset_job_store_for_tests()
 
 
-# ───────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 # Postgres serialization tests (no DB connection required)
-# ───────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 
 
 class TestPostgresSerialization:
     """Test the _job_to_row / _row_to_job serialization functions."""
 
     def _import_postgres_module(self):
-        """Import the postgres repository module (may fail if asyncpg missing)."""
         try:
             from app.postgres_repository import _job_to_row, _row_to_job
             return _job_to_row, _row_to_job
         except ImportError:
-            pytest.skip("asyncpg not installed")
+            pytest.skip("psycopg2 not installed")
             return None, None
 
     def test_job_to_row_basic_fields(self):
-        """Basic Job fields are serialized correctly to a row dict."""
         _job_to_row, _ = self._import_postgres_module()
         if _job_to_row is None:
             return
@@ -254,7 +242,6 @@ class TestPostgresSerialization:
         assert json.loads(row["urls"]) == ["https://example.com"]
 
     def test_job_to_row_optional_fields(self):
-        """Optional/None fields are converted to empty strings or defaults."""
         _job_to_row, _ = self._import_postgres_module()
         if _job_to_row is None:
             return
@@ -271,7 +258,6 @@ class TestPostgresSerialization:
         assert json.loads(row["results"]) == []
 
     def test_job_to_row_bool_fields(self):
-        """Boolean fields are preserved as Python bools."""
         _job_to_row, _ = self._import_postgres_module()
         if _job_to_row is None:
             return
@@ -292,7 +278,6 @@ class TestPostgresSerialization:
         assert row["results_on_disk"] is True
 
     def test_row_to_job_round_trip(self):
-        """A job serialized and deserialized preserves all fields."""
         _job_to_row, _row_to_job = self._import_postgres_module()
         if _job_to_row is None:
             return
@@ -339,7 +324,6 @@ class TestPostgresSerialization:
         assert restored.error == original.error
 
     def test_row_to_job_invalid_row_returns_none(self):
-        """Deserializing an invalid row returns None without crashing."""
         _, _row_to_job = self._import_postgres_module()
         if _row_to_job is None:
             return
@@ -347,12 +331,26 @@ class TestPostgresSerialization:
         result = _row_to_job({})
         assert result is None
 
+    def test_job_to_row_includes_deleted_at_none(self):
+        """Active jobs should have deleted_at=None for soft-delete restoration."""
+        _job_to_row, _ = self._import_postgres_module()
+        if _job_to_row is None:
+            return
+
+        job = Job(
+            id="test-deleted-at",
+            name="Deleted At Test",
+            urls=["https://example.com"],
+        )
+        row = _job_to_row(job)
+        assert "deleted_at" in row
+        assert row["deleted_at"] is None
+
 
 class TestPostgresSchemaRepair:
     """Tests for Postgres schema repair logic (no DB connection required)."""
 
     def _import(self):
-        """Import postgres module functions."""
         try:
             from app.postgres_repository import (
                 _ensure_required_tables,
@@ -365,7 +363,6 @@ class TestPostgresSchemaRepair:
             return None, None, None
 
     def test_build_create_jobs_includes_status_column(self):
-        """_build_create_jobs_sql produces valid SQL with all columns."""
         _, build_jobs, _ = self._import()
         if build_jobs is None:
             return
@@ -378,7 +375,6 @@ class TestPostgresSchemaRepair:
         assert "source_policy" in sql
 
     def test_build_create_recycle_includes_columns(self):
-        """_build_create_recycle_bin_sql produces valid SQL."""
         _, _, build_recycle = self._import()
         if build_recycle is None:
             return
@@ -389,21 +385,17 @@ class TestPostgresSchemaRepair:
         assert "deleted_at" in sql
 
     def test_ensure_required_tables_syntax_valid(self):
-        """_ensure_required_tables contains valid SQL syntax (no Postgres connection needed for this check)."""
         ensure, build_jobs, build_recycle = self._import()
         if ensure is None:
             return
         jobs_sql = build_jobs()
         recycle_sql = build_recycle()
-        # Basic syntax verification: CREATE TABLE ... (
         assert jobs_sql.count("CREATE TABLE") == 1
         assert recycle_sql.count("CREATE TABLE") == 1
-        # Each opening paren has matching closing paren
         assert jobs_sql.count("(") == jobs_sql.count(")")
         assert recycle_sql.count("(") == recycle_sql.count(")")
 
     def test_current_schema_version_is_2(self):
-        """_CURRENT_SCHEMA_VERSION is now 2 after the schema repair upgrade."""
         try:
             from app.postgres_repository import _CURRENT_SCHEMA_VERSION
             assert _CURRENT_SCHEMA_VERSION >= 2
@@ -415,7 +407,6 @@ class TestPostgresHealthCheck:
     """Tests for health check (without Postgres connection)."""
 
     def test_health_check_fails_gracefully(self):
-        """Postgres health check returns error state without a real connection."""
         try:
             from app.postgres_repository import PostgresJobRepository
         except ImportError:
@@ -427,3 +418,148 @@ class TestPostgresHealthCheck:
         assert result["ok"] is False
         assert result["backend"] == "postgres"
         assert "error" in result
+
+
+# ----------------------------------------------------------------------
+# Postgres integration tests (require Docker + --run-postgres)
+# ----------------------------------------------------------------------
+
+
+@pytest.mark.postgres
+class TestPostgresIntegration:
+    """Real Postgres integration tests using testcontainers.
+
+    These tests require Docker and are skipped by default.
+    Run with: pytest --run-postgres -m postgres -v
+    """
+
+    @pytest.fixture(autouse=True)
+    def postgres_container(self):
+        """Start a Postgres testcontainer and configure the connection."""
+        from testcontainers.postgres import PostgresContainer
+
+        with PostgresContainer("postgres:16-alpine") as pg:
+            os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
+            os.environ["DATAFORGE_DATABASE_URL"] = pg.get_connection_url()
+            os.environ["PGPASSWORD"] = pg.password
+            yield
+            os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+            os.environ.pop("DATAFORGE_DATABASE_URL", None)
+            os.environ.pop("PGPASSWORD", None)
+
+    def _setup_v1_schema(self, conn):
+        """Create a minimal v1 schema (jobs table but no recycle_bin)."""
+        import psycopg2
+
+        with conn.cursor() as cur:
+            cur.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)")
+            cur.execute("DELETE FROM schema_version")
+            cur.execute("INSERT INTO schema_version (version) VALUES (1)")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS jobs (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    mode TEXT NOT NULL DEFAULT 'manual',
+                    urls TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT DEFAULT ''
+                )
+            """)
+        conn.commit()
+
+    def test_postgres_repairs_missing_recycle_bin_when_schema_version_is_current(self):
+        """When schema_version=1 and recycle_bin is missing, _ensure_schema() creates it."""
+        import psycopg2
+
+        dsn = os.environ["DATAFORGE_DATABASE_URL"]
+        conn = psycopg2.connect(dsn)
+        try:
+            self._setup_v1_schema(conn)
+        finally:
+            conn.close()
+
+        # Reset the module-level pool so the repo uses our container
+        from app.postgres_repository import _close_pool
+        _close_pool()
+        from app.storage_interface import reset_repository
+        reset_repository()
+
+        from app.postgres_repository import PostgresJobRepository
+        repo = PostgresJobRepository()
+
+        # Trigger schema ensure + health check
+        health = repo.health_check()
+        assert health["ok"] is True, f"Health check failed: {health}"
+        assert health["schema_version"] == 2, f"Expected schema_version=2, got {health['schema_version']}"
+
+        # Verify recycle_bin table exists
+        health2 = repo.health_check()
+        assert "recycle_bin_count" in health2
+
+        # Verify we can insert into recycle_bin
+        from app.models import Job, JobStatus
+        recycled = Job(
+            id="recycled-after-repair",
+            name="Repair Test",
+            urls=["https://example.com"],
+            status=JobStatus.COMPLETED,
+        )
+        repo.save_all({}, {recycled.id: recycled})
+        _, loaded_recycle, _ = repo.load_all()
+        assert recycled.id in loaded_recycle, "Recycle bin should accept entries after repair"
+
+        _close_pool()
+        reset_repository()
+
+    def test_postgres_save_single_restores_soft_deleted_job_id(self):
+        """Saving an active job over a soft-deleted ID should restore visibility."""
+        import psycopg2
+
+        dsn = os.environ["DATAFORGE_DATABASE_URL"]
+        conn = psycopg2.connect(dsn)
+        try:
+            self._setup_v1_schema(conn)
+        finally:
+            conn.close()
+
+        from app.postgres_repository import _close_pool
+        _close_pool()
+        from app.storage_interface import reset_repository
+        reset_repository()
+
+        from app.postgres_repository import PostgresJobRepository
+        repo = PostgresJobRepository()
+
+        # Insert a job, then soft-delete it
+        from app.models import Job, JobStatus
+        job = Job(
+            id="soft-delete-test",
+            name="Will Be Deleted",
+            urls=["https://example.com"],
+            status=JobStatus.COMPLETED,
+        )
+        repo.save_all({job.id: job}, {})
+
+        # Move to recycle bin (simulates soft delete)
+        repo.save_all({}, {job.id: job})
+
+        # Verify it's gone from active jobs
+        active_jobs, _, _ = repo.load_all()
+        assert job.id not in active_jobs, "Job should be hidden after soft delete"
+
+        # Now save an active job with the same ID (simulating restore)
+        restored_job = Job(
+            id="soft-delete-test",
+            name="Restored Job",
+            urls=["https://example.com"],
+            status=JobStatus.PENDING,
+        )
+        repo.save_single(restored_job)
+
+        # Verify it's visible again
+        loaded, _, _ = repo.load_all()
+        assert restored_job.id in loaded, "Job should be visible after save_single over soft-deleted ID"
+        assert loaded[restored_job.id].name == "Restored Job"
+
+        _close_pool()
+        reset_repository()
