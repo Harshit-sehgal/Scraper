@@ -5,6 +5,7 @@ and LLM providers, so the worker queue can apply smarter backoff instead
 of burning retries on transient rate-limit blocks.
 """
 
+import datetime
 import re
 import time
 from typing import Optional
@@ -140,4 +141,3 @@ def reset_rate_limit_state(domain_or_type: Optional[str] = None) -> None:
         _RATE_LIMIT_STATE.pop(domain_or_type, None)
     else:
         _RATE_LIMIT_STATE.clear()
-```

@@ -269,7 +269,31 @@ app.add_middleware(
 )
 
 
-# ─── API Key Auth + Rate Limit Middleware ────────────────────────────────
+# ─── Request Body Size Limit ───────────────────────────────────────────
+
+
+MAX_BODY_SIZE = 5 * 1024 * 1024  # 5MB
+
+
+@app.middleware("http")
+async def body_size_middleware(request: Request, call_next):
+    """Limit request body size to prevent abuse."""
+    if request.method in ("POST", "PUT", "PATCH") and request.url.path.startswith("/api/"):
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > MAX_BODY_SIZE:
+                    return JSONResponse(
+                        status_code=413,
+                        content={"detail": "Request body too large (max 5MB)"},
+                    )
+            except (ValueError, TypeError):
+                pass
+    response = await call_next(request)
+    return response
+
+
+# ─── API Key Auth Middleware ────────────────────────────────────────────────
 
 
 @app.middleware("http")
