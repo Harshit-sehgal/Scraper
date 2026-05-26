@@ -408,25 +408,43 @@ class WorkerQueue:
         task_id: str,
         error: str,
         retry: bool = True,
+        retry_after: Optional[float] = None,
+        task_type: Optional[str] = None,
     ):
-        """Mark a task as failed. Retries if attempts remain."""
+        """Mark a task as failed. Retries if attempts remain.
+
+        Args:
+            task_id: The task to fail.
+            error: Error description.
+            retry: Whether to retry (if attempts remain).
+            retry_after: Optional explicit retry-after seconds (e.g. from
+                Retry-After header for rate-limited tasks). If set, this
+                overrides the default exponential backoff.
+            task_type: The task type, used for rate-limit state tracking.
+                If omitted, inferred from the DB row.
+        """
         now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         async with self._in_flight_lock:
             conn = self._conn()
             try:
                 row = conn.execute(
-                    "SELECT attempts, max_attempts FROM tasks WHERE id = ?",
+                    "SELECT attempts, max_attempts, type FROM tasks WHERE id = ?",
                     (task_id,),
                 ).fetchone()
 
                 if row:
                     attempts = row["attempts"]
                     max_attempts = row["max_attempts"]
+                    actual_type = task_type or row["type"]
 
                     if retry and attempts < max_attempts:
-                        # Schedule retry with exponential backoff
-                        # Set status back to PENDING so _dequeue_one picks it up.
-                        backoff = min(2 ** (attempts - 1) * 30, 3600)
+                        # Use explicit retry-after if provided (rate-limit aware),
+                        # otherwise use standard exponential backoff.
+                        if retry_after is not None and retry_after > 0:
+                            backoff = min(retry_after, 3600.0)
+                        else:
+                            backoff = float(min(2 ** (attempts - 1) * 30, 3600))
+
                         retry_at = (datetime.datetime.now() + datetime.timedelta(seconds=backoff)).strftime('%Y-%m-%d %H:%M:%S')
                         conn.execute(
                             "UPDATE tasks SET status = ?, last_error = ?, scheduled_at = ? WHERE id = ?",
@@ -444,7 +462,7 @@ class WorkerQueue:
                         # Record worker failure counter for metrics
                         try:
                             from app.metrics_collector import record_worker_failure
-                            record_worker_failure(task_data.get("type", "unknown"))
+                            record_worker_failure(actual_type)
                         except Exception:
                             pass
                         conn.execute(
@@ -638,7 +656,7 @@ class WorkerQueue:
                 await asyncio.sleep(1)
 
     async def _execute_task(self, task: QueueTask):
-        """Execute a single task with timeout."""
+        """Execute a single task with timeout and rate-limit-aware retries."""
         handler = self._handlers.get(task.type)
         if handler is None:
             logger.error("No handler registered for task type: %s", task.type)
@@ -657,7 +675,31 @@ class WorkerQueue:
         except asyncio.TimeoutError:
             await self.fail(task.id, f"Timeout after {task.timeout_seconds}s", retry=True)
         except Exception as e:
-            await self.fail(task.id, f"{type(e).__name__}: {e}", retry=True)
+            error_msg = f"{type(e).__name__}: {e}"
+            # Rate-limit-aware retry: check if the error is rate-limit related
+            # and parse Retry-After from error context if available
+            retry_after = None
+            try:
+                from app.utils.rate_limit import is_rate_limit_error, parse_retry_after
+                if is_rate_limit_error(body=error_msg):
+                    retry_after = parse_retry_after()
+                    if retry_after is not None:
+                        logger.info(
+                            "Task %s hit rate limit, honouring Retry-After: %.1fs",
+                            task.id, retry_after,
+                        )
+                    # Mark in-memory rate-limit state for the domain/task-type
+                    from app.utils.rate_limit import get_cooldown_seconds, mark_rate_limited
+                    mark_rate_limited(task.type, retry_after=retry_after)
+                    cooldown = get_cooldown_seconds(task.type)
+                    if cooldown > 0:
+                        logger.info(
+                            "Task %s cooling down %.1fs for %s",
+                            task.id, cooldown, task.type,
+                        )
+            except Exception:
+                pass
+            await self.fail(task.id, error_msg, retry=True, retry_after=retry_after, task_type=task.type)
 
     async def _cleanup_in_flight(self, task_id: str):
         """Remove a task from the in-flight tracker."""
