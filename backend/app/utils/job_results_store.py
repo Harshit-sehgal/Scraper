@@ -86,6 +86,47 @@ def load_job_results_from_disk(job_id: str, file_path: Optional[str] = None) -> 
     return results
 
 
+def load_paginated_job_results_from_disk(
+    job_id: str,
+    limit: int = 100,
+    offset: int = 0,
+    file_path: Optional[str] = None,
+) -> tuple[list[dict], int]:
+    """
+    Decompress and load only a paginated chunk of record dictionaries from disk.
+    
+    Skips lines up to *offset*, loads up to *limit* records, and counts the remaining lines
+    to return the exact total count without parsing all records.
+    
+    Returns:
+        tuple of (records_page: list[dict], total_count: int)
+    """
+    if file_path:
+        path = Path(file_path)
+    else:
+        path = get_job_results_path(job_id)
+        
+    if not path.exists():
+        return [], 0
+        
+    records = []
+    total_count = 0
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            for idx, line in enumerate(f):
+                line = line.strip()
+                if not line:
+                    continue
+                total_count += 1
+                if idx >= offset and len(records) < limit:
+                    records.append(json.loads(line))
+    except Exception as e:
+        logger.exception("Failed to read paginated job results from disk for %s: %s", job_id, e)
+        raise e
+        
+    return records, total_count
+
+
 def delete_job_results_from_disk(job_id: str, file_path: Optional[str] = None) -> bool:
     """
     Delete the compressed results file from disk for a given job ID.

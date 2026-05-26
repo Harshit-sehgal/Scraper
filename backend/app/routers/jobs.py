@@ -101,13 +101,16 @@ def create_jobs_router(
             raise HTTPException(status_code=404, detail="Job not found")
         job = jobs_store[job_id]
 
-        results_list = list(job.results)
         if job.results_on_disk:
-            from app.utils.job_results_store import load_job_results_from_disk
-            results_list = load_job_results_from_disk(job.id, job.results_file_path)
+            from app.utils.job_results_store import load_paginated_job_results_from_disk
+            page, total = load_paginated_job_results_from_disk(
+                job.id, limit=limit, offset=offset, file_path=job.results_file_path,
+            )
+        else:
+            results_list = list(job.results)
+            total = len(results_list)
+            page = results_list[offset:offset + limit]
 
-        total = len(results_list)
-        page = results_list[offset:offset + limit]
         return {
             "job_id": job_id,
             "results": page,
