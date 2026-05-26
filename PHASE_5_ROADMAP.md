@@ -250,11 +250,11 @@ Modes:
 - [ ] Team can explain system to new engineer
 
 ### By Week 4:
-- [ ] 20 architectural tests passing
-- [ ] 100% architecture enforcement
-- [ ] Architecture validated by tests
-- [ ] TROUBLESHOOTING.md complete
-- [ ] Operators have guide
+- [x] 20 architectural tests passing ✓
+- [x] 100% architecture enforcement ✓
+- [x] Architecture validated by tests ✓
+- [x] TROUBLESHOOTING.md complete ✓
+- [x] Operators have guide ✓
 
 ### By Week 8:
 - [ ] 20 chaos scenarios defined
