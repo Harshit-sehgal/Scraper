@@ -184,14 +184,25 @@ else
     ALL_PASS=false
 fi
 
-# ───── Step 7: Create a job via API ───────────────────────────────────────
+# ───── Step 7: Create a local deterministic smoke page served by nginx ────
 echo ""
-echo "─── Step 7: Create a job and verify worker processes it ──────────────"
+echo "─── Step 7: Create local smoke test page ─────────────────────────────"
+
+if [ -f "frontend/smoke/records.html" ]; then
+    echo -e "  $PASS  Local smoke page exists at frontend/smoke/records.html"
+else
+    echo -e "  $FAIL  Local smoke page not found"
+    ALL_PASS=false
+fi
+
+# ───── Step 8: Create a job via API (targeting local smoke page) ──────────
+echo ""
+echo "─── Step 8: Create a job against local smoke page ────────────────────"
 
 JOB_RESPONSE=$(curl -s -X POST \
     -H "X-API-Key: $DATAFORGE_API_KEY" \
     -H "Content-Type: application/json" \
-    -d '{"name":"Smoke Test Job","mode":"manual","urls":["https://example.com"]}' \
+    -d '{"name":"Smoke Test Job","mode":"manual","urls":["http://nginx/smoke/records.html"]}' \
     http://localhost/api/jobs 2>/dev/null || echo '{"error":"unreachable"}')
 
 JOB_ID=$(echo "$JOB_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('job_id',''))" 2>/dev/null || echo "")
@@ -202,15 +213,17 @@ else
     ALL_PASS=false
 fi
 
-# ───── Step 8: Verify job enters queue and worker processes it ────────────
+# ───── Step 9: Verify job lifecycle ───────────────────────────────────────
 echo ""
-echo "─── Step 8: Verify job lifecycle ─────────────────────────────────────"
+echo "─── Step 9: Verify job lifecycle ────────────────────────────────────"
 
 if [ -n "$JOB_ID" ]; then
     # Poll for up to 90 seconds for the job to reach a terminal status
     echo -e "  $INFO  Waiting for worker to process the job (polling up to 90s)..."
     TERMINAL_STATUSES="^(completed|degraded|empty_result|failed|canceled)$"
+    SUCCESS_STATUSES="^(completed|degraded|empty_result)$"
     JOB_REACHED_TERMINAL=false
+    JOB_SCRAPE_SUCCEEDED=false
     POLL_DEADLINE=$((SECONDS + 90))
     while [ $SECONDS -lt $POLL_DEADLINE ]; do
         JOB_STATUS=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" \
@@ -220,6 +233,9 @@ if [ -n "$JOB_ID" ]; then
         if echo "$STATUS_VALUE" | grep -qE "$TERMINAL_STATUSES"; then
             echo -e "  $PASS  Job reached terminal status: $STATUS_VALUE"
             JOB_REACHED_TERMINAL=true
+            if echo "$STATUS_VALUE" | grep -qE "$SUCCESS_STATUSES"; then
+                JOB_SCRAPE_SUCCEEDED=true
+            fi
             break
         fi
         echo -e "  $INFO  Job status: $STATUS_VALUE — still waiting..."
@@ -229,6 +245,11 @@ if [ -n "$JOB_ID" ]; then
     if [ "$JOB_REACHED_TERMINAL" = false ]; then
         echo -e "  $FAIL  Job did not reach terminal status within 90 seconds (last status: ${STATUS_VALUE:-unknown})"
         ALL_PASS=false
+    elif [ "$JOB_SCRAPE_SUCCEEDED" = false ]; then
+        echo -e "  $FAIL  Worker processed the job but scraping did not succeed (status: ${STATUS_VALUE:-unknown}) — expected completed/degraded/empty_result"
+        ALL_PASS=false
+    else
+        echo -e "  $PASS  Scrape succeeded: job reached successful terminal status"
     fi
 fi
 

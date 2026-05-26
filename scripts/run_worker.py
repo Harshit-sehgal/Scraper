@@ -114,13 +114,19 @@ async def main():
             priority=Priority.HIGH,
         )
         logger.info("Enqueued single task: %s (job_id=%s)", task_id, job_id)
-        # Poll until task reaches terminal state instead of fixed sleep
+        # Poll until task reaches terminal state using get_task_state
+        terminal_task_statuses = {"completed", "failed", "dead_letter", "cancelled"}
         deadline = time.time() + 600  # Max 10 minute wait
         while time.time() < deadline:
-            status = queue.get_status()
-            if status.get("running", 0) == 0 and status.get("pending", 0) == 0:
-                logger.info("Task %s reached terminal state, exiting.", task_id)
-                break
+            task_state = queue.get_task_state(task_id)
+            if task_state is not None:
+                ts = task_state.get("status", "")
+                if ts in terminal_task_statuses:
+                    logger.info(
+                        "Task %s reached terminal state: %s", task_id, ts,
+                    )
+                    break
+                logger.debug("Task %s status: %s", task_id, ts)
             await asyncio.sleep(5)
     else:
         # Continuous mode: run until shutdown

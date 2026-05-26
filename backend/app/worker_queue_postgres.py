@@ -463,6 +463,29 @@ class PostgresWorkerQueue:
 
     # ─── Observability ─────────────────────────────────────────────────
 
+    def get_task_state(self, task_id: str) -> Optional[dict]:
+        """Return the current state of a specific task by ID.
+
+        Checks the active queue_tasks first, then falls back to queue_task_history.
+        Returns None if the task is not found.
+        """
+        try:
+            with _conn() as conn:
+                row = _fetch_one(
+                    conn, "SELECT * FROM queue_tasks WHERE id = %s", (task_id,),
+                )
+                if row:
+                    return row
+                row = _fetch_one(
+                    conn, "SELECT * FROM queue_task_history WHERE id = %s", (task_id,),
+                )
+                if row:
+                    return row
+                return None
+        except Exception as e:
+            logger.error("Failed to get task state for %s: %s", task_id, e)
+            return None
+
     def get_status(self) -> dict:
         """Return queue status for monitoring."""
         try:

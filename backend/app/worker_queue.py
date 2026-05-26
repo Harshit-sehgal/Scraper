@@ -634,6 +634,30 @@ class WorkerQueue:
 
     # ─── Observability ─────────────────────────────────────────────────
 
+    def get_task_state(self, task_id: str) -> Optional[dict]:
+        """Return the current state of a specific task by ID.
+
+        Checks the active queue first, then falls back to task_history.
+        Returns None if the task is not found.
+        """
+        conn = self._conn()
+        try:
+            # Check active tasks
+            row = conn.execute(
+                "SELECT * FROM tasks WHERE id = ?", (task_id,),
+            ).fetchone()
+            if row:
+                return dict(row)
+            # Check history
+            row = conn.execute(
+                "SELECT * FROM task_history WHERE id = ?", (task_id,),
+            ).fetchone()
+            if row:
+                return dict(row)
+            return None
+        finally:
+            conn.close()
+
     def get_status(self) -> dict:
         """Return queue status for monitoring."""
         conn = self._conn()

@@ -399,8 +399,15 @@ def create_jobs_router(
                 status_code=409,
                 detail="Cannot delete/recycle an active job. Cancel the job first."
             )
+        repo = get_job_repository()
+        try:
+            repo.move_to_recycle_bin(job_id)
+            sync_mem = True
+        except NotImplementedError:
+            sync_mem = False
         recycle_bin_store[job_id] = jobs_store.pop(job_id)
-        persist_state_fn()
+        if not sync_mem:
+            persist_state_fn()
         return {"message": "Job moved to recycle bin"}
 
     @router.delete("/api/jobs/cleanup/terminal")
@@ -425,16 +432,24 @@ def create_jobs_router(
 
         removed = 0
         from app.utils.job_results_store import delete_job_results_from_disk
+        # Try to use atomic repository operations for Postgres;
+        # fall back to in-memory + full-state save for SQLite.
+        from app.postgres_repository import PostgresJobRepository
+        repo = get_job_repository()
+        use_atomic = isinstance(repo, PostgresJobRepository)
+
         for jid, _ in terminal:
             if jid in keep_ids:
                 continue
             job = jobs_store.get(jid)
             file_path = job.results_file_path if job else None
+            if use_atomic:
+                repo.move_to_recycle_bin(jid)
             del jobs_store[jid]
             delete_job_results_from_disk(jid, file_path)
             removed += 1
 
-        if removed:
+        if removed and not use_atomic:
             persist_state_fn()
 
         return {
@@ -453,29 +468,51 @@ def create_jobs_router(
     async def restore_job(job_id: str):
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
+        repo = get_job_repository()
+        try:
+            repo.restore_from_recycle_bin(job_id)
+            sync_mem = True
+        except NotImplementedError:
+            sync_mem = False
         jobs_store[job_id] = recycle_bin_store.pop(job_id)
-        persist_state_fn()
+        if not sync_mem:
+            persist_state_fn()
         return {"message": "Job restored"}
 
     @router.delete("/api/recycle_bin/{job_id}")
     async def hard_delete_job(job_id: str):
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
-        del recycle_bin_store[job_id]
         from app.utils.job_results_store import delete_job_results_from_disk
         delete_job_results_from_disk(job_id)
-        persist_state_fn()
+        repo = get_job_repository()
+        try:
+            repo.hard_delete(job_id)
+            sync_mem = True
+        except NotImplementedError:
+            sync_mem = False
+        del recycle_bin_store[job_id]
+        if not sync_mem:
+            persist_state_fn()
         return {"message": "Job permanently deleted"}
 
     @router.delete("/api/recycle_bin")
     async def clear_recycle_bin():
         count = len(recycle_bin_store)
         from app.utils.job_results_store import delete_job_results_from_disk
-        for job_id in list(recycle_bin_store.keys()):
-            delete_job_results_from_disk(job_id)
+        for jid in list(recycle_bin_store.keys()):
+            delete_job_results_from_disk(jid)
+        repo = get_job_repository()
+        try:
+            for jid in list(recycle_bin_store.keys()):
+                repo.hard_delete(jid)
+            sync_mem = True
+        except NotImplementedError:
+            sync_mem = False
         recycle_bin_store.clear()
         if count:
-            persist_state_fn()
+            if not sync_mem:
+                persist_state_fn()
         return {"message": f"Recycle bin cleared ({count} items)", "cleared": count}
 
     return router
