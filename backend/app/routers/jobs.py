@@ -77,7 +77,7 @@ def create_jobs_router(
         loaded_from_disk = False
         if job.results_on_disk:
             from app.utils.job_results_store import load_job_results_from_disk
-            results_list = load_job_results_from_disk(job.id)
+            results_list = load_job_results_from_disk(job.id, job.results_file_path)
             loaded_from_disk = True
 
         # Backfill source metadata helper logic
@@ -238,7 +238,7 @@ def create_jobs_router(
         loaded_from_disk = False
         if job.results_on_disk:
             from app.utils.job_results_store import load_job_results_from_disk
-            results_list = load_job_results_from_disk(job.id)
+            results_list = load_job_results_from_disk(job.id, job.results_file_path)
             loaded_from_disk = True
 
         if not results_list:

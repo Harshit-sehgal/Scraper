@@ -45,14 +45,53 @@ function showApiKeyPrompt() {
     }
 }
 
+// ─── Admin Key Management (for X-Admin-Key protected endpoints) ─────
+function getAdminKey() {
+    try { return localStorage.getItem('dataforge_admin_key') || ''; } catch { return ''; }
+}
+
+function setAdminKey(key) {
+    try { localStorage.setItem('dataforge_admin_key', key); } catch { /* ignore storage errors */ }
+}
+
+function showAdminKeyPrompt() {
+    const current = getAdminKey();
+    const key = prompt('Enter your DataForge Admin key:', current);
+    if (key !== null) {
+        setAdminKey(key.trim());
+        if (key.trim()) {
+            toast('Admin key set', 'success');
+        }
+    }
+}
+
 // Central fetch wrapper that attaches X-API-Key header for API calls
 async function apiFetch(url, options = {}) {
-    const headers = { ...(options.headers || {}) };
+    // Destructure `admin` out of options to avoid mutating the caller's object
+    const { admin, ...rest } = options;
+    const headers = { ...(rest.headers || {}) };
     const key = getApiKey();
     if (key && (url.startsWith(API + '/api/') || url.startsWith('/api/'))) {
         headers['X-API-Key'] = key;
     }
-    return fetch(url, { ...options, headers });
+    // Admin key override: if admin is truthy, send X-Admin-Key
+    if (admin) {
+        const adminKey = getAdminKey();
+        if (adminKey) {
+            headers['X-Admin-Key'] = adminKey;
+        }
+    }
+    try {
+        const res = await fetch(url, { ...rest, headers });
+        // Auto-prompt on 403: API key may be missing or expired
+        if (res.status === 403 && !admin) {
+            showApiKeyPrompt();
+        }
+        return res;
+    } catch (err) {
+        // Network errors are handled by callers
+        throw err;
+    }
 }
 
 const UI_STATE_KEY = 'dataforge_ui_state_v1';
@@ -1905,7 +1944,8 @@ async function switchOperatorMode(mode) {
         const res = await apiFetch(`${API}/api/operator/mode`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mode })
+            body: JSON.stringify({ mode }),
+            admin: true
         });
 
         if (!res.ok) {

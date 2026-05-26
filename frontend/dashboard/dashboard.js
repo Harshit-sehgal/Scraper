@@ -3,12 +3,31 @@
  * Phase 63: Real-time Topology Visualization & Drift Monitoring
  */
 
+// ─── API key management (shared with main dashboard) ───────────────────
+function getDashboardApiKey() {
+    try { return localStorage.getItem("dataforge_api_key") || ""; } catch { return ""; }
+}
+
+function setDashboardApiKey(key) {
+    try { localStorage.setItem("dataforge_api_key", key); } catch {}
+}
+
+async function dashboardApiFetch(url, options = {}) {
+    const headers = { ...(options.headers || {}) };
+    const key = getDashboardApiKey();
+    if (key && url.includes("/api/")) headers["X-API-Key"] = key;
+    return fetch(url, { ...options, headers });
+}
+
 // Configurable API base — supports window.DATAFORGE_API_BASE override, same as app.js
 const API_SERVER = (() => {
     const explicit = typeof window.DATAFORGE_API_BASE === 'string' ? window.DATAFORGE_API_BASE.trim() : '';
     if (explicit) return explicit.replace(/\/$/, '');
     const { protocol, hostname, port } = window.location;
-    if ((protocol === 'http:' || protocol === 'https:') && ((hostname === 'localhost' || hostname === '127.0.0.1') && port !== '8000')) {
+    // Only use 127.0.0.1:8000 for dev servers like Vite/Webpack (ports 3000, 5173)
+    // Not for nginx port 80 (production) — use same-origin there
+    const devPorts = ['3000', '5173'];
+    if ((protocol === 'http:' || protocol === 'https:') && (hostname === 'localhost' || hostname === '127.0.0.1') && devPorts.includes(port)) {
         return 'http://127.0.0.1:8000';
     }
     return window.location.origin;
@@ -136,14 +155,14 @@ function setupControls() {
 async function updateLoop() {
     // Use allSettled so individual failures don't crash the whole update
     const results = await Promise.allSettled([
-        fetch(`${API_SYSTEM}/topology`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SYSTEM}/observability`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SYSTEM}/history/topology`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SCRAPER}/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SCRAPER}/browser`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SCRAPER}/memory/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SYSTEM}/acquisition/telemetry`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SERVER}/api/system/status`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        dashboardApiFetch(`${API_SYSTEM}/topology`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SYSTEM}/observability`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SYSTEM}/history/topology`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SCRAPER}/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SCRAPER}/browser`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SCRAPER}/memory/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SYSTEM}/acquisition/telemetry`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SERVER}/api/system/status`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
     ]);
 
     const [topologyResult, observabilityResult, historyResult, scraperStatsResult, browserStatsResult, memoryStatsResult, acqTelemetryResult, systemStatusResult] = results;

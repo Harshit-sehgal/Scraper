@@ -491,6 +491,8 @@ class PostgresWorkerQueue:
                 )
 
                 return {
+                    "ok": True,
+                    "backend": "postgres",
                     "pending": pending["cnt"] if pending else 0,
                     "running": running["cnt"] if running else 0,
                     "retrying": 0,

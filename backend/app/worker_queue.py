@@ -120,9 +120,15 @@ class QueueTask:
                 task.status = TaskStatus(raw_status)
             except ValueError:
                 task.status = TaskStatus.PENDING
-        task.created_at = d.get("created_at", task.created_at)
-        task.started_at = d.get("started_at")
-        task.completed_at = d.get("completed_at")
+        # Normalize timestamps: convert datetime/date objects to ISO strings
+        for _f in ("created_at", "started_at", "completed_at", "scheduled_at"):
+            _v = d.get(_f)
+            if _v is None:
+                continue
+            if hasattr(_v, "isoformat"):
+                setattr(task, _f, _v.isoformat())
+            elif isinstance(_v, str):
+                setattr(task, _f, _v)
         task.attempts = d.get("attempts", 0)
         task.last_error = d.get("last_error")
         return task
@@ -657,6 +663,8 @@ class WorkerQueue:
             ).fetchall()
 
             return {
+                "ok": True,
+                "backend": "sqlite",
                 "pending": pending,
                 "running": running,
                 "retrying": retrying,

@@ -56,7 +56,7 @@ def create_exports_router(jobs_store: dict):
         results_list = list(job.results)
         if job.results_on_disk:
             from app.utils.job_results_store import load_job_results_from_disk
-            results_list = load_job_results_from_disk(job.id)
+            results_list = load_job_results_from_disk(job.id, job.results_file_path)
 
         if not results_list:
             raise HTTPException(status_code=400, detail="No results to export")
@@ -94,7 +94,7 @@ def create_exports_router(jobs_store: dict):
         results_list = list(job.results)
         if job.results_on_disk:
             from app.utils.job_results_store import load_job_results_from_disk
-            results_list = load_job_results_from_disk(job.id)
+            results_list = load_job_results_from_disk(job.id, job.results_file_path)
 
         if not results_list:
             raise HTTPException(status_code=400, detail="No results to export")
@@ -116,7 +116,7 @@ def create_exports_router(jobs_store: dict):
         results_list = list(job.results)
         if job.results_on_disk:
             from app.utils.job_results_store import load_job_results_from_disk
-            results_list = load_job_results_from_disk(job.id)
+            results_list = load_job_results_from_disk(job.id, job.results_file_path)
 
         if not results_list:
             raise HTTPException(status_code=400, detail="No results to export")
