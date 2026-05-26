@@ -142,8 +142,16 @@ Before starting the production stack (from the project root directory), validate
 python3 scripts/check_prod_env.py --env-file .env.production.example
 ```
 
-The script checks required variables: `DATAFORGE_API_KEY`, `DATAFORGE_CORS_ORIGINS`, `DATAFORGE_DB_PASSWORD`,
-`DATAFORGE_STORAGE_BACKEND`, and `DATAFORGE_WORKER_QUEUE`.
+The script validates all required variables:
+- `DATAFORGE_API_KEY` — rejects known placeholders, requires ≥16 characters
+- `DATAFORGE_CORS_ORIGINS` — must be a JSON array, rejects wildcard `*`, validates URL format
+- `DATAFORGE_DB_PASSWORD` — rejects known defaults (`dataforge`, `change-me`, `password`), requires ≥8 characters
+- `DATAFORGE_STORAGE_BACKEND` — must be `postgres`
+- `DATAFORGE_DATABASE_URL` — must start with `postgresql://` or `postgres://`
+- `DATAFORGE_WORKER_QUEUE` — must be `true`
+- `DATAFORGE_ENV` — must be `production`
+
+Exit code 0 passes, 1 fails. Do not deploy until all checks pass.
 
 ### Docker Postgres Setup
 
@@ -206,6 +214,27 @@ This starts:
 
 **Important:** The production Docker stack configures Postgres + worker queue by default. The API service has `DATAFORGE_WORKER_QUEUE=true` so jobs are automatically enqueued. Both API and worker services mount `dataforge_data:/app/backend/data` for the SQLite worker queue.
 
+### Production Docker Smoke Test
+
+Use the smoke test script to validate the full production stack boots correctly:
+
+```bash
+# Ensure .env has valid production settings first
+export DATAFORGE_API_KEY="your-strong-key"
+export DATAFORGE_DB_PASSWORD="your-strong-password"
+bash scripts/smoke_prod_stack.sh
+```
+
+The script:
+1. Runs `check_prod_env.py` to validate `.env`
+2. Validates `docker-compose.prod.yml` config
+3. Builds production images (`--no-cache`)
+4. Starts the full stack
+5. Checks `/health`, `/ready` (asserts `backend=postgres`)
+6. Checks authenticated endpoints `/api/system/status` and `/api/system/storage/status`
+7. Creates a job via the API and verifies the worker processes it
+8. Displays worker logs
+
 ### Single-Container Architecture Note
 The current production stack is **single-node**: the SQLite worker queue requires a shared filesystem between API and worker. True horizontal scaling requires moving the queue to Postgres or Redis (see section 8).
 
@@ -244,9 +273,12 @@ Grafana is accessible at `http://localhost:3000` (default: admin/admin).
 
 ## 8. Production Staging Checklist
 
+- [ ] **`python3 scripts/check_prod_env.py --env-file .env`** passes (all 7 checks)
 - [ ] **SQLite** or **PostgreSQL** backend configured and healthy
 - [ ] **DATAFORGE_STORAGE_BACKEND** + **DATAFORGE_DATABASE_URL** set for Postgres
-- [ ] **DATAFORGE_API_KEY** set to a strong random key
+- [ ] **DATAFORGE_API_KEY** set to a strong random key (not a placeholder, ≥16 chars)
+- [ ] **DATAFORGE_DB_PASSWORD** set to a strong password (not a default, ≥8 chars)
+- [ ] **DATAFORGE_ENV** set to `production`
 - [ ] **DATAFORGE_CORS_ORIGINS** locked to trusted domains
 - [ ] **DATAFORGE_WORKER_QUEUE=true** for background processing
 - [ ] **Health `/health`** returns `{"status": "ok"}`
@@ -257,7 +289,10 @@ Grafana is accessible at `http://localhost:3000` (default: admin/admin).
 - [ ] **Benchmark Suite**: `pytest backend/tests/test_benchmark_suite.py` passes
 - [ ] **Isolated Tests**: No live API keys needed for regression checks
 - [ ] **Worker Queue**: Enqueues jobs correctly when `DATAFORGE_WORKER_QUEUE=true`
+- [ ] **In production, enqueue failure returns 503** (no silent inline fallback)
+- [ ] **API docs (`/docs`, `/openapi.json`) are protected behind API key in production**
 - [ ] **Postgres Integration**: `pytest --run-postgres -m postgres -v` passes (requires Docker)
+- [ ] **Smoke Test**: `bash scripts/smoke_prod_stack.sh` passes
 
 ---
 

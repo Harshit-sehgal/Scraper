@@ -244,7 +244,9 @@ app.add_middleware(
 @app.middleware("http")
 async def api_key_middleware(request: Request, call_next):
     if settings.API_KEY and request.url.path.startswith("/api/"):
-        if "/docs" not in request.url.path and "/openapi" not in request.url.path:
+        # Protect /docs and /openapi behind API key in production
+        is_docs_path = "/docs" in request.url.path or "/openapi" in request.url.path
+        if not is_docs_path or settings.ENV.lower() == "production":
             api_key = request.headers.get("X-API-Key", "")
             if api_key != settings.API_KEY:
                 return JSONResponse(

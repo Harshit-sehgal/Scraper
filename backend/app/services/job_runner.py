@@ -373,7 +373,6 @@ async def run_job(
 
         if job.cancel_requested:
             mark_job_canceled(job)
-            persist_state_fn()
             if persist_state_single_critical_fn:
                 persist_state_single_critical_fn()
             return

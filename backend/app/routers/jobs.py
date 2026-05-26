@@ -161,6 +161,19 @@ def create_jobs_router(
                     "Job %s enqueued to worker queue (task=%s)", job.id, task_id
                 )
             except Exception as e:
+                if settings.ENV.lower() == "production":
+                    logging.getLogger(__name__).error(
+                        "Failed to enqueue job %s to worker queue in production: %s",
+                        job.id, e,
+                    )
+                    raise HTTPException(
+                        status_code=503,
+                        detail=(
+                            f"Failed to enqueue job {job.id} to worker queue. "
+                            "Inline fallback is disabled in production. "
+                            "Check that the worker queue is running and healthy."
+                        ),
+                    )
                 logging.getLogger(__name__).warning(
                     "Failed to enqueue job %s to worker queue, falling back to inline: %s",
                     job.id, e,
