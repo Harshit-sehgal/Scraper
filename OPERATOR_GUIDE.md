@@ -344,6 +344,45 @@ print('Active:', d['active_mode'])
 - [ ] **Health checks pass:** `/health` returns 200, `/ready` returns 200
 - [ ] **Smoke test passes:** `bash scripts/smoke_prod_stack.sh`
 
+### Nginx CORS Production Allowlist Configuration
+By default, the Nginx reverse proxy's CORS map (`nginx.conf`) restricts origins strictly to `localhost` and `127.0.0.1` for staging/local development:
+```nginx
+map $http_origin $cors_origin {
+    default "";
+    "~^https?://(localhost|127\.0\.0\.1)(:\d+)?$" $http_origin;
+}
+```
+**CRITICAL**: When deploying to a real production environment, you **must** append your actual production domains/subdomains to this map block in `nginx.conf`, otherwise all cross-origin browser API calls from those domains will be blocked:
+```nginx
+map $http_origin $cors_origin {
+    default "";
+    "~^https?://(localhost|127\.0\.0\.1)(:\d+)?$" $http_origin;
+    "https://yourdomain.com" $http_origin;
+    "https://app.yourdomain.com" $http_origin;
+}
+```
+
+### Release Verification & Tagging Gate
+Before pushing a final release candidate and tagging `v1.0.0-staging`, operators should run the complete gate locally:
+```bash
+# 1. Run local test suite
+cd backend
+.venv/bin/pytest -q
+
+# 2. Run local architecture validator
+.venv/bin/python3 ../architecture_validator.py
+
+# 3. Check environment templates and placeholders
+.venv/bin/python3 scripts/check_prod_env.py --env-file .env.production.example
+
+# 4. Run Docker production stack smoke tests
+bash scripts/smoke_prod_stack.sh
+
+# 5. Tag and push verified release staging candidate
+git tag -f v1.0.0-staging HEAD
+git push origin -f v1.0.0-staging
+```
+
 ### Post-Deployment
 
 - [ ] **System status online:** `GET /api/system/status` returns `{"status": "online"}`
