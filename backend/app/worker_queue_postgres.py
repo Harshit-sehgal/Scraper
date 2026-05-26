@@ -24,71 +24,92 @@ from app.postgres_repository import _conn, _execute, _fetch_all, _fetch_one
 logger = logging.getLogger(__name__)
 
 
+_CURRENT_QUEUE_SCHEMA_VERSION = 2
+
+
 def _ensure_schema():
-    """Create the queue tables in Postgres if they don't exist."""
+    """Create queue tables and run schema migrations."""
     with _conn() as conn:
         _execute(conn, """
-            CREATE TABLE IF NOT EXISTS queue_tasks (
-                id TEXT PRIMARY KEY,
-                type TEXT NOT NULL,
-                payload TEXT NOT NULL DEFAULT '{}',
-                priority INTEGER NOT NULL DEFAULT 2,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                started_at TIMESTAMP,
-                completed_at TIMESTAMP,
-                attempts INTEGER NOT NULL DEFAULT 0,
-                max_attempts INTEGER NOT NULL DEFAULT 3,
-                last_error TEXT,
-                scheduled_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                timeout_seconds INTEGER NOT NULL DEFAULT 300
+            CREATE TABLE IF NOT EXISTS queue_schema_version (
+                version INTEGER PRIMARY KEY
             )
         """)
+        row = _fetch_one(conn, "SELECT MAX(version) AS version FROM queue_schema_version")
+        current = row["version"] if row and row.get("version") is not None else 0
 
-        _execute(conn, """
-            CREATE INDEX IF NOT EXISTS idx_queue_tasks_status_priority
-                ON queue_tasks(status, priority)
-        """)
+        if current < _CURRENT_QUEUE_SCHEMA_VERSION:
+            if current < 1:
+                _execute(conn, """
+                    CREATE TABLE IF NOT EXISTS queue_tasks (
+                        id TEXT PRIMARY KEY,
+                        type TEXT NOT NULL,
+                        payload TEXT NOT NULL DEFAULT '{}',
+                        priority INTEGER NOT NULL DEFAULT 2,
+                        status TEXT NOT NULL DEFAULT 'pending',
+                        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                        started_at TIMESTAMP,
+                        completed_at TIMESTAMP,
+                        attempts INTEGER NOT NULL DEFAULT 0,
+                        max_attempts INTEGER NOT NULL DEFAULT 3,
+                        last_error TEXT,
+                        scheduled_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                        timeout_seconds INTEGER NOT NULL DEFAULT 300
+                    )
+                """)
 
-        _execute(conn, """
-            CREATE INDEX IF NOT EXISTS idx_queue_tasks_scheduled
-                ON queue_tasks(scheduled_at)
-        """)
+                _execute(conn, """
+                    CREATE INDEX IF NOT EXISTS idx_queue_tasks_status_priority
+                        ON queue_tasks(status, priority)
+                """)
 
-        _execute(conn, """
-            CREATE TABLE IF NOT EXISTS queue_task_history (
-                id TEXT PRIMARY KEY,
-                type TEXT NOT NULL,
-                payload TEXT NOT NULL DEFAULT '{}',
-                priority INTEGER NOT NULL DEFAULT 2,
-                status TEXT NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                started_at TIMESTAMP,
-                completed_at TIMESTAMP,
-                attempts INTEGER NOT NULL DEFAULT 0,
-                max_attempts INTEGER NOT NULL DEFAULT 3,
-                last_error TEXT,
-                result TEXT,
-                timeout_seconds INTEGER NOT NULL DEFAULT 300,
-                finished_at TIMESTAMP NOT NULL DEFAULT NOW()
-            )
-        """)
+                _execute(conn, """
+                    CREATE INDEX IF NOT EXISTS idx_queue_tasks_scheduled
+                        ON queue_tasks(scheduled_at)
+                """)
 
-        _execute(conn, """
-            CREATE INDEX IF NOT EXISTS idx_queue_task_history_type
-                ON queue_task_history(type)
-        """)
+                _execute(conn, """
+                    CREATE TABLE IF NOT EXISTS queue_task_history (
+                        id TEXT PRIMARY KEY,
+                        type TEXT NOT NULL,
+                        payload TEXT NOT NULL DEFAULT '{}',
+                        priority INTEGER NOT NULL DEFAULT 2,
+                        status TEXT NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                        started_at TIMESTAMP,
+                        completed_at TIMESTAMP,
+                        attempts INTEGER NOT NULL DEFAULT 0,
+                        max_attempts INTEGER NOT NULL DEFAULT 3,
+                        last_error TEXT,
+                        timeout_seconds INTEGER NOT NULL DEFAULT 300,
+                        finished_at TIMESTAMP NOT NULL DEFAULT NOW()
+                    )
+                """)
 
-        _execute(conn, """
-            CREATE INDEX IF NOT EXISTS idx_queue_task_history_finished
-                ON queue_task_history(finished_at DESC)
-        """)
+                _execute(conn, """
+                    CREATE INDEX IF NOT EXISTS idx_queue_task_history_type
+                        ON queue_task_history(type)
+                """)
 
-        # Add result column if missing (migration for existing databases)
-        try:
-            _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN result TEXT")
-        except Exception:
-            pass
+                _execute(conn, """
+                    CREATE INDEX IF NOT EXISTS idx_queue_task_history_finished
+                        ON queue_task_history(finished_at DESC)
+                """)
+                current = 1
+
+            if current < 2:
+                # Add result column (used for storing successful task results)
+                try:
+                    _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN result TEXT")
+                except Exception:
+                    pass
+                current = 2
+
+            _execute(conn, "DELETE FROM queue_schema_version")
+            _execute(conn, "INSERT INTO queue_schema_version (version) VALUES (%s)", (current,))
+            logger.info("Postgres queue schema migrated to version %d", current)
+        else:
+            logger.debug("Postgres queue schema already at version %d", _CURRENT_QUEUE_SCHEMA_VERSION)
 
 
 class PostgresWorkerQueue:

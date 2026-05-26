@@ -1,6 +1,7 @@
 import re
 import logging
 import asyncio
+import socket
 import time
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
@@ -13,6 +14,53 @@ from app.browser_pool import get_browser_pool
 from app.domain_intelligence import get_domain_intelligence
 from app.strategy_evolution import FetchStrategy
 from app.browser_network_capture import setup_network_capture, store_captures
+
+
+# ─── SSRF / private-network IP validation ──────────────────────────────
+# Shared with models.py; duplicated here to avoid circular imports.
+_PRIVATE_IP_PREFIXES: tuple = (
+    "127.", "10.", "169.254.", "172.16.", "172.17.", "172.18.", "172.19.",
+    "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
+    "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
+    "192.168.", "0.",
+)
+
+
+def _is_private_ip(ip_str: str) -> bool:
+    """Return True if the IP is in a private, loopback, or link-local range."""
+    return ip_str.startswith(_PRIVATE_IP_PREFIXES)
+
+
+def _validate_url_safe(url: str) -> None:
+    """Raise ValueError if the URL resolves to or points to a private/internal network target."""
+    parsed = urlparse(url)
+    hostname = parsed.hostname or ""
+
+    # Quick check for known loopback hostnames
+    if hostname in ("localhost", "127.0.0.1", "0.0.0.0", "[::1]"):
+        raise ValueError(f"URL target '{url}' is a loopback address — rejected for security")
+    if hostname == "169.254.169.254":
+        raise ValueError(f"URL target '{url}' is a cloud metadata endpoint — rejected for security")
+
+    # Check literal IPv4
+    import re as _re
+    ip_match = _re.match(r"^(\d{1,3}\.){3}\d{1,3}$", hostname)
+    if ip_match and _is_private_ip(hostname):
+        raise ValueError(f"URL target '{url}' is a private/internal IP address — rejected for security")
+
+    # DNS resolution check for hostnames that resolve to private IPs
+    try:
+        addrs = socket.getaddrinfo(hostname, None)
+        for addr in addrs:
+            ip = addr[4][0]
+            if _is_private_ip(ip):
+                raise ValueError(
+                    f"URL target '{url}' resolves to private IP {ip} — rejected for security"
+                )
+    except (socket.gaierror, OSError):
+        # DNS failure isn't an SSRF risk; let the caller handle the connection error
+        pass
+
 
 logger = logging.getLogger(__name__)
 
@@ -376,6 +424,18 @@ async def fetch_page_content(
                 initial_timeout = min(settings.PLAYWRIGHT_TIMEOUT, 15000)
             await page.goto(url, wait_until=wait_until, timeout=initial_timeout)  # type: ignore[arg-type]
 
+            # SSRF: validate the final page URL is not private/internal after Playwright navigation
+            try:
+                final_url = page.url
+                _validate_url_safe(final_url)
+            except ValueError:
+                logger.warning(
+                    "[SSRF] Playwright navigated to blocked target %s from %s — aborting",
+                    page.url, url,
+                )
+                await page.close()
+                raise
+
             # Phase 79: Adaptive hydration and scroll from domain intelligence
             intel = get_domain_intelligence().get_intelligence(url)
 
@@ -522,6 +582,19 @@ async def fetch_page_content(
                 pass
 
 
+async def _check_redirect_targets(client: httpx.AsyncClient, url: str) -> None:
+    """Follow redirects and validate the final URL is not a private/internal target."""
+    try:
+        resp = await client.get(url, follow_redirects=True, timeout=10.0)
+        final_url = str(resp.url)
+        _validate_url_safe(final_url)
+    except httpx.TimeoutException:
+        # Timeout following redirects isn't an SSRF risk
+        pass
+    except Exception:
+        raise
+
+
 async def _fetch_with_httpx(
     url: str,
     strategy: FetchStrategy = FetchStrategy.HTTPX_BASIC,
@@ -562,8 +635,12 @@ async def _fetch_with_httpx(
                 if strategy == FetchStrategy.HTTPX_SMART:
                     await client.get(urlparse(url).scheme + "://" + urlparse(url).netloc)
                 
-                resp = await client.get(url)
+                resp = await client.get(url, follow_redirects=True)
                 resp.raise_for_status()
+
+                # SSRF: validate the final resolved URL is not private/internal
+                final_url = str(resp.url)
+                _validate_url_safe(final_url)
                 
                 # Persist cookies from response for future requests
                 set_cookie = resp.headers.get("set-cookie", "")

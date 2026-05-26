@@ -539,10 +539,16 @@ class PostgresJobRepository(JobRepository):
             return jobs_store, recycle_store, world_state_data
 
     def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job]) -> None:
+        """Save all jobs and recycle bin entries using UPSERT semantics.
+
+        Uses INSERT ... ON CONFLICT DO UPDATE instead of DELETE+INSERT to avoid
+        destroying data that was concurrently written by other processes (e.g.
+        worker single-job saves). Stale rows that exist in the DB but not in
+        the in-memory store are cleaned up at the end.
+        """
         self._ensure()
         with _conn() as conn:
-            # Clear and re-insert jobs
-            _execute(conn, "DELETE FROM jobs WHERE deleted_at IS NULL")
+            # Upsert jobs — do NOT delete first
             for job in jobs.values():
                 row = _job_to_row(job)
                 cols = ", ".join(row.keys())
@@ -554,8 +560,15 @@ class PostgresJobRepository(JobRepository):
                     list(row.values()),
                 )
 
-            # Clear and re-insert recycle bin
-            _execute(conn, "DELETE FROM recycle_bin")
+            # Remove stale jobs that are in the DB but not in the in-memory store
+            active_ids = list(jobs.keys())
+            _execute(
+                conn,
+                "DELETE FROM jobs WHERE deleted_at IS NULL AND id != ALL(%s)",
+                (active_ids,) if active_ids else (["__no_active_ids__"],),
+            )
+
+            # Upsert recycle bin — do NOT delete first
             for job in recycle_bin.values():
                 row = _job_to_row(job)
                 row["deleted_at"] = datetime.datetime.now().isoformat()
@@ -566,6 +579,14 @@ class PostgresJobRepository(JobRepository):
                     f"INSERT INTO recycle_bin ({cols}) VALUES ({ph}) ON CONFLICT (id) DO NOTHING",
                     list(row.values()),
                 )
+
+            # Remove stale recycle bin entries
+            recycle_ids = list(recycle_bin.keys())
+            _execute(
+                conn,
+                "DELETE FROM recycle_bin WHERE id != ALL(%s)",
+                (recycle_ids,) if recycle_ids else (["__no_recycle_ids__"],),
+            )
 
     def save_single(self, job: Job) -> None:
         self._ensure()

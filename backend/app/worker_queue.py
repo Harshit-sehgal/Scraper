@@ -158,63 +158,86 @@ def _get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     return conn
 
 
+_CURRENT_QUEUE_SCHEMA_VERSION = 2
+
+
 def _ensure_schema(db_path: Optional[Path] = None):
-    """Create the queue tables if they don't exist."""
+    """Create the queue tables if they don't exist and run migrations."""
     with _DB_LOCK:
         conn = _get_connection(db_path=db_path)
         try:
-            conn.executescript("""
-                CREATE TABLE IF NOT EXISTS tasks (
-                    id TEXT PRIMARY KEY,
-                    type TEXT NOT NULL,
-                    payload TEXT NOT NULL DEFAULT '{}',
-                    priority INTEGER NOT NULL DEFAULT 2,
-                    status TEXT NOT NULL DEFAULT 'pending',
-                    created_at TEXT NOT NULL,
-                    started_at TEXT,
-                    completed_at TEXT,
-                    attempts INTEGER NOT NULL DEFAULT 0,
-                    max_attempts INTEGER NOT NULL DEFAULT 3,
-                    last_error TEXT,
-                    scheduled_at TEXT NOT NULL,
-                    timeout_seconds INTEGER NOT NULL DEFAULT 300
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_tasks_status_priority
-                    ON tasks(status, priority);
-
-                CREATE INDEX IF NOT EXISTS idx_tasks_scheduled
-                    ON tasks(scheduled_at);
-
-                CREATE TABLE IF NOT EXISTS task_history (
-                    id TEXT PRIMARY KEY,
-                    type TEXT NOT NULL,
-                    payload TEXT NOT NULL DEFAULT '{}',
-                    priority INTEGER NOT NULL DEFAULT 2,
-                    status TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    started_at TEXT,
-                    completed_at TEXT,
-                    attempts INTEGER NOT NULL DEFAULT 0,
-                    max_attempts INTEGER NOT NULL DEFAULT 3,
-                    last_error TEXT,
-                    result TEXT,
-                    timeout_seconds INTEGER NOT NULL DEFAULT 300,
-                    finished_at TEXT NOT NULL
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_task_history_type
-                    ON task_history(type);
-
-                CREATE INDEX IF NOT EXISTS idx_task_history_finished
-                    ON task_history(finished_at DESC);
+            # Create schema_version table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS queue_schema_version (
+                    version INTEGER PRIMARY KEY
+                )
             """)
-            # Add result column if missing (migration for existing databases)
-            try:
-                conn.execute("ALTER TABLE task_history ADD COLUMN result TEXT")
-            except Exception:
-                pass
-            conn.commit()
+            row = conn.execute("SELECT MAX(version) FROM queue_schema_version").fetchone()
+            current = row[0] if row and row[0] is not None else 0
+
+            if current < _CURRENT_QUEUE_SCHEMA_VERSION:
+                if current < 1:
+                    conn.executescript("""
+                        CREATE TABLE IF NOT EXISTS tasks (
+                            id TEXT PRIMARY KEY,
+                            type TEXT NOT NULL,
+                            payload TEXT NOT NULL DEFAULT '{}',
+                            priority INTEGER NOT NULL DEFAULT 2,
+                            status TEXT NOT NULL DEFAULT 'pending',
+                            created_at TEXT NOT NULL,
+                            started_at TEXT,
+                            completed_at TEXT,
+                            attempts INTEGER NOT NULL DEFAULT 0,
+                            max_attempts INTEGER NOT NULL DEFAULT 3,
+                            last_error TEXT,
+                            scheduled_at TEXT NOT NULL,
+                            timeout_seconds INTEGER NOT NULL DEFAULT 300
+                        );
+
+                        CREATE INDEX IF NOT EXISTS idx_tasks_status_priority
+                            ON tasks(status, priority);
+
+                        CREATE INDEX IF NOT EXISTS idx_tasks_scheduled
+                            ON tasks(scheduled_at);
+
+                        CREATE TABLE IF NOT EXISTS task_history (
+                            id TEXT PRIMARY KEY,
+                            type TEXT NOT NULL,
+                            payload TEXT NOT NULL DEFAULT '{}',
+                            priority INTEGER NOT NULL DEFAULT 2,
+                            status TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            started_at TEXT,
+                            completed_at TEXT,
+                            attempts INTEGER NOT NULL DEFAULT 0,
+                            max_attempts INTEGER NOT NULL DEFAULT 3,
+                            last_error TEXT,
+                            timeout_seconds INTEGER NOT NULL DEFAULT 300,
+                            finished_at TEXT NOT NULL
+                        );
+
+                        CREATE INDEX IF NOT EXISTS idx_task_history_type
+                            ON task_history(type);
+
+                        CREATE INDEX IF NOT EXISTS idx_task_history_finished
+                            ON task_history(finished_at DESC);
+                    """)
+                    current = 1
+
+                if current < 2:
+                    # Add result column to task_history (used for storing successful task results)
+                    try:
+                        conn.execute("ALTER TABLE task_history ADD COLUMN result TEXT")
+                    except Exception:
+                        pass
+                    current = 2
+
+                conn.execute("DELETE FROM queue_schema_version")
+                conn.execute("INSERT INTO queue_schema_version (version) VALUES (?)", (current,))
+                conn.commit()
+                logger.info("Worker queue schema migrated to version %d", current)
+            else:
+                logger.debug("Worker queue schema already at version %d", _CURRENT_QUEUE_SCHEMA_VERSION)
         finally:
             conn.close()
 
