@@ -228,6 +228,17 @@ def check_db_password(value: str) -> bool:
     return True
 
 
+def check_env(value: str) -> bool:
+    """Validate DATAFORGE_ENV is set to 'production'."""
+    if value.lower() != "production":
+        print(
+            f"  [FAIL]  DATAFORGE_ENV={value!r}. "
+            "Must be set to 'production'."
+        )
+        return False
+    return True
+
+
 def main() -> int:
     args = parse_args()
     env_path = Path(args.env_file).expanduser().resolve()
@@ -253,7 +264,7 @@ def main() -> int:
          "Must be a postgresql:// URL matching docker-compose.prod.yml"),
         ("DATAFORGE_WORKER_QUEUE", True, check_worker_queue,
          "Must be 'true' for production"),
-        ("DATAFORGE_ENV", True, None,
+        ("DATAFORGE_ENV", True, check_env,
          "Must be set to 'production'"),
     ]
 

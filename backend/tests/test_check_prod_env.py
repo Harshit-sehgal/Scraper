@@ -222,6 +222,21 @@ class TestCheckProdEnvValidators:
         mod = self._import_module()
         assert mod.check_db_password("secure-password-123!@#")
 
+    def test_check_env_accepts_production(self):
+        """'production' should pass."""
+        mod = self._import_module()
+        assert mod.check_env("production")
+        assert mod.check_env("PRODUCTION")
+        assert mod.check_env("Production")
+
+    def test_check_env_rejects_non_production(self):
+        """Anything other than 'production' should fail."""
+        mod = self._import_module()
+        assert not mod.check_env("development")
+        assert not mod.check_env("test")
+        assert not mod.check_env("staging")
+        assert not mod.check_env("")
+
 
 class TestCheckProdEnvIntegration:
     """Integration tests exercising the full main() flow."""
@@ -266,6 +281,22 @@ class TestCheckProdEnvIntegration:
                 all_pass = False
 
         assert all_pass, "All production env checks should pass with valid values"
+
+    def test_rejects_development_env(self, env_file):
+        """Env with DATAFORGE_ENV=development should fail."""
+        mod = self._import_module()
+        _write_env(env_file, {
+            "DATAFORGE_API_KEY": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+            "DATAFORGE_CORS_ORIGINS": '["https://myapp.example.com"]',
+            "DATAFORGE_DB_PASSWORD": "secure-password-123",
+            "DATAFORGE_STORAGE_BACKEND": "postgres",
+            "DATAFORGE_DATABASE_URL": "postgresql://user:pass@localhost/db",
+            "DATAFORGE_WORKER_QUEUE": "true",
+            "DATAFORGE_ENV": "development",
+        })
+
+        env = mod.load_env_file(env_file)
+        assert not mod.check_var(env, "DATAFORGE_ENV", required=True, validator=mod.check_env)
 
     def test_rejects_wildcard_cors(self, env_file):
         """Env with wildcard CORS should fail CORS check."""
@@ -338,6 +369,6 @@ class TestCheckProdEnvIntegration:
             mod.check_var(env, "DATAFORGE_STORAGE_BACKEND", required=True, validator=mod.check_storage_backend),
             mod.check_var(env, "DATAFORGE_DATABASE_URL", required=True, validator=mod.check_database_url),
             mod.check_var(env, "DATAFORGE_WORKER_QUEUE", required=True, validator=mod.check_worker_queue),
-            mod.check_var(env, "DATAFORGE_ENV", required=True),
+            mod.check_var(env, "DATAFORGE_ENV", required=True, validator=mod.check_env),
         ]
         assert all(checks), f"All checks should pass: {checks}"

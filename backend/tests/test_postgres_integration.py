@@ -39,10 +39,15 @@ def postgres_container():
 
 @pytest.fixture()
 def clean_db(postgres_container):
-    """Clean the Postgres database between tests."""
-    from app.postgres_repository import _conn, _execute
+    """Clean the Postgres database between tests.
+
+    Calls _ensure_schema() first so all tables exist before DELETE statements
+    run — this prevents failures on fresh databases where tables don't exist yet.
+    """
+    from app.postgres_repository import _conn, _execute, _ensure_schema
 
     reset_repository()
+    _ensure_schema()
     with _conn() as conn:
         _execute(conn, "DELETE FROM jobs")
         _execute(conn, "DELETE FROM recycle_bin")
@@ -305,8 +310,16 @@ class TestPostgresSchemaRepairIntegration:
     """Verifies schema repair logic against a real Postgres database."""
 
     def _setup_v1_schema_no_recycle_bin(self, conn):
-        """Create a minimal v1 schema (schema_version=1, jobs table, NO recycle_bin)."""
+        """Create a minimal v1 schema (schema_version=1, jobs table, NO recycle_bin).
+
+        Drops any existing tables first so this test is order-independent.
+        """
         with conn.cursor() as cur:
+            # Drop existing tables for clean, order-independent state
+            cur.execute("DROP TABLE IF EXISTS recycle_bin CASCADE")
+            cur.execute("DROP TABLE IF EXISTS jobs CASCADE")
+            cur.execute("DROP TABLE IF EXISTS schema_version CASCADE")
+            # Create minimal v1 schema
             cur.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)")
             cur.execute("DELETE FROM schema_version")
             cur.execute("INSERT INTO schema_version (version) VALUES (1)")
