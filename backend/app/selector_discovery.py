@@ -1484,6 +1484,20 @@ async def _try_form_search_recovery(
     # Build absolute form action URL
     absolute_action = _build_absolute_url(landing_page_url, form_action)
 
+    # SSRF: Validate absolute form action URL before submission
+    from app.url_safety import validate_public_http_url
+    try:
+        validate_public_http_url(absolute_action)
+    except ValueError as e:
+        return {
+            "success": False,
+            "fresh_url": landing_page_url,
+            "fresh_html": "",
+            "form_detected": True,
+            "form_info": form_info,
+            "error": f"Search form action URL '{absolute_action}' failed security check: {e}",
+        }
+
     logger.info(
         "[SearchRecovery] POSTing to %s with params: %s",
         absolute_action, mapped_params,
@@ -1492,7 +1506,7 @@ async def _try_form_search_recovery(
     # Step 3: Submit the form
     try:
         async with httpx.AsyncClient(
-            follow_redirects=True,
+            follow_redirects=False,
             timeout=httpx.Timeout(30.0),
         ) as client:
             if form_method == "GET":
@@ -1500,7 +1514,29 @@ async def _try_form_search_recovery(
             else:
                 resp = await client.post(absolute_action, data=mapped_params)
 
+            max_redirects = 10
+            redirects_followed = 0
+            while resp.is_redirect:
+                redirects_followed += 1
+                if redirects_followed > max_redirects:
+                    raise ValueError(f"Too many redirects (max {max_redirects})")
+                
+                redirect_target = resp.headers.get("location", "")
+                if not redirect_target:
+                    break
+                
+                from urllib.parse import urljoin
+                redirect_url = urljoin(str(resp.url), redirect_target)
+                
+                # SSRF: Validate each redirect hop target URL
+                validate_public_http_url(redirect_url)
+                
+                resp = await client.get(redirect_url)
+
             fresh_url = str(resp.url)
+            # SSRF: Validate final resolved URL
+            validate_public_http_url(fresh_url)
+
             fresh_html = resp.text
 
             if resp.status_code >= 400:

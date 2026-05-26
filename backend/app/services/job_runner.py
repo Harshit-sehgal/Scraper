@@ -107,8 +107,20 @@ async def run_job(
                 max_per_domain=job.max_per_domain,
             )
             job.total_llm_calls += get_llm_call_count()
-            job.discovered_urls = discovered
-            job.urls = [d["url"] for d in discovered if "url" in d]
+            from app.url_safety import validate_public_http_url
+            safe_discovered = []
+            safe_urls = []
+            for d in discovered:
+                url = d.get("url")
+                if url:
+                    try:
+                        validate_public_http_url(url)
+                        safe_discovered.append(d)
+                        safe_urls.append(url)
+                    except ValueError:
+                        pass
+            job.discovered_urls = safe_discovered
+            job.urls = safe_urls
 
             if not job.urls:
                 if job.cancel_requested:

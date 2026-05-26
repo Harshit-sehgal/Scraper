@@ -54,7 +54,17 @@ def create_jobs_router(
             source_policy=req.source_policy,
             max_per_domain=req.max_per_domain,
         )
-        return {"urls": results}
+        from app.url_safety import validate_public_http_url
+        safe_results = []
+        for r in results:
+            url = r.get("url")
+            if url:
+                try:
+                    validate_public_http_url(url)
+                    safe_results.append(r)
+                except ValueError:
+                    pass
+        return {"urls": safe_results}
 
     @router.post("/api/schema/suggest")
     async def suggest_schema(req: SchemaSuggestionRequest):

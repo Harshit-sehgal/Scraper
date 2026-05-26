@@ -1,3 +1,4 @@
+import pytest
 from pathlib import Path
 from app import main as main_mod
 from app.models import Job, JobStatus, ScrapeMode
@@ -125,3 +126,58 @@ def test_create_job_enqueue_failure_cleanup(client, monkeypatch):
     
     # Verify job is NOT in memory store
     assert len(main_mod.jobs_store) == 0
+
+def test_auto_discovery_url_filtering(client, monkeypatch):
+    """Verify that auto-discovered URLs are filtered against SSRF protections in both API and Job runner contexts."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "ENV", "production")
+
+    # Mock discover_urls to return a mix of safe and unsafe URLs
+    async def mock_discover(*args, **kwargs):
+        return [
+            {"url": "https://example.com/safe-item"},
+            {"url": "http://127.0.0.1/unsafe-loopback"},
+            {"url": "http://nginx/unsafe-internal"},
+            {"url": "https://google.com/safe-google"}
+        ]
+    
+    monkeypatch.setattr("app.routers.jobs.discover_urls", mock_discover)
+    
+    # Verify discover API endpoint filters out loopback & internal targets
+    payload = {
+        "topic": "test",
+        "domain": "example.com",
+        "num_results": 5,
+        "schema_field_names": ["title"]
+    }
+    resp = client.post("/api/discover", json=payload)
+    assert resp.status_code == 200
+    urls = resp.json()["urls"]
+    assert len(urls) == 2
+    assert urls[0]["url"] == "https://example.com/safe-item"
+    assert urls[1]["url"] == "https://google.com/safe-google"
+
+@pytest.mark.asyncio
+async def test_search_form_recovery_ssrf_blocking(monkeypatch):
+    """Verify that search form recovery action and redirect target URLs are checked against SSRF."""
+    from app.selector_discovery import _try_form_search_recovery
+    
+    # Verify form action is validated
+    landing_page_html = """
+    <html>
+        <body>
+            <form action="http://127.0.0.1/admin/delete" method="POST">
+                <input name="q" type="text">
+            </form>
+        </body>
+    </html>
+    """
+    
+    res = await _try_form_search_recovery(
+        landing_page_html=landing_page_html,
+        landing_page_url="https://example.com",
+        search_params={"q": "test-search"}
+    )
+    
+    assert res["success"] is False
+    assert "failed security check" in res["error"]
