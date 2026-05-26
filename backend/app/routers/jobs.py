@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+import threading
 from typing import Callable
 
 from fastapi import APIRouter, HTTPException, Query
@@ -40,6 +41,39 @@ def create_jobs_router(
 ):
     router = APIRouter()
 
+    # ── Thread-safe store access ───────────────────────────────────────
+    # Protect concurrent access to jobs_store and recycle_bin_store.
+    # These are Python dicts shared across async requests; a threading lock
+    # is sufficient because critical sections are microsecond-level lookups.
+    _store_lock = threading.Lock()
+
+    def _get_job(job_id: str) -> Job:
+        """Thread-safe lookup returning the job or raising 404."""
+        with _store_lock:
+            if job_id not in jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            return jobs_store[job_id]
+
+    def _pop_job(job_id: str) -> Job:
+        """Thread-safe pop from jobs_store, raising 404 if missing."""
+        with _store_lock:
+            if job_id not in jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            return jobs_store.pop(job_id)
+
+    def _move_to_recycle_bin(job: Job) -> None:
+        """Thread-safe move from jobs_store to recycle_bin_store."""
+        with _store_lock:
+            recycle_bin_store[job.id] = job
+            jobs_store.pop(job.id, None)
+
+    def _pop_from_recycle_bin(job_id: str) -> Job:
+        """Thread-safe pop from recycle_bin_store, raising 404 if missing."""
+        with _store_lock:
+            if job_id not in recycle_bin_store:
+                raise HTTPException(status_code=404, detail="Job not in recycle bin")
+            return recycle_bin_store.pop(job_id)
+
     @router.post("/api/discover")
     async def discover(req: DiscoveryRequest):
         """Auto-discover best URLs to scrape for a topic."""
@@ -74,14 +108,13 @@ def create_jobs_router(
 
     @router.get("/api/jobs")
     async def list_jobs():
-        ordered = sorted(jobs_store.values(), key=lambda j: j.created_at, reverse=True)
-        return {"jobs": [job.model_dump() for job in ordered]}
+        with _store_lock:
+            ordered = sorted(jobs_store.values(), key=lambda j: j.created_at, reverse=True)
+            return {"jobs": [job.model_dump() for job in ordered]}
 
     @router.get("/api/jobs/{job_id}")
     async def get_job(job_id: str, include_results: bool = Query(False)):
-        if job_id not in jobs_store:
-            raise HTTPException(status_code=404, detail="Job not found")
-        job = jobs_store[job_id]
+        job = _get_job(job_id)
 
         results_list = []
         if include_results:
@@ -97,9 +130,7 @@ def create_jobs_router(
     @router.get("/api/jobs/{job_id}/results")
     async def get_job_results(job_id: str, limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)):
         """Return a paginated slice of job results."""
-        if job_id not in jobs_store:
-            raise HTTPException(status_code=404, detail="Job not found")
-        job = jobs_store[job_id]
+        job = _get_job(job_id)
 
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
@@ -126,9 +157,7 @@ def create_jobs_router(
     @router.post("/api/jobs/{job_id}/backfill-metadata")
     async def backfill_job_metadata(job_id: str):
         """Explicitly backfill source metadata for manual-mode job results."""
-        if job_id not in jobs_store:
-            raise HTTPException(status_code=404, detail="Job not found")
-        job = jobs_store[job_id]
+        job = _get_job(job_id)
 
         results_list = list(job.results)
         if job.results_on_disk:
