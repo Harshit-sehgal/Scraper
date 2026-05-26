@@ -126,6 +126,135 @@ class SQLiteJobRepository(JobRepository):
                 return None
         return None
 
+    def move_to_recycle_bin(self, job_id: str) -> bool:
+        """Move a job to the recycle bin atomically in SQLite."""
+        from app.job_store import _get_connection, _DB_LOCK
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                # Find the row in jobs
+                cursor = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
+                row = cursor.fetchone()
+                if not row:
+                    return False
+                # Convert to dict
+                col_names = [description[0] for description in cursor.description]
+                row_dict = dict(zip(col_names, row))
+                # Delete from jobs
+                conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+                # Set deleted_at timestamp
+                import datetime
+                row_dict["deleted_at"] = datetime.datetime.now().isoformat()
+                # Insert into recycle_bin
+                columns = ", ".join(row_dict.keys())
+                placeholders = ", ".join("?" for _ in row_dict)
+                conn.execute(
+                    f"INSERT OR REPLACE INTO recycle_bin ({columns}) VALUES ({placeholders})",
+                    list(row_dict.values()),
+                )
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
+    def restore_from_recycle_bin(self, job_id: str) -> bool:
+        """Restore a job from the recycle bin back to active jobs atomically in SQLite."""
+        from app.job_store import _get_connection, _DB_LOCK
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                # Find row in recycle_bin
+                cursor = conn.execute("SELECT * FROM recycle_bin WHERE id = ?", (job_id,))
+                row = cursor.fetchone()
+                if not row:
+                    return False
+                col_names = [description[0] for description in cursor.description]
+                row_dict = dict(zip(col_names, row))
+                # Delete from recycle_bin
+                conn.execute("DELETE FROM recycle_bin WHERE id = ?", (job_id,))
+                
+                # Exclude deleted_at as it is not present in jobs table
+                if "deleted_at" in row_dict:
+                    del row_dict["deleted_at"]
+                
+                # Insert into jobs
+                columns = ", ".join(row_dict.keys())
+                placeholders = ", ".join("?" for _ in row_dict)
+                conn.execute(
+                    f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",
+                    list(row_dict.values()),
+                )
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
+    def hard_delete(self, job_id: str) -> bool:
+        """Permanently delete a job atomically in SQLite."""
+        from app.job_store import _get_connection, _DB_LOCK
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+                cursor = conn.execute("DELETE FROM recycle_bin WHERE id = ?", (job_id,))
+                deleted = cursor.rowcount
+                conn.commit()
+                return deleted > 0
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
+    def clear_terminal_jobs(self, older_than: Optional[str] = None) -> int:
+        """Remove terminal-status jobs atomically in SQLite and move them to recycle_bin."""
+        from app.job_store import _get_connection, _DB_LOCK
+        terminal_statuses = ("completed", "failed", "canceled", "degraded", "empty_result")
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                query = "SELECT * FROM jobs WHERE status IN (?, ?, ?, ?, ?)"
+                params = list(terminal_statuses)
+                if older_than:
+                    query += " AND completed_at < ?"
+                    params.append(older_than)
+                
+                cursor = conn.execute(query, params)
+                rows = cursor.fetchall()
+                if not rows:
+                    return 0
+                
+                col_names = [description[0] for description in cursor.description]
+                import datetime
+                now = datetime.datetime.now().isoformat()
+                for r in rows:
+                    row_dict = dict(zip(col_names, r))
+                    jid = row_dict["id"]
+                    # Delete from jobs
+                    conn.execute("DELETE FROM jobs WHERE id = ?", (jid,))
+                    # Set deleted_at timestamp
+                    row_dict["deleted_at"] = now
+                    # Insert into recycle_bin
+                    columns = ", ".join(row_dict.keys())
+                    placeholders = ", ".join("?" for _ in row_dict)
+                    conn.execute(
+                        f"INSERT OR REPLACE INTO recycle_bin ({columns}) VALUES ({placeholders})",
+                        list(row_dict.values()),
+                    )
+                conn.commit()
+                return len(rows)
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
 
 # ───────────────────────────────────────────────────────────────────────
 # Repository resolver factory

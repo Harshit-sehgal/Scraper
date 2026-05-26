@@ -24,6 +24,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    ALLOWED_INTERNAL_HOSTS: str = ""
+    """Comma-separated list of allowed internal hostnames (for testing/smoke)."""
+
     # ─── Browser / Playwright ──────────────────────────────────────────────
     PLAYWRIGHT_TIMEOUT: int = 45000
     """Max ms to wait for page navigation / networkidle."""

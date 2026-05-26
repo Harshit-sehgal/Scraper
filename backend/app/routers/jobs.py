@@ -68,15 +68,17 @@ def create_jobs_router(
         return {"jobs": [job.model_dump() for job in ordered]}
 
     @router.get("/api/jobs/{job_id}")
-    async def get_job(job_id: str):
+    async def get_job(job_id: str, include_results: bool = Query(False)):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
         job = jobs_store[job_id]
 
-        results_list = list(job.results)
-        if job.results_on_disk:
-            from app.utils.job_results_store import load_job_results_from_disk
-            results_list = load_job_results_from_disk(job.id, job.results_file_path)
+        results_list = []
+        if include_results:
+            results_list = list(job.results)
+            if job.results_on_disk:
+                from app.utils.job_results_store import load_job_results_from_disk
+                results_list = load_job_results_from_disk(job.id, job.results_file_path)
 
         dumped = job.model_dump()
         dumped["results"] = results_list
@@ -104,6 +106,41 @@ def create_jobs_router(
             "offset": offset,
             "returned": len(page),
         }
+
+    @router.post("/api/jobs/{job_id}/backfill-metadata")
+    async def backfill_job_metadata(job_id: str):
+        """Explicitly backfill source metadata for manual-mode job results."""
+        if job_id not in jobs_store:
+            raise HTTPException(status_code=404, detail="Job not found")
+        job = jobs_store[job_id]
+
+        results_list = list(job.results)
+        if job.results_on_disk:
+            from app.utils.job_results_store import load_job_results_from_disk
+            results_list = load_job_results_from_disk(job.id, job.results_file_path)
+
+        from app.discovery import infer_source_metadata
+        from app.utils.quality import safe_score
+        
+        updated = False
+        for row in results_list:
+            source_url = str(row.get("source_url") or "")
+            source_type = str(row.get("source_type") or "unknown").strip().lower()
+            if source_type == "unknown" and source_url:
+                inferred = infer_source_metadata(url=source_url)
+                row["source_type"] = str(inferred.get("source_type") or "unknown")
+                row["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
+                updated = True
+
+        if updated:
+            job.results = results_list
+            if job.results_on_disk:
+                from app.utils.job_results_store import save_job_results_to_disk
+                save_job_results_to_disk(job.id, results_list)
+            _save_job(job)
+            persist_state_fn()
+
+        return {"message": "Metadata backfilled successfully", "updated": updated}
 
     @router.post("/api/jobs")
     async def create_job(job_data: JobCreate):
@@ -392,14 +429,8 @@ def create_jobs_router(
                 detail="Cannot delete/recycle an active job. Cancel the job first."
             )
         repo = get_job_repository()
-        try:
-            repo.move_to_recycle_bin(job_id)
-            sync_mem = True
-        except NotImplementedError:
-            sync_mem = False
+        repo.move_to_recycle_bin(job_id)
         recycle_bin_store[job_id] = jobs_store.pop(job_id)
-        if not sync_mem:
-            persist_state_fn()
         return {"message": "Job moved to recycle bin"}
 
     @router.delete("/api/jobs/cleanup/terminal")
@@ -424,25 +455,18 @@ def create_jobs_router(
 
         removed = 0
         from app.utils.job_results_store import delete_job_results_from_disk
-        # Try to use atomic repository operations for Postgres;
-        # fall back to in-memory + full-state save for SQLite.
-        from app.postgres_repository import PostgresJobRepository
         repo = get_job_repository()
-        use_atomic = isinstance(repo, PostgresJobRepository)
 
         for jid, _ in terminal:
             if jid in keep_ids:
                 continue
             job = jobs_store.get(jid)
             file_path = job.results_file_path if job else None
-            if use_atomic:
-                repo.move_to_recycle_bin(jid)
-            del jobs_store[jid]
+            repo.move_to_recycle_bin(jid)
+            if jid in jobs_store:
+                recycle_bin_store[jid] = jobs_store.pop(jid)
             delete_job_results_from_disk(jid, file_path)
             removed += 1
-
-        if removed and not use_atomic:
-            persist_state_fn()
 
         return {
             "message": f"Cleared {removed} terminal jobs",
@@ -461,14 +485,8 @@ def create_jobs_router(
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
         repo = get_job_repository()
-        try:
-            repo.restore_from_recycle_bin(job_id)
-            sync_mem = True
-        except NotImplementedError:
-            sync_mem = False
+        repo.restore_from_recycle_bin(job_id)
         jobs_store[job_id] = recycle_bin_store.pop(job_id)
-        if not sync_mem:
-            persist_state_fn()
         return {"message": "Job restored"}
 
     @router.delete("/api/recycle_bin/{job_id}")
@@ -480,14 +498,8 @@ def create_jobs_router(
         file_path = job.results_file_path if job else None
         delete_job_results_from_disk(job_id, file_path)
         repo = get_job_repository()
-        try:
-            repo.hard_delete(job_id)
-            sync_mem = True
-        except NotImplementedError:
-            sync_mem = False
+        repo.hard_delete(job_id)
         del recycle_bin_store[job_id]
-        if not sync_mem:
-            persist_state_fn()
         return {"message": "Job permanently deleted"}
 
     @router.delete("/api/recycle_bin")
@@ -499,16 +511,9 @@ def create_jobs_router(
             file_path = job.results_file_path if job else None
             delete_job_results_from_disk(jid, file_path)
         repo = get_job_repository()
-        try:
-            for jid in list(recycle_bin_store.keys()):
-                repo.hard_delete(jid)
-            sync_mem = True
-        except NotImplementedError:
-            sync_mem = False
+        for jid in list(recycle_bin_store.keys()):
+            repo.hard_delete(jid)
         recycle_bin_store.clear()
-        if count:
-            if not sync_mem:
-                persist_state_fn()
         return {"message": f"Recycle bin cleared ({count} items)", "cleared": count}
 
     return router

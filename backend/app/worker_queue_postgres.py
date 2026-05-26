@@ -30,12 +30,22 @@ _CURRENT_QUEUE_SCHEMA_VERSION = 2
 def _ensure_schema():
     """Create queue tables and run schema migrations."""
     with _conn() as conn:
+        # Check if the existing table has the new structure or needs a recreate
+        try:
+            _fetch_one(conn, "SELECT id FROM queue_schema_version LIMIT 1")
+        except Exception:
+            try:
+                _execute(conn, "DROP TABLE IF EXISTS queue_schema_version CASCADE")
+            except Exception:
+                pass
+
         _execute(conn, """
             CREATE TABLE IF NOT EXISTS queue_schema_version (
-                version INTEGER PRIMARY KEY
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL
             )
         """)
-        row = _fetch_one(conn, "SELECT MAX(version) AS version FROM queue_schema_version")
+        row = _fetch_one(conn, "SELECT version FROM queue_schema_version WHERE id = 1")
         current = row["version"] if row and row.get("version") is not None else 0
 
         if current < _CURRENT_QUEUE_SCHEMA_VERSION:
@@ -105,8 +115,11 @@ def _ensure_schema():
                     pass
                 current = 2
 
-            _execute(conn, "DELETE FROM queue_schema_version")
-            _execute(conn, "INSERT INTO queue_schema_version (version) VALUES (%s)", (current,))
+            _execute(
+                conn,
+                "INSERT INTO queue_schema_version (id, version) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version",
+                (current,),
+            )
             logger.info("Postgres queue schema migrated to version %d", current)
         else:
             logger.debug("Postgres queue schema already at version %d", _CURRENT_QUEUE_SCHEMA_VERSION)

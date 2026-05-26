@@ -302,13 +302,12 @@ def main() -> int:
          "Must be 'postgres' for production — set DATAFORGE_QUEUE_BACKEND=postgres"),
         ("DATAFORGE_ENV", True, check_env,
          "Must be set to 'production'"),
+        ("GRAFANA_PASSWORD", True, check_grafana_password,
+         "Set a strong Grafana admin password (reject: admin, password, grafana, change-me)"),
     ]
 
     # ── Optional but recommended ─────────────────────────────────────────
-    recommended = [
-        ("GRAFANA_PASSWORD", False, check_grafana_password,
-         "Set a strong Grafana admin password (reject: admin, password, grafana, change-me)"),
-    ]
+    recommended = []
 
     for name, required, validator, hint in recommended:
         passed = check_var(env, name, required=required, validator=validator, hint=hint)

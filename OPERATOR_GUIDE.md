@@ -351,7 +351,7 @@ print('Active:', d['active_mode'])
 - [ ] **Storage status healthy:** `GET /api/system/storage/status` shows backend=postgres
 - [ ] **Metrics endpoint returns data:** `GET /metrics` shows job/queue/backend gauges
 - [ ] **Worker processing tasks:** `GET /metrics` shows queue_running > 0 when jobs are active
-- [ ] **API docs protected:** `/docs` returns 403 without API key in production
+- [ ] **API docs protected:** `/docs`, `/redoc`, and `/openapi.json` are completely disabled (returning 404) in production
 - [ ] **Prometheus scraping:** Targets are up in Prometheus UI
 - [ ] **Grafana dashboards:** Data sources connected and panels populate
 
@@ -611,7 +611,7 @@ DataForge includes a pre-provisioned Grafana dashboard at `grafana/dashboards/da
    docker compose -f docker-compose.prod.yml up -d prometheus grafana
    ```
 
-2. Access Grafana at `http://localhost:3000` (default: `admin`/`admin`)
+2. Access Grafana at `http://localhost:3000` (authenticated using the required `GRAFANA_PASSWORD` set in `.env`)
 
 3. The `DataForge Overview` dashboard is auto-provisioned and shows:
    - System status

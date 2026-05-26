@@ -261,6 +261,7 @@ class TestCheckProdEnvIntegration:
             "DATAFORGE_DATABASE_URL": "postgresql://dataforge:secure-password-123@postgres:5432/dataforge",
             "DATAFORGE_WORKER_QUEUE": "true",
             "DATAFORGE_ENV": "production",
+            "GRAFANA_PASSWORD": "strong-grafana-password-123",
         })
 
         env = mod.load_env_file(env_file)
@@ -273,6 +274,7 @@ class TestCheckProdEnvIntegration:
             ("DATAFORGE_DATABASE_URL", True, mod.check_database_url),
             ("DATAFORGE_WORKER_QUEUE", True, mod.check_worker_queue),
             ("DATAFORGE_ENV", True, None),
+            ("GRAFANA_PASSWORD", True, mod.check_grafana_password),
         ]
         for name, required, validator in checks_list:
             passed = mod.check_var(env, name, required=required, validator=validator)
@@ -358,6 +360,7 @@ class TestCheckProdEnvIntegration:
             "DATAFORGE_DATABASE_URL": "postgresql://dataforge:strong-password-xyz@postgres:5432/dataforge",
             "DATAFORGE_WORKER_QUEUE": "true",
             "DATAFORGE_ENV": "production",
+            "GRAFANA_PASSWORD": "strong-grafana-password-xyz",
         })
 
         env = mod.load_env_file(env_file)
@@ -369,5 +372,23 @@ class TestCheckProdEnvIntegration:
             mod.check_var(env, "DATAFORGE_DATABASE_URL", required=True, validator=mod.check_database_url),
             mod.check_var(env, "DATAFORGE_WORKER_QUEUE", required=True, validator=mod.check_worker_queue),
             mod.check_var(env, "DATAFORGE_ENV", required=True, validator=mod.check_env),
+            mod.check_var(env, "GRAFANA_PASSWORD", required=True, validator=mod.check_grafana_password),
         ]
         assert all(checks), f"All checks should pass: {checks}"
+
+    def test_rejects_missing_grafana_password(self, env_file):
+        """Missing GRAFANA_PASSWORD should fail validation."""
+        mod = self._import_module()
+        _write_env(env_file, {
+            "DATAFORGE_API_KEY": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+            "DATAFORGE_CORS_ORIGINS": '["https://app.example.com"]',
+            "DATAFORGE_DB_PASSWORD": "strong-password-xyz",
+            "DATAFORGE_STORAGE_BACKEND": "postgres",
+            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:strong-password-xyz@postgres:5432/dataforge",
+            "DATAFORGE_WORKER_QUEUE": "true",
+            "DATAFORGE_ENV": "production",
+            # GRAFANA_PASSWORD is deliberately missing
+        })
+
+        env = mod.load_env_file(env_file)
+        assert not mod.check_var(env, "GRAFANA_PASSWORD", required=True, validator=mod.check_grafana_password)

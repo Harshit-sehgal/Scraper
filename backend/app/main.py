@@ -929,7 +929,25 @@ async def analyze_url(req: URLPreviewRequest):
         suggested_fields: List of detected fields with name, type, selector, example, confidence
     """
     from app.selector_discovery import analyze_url_for_fields
+    from app.url_safety import validate_public_http_url
     
+    try:
+        validate_public_http_url(req.url)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "url": req.url,
+                "error": f"URL failed security validation: {e}",
+                "page_structure": "unknown",
+                "structure_confidence": 0.0,
+                "estimated_record_count": 0,
+                "item_container": None,
+                "suggested_fields": [],
+                "anti_bot_score": 0.0,
+            }
+        )
+
     URL_ANALYZER_TIMEOUT = settings.URL_ANALYZER_TIMEOUT
     
     try:
@@ -963,6 +981,7 @@ async def analyze_url(req: URLPreviewRequest):
 
 # ─── Prometheus /metrics endpoint ───────────────────────────────────────
 
+METRICS_COLLECTION_ERRORS = 0
 
 @app.get("/metrics")
 async def metrics():
@@ -970,6 +989,7 @@ async def metrics():
 
     Exposes job counts, queue depth, and runtime stats in Prometheus text format.
     """
+    global METRICS_COLLECTION_ERRORS
     from prometheus_client import generate_latest, Gauge
     from prometheus_client.core import CollectorRegistry
     from fastapi.responses import Response
@@ -1000,16 +1020,23 @@ async def metrics():
         except (TypeError, ValueError):
             pass
 
-    # Repository backend type
+    # Repository backend type and collection health
+    backend_ok = 1
     try:
         repo = get_job_repository()
         backend = getattr(repo, "backend", "sqlite")
         backend_gauge = Gauge("dataforge_backend", "Storage backend type", ["backend"], registry=registry)
         backend_gauge.labels(backend=backend).set(1)
-    except Exception:
-        pass
+    except Exception as e:
+        backend_ok = 0
+        METRICS_COLLECTION_ERRORS += 1
+        logging.getLogger(__name__).error("Metrics: backend collection failed: %s", e)
 
-    # Worker queue stats
+    backend_ok_gauge = Gauge("dataforge_backend_collection_ok", "Whether storage backend metrics collected successfully", registry=registry)
+    backend_ok_gauge.set(backend_ok)
+
+    # Worker queue stats and collection health
+    queue_ok = 1
     try:
         from app.worker_queue import get_worker_queue
         q = get_worker_queue()
@@ -1020,8 +1047,17 @@ async def metrics():
         queue_running.set(q_status.get("running", 0))
         queue_dead_letter = Gauge("dataforge_queue_dead_letter", "Dead letter queue size", registry=registry)
         queue_dead_letter.set(q_status.get("dead_letter", 0))
-    except Exception:
-        pass
+    except Exception as e:
+        queue_ok = 0
+        METRICS_COLLECTION_ERRORS += 1
+        logging.getLogger(__name__).error("Metrics: queue collection failed: %s", e)
+
+    queue_ok_gauge = Gauge("dataforge_queue_collection_ok", "Whether worker queue metrics collected successfully", registry=registry)
+    queue_ok_gauge.set(queue_ok)
+
+    # Cumulative collection errors
+    error_total_gauge = Gauge("dataforge_metrics_collection_error_total", "Total collection errors encountered", registry=registry)
+    error_total_gauge.set(METRICS_COLLECTION_ERRORS)
 
     return Response(content=generate_latest(registry), media_type="text/plain")
 

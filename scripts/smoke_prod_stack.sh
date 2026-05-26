@@ -221,7 +221,7 @@ if [ -n "$JOB_ID" ]; then
     # Poll for up to 90 seconds for the job to reach a terminal status
     echo -e "  $INFO  Waiting for worker to process the job (polling up to 90s)..."
     TERMINAL_STATUSES="^(completed|degraded|empty_result|failed|canceled)$"
-    SUCCESS_STATUSES="^(completed|degraded|empty_result)$"
+    SUCCESS_STATUSES="^(completed|degraded)$"
     JOB_REACHED_TERMINAL=false
     JOB_SCRAPE_SUCCEEDED=false
     POLL_DEADLINE=$((SECONDS + 90))
@@ -246,10 +246,20 @@ if [ -n "$JOB_ID" ]; then
         echo -e "  $FAIL  Job did not reach terminal status within 90 seconds (last status: ${STATUS_VALUE:-unknown})"
         ALL_PASS=false
     elif [ "$JOB_SCRAPE_SUCCEEDED" = false ]; then
-        echo -e "  $FAIL  Worker processed the job but scraping did not succeed (status: ${STATUS_VALUE:-unknown}) — expected completed/degraded/empty_result"
+        echo -e "  $FAIL  Worker processed the job but scraping did not succeed with positive results (status: ${STATUS_VALUE:-unknown}) — expected completed or degraded"
         ALL_PASS=false
     else
-        echo -e "  $PASS  Scrape succeeded: job reached successful terminal status"
+        # Assert expected record count from local smoke HTML page
+        RESULTS_RESPONSE=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" \
+            "http://localhost/api/jobs/$JOB_ID/results" 2>/dev/null || echo '{"results":[]}')
+        RECORD_COUNT=$(echo "$RESULTS_RESPONSE" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('results', [])))" 2>/dev/null || echo "0")
+        
+        if [ "$RECORD_COUNT" -ge 2 ]; then
+            echo -e "  $PASS  Extraction works end-to-end! Extracted $RECORD_COUNT records (expected >= 2)"
+        else
+            echo -e "  $FAIL  Extraction returned zero or too few records ($RECORD_COUNT expected >= 2). Response: $RESULTS_RESPONSE"
+            ALL_PASS=false
+        fi
     fi
 fi
 

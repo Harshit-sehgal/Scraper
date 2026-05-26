@@ -17,49 +17,7 @@ from app.browser_network_capture import setup_network_capture, store_captures
 
 
 # ─── SSRF / private-network IP validation ──────────────────────────────
-# Shared with models.py; duplicated here to avoid circular imports.
-_PRIVATE_IP_PREFIXES: tuple = (
-    "127.", "10.", "169.254.", "172.16.", "172.17.", "172.18.", "172.19.",
-    "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
-    "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
-    "192.168.", "0.",
-)
-
-
-def _is_private_ip(ip_str: str) -> bool:
-    """Return True if the IP is in a private, loopback, or link-local range."""
-    return ip_str.startswith(_PRIVATE_IP_PREFIXES)
-
-
-def _validate_url_safe(url: str) -> None:
-    """Raise ValueError if the URL resolves to or points to a private/internal network target."""
-    parsed = urlparse(url)
-    hostname = parsed.hostname or ""
-
-    # Quick check for known loopback hostnames
-    if hostname in ("localhost", "127.0.0.1", "0.0.0.0", "[::1]"):
-        raise ValueError(f"URL target '{url}' is a loopback address — rejected for security")
-    if hostname == "169.254.169.254":
-        raise ValueError(f"URL target '{url}' is a cloud metadata endpoint — rejected for security")
-
-    # Check literal IPv4
-    import re as _re
-    ip_match = _re.match(r"^(\d{1,3}\.){3}\d{1,3}$", hostname)
-    if ip_match and _is_private_ip(hostname):
-        raise ValueError(f"URL target '{url}' is a private/internal IP address — rejected for security")
-
-    # DNS resolution check for hostnames that resolve to private IPs
-    try:
-        addrs = socket.getaddrinfo(hostname, None)
-        for addr in addrs:
-            ip = addr[4][0]
-            if _is_private_ip(ip):
-                raise ValueError(
-                    f"URL target '{url}' resolves to private IP {ip} — rejected for security"
-                )
-    except (socket.gaierror, OSError):
-        # DNS failure isn't an SSRF risk; let the caller handle the connection error
-        pass
+from app.url_safety import validate_public_http_url as _validate_url_safe
 
 
 logger = logging.getLogger(__name__)
@@ -626,16 +584,44 @@ async def _fetch_with_httpx(
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(timeout_seconds),
         headers=headers,
-        follow_redirects=True,
+        follow_redirects=False,
     ) as client:
         for attempt in range(max(1, settings.MAX_RETRIES)):
             retry_count = attempt
             try:
+                # Validate the initial URL before fetching
+                _validate_url_safe(url)
+                
                 # Phase 80: Smart mode simulates basic session
                 if strategy == FetchStrategy.HTTPX_SMART:
-                    await client.get(urlparse(url).scheme + "://" + urlparse(url).netloc)
+                    initial_host = urlparse(url).scheme + "://" + urlparse(url).netloc
+                    _validate_url_safe(initial_host)
+                    await client.get(initial_host)
                 
-                resp = await client.get(url, follow_redirects=True)
+                current_url = url
+                max_redirects = 10
+                redirects_followed = 0
+                
+                while True:
+                    resp = await client.get(current_url)
+                    if resp.is_redirect:
+                        redirects_followed += 1
+                        if redirects_followed > max_redirects:
+                            raise ValueError(f"Too many redirects (max {max_redirects})")
+                        
+                        redirect_target = resp.headers.get("location", "")
+                        if not redirect_target:
+                            break
+                        
+                        from urllib.parse import urljoin
+                        redirect_url = urljoin(str(resp.url), redirect_target)
+                        
+                        # Validate the target redirect URL before fetching it!
+                        _validate_url_safe(redirect_url)
+                        current_url = redirect_url
+                    else:
+                        break
+                
                 resp.raise_for_status()
 
                 # SSRF: validate the final resolved URL is not private/internal

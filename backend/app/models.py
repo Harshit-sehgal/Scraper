@@ -197,14 +197,14 @@ class JobCreate(BaseModel):
             cleaned_urls = [u.strip() for u in self.urls if str(u or "").strip()]
             if not cleaned_urls:
                 raise ValueError("Manual mode requires at least one URL")
-            # max_length=100 on the urls field enforces the upper bound
-            invalid_urls = [
-                u
-                for u in cleaned_urls
-                if urlparse(u).scheme not in {"http", "https"} or not urlparse(u).netloc
-            ]
-            if invalid_urls:
-                raise ValueError("Manual mode requires valid http(s) URLs")
+            from app.url_safety import validate_public_http_url
+            for u in cleaned_urls:
+                try:
+                    validate_public_http_url(u)
+                except ValueError as e:
+                    if "Only http and https are allowed" in str(e) or "scheme" in str(e) or not u.startswith(("http://", "https://")):
+                        raise ValueError("Manual mode requires valid http(s) URLs")
+                    raise ValueError(f"URL '{u}' failed security check: {e}")
             self.urls = cleaned_urls
 
         if self.mode == ScrapeMode.AUTO:
