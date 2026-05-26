@@ -68,6 +68,7 @@ def _ensure_schema():
                 attempts INTEGER NOT NULL DEFAULT 0,
                 max_attempts INTEGER NOT NULL DEFAULT 3,
                 last_error TEXT,
+                result TEXT,
                 timeout_seconds INTEGER NOT NULL DEFAULT 300,
                 finished_at TIMESTAMP NOT NULL DEFAULT NOW()
             )
@@ -82,6 +83,12 @@ def _ensure_schema():
             CREATE INDEX IF NOT EXISTS idx_queue_task_history_finished
                 ON queue_task_history(finished_at DESC)
         """)
+
+        # Add result column if missing (migration for existing databases)
+        try:
+            _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN result TEXT")
+        except Exception:
+            pass
 
 
 class PostgresWorkerQueue:
@@ -216,15 +223,16 @@ class PostgresWorkerQueue:
                         """INSERT INTO queue_task_history
                            (id, type, payload, priority, status, created_at,
                             started_at, completed_at, attempts, max_attempts,
-                            last_error, timeout_seconds, finished_at)
+                            last_error, result, timeout_seconds, finished_at)
                            VALUES (%s, %s, %s, %s, 'completed', %s,
-                                   %s, NOW(), %s, %s, %s, %s, NOW())""",
+                                   %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
                         (
                             row["id"], row["type"], row["payload"],
                             row["priority"], row["created_at"],
                             row.get("started_at"),
                             row["attempts"], row["max_attempts"],
                             None,
+                            json.dumps(result) if result else None,
                             row.get("timeout_seconds", 300),
                         ),
                     )
@@ -269,15 +277,16 @@ class PostgresWorkerQueue:
                             """INSERT INTO queue_task_history
                                (id, type, payload, priority, status, created_at,
                                 started_at, completed_at, attempts, max_attempts,
-                                last_error, timeout_seconds, finished_at)
+                                last_error, result, timeout_seconds, finished_at)
                                VALUES (%s, %s, %s, %s, 'dead_letter', %s,
-                                       %s, NOW(), %s, %s, %s, %s, NOW())""",
+                                       %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
                             (
                                 row["id"], row["type"], row["payload"],
                                 row["priority"], row["created_at"],
                                 row.get("started_at"),
                                 row["attempts"], row["max_attempts"],
                                 error,
+                                None,
                                 row.get("timeout_seconds", 300),
                             ),
                         )
@@ -306,15 +315,16 @@ class PostgresWorkerQueue:
                             """INSERT INTO queue_task_history
                                (id, type, payload, priority, status, created_at,
                                 started_at, completed_at, attempts, max_attempts,
-                                last_error, timeout_seconds, finished_at)
+                                last_error, result, timeout_seconds, finished_at)
                                VALUES (%s, %s, %s, %s, 'cancelled', %s,
-                                       %s, NOW(), %s, %s, %s, %s, NOW())""",
+                                       %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
                             (
                                 row["id"], row["type"], row["payload"],
                                 row["priority"], row["created_at"],
                                 row.get("started_at"),
                                 row["attempts"], row["max_attempts"],
                                 "Cancelled by user (in-flight)",
+                                None,
                                 row.get("timeout_seconds", 300),
                             ),
                         )
@@ -335,15 +345,16 @@ class PostgresWorkerQueue:
                     """INSERT INTO queue_task_history
                        (id, type, payload, priority, status, created_at,
                         started_at, completed_at, attempts, max_attempts,
-                        last_error, timeout_seconds, finished_at)
+                        last_error, result, timeout_seconds, finished_at)
                        VALUES (%s, %s, %s, %s, 'cancelled', %s,
-                               %s, NOW(), %s, %s, %s, %s, NOW())""",
+                               %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
                     (
                         row["id"], row["type"], row["payload"],
                         row["priority"], row["created_at"],
                         row.get("started_at"),
                         row["attempts"], row["max_attempts"],
                         "Cancelled by user",
+                        None,
                         row.get("timeout_seconds", 300),
                     ),
                 )

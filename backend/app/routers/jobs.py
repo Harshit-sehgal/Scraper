@@ -72,46 +72,38 @@ def create_jobs_router(
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
         job = jobs_store[job_id]
-        
+
         results_list = list(job.results)
-        loaded_from_disk = False
         if job.results_on_disk:
             from app.utils.job_results_store import load_job_results_from_disk
             results_list = load_job_results_from_disk(job.id, job.results_file_path)
-            loaded_from_disk = True
-
-        # Backfill source metadata helper logic
-        if results_list:
-            changed = False
-            for row in results_list:
-                source_url = str(row.get("source_url") or "").strip()
-                if not source_url:
-                    continue
-
-                source_type = str(row.get("source_type") or "unknown").strip().lower()
-                trust_score = row.get("source_trust_score")
-                if source_type != "unknown" and trust_score is not None:
-                    continue
-
-                inferred = infer_source_metadata(url=source_url)
-                row["source_type"] = str(inferred.get("source_type") or "unknown")
-                row["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
-                changed = True
-
-            if changed:
-                q = dict(job.quality_report or {})
-                q["source_breakdown"] = compute_source_breakdown(results_list)
-                job.quality_report = q
-                if loaded_from_disk:
-                    from app.utils.job_results_store import save_job_results_to_disk
-                    save_job_results_to_disk(job.id, results_list)
-                else:
-                    job.results = results_list
-                _save_job(job)
 
         dumped = job.model_dump()
         dumped["results"] = results_list
         return dumped
+
+    @router.get("/api/jobs/{job_id}/results")
+    async def get_job_results(job_id: str, limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)):
+        """Return a paginated slice of job results."""
+        if job_id not in jobs_store:
+            raise HTTPException(status_code=404, detail="Job not found")
+        job = jobs_store[job_id]
+
+        results_list = list(job.results)
+        if job.results_on_disk:
+            from app.utils.job_results_store import load_job_results_from_disk
+            results_list = load_job_results_from_disk(job.id, job.results_file_path)
+
+        total = len(results_list)
+        page = results_list[offset:offset + limit]
+        return {
+            "job_id": job_id,
+            "results": page,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "returned": len(page),
+        }
 
     @router.post("/api/jobs")
     async def create_job(job_data: JobCreate):
@@ -484,7 +476,9 @@ def create_jobs_router(
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
         from app.utils.job_results_store import delete_job_results_from_disk
-        delete_job_results_from_disk(job_id)
+        job = recycle_bin_store.get(job_id)
+        file_path = job.results_file_path if job else None
+        delete_job_results_from_disk(job_id, file_path)
         repo = get_job_repository()
         try:
             repo.hard_delete(job_id)
@@ -501,7 +495,9 @@ def create_jobs_router(
         count = len(recycle_bin_store)
         from app.utils.job_results_store import delete_job_results_from_disk
         for jid in list(recycle_bin_store.keys()):
-            delete_job_results_from_disk(jid)
+            job = recycle_bin_store.get(jid)
+            file_path = job.results_file_path if job else None
+            delete_job_results_from_disk(jid, file_path)
         repo = get_job_repository()
         try:
             for jid in list(recycle_bin_store.keys()):

@@ -198,6 +198,7 @@ def _ensure_schema(db_path: Optional[Path] = None):
                     attempts INTEGER NOT NULL DEFAULT 0,
                     max_attempts INTEGER NOT NULL DEFAULT 3,
                     last_error TEXT,
+                    result TEXT,
                     timeout_seconds INTEGER NOT NULL DEFAULT 300,
                     finished_at TEXT NOT NULL
                 );
@@ -208,6 +209,11 @@ def _ensure_schema(db_path: Optional[Path] = None):
                 CREATE INDEX IF NOT EXISTS idx_task_history_finished
                     ON task_history(finished_at DESC);
             """)
+            # Add result column if missing (migration for existing databases)
+            try:
+                conn.execute("ALTER TABLE task_history ADD COLUMN result TEXT")
+            except Exception:
+                pass
             conn.commit()
         finally:
             conn.close()
@@ -353,14 +359,15 @@ class WorkerQueue:
                         """INSERT OR REPLACE INTO task_history
                            (id, type, payload, priority, status, created_at,
                             started_at, completed_at, attempts, max_attempts,
-                            last_error, timeout_seconds, finished_at)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            last_error, result, timeout_seconds, finished_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             task_data["id"], task_data["type"],
                             task_data["payload"], task_data["priority"],
                             TaskStatus.COMPLETED, task_data["created_at"],
                             task_data["started_at"], now,
                             task_data["attempts"], task_data["max_attempts"],
+                            None,
                             json.dumps(result) if result else None,
                             task_data.get("timeout_seconds", 300),
                             now,
@@ -415,8 +422,8 @@ class WorkerQueue:
                             """INSERT OR REPLACE INTO task_history
                                (id, type, payload, priority, status, created_at,
                                 started_at, completed_at, attempts, max_attempts,
-                                last_error, timeout_seconds, finished_at)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                last_error, result, timeout_seconds, finished_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                             (
                                 task_data["id"], task_data["type"],
                                 task_data["payload"], task_data["priority"],
@@ -424,6 +431,7 @@ class WorkerQueue:
                                 task_data["started_at"], now,
                                 task_data["attempts"], task_data["max_attempts"],
                                 error,
+                                None,
                                 task_data.get("timeout_seconds", 300),
                                 now,
                             ),
@@ -462,8 +470,8 @@ class WorkerQueue:
                             """INSERT OR REPLACE INTO task_history
                                (id, type, payload, priority, status, created_at,
                                 started_at, completed_at, attempts, max_attempts,
-                                last_error, timeout_seconds, finished_at)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                last_error, result, timeout_seconds, finished_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                             (
                                 task_data["id"], task_data["type"],
                                 task_data["payload"], task_data["priority"],
@@ -471,6 +479,7 @@ class WorkerQueue:
                                 task_data.get("started_at"), now,
                                 task_data["attempts"], task_data["max_attempts"],
                                 "Cancelled by user (in-flight)",
+                                None,
                                 task_data.get("timeout_seconds", 300),
                                 now,
                             ),
@@ -496,8 +505,8 @@ class WorkerQueue:
                     """INSERT OR REPLACE INTO task_history
                        (id, type, payload, priority, status, created_at,
                         started_at, completed_at, attempts, max_attempts,
-                        last_error, timeout_seconds, finished_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        last_error, result, timeout_seconds, finished_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         task_data["id"], task_data["type"],
                         task_data["payload"], task_data["priority"],
@@ -505,6 +514,7 @@ class WorkerQueue:
                         task_data.get("started_at"), now,
                         task_data["attempts"], task_data["max_attempts"],
                         "Cancelled by user",
+                        None,
                         task_data.get("timeout_seconds", 300),
                         now,
                     ),
