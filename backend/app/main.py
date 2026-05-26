@@ -196,6 +196,27 @@ async def lifespan(app: FastAPI):
     _background_tasks.clear()
     logger.info("Background tasks cleaned up")
 
+    # Persist semantic world state to repository if Postgres supports it
+    try:
+        repo = get_job_repository()
+        if hasattr(repo, "save_world_state"):
+            from app.semantic_world_state import get_world_state
+            ws = get_world_state()
+            try:
+                repo.save_world_state(ws.to_dict())
+                logger.info("Semantic world state persisted to repository on shutdown")
+            except Exception as e:
+                logger.warning("Failed to persist world state on shutdown: %s", e)
+    except Exception:
+        pass
+
+    # Flush any pending background state writes
+    try:
+        from app.state_store import flush_state_writes
+        flush_state_writes()
+    except Exception:
+        pass
+
     # Close Postgres connection pool if active
     try:
         shutdown_postgres()
@@ -368,6 +389,8 @@ async def ready():
     Uses the active JobRepository's health_check() if available (Postgres),
     otherwise falls back to SQLite storage health (SQLite).
     Returns 503 if the backend is unhealthy.
+
+    In production mode, returns minimal info to avoid leaking backend/schema details.
     """
     repo = get_job_repository()
     if hasattr(repo, "health_check"):
@@ -379,13 +402,12 @@ async def ready():
     if not health["ok"]:
         return JSONResponse(
             status_code=503,
-            content={
-                "status": "not_ready",
-                "error": health.get("error", "Unknown storage health issue"),
-                "schema_version": health.get("schema_version", 0),
-                "expected_version": health.get("expected_version", 0),
-            },
+            content={"status": "not_ready", "error": health.get("error", "Backend unhealthy")},
         )
+
+    # In production return minimal info to avoid leaking backend/schema details
+    if settings.ENV.lower() == "production":
+        return {"status": "ready"}
 
     backend = getattr(repo, "backend", "sqlite")
     return {
@@ -512,14 +534,65 @@ async def export_knowledge():
     }
 
 
+class KnowledgeMergeRequest(BaseModel):
+    """Validated request body for merge/knowledge endpoint."""
+    role_manifold: dict[str, list[float]] = Field(
+        default_factory=dict,
+        description="Role vectors to merge into the field manifold",
+    )
+    learned_exclusions: dict[str, float] = Field(
+        default_factory=dict,
+        description="Learned exclusions to merge (key format: 'role1|role2')",
+    )
+
+    @classmethod
+    def validate_payload(cls, data: dict) -> "KnowledgeMergeRequest":
+        """Validate and cap payload size."""
+        max_roles = 500
+        max_exclusions = 500
+        # Clamp to max sizes
+        if "role_manifold" in data and len(data["role_manifold"]) > max_roles:
+            data["role_manifold"] = dict(list(data["role_manifold"].items())[:max_roles])
+        if "learned_exclusions" in data and len(data["learned_exclusions"]) > max_exclusions:
+            data["learned_exclusions"] = dict(list(data["learned_exclusions"].items())[:max_exclusions])
+        return cls(**data)
+
+
+def _require_admin_key(request: Request):
+    """Check admin API key for powerful system routes."""
+    if not settings.ADMIN_API_KEY:
+        return  # No admin key configured — fall back to regular API key
+    provided = request.headers.get("X-Admin-Key", "")
+    if not secrets.compare_digest(provided, settings.ADMIN_API_KEY):
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=403,
+            detail="Admin API key required. Provide X-Admin-Key header.",
+        )
+
+
 @app.post("/api/system/merge/knowledge")
-async def merge_knowledge(data: dict):
-    """Merge an external knowledge manifold into the current field."""
+async def merge_knowledge(request: Request, data: dict):
+    """Merge an external knowledge manifold into the current field.
+
+    Validated with size caps: max 500 roles, max 500 exclusions.
+    Requires admin API key if DATAFORGE_ADMIN_API_KEY is configured.
+    """
+    _require_admin_key(request)
+    # Validate payload with size caps
+    try:
+        req = KnowledgeMergeRequest.validate_payload(data)
+    except Exception as e:
+        return JSONResponse(
+            status_code=422,
+            content={"detail": f"Invalid merge payload: {e}"},
+        )
+
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
 
     # 1. Merge Manifold (Geometric Beliefs)
-    remote_manifold = data.get("role_manifold", {})
+    remote_manifold = req.role_manifold
     merged_roles = 0
     for role, vec in remote_manifold.items():
         if ws.has_manifold_role(role):
@@ -529,7 +602,7 @@ async def merge_knowledge(data: dict):
         merged_roles += 1
 
     # 2. Merge Exclusions (Topological Constraints)
-    remote_exc = data.get("learned_exclusions", {})
+    remote_exc = req.learned_exclusions
     for k_str, val in remote_exc.items():
         parts = k_str.split("|")
         if len(parts) == 2:
@@ -878,6 +951,71 @@ async def analyze_url(req: URLPreviewRequest):
         return JSONResponse(status_code=422, content=result)
     
     return result
+
+
+# ─── Prometheus /metrics endpoint ───────────────────────────────────────
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus-formatted metrics endpoint for DataForge scraper.
+
+    Exposes job counts, queue depth, and runtime stats in Prometheus text format.
+    """
+    from prometheus_client import generate_latest, Gauge
+    from prometheus_client.core import CollectorRegistry
+    from fastapi.responses import Response
+
+    # Clear registry to avoid duplicate registration errors on hot-reload
+    registry = CollectorRegistry()
+
+    # Job counts by status
+    from app.models import JobStatus
+    counts = {s.value: 0 for s in JobStatus}
+    for job in jobs_store.values():
+        status_key = str(job.status.value if isinstance(job.status, JobStatus) else job.status)
+        counts[status_key] = counts.get(status_key, 0) + 1
+
+    job_total = Gauge("dataforge_jobs_total", "Total jobs", ["status"], registry=registry)
+    for status, count in counts.items():
+        job_total.labels(status=status).set(count)
+
+    # Recycle bin count
+    recycle_gauge = Gauge("dataforge_recycle_bin_total", "Total jobs in recycle bin", registry=registry)
+    recycle_gauge.set(len(recycle_bin_store))
+
+    # Runtime limits
+    for key, val in CONFIG.items():
+        g = Gauge(f"dataforge_config_{key}", f"Config value for {key}", registry=registry)
+        try:
+            g.set(float(val))
+        except (TypeError, ValueError):
+            pass
+
+    # Repository backend type
+    try:
+        repo = get_job_repository()
+        backend = getattr(repo, "backend", "sqlite")
+        backend_gauge = Gauge("dataforge_backend", "Storage backend type", ["backend"], registry=registry)
+        backend_gauge.labels(backend=backend).set(1)
+    except Exception:
+        pass
+
+    # Worker queue stats
+    try:
+        from app.worker_queue import get_worker_queue
+        q = get_worker_queue()
+        q_status = q.get_status()
+        queue_pending = Gauge("dataforge_queue_pending", "Pending tasks in worker queue", registry=registry)
+        queue_pending.set(q_status.get("pending", 0))
+        queue_running = Gauge("dataforge_queue_running", "Running tasks in worker queue", registry=registry)
+        queue_running.set(q_status.get("running", 0))
+        queue_dead_letter = Gauge("dataforge_queue_dead_letter", "Dead letter queue size", registry=registry)
+        queue_dead_letter.set(q_status.get("dead_letter", 0))
+    except Exception:
+        pass
+
+    return Response(content=generate_latest(registry), media_type="text/plain")
 
 
 # ─── Serve Frontend (must be AFTER all API route definitions) ────────────

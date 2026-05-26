@@ -185,6 +185,7 @@ def _ensure_schema(db_path: Optional[Path] = None):
                     attempts INTEGER NOT NULL DEFAULT 0,
                     max_attempts INTEGER NOT NULL DEFAULT 3,
                     last_error TEXT,
+                    timeout_seconds INTEGER NOT NULL DEFAULT 300,
                     finished_at TEXT NOT NULL
                 );
 
@@ -339,8 +340,8 @@ class WorkerQueue:
                         """INSERT OR REPLACE INTO task_history
                            (id, type, payload, priority, status, created_at,
                             started_at, completed_at, attempts, max_attempts,
-                            last_error, finished_at)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            last_error, timeout_seconds, finished_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             task_data["id"], task_data["type"],
                             task_data["payload"], task_data["priority"],
@@ -348,6 +349,7 @@ class WorkerQueue:
                             task_data["started_at"], now,
                             task_data["attempts"], task_data["max_attempts"],
                             json.dumps(result) if result else None,
+                            task_data.get("timeout_seconds", 300),
                             now,
                         ),
                     )
@@ -400,15 +402,17 @@ class WorkerQueue:
                             """INSERT OR REPLACE INTO task_history
                                (id, type, payload, priority, status, created_at,
                                 started_at, completed_at, attempts, max_attempts,
-                                last_error, finished_at)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                last_error, timeout_seconds, finished_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                             (
                                 task_data["id"], task_data["type"],
                                 task_data["payload"], task_data["priority"],
                                 TaskStatus.DEAD_LETTER, task_data["created_at"],
                                 task_data["started_at"], now,
                                 task_data["attempts"], task_data["max_attempts"],
-                                error, now,
+                                error,
+                                task_data.get("timeout_seconds", 300),
+                                now,
                             ),
                         )
                         conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
@@ -422,9 +426,49 @@ class WorkerQueue:
                 conn.close()
 
     async def cancel(self, task_id: str) -> bool:
-        """Cancel a pending task. Archives to task_history. Returns True if cancelled."""
+        """Cancel a task. Handles both pending (SQLite) and in-flight (asyncio) tasks.
+        Pending tasks are archived to task_history and removed from the queue.
+        In-flight tasks also have their asyncio task cancelled.
+        Returns True if cancelled.
+        """
         now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         async with self._in_flight_lock:
+            # Check in-flight tasks first (running tasks)
+            if task_id in self._in_flight:
+                flight_task = self._in_flight[task_id]
+                flight_task.cancel()
+                # Archive to history
+                conn = self._conn()
+                try:
+                    row = conn.execute(
+                        "SELECT * FROM tasks WHERE id = ?", (task_id,),
+                    ).fetchone()
+                    if row:
+                        task_data = dict(row)
+                        conn.execute(
+                            """INSERT OR REPLACE INTO task_history
+                               (id, type, payload, priority, status, created_at,
+                                started_at, completed_at, attempts, max_attempts,
+                                last_error, timeout_seconds, finished_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (
+                                task_data["id"], task_data["type"],
+                                task_data["payload"], task_data["priority"],
+                                TaskStatus.CANCELLED, task_data["created_at"],
+                                task_data.get("started_at"), now,
+                                task_data["attempts"], task_data["max_attempts"],
+                                "Cancelled by user (in-flight)",
+                                task_data.get("timeout_seconds", 300),
+                                now,
+                            ),
+                        )
+                        conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+                        conn.commit()
+                    return True
+                finally:
+                    conn.close()
+
+            # Check pending tasks
             conn = self._conn()
             try:
                 row = conn.execute(
@@ -439,15 +483,17 @@ class WorkerQueue:
                     """INSERT OR REPLACE INTO task_history
                        (id, type, payload, priority, status, created_at,
                         started_at, completed_at, attempts, max_attempts,
-                        last_error, finished_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        last_error, timeout_seconds, finished_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         task_data["id"], task_data["type"],
                         task_data["payload"], task_data["priority"],
                         TaskStatus.CANCELLED, task_data["created_at"],
                         task_data.get("started_at"), now,
                         task_data["attempts"], task_data["max_attempts"],
-                        "Cancelled by user", now,
+                        "Cancelled by user",
+                        task_data.get("timeout_seconds", 300),
+                        now,
                     ),
                 )
                 conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
@@ -648,7 +694,7 @@ class WorkerQueue:
                 """INSERT INTO tasks
                    (id, type, payload, priority, status, created_at,
                     scheduled_at, attempts, max_attempts, timeout_seconds)
-                   VALUES (?, ?, ?, ?, 'pending', ?, datetime('now'), 0, ?, ?)""",
+                   VALUES (?, ?, ?, ?, 'pending', ?, datetime('now', 'localtime'), 0, ?, ?)""",
                 (
                     task_data["id"], task_data["type"],
                     task_data["payload"], task_data["priority"],

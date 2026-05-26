@@ -29,7 +29,7 @@ from app.storage_interface import JobRepository
 
 logger = logging.getLogger(__name__)
 
-_CURRENT_SCHEMA_VERSION = 2
+_CURRENT_SCHEMA_VERSION = 3
 
 # ───────────────────────────────────────────────────────────────────────
 # Connection pool (thread-safe, synchronous)
@@ -40,7 +40,11 @@ _pool_lock = threading.Lock()
 
 
 def _get_database_url() -> str:
-    """Resolve the Postgres DSN from environment or settings."""
+    """Resolve the Postgres DSN from environment or settings.
+
+    In non-development environments, the DSN MUST be explicitly set via
+    DATAFORGE_DATABASE_URL. The fallback default only applies in development.
+    """
     url = os.getenv("DATAFORGE_DATABASE_URL", "").strip()
     if url:
         return url
@@ -51,7 +55,14 @@ def _get_database_url() -> str:
         pass
     if url:
         return url
-    return "postgresql://dataforge:dataforge@localhost:5432/dataforge"
+    # Only allow fallback default in development mode
+    env = os.getenv("DATAFORGE_ENV", "development").strip().lower()
+    if env == "development":
+        return "postgresql://dataforge:dataforge@localhost:5432/dataforge"
+    raise RuntimeError(
+        "DATAFORGE_DATABASE_URL is required in non-development environments. "
+        "Set it to a valid Postgres connection string."
+    )
 
 
 def _get_pool() -> pg_pool.ThreadedConnectionPool:
@@ -212,6 +223,7 @@ def _ensure_required_tables(conn):
 
     # Add extra columns that may have been added in later migrations
     for col_def in _JOBS_COLUMNS_SQL:
+        # Use savepoints so individual column failures don't abort the transaction
         try:
             _execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
         except Exception:
@@ -221,8 +233,11 @@ def _ensure_required_tables(conn):
 
     for col_def in _JOBS_COLUMNS_SQL:
         try:
+            _execute(conn, "SAVEPOINT alter_recycle_col")
             _execute(conn, f"ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS {col_def}")
+            _execute(conn, "RELEASE SAVEPOINT alter_recycle_col")
         except Exception:
+            _execute(conn, "ROLLBACK TO SAVEPOINT alter_recycle_col")
             pass
 
     for idx_sql in [
@@ -230,8 +245,11 @@ def _ensure_required_tables(conn):
         "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC)",
     ]:
         try:
+            _execute(conn, "SAVEPOINT create_index")
             _execute(conn, idx_sql)
+            _execute(conn, "RELEASE SAVEPOINT create_index")
         except Exception:
+            _execute(conn, "ROLLBACK TO SAVEPOINT create_index")
             pass
 
 
@@ -265,6 +283,17 @@ def _ensure_schema():
             if current < 2:
                 # Version 1 -> 2: intentionally empty — _ensure_required_tables above
                 # already ensures all columns and the recycle_bin table exist.
+                pass
+
+            if current < 3:
+                # Version 2 -> 3: add world_state table for semantic state persistence
+                _execute(conn, """
+                    CREATE TABLE IF NOT EXISTS world_state (
+                        id TEXT PRIMARY KEY,
+                        payload TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                """)
                 pass
 
             _execute(conn, "DELETE FROM schema_version")
@@ -495,7 +524,16 @@ class PostgresJobRepository(JobRepository):
                 if job:
                     recycle_store[job.id] = job
 
-            return jobs_store, recycle_store, None
+            # Load world state
+            ws_row = _fetch_one(conn, "SELECT payload FROM world_state WHERE id = 'default'")
+            world_state_data: Optional[dict] = None
+            if ws_row and ws_row.get("payload"):
+                try:
+                    world_state_data = json.loads(ws_row["payload"])
+                except Exception as e:
+                    logger.warning("Failed to deserialize world_state payload: %s", e)
+
+            return jobs_store, recycle_store, world_state_data
 
     def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job]) -> None:
         self._ensure()
@@ -537,6 +575,113 @@ class PostgresJobRepository(JobRepository):
                 conn,
                 f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",
                 list(row.values()),
+            )
+
+    # ─── Individual repository operations (avoid full-state rewrites) ────
+
+    def move_to_recycle_bin(self, job_id: str) -> bool:
+        """Move a job to the recycle bin by soft-deleting it and copying to recycle_bin table."""
+        self._ensure()
+        with _conn() as conn:
+            row = _fetch_one(conn, "SELECT * FROM jobs WHERE id = %s AND deleted_at IS NULL", (job_id,))
+            if not row:
+                return False
+            now = datetime.datetime.now().isoformat()
+            _execute(conn, "UPDATE jobs SET deleted_at = %s WHERE id = %s", (now, job_id))
+            # Upsert into recycle_bin
+            cols_to_copy = [k for k in row.keys() if k != "deleted_at"]
+            insert_cols = ", ".join(cols_to_copy)
+            insert_vals = ", ".join(f"%s" for _ in cols_to_copy)
+            row_data = {k: row[k] for k in cols_to_copy}
+            row_data["deleted_at"] = now
+            _execute(
+                conn,
+                f"INSERT INTO recycle_bin ({insert_cols}, deleted_at) VALUES ({insert_vals}, %s) ON CONFLICT (id) DO NOTHING",
+                list(row_data.values()) + [now],
+            )
+            return True
+
+    def restore_from_recycle_bin(self, job_id: str) -> bool:
+        """Restore a job from the recycle bin back to active jobs."""
+        self._ensure()
+        with _conn() as conn:
+            row = _fetch_one(conn, "SELECT * FROM recycle_bin WHERE id = %s", (job_id,))
+            if not row:
+                return False
+            # Remove from recycle_bin and restore to jobs
+            _execute(conn, "DELETE FROM recycle_bin WHERE id = %s", (job_id,))
+            # Restore with deleted_at=NULL
+            cols = [k for k in row.keys() if k != "deleted_at"]
+            col_list = ", ".join(cols)
+            ph = ", ".join("%s" for _ in cols)
+            _execute(
+                conn,
+                f"INSERT INTO jobs ({col_list}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET deleted_at = NULL",
+                [row[k] for k in cols],
+            )
+            return True
+
+    def hard_delete(self, job_id: str) -> bool:
+        """Permanently delete a job from all tables."""
+        self._ensure()
+        with _conn() as conn:
+            cur = _execute(conn, "DELETE FROM jobs WHERE id = %s", (job_id,))
+            deleted = cur.rowcount
+            _execute(conn, "DELETE FROM recycle_bin WHERE id = %s", (job_id,))
+            return deleted > 0
+
+    def clear_terminal_jobs(self, older_than: Optional[str] = None) -> int:
+        """Remove terminal-status jobs older than the given timestamp.
+        Only removes jobs that are completed, failed, canceled, degraded, or empty_result.
+        Moves them to recycle_bin before deletion."""
+        self._ensure()
+        terminal_statuses = ("completed", "failed", "canceled", "degraded", "empty_result")
+        with _conn() as conn:
+            rows = _fetch_all(
+                conn,
+                "SELECT * FROM jobs WHERE status = ANY(%s) AND deleted_at IS NULL"
+                + (" AND completed_at < %s" if older_than else ""),
+                (list(terminal_statuses), older_than) if older_than else (list(terminal_statuses),),
+            )
+            for row in rows:
+                now = datetime.datetime.now().isoformat()
+                _execute(conn, "UPDATE jobs SET deleted_at = %s WHERE id = %s", (now, row["id"]))
+                cols = [k for k in row.keys() if k != "deleted_at"]
+                col_list = ", ".join(cols)
+                ph = ", ".join("%s" for _ in cols)
+                _execute(
+                    conn,
+                    f"INSERT INTO recycle_bin ({col_list}, deleted_at) VALUES ({ph}, %s) ON CONFLICT (id) DO NOTHING",
+                    [row[k] for k in cols] + [now],
+                )
+            return len(rows)
+
+    # ─── World state persistence ────────────────────────────────────────
+
+    def load_world_state(self) -> Optional[dict]:
+        """Load semantic world state from Postgres."""
+        self._ensure()
+        with _conn() as conn:
+            row = _fetch_one(conn, "SELECT payload FROM world_state WHERE id = 'default'")
+            if row and row.get("payload"):
+                try:
+                    return json.loads(row["payload"])
+                except Exception as e:
+                    logger.warning("Failed to deserialize world_state payload: %s", e)
+            return None
+
+    def save_world_state(self, payload: dict) -> None:
+        """Save semantic world state to Postgres."""
+        self._ensure()
+        now = datetime.datetime.now().isoformat()
+        payload_json = json.dumps(payload, ensure_ascii=False)
+        with _conn() as conn:
+            _execute(
+                conn,
+                """INSERT INTO world_state (id, payload, updated_at)
+                   VALUES ('default', %s, %s)
+                   ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at""",
+                (payload_json, now),
             )
 
     def health_check(self) -> dict:

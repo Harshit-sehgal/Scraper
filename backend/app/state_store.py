@@ -179,3 +179,15 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
     }
 
     _SAVE_EXECUTOR.submit(_write_state_to_disk, path, payload)
+
+
+def flush_state_writes():
+    """Wait for all pending background state writes to complete.
+
+    Should be called during graceful shutdown to ensure no state is lost.
+    This is a synchronous call that blocks until all pending writes finish.
+    """
+    global _SAVE_EXECUTOR
+    _SAVE_EXECUTOR.shutdown(wait=True)
+    # Recreate executor for any future writes
+    _SAVE_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)

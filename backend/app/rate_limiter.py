@@ -132,9 +132,13 @@ class RateLimiterMiddleware:
         if "/docs" in path or "/openapi" in path:
             return await call_next(request)
 
-        # Determine client key
+        # Determine client key — use X-Forwarded-For when behind trusted proxy
         if self._per_ip:
-            client_ip = request.client.host if request.client else "unknown"
+            forwarded = request.headers.get("X-Forwarded-For", "")
+            if forwarded:
+                client_ip = forwarded.split(",")[0].strip()
+            else:
+                client_ip = request.client.host if request.client else "unknown"
             key = f"global:{client_ip}"
         else:
             key = "global"

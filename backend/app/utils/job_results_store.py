@@ -6,6 +6,7 @@ import gzip
 import json
 import logging
 from pathlib import Path
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +54,20 @@ def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
     return str(path)
 
 
-def load_job_results_from_disk(job_id: str) -> list[dict]:
+def load_job_results_from_disk(job_id: str, file_path: Optional[str] = None) -> list[dict]:
     """
     Decompress and load the list of record dictionaries from disk for a given job ID.
-    
+
+    If *file_path* is provided, it is used directly (supporting migrated or
+    externally stored result paths). Otherwise the path is recomputed from
+    the job ID using the standard path convention.
+
     Returns an empty list if the file does not exist.
     """
-    path = get_job_results_path(job_id)
+    if file_path:
+        path = Path(file_path)
+    else:
+        path = get_job_results_path(job_id)
     if not path.exists():
         logger.warning("Results file not found on disk for job %s at %s", job_id, path)
         return []

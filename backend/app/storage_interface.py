@@ -37,6 +37,34 @@ class JobRepository(ABC):
         """Atomically upsert or save a single job's status, progress, or logs."""
         pass
 
+    # ─── Individual repository operations (avoid full-state rewrites) ────
+
+    def move_to_recycle_bin(self, job_id: str) -> bool:
+        """Move a job to the recycle bin. Returns True if the job was moved."""
+        raise NotImplementedError
+
+    def restore_from_recycle_bin(self, job_id: str) -> bool:
+        """Restore a job from the recycle bin. Returns True if restored."""
+        raise NotImplementedError
+
+    def hard_delete(self, job_id: str) -> bool:
+        """Permanently delete a job. Returns True if deleted."""
+        raise NotImplementedError
+
+    def clear_terminal_jobs(self, older_than: Optional[str] = None) -> int:
+        """Remove terminal-status jobs older than the given timestamp. Returns count removed."""
+        raise NotImplementedError
+
+    # ─── World state persistence ────────────────────────────────────────
+
+    def load_world_state(self) -> Optional[dict]:
+        """Load semantic world state from the persistent store."""
+        return None
+
+    def save_world_state(self, payload: dict) -> None:
+        """Save semantic world state to the persistent store."""
+        pass
+
 
 class SQLiteJobRepository(JobRepository):
     """SQLite-backed implementation of the JobRepository interface.

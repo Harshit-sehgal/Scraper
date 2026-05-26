@@ -103,7 +103,7 @@ async def main():
     )
 
     if args.once:
-        # Single-task mode: enqueue one specific job and wait
+        # Single-task mode: enqueue one specific job and wait for completion
         job_id = os.getenv("DATAFORGE_JOB_ID")
         if not job_id:
             raise SystemExit("DATAFORGE_JOB_ID is required when using --once")
@@ -113,7 +113,14 @@ async def main():
             priority=Priority.HIGH,
         )
         logger.info("Enqueued single task: %s (job_id=%s)", task_id, job_id)
-        await asyncio.sleep(300)  # Wait up to 5 minutes
+        # Poll until task reaches terminal state instead of fixed sleep
+        deadline = time.time() + 600  # Max 10 minute wait
+        while time.time() < deadline:
+            status = queue.get_status()
+            if status.get("running", 0) == 0 and status.get("pending", 0) == 0:
+                logger.info("Task %s reached terminal state, exiting.", task_id)
+                break
+            await asyncio.sleep(5)
     else:
         # Continuous mode: run until shutdown
         await shutdown_event.wait()
