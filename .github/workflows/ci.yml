@@ -106,6 +106,19 @@ jobs:
         run: |
           bash -n scripts/start.sh
 
+      - name: Check for committed runtime artifacts
+        run: |
+          git ls-files | grep -E '\.(db|sqlite|sqlite3)$|\.json\.lock$' && exit 1 || echo "No bad runtime artifacts tracked"
+
+      - name: Validate configuration files (YAML and JSON)
+        run: |
+          find . -name "*.yml" -o -name "*.yaml" | while read f; do
+            python -c "import yaml; yaml.safe_load(open('$f')); print('OK:', '$f')" || exit 1
+          done
+          find . -name "*.json" | while read f; do
+            python -m json.tool "$f" >/dev/null || exit 1
+          done
+
   test:
     runs-on: ubuntu-latest
     steps:
