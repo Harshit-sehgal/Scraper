@@ -243,7 +243,7 @@ async def collect_browser_state(page) -> dict[str, Any]:
     if not isinstance(storage_snapshot, dict):
         storage_snapshot = {}
 
-    state = {
+    state: dict[str, Any] = {
         "cookies": _sanitize_cookies(raw_cookies),
         "storage": {
             "localStorage": _sanitize_storage_mapping(storage_snapshot.get("localStorage", {}), "localStorage"),
