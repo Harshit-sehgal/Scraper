@@ -249,6 +249,8 @@ class Settings(BaseSettings):
     """Application runtime environment: development or production."""
     API_KEY: str = ""
     """If set, all /api/* endpoints require X-API-Key header."""
+    OPERATOR_API_KEY: str = ""
+    """If set, operator routes (creating and running jobs, manual scraper invocation) require this key."""
     ADMIN_API_KEY: str = ""
     """If set, powerful admin routes (/api/system/merge, /api/system/scheduler, etc.) require this key."""
     METRICS_TOKEN: str = ""

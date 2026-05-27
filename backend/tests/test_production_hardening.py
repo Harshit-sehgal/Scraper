@@ -143,6 +143,7 @@ def test_create_job_enqueue_failure_cleanup(client, monkeypatch):
     """Verify that if enqueue fails in production, the job is removed from memory and repository (not left orphaned)."""
     from app.config import settings
     monkeypatch.setattr(settings, "ENV", "production")
+    monkeypatch.setattr(settings, "OPERATOR_API_KEY", "test-key")
     monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
     
     # Mock enqueue to raise an error
@@ -158,7 +159,11 @@ def test_create_job_enqueue_failure_cleanup(client, monkeypatch):
         "schema_fields": [{"name": "company_name", "field_type": "string", "required": True}],
     }
     
-    resp = client.post("/api/jobs", json=payload)
+    resp = client.post(
+        "/api/jobs",
+        json=payload,
+        headers={"X-API-Key": "test-key"}
+    )
     assert resp.status_code == 503
     assert "Failed to enqueue job" in resp.json()["detail"]
     

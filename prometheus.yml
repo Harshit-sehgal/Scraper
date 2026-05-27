@@ -19,15 +19,15 @@ global:
     env:     'production'
 
 # Alertmanager configuration (optional — add if we set up alert routing)
-# alerting:
-#   alertmanagers:
-#     - static_configs:
-#         - targets:
-#           - alertmanager:9093
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
 
 # Rule files (optional — add alert rules here)
-# rule_files:
-#   - "alerts/*.yml"
+rule_files:
+  - "prometheus_alerts.yml"
 
 scrape_configs:
   # ─── Prometheus Self-monitoring ──────────────────────────────────────

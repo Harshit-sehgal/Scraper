@@ -273,6 +273,7 @@ def test_enqueue_failure_rollback_in_production(client, monkeypatch):
 
     # Patch settings.ENV directly (cached at import, so setenv won't work)
     monkeypatch.setattr(settings, "ENV", "production")
+    monkeypatch.setattr(settings, "OPERATOR_API_KEY", "test-key")
     # Make the create_job endpoint enter the worker queue branch
     monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "1")
     # Patch get_worker_queue to return a broken queue
@@ -308,7 +309,11 @@ def test_enqueue_failure_rollback_in_production(client, monkeypatch):
         "urls": ["https://example.com"],
         "schema_fields": [{"name": "company_name", "field_type": "string"}],
     }
-    resp = client.post("/api/jobs", json=payload)
+    resp = client.post(
+        "/api/jobs",
+        json=payload,
+        headers={"X-API-Key": "test-key"}
+    )
     assert resp.status_code == 503, f"Expected 503, got {resp.status_code}: {resp.text}"
     assert "Failed to enqueue" in resp.json()["detail"]
 

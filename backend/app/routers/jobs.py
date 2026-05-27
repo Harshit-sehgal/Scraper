@@ -4,7 +4,8 @@ import logging
 import threading
 from typing import Callable
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
+from app.utils.rbac import UserRole, require_role
 
 from app.config import settings
 from app.discovery import discover_urls, infer_source_metadata
@@ -187,7 +188,7 @@ def create_jobs_router(
         return {"message": "Metadata backfilled successfully", "updated": updated}
 
     @router.post("/api/jobs")
-    async def create_job(job_data: JobCreate):
+    async def create_job(job_data: JobCreate, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         import os
 
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
@@ -265,7 +266,7 @@ def create_jobs_router(
         return {"job_id": job.id, "status": job.status.value}
 
     @router.post("/api/jobs/{job_id}/cancel")
-    async def cancel_job(job_id: str):
+    async def cancel_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
 
@@ -305,7 +306,7 @@ def create_jobs_router(
         }
 
     @router.post("/api/jobs/{job_id}/reclean")
-    async def reclean_job(job_id: str):
+    async def reclean_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         """Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs."""
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -470,7 +471,7 @@ def create_jobs_router(
         }
 
     @router.delete("/api/jobs/{job_id}")
-    async def delete_job(job_id: str):
+    async def delete_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
         job = jobs_store[job_id]
@@ -485,7 +486,7 @@ def create_jobs_router(
         return {"message": "Job moved to recycle bin"}
 
     @router.delete("/api/jobs/cleanup/terminal")
-    async def clear_terminal_jobs(keep_recent: int = Query(5, ge=0, le=5000)):
+    async def clear_terminal_jobs(keep_recent: int = Query(5, ge=0, le=5000), _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         terminal_statuses = {JobStatus.COMPLETED, JobStatus.DEGRADED, JobStatus.EMPTY_RESULT, JobStatus.FAILED, JobStatus.CANCELED}
         terminal = [
             (jid, job)
@@ -528,7 +529,7 @@ def create_jobs_router(
         return {"jobs": [job.model_dump() for job in ordered]}
 
     @router.post("/api/recycle_bin/{job_id}/restore")
-    async def restore_job(job_id: str):
+    async def restore_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
         repo = get_job_repository()
@@ -537,7 +538,7 @@ def create_jobs_router(
         return {"message": "Job restored"}
 
     @router.delete("/api/recycle_bin/{job_id}")
-    async def hard_delete_job(job_id: str):
+    async def hard_delete_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
         from app.utils.job_results_store import delete_job_results_from_disk
@@ -550,7 +551,7 @@ def create_jobs_router(
         return {"message": "Job permanently deleted"}
 
     @router.delete("/api/recycle_bin")
-    async def clear_recycle_bin():
+    async def clear_recycle_bin(_role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         count = len(recycle_bin_store)
         from app.utils.job_results_store import delete_job_results_from_disk
         for jid in list(recycle_bin_store.keys()):

@@ -1,0 +1,58 @@
+# =============================================================================
+# DataForge Scraper — Prometheus Alerting Rules
+# =============================================================================
+# Defines production alerts routed via Alertmanager.
+# =============================================================================
+
+groups:
+  - name: dataforge_scraper_alerts
+    rules:
+      # 1. API Server Liveness Alert
+      - alert: DataForgeAPIInstanceDown
+        expr: up{job="dataforge"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DataForge API instance is down"
+          description: "Instance {{ $labels.instance }} has been offline for more than 1 minute."
+
+      # 2. Queue Backlog Alert
+      - alert: QueueBacklogHigh
+        expr: dataforge_queue_pending > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scraper queue backlog is high"
+          description: "Pending queue depth is {{ $value }} (threshold > 100) for more than 5 minutes."
+
+      # 3. High Job Failure Rate Alert
+      - alert: HighJobFailureRate
+        expr: rate(dataforge_jobs_total{status="failed"}[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High scraper job failure rate"
+          description: "Scraped jobs are failing at a rate of {{ $value }} failures/sec over the last 5 minutes."
+
+      # 4. Database Exceptions Alert
+      - alert: DatabaseErrorsDetected
+        expr: rate(dataforge_errors_total{type="database"}[1m]) > 0
+        for: 0s # Trigger instantly
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection exceptions detected"
+          description: "Postgres database errors are actively occurring at a rate of {{ $value }} errors/sec."
+
+      # 5. API Response Latency Alert
+      - alert: HighAPIResponseLatency
+        expr: histogram_quantile(0.95, sum(rate(dataforge_request_latency_seconds_bucket[5m])) by (le)) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API response latency"
+          description: "95th percentile response latency is {{ $value }}s (threshold > 2.0s) for more than 5 minutes."

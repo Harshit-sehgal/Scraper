@@ -24,7 +24,7 @@ from app.postgres_repository import _conn, _execute, _fetch_all, _fetch_one
 logger = logging.getLogger(__name__)
 
 
-_CURRENT_QUEUE_SCHEMA_VERSION = 2
+_CURRENT_QUEUE_SCHEMA_VERSION = 3
 
 
 def _ensure_schema():
@@ -114,6 +114,14 @@ def _ensure_schema():
                 except Exception:
                     pass
                 current = 2
+
+            if current < 3:
+                # Add execution_time_ms column for tracking task latencies
+                try:
+                    _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN execution_time_ms INTEGER")
+                except Exception:
+                    pass
+                current = 3
 
             _execute(
                 conn,
