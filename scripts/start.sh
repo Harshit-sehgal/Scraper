@@ -47,10 +47,48 @@ fi
 # shellcheck disable=SC1091
 source "$VENV_DIR/bin/activate"
 
-# ─── Check key dependency ──────────────────────────────────────────────────
-if ! python -c "import fastapi" 2>/dev/null; then
-    echo "❌ Dependencies not installed. Run:"
+# ─── Check runtime dependencies ─────────────────────────────────────────────
+if ! python - <<'PY'
+import importlib
+from pathlib import Path
+
+missing = []
+
+for label, module_name in (
+    ("fastapi", "fastapi"),
+    ("playwright", "playwright.sync_api"),
+):
+    try:
+        importlib.import_module(module_name)
+    except Exception:
+        missing.append(label)
+
+if not any(importlib.util.find_spec(name) for name in ("ddgs", "duckduckgo_search")):
+    missing.append("ddgs or duckduckgo_search")
+
+if missing:
+    raise SystemExit("Missing dependencies: " + ", ".join(missing))
+
+try:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        chromium_path = Path(playwright.chromium.executable_path)
+    if not chromium_path.exists():
+        raise SystemExit(
+            "Missing Playwright Chromium browser. Run: python -m playwright install chromium"
+        )
+except SystemExit:
+    raise
+except Exception as exc:
+    raise SystemExit(f"Playwright browser check failed: {exc}") from exc
+
+print("Dependency check passed")
+PY
+then
+    echo "❌ Runtime dependencies not installed or incomplete. Run:"
     echo "   pip install -r backend/requirements.txt"
+    echo "   python -m playwright install chromium"
     exit 1
 fi
 

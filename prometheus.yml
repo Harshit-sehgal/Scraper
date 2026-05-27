@@ -18,14 +18,8 @@ global:
     monitor: 'dataforge'
     env:     'production'
 
-# Alertmanager configuration (optional — add if we set up alert routing)
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets:
-            - alertmanager:9093
-
-# Rule files (optional — add alert rules here)
+# Rule files are evaluated locally. Alertmanager routing is intentionally
+# omitted until an alertmanager service and routing config are deployed.
 rule_files:
   - "prometheus_alerts.yml"
 

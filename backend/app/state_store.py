@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import shutil
+import atexit
 from pathlib import Path
 from threading import Lock
 import concurrent.futures
@@ -191,3 +192,11 @@ def flush_state_writes():
     _SAVE_EXECUTOR.shutdown(wait=True)
     # Recreate executor for any future writes
     _SAVE_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
+
+def shutdown_state_writes() -> None:
+    """Drain and close the background state executor without recreating it."""
+    _SAVE_EXECUTOR.shutdown(wait=True)
+
+
+atexit.register(shutdown_state_writes)

@@ -54,6 +54,57 @@ def test_nginx_blocks_metrics_and_docs():
     assert "location /openapi.json" in content
     assert "return 404;" in content
 
+
+def test_production_prometheus_mounts_alert_rules():
+    """Production compose must mount the same alert rule file Prometheus loads."""
+    root = Path(__file__).resolve().parents[2]
+    compose = (root / "docker-compose.prod.yml").read_text()
+    prometheus = (root / "prometheus.yml").read_text()
+
+    assert 'rule_files:\n  - "prometheus_alerts.yml"' in prometheus
+    assert "./prometheus.yml:/etc/prometheus/prometheus.yml:ro" in compose
+    assert "./prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro" in compose
+
+
+def test_prometheus_does_not_reference_undeployed_alertmanager():
+    """Prometheus should not point at Alertmanager unless compose deploys it."""
+    root = Path(__file__).resolve().parents[2]
+    compose = (root / "docker-compose.prod.yml").read_text()
+    prometheus = (root / "prometheus.yml").read_text()
+
+    assert "alertmanager:" not in compose
+    assert "alertmanager:9093" not in prometheus
+    assert "\nalerting:" not in prometheus
+
+
+def test_ci_prometheus_check_matches_production_mount_layout():
+    """CI promtool validation should use the same selected-file mounts as prod."""
+    workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "ci.yml"
+    content = workflow.read_text()
+
+    assert '$PWD/prometheus.yml:/etc/prometheus/prometheus.yml:ro' in content
+    assert '$PWD/prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro' in content
+    assert '$PWD:/etc/prometheus:ro' not in content
+
+
+def test_ci_does_not_install_optional_g4f_by_default():
+    """Optional LLM providers should not make CI differ from production installs."""
+    workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "ci.yml"
+    content = workflow.read_text()
+
+    assert "pip install g4f" not in content
+
+
+def test_start_script_checks_runtime_scraper_dependencies():
+    """The dev startup script should check scraper/discovery dependencies, not just FastAPI."""
+    script = Path(__file__).resolve().parents[2] / "scripts" / "start.sh"
+    content = script.read_text()
+
+    assert "ddgs or duckduckgo_search" in content
+    assert "playwright.sync_api" in content
+    assert "python -m playwright install chromium" in content
+
+
 def test_clear_terminal_jobs_preserves_result_files(client, tmp_path, monkeypatch):
     """Verify that moving terminal jobs to the recycle bin does NOT delete their result files."""
     # Mock results directory to use tmp_path

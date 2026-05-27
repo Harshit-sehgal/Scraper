@@ -36,6 +36,15 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_postgres)
 
 
+def pytest_sessionfinish(session, exitstatus):
+    """Drain background state writes so pytest exits cleanly after direct module tests."""
+    try:
+        from app.state_store import flush_state_writes
+        flush_state_writes()
+    except Exception:
+        pass
+
+
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = ROOT / "backend"
 if str(BACKEND_ROOT) not in sys.path:

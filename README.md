@@ -137,7 +137,7 @@ DataForge Studio exposes a rich, RESTful API interface for programmatic jobs and
 | DELETE | `/api/recycle_bin/{id}` | Permanently delete a job. |
 | POST | `/api/system/scheduler/step` | Trigger cognitive scheduler manually. |
 | GET | `/api/system/search?query=...`| Topological search. |
-| GET | `/metrics` | Prometheus metrics endpoint (job counts, queue depth, backend type) |
+| GET | `/metrics` | Prometheus metrics endpoint. In production it is blocked by public Nginx and scraped internally by Prometheus over the Docker network. |
 
 ---
 

@@ -14,16 +14,28 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
-try:
-    from ddgs import DDGS
-except ImportError:
-    from duckduckgo_search import DDGS
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 )
 TIMEOUT = 15
+
+
+def get_ddgs_class():
+    """Resolve the optional DuckDuckGo search client only when search runs."""
+    try:
+        from ddgs import DDGS
+        return DDGS
+    except ImportError:
+        try:
+            from duckduckgo_search import DDGS
+            return DDGS
+        except ImportError as exc:
+            raise RuntimeError(
+                "Lead enrichment discovery requires ddgs or duckduckgo_search. "
+                "Install backend requirements first."
+            ) from exc
 
 BLOCKED_DOMAINS = {
     "houzz.in",
@@ -463,7 +475,8 @@ def _score_website_candidate(result: dict, company_name: str) -> float:
 def search_official_website(company_name: str, context: EnrichmentContext) -> str | None:
     query = f"{company_name} {context.city} {context.niche} official website"
     try:
-        with DDGS() as ddgs:
+        ddgs_class = get_ddgs_class()
+        with ddgs_class() as ddgs:
             results = list(ddgs.text(query, max_results=8))
     except Exception as e:
         import logging

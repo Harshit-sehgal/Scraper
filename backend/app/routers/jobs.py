@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from app.utils.rbac import UserRole, require_role
 
 from app.config import settings
-from app.discovery import discover_urls, infer_source_metadata
+from app.discovery import DiscoveryDependencyError, discover_urls, infer_source_metadata
 from app.filters import process_results
 from app.models import (
     DiscoveryRequest,
@@ -78,17 +78,20 @@ def create_jobs_router(
     @router.post("/api/discover")
     async def discover(req: DiscoveryRequest):
         """Auto-discover best URLs to scrape for a topic."""
-        results = await discover_urls(
-            query=req.topic,
-            domain=req.domain,
-            num_results=req.num_results,
-            location=req.location,
-            data_fields=req.schema_field_names,
-            origin_location=req.origin_location,
-            max_distance_km=req.max_distance_km,
-            source_policy=req.source_policy,
-            max_per_domain=req.max_per_domain,
-        )
+        try:
+            results = await discover_urls(
+                query=req.topic,
+                domain=req.domain,
+                num_results=req.num_results,
+                location=req.location,
+                data_fields=req.schema_field_names,
+                origin_location=req.origin_location,
+                max_distance_km=req.max_distance_km,
+                source_policy=req.source_policy,
+                max_per_domain=req.max_per_domain,
+            )
+        except DiscoveryDependencyError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         from app.url_safety import validate_public_http_url
         safe_results = []
         for r in results:

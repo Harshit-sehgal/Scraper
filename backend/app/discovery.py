@@ -9,11 +9,6 @@ from collections import defaultdict
 from typing import Optional
 from urllib.parse import urlparse, urlunparse
 
-try:
-    from ddgs import DDGS  # type: ignore
-except ImportError:
-    from duckduckgo_search import DDGS  # type: ignore
-
 from app.async_utils import run_sync_in_thread
 from app.config import settings
 from app.models import SourcePolicy
@@ -55,6 +50,27 @@ SOURCE_TRUST_SCORE = {
     "social": settings.SOURCE_TRUST_SOCIAL,
     "search_result": settings.SOURCE_TRUST_SEARCH,
 }
+
+
+class DiscoveryDependencyError(RuntimeError):
+    """Raised when optional web-discovery dependencies are unavailable."""
+
+
+def get_ddgs_class():
+    """Resolve the preferred DuckDuckGo search client lazily."""
+    try:
+        from ddgs import DDGS  # type: ignore
+        return DDGS
+    except ImportError:
+        try:
+            from duckduckgo_search import DDGS  # type: ignore
+            return DDGS
+        except ImportError as exc:
+            raise DiscoveryDependencyError(
+                "Discovery requires ddgs or duckduckgo_search. "
+                "Install backend requirements first."
+            ) from exc
+
 
 # Domains that repeatedly fail to resolve/connect can be excluded from discovery.
 def _get_blocked_domains() -> set[str]:
@@ -271,8 +287,10 @@ async def discover_urls(
 
     results = []
     try:
+        ddgs_class = get_ddgs_class()
+
         def fetch_ddg():
-            with DDGS() as ddgs:
+            with ddgs_class() as ddgs:
                 max_fetch = max(num_results * 3, num_results)
                 max_fetch = min(max_fetch, 80)
                 return list(ddgs.text(search_query, max_results=max_fetch))
@@ -369,6 +387,8 @@ async def discover_urls(
 
         logging.info("Found %d real URLs.", len(results))
         return results
+    except DiscoveryDependencyError:
+        raise
     except Exception as e:
         logging.exception("Discovered error: %s", e)
         return []

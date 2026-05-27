@@ -331,6 +331,9 @@ async def api_key_middleware(request: Request, call_next):
         if not is_docs_path or settings.ENV.lower() == "production":
             api_key = request.headers.get("X-API-Key", "")
             admin_key_header = request.headers.get("X-Admin-Key", "")
+            auth_header = request.headers.get("Authorization", "")
+            auth_scheme, _, auth_token = auth_header.partition(" ")
+            bearer_token = auth_token.strip() if auth_scheme.lower() == "bearer" else ""
             
             def is_match(provided, expected):
                 if not expected or not provided:
@@ -338,17 +341,24 @@ async def api_key_middleware(request: Request, call_next):
                 return secrets.compare_digest(provided, expected)
                 
             valid = False
-            if settings.API_KEY and is_match(api_key, settings.API_KEY):
+            if settings.API_KEY and (is_match(api_key, settings.API_KEY) or is_match(bearer_token, settings.API_KEY)):
                 valid = True
-            elif getattr(settings, "OPERATOR_API_KEY", "") and is_match(api_key, settings.OPERATOR_API_KEY):
+            elif getattr(settings, "OPERATOR_API_KEY", "") and (
+                is_match(api_key, settings.OPERATOR_API_KEY)
+                or is_match(bearer_token, settings.OPERATOR_API_KEY)
+            ):
                 valid = True
-            elif settings.ADMIN_API_KEY and (is_match(api_key, settings.ADMIN_API_KEY) or is_match(admin_key_header, settings.ADMIN_API_KEY)):
+            elif settings.ADMIN_API_KEY and (
+                is_match(api_key, settings.ADMIN_API_KEY)
+                or is_match(bearer_token, settings.ADMIN_API_KEY)
+                or is_match(admin_key_header, settings.ADMIN_API_KEY)
+            ):
                 valid = True
                 
             if not valid:
                 return JSONResponse(
                     status_code=403,
-                    content={"detail": "Invalid or missing API key. Provide X-API-Key header."},
+                    content={"detail": "Invalid or missing API key. Provide X-API-Key or Authorization Bearer token."},
                 )
     response = await call_next(request)
     return response

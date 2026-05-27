@@ -272,9 +272,12 @@ curl http://localhost:8000/metrics         # Prometheus metrics (job counts, que
 ### Prometheus
 Configuration: `prometheus.yml`
 - Self-monitoring enabled by default
-- DataForge `/metrics`, PostgreSQL exporter, and nginx stub_status targets are **commented out** until those components are implemented
+- DataForge `/metrics` is scraped internally from `dataforge:8000`
+- Public Nginx intentionally returns 404 for `/metrics`; do not expose metrics publicly unless you add auth/IP restrictions
+- PostgreSQL exporter and nginx stub_status targets are commented out until those components are implemented
 - Retains data for 30 days
 - Supports live config reload
+- Alert rules are loaded from `prometheus_alerts.yml`; Alertmanager routing is omitted until an Alertmanager service is deployed
 
 ### Grafana
 Provisioned dashboards at `grafana/dashboards/dataforge_overview.json`:

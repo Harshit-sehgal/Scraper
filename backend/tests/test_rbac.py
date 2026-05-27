@@ -98,3 +98,32 @@ def test_rbac_endpoint_guards(client, monkeypatch):
         headers={"X-API-Key": "admin-secret"}
     )
     assert resp.status_code in (200, 400)
+
+
+def test_api_middleware_accepts_bearer_tokens_before_rbac(client, monkeypatch):
+    """Global API auth must not reject Bearer tokens before route RBAC runs."""
+    monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-secret")
+    monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-secret")
+    monkeypatch.setattr(settings, "API_KEY", "user-secret")
+    monkeypatch.setattr(settings, "ENV", "production")
+
+    payload = {
+        "name": "bearer-rbac-test",
+        "mode": "manual",
+        "urls": ["https://example.com"],
+        "schema_fields": [{"name": "title", "field_type": "string", "required": True}],
+    }
+
+    operator_resp = client.post(
+        "/api/jobs",
+        json=payload,
+        headers={"Authorization": "Bearer operator-secret"},
+    )
+    assert operator_resp.status_code != 403
+
+    admin_resp = client.post(
+        "/api/operator/mode",
+        json={"mode": "production"},
+        headers={"Authorization": "Bearer admin-secret"},
+    )
+    assert admin_resp.status_code in (200, 400)
