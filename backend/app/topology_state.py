@@ -5,14 +5,30 @@ global_communities, schema_patterns, topological_laws, or cohesion
 structures directly. All topology changes go through this state object.
 """
 
-from typing import Callable, Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Set, Tuple, Optional
 from dataclasses import dataclass
 from app.core_types import FieldConflictRegion, MAX_COUPLING_TRANSFER
 from app.transaction_context import active_transaction
+import ast
+
+def parse_topology_key(raw: str) -> tuple[str, str]:
+    try:
+        value = ast.literal_eval(raw)
+    except (SyntaxError, ValueError, TypeError):
+        raise ValueError(f"Invalid topology key format: {raw!r}")
+
+    if (
+        not isinstance(value, tuple)
+        or len(value) != 2
+        or not all(isinstance(item, str) for item in value)
+    ):
+        raise ValueError(f"Invalid topology key structure: {raw!r}")
+
+    return value
+
 
 class ConflictError(Exception):
     """Raised when an optimistic concurrency conflict is detected."""
-    pass
 
 
 def _clamp01(value: float) -> float:
@@ -698,7 +714,8 @@ class TopologyState:
 
     def neighbors_of(self, region_id: Any) -> List[RegionSnapshot]:
         target = self.get_region(region_id)
-        if not target: return []
+        if not target:
+            return []
         view = self.get_view()
         result = []
         target_roles = set(target.competing_roles)
@@ -1112,7 +1129,8 @@ class TopologyState:
 
     def adjust_region_instability(self, region_id: Any, delta: float):
         r = self.get_region(region_id)
-        if r: self.set_region_instability(r.region_id, r.instability + delta)
+        if r:
+            self.set_region_instability(r.region_id, r.instability + delta)
 
     def set_region_energy(self, region_id: Any, value: float):
         r = self.get_region(region_id)
@@ -1122,7 +1140,8 @@ class TopologyState:
 
     def adjust_region_energy(self, region_id: Any, delta: float):
         r = self.get_region(region_id)
-        if r: self.set_region_energy(r.region_id, r.local_energy + delta)
+        if r:
+            self.set_region_energy(r.region_id, r.local_energy + delta)
 
     def set_region_integrity(self, region_id: Any, value: float):
         r = self.get_region(region_id)
@@ -1138,7 +1157,8 @@ class TopologyState:
 
     def adjust_region_recurrence(self, region_id: str, delta: float):
         r = self.get_region(region_id)
-        if r: self.set_region_recurrence(region_id, r.recurrence_score + delta)
+        if r:
+            self.set_region_recurrence(region_id, r.recurrence_score + delta)
 
     def set_region_momentum(self, region_id: str, value: float):
         r = self.get_region(region_id)
@@ -1172,7 +1192,8 @@ class TopologyState:
 
     def update_region_after_recurrence(self, region_id: str, field_pressure: float):
         r = self.get_region(region_id)
-        if not r: return
+        if not r:
+            return
         target_instability = min(1.0, r.instability + 0.15)
         r.stability_momentum = r.stability_momentum * 0.7 + 0.3 * target_instability
         r.instability = r.stability_momentum
@@ -2220,8 +2241,8 @@ class TopologyState:
                     else:
                         # Assume it's repr of a tuple, convert back
                         try:
-                            target[eval(k)] = v
-                        except (ValueError, SyntaxError):
+                            target[parse_topology_key(k)] = v
+                        except ValueError:
                             target[tuple(k.split("|"))] = v
                 else:
                     # Already a tuple/list
@@ -2299,8 +2320,8 @@ class TopologyState:
             else:
                 # New format: "('a', 'b')"
                 try:
-                    pair = eval(key_str)
-                except (ValueError, SyntaxError):
+                    pair = parse_topology_key(key_str)
+                except ValueError:
                     pass
             
             if pair:
@@ -2311,7 +2332,8 @@ class TopologyState:
         # Merge anchors
         remote_anchors = other_data.get("anchors", [])
         for a in remote_anchors:
-            if len(a) == 2: self.record_anchor(tuple(a))
+            if len(a) == 2:
+                self.record_anchor(tuple(a))
             
         self._record("merge", {"remote_regions": len(remote_regions)})
 

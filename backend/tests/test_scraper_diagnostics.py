@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from app.scraper_diagnostics import ScraperDiagnosticReport, run_diagnostics
-from app.models import SchemaField
+from app.models import SchemaField, FieldType
 
 
 class TestScraperDiagnosticReport:
@@ -85,7 +85,7 @@ class TestRunDiagnostics:
 
     async def test_success_path(self):
         """Successful extraction returns a populated report."""
-        schema = [SchemaField(name="name", field_type="string")]
+        schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]
 
         with (
             patch("app.scraper_diagnostics.fetch_page_content") as mock_fetch,
@@ -134,7 +134,7 @@ class TestRunDiagnostics:
 
     async def test_error_path_populates_errors(self):
         """When extraction throws, errors list should be populated."""
-        schema = [SchemaField(name="name", field_type="string")]
+        schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]
 
         with (
             patch("app.scraper_diagnostics.fetch_page_content") as mock_fetch,
@@ -154,7 +154,7 @@ class TestRunDiagnostics:
 
     async def test_fetch_failure_still_produces_report(self):
         """Even early failures produce a report with error."""
-        schema = [SchemaField(name="name", field_type="string")]
+        schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]
 
         with patch("app.scraper_diagnostics.fetch_page_content") as mock_fetch:
             mock_fetch.side_effect = RuntimeError("Connection refused")
@@ -166,7 +166,7 @@ class TestRunDiagnostics:
 
     async def test_memory_miss(self):
         """When no selectors in memory, memory_hit is False."""
-        schema = [SchemaField(name="name", field_type="string")]
+        schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]
 
         with (
             patch("app.scraper_diagnostics.fetch_page_content") as mock_fetch,

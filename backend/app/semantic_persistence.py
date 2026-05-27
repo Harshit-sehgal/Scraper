@@ -15,6 +15,7 @@ import os
 import fcntl
 
 from app.semantic_world_state import get_world_state
+from app.config import settings
 
 
 _STATE_LOCK_PATH: str | None = None
@@ -23,17 +24,19 @@ _STATE_LOCK_PATH: str | None = None
 def _get_lock_path() -> str:
     global _STATE_LOCK_PATH
     if _STATE_LOCK_PATH is None:
-        cache = os.environ.get('SEMANTIC_STATE_PATH', '/tmp/semantic_state_v2.json')
+        cache = os.environ.get('SEMANTIC_STATE_PATH') or settings.SEMANTIC_STATE_PATH
         _STATE_LOCK_PATH = cache + '.lock'
     return _STATE_LOCK_PATH
 
 
 def get_canonical_cache_path() -> str:
-    return os.environ.get('SEMANTIC_STATE_PATH', '/tmp/semantic_state_v2.json')
+    return os.environ.get('SEMANTIC_STATE_PATH') or settings.SEMANTIC_STATE_PATH
 
 
 def _acquire_lock():
     path = _get_lock_path()
+    if os.path.dirname(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
     fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
     fcntl.flock(fd, fcntl.LOCK_EX)
     return fd

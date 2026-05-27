@@ -2,8 +2,8 @@
 
 **Purpose**: Single source of truth for DataForge system architecture  
 **Audience**: Engineers, operators, new team members  
-**Status**: Phase 5 in progress  
-**Last Updated**: May 20, 2026
+**Status**: Phase 5 Complete + Production Hardening  
+**Last Updated**: May 26, 2026
 
 ---
 
@@ -709,19 +709,31 @@ Memory Layer (depends on: all layers)
 ## Future Enhancements
 
 ### Phase 5 (Current)
-- [ ] System topology visualization
-- [ ] Architectural validation tests
-- [ ] Hard boundary enforcement
+- [x] System topology visualization ✓
+- [x] Dependency graph and data flow diagrams ✓
+- [x] Architectural validation tests (40 tests passing) ✓
+- [x] Chaos engineering framework (22 scenarios, 5 tests) ✓
+- [x] Hard boundary enforcement ✓
+- [x] Operational Intelligence (Week 9-12) ✓
+  - Degradation predictor (6 failure patterns detected)
+  - Operator mode switching (5 modes: production, benchmark, forensic, stealth, low_cost)
+  - Frontend dashboard with health/predictions/mode controls
+  - 35 tests (22 + 13), mypy clean
+  - PLAYBOOKS.md with 6 issue resolution playbooks
 
-### Phase 6
-- [ ] Chaos engineering framework
-- [ ] Failure scenario library
-- [ ] Resource governance enforcement
+### Phase 6 (Production Hardening — Complete)
+- [x] Prometheus /metrics endpoint ✓
+- [x] Admin API key for powerful routes ✓
+- [x] Postgres world-state persistence ✓
+- [x] Postgres-backed worker queue (multi-node capable) ✓
+- [x] Role-based API keys (read-only, operator, admin) ✓
+- [x] secrets.compare_digest for timing-attack resistance ✓
+- [x] Rate limiter respects X-Forwarded-For header ✓
+- [x] CI pipeline (lint, typecheck, test, arch-validation, Docker build) ✓
 
 ### Phase 7
-- [ ] Predictive degradation dashboard
-- [ ] Operator mode switching
-- [ ] Production readiness validation
+- [ ] Production deployment guide
+- [ ] Self-healing automation
 
 ---
 

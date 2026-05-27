@@ -38,16 +38,17 @@ def test_lifecycle_hooks_exist():
                     if node.func.value.func.attr == "get_world_state":
                         calls.add(name)
 
-    with open(_app_path("app/semantic_world_state.py")) as f:
-        world_state_src = f.read()
-
     world_state_methods = set()
-    tree2 = ast.parse(world_state_src)
-    for node in ast.walk(tree2):
-        if isinstance(node, ast.ClassDef) and node.name == "SemanticWorldState":
-            for item in node.body:
-                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    world_state_methods.add(item.name)
+    ws_dir = os.path.dirname(_app_path("app/semantic_world_state/core.py"))
+    for fname in os.listdir(ws_dir):
+        if fname.endswith(".py"):
+            with open(os.path.join(ws_dir, fname)) as f:
+                tree2 = ast.parse(f.read())
+            for node in ast.walk(tree2):
+                if isinstance(node, ast.ClassDef) and (node.name == "SemanticWorldState" or "Mixin" in node.name):
+                    for item in node.body:
+                        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            world_state_methods.add(item.name)
 
     missing = calls - world_state_methods
     assert not missing, (
@@ -58,17 +59,18 @@ def test_lifecycle_hooks_exist():
 
 def test_no_orphan_methods():
     """All SemanticWorldState public methods should be reachable from the pipeline or scheduler."""
-    with open(_app_path("app/semantic_world_state.py")) as f:
-        src = f.read()
-
-    tree = ast.parse(src)
     methods = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef) and node.name == "SemanticWorldState":
-            for item in node.body:
-                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    if not item.name.startswith("_"):
-                        methods.add(item.name)
+    ws_dir = os.path.dirname(_app_path("app/semantic_world_state/core.py"))
+    for fname in os.listdir(ws_dir):
+        if fname.endswith(".py"):
+            with open(os.path.join(ws_dir, fname)) as f:
+                tree = ast.parse(f.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef) and (node.name == "SemanticWorldState" or "Mixin" in node.name):
+                    for item in node.body:
+                        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            if not item.name.startswith("_"):
+                                methods.add(item.name)
 
     # Check all app files for references to these methods
     app_dir = _app_path("app")
@@ -198,7 +200,10 @@ def test_no_dead_imports():
         "semantic_allocation_engine", "semantic_inference_engine",
     ]
     for mod_name in core_modules:
-        with open(_app_path(f"app/{mod_name}.py")) as f:
+        path = _app_path(f"app/{mod_name}.py")
+        if mod_name == "semantic_world_state":
+            path = _app_path("app/semantic_world_state/core.py")
+        with open(path) as f:
             tree = ast.parse(f.read())
 
         # Collect all imported names and their source modules

@@ -110,28 +110,26 @@ from app.llm_bridge import _groq_model_candidates
 
 class TestGroqModelCandidates:
     def test_defaults_when_no_env_vars(self):
-        with patch.dict(os.environ, {}, clear=True):
+        with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "llama-3.3-70b-versatile"), \
+             patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant"):
             models = _groq_model_candidates()
             assert models == ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 
-    def test_uses_env_vars(self):
-        with patch.dict(os.environ, {
-            "GROQ_MODEL": "mixtral-8x7b-32768",
-            "GROQ_FALLBACK_MODEL": "llama2-70b-4096",
-        }):
+    def test_uses_settings(self):
+        with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "mixtral-8x7b-32768"), \
+             patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama2-70b-4096"):
             models = _groq_model_candidates()
             assert models == ["mixtral-8x7b-32768", "llama2-70b-4096"]
 
     def test_deduplicates_identical_models(self):
-        with patch.dict(os.environ, {
-            "GROQ_MODEL": "llama-3.3-70b-versatile",
-            "GROQ_FALLBACK_MODEL": "llama-3.3-70b-versatile",
-        }):
+        with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "llama-3.3-70b-versatile"), \
+             patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama-3.3-70b-versatile"):
             models = _groq_model_candidates()
             assert models == ["llama-3.3-70b-versatile"]  # Deduplicated
 
-    def test_handles_empty_env(self):
-        with patch.dict(os.environ, {"GROQ_MODEL": "", "GROQ_FALLBACK_MODEL": ""}):
+    def test_uses_defaults_on_none(self):
+        with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", ""), \
+             patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", ""):
             models = _groq_model_candidates()
             # Empty strings resolve to defaults due to `or` operator
             assert models == ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]

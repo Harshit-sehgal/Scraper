@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from enum import Enum
-from typing import Optional, Callable, Any
+from typing import Callable, Any, Optional
 
 from app.failure_classification import FailureCategory, FailureClassification
 
@@ -60,19 +60,49 @@ class RecoveryPlan:
     
     failure_category: FailureCategory
     primary_action: RecoveryAction
-    secondary_actions: list[RecoveryAction]  # Escalation path
-    parameters: dict[str, Any]  # Action-specific params
-    max_retry_attempts: int  # Total retries for this action
-    backoff_seconds: float  # Time to wait before retry
-    should_escalate: bool  # Whether to try secondary actions if primary fails
-    reason: str  # Why this recovery plan was chosen
-    
+    secondary_actions: list[RecoveryAction] = field(default_factory=list)
+    parameters: dict[str, Any] = field(default_factory=dict)
+    max_retry_attempts: int = 1
+    backoff_seconds: float = 1.0
+    should_escalate: bool = False
+    reason: str = ""
+
     def to_dict(self) -> dict:
         result = asdict(self)
         result["failure_category"] = self.failure_category.value
         result["primary_action"] = self.primary_action.value
         result["secondary_actions"] = [a.value for a in self.secondary_actions]
         return result
+
+
+@dataclass
+class AttemptContext:
+    """Mutable context mutated by recovery handlers and consumed by the next scrape attempt."""
+    timeout_ms: int | None = None
+    hydration_wait_ms: int | None = None
+    fetch_strategy: str | None = None
+    bypass_selector_memory: bool = False
+    force_llm_discovery: bool = False
+    prefer_httpx: bool = False
+    reduce_concurrency: bool = False
+    proxy_profile: str | None = None
+    search_params: dict[str, str] | None = None
+    extra_headers: dict[str, str] = field(default_factory=dict)
+    skip_networkidle: bool = False
+    scroll_attempts: int | None = None
+    anti_bot_stealth: bool = False
+
+    # Recovery-only flags
+    skip_url: bool = False
+    """If True, the URL should be skipped entirely (set by handle_skip_url)."""
+    skip_domain: str | None = None
+    """If set, the domain should be skipped (set by handle_skip_domain)."""
+    min_record_score_override: float | None = None
+    """Override the minimum record score (set by handle_lower_score_threshold)."""
+    force_container_discovery: bool = False
+    """If True, bypass memory and LLM discovery and go straight to container discovery."""
+    abort_domain: bool = False
+    """If True, mark domain cooldown instead of retrying with a different strategy."""
 
 
 class RecoveryStrategist:
@@ -319,7 +349,6 @@ class RecoveryStrategist:
     
     def __init__(self):
         """Initialize recovery strategist."""
-        pass
     
     def generate_recovery_plan(
         self,
@@ -422,16 +451,18 @@ class RecoveryExecutor:
         self,
         plan: RecoveryPlan,
         context: dict[str, Any],
+        attempt_ctx: AttemptContext | None = None,
     ) -> bool:
-        """Execute a recovery plan.
+        """Execute a recovery plan, mutating attempt_ctx for the next scrape.
         
         Args:
             plan: The recovery plan to execute
             context: Execution context (url, html, schema_fields, etc.)
-            
-        Returns:
-            True if recovery succeeded, False otherwise
+            attempt_ctx: Mutable context that handlers modify for the next attempt.
+                         Changes here are consumed by the scraper before retry.
         """
+        if attempt_ctx is None:
+            attempt_ctx = AttemptContext()
         # Apply backoff if specified
         if plan.backoff_seconds > 0:
             logger.info(
@@ -449,7 +480,7 @@ class RecoveryExecutor:
         handler = self.action_handlers.get(plan.primary_action)
         if handler:
             try:
-                result = await handler(plan.parameters, context)
+                result = await handler(plan.parameters, context, attempt_ctx)
                 if result:
                     logger.info("Recovery successful: %s", plan.primary_action.value)
                     return True
@@ -465,7 +496,7 @@ class RecoveryExecutor:
                 handler = self.action_handlers.get(secondary_action)
                 if handler:
                     try:
-                        result = await handler(plan.parameters, context)
+                        result = await handler(plan.parameters, context, attempt_ctx)
                         if result:
                             logger.info("Recovery successful via escalation: %s", secondary_action.value)
                             return True

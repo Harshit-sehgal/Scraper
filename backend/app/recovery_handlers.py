@@ -25,6 +25,7 @@ from app.recovery_strategies import (
 )
 from app.proxy_manager import get_proxy_manager
 from app.selector_memory import get_selector_memory
+from app.domain_runtime_policy import get_domain_runtime_policy
 
 logger = logging.getLogger(__name__)
 
@@ -34,100 +35,68 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════════════
 
 
-async def handle_rotate_proxy(params: dict[str, Any], context: dict[str, Any]) -> bool:
-    """Rotate to next proxy and retry.
-    
-    Context:
-        - url: The URL being scraped
-        - html: Optional current HTML (may be empty/error page)
-    
-    Returns:
-        True if rotation successful, False if no proxy pool
-    """
-    proxy_manager = get_proxy_manager()
-    
-    if not proxy_manager.enabled:
-        logger.warning("Proxy rotation requested but proxy rotation not enabled")
+async def handle_rotate_proxy(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+    """Rotate to next proxy in the pool."""
+    logger.info("Rotating proxy for %s", context.get("url", ""))
+    pm = get_proxy_manager()
+    if not pm.enabled:
+        logger.warning("Proxy rotation disabled — returning False")
         return False
-    
-    old_proxy = proxy_manager.current_proxy
-    new_proxy = proxy_manager.rotate()
-    
-    logger.info("Rotated proxy: %s → %s", old_proxy, new_proxy)
+    pm.rotate()
+    if attempt_ctx:
+        attempt_ctx.anti_bot_stealth = True
+        attempt_ctx.proxy_profile = "rotated"
     return True
 
 
-async def handle_backoff_and_slow(params: dict[str, Any], context: dict[str, Any]) -> bool:
-    """Backoff with exponential delay.
-    
-    Parameters:
-        - delay_ms: Base delay in milliseconds (default 10000)
-        - slow_factor: Rate multiplication factor (default 0.5 = half speed)
-    """
-    delay_ms = params.get("delay_ms", 10000)
+async def handle_backoff_and_slow(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+    """Apply backoff delay and reduce request rate."""
+    delay_ms = params.get("delay_ms", 5000)
     slow_factor = params.get("slow_factor", 0.5)
-    
     delay_seconds = delay_ms / 1000.0
-    logger.info("Backoff: waiting %.1f seconds, then slowing to %.1f speed",
-               delay_seconds, slow_factor)
-    
+    logger.info("Backoff: waiting %.1f seconds, then slowing to %.1f speed", delay_seconds, slow_factor)
     await asyncio.sleep(delay_seconds)
-    
-    # Note: slow_factor would be applied to subsequent requests
-    # by the rate limiter or fetch logic
+    url = context.get("url", "")
+    if url:
+        get_domain_runtime_policy().set_reduce_concurrency(url)
+    if attempt_ctx:
+        attempt_ctx.reduce_concurrency = True
+        attempt_ctx.timeout_ms = int(params.get("timeout_ms", 40000))
     return True
 
 
-async def handle_increase_hydration_wait(params: dict[str, Any], context: dict[str, Any]) -> bool:
-    """Increase wait time for page hydration.
-    
-    Parameters:
-        - extra_delay_ms: Additional delay (default 5000)
-        - max_hydration_wait: Maximum total wait (default 30000)
-    """
-    extra_delay_ms = params.get("extra_delay_ms", 5000)
-    
-    logger.info("Increasing hydration wait by %d ms", extra_delay_ms)
-    
-    # This would be applied to the next fetch_page_content call
-    # Context could track this for subsequent retries
-    delay_seconds = extra_delay_ms / 1000.0
-    await asyncio.sleep(delay_seconds)
-    
+async def handle_increase_hydration_wait(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+    """Increase the time waited for JS hydration."""
+    extra_ms = params.get("extra_delay_ms", 5000)
+    max_wait = params.get("max_hydration_wait", 30000)
+    logger.info("Increasing hydration wait by %dms (max %dms)", extra_ms, max_wait)
+    if attempt_ctx:
+        current = attempt_ctx.hydration_wait_ms or 0
+        attempt_ctx.hydration_wait_ms = min(current + extra_ms, max_wait)
     return True
 
 
-async def handle_increase_timeout(params: dict[str, Any], context: dict[str, Any]) -> bool:
-    """Increase timeout for page fetch.
-    
-    Parameters:
-        - timeout_ms: New timeout value (default 30000)
-    """
-    timeout_ms = params.get("timeout_ms", 30000)
-    
-    logger.info("Recovery action: increasing timeout to %d ms", timeout_ms)
-    
-    # This adjustment would be applied by the calling code
-    # when retrying the fetch
+async def handle_increase_timeout(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+    """Increase the overall fetch timeout."""
+    timeout_ms = params.get("timeout_ms", 40000)
+    logger.info("Increasing timeout to %dms", timeout_ms)
+    if attempt_ctx:
+        attempt_ctx.timeout_ms = timeout_ms
     return True
 
 
-async def handle_reduce_concurrency(params: dict[str, Any], context: dict[str, Any]) -> bool:
-    """Reduce browser concurrency to prevent starvation.
-    
-    Parameters:
-        - max_contexts: Maximum concurrent browser contexts (default 3)
-    """
-    max_contexts = params.get("max_contexts", 3)
-    
-    logger.info("Recovery action: reducing concurrency to %d contexts", max_contexts)
-    
-    # This would be signaled to browser_pool.py
-    # For now, just log the action
+async def handle_reduce_concurrency(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+    """Reduce concurrent fetches and update domain runtime policy."""
+    url = context.get("url", "")
+    logger.info("Reducing concurrency for %s", url)
+    if url:
+        get_domain_runtime_policy().set_reduce_concurrency(url)
+    if attempt_ctx:
+        attempt_ctx.reduce_concurrency = True
     return True
 
 
-async def handle_retry_with_dns_flush(params: dict[str, Any], context: dict[str, Any]) -> bool:
+async def handle_retry_with_dns_flush(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
     """Retry with DNS cache flush.
     
     Parameters:
@@ -143,37 +112,26 @@ async def handle_retry_with_dns_flush(params: dict[str, Any], context: dict[str,
     return True
 
 
-async def handle_force_rediscovery(params: dict[str, Any], context: dict[str, Any]) -> bool:
-    """Force selector rediscovery for a domain.
-    
-    Parameters:
-        - bypass_memory: Skip selector memory (default True)
-    
-    Side Effect:
-        Marks domain selectors for rediscovery in selector memory
-    """
+async def handle_force_rediscovery(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
     url = context.get("url")
     if not url:
-        logger.warning("Force rediscovery: no URL in context")
         return False
-    
     selector_memory = get_selector_memory()
-    
-    # Remove the selector memory entry for this domain so it's rediscovered
     domain = selector_memory._extract_domain(url)
     if domain and domain in selector_memory._memory:
         logger.info("Force rediscovery: clearing cached selectors for %s", domain)
         del selector_memory._memory[domain]
         selector_memory._save()
-        return True
-    
-    logger.info("Force rediscovery: no cached selectors found for %s", domain)
+    if attempt_ctx:
+        attempt_ctx.force_llm_discovery = True
+        attempt_ctx.bypass_selector_memory = True
     return True
 
 
 async def handle_force_rediscovery_with_swap_detection(
     params: dict[str, Any],
-    context: dict[str, Any]
+    context: dict[str, Any],
+    attempt_ctx=None,
 ) -> bool:
     """Force rediscovery with field swap detection.
     
@@ -186,92 +144,89 @@ async def handle_force_rediscovery_with_swap_detection(
     """
     # Same as basic force_rediscovery for now
     # The swap detection would be in the extraction layer
-    return await handle_force_rediscovery(params, context)
+    return await handle_force_rediscovery(params, context, attempt_ctx)
 
 
-async def handle_lower_score_threshold(params: dict[str, Any], context: dict[str, Any]) -> bool:
-    """Lower quality score threshold for extracted records.
-    
-    Parameters:
-        - score_multiplier: Multiply quality scores by this (default 0.8)
-    """
+async def handle_lower_score_threshold(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+    """Lower quality score threshold for extracted records."""
     score_multiplier = params.get("score_multiplier", 0.8)
-    
     logger.info("Recovery action: lowering quality threshold (multiplier=%.1f)", score_multiplier)
-    
-    # This would be applied to the next extraction round
-    # The context could track this adjustment
+    if attempt_ctx:
+        attempt_ctx.reduce_concurrency = True
+        # Actually lower the min score threshold for the next retry
+        current_score = context.get("min_record_score", 0.35)
+        attempt_ctx.min_record_score_override = current_score * score_multiplier
+        logger.info(
+            "  -> setting min_record_score_override to %.3f (was %.3f)",
+            attempt_ctx.min_record_score_override, current_score,
+        )
     return True
 
 
-async def handle_retry_with_field_focus(params: dict[str, Any], context: dict[str, Any]) -> bool:
-    """Retry with focus on critical fields only.
-    
-    Parameters:
-        - focus_fields: Which fields to focus on (default None = all)
-    """
+async def handle_retry_with_field_focus(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+    """Retry with focus on critical fields only."""
     logger.info("Recovery action: retry with field focus strategy")
-    
-    # This would affect the next extraction attempt
+    if attempt_ctx:
+        attempt_ctx.force_llm_discovery = True
+        attempt_ctx.bypass_selector_memory = True
     return True
 
 
-async def handle_escalate_to_llm(params: dict[str, Any], context: dict[str, Any]) -> bool:
-    """Escalate to LLM-based discovery.
-    
-    Parameters:
-        - force_llm_discovery: Force LLM (default True)
-    """
+async def handle_escalate_to_llm(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+    """Escalate to LLM-based discovery."""
     logger.info("Recovery action: escalating to LLM-based discovery")
-    
-    # Next extraction would use LLM discovery instead of cached selectors
+    if attempt_ctx:
+        attempt_ctx.force_llm_discovery = True
+        attempt_ctx.bypass_selector_memory = True
     return True
 
 
-async def handle_use_httpx_fallback(params: dict[str, Any], context: dict[str, Any]) -> bool:
-    """Use httpx fallback instead of Playwright.
-    
-    Parameters:
-        - prefer_httpx: Use httpx (default True)
-    """
-    logger.info("Recovery action: switching to httpx fallback fetch method")
-    
-    # This would signal to fetch_page_content to use httpx
-    return True
-
-
-async def handle_abort_domain(params: dict[str, Any], context: dict[str, Any]) -> bool:
-    """Stop scraping a domain temporarily.
-    
-    Parameters:
-        - skip_domain_minutes: Minutes to skip (default 60)
-    """
+async def handle_abort_domain(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+    """Stop scraping a domain temporarily — mark cooldown, don't retry with a different strategy."""
     skip_minutes = params.get("skip_domain_minutes", 60)
     url = context.get("url")
-    
-    logger.warning(
-        "Recovery action: aborting domain %s for %d minutes",
-        url, skip_minutes
-    )
-    
-    # This would be tracked in domain_intelligence for blocking
+    logger.warning("Recovery action: aborting domain %s for %d minutes", url, skip_minutes)
+    if url:
+        get_domain_runtime_policy().set_abort_domain(url)
+    if attempt_ctx:
+        attempt_ctx.abort_domain = True
+        # Do NOT switch to httpx_basic — aborted domains should be skipped, not retried
+        if url:
+            from urllib.parse import urlparse
+            domain = urlparse(url).netloc.lower()
+            if domain:
+                attempt_ctx.skip_domain = domain
     return True
 
 
-async def handle_skip_domain(params: dict[str, Any], context: dict[str, Any]) -> bool:
+async def handle_use_httpx_fallback(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
+    logger.info("Recovery action: switching to httpx fallback fetch method")
+    if attempt_ctx:
+        attempt_ctx.prefer_httpx = True
+        attempt_ctx.fetch_strategy = "httpx_basic"
+    return True
+
+
+async def handle_skip_domain(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
     """Skip domain permanently (for this job).
     
-    Parameters:
-        None
+    Also records an abort in the domain runtime policy so future scheduling
+    is aware of the skip.
     """
     url = context.get("url")
     logger.warning("Recovery action: skipping domain %s", url)
+    if url:
+        get_domain_runtime_policy().set_abort_domain(url)
     
-    # Job runner would mark this domain as skipped
+    if attempt_ctx:
+        from urllib.parse import urlparse
+        domain = urlparse(url).netloc.lower() if url else None
+        if domain:
+            attempt_ctx.skip_domain = domain
     return True
 
 
-async def handle_skip_url(params: dict[str, Any], context: dict[str, Any]) -> bool:
+async def handle_skip_url(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
     """Skip this specific URL.
     
     Parameters:
@@ -280,6 +235,8 @@ async def handle_skip_url(params: dict[str, Any], context: dict[str, Any]) -> bo
     url = context.get("url")
     logger.warning("Recovery action: skipping URL %s", url)
     
+    if attempt_ctx:
+        attempt_ctx.skip_url = True
     return True
 
 

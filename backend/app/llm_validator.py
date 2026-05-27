@@ -27,7 +27,7 @@ def validate_llm_json(
     raw: Any,
     expected_type: type = dict,
     required_keys: Optional[list[str]] = None,
-    key_types: Optional[dict[str, type]] = None,
+    key_types: Optional[dict[str, type | tuple[type, ...]]] = None,
     list_item_type: Optional[type] = None,
     allow_extra_keys: bool = True,
 ) -> tuple[bool, str | None]:
@@ -68,8 +68,9 @@ def validate_llm_json(
             for key, expected in key_types.items():
                 if key in raw and raw[key] is not None:
                     if not isinstance(raw[key], expected):
+                        expected_name = getattr(expected, '__name__', str(expected))
                         return False, (
-                            f"Key '{key}' expected type {expected.__name__}, "
+                            f"Key '{key}' expected type {expected_name}, "
                             f"got {type(raw[key]).__name__}: {str(raw[key])[:100]}"
                         )
 
@@ -88,7 +89,7 @@ def validate_llm_json(
 def validate_llm_record_list(
     raw: Any,
     required_record_keys: Optional[list[str]] = None,
-    record_key_types: Optional[dict[str, type]] = None,
+    record_key_types: Optional[dict[str, type | tuple[type, ...]]] = None,
 ) -> tuple[bool, str | None]:
     """Validate an LLM response that should be a list of dict records.
 

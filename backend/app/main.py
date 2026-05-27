@@ -4,28 +4,74 @@ FastAPI Main Server — DataForge General-Purpose Web Scraper API.
 
 import asyncio
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Any
 
-# Load .env before any app imports that read env vars at module level
-from dotenv import load_dotenv
-load_dotenv()
-
-# ruff: noqa: E402
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.routers.jobs import create_jobs_router
 from app.routers.exports import create_exports_router
 from app.routers.scraper import router as scraper_router
 from app.services.job_runner import run_job
-from app.services.state import persist_state
-from app.state_store import load_state, get_state_file_path
+from app.state_store import get_state_file_path
+from app.storage_interface import get_job_repository
+
+# Repository is resolved lazily inside lifespan() so that env vars can be
+# patched during tests before startup. The module-level variable is set
+# during startup and referenced by route handlers.
+job_repo = None
 from app.rate_limiter import RateLimiterMiddleware
+from app.postgres_repository import shutdown_postgres
+import time
+
+
+from enum import Enum
+
+
+class AcquisitionMode(str, Enum):
+    """Acquisition mode for URL preview/analysis.
+    
+    Determines how aggressively the system attempts to acquire the page:
+    - standard: Basic fetch, single attempt
+    - aggressive: Session recovery, search form submission
+    - deep_scan: All recovery strategies, multiple retries
+    """
+    STANDARD = "standard"
+    AGGRESSIVE = "aggressive"
+    DEEP_SCAN = "deep_scan"
+
+
+# ─── Request Models ────────────────────────────────────────────────────────
+
+
+class URLPreviewRequest(BaseModel):
+    """Request body for URL analysis."""
+    url: str = Field(..., description="The URL to analyze for data extraction")
+    search_params: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Optional search parameters to submit to the site's search form if "
+            "the URL has expired (e.g. expired session token). Keys are semantic: "
+            "origin, destination, departure_date, return_date, adults, children. "
+            "Values are the search values (e.g. 'NYC', 'LHR', '05/15/2026')."
+        ),
+    )
+    acquisition_mode: AcquisitionMode = Field(
+        default=AcquisitionMode.STANDARD,
+        description=(
+            "Acquisition mode: 'standard' (basic fetch), 'aggressive' (session recovery, "
+            "search form submission), or 'deep_scan' (all recovery strategies, multiple retries)."
+        ),
+    )
+
 
 logger = logging.getLogger(__name__)
 
@@ -113,8 +159,13 @@ async def lifespan(app: FastAPI):
         "max_recycle_bin_history": settings.MAX_RECYCLE_BIN_HISTORY,
     }
 
-    # Durable job store & semantic field state
-    loaded_jobs, loaded_recycle, world_state_data = load_state()
+    # Resolve the repository lazily so env vars can be patched before startup.
+    global job_repo
+    job_repo = get_job_repository()
+
+    # Durable job store & semantic field state — single DB read on startup
+    # Use the repository factory to support SQLite or Postgres transparently
+    loaded_jobs, loaded_recycle, world_state_data = job_repo.load_all()
     jobs_store.clear()
     jobs_store.update(loaded_jobs)
     recycle_bin_store.clear()
@@ -146,6 +197,33 @@ async def lifespan(app: FastAPI):
     _background_tasks.clear()
     logger.info("Background tasks cleaned up")
 
+    # Persist semantic world state to repository if Postgres supports it
+    try:
+        repo = get_job_repository()
+        if hasattr(repo, "save_world_state"):
+            from app.semantic_world_state import get_world_state
+            ws = get_world_state()
+            try:
+                repo.save_world_state(ws.to_dict())
+                logger.info("Semantic world state persisted to repository on shutdown")
+            except Exception as e:
+                logger.warning("Failed to persist world state on shutdown: %s", e)
+    except Exception as e:
+        logger.warning("Failed to check repository support for world state during shutdown: %s", e)
+
+    # Flush any pending background state writes
+    try:
+        from app.state_store import flush_state_writes
+        flush_state_writes()
+    except Exception as e:
+        logger.warning("Failed to flush state writes during shutdown: %s", e)
+
+    # Close Postgres connection pool if active
+    try:
+        shutdown_postgres()
+    except Exception as e:
+        logger.warning("Failed to close Postgres connection pool during shutdown: %s", e)
+
 
 def _schedule_background_task(coro):
     """Schedule a background task with error handling."""
@@ -164,11 +242,19 @@ def _schedule_background_task(coro):
 
 
 # Create FastAPI app with lifespan
+# Disable interactive API docs in production to prevent schema leakage
+_docs_url = None if settings.ENV.lower() == "production" else "/docs"
+_redoc_url = None if settings.ENV.lower() == "production" else "/redoc"
+_openapi_url = None if settings.ENV.lower() == "production" else "/openapi.json"
+
 app = FastAPI(
     title="DataForge — General-Purpose Web Scraper",
     description="AI-powered scraper that extracts structured data from any website",
     version="2.0.0",
     lifespan=lifespan,
+    docs_url=_docs_url,
+    redoc_url=_redoc_url,
+    openapi_url=_openapi_url,
 )
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -183,15 +269,97 @@ app.add_middleware(
 )
 
 
-# ─── API Key Auth + Rate Limit Middleware ────────────────────────────────
+# ─── Request Body Size Limit ───────────────────────────────────────────
+
+
+MAX_BODY_SIZE = 5 * 1024 * 1024  # 5MB
+
+
+@app.middleware("http")
+async def body_size_middleware(request: Request, call_next):
+    """Limit request body size to prevent abuse."""
+    request.state.body_limit_exceeded = False
+
+    if request.method in ("POST", "PUT", "PATCH") and request.url.path.startswith("/api/"):
+        # 1. Fast-path check on Content-Length header
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > MAX_BODY_SIZE:
+                    return JSONResponse(
+                        status_code=413,
+                        content={"detail": "Request body too large (max 5MB)"},
+                    )
+            except (ValueError, TypeError):
+                pass
+
+        # 2. Wrap Starlette receive callable to dynamically enforce size limit for chunked/streamed bodies
+        original_receive = request.receive
+        bytes_received = 0
+
+        async def custom_receive():
+            nonlocal bytes_received
+            message = await original_receive()
+            if message.get("type") == "http.request":
+                body = message.get("body", b"")
+                bytes_received += len(body)
+                if bytes_received > MAX_BODY_SIZE:
+                    request.state.body_limit_exceeded = True
+                    raise ValueError("Body size limit exceeded")
+            return message
+
+        request._receive = custom_receive
+
+    try:
+        response = await call_next(request)
+        if getattr(request.state, "body_limit_exceeded", False):
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Request body too large (max 5MB)"},
+            )
+        return response
+    except ValueError as exc:
+        if str(exc) == "Body size limit exceeded" or getattr(request.state, "body_limit_exceeded", False):
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Request body too large (max 5MB)"},
+            )
+        raise exc
+    except Exception as exc:
+        if getattr(request.state, "body_limit_exceeded", False):
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Request body too large (max 5MB)"},
+            )
+        raise exc
+
+
+# ─── API Key Auth Middleware ────────────────────────────────────────────────
 
 
 @app.middleware("http")
 async def api_key_middleware(request: Request, call_next):
-    if settings.API_KEY and request.url.path.startswith("/api/"):
-        if "/docs" not in request.url.path and "/openapi" not in request.url.path:
+    if (settings.API_KEY or settings.ADMIN_API_KEY or getattr(settings, "OPERATOR_API_KEY", "")) and request.url.path.startswith("/api/"):
+        # Protect /docs and /openapi behind API key in production
+        is_docs_path = "/docs" in request.url.path or "/openapi" in request.url.path
+        if not is_docs_path or settings.ENV.lower() == "production":
             api_key = request.headers.get("X-API-Key", "")
-            if api_key != settings.API_KEY:
+            admin_key_header = request.headers.get("X-Admin-Key", "")
+            
+            def is_match(provided, expected):
+                if not expected or not provided:
+                    return False
+                return secrets.compare_digest(provided, expected)
+                
+            valid = False
+            if settings.API_KEY and is_match(api_key, settings.API_KEY):
+                valid = True
+            elif getattr(settings, "OPERATOR_API_KEY", "") and is_match(api_key, settings.OPERATOR_API_KEY):
+                valid = True
+            elif settings.ADMIN_API_KEY and (is_match(api_key, settings.ADMIN_API_KEY) or is_match(admin_key_header, settings.ADMIN_API_KEY)):
+                valid = True
+                
+            if not valid:
                 return JSONResponse(
                     status_code=403,
                     content={"detail": "Invalid or missing API key. Provide X-API-Key header."},
@@ -208,12 +376,32 @@ rate_limiter = RateLimiterMiddleware(
 app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limiter.middleware)
 
 
+# ─── Metrics / Request Latency Middleware ─────────────────────────────
+
+@app.middleware("http")
+async def latency_tracking_middleware(request: Request, call_next):
+    """Track API and metrics endpoint request durations for Prometheus export."""
+    path = request.url.path
+    # Only track API routes and the metrics endpoint itself
+    if path.startswith("/api/") or path == "/metrics" or path in ("/health", "/ready"):
+        start = time.time()
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            duration = time.time() - start
+            from app.metrics_collector import record_request_latency
+            record_request_latency(duration)
+    else:
+        return await call_next(request)
+
+
 # ─── Periodic Gossip State Propagation ───────────────────────────────
 
 async def _periodic_gossip_propagation():
     """Propagate gossip state every 60 seconds."""
     while True:
-        await asyncio.sleep(60)
+        await asyncio.sleep(settings.GOSSIP_PROPAGATION_INTERVAL)
         try:
             if gossip is not None:
                 propagated = gossip.propagate_state_via_gossip(heartbeat_manager=heartbeat_mgr)
@@ -221,6 +409,28 @@ async def _periodic_gossip_propagation():
                     logger.debug("Propagated gossip state to %d peers", propagated)
         except Exception as e:
             logger.debug("Gossip propagation skipped: %s", e)
+
+
+def _persist_single_wrapper(job_id: str, critical: bool = False) -> None:
+    """Persist a single job to the configured backend.
+
+    Resolves the repository lazily via get_job_repository() so this works
+    before lifespan runs (e.g. in tests).
+
+    Args:
+        job_id: The job ID to persist.
+        critical: If True, re-raise on failure. Use for terminal states
+            (completed, failed, canceled, degraded, empty_result).
+            If False (default), log and swallow. Use for hot-path progress updates.
+    """
+    job = jobs_store.get(job_id)
+    if job:
+        try:
+            get_job_repository().save_single(job)
+        except Exception as e:
+            logger.error("Failed to persist single job %s: %s", job_id, e)
+            if critical:
+                raise
 
 
 async def _run_job_wrapper(job_id: str):
@@ -233,16 +443,16 @@ async def _run_job_wrapper(job_id: str):
         per_url_scrape_timeout_seconds=CONFIG["per_url_timeout_seconds"],
         ai_structuring_timeout_seconds=CONFIG["ai_structuring_timeout_seconds"],
         insight_timeout_seconds=CONFIG["insight_timeout_seconds"],
+        # Non-critical: hot-path progress/log persistence is best-effort
+        persist_state_single_fn=lambda: _persist_single_wrapper(job_id, critical=False),
+        # Critical: terminal state single-row persistence must not be silently lost
+        persist_state_single_critical_fn=lambda: _persist_single_wrapper(job_id, critical=True),
     )
 
 
 def _persist_state_wrapper():
-    persist_state(
-        jobs_store=jobs_store,
-        recycle_bin_store=recycle_bin_store,
-        max_job_history=CONFIG["max_job_history"],
-        max_recycle_bin_history=CONFIG["max_recycle_bin_history"],
-    )
+    repo = get_job_repository()
+    repo.save_all(jobs=jobs_store, recycle_bin=recycle_bin_store)
 
 
 # Include Routers
@@ -263,6 +473,9 @@ app.include_router(
 
 app.include_router(scraper_router)
 
+from app.routers.operator import router as operator_router
+app.include_router(operator_router)
+
 
 # ─── Routes ──────────────────────────────────────────────────────────────
 
@@ -270,6 +483,84 @@ app.include_router(scraper_router)
 @app.get("/")
 async def root():
     return {"message": "DataForge API v2", "docs": "/docs", "dashboard": "/app"}
+
+
+@app.get("/health")
+async def health():
+    """Liveness probe — always returns 200 if the process is alive."""
+    return {"status": "ok"}
+
+
+@app.get("/ready")
+async def ready():
+    """Readiness probe — checks that the configured storage backend is reachable.
+
+    Uses the active JobRepository's health_check() if available (Postgres),
+    otherwise falls back to SQLite storage health (SQLite).
+    Returns 503 if the backend is unhealthy.
+
+    In production mode, returns minimal info to avoid leaking backend/schema details.
+    """
+    start_time = time.time()
+    repo = get_job_repository()
+    try:
+        if hasattr(repo, "health_check"):
+            health = repo.health_check()
+        else:
+            from app.job_store import get_storage_health
+            health = get_storage_health()
+
+        duration = time.time() - start_time
+        from app.metrics_collector import record_health_check_latency as _rchl
+        _rchl(duration)
+
+        if not health["ok"]:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "not_ready", "error": health.get("error", "Backend unhealthy")},
+            )
+
+        # In production return minimal info to avoid leaking backend/schema details
+        if settings.ENV.lower() == "production":
+            return {"status": "ready"}
+
+        backend = getattr(repo, "backend", "sqlite")
+        return {
+            "status": "ready",
+            "backend": backend,
+            "storage": "ok",
+            "migrations": "ok",
+            "schema_version": health.get("schema_version", 0),
+            "job_count": health.get("job_count", len(jobs_store)),
+            "recycle_bin_count": health.get("recycle_bin_count", len(recycle_bin_store)),
+        }
+    except Exception as e:
+        duration = time.time() - start_time
+        from app.metrics_collector import record_health_check_latency
+        record_health_check_latency(duration)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "error": str(e)},
+        )
+
+
+@app.get("/api/system/storage/status")
+async def storage_status():
+    """Detailed storage backend status — uses the active JobRepository."""
+    repo = get_job_repository()
+    if hasattr(repo, "health_check"):
+        health = repo.health_check()
+        return {
+            "backend": "postgres",
+            "ok": health.get("ok", False),
+            "error": health.get("error"),
+            "schema_version": health.get("schema_version", 0),
+            "expected_version": health.get("expected_version", 0),
+            "job_count": health.get("job_count", 0),
+            "recycle_bin_count": health.get("recycle_bin_count", 0),
+        }
+    from app.job_store import get_storage_status
+    return get_storage_status()
 
 
 @app.get("/api/system/status")
@@ -285,12 +576,18 @@ async def system_status():
     active = counts.get(JobStatus.PENDING.value, 0) + counts.get(JobStatus.DISCOVERING.value, 0) + counts.get(JobStatus.RUNNING.value, 0)
 
     from app.state_store import get_state_file_path
+    from app.storage_interface import get_job_repository
+    repo = get_job_repository()
+    backend = getattr(repo, "backend", "sqlite")
     return {
         "status": "online",
+        "backend": backend,
         "jobs": {
             "total": len(jobs_store),
             "active": active,
             "completed": counts.get(JobStatus.COMPLETED.value, 0),
+            "degraded": counts.get(JobStatus.DEGRADED.value, 0),
+            "empty_result": counts.get(JobStatus.EMPTY_RESULT.value, 0),
             "failed": counts.get(JobStatus.FAILED.value, 0),
             "canceled": counts.get(JobStatus.CANCELED.value, 0),
         },
@@ -360,14 +657,65 @@ async def export_knowledge():
     }
 
 
+class KnowledgeMergeRequest(BaseModel):
+    """Validated request body for merge/knowledge endpoint."""
+    role_manifold: dict[str, list[float]] = Field(
+        default_factory=dict,
+        description="Role vectors to merge into the field manifold",
+    )
+    learned_exclusions: dict[str, float] = Field(
+        default_factory=dict,
+        description="Learned exclusions to merge (key format: 'role1|role2')",
+    )
+
+    @classmethod
+    def validate_payload(cls, data: dict) -> "KnowledgeMergeRequest":
+        """Validate and cap payload size."""
+        max_roles = 500
+        max_exclusions = 500
+        # Clamp to max sizes
+        if "role_manifold" in data and len(data["role_manifold"]) > max_roles:
+            data["role_manifold"] = dict(list(data["role_manifold"].items())[:max_roles])
+        if "learned_exclusions" in data and len(data["learned_exclusions"]) > max_exclusions:
+            data["learned_exclusions"] = dict(list(data["learned_exclusions"].items())[:max_exclusions])
+        return cls(**data)
+
+
+def _require_admin_key(request: Request):
+    """Check admin API key for powerful system routes."""
+    if not settings.ADMIN_API_KEY:
+        return  # No admin key configured — fall back to regular API key
+    provided = request.headers.get("X-Admin-Key", "")
+    if not secrets.compare_digest(provided, settings.ADMIN_API_KEY):
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=403,
+            detail="Admin API key required. Provide X-Admin-Key header.",
+        )
+
+
 @app.post("/api/system/merge/knowledge")
-async def merge_knowledge(data: dict):
-    """Merge an external knowledge manifold into the current field."""
+async def merge_knowledge(request: Request, data: dict):
+    """Merge an external knowledge manifold into the current field.
+
+    Validated with size caps: max 500 roles, max 500 exclusions.
+    Requires admin API key if DATAFORGE_ADMIN_API_KEY is configured.
+    """
+    _require_admin_key(request)
+    # Validate payload with size caps
+    try:
+        req = KnowledgeMergeRequest.validate_payload(data)
+    except Exception as e:
+        return JSONResponse(
+            status_code=422,
+            content={"detail": f"Invalid merge payload: {e}"},
+        )
+
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
 
     # 1. Merge Manifold (Geometric Beliefs)
-    remote_manifold = data.get("role_manifold", {})
+    remote_manifold = req.role_manifold
     merged_roles = 0
     for role, vec in remote_manifold.items():
         if ws.has_manifold_role(role):
@@ -377,7 +725,7 @@ async def merge_knowledge(data: dict):
         merged_roles += 1
 
     # 2. Merge Exclusions (Topological Constraints)
-    remote_exc = data.get("learned_exclusions", {})
+    remote_exc = req.learned_exclusions
     for k_str, val in remote_exc.items():
         parts = k_str.split("|")
         if len(parts) == 2:
@@ -414,6 +762,31 @@ async def system_observability():
             "levels": {r: ws.get_role_level(r) for r in ws.role_manifold},
         },
     }
+
+
+@app.get("/api/system/domain-policy")
+async def system_domain_policy():
+    """Return the current domain runtime policy summaries."""
+    from app.domain_runtime_policy import get_domain_runtime_policy
+    policy = get_domain_runtime_policy()
+    summary = policy.get_summary()
+    # Add recommended_action for each domain
+    result = {}
+    for domain_key, entry_data in summary.items():
+        # Build a representative URL for the recommended_action query
+        sample_url = f"https://{domain_key}/"
+        result[domain_key] = {
+            **entry_data,
+            "recommended_action": policy.recommended_action(sample_url),
+        }
+    return result
+
+
+@app.get("/api/system/acquisition/telemetry")
+async def acquisition_telemetry():
+    """Exposes acquisition telemetry: state distribution, recovery rates, recent events."""
+    from app.acquisition_telemetry import get_acquisition_telemetry
+    return get_acquisition_telemetry().get_summary()
 
 
 @app.get("/api/system/history/topology")
@@ -531,7 +904,7 @@ async def export_system_diagnostics():
     # Regular expressions for PII sanitization
     email_regex = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
     phone_regex = re.compile(r"\+?\b\d[\d\s()\-]{8,14}\d\b")
-    sensitive_keys = {"authorization", "auth", "api_key", "key", "password", "token", "secret", "signature", "alert_webhook_url"}
+    sensitive_keys = {"authorization", "auth", "api_key", "key", "password", "token", "secret", "signature", "alert_webhook_url", "credential", "session", "cookie", "bearer", "private", "client_secret", "api_secret", "access_key", "secret_key"}
 
     def sanitize_value(val):
         if isinstance(val, str):
@@ -638,6 +1011,247 @@ async def export_system_diagnostics():
         "Content-Disposition": "attachment; filename=dataforge_diagnostics.zip"
     }
     return Response(zip_buffer.getvalue(), media_type="application/zip", headers=headers)
+
+
+# ─── URL Analyzer Endpoint ──────────────────────────────────────────────
+
+
+@app.post("/api/url/analyze")
+async def analyze_url(req: URLPreviewRequest):
+    """Analyze a URL and auto-detect what data fields can be extracted.
+    
+    Fetches the URL, analyzes page structure, detects value patterns,
+    and uses LLM to discover all data fields with their CSS selectors,
+    types, confidence scores, and example values.
+    
+    This is the "preview URL → suggest fields" step that lets users
+    see what data is available before deciding what to scrape.
+    
+    Note: A 120-second overall timeout is enforced to prevent hanging
+    connections. If the page takes too long to render or the LLM is
+    unresponsive, a clear timeout error is returned instead of a
+    connection reset / cryptic NetworkError on the frontend.
+    
+    Returns:
+        url: The analyzed URL
+        page_structure: Type of structure (table|cards|list|mixed)
+        structure_confidence: How confident we are in the structure type
+        estimated_record_count: Estimated number of records on the page
+        item_container: CSS selector for repeating items
+        fetch_method: Method used to fetch the page
+        fetch_time_ms: Time taken to fetch and analyze
+        anti_bot_score: Likelihood the page has anti-bot protection
+        suggested_fields: List of detected fields with name, type, selector, example, confidence
+    """
+    from app.selector_discovery import analyze_url_for_fields
+    from app.url_safety import validate_public_http_url
+    
+    try:
+        validate_public_http_url(req.url)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "url": req.url,
+                "error": f"URL failed security validation: {e}",
+                "page_structure": "unknown",
+                "structure_confidence": 0.0,
+                "estimated_record_count": 0,
+                "item_container": None,
+                "suggested_fields": [],
+                "anti_bot_score": 0.0,
+            }
+        )
+
+    URL_ANALYZER_TIMEOUT = settings.URL_ANALYZER_TIMEOUT
+    
+    try:
+        result = await asyncio.wait_for(
+            analyze_url_for_fields(url=req.url, search_params=req.search_params, acquisition_mode=req.acquisition_mode),
+            timeout=URL_ANALYZER_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("[URLAnalyzer] Timeout after %ds analyzing %s", URL_ANALYZER_TIMEOUT, req.url)
+        return JSONResponse(
+            status_code=408,
+            content={
+                "url": req.url,
+                "error": f"Analysis timed out after {URL_ANALYZER_TIMEOUT} seconds. The page may be too slow, heavy, or protected by anti-bot measures.",
+                "redirect_info": None,
+                "content_quality": None,
+                "page_structure": "unknown",
+                "structure_confidence": 0.0,
+                "estimated_record_count": 0,
+                "item_container": None,
+                "suggested_fields": [],
+                "anti_bot_score": 0.0,
+            },
+        )
+    
+    if "error" in result and result["error"]:
+        return JSONResponse(status_code=422, content=result)
+    
+    return result
+
+
+# ─── Prometheus /metrics endpoint ───────────────────────────────────────
+
+# ─── Prometheus Metrics State ──────────────────────────────────────────
+# Module-level collectors for runtime metrics.
+# Shared state is in app.metrics_collector to avoid circular imports with worker_queue.
+
+METRICS_COLLECTION_ERRORS = 0
+
+
+@app.get("/metrics")
+async def metrics(request: Request):
+    """Prometheus-formatted metrics endpoint for DataForge scraper.
+
+    Exposes job counts, queue depth, runtime stats, request latencies,
+    worker failure counts, and backend health check durations.
+
+    Protected by METRICS_TOKEN if configured (Bearer token or X-API-Key).
+    """
+    # Auth check
+    if settings.METRICS_TOKEN:
+        auth_header = request.headers.get("Authorization", "")
+        api_key_header = request.headers.get("X-API-Key", "")
+        # Accept either Authorization: Bearer <token> or X-API-Key: <token>
+        bearer_token = ""
+        if auth_header.startswith("Bearer "):
+            bearer_token = auth_header[7:]
+        if not secrets.compare_digest(bearer_token, settings.METRICS_TOKEN) and \
+           not secrets.compare_digest(api_key_header, settings.METRICS_TOKEN):
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Invalid or missing metrics token. Provide Authorization: Bearer <token> or X-API-Key header."},
+            )
+
+    global METRICS_COLLECTION_ERRORS
+    from prometheus_client import generate_latest, Gauge, Histogram
+    from prometheus_client.core import CollectorRegistry
+    from fastapi.responses import Response
+
+    # Clear registry to avoid duplicate registration errors on hot-reload
+    registry = CollectorRegistry()
+
+    # ── Job counts by status ─────────────────────────────────────────────
+    from app.models import JobStatus
+    counts = {s.value: 0 for s in JobStatus}
+    for job in jobs_store.values():
+        status_key = str(job.status.value if isinstance(job.status, JobStatus) else job.status)
+        counts[status_key] = counts.get(status_key, 0) + 1
+
+    job_total = Gauge("dataforge_jobs_total", "Total jobs", ["status"], registry=registry)
+    for status, count in counts.items():
+        job_total.labels(status=status).set(count)
+
+    # Recycle bin count
+    recycle_gauge = Gauge("dataforge_recycle_bin_total", "Total jobs in recycle bin", registry=registry)
+    recycle_gauge.set(len(recycle_bin_store))
+
+    # Runtime limits
+    for key, val in CONFIG.items():
+        g = Gauge(f"dataforge_config_{key}", f"Config value for {key}", registry=registry)
+        try:
+            g.set(float(val))
+        except (TypeError, ValueError):
+            pass
+
+    # ── Repository backend ──────────────────────────────────────────────
+    backend_ok = 1
+    try:
+        repo = get_job_repository()
+        backend = getattr(repo, "backend", "sqlite")
+        backend_gauge = Gauge("dataforge_backend", "Storage backend type", ["backend"], registry=registry)
+        backend_gauge.labels(backend=backend).set(1)
+    except Exception as e:
+        backend_ok = 0
+        METRICS_COLLECTION_ERRORS += 1
+        logging.getLogger(__name__).error("Metrics: backend collection failed: %s", e)
+
+    backend_ok_gauge = Gauge("dataforge_backend_collection_ok", "Whether storage backend metrics collected successfully", registry=registry)
+    backend_ok_gauge.set(backend_ok)
+
+    # ── Worker queue stats ──────────────────────────────────────────────
+    queue_ok = 1
+    try:
+        from app.worker_queue import get_worker_queue
+        q = get_worker_queue()
+        q_status = q.get_status()
+        queue_pending = Gauge("dataforge_queue_pending", "Pending tasks in worker queue", registry=registry)
+        queue_pending.set(q_status.get("pending", 0))
+        queue_running = Gauge("dataforge_queue_running", "Running tasks in worker queue", registry=registry)
+        queue_running.set(q_status.get("running", 0))
+        queue_dead_letter = Gauge("dataforge_queue_dead_letter", "Dead letter queue size", registry=registry)
+        queue_dead_letter.set(q_status.get("dead_letter", 0))
+    except Exception as e:
+        queue_ok = 0
+        METRICS_COLLECTION_ERRORS += 1
+        logging.getLogger(__name__).error("Metrics: queue collection failed: %s", e)
+
+    queue_ok_gauge = Gauge("dataforge_queue_collection_ok", "Whether worker queue metrics collected successfully", registry=registry)
+    queue_ok_gauge.set(queue_ok)
+
+    # ── Worker failure counters ─────────────────────────────────────────
+    from app.metrics_collector import get_worker_failures
+    failures = get_worker_failures()
+    if failures:
+        failure_gauge = Gauge("dataforge_worker_failures_total", "Total worker failures by task type", ["task_type"], registry=registry)
+        for task_type, count in failures.items():
+            failure_gauge.labels(task_type=task_type).set(count)
+
+    # ── Request duration histogram ──────────────────────────────────────
+    from app.metrics_collector import get_request_latencies, get_health_check_latencies
+    if settings.METRICS_ENABLE_HISTOGRAMS:
+        req_latencies = get_request_latencies()
+        if req_latencies:
+            buckets = [float(b.strip()) for b in settings.METRICS_HISTOGRAM_BUCKETS.split(",") if b.strip()]
+            req_hist = Histogram(
+                "dataforge_request_duration_seconds",
+                "API request duration in seconds",
+                buckets=buckets,
+                registry=registry,
+            )
+            for v in req_latencies:
+                req_hist.observe(v)
+
+    # ── Backend health check latency histogram ──────────────────────────
+    if settings.METRICS_ENABLE_HISTOGRAMS:
+        health_latencies = get_health_check_latencies()
+        if health_latencies:
+            buckets = [float(b.strip()) for b in settings.METRICS_HISTOGRAM_BUCKETS.split(",") if b.strip()]
+            health_hist = Histogram(
+                "dataforge_backend_health_check_duration_seconds",
+                "Backend health check duration in seconds",
+                buckets=buckets,
+                registry=registry,
+            )
+            for v in health_latencies:
+                health_hist.observe(v)
+
+    # ── Cumulative collection errors ────────────────────────────────────
+    error_total_gauge = Gauge("dataforge_metrics_collection_error_total", "Total collection errors encountered", registry=registry)
+    error_total_gauge.set(METRICS_COLLECTION_ERRORS)
+
+    # ── Cumulative error counts by type (database, scraper, etc.) ───────
+    from app.metrics_collector import get_errors, get_llm_calls, get_requests_total
+    errors_dict = get_errors()
+    errors_gauge = Gauge("dataforge_errors_total", "Cumulative error count by type", ["type"], registry=registry)
+    for err_type, count in errors_dict.items():
+        errors_gauge.labels(type=err_type).set(count)
+    if "database" not in errors_dict:
+        errors_gauge.labels(type="database").set(0)
+
+    # ── Cumulative LLM calls count ──────────────────────────────────────
+    llm_gauge = Gauge("dataforge_llm_calls_total", "Cumulative LLM calls count", registry=registry)
+    llm_gauge.set(get_llm_calls())
+
+    # ── Cumulative requests count ───────────────────────────────────────
+    requests_gauge = Gauge("dataforge_requests_total", "Total requests count", registry=registry)
+    requests_gauge.set(get_requests_total())
+
+    return Response(content=generate_latest(registry), media_type="text/plain")
 
 
 # ─── Serve Frontend (must be AFTER all API route definitions) ────────────

@@ -24,6 +24,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    ALLOWED_INTERNAL_HOSTS: str = ""
+    """Comma-separated list of allowed internal hostnames (for testing/smoke)."""
+
     # ─── Browser / Playwright ──────────────────────────────────────────────
     PLAYWRIGHT_TIMEOUT: int = 45000
     """Max ms to wait for page navigation / networkidle."""
@@ -70,6 +73,8 @@ class Settings(BaseSettings):
     """Ms to wait for each common loading indicator to disappear."""
     PAGE_SCROLL_DELAY: float = 0.5
     """Seconds to wait after auto-scrolling to trigger lazy loaders."""
+    POST_SCROLL_RESET_DELAY: float = 0.2
+    """Seconds to wait after resetting scroll position to top."""
     MAX_SCROLL_ATTEMPTS: int = 3
     """Maximum number of sequential scrolls for infinite-scroll pages."""
     PLAYWRIGHT_STEALTH: bool = True
@@ -130,6 +135,17 @@ class Settings(BaseSettings):
     """Number of records used for dataset insight generation."""
     INSIGHT_TEMPERATURE: float = 0.5
     """Temperature for insight generation LLM calls."""
+
+    # ─── URL Analyzer ──────────────────────────────────────────────────────
+    URL_ANALYZER_MAX_FIELDS: int = 30
+    """Max fields returned by the URL analyzer (higher than intent parser because
+    we're analyzing an actual page with all its data columns)."""
+    URL_ANALYZER_SNIPPET_MAX_CHARS: int = 30000
+    """Max characters of HTML sent to LLM for URL analysis (higher than selector
+    discovery because we need the LLM to see more of the page to find all fields)."""
+    URL_ANALYZER_TEMPERATURE: float = 0.5
+    """Temperature for URL analysis LLM calls (higher than default 0.1 to encourage
+    more thorough exploration and descriptive field naming)."""
 
     # ─── Scraper Heuristics (Grounding abstractions) ───────────────────────
     SELECTOR_SNIPPET_MAX_CHARS: int = 16000
@@ -224,7 +240,7 @@ class Settings(BaseSettings):
     MOTIF_PRUNE_THRESHOLD: float = 0.2
 
     # ─── Paths ─────────────────────────────────────────────────────────────
-    SEMANTIC_STATE_PATH: str = "./backend/data/semantic_state.json"
+    SEMANTIC_STATE_PATH: str = "data/semantic_state.json"
     STATE_FILE_PATH: str = ""
     """Override for jobs_state.json path. Empty = use default ./backend/data/jobs_state.json"""
 
@@ -233,10 +249,20 @@ class Settings(BaseSettings):
     """Application runtime environment: development or production."""
     API_KEY: str = ""
     """If set, all /api/* endpoints require X-API-Key header."""
+    OPERATOR_API_KEY: str = ""
+    """If set, operator routes (creating and running jobs, manual scraper invocation) require this key."""
+    ADMIN_API_KEY: str = ""
+    """If set, powerful admin routes (/api/system/merge, /api/system/scheduler, etc.) require this key."""
+    METRICS_TOKEN: str = ""
+    """If set, /metrics endpoint requires Authorization: Bearer <token> or X-API-Key header."""
     ALERT_WEBHOOK_URL: Optional[str] = None
     """URL to send webhook alerts for domain anti-bot level shifts."""
     CORS_ORIGINS: list[str] = ["*"]
     """Allowed origins for CORS. Defaults to '*' but should be locked down in production."""
+    METRICS_ENABLE_HISTOGRAMS: bool = True
+    """Enable request duration and operation latency histograms in /metrics output."""
+    METRICS_HISTOGRAM_BUCKETS: str = "0.01,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0,30.0,60.0,120.0"
+    """Comma-separated bucket boundaries for duration histograms (seconds)."""
     RATE_LIMIT_GLOBAL: str = "600/minute"
     """Global rate limit for /api/* endpoints (slowapi format). Empty = disabled."""
     RATE_LIMIT_JOB_CREATE: str = "10/minute"
@@ -247,6 +273,8 @@ class Settings(BaseSettings):
     # ─── Crawl Policy (operational governance) ─────────────────────────────
     CRAWL_MAX_TOTAL_CONCURRENCY: int = 10
     """Absolute cap on global parallel fetches."""
+    JOB_MAX_PARALLEL_URLS: int = 3
+    """Max URLs processed in parallel within a single job."""
     CRAWL_PER_DOMAIN_CONCURRENCY: int = 2
     """Max concurrent fetches per domain."""
     CRAWL_DEFAULT_DELAY_SECONDS: float = 1.0
@@ -289,6 +317,282 @@ class Settings(BaseSettings):
     # ─── Email Validation ────────────────────────────────────────────────────
     EMAIL_BLOCKED_DOMAINS: str = "example.com,test.com,localhost"
     """Comma-separated list of email domains to reject as invalid."""
+
+    # ─── Acquisition Pipeline ──────────────────────────────────────────────
+    ACQUISITION_STANDARD_MAX_RETRIES: int = 1
+    """Max retries for STANDARD acquisition mode."""
+    ACQUISITION_AGGRESSIVE_MAX_RETRIES: int = 2
+    """Max retries for AGGRESSIVE acquisition mode."""
+    ACQUISITION_DEEP_SCAN_MAX_RETRIES: int = 3
+    """Max retries for DEEP_SCAN acquisition mode."""
+    ACQUISITION_AGGRESSIVE_TIMEOUT_MULT: float = 1.5
+    """Timeout multiplier for AGGRESSIVE mode."""
+    ACQUISITION_DEEP_SCAN_TIMEOUT_MULT: float = 2.0
+    """Timeout multiplier for DEEP_SCAN mode."""
+    ACQUISITION_TELEMETRY_MAX_HISTORY: int = 500
+    """Max acquisition events retained in telemetry history."""
+    ACQUISITION_TELEMETRY_RECENT_DEFAULT: int = 20
+    """Default count for recent acquisition events query."""
+
+    # ─── Session URL Detection ────────────────────────────────────────────
+    SESSION_PARAM_NAME_CONFIDENCE: float = 0.8
+    """Confidence boost for known session param name patterns."""
+    SESSION_PARAM_VALUE_CONFIDENCE: float = 0.7
+    """Confidence for param value matching session patterns."""
+    SESSION_PATH_HASH_CONFIDENCE: float = 0.6
+    """Confidence for path-hash-like param values."""
+    SESSION_NO_EPHEMERAL_MAX_CONFIDENCE: float = 0.3
+    """Max confidence when no ephemeral params detected."""
+    SESSION_BOUND_CONFIDENCE_THRESHOLD: float = 0.6
+    """Confidence threshold above which a URL is classified as session-bound."""
+
+    # ─── Empty Response Detection ─────────────────────────────────────────
+    EMPTY_RESPONSE_MIN_HTML_LEN: int = 50
+    """HTML shorter than this is classified as blank."""
+    EMPTY_RESPONSE_MINIMAL_TEXT_LEN: int = 100
+    """Visible text shorter than this is classified as minimal."""
+    EMPTY_RESPONSE_LOW_TEXT_LEN: int = 300
+    """Text shorter than this with few data signals is likely empty."""
+    EMPTY_RESPONSE_LOW_SIGNAL_COUNT: int = 2
+    """Fewer than this many data signals is considered low-content."""
+    EMPTY_RESPONSE_DATA_SIGNAL_THRESHOLD: int = 5
+    """This many or more data signals means the page is not empty."""
+    EMPTY_RESPONSE_MODERATE_SIGNAL_COUNT: int = 2
+    """This many moderate data signals may still indicate content."""
+    EMPTY_RESPONSE_CONFIDENCE_THRESHOLD: float = 0.5
+    """Confidence above this means the page is empty."""
+    EMPTY_PAGE_SIGNAL_CONFIDENCE: float = 0.8
+    """Confidence for strong empty-page signals (login walls, etc.)."""
+
+    # ─── Zero Result Classification ────────────────────────────────────────
+    ZERO_RESULT_ANTIBOT_THRESHOLD: float = 0.8
+    """Anti-bot score above this classifies zero-result as anti-bot block."""
+    ZERO_RESULT_EMPTY_HTML_LEN: int = 100
+    """HTML shorter than this is classified as a blank/empty page."""
+    ZERO_RESULT_JS_SHELL_HTML_LEN: int = 1000
+    """HTML longer than this without containers suggests JS shell."""
+    ZERO_RESULT_AUTH_PATTERNS: list[str] = ["login", "sign in", "password"]
+    """Text patterns that indicate an authentication gate."""
+
+    # ─── Record Quality Scoring ───────────────────────────────────────────
+    QUALITY_BASE_SCORE: float = 0.3
+    """Base quality score for non-empty text values."""
+    QUALITY_TEXT_LEN_THRESHOLD_1: int = 4
+    """Text longer than this gets a length bonus (+0.2)."""
+    QUALITY_TEXT_LEN_THRESHOLD_2: int = 20
+    """Text longer than this gets another length bonus (+0.1)."""
+    QUALITY_NOISE_PENALTY: float = 0.6
+    """Penalty for noise phrases in identity fields."""
+    QUALITY_SHORT_IDENTITY_PENALTY: float = 0.2
+    """Penalty for short text in identity fields (< 3 chars)."""
+    QUALITY_STATUS_LONG_PENALTY: float = 0.4
+    """Penalty for long text in status fields (> 25 chars)."""
+    QUALITY_STATUS_MISMATCH_PENALTY: float = 0.2
+    """Penalty for status fields without known phrases and long text."""
+    QUALITY_PRESENT_FIELD_THRESHOLD: float = 0.2
+    """Field quality above this counts as 'present'."""
+    QUALITY_REQUIRED_MISSING_THRESHOLD: float = 0.3
+    """Required field quality below this increments missing count."""
+    QUALITY_REQUIRED_WEIGHT: float = 1.2
+    """Weight multiplier for required fields in scoring."""
+    QUALITY_PRESENCE_COHESION_THRESHOLD: float = 0.3
+    """Presence vote below this triggers a cohesion penalty."""
+    QUALITY_PRESENCE_VOTE_WEIGHT: float = 0.3
+    """Weight for presence vote in ensemble blend."""
+    QUALITY_QUALITY_VOTE_WEIGHT: float = 0.7
+    """Weight for quality vote in ensemble blend."""
+
+    # ─── Selector Fallback Extraction ──────────────────────────────────────
+    SELECTOR_FUZZY_MIN_WORDS: int = 2
+    """Min words in example value for fuzzy matching."""
+    SELECTOR_FUZZY_MAX_WORDS: int = 5
+    """Max words in example value for fuzzy matching."""
+    SELECTOR_FUZZY_MATCH_RATIO: float = 0.7
+    """Min word match ratio for fuzzy example matching."""
+    SELECTOR_CONTEXT_WINDOW_MAX_LEN: int = 120
+    """Max characters for context window around fuzzy match."""
+    SELECTOR_MIN_SEGMENT_LEN: int = 3
+    """Min characters for extracted context segment."""
+
+    # ─── Queue Backend ─────────────────────────────────────────────────────
+    QUEUE_BACKEND: str = "sqlite"
+    """Worker queue backend: 'sqlite' (single-node) or 'postgres' (multi-node).
+    Postgres backend requires DATAFORGE_STORAGE_BACKEND=postgres and a running
+    Postgres instance available via DATAFORGE_DATABASE_URL."""
+
+    # ─── Anti-Bot Detection ────────────────────────────────────────────────
+    ANTIBOT_PLATFORM_MATCH_SCORE: float = 0.6
+    """Score boost when platform matches expected pattern."""
+    ANTIBOT_CLOUDFLARE_SCORE: float = 0.45
+    """Score for Cloudflare server header detection."""
+    ANTIBOT_AKAMAI_SCORE: float = 0.55
+    """Score for Akamai server header detection."""
+    ANTIBOT_HARD_BLOCK_THRESHOLD: float = 0.8
+    """Anti-bot score above this means hard block."""
+    ANTIBOT_STEALTH_ESCALATION_MEAN: float = 0.4
+    """Mean score above this triggers stealth escalation."""
+    ANTIBOT_UA_HISTORY_SIZE: int = 5
+    """Number of recent user-agent strings to track."""
+    ANTIBOT_BLOCK_HISTORY_SIZE: int = 10
+    """Number of historical block events to retain."""
+    ANTIBOT_HARD_BLOCK_DELAY: int = 30
+    """Seconds to delay after a hard block detection."""
+    ANTIBOT_MEDIUM_CHALLENGE_DELAY: int = 5
+    """Seconds to delay after a medium challenge detection."""
+    ANTIBOT_COOKIE_MAX_AGE_HOURS: int = 24
+    """Max age in hours before cookie refresh is required."""
+
+    # ─── Failure Classification ────────────────────────────────────────────
+    CLASSIFY_HYDRATION_DOM_THRESHOLD: int = 50
+    """DOM nodes below this suggests hydration failure."""
+    CLASSIFY_EMPTY_PAGE_HTML_THRESHOLD: int = 500
+    """HTML chars below this suggests empty page."""
+    CLASSIFY_LAZYLOAD_DOM_THRESHOLD: int = 100
+    """DOM nodes below this suggests lazy-load failure."""
+    CLASSIFY_ANTIBOT_SCORE_THRESHOLD: float = 0.6
+    """Anti-bot score above this classifies as bot detection."""
+    CLASSIFY_LOW_SELECTOR_HIT_THRESHOLD: float = 0.3
+    """Selector hit rate below this suggests selector decay."""
+    CLASSIFY_DECAY_RATE_THRESHOLD: float = 0.5
+    """Decay rate above this suggests selector quality degradation."""
+    CLASSIFY_MALFORMED_DOM_RATIO: float = 0.3
+    """DOM ratio below this suggests malformed HTML."""
+    CLASSIFY_PARTIAL_EXTRACTION_FILL_RATE: float = 0.5
+    """Fill rate below this suggests partial extraction."""
+    CLASSIFY_FAILURE_PATTERN_THRESHOLD: int = 3
+    """Failure count above this indicates a pattern."""
+    CLASSIFY_HYDRATION_DELAY_INCREMENT: int = 500
+    """Ms to add per detected loading indicator."""
+    CLASSIFY_HYDRATION_DELAY_MAX: int = 10000
+    """Max ms for hydration delay."""
+
+    # ─── Discovery & Source Trust ──────────────────────────────────────────
+    DISCOVERY_SOCIAL_DOMAINS: str = "facebook.com,twitter.com,x.com,instagram.com,linkedin.com,reddit.com,pinterest.com,tiktok.com,youtube.com"
+    """Comma-separated social root domains for source classification."""
+    DISCOVERY_DIRECTORY_DOMAINS: str = "yelp.com,yellowpages.com,justdial.com,sulekha.com,indiamart.com,tripadvisor.com,glassdoor.com,angieslist.com,homeadvisor.com,houzz.com"
+    """Comma-separated directory domains for source classification."""
+    DISCOVERY_SEARCH_DOMAINS: str = "google.com,bing.com,yahoo.com,duckduckgo.com,baidu.com"
+    """Comma-separated search engine domains for source classification."""
+    SOURCE_TRUST_OFFICIAL: float = 0.92
+    """Default trust score for official domains."""
+    SOURCE_TRUST_DIRECTORY: float = 0.62
+    """Default trust score for directory domains."""
+    SOURCE_TRUST_SOCIAL: float = 0.5
+    """Default trust score for social media domains."""
+    SOURCE_TRUST_SEARCH: float = 0.35
+    """Default trust score for search engine results."""
+
+    # ─── Browser Stealth Pool ─────────────────────────────────────────────
+    STEALTH_UA_POOL: str = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36,"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36,"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0,"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0,"
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    )
+    """Comma-separated pool of stealth user-agent strings shared across browser_pool and anti_bot_engine."""
+    STEALTH_VIEWPORT_WIDTHS: str = "1280,1366,1440,1536,1600,1920"
+    """Comma-separated viewport widths for stealth randomization."""
+    STEALTH_VIEWPORT_HEIGHTS: str = "720,768,800,900,1024,1080"
+    """Comma-separated viewport heights for stealth randomization."""
+    STEALTH_DEVICE_SCALE_FACTORS: str = "1.0,1.25,1.5,2.0"
+    """Comma-separated device scale factors for stealth randomization."""
+    STEALTH_NAVIGATOR_LANGUAGES: str = "en-US,en"
+    """Comma-separated navigator.languages for stealth JS injection."""
+    STEALTH_TIMEZONE_POOL: str = "America/New_York,America/Chicago,America/Los_Angeles,Europe/London,Europe/Berlin,Asia/Singapore,Asia/Tokyo,Australia/Sydney"
+    """Comma-separated timezone IDs for stealth randomization."""
+    STEALTH_HARDWARE_CONCURRENCY: int = 4
+    """navigator.hardwareConcurrency value for stealth JS injection."""
+    STEALTH_ACCEPT_LANGUAGE: str = "en-US,en;q=0.9"
+    """Accept-Language header for stealth HTTP requests."""
+    STEALTH_DEFAULT_LOCALE: str = "en-US"
+    """Default locale for browser contexts."""
+
+    # ─── LLM Provider Models ──────────────────────────────────────────────
+    GROQ_DEFAULT_MODEL: str = "llama-3.3-70b-versatile"
+    """Default model for Groq LLM calls."""
+    GROQ_FALLBACK_MODEL: str = "llama-3.1-8b-instant"
+    """Fallback model when default Groq model fails."""
+    G4F_JSON_MODEL: str = "gpt-4o-mini"
+    """Model for g4f JSON fallback calls."""
+    G4F_TEXT_MODEL: str = "gpt-4o"
+    """Model for g4f text fallback calls."""
+
+    # ─── Search Form Recovery ─────────────────────────────────────────────
+    SEARCH_FORM_MIN_SCORE: int = 3
+    """Minimum score for a form to be classified as a search form."""
+    SEARCH_FORM_RECOVERY_TIMEOUT: float = 30.0
+    """Timeout in seconds for search form POST recovery."""
+
+    # ─── Location / Locale ────────────────────────────────────────────────
+    LOCATION_WORDS: str = "chennai,bangalore,delhi,mumbai,kolkata,hyderabad,pune,ahmedabad,jaipur,lucknow,london,new york,los angeles,chicago,houston,phoenix,paris,berlin,tokyo,singapore,sydney,toronto,melbourne,dubai,amsterdam,beijing,seoul,bangkok,madrid,rome,dublin,sao paulo,mexico city,buenos aires,cairo,nairobi,lagos,jakarta,manila"
+    """Comma-separated location words for geographic field detection."""
+
+    # ─── Scraper Recovery ──────────────────────────────────────────────────
+    MAX_RECOVERY_ATTEMPTS: int = 3
+    """Max recovery attempts per URL in scrape_url_with_recovery."""
+    RECOVERY_TIMEOUT_MULTIPLIER: int = 4
+    """Multiplier for per_url_timeout when recovery is active."""
+
+    # ─── Job Runner ────────────────────────────────────────────────────────
+    JOB_RESULTS_DISK_OFFLOAD_THRESHOLD: int = 1000
+    """Record count above which job results are offloaded to disk."""
+    COST_PER_LLM_CALL: float = 0.01
+    """Cost model: dollars per LLM call."""
+    COST_PER_FETCH_MS: float = 0.005
+    """Cost model: dollars per 1000ms of fetch time."""
+    COST_PER_URL_SCRAPE: float = 0.02
+    """Cost model: dollars per URL scraped."""
+
+    # ─── Semantic World State ──────────────────────────────────────────────
+    MOTIF_MIN_COOCCURRENCE: int = 2
+    """Minimum co-occurrence for field pair motif extraction."""
+    REGRESSION_CAPTURE_SCORE_FACTOR: float = 0.5
+    """Factor of min_record_score for regression capture threshold."""
+    REGRESSION_LOW_QUALITY_CONFIDENCE: float = 0.6
+    """Confidence threshold for low-quality regression capture."""
+
+    # ─── Browser Pool Recycling ────────────────────────────────────────────
+    BROWSER_MAX_CUMULATIVE_FETCHES: int = 200
+    """Max cumulative fetches before a browser context is recycled."""
+    BROWSER_MAX_RSS_MEMORY_MB: int = 1024
+    """Max RSS memory in MB before triggering browser recycle."""
+    BROWSER_DRAIN_POLL_INTERVAL: float = 0.5
+    """Seconds between drain checks when closing browser pages."""
+    BROWSER_CLEANUP_INTERVAL: int = 60
+    """Seconds between periodic browser pool cleanup sweeps."""
+
+    # ─── Domain Intelligence ───────────────────────────────────────────────
+    DOMAIN_INTELLIGENCE_SMOOTHING_ALPHA: float = 0.3
+    """Smoothing factor for exponential moving average in domain intelligence."""
+
+    # ─── URL Analyzer ──────────────────────────────────────────────────────
+    URL_ANALYZER_TIMEOUT: int = 120
+    """Max seconds for URL analysis endpoint."""
+
+    # ─── Gossip Propagation ────────────────────────────────────────────────
+    GOSSIP_PROPAGATION_INTERVAL: int = 60
+    """Seconds between gossip propagation cycles."""
+
+    # ─── Domain Health Alerts ──────────────────────────────────────────────
+    DOMAIN_HEALTH_ALERT_COOLDOWN: int = 60
+    """Seconds between domain health alert notifications for the same domain."""
+
+    # ─── Domain Intelligence Persistence ───────────────────────────────────
+    DOMAIN_INTELLIGENCE_PATH: str = "data/domain_intelligence.json"
+    """Path for domain intelligence persistence file."""
+    SELECTOR_MEMORY_PATH: str = "data/selector_memory.json"
+    """Path for selector memory persistence file."""
+    SELECTOR_DECAY_SNAPSHOT_PATH: str = "data/selector_decay_snapshots.json"
+    """Path for selector decay snapshots."""
+    REGRESSION_REGISTRY_PATH: str = "data/regression_registry.json"
+    """Path for regression capture registry."""
+    SELECTOR_PROFILES_DIR: str = "profiles"
+    """Directory for selector profile definitions."""
+    FRONTEND_DIR: str = ""
+    """Override for frontend static files directory. Empty = auto-detect."""
+    HTTPX_BASIC_USER_AGENT: str = "python-httpx/0.27.0"
+    """User-Agent for basic HTTPX requests (non-stealth)."""
 
     # ─── Federation / Sharding ──────────────────────────────────────────────
     NODE_ID: str = "node-1"

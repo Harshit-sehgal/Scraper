@@ -2,6 +2,7 @@ from typing import Any
 import re
 from statistics import mean
 from app.models import SchemaField, FieldType
+from app.config import settings
 
 def clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
@@ -48,13 +49,13 @@ def _value_quality(field: SchemaField, value) -> float:
         return 0.0
 
     # Probabilistic scoring: start with a baseline and add "evidence"
-    score = 0.3 # Base for non-empty text
+    score = settings.QUALITY_BASE_SCORE # Base for non-empty text
     
     # Text length density (too short is suspicious for non-codes)
     if field.field_type not in (FieldType.CODE, FieldType.RATING, FieldType.NUMBER):
-        if len(text) > 4:
+        if len(text) > settings.QUALITY_TEXT_LEN_THRESHOLD_1:
             score += 0.2
-        if len(text) > 20:
+        if len(text) > settings.QUALITY_TEXT_LEN_THRESHOLD_2:
             score += 0.1
 
     # Negative Evidence: identify "swapped" or "noise" text in identifying fields
@@ -66,18 +67,18 @@ def _value_quality(field: SchemaField, value) -> float:
     
     if is_identity_field:
         if any(p in text.lower() for p in noise_status_phrases):
-            score -= 0.6 # Heavy penalty
+            score -= settings.QUALITY_NOISE_PENALTY # Heavy penalty
         if len(text) < 3:
-            score -= 0.2
+                score -= settings.QUALITY_SHORT_IDENTITY_PENALTY
             
     if is_status_field:
         # Status fields should be short. If it's a long sentence, it's likely a swapped title.
         if len(text) > 25:
-            score -= 0.4
+            score -= settings.QUALITY_STATUS_LONG_PENALTY
         if not any(p in text.lower() for p in noise_status_phrases):
             # If it's not a known status phrase AND it's not a simple number/code
             if field.field_type == FieldType.STRING and len(text) > 10:
-                score -= 0.2
+                score -= settings.QUALITY_STATUS_MISMATCH_PENALTY
             
     # Type-specific quality "votes"
     if field.field_type == FieldType.EMAIL:
@@ -121,40 +122,44 @@ def score_record_quality(record: dict, schema_fields: list[SchemaField]) -> floa
 
     present_fields = 0
     total_quality = 0.0
-    required_missing = False
+    required_count = 0
+    required_missing_count = 0
 
     for field in schema_fields:
         val = record.get(field.name)
         quality = _value_quality(field, val)
         
-        if quality > 0.2:
+        if quality > settings.QUALITY_PRESENT_FIELD_THRESHOLD:
             present_fields += 1
             
-        if field.required and quality < 0.3:
-            required_missing = True
+        if field.required:
+            required_count += 1
+            if quality < settings.QUALITY_REQUIRED_MISSING_THRESHOLD:
+                required_missing_count += 1
             
-        weight = 1.2 if field.required else 1.0
+        weight = settings.QUALITY_REQUIRED_WEIGHT if field.required else 1.0
         total_quality += quality * weight
 
     # 1. Presence Vote (0.0 to 1.0)
     presence_vote = present_fields / len(schema_fields)
     
     # 2. Quality Vote (0.0 to 1.0)
-    max_possible_quality = sum(1.2 if f.required else 1.0 for f in schema_fields)
+    max_possible_quality = sum(settings.QUALITY_REQUIRED_WEIGHT if f.required else 1.0 for f in schema_fields)
     quality_vote = total_quality / max_possible_quality
     
     # 3. Structural Cohesion Vote
     # If we have very few fields present but they are high quality, it's still suspicious.
     # Conversely, many low quality fields are also bad.
     cohesion_vote = 1.0
-    if presence_vote < 0.3:
+    if presence_vote < settings.QUALITY_PRESENCE_COHESION_THRESHOLD:
         cohesion_vote *= 0.7
-    if required_missing:
-        cohesion_vote *= 0.5
+    if required_missing_count > 0:
+        missing_ratio = required_missing_count / max(required_count, 1)
+        cohesion_vote *= 1.0 - (missing_ratio * 0.5)
 
     # Ensemble blending
     # We use a weighted geometric mean-ish approach to ensure one bad vote impacts heavily
-    raw_confidence = (presence_vote * 0.3) + (quality_vote * 0.7)
+    raw_confidence = (presence_vote * settings.QUALITY_PRESENCE_VOTE_WEIGHT) + (quality_vote * settings.QUALITY_QUALITY_VOTE_WEIGHT)
     final_confidence = raw_confidence * cohesion_vote
     
     return round(clamp01(final_confidence), 3)
@@ -171,6 +176,7 @@ def build_quality_report(
     ai_source_prediction: dict | None = None,
     ai_structuring_report: dict | None = None,
     warnings: list[str] | None = None,
+    acquisition_lineages: list[dict] | None = None,
 ) -> dict:
     scores = [safe_score(r.get("record_score", 0.0)) for r in raw_results if isinstance(r, dict)]
     kept_scores = [safe_score(r.get("record_score", 0.0)) for r in final_results if isinstance(r, dict)]
@@ -183,8 +189,6 @@ def build_quality_report(
     coverage_ratio = round((len(final_results) / len(raw_results)), 3) if raw_results else (1.0 if final_results else 0.0)
     mismatch_count = int((type_integrity_report or {}).get("total_type_mismatches") or 0)
     mismatch_ratio = mismatch_count / max(1, len(final_results))
-
-    from app.config import settings
 
     # Weighted blend of quality score, retention, source trust, and type integrity.
     overall_score = round(
@@ -202,8 +206,25 @@ def build_quality_report(
 
     source_ai = dict(ai_source_prediction or {})
     processed = int(source_ai.get("records_processed") or 0)
-    structured = int(source_ai.get("ai_chunks") or 0)
+    structured = int(source_ai.get("records_ai_structured") or 0)
     source_ai["ai_row_rate"] = round((structured / processed), 3) if processed else 0.0
+
+    # Build acquisition summary from per-URL lineages
+    acquisition_summary: dict = {
+        "per_url": acquisition_lineages or [],
+        "direct": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") == "direct"),
+        "recovered": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") == "recovered"),
+        "session_expired": sum(1 for lin in (acquisition_lineages or []) if "session" in lin.get("state", "") or "recovery" in lin.get("state", "")),
+        "anti_bot_blocked": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") == "anti_bot_blocked"),
+        "empty_response": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") in ("empty_response", "no_search_form")),
+    }
+    # Summarize recommended next actions
+    next_actions: dict[str, int] = {}
+    for lin in (acquisition_lineages or []):
+        action = lin.get("recommended_next_action", "") or ""
+        if action:
+            next_actions[action] = next_actions.get(action, 0) + 1
+    acquisition_summary["recommended_next_actions"] = next_actions
 
     return {
         "raw_records": len(raw_results),
@@ -223,4 +244,5 @@ def build_quality_report(
         "ai_structuring": ai_structuring_report or {},
         "warnings": warnings or [],
         "radius": radius_report,
+        "acquisition": acquisition_summary,
     }

@@ -1,10 +1,13 @@
 import asyncio
 import datetime
 import logging
+import threading
 from typing import Callable
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
+from app.utils.rbac import UserRole, require_role
 
+from app.config import settings
 from app.discovery import discover_urls, infer_source_metadata
 from app.filters import process_results
 from app.models import (
@@ -21,6 +24,13 @@ from app.scraper import (
 )
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
+from app.storage_interface import get_job_repository
+
+
+def _save_job(job) -> None:
+    """Persist a single job through the configured repository."""
+    get_job_repository().save_single(job)
+
 
 def create_jobs_router(
     jobs_store: dict,
@@ -31,6 +41,39 @@ def create_jobs_router(
     config: dict,
 ):
     router = APIRouter()
+
+    # ── Thread-safe store access ───────────────────────────────────────
+    # Protect concurrent access to jobs_store and recycle_bin_store.
+    # These are Python dicts shared across async requests; a threading lock
+    # is sufficient because critical sections are microsecond-level lookups.
+    _store_lock = threading.Lock()
+
+    def _get_job(job_id: str) -> Job:
+        """Thread-safe lookup returning the job or raising 404."""
+        with _store_lock:
+            if job_id not in jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            return jobs_store[job_id]
+
+    def _pop_job(job_id: str) -> Job:
+        """Thread-safe pop from jobs_store, raising 404 if missing."""
+        with _store_lock:
+            if job_id not in jobs_store:
+                raise HTTPException(status_code=404, detail="Job not found")
+            return jobs_store.pop(job_id)
+
+    def _move_to_recycle_bin(job: Job) -> None:
+        """Thread-safe move from jobs_store to recycle_bin_store."""
+        with _store_lock:
+            recycle_bin_store[job.id] = job
+            jobs_store.pop(job.id, None)
+
+    def _pop_from_recycle_bin(job_id: str) -> Job:
+        """Thread-safe pop from recycle_bin_store, raising 404 if missing."""
+        with _store_lock:
+            if job_id not in recycle_bin_store:
+                raise HTTPException(status_code=404, detail="Job not in recycle bin")
+            return recycle_bin_store.pop(job_id)
 
     @router.post("/api/discover")
     async def discover(req: DiscoveryRequest):
@@ -46,7 +89,17 @@ def create_jobs_router(
             source_policy=req.source_policy,
             max_per_domain=req.max_per_domain,
         )
-        return {"urls": results}
+        from app.url_safety import validate_public_http_url
+        safe_results = []
+        for r in results:
+            url = r.get("url")
+            if url:
+                try:
+                    validate_public_http_url(url)
+                    safe_results.append(r)
+                except ValueError:
+                    pass
+        return {"urls": safe_results}
 
     @router.post("/api/schema/suggest")
     async def suggest_schema(req: SchemaSuggestionRequest):
@@ -56,57 +109,88 @@ def create_jobs_router(
 
     @router.get("/api/jobs")
     async def list_jobs():
-        ordered = sorted(jobs_store.values(), key=lambda j: j.created_at, reverse=True)
-        return {"jobs": [job.model_dump() for job in ordered]}
+        with _store_lock:
+            ordered = sorted(jobs_store.values(), key=lambda j: j.created_at, reverse=True)
+            return {"jobs": [job.model_dump() for job in ordered]}
 
     @router.get("/api/jobs/{job_id}")
-    async def get_job(job_id: str):
-        if job_id not in jobs_store:
-            raise HTTPException(status_code=404, detail="Job not found")
-        job = jobs_store[job_id]
-        
-        results_list = list(job.results)
-        loaded_from_disk = False
-        if job.results_on_disk:
-            from app.utils.job_results_store import load_job_results_from_disk
-            results_list = load_job_results_from_disk(job.id)
-            loaded_from_disk = True
+    async def get_job(job_id: str, include_results: bool = Query(False)):
+        job = _get_job(job_id)
 
-        # Backfill source metadata helper logic
-        if results_list:
-            changed = False
-            for row in results_list:
-                source_url = str(row.get("source_url") or "").strip()
-                if not source_url:
-                    continue
+        results_list = []
+        if include_results:
+            results_list = list(job.results)
+            if job.results_on_disk:
+                from app.utils.job_results_store import load_job_results_from_disk
+                results_list = load_job_results_from_disk(job.id, job.results_file_path)
 
-                source_type = str(row.get("source_type") or "unknown").strip().lower()
-                trust_score = row.get("source_trust_score")
-                if source_type != "unknown" and trust_score is not None:
-                    continue
-
-                inferred = infer_source_metadata(url=source_url)
-                row["source_type"] = str(inferred.get("source_type") or "unknown")
-                row["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
-                changed = True
-
-            if changed:
-                q = dict(job.quality_report or {})
-                q["source_breakdown"] = compute_source_breakdown(results_list)
-                job.quality_report = q
-                if loaded_from_disk:
-                    from app.utils.job_results_store import save_job_results_to_disk
-                    save_job_results_to_disk(job.id, results_list)
-                else:
-                    job.results = results_list
-                persist_state_fn()
-                
         dumped = job.model_dump()
         dumped["results"] = results_list
         return dumped
 
+    @router.get("/api/jobs/{job_id}/results")
+    async def get_job_results(job_id: str, limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)):
+        """Return a paginated slice of job results."""
+        job = _get_job(job_id)
+
+        if job.results_on_disk:
+            from app.utils.job_results_store import load_paginated_job_results_from_disk
+            page, total = load_paginated_job_results_from_disk(
+                job.id, limit=limit, offset=offset, file_path=job.results_file_path,
+            )
+        else:
+            results_list = list(job.results)
+            total = len(results_list)
+            page = results_list[offset:offset + limit]
+
+        next_offset = offset + limit if (offset + limit) < total else None
+
+        return {
+            "job_id": job_id,
+            "results": page,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "next_offset": next_offset,
+            "returned": len(page),
+        }
+
+    @router.post("/api/jobs/{job_id}/backfill-metadata")
+    async def backfill_job_metadata(job_id: str):
+        """Explicitly backfill source metadata for manual-mode job results."""
+        job = _get_job(job_id)
+
+        results_list = list(job.results)
+        if job.results_on_disk:
+            from app.utils.job_results_store import load_job_results_from_disk
+            results_list = load_job_results_from_disk(job.id, job.results_file_path)
+
+        from app.discovery import infer_source_metadata
+        from app.utils.quality import safe_score
+        
+        updated = False
+        for row in results_list:
+            source_url = str(row.get("source_url") or "")
+            source_type = str(row.get("source_type") or "unknown").strip().lower()
+            if source_type == "unknown" and source_url:
+                inferred = infer_source_metadata(url=source_url)
+                row["source_type"] = str(inferred.get("source_type") or "unknown")
+                row["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
+                updated = True
+
+        if updated:
+            job.results = results_list
+            if job.results_on_disk:
+                from app.utils.job_results_store import save_job_results_to_disk
+                save_job_results_to_disk(job.id, results_list)
+            _save_job(job)
+
+        return {"message": "Metadata backfilled successfully", "updated": updated}
+
     @router.post("/api/jobs")
-    async def create_job(job_data: JobCreate):
+    async def create_job(job_data: JobCreate, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+        import os
+
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
         urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
 
@@ -124,6 +208,8 @@ def create_jobs_router(
             max_distance_km=job_data.max_distance_km,
             schema_fields=job_data.schema_fields,
             filters=job_data.filters,
+            selectors_map=job_data.selectors_map,
+            search_params=job_data.search_params,
             pagination=job_data.pagination,
             max_pages=job_data.max_pages,
             deduplicate=job_data.deduplicate,
@@ -131,17 +217,61 @@ def create_jobs_router(
             min_record_score=job_data.min_record_score,
         )
         jobs_store[job.id] = job
-        persist_state_fn()
-        schedule_task_fn(run_job_coro_fn(job.id))
+        _save_job(job)
+
+        # If DATAFORGE_WORKER_QUEUE is set, enqueue the job for async processing
+        worker_queue_enabled = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
+        if worker_queue_enabled and worker_queue_enabled.lower() in ("1", "true", "yes"):
+            try:
+                from app.worker_queue import get_worker_queue, Priority
+                queue = get_worker_queue()
+                task_id = await queue.enqueue(
+                    task_type="scrape_job",
+                    payload={"job_id": job.id},
+                    priority=Priority.NORMAL,
+                    task_id=job.id,
+                )
+                logging.getLogger(__name__).info(
+                    "Job %s enqueued to worker queue (task=%s)", job.id, task_id
+                )
+            except Exception as e:
+                if settings.ENV.lower() == "production":
+                    logging.getLogger(__name__).error(
+                        "Failed to enqueue job %s to worker queue in production: %s",
+                        job.id, e,
+                    )
+                    if job.id in jobs_store:
+                        del jobs_store[job.id]
+                    try:
+                        repo = get_job_repository()
+                        repo.hard_delete(job.id)
+                    except Exception:
+                        pass
+                    raise HTTPException(
+                        status_code=503,
+                        detail=(
+                            f"Failed to enqueue job {job.id} to worker queue. "
+                            "Inline fallback is disabled in production. "
+                            "Check that the worker queue is running and healthy."
+                        ),
+                    )
+                logging.getLogger(__name__).warning(
+                    "Failed to enqueue job %s to worker queue, falling back to inline: %s",
+                    job.id, e,
+                )
+                schedule_task_fn(run_job_coro_fn(job.id))
+        else:
+            schedule_task_fn(run_job_coro_fn(job.id))
+
         return {"job_id": job.id, "status": job.status.value}
 
     @router.post("/api/jobs/{job_id}/cancel")
-    async def cancel_job(job_id: str):
+    async def cancel_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
 
         job = jobs_store[job_id]
-        if job.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELED}:
+        if job.status in {JobStatus.COMPLETED, JobStatus.DEGRADED, JobStatus.EMPTY_RESULT, JobStatus.FAILED, JobStatus.CANCELED}:
             return {
                 "job_id": job.id,
                 "status": job.status.value,
@@ -153,16 +283,30 @@ def create_jobs_router(
         if job.status == JobStatus.PENDING:
             mark_job_canceled(job, "Canceled before execution.")
 
-        persist_state_fn()
+        # Cancel the queued task if worker queue is enabled
+        import os as _os
+        worker_queue_enabled = _os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
+        if worker_queue_enabled and worker_queue_enabled.lower() in ("1", "true", "yes"):
+            try:
+                from app.worker_queue import get_worker_queue
+                queue = get_worker_queue()
+                await queue.cancel(job_id)
+            except Exception as e:
+                logging.getLogger(__name__).warning(
+                    "Failed to cancel queued task for job %s: %s", job_id, e,
+                )
+
+        _save_job(job)
         return {
             "job_id": job.id,
             "status": job.status.value,
             "cancel_requested": True,
+            "cancel_queued_task": True,
             "message": "Cancellation requested",
         }
 
     @router.post("/api/jobs/{job_id}/reclean")
-    async def reclean_job(job_id: str):
+    async def reclean_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         """Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs."""
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -175,7 +319,7 @@ def create_jobs_router(
         loaded_from_disk = False
         if job.results_on_disk:
             from app.utils.job_results_store import load_job_results_from_disk
-            results_list = load_job_results_from_disk(job.id)
+            results_list = load_job_results_from_disk(job.id, job.results_file_path)
             loaded_from_disk = True
 
         if not results_list:
@@ -257,8 +401,8 @@ def create_jobs_router(
         for row in job.results:
             row["scraped_at"] = scraped_at
 
-        # Save back to disk if they remain above 1,000, or if it was loaded from disk and is still above 1000
-        if len(job.results) > 1000:
+        # Save back to disk if results remain above the configured in-memory threshold.
+        if len(job.results) > settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD:
             from app.utils.job_results_store import save_job_results_to_disk
             file_path = save_job_results_to_disk(job.id, job.results)
             job.results_on_disk = True
@@ -267,7 +411,7 @@ def create_jobs_router(
         else:
             if loaded_from_disk:
                 from app.utils.job_results_store import delete_job_results_from_disk
-                delete_job_results_from_disk(job.id)
+                delete_job_results_from_disk(job.id, job.results_file_path)
                 job.results_on_disk = False
                 job.results_file_path = None
 
@@ -316,7 +460,7 @@ def create_jobs_router(
             "warnings": reclean_warnings,
         }
         job.quality_report = quality
-        persist_state_fn()
+        _save_job(job)
 
         return {
             "job_id": job.id,
@@ -327,16 +471,23 @@ def create_jobs_router(
         }
 
     @router.delete("/api/jobs/{job_id}")
-    async def delete_job(job_id: str):
+    async def delete_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
+        job = jobs_store[job_id]
+        if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot delete/recycle an active job. Cancel the job first."
+            )
+        repo = get_job_repository()
+        repo.move_to_recycle_bin(job_id)
         recycle_bin_store[job_id] = jobs_store.pop(job_id)
-        persist_state_fn()
         return {"message": "Job moved to recycle bin"}
 
     @router.delete("/api/jobs/cleanup/terminal")
-    async def clear_terminal_jobs(keep_recent: int = Query(5, ge=0, le=5000)):
-        terminal_statuses = {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELED}
+    async def clear_terminal_jobs(keep_recent: int = Query(5, ge=0, le=5000), _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
+        terminal_statuses = {JobStatus.COMPLETED, JobStatus.DEGRADED, JobStatus.EMPTY_RESULT, JobStatus.FAILED, JobStatus.CANCELED}
         terminal = [
             (jid, job)
             for jid, job in jobs_store.items()
@@ -355,16 +506,15 @@ def create_jobs_router(
         keep_ids = {jid for jid, _ in terminal[:keep_recent]}
 
         removed = 0
-        from app.utils.job_results_store import delete_job_results_from_disk
+        repo = get_job_repository()
+
         for jid, _ in terminal:
             if jid in keep_ids:
                 continue
-            del jobs_store[jid]
-            delete_job_results_from_disk(jid)
+            repo.move_to_recycle_bin(jid)
+            if jid in jobs_store:
+                recycle_bin_store[jid] = jobs_store.pop(jid)
             removed += 1
-
-        if removed:
-            persist_state_fn()
 
         return {
             "message": f"Cleared {removed} terminal jobs",
@@ -379,32 +529,39 @@ def create_jobs_router(
         return {"jobs": [job.model_dump() for job in ordered]}
 
     @router.post("/api/recycle_bin/{job_id}/restore")
-    async def restore_job(job_id: str):
+    async def restore_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
+        repo = get_job_repository()
+        repo.restore_from_recycle_bin(job_id)
         jobs_store[job_id] = recycle_bin_store.pop(job_id)
-        persist_state_fn()
         return {"message": "Job restored"}
 
     @router.delete("/api/recycle_bin/{job_id}")
-    async def hard_delete_job(job_id: str):
+    async def hard_delete_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
-        del recycle_bin_store[job_id]
         from app.utils.job_results_store import delete_job_results_from_disk
-        delete_job_results_from_disk(job_id)
-        persist_state_fn()
+        job = recycle_bin_store.get(job_id)
+        file_path = job.results_file_path if job else None
+        delete_job_results_from_disk(job_id, file_path)
+        repo = get_job_repository()
+        repo.hard_delete(job_id)
+        del recycle_bin_store[job_id]
         return {"message": "Job permanently deleted"}
 
     @router.delete("/api/recycle_bin")
-    async def clear_recycle_bin():
+    async def clear_recycle_bin(_role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         count = len(recycle_bin_store)
         from app.utils.job_results_store import delete_job_results_from_disk
-        for job_id in list(recycle_bin_store.keys()):
-            delete_job_results_from_disk(job_id)
+        for jid in list(recycle_bin_store.keys()):
+            job = recycle_bin_store.get(jid)
+            file_path = job.results_file_path if job else None
+            delete_job_results_from_disk(jid, file_path)
+        repo = get_job_repository()
+        for jid in list(recycle_bin_store.keys()):
+            repo.hard_delete(jid)
         recycle_bin_store.clear()
-        if count:
-            persist_state_fn()
         return {"message": f"Recycle bin cleared ({count} items)", "cleared": count}
 
     return router

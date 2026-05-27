@@ -20,6 +20,8 @@ import time
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
+from app.anti_bot_engine import get_anti_bot_engine
+
 logger = logging.getLogger(__name__)
 
 
@@ -152,7 +154,6 @@ def get_scrape_telemetry() -> ScrapeTelemetryCollector:
     return _collector
 
 
-from app.anti_bot_engine import get_anti_bot_engine
 
 def detect_anti_bot(html: str) -> float:
     """Score how likely this page is an anti-bot / challenge page.

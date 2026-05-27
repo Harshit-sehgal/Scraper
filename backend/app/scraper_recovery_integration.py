@@ -17,18 +17,42 @@ This integrates with:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from typing import Any, Dict, Optional
 
 from app.failure_classification import classify_failure, FailureCategory
-from app.recovery_strategies import get_recovery_strategist, get_recovery_executor
+from app.config import settings
+from app.recovery_strategies import get_recovery_strategist, get_recovery_executor, AttemptContext
 from app.selector_memory import get_selector_memory
 from app.domain_intelligence import get_domain_intelligence
 from app.models import SchemaField
+from app.acquisition_state import AcquisitionLineage, AcquisitionState
 
 logger = logging.getLogger(__name__)
+
+
+def _recommended_action_for_state(state: AcquisitionState) -> str:
+    if state == AcquisitionState.SESSION_EXPIRED:
+        return "provide_search_params"
+    if state == AcquisitionState.ANTI_BOT_BLOCKED:
+        return "use_authorized_access_or_retry_later"
+    if state == AcquisitionState.EMPTY_RESPONSE:
+        return "check_login_js_or_cookie_wall"
+    return "inspect_failure_telemetry"
+
+
+def _acquisition_state_for_failure(failure_category: str | None) -> AcquisitionState:
+    category = (failure_category or "").lower()
+    if any(key in category for key in ("anti_bot", "captcha", "banned", "rate_limited")):
+        return AcquisitionState.ANTI_BOT_BLOCKED
+    if "session" in category:
+        return AcquisitionState.SESSION_EXPIRED
+    if any(key in category for key in ("empty", "no_records", "zero_records", "selector", "low_quality")):
+        return AcquisitionState.EMPTY_RESPONSE
+    if "timeout" in category:
+        return AcquisitionState.EMPTY_RESPONSE
+    return AcquisitionState.EMPTY_RESPONSE
 
 
 async def scrape_url_with_recovery(
@@ -37,7 +61,9 @@ async def scrape_url_with_recovery(
     min_record_score: float | None = None,
     user_intent: str = "",
     world_state=None,
-    max_recovery_attempts: int = 3,
+    max_recovery_attempts: int = settings.MAX_RECOVERY_ATTEMPTS,
+    selectors_map: dict | None = None,
+    search_params: dict[str, str] | None = None,
 ) -> tuple[list[dict], dict]:
     """Scrape a URL with intelligent failure recovery.
     
@@ -48,19 +74,21 @@ async def scrape_url_with_recovery(
         user_intent: User intent for extraction
         world_state: Semantic world state for tracking
         max_recovery_attempts: Maximum recovery attempts before giving up
+        selectors_map: Pre-discovered CSS selectors map from URL analysis
+        search_params: Optional search parameters for session-bound URL recovery
         
     Returns:
         Tuple of (results, recovery_stats) where:
             - results: Extracted records (empty list if all attempts failed)
             - recovery_stats: Dictionary with recovery information
     """
-    from app.scraper import scrape_url
-    
+    from app.scraper import scrape_url_attempt
+
     strategist = get_recovery_strategist()
     executor = get_recovery_executor()
     selector_memory = get_selector_memory()
     get_domain_intelligence()
-    
+
     recovery_stats: Dict[str, Any] = {
         "url": url,
         "attempts": 0,
@@ -71,95 +99,197 @@ async def scrape_url_with_recovery(
         "failure_classifications": [],
         "total_time_ms": 0.0,
     }
-    
+
     start_time = time.time()
     attempt = 0
     last_error: Optional[Exception] = None
-    
+    attempt_ctx = AttemptContext()
+
     while attempt < max_recovery_attempts:
+        if attempt_ctx.skip_url:
+            recovery_stats["final_failure_category"] = "skipped_url"
+            break
+        if attempt_ctx.abort_domain or attempt_ctx.skip_domain:
+            recovery_stats["final_failure_category"] = "skipped_domain"
+            break
+
         attempt += 1
         recovery_stats["attempts"] += 1
-        
+
         try:
-            logger.info("Scrape attempt %d/%d for %s", attempt, max_recovery_attempts, url)
-            results = await scrape_url(
-                url,
-                schema_fields,
-                min_record_score=min_record_score,
-                user_intent=user_intent,
-                world_state=world_state,
-            )
-            
-            # Since scrape_url catches exceptions and returns [], 
-            # we must check telemetry to see if it actually failed.
+            # Chaos failure injection check
+            from app.chaos_simulator import get_chaos_simulator, FailureMode
+            chaos = get_chaos_simulator()
+
+            if chaos.is_failure_active(FailureMode.NETWORK_TIMEOUT):
+                logger.warning("[Chaos Simulation] Injecting NETWORK_TIMEOUT")
+                raise Exception("Timed out waiting for response")
+
+            if chaos.is_failure_active(FailureMode.BROWSER_CRASH):
+                logger.warning("[Chaos Simulation] Injecting BROWSER_CRASH")
+                raise Exception("Browser target closed unexpectedly")
+
+            if chaos.is_failure_active(FailureMode.ANTI_BOT_ESCALATION):
+                logger.warning("[Chaos Simulation] Injecting ANTI_BOT_ESCALATION")
+                raise Exception("403 Forbidden - WAF Challenge")
+
+            if chaos.is_failure_active(FailureMode.SELECTOR_POISONING):
+                logger.warning("[Chaos Simulation] Injecting SELECTOR_POISONING (zero records)")
+                results: Any = []
+            else:
+                # Use scrape_url_attempt for richer result metadata
+                result = await scrape_url_attempt(
+                    url,
+                    schema_fields,
+                    min_record_score=min_record_score,
+                    user_intent=user_intent,
+                    world_state=world_state,
+                    selectors_map=selectors_map,
+                    search_params=search_params,
+                    attempt_ctx=attempt_ctx,
+                )
+                results = list(result)  # Extract records as a plain list
+
+            # Check telemetry for fetch-level errors
             from app.scrape_telemetry import get_scrape_telemetry
             telemetry = get_scrape_telemetry()
             last_event = telemetry.get_last_for_url(url)
-            
+
             if last_event and last_event.error:
-                # It was a fetch or structural failure
                 logger.warning("Scrape attempt %d failed: %s", attempt, last_event.error)
                 raise Exception(last_event.error)
-            
+
             if not results and attempt < max_recovery_attempts:
-                # Extraction returned nothing - treat as failure to trigger recovery
                 logger.warning("Scrape attempt %d returned 0 records, triggering recovery", attempt)
                 raise Exception("zero_records_extracted")
-            
+
             recovery_stats["success"] = True
             recovery_stats["total_time_ms"] = (time.time() - start_time) * 1000
-            logger.info("Scrape succeeded on attempt %d for %s (got %d records)", 
-                       attempt, url, len(results))
+
+            # Build acquisition lineage from enriched result metadata
+            anti_bot_score = result.anti_bot_score
+            fetch_method = result.fetch_method or "playwright_full"
+            recommend = result.recommended_next_action
+
+            if attempt > 1:
+                state = AcquisitionState.RECOVERED
+                user_message = "Scrape succeeded after recovery actions."
+            elif anti_bot_score > 0.5:
+                state = AcquisitionState.ANTI_BOT_BLOCKED
+                user_message = "Page may have anti-bot protections."
+            else:
+                state = AcquisitionState.DIRECT
+                user_message = "Page loaded successfully."
+
+            lineage = AcquisitionLineage(
+                original_url=url,
+                final_url=result.final_url or url,
+                state=state,
+                fetch_method=fetch_method,
+                anti_bot_score=anti_bot_score,
+                data_evidence_score=result.data_evidence_score,
+                user_message=user_message,
+                recommended_next_action=recommend or _recommended_action_for_state(state),
+                recovery_method=", ".join(recovery_stats["recovery_actions_taken"]) if recovery_stats["recovery_actions_taken"] else None,
+            )
+            recovery_stats["acquisition_lineage"] = lineage.to_dict()
+
+            logger.info(
+                "Scrape succeeded on attempt %d for %s (got %d records, state=%s, anti_bot=%.2f)",
+                attempt, url, len(results), state.value if hasattr(state, 'value') else str(state), anti_bot_score,
+            )
             return results, recovery_stats
-            
+
         except Exception as e:
             last_error = e
             error_msg = str(e)
-            
+
             # Get telemetry if available for richer classification
             from app.scrape_telemetry import get_scrape_telemetry
             last_event = get_scrape_telemetry().get_last_for_url(url)
             event_dict = last_event.to_dict() if last_event else {}
-            
-            # 1. Classify the failure
+
+            # Use scrape result HTML for evidence-based classification if available
+            result_html = None
+            if 'result' in locals():
+                result_html = getattr(result, 'html', None)
+
             classification = classify_failure(
                 error_message=error_msg,
                 telemetry=event_dict,
-                html=None, # We don't have HTML here, scrape_url doesn't return it
+                html=result_html,
             )
             recovery_stats["failure_classifications"].append(classification.to_dict())
             recovery_stats["final_failure_category"] = classification.category.value
-            
-            # Special case: if SELECTOR_DECAY, clean up selector memory
+
             if classification.category == FailureCategory.SELECTOR_DECAY:
                 logger.info("Selector decay detected, cleaning up selector memory for %s", url)
                 selector_memory.force_cleanup()
 
             if attempt >= max_recovery_attempts:
                 break
-                
-            # 2. Generate recovery plan
-            plan = strategist.generate_recovery_plan(classification, attempt)
-            logger.info("Generated recovery plan for %s: %s (attempt %d)", 
+
+            domain_info = get_domain_intelligence().get_intelligence(url).to_dict()
+            plan = strategist.generate_recovery_plan(classification, attempt, domain_info=domain_info)
+            logger.info("Generated recovery plan for %s: %s (attempt %d)",
                        url, plan.primary_action.value, attempt)
-            
-            # 3. Execute recovery
+
+            if attempt > plan.max_retry_attempts:
+                logger.warning(
+                    "Max retry attempts (%d) reached for %s, giving up",
+                    plan.max_retry_attempts, url,
+                )
+                break
+
             recovery_stats["recovery_attempts"] += 1
             recovery_stats["recovery_actions_taken"].append(plan.primary_action.value)
-            
+
             success = await executor.execute(plan, context={
                 "url": url,
                 "attempt": attempt,
                 "world_state": world_state,
-            })
-            
+                "min_record_score": min_record_score or settings.DEFAULT_MIN_RECORD_SCORE,
+            }, attempt_ctx=attempt_ctx)
+
             if not success:
                 logger.warning("Recovery action %s failed for %s", plan.primary_action.value, url)
-            
-            # Exponential backoff
-            await asyncio.sleep(plan.backoff_seconds)
-            
+
+            if attempt_ctx.skip_url:
+                recovery_stats["final_failure_category"] = "skipped_url"
+                break
+            if attempt_ctx.abort_domain or attempt_ctx.skip_domain:
+                recovery_stats["final_failure_category"] = "skipped_domain"
+                break
+
+            if attempt_ctx.bypass_selector_memory:
+                selector_memory.force_cleanup()
+            if attempt_ctx.force_llm_discovery and selectors_map:
+                selectors_map = None
+
     recovery_stats["total_time_ms"] = (time.time() - start_time) * 1000
-    logger.error("All %d scrape attempts failed for %s. Last error: %s", 
+
+    failure_category = recovery_stats.get("final_failure_category", "unknown")
+    state = _acquisition_state_for_failure(failure_category)
+
+    from app.scrape_telemetry import get_scrape_telemetry
+    last_event = get_scrape_telemetry().get_last_for_url(url)
+    event_dict = last_event.to_dict() if last_event else {}
+
+    lineage = AcquisitionLineage(
+        original_url=url,
+        final_url=url,
+        state=state,
+        message=f"Final failure category: {failure_category}",
+        fetch_method=event_dict.get("fetch_method", "unknown") or "unknown",
+        session_bound=(state == AcquisitionState.SESSION_EXPIRED),
+        anti_bot_score=float(event_dict.get("anti_bot_score", 0.0) or 0.0),
+        data_evidence_score=0.0,
+        user_message="",
+        recommended_next_action=_recommended_action_for_state(state),
+    )
+    lineage.user_message = lineage.get_user_message()
+    recovery_stats["acquisition_lineage"] = lineage.to_dict()
+
+    logger.error("All %d scrape attempts failed for %s. Last error: %s",
                 max_recovery_attempts, url, last_error)
     return [], recovery_stats

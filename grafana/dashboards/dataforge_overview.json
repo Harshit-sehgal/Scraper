@@ -1,0 +1,82 @@
+{
+  "title": "DataForge — Production Overview",
+  "uid": "dataforge-overview",
+  "version": 2,
+  "schemaVersion": 39,
+  "tags": ["dataforge", "production"],
+  "timezone": "browser",
+  "editable": true,
+  "panels": [
+    {
+      "title": "System Status",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "targets": [{"expr": "up{job='dataforge'}", "legendFormat": "API Server"}]
+    },
+    {
+      "title": "Active Jobs",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "targets": [{"expr": "sum(dataforge_jobs_total{status='running'}) or vector(0)", "legendFormat": "Active"}]
+    },
+    {
+      "title": "Queue Depth",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "targets": [{"expr": "dataforge_queue_pending", "legendFormat": "Pending"}]
+    },
+    {
+      "title": "Failed Jobs Stat",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "targets": [{"expr": "sum(dataforge_jobs_total{status='failed'}) or vector(0)", "legendFormat": "Failed"}]
+    },
+    {
+      "title": "DB Errors Stat",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "targets": [{"expr": "sum(dataforge_errors_total{type='database'}) or vector(0)", "legendFormat": "DB Errors"}]
+    },
+    {
+      "title": "Request Rate (1m)",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [{"expr": "rate(dataforge_requests_total[1m])", "legendFormat": "req/s"}]
+    },
+    {
+      "title": "Job Status Breakdown",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 4},
+      "targets": [
+        {"expr": "dataforge_jobs_total{status='completed'}", "legendFormat": "Completed"},
+        {"expr": "dataforge_jobs_total{status='failed'}", "legendFormat": "Failed"},
+        {"expr": "dataforge_jobs_total{status='running'}", "legendFormat": "Running"},
+        {"expr": "dataforge_jobs_total{status='canceled'}", "legendFormat": "Canceled"}
+      ]
+    },
+    {
+      "title": "95th Percentile Latency",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 4},
+      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(dataforge_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95 Latency"}]
+    },
+    {
+      "title": "Memory Usage",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 12},
+      "targets": [{"expr": "process_resident_memory_bytes{job='dataforge'}", "legendFormat": "Memory"}]
+    },
+    {
+      "title": "LLM Call Rate",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 12},
+      "targets": [{"expr": "rate(dataforge_llm_calls_total[5m])", "legendFormat": "calls/s"}]
+    },
+    {
+      "title": "Error Rate",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 12},
+      "targets": [{"expr": "rate(dataforge_errors_total[5m])", "legendFormat": "errors/s"}]
+    }
+  ]
+}

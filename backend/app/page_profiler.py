@@ -36,6 +36,16 @@ class ValuePatterns:
     numbers: List[str] = field(default_factory=list)
     durations: List[str] = field(default_factory=list)
     urls: List[str] = field(default_factory=list)
+    weights: List[str] = field(default_factory=list)  # ["250g", "1kg", "500 g", "2lb"]
+    percentages: List[str] = field(default_factory=list)  # ["8%", "20% off", "0.5%"]
+    times: List[str] = field(default_factory=list)  # ["14:30", "2:30 PM", "08:00"]
+    booleans: List[str] = field(default_factory=list)  # ["Available", "In Stock", "Yes", "No"]
+    dimensions: List[str] = field(default_factory=list)  # ["10x15cm", "5\"x7\"", "A4"]
+    quantities: List[str] = field(default_factory=list)  # ["Pack of 6", "12 pieces", "500ml"]
+    product_codes: List[str] = field(default_factory=list)  # ["SKU-12345", "#ABC123", "EAN 123456789"]
+    units: List[str] = field(default_factory=list)  # ["per kg", "per item", "each", "dozen"]
+    airport_codes: List[str] = field(default_factory=list)  # ["LHR", "JFK", "DXB", "SFO"]
+    address_fragments: List[str] = field(default_factory=list)  # ["123 Main St", "New York, NY"]
 
 
 # Universal patterns for value type detection (NOT domain-specific)
@@ -80,6 +90,50 @@ VALUE_PATTERNS = {
     "url": [
         r"https?://[^\s]+",
         r"www\.[^\s]+",
+    ],
+    "weight": [
+        r"\d+[\.\,]?\d*\s*(?:g|kg|lb|lbs|ounce|oz|gram|kilo|kilogram)",  # 250g, 1kg, 500 g, 2lb
+        r"(?:g|kg|lb|lbs|ounce|oz|gram|kilo|kilograms?)\s*\d+",  # kg 1, g 500
+    ],
+    "percentage": [
+        r"\d+[\.\,]?\d*%",  # 8%, 20%, 0.5%
+        r"\d+[\.\,]?\d*\s*per\s*cent",  # 8 per cent
+    ],
+    "time": [
+        r"\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?",  # 14:30, 2:30 PM, 08:00
+        r"\d{1,2}\s*(?:AM|PM|am|pm)",  # 2 PM, 11 AM
+    ],
+    "boolean": [
+        r"\b(?:Yes|No|True|False|Available|Unavailable|In\s+Stock|Out\s+of\s+Stock|Sold\s+Out|Inactive|Active|Enabled|Disabled)\b",
+    ],
+    "dimension": [
+        r"\d+[\.\,]?\d*\s*(?:x|×|\*)\s*\d+[\.\,]?\d*\s*(?:cm|mm|m|in|inches|ft|feet)?",  # 10x15cm, 5x7
+        r"(?:A[0-5]|Letter|Legal|Tabloid)",  # Paper sizes
+    ],
+    "quantity": [
+        r"(?:Pack|pack)\s*(?:of|/)?\s*\d+",  # Pack of 6, Pack/12
+        r"\d+\s*(?:pieces?|units?|items?|count|pcs|qty)",  # 12 pieces, 6 units
+        r"\d+[\.\,]?\d*\s*(?:ml|l|L|litre|liter|gallon|fl oz)",  # 500ml, 1L, 2 litres
+        r"(?:each|per\s*dozen|per\s*piece|per\s*unit)",  # each, per dozen
+    ],
+    "product_code": [
+        r"\bSKU[-:\s]*[A-Za-z0-9-]+\b",  # SKU-12345, SKU: ABC123
+        r"\b(?:EAN|UPC|ISBN|ASIN)[-:\s]*[0-9]+\b",  # EAN 1234567890123
+        r"\b[0-9]{12,13}\b",  # EAN-13 / UPC-A barcode numbers only (12-13 digits)
+    ],
+    "unit_type": [
+        r"per\s*(?:kg|g|lb|piece|item|unit|dozen|litre|ml|pack|box|serving)",  # per kg, per piece
+        r"(?:each|per\s*kg|per\s*g|per\s*lb|/\s*kg|/\s*piece|/\s*item)",  # each, /kg
+        r"\b(?:dozen|pack|box|carton|case|bundle|pair|set)\b",
+    ],
+    "airport_code": [
+        r"\b[A-Z]{3}\b",  # LHR, JFK, DXB, SFO — shared with codes_3letter but kept separate for flight context
+    ],
+    "address": [
+        r"\d+\s+[A-Za-z]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Drive|Dr|Boulevard|Blvd|Way|Circle|Cir|Court|Ct|Plaza|Square)",  # 123 Main St
+        r"[A-Za-z ,]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln)\s+\d+",
+        r"\b(?:P\.?\s*O\.?\s*Box)\s+\d+",
+        r"\b[\w\s]+,\s*(?:NY|CA|TX|FL|IL|OH|PA|GA|NC|MI|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|AL|SC|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|WV|ID|HI|NH|ME|RI|MT|DE|SD|ND|AK|VT|WY|DC)\b",  # New York, NY
     ],
 }
 
@@ -308,42 +362,62 @@ def detect_value_patterns(html: str) -> ValuePatterns:
     Detect what types of values the page contains using universal patterns.
 
     This is domain-agnostic - it just looks for patterns like currency symbols,
-    date formats, etc., regardless of whether it's a flight, hotel, or product page.
+    date formats, weights, times, etc., regardless of whether it's a flight, 
+    product, or directory page.
     """
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text()
 
     patterns = ValuePatterns()
 
-    # Extract samples for each pattern type
+    # Common English words to exclude from 3-letter code detection
+    COMMON_3LETTER_WORDS = {"THE", "AND", "FOR", "ARE", "NOT", "YOU", "ALL", "CAN",
+                            "HAS", "WAS", "BUT", "ITS", "OUT", "NEW", "NOW", "HOW",
+                            "GET", "SEE", "USE", "MAY", "LET", "MAN", "WAY", "DAY",
+                            "OLD", "BIG", "FEW", "HOT", "TOP", "BAD", "RUN", "SIT",
+                            "DID", "LOT", "ASK", "TRY", "TOO", "OWN", "CUT", "HIM",
+                            "HER", "ONE", "TWO", "SIX", "TEN", "ANY", "EACH", "OUR"}
+
+    # Map pattern_type to ValuePatterns attribute
+    pattern_map = {
+        "currency": "currencies",
+        "date": "dates",
+        "rating": "ratings",
+        "code_3letter": "codes_3letter",
+        "phone": "phones",
+        "email": "emails",
+        "number": "numbers",
+        "duration": "durations",
+        "url": "urls",
+        "weight": "weights",
+        "percentage": "percentages",
+        "time": "times",
+        "boolean": "booleans",
+        "dimension": "dimensions",
+        "quantity": "quantities",
+        "product_code": "product_codes",
+        "unit_type": "units",
+        "airport_code": "airport_codes",
+        "address": "address_fragments",
+    }
+
     for pattern_type, regexes in VALUE_PATTERNS.items():
         samples = []
         for regex in regexes:
             matches = re.findall(regex, text, re.IGNORECASE)
-            samples.extend(matches[:10])  # Limit samples
+            samples.extend(matches[:10])
 
-        # Store unique samples
-        if pattern_type == "currency":
-            patterns.currencies = list(set(samples))[:10]
-        elif pattern_type == "date":
-            patterns.dates = list(set(samples))[:10]
-        elif pattern_type == "rating":
-            patterns.ratings = list(set(samples))[:10]
-        elif pattern_type == "code_3letter":
-            # Accept all 3-letter codes; filter out common English words
-            common_words = {"THE", "AND", "FOR", "ARE", "NOT", "YOU", "ALL", "CAN", "HAS", "WAS", "BUT", "ITS", "OUT", "NEW", "NOW", "HOW"}
-            codes = [s for s in set(samples) if s.upper() not in common_words]
-            patterns.codes_3letter = codes[:10]
-        elif pattern_type == "phone":
-            patterns.phones = list(set(samples))[:10]
-        elif pattern_type == "email":
-            patterns.emails = list(set(samples))[:10]
-        elif pattern_type == "number":
-            patterns.numbers = list(set(samples))[:20]
-        elif pattern_type == "duration":
-            patterns.durations = list(set(samples))[:10]
-        elif pattern_type == "url":
-            patterns.urls = list(set(samples))[:10]
+        attr_name = pattern_map.get(pattern_type)
+        if not attr_name:
+            continue
+
+        unique = list(set(samples))
+
+        # Special handling for 3-letter codes (filter common words)
+        if pattern_type in ("code_3letter", "airport_code"):
+            unique = [s for s in unique if s.upper() not in COMMON_3LETTER_WORDS]
+
+        setattr(patterns, attr_name, unique[:10])
 
     return patterns
 

@@ -48,25 +48,35 @@ class ArchitecturalValidator:
     
     def _parse_all_modules(self):
         """Parse all Python modules and extract dependencies"""
-        for py_file in sorted(self.app_dir.glob('*.py')):
+        files = list(self.app_dir.glob('*.py'))
+        ws_pkg = self.app_dir / "semantic_world_state"
+        if ws_pkg.is_dir():
+            files.append(ws_pkg / "core.py")
+            
+        for py_file in sorted(files):
             try:
                 with open(py_file) as f:
                     tree = ast.parse(f.read())
                 
                 module_name = py_file.stem
+                if py_file.parent.name == "semantic_world_state":
+                    module_name = "semantic_world_state"
+                    
                 self.layer_map[module_name] = self._detect_layer(module_name)
-                imports = set()
+                imports = self.imports_map.get(module_name, set())
                 
                 for node in ast.walk(tree):
                     if isinstance(node, ast.ImportFrom):
                         if node.module and node.module.startswith('backend.app.'):
                             imported = node.module.replace('backend.app.', '')
-                            imports.add(imported)
+                            if not imported.startswith("semantic_world_state"):
+                                imports.add(imported)
                     elif isinstance(node, ast.Import):
                         for alias in node.names:
                             if 'backend.app' in alias.name:
                                 imported = alias.name.replace('backend.app.', '')
-                                imports.add(imported)
+                                if not imported.startswith("semantic_world_state"):
+                                    imports.add(imported)
                 
                 self.imports_map[module_name] = imports
             except Exception as e:

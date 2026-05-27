@@ -3,12 +3,50 @@
  * Phase 63: Real-time Topology Visualization & Drift Monitoring
  */
 
+// ─── API key management (shared with main dashboard) ───────────────────
+function getDashboardApiKey() {
+    try { return localStorage.getItem("dataforge_api_key") || ""; } catch { return ""; }
+}
+
+function setDashboardApiKey(key) {
+    try { localStorage.setItem("dataforge_api_key", key); } catch {}
+}
+
+let dashboardApiLast403 = 0;
+
+async function dashboardApiFetch(url, options = {}) {
+    const headers = { ...(options.headers || {}) };
+    const key = getDashboardApiKey();
+    if (key && url.includes("/api/")) headers["X-API-Key"] = key;
+    try {
+        const res = await fetch(url, { ...options, headers });
+        // Auto-prompt on 403: API key may be missing or invalid
+        if (res.status === 403) {
+            const now = Date.now();
+            if (now - dashboardApiLast403 > 15000) {
+                dashboardApiLast403 = now;
+                const current = getDashboardApiKey();
+                const newKey = prompt("API key required. Enter your DataForge API key:", current);
+                if (newKey !== null) {
+                    setDashboardApiKey(newKey.trim());
+                }
+            }
+        }
+        return res;
+    } catch (err) {
+        throw err;
+    }
+}
+
 // Configurable API base — supports window.DATAFORGE_API_BASE override, same as app.js
 const API_SERVER = (() => {
     const explicit = typeof window.DATAFORGE_API_BASE === 'string' ? window.DATAFORGE_API_BASE.trim() : '';
     if (explicit) return explicit.replace(/\/$/, '');
     const { protocol, hostname, port } = window.location;
-    if ((protocol === 'http:' || protocol === 'https:') && ((hostname === 'localhost' || hostname === '127.0.0.1') && port !== '8000')) {
+    // Only use 127.0.0.1:8000 for dev servers like Vite/Webpack (ports 3000, 5173)
+    // Not for nginx port 80 (production) — use same-origin there
+    const devPorts = ['3000', '5173'];
+    if ((protocol === 'http:' || protocol === 'https:') && (hostname === 'localhost' || hostname === '127.0.0.1') && devPorts.includes(port)) {
         return 'http://127.0.0.1:8000';
     }
     return window.location.origin;
@@ -136,15 +174,17 @@ function setupControls() {
 async function updateLoop() {
     // Use allSettled so individual failures don't crash the whole update
     const results = await Promise.allSettled([
-        fetch(`${API_SYSTEM}/topology`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SYSTEM}/observability`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SYSTEM}/history/topology`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SCRAPER}/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SCRAPER}/browser`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-        fetch(`${API_SCRAPER}/memory/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        dashboardApiFetch(`${API_SYSTEM}/topology`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SYSTEM}/observability`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SYSTEM}/history/topology`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SCRAPER}/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SCRAPER}/browser`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SCRAPER}/memory/stats`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SYSTEM}/acquisition/telemetry`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        dashboardApiFetch(`${API_SERVER}/api/system/status`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
     ]);
 
-    const [topologyResult, observabilityResult, historyResult, scraperStatsResult, browserStatsResult, memoryStatsResult] = results;
+    const [topologyResult, observabilityResult, historyResult, scraperStatsResult, browserStatsResult, memoryStatsResult, acqTelemetryResult, systemStatusResult] = results;
 
     // Check for rate limiting or other failures
     const anyFailed = results.some(r => r.status === 'rejected');
@@ -171,6 +211,8 @@ async function updateLoop() {
     const scraperStats = scraperStatsResult.status === 'fulfilled' ? scraperStatsResult.value : null;
     const browserStats = browserStatsResult.status === 'fulfilled' ? browserStatsResult.value : null;
     const memoryStats = memoryStatsResult.status === 'fulfilled' ? memoryStatsResult.value : null;
+    const acqTelemetry = acqTelemetryResult.status === 'fulfilled' ? acqTelemetryResult.value : null;
+    const systemStatus = systemStatusResult.status === 'fulfilled' ? systemStatusResult.value : null;
 
     // Update Timeline
     topologyHistory = history.history || [];
@@ -185,7 +227,9 @@ async function updateLoop() {
             topology.macro_continents || [],
             scraperStats,
             browserStats,
-            memoryStats
+            memoryStats,
+            acqTelemetry,
+            systemStatus
         );
         renderTopology(
             topology.field_regions || [],
@@ -206,7 +250,7 @@ async function updateLoop() {
     pollTimer = setTimeout(updateLoop, currentInterval);
 }
 
-function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, browserStats, memoryStats) {
+function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, browserStats, memoryStats, acqTelemetry, systemStatus) {
     m = m || {};
     document.getElementById('metric-pressure').innerText = Number(m.field_pressure || 0).toFixed(3);
     document.getElementById('metric-energy').innerText = Number(m.global_energy || 0).toFixed(3);
@@ -228,6 +272,50 @@ function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, b
     }
     if (memoryStats) {
         document.getElementById('metric-memory-domains').innerText = memoryStats.domain_count || 0;
+    }
+
+    // Acquisition Pipeline Metrics (Phase 92)
+    if (acqTelemetry) {
+        const t = acqTelemetry;
+        document.getElementById('metric-session-bound').innerText = t.session_bound_urls || 0;
+        document.getElementById('metric-total-acquisitions').innerText = t.total_acquisitions || 0;
+
+        const rate = t.recovery_success_rate != null ? (t.recovery_success_rate * 100).toFixed(0) : null;
+        document.getElementById('metric-recovery-rate').innerText = rate != null ? `${rate}%` : '--%';
+        document.getElementById('metric-recovery-detail').innerText = `${t.recovery_successes || 0} / ${t.recovery_attempts || 0} attempts`;
+
+        const emptyCount = (t.state_distribution && t.state_distribution.empty_response) || 0;
+        document.getElementById('metric-empty-200').innerText = emptyCount;
+
+        // Acquisition mode distribution
+        const dist = t.state_distribution || {};
+        const modes = [];
+        if (dist.direct) modes.push(`direct:${dist.direct}`);
+        if (dist.recovered) modes.push(`recovered:${dist.recovered}`);
+        if (dist.session_expired) modes.push(`expired:${dist.session_expired}`);
+        if (dist.empty_response) modes.push(`empty:${dist.empty_response}`);
+        if (dist.awaiting_search_params) modes.push(`awaiting:${dist.awaiting_search_params}`);
+        document.getElementById('metric-acq-modes').innerText = modes.length ? modes.join('  ') : '--';
+
+        // Color-code recovery rate
+        const recoveryEl = document.getElementById('metric-recovery-rate');
+        if (rate != null) {
+            if (rate >= 80) recoveryEl.className = 'metric-value text-green-500';
+            else if (rate >= 40) recoveryEl.className = 'metric-value text-yellow-500';
+            else recoveryEl.className = 'metric-value text-red-500';
+        }
+
+        // Style empty-200 count
+        const emptyEl = document.getElementById('metric-empty-200');
+        if (emptyCount > 0) emptyEl.className = 'metric-value text-red-500';
+    }
+
+    if (systemStatus) {
+        const jobs = systemStatus.jobs || {};
+        document.getElementById('metric-jobs-completed').innerText = jobs.completed || 0;
+        document.getElementById('metric-jobs-degraded').innerText = jobs.degraded || 0;
+        document.getElementById('metric-jobs-empty-result').innerText = jobs.empty_result || 0;
+        document.getElementById('metric-jobs-failed').innerText = jobs.failed || 0;
     }
 
     // Style energy balance based on conservation status

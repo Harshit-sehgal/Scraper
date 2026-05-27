@@ -16,6 +16,9 @@ import random
 import time
 from typing import Dict, List, Optional
 
+import re
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
 # Primary detection patterns for common anti-bot platforms
@@ -101,15 +104,17 @@ class AntiBotEngine:
             for p in patterns:
                 if p in lower_html:
                     # Platform matches boost score
-                    max_score = max(max_score, 0.6)
+                    max_score = max(max_score, settings.ANTIBOT_PLATFORM_MATCH_SCORE)
                 
         # 3. Header-based Detection
         if headers:
             headers_lower = {k.lower(): str(v).lower() for k, v in headers.items()}
             # Look for common anti-bot headers
             server = headers_lower.get("server", "")
-            if "cloudflare" in server: max_score = max(max_score, 0.45)
-            if "akamai" in server: max_score = max(max_score, 0.55)
+            if "cloudflare" in server:
+                max_score = max(max_score, settings.ANTIBOT_CLOUDFLARE_SCORE)
+            if "akamai" in server:
+                max_score = max(max_score, settings.ANTIBOT_AKAMAI_SCORE)
             
             # Check for set-cookie headers related to bot detection
             cookies = headers_lower.get("set-cookie", "")
@@ -126,9 +131,9 @@ class AntiBotEngine:
             
         # If mean score of last 3 attempts is > 0.4, or any is > 0.8
         recent = history[-3:]
-        if any(s > 0.8 for s in recent):
+        if any(s > settings.ANTIBOT_HARD_BLOCK_THRESHOLD for s in recent):
             return True
-        if len(recent) >= 2 and sum(recent) / len(recent) > 0.4:
+        if len(recent) >= 2 and sum(recent) / len(recent) > settings.ANTIBOT_STEALTH_ESCALATION_MEAN:
             return True
             
         return False
@@ -146,13 +151,7 @@ class AntiBotEngine:
           - platform: OS platform string
         """
         # UA rotation based on attempt history
-        ua_pool = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:122.0) Gecko/20100101 Firefox/122.0",
-        ]
+        ua_pool = settings.STEALTH_UA_POOL.split(",")
         
         # Track UAs used per domain to avoid reusing the same one
         used_uas = self._ua_history.get(domain, [])
@@ -165,22 +164,30 @@ class AntiBotEngine:
         if domain not in self._ua_history:
             self._ua_history[domain] = []
         self._ua_history[domain].append(ua)
-        self._ua_history[domain] = self._ua_history[domain][-5:]  # Keep last 5
+        self._ua_history[domain] = self._ua_history[domain][-settings.ANTIBOT_UA_HISTORY_SIZE:]  # Keep last 5
         
         # Randomize additional headers to mimic real browsers
         is_chromium = "Chrome" in ua and "Firefox" not in ua
+        chrome_ver_match = re.search(r"Chrome/(\d+)", ua)
+        chrome_ver = chrome_ver_match.group(1) if chrome_ver_match else "122"
+        if "Windows" in ua:
+            sec_ch_ua_platform = '"Windows"'
+        elif "Mac" in ua:
+            sec_ch_ua_platform = '"macOS"'
+        else:
+            sec_ch_ua_platform = '"Linux"'
         extra_headers = {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Language": settings.STEALTH_ACCEPT_LANGUAGE,
             "Accept-Encoding": "gzip, deflate, br",
             "Sec-Fetch-Dest": "document",
             "Sec-Fetch-Mode": "navigate",
             "Sec-Fetch-Site": "none",
             "Sec-Fetch-User": "?1",
             "Upgrade-Insecure-Requests": "1",
-            "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+            "Sec-Ch-Ua": f'"Chromium";v="{chrome_ver}", "Not(A:Brand";v="24", "Google Chrome";v="{chrome_ver}"',
             "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"Windows"',
+            "Sec-Ch-Ua-Platform": sec_ch_ua_platform,
         }
         if not is_chromium:
             # Firefox-style headers
@@ -193,18 +200,18 @@ class AntiBotEngine:
             extra_headers.pop("Sec-Ch-Ua-Platform", None)
         
         # Viewport randomization (with reasonable ranges)
-        viewport_width = random.choice([1280, 1366, 1440, 1536, 1600, 1920])
-        viewport_height = random.choice([720, 768, 800, 900, 1024, 1080])
+        viewport_width = random.choice([int(x) for x in settings.STEALTH_VIEWPORT_WIDTHS.split(",")])
+        viewport_height = random.choice([int(x) for x in settings.STEALTH_VIEWPORT_HEIGHTS.split(",")])
         
         profile = {
             "user_agent": ua,
             "extra_headers": extra_headers,
             "viewport": {"width": viewport_width, "height": viewport_height},
             "cookie_string": self._cookies.get(domain, ""),
-            "timezone": random.choice(["America/New_York", "America/Chicago", "America/Los_Angeles", "Europe/London", "Asia/Singapore"]),
-            "locale": "en-US",
+            "timezone": random.choice(settings.STEALTH_TIMEZONE_POOL.split(",")),
+            "locale": settings.STEALTH_DEFAULT_LOCALE,
             "platform": "Win32" if "Windows" in ua else ("MacIntel" if "Mac" in ua else "Linux x86_64"),
-            "device_scale_factor": random.choice([1.0, 1.25, 1.5, 2.0]),
+            "device_scale_factor": random.choice([float(x) for x in settings.STEALTH_DEVICE_SCALE_FACTORS.split(",")]),
         }
         return profile
 
@@ -220,7 +227,7 @@ class AntiBotEngine:
         """Get persisted cookies for a domain."""
         return self._cookies.get(domain, "")
 
-    def should_refresh_cookies(self, domain: str, max_age_hours: int = 24) -> bool:
+    def should_refresh_cookies(self, domain: str, max_age_hours: int = settings.ANTIBOT_COOKIE_MAX_AGE_HOURS) -> bool:
         """Check if stored cookies for a domain should be refreshed."""
         last_update = self._last_cookie_update.get(domain, 0)
         if last_update == 0:
@@ -235,13 +242,12 @@ class AntiBotEngine:
         if last_score < 0.3:
             policy = {"action": "continue", "delay": 0}
             
-        elif last_score > 0.8:
-            # Hard block: need significant slowdown and proxy rotation
-            policy = {"action": "retry_slow", "delay": 30, "rotate_proxy": True}
+        elif last_score > settings.ANTIBOT_HARD_BLOCK_THRESHOLD:
+            policy = {"action": "retry_slow", "delay": settings.ANTIBOT_HARD_BLOCK_DELAY, "rotate_proxy": True}
             
         elif last_score > 0.5:
             # Medium challenge: probably just need more wait time/js execution
-            policy = {"action": "retry_wait", "delay": 5}
+            policy = {"action": "retry_wait", "delay": settings.ANTIBOT_MEDIUM_CHALLENGE_DELAY}
             
         else:
             policy = {"action": "continue", "delay": 0}
@@ -258,10 +264,10 @@ class AntiBotEngine:
             self._block_history[domain] = []
         self._block_history[domain].append(score)
         # Keep last 10 attempts
-        self._block_history[domain] = self._block_history[domain][-10:]
+        self._block_history[domain] = self._block_history[domain][-settings.ANTIBOT_BLOCK_HISTORY_SIZE:]
         
         # If score indicates hard block, record proxy failure
-        if score > 0.8 and self.proxy_manager.enabled:
+        if score > settings.ANTIBOT_HARD_BLOCK_THRESHOLD and self.proxy_manager.enabled:
             self.proxy_manager.record_failure()
             logger.info(f"Hard block detected on {domain}, recorded proxy failure")
 

@@ -12,7 +12,7 @@ def normalize_scraped_record(record: dict, schema_fields: list[SchemaField]) -> 
         else:
             normalized[field.name] = val
     # Preserve metadata fields needed for source breakdown and tracking
-    for mf in ("source_type", "source_url", "source_trust_score", "record_score", "_key"):
+    for mf in ("source_type", "source_url", "source_trust_score", "record_score", "_key", "_extraction_method"):
         if mf in record:
             normalized[mf] = record[mf]
     return normalized
@@ -197,6 +197,8 @@ def align_extracted_keys_to_schema(
         return raw_records
 
     profile_keys = [k for k in raw_records[0].keys() if not k.startswith("_")]
+    if "_extraction_method" in raw_records[0]:
+        profile_keys.append("_extraction_method")
     if not profile_keys:
         return raw_records
 
@@ -209,9 +211,14 @@ def align_extracted_keys_to_schema(
             intent_boost_fields |= keywords_to_tokens(kws)
 
     candidates: list[tuple[float, str, str]] = []
+    schema_name_set = {f.name.lower(): f.name for f in schema_fields}
     for pk in profile_keys:
         pk_cfg = selector_field_defs.get(pk) if isinstance(selector_field_defs.get(pk), dict) else None
         pk_tokens = _get_word_tokens(pk)
+        pk_lower = pk.lower()
+        if pk_lower in schema_name_set:
+            candidates.append((float('inf'), pk, schema_name_set[pk_lower]))
+            continue
         for sf in schema_fields:
             sc = _alignment_score(pk, sf, pk_cfg)
             sf_tokens = _get_word_tokens(sf.name)
@@ -239,11 +246,13 @@ def align_extracted_keys_to_schema(
     for r in raw_records:
         aligned = {}
         for pk, val in r.items():
-            if pk.startswith("_"):
+            if pk.startswith("_") and pk != "_extraction_method":
                 continue
             if pk in mapping:
                 aligned[mapping[pk]] = val
             elif pk in schema_names:
+                aligned[pk] = val
+            elif pk == "_extraction_method":
                 aligned[pk] = val
         aligned_records.append(aligned)
 
@@ -290,5 +299,7 @@ def process_raw_records(
     results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * settings.RECORD_ACCEPTANCE_FACTOR)]
     results = _dedupe_records(results, schema_fields)
     results = _limit_source_records(results, schema_fields)
-    results = run_pipeline(results, [f.name for f in schema_fields])
+    avg_score = sum(r.get("record_score", 0) for r in results) / max(len(results), 1)
+    if avg_score < 0.5 and results:
+        results = run_pipeline(results, [f.name for f in schema_fields])
     return results

@@ -17,8 +17,9 @@ Role-type compatibility is derived geometrically from the Role Manifold.
 
 import random
 from copy import deepcopy
-from typing import List, Set, Tuple
+from typing import List, Protocol, Set, Tuple
 
+from app.field_laws import ROLE_EXCLUSIVITY
 from app.semantic_ir import (
     AllocationGraph,
     SemanticRecord,
@@ -47,17 +48,28 @@ def reset_role_engine():
 # Exclusivity constraints — now defined in field_laws.py to prevent
 # upward dependency from core_types.py to this allocation engine.
 # Imported here for backward compatibility and local usage.
-from app.field_laws import ROLE_EXCLUSIVITY
+
+
+class _SemanticMetricsProtocol(Protocol):
+    """Typed interface for the metrics-like object accessed via ws.metrics.
+
+    Replaces unchecked 'Any' with an explicit protocol so mypy can validate
+    attribute access without needing type: ignore comments.
+    """
+    _smoothed_structural: float
+    _smoothed_runtime: float
+    semantic_temperature: float
+    integrity_score: float
 
 
 def _adaptive_exclusion_threshold() -> float:
     """Exclusion threshold with hysteresis + temperature modulation."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
-    # Read-only access to smoothed metrics updated during evolution
-    base = getattr(ws.metrics, "_smoothed_structural", 0.4)
-    temp = ws.metrics.semantic_temperature
-    conv = ws.metrics.integrity_score
+    metrics: _SemanticMetricsProtocol = ws.metrics  # type: ignore[has-type]
+    base: float = float(metrics._smoothed_structural)
+    temp: float = float(metrics.semantic_temperature)
+    conv: float = float(metrics.integrity_score)
     # Stress (temp) increases threshold; Convergence (trust) decreases it
     result = base + (temp - 0.5) * 0.2 - (conv - 0.5) * 0.15
     return max(0.2, min(0.6, result))
@@ -67,10 +79,10 @@ def _adaptive_runtime_exclusion_threshold() -> float:
     """Exclusion threshold with hysteresis + temperature + convergence."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
-    # Read-only access to smoothed metrics updated during evolution
-    base = getattr(ws.metrics, "_smoothed_runtime", 0.3)
-    temp = ws.metrics.semantic_temperature
-    conv = ws.metrics.integrity_score
+    metrics: _SemanticMetricsProtocol = ws.metrics  # type: ignore[has-type]
+    base: float = float(metrics._smoothed_runtime)
+    temp: float = float(metrics.semantic_temperature)
+    conv: float = float(metrics.integrity_score)
     # Stress (temp) increases threshold; Convergence (trust) decreases it
     result = base + (temp - 0.5) * 0.15 - (conv - 0.5) * 0.1
     return max(0.15, min(0.5, result))
@@ -349,7 +361,8 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
                     # Now check pairs within nearby candidates (O(k²) where k << n)
                     for i, (c1, t1) in enumerate(candidates_in_bucket):
                         for c2, t2 in nearby_candidates:
-                            if c1 == c2: continue
+                            if c1 == c2:
+                                continue
                             dist = abs(t1.position - t2.position)
                             if dist < 50: # Physically close
                                 # Boost compatibility for both

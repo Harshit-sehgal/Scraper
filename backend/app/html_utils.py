@@ -1,19 +1,27 @@
 import re
 import logging
 import asyncio
+
 import time
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 import httpx
 
 from app.config import settings
-
-logger = logging.getLogger(__name__)
 from app.models import SchemaField, FieldType
 from app.semantic_segmentation import segment_single_text, is_likely_noise_field
 from app.browser_pool import get_browser_pool
 from app.domain_intelligence import get_domain_intelligence
 from app.strategy_evolution import FetchStrategy
+from app.browser_network_capture import setup_network_capture, store_captures
+
+
+# ─── SSRF / private-network IP validation ──────────────────────────────
+from app.url_safety import validate_public_http_url as _validate_url_safe
+
+
+logger = logging.getLogger(__name__)
+
 
 EMPTY_TOKENS = {"-", "n/a", "na", "null", "none", "", "not available", "empty", "0", "false", "undefined"}
 PLACEHOLDER_PHRASES = {"no data", "not specified", "coming soon", "tbd", "unknown"}
@@ -270,9 +278,25 @@ def _boost_contacts_with_page_html(
 
 async def fetch_page_content(
     url: str, 
-    preferred_method: FetchStrategy | str = FetchStrategy.PLAYWRIGHT_FULL
+    preferred_method: FetchStrategy | str = FetchStrategy.PLAYWRIGHT_FULL,
+    timeout_ms: int | None = None,
+    hydration_wait_ms: int | None = None,
+    skip_networkidle: bool = False,
+    scroll_attempts: int | None = None,
+    anti_bot_stealth: bool = False,
+    extra_headers: dict[str, str] | None = None,
 ) -> tuple[str, float, str, int]:
     """Load a URL in a pooled headless browser context or via plain HTTP.
+
+    Args:
+        url: The URL to fetch.
+        preferred_method: The preferred fetch strategy.
+        timeout_ms: Override the Playwright navigation timeout (ms).
+        hydration_wait_ms: Override the hydration wait/delay after load (ms).
+        skip_networkidle: If True, use domcontentloaded instead of networkidle.
+        scroll_attempts: Override the number of scroll attempts.
+        anti_bot_stealth: If True, enable extra stealth measures.
+        extra_headers: Extra HTTP headers to inject.
 
     Returns:
         tuple of (html_content, js_render_delay_ms, method_used, retry_count)
@@ -288,12 +312,20 @@ async def fetch_page_content(
     else:
         strategy = preferred_method
 
+    if anti_bot_stealth and strategy in (FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT):
+        strategy = FetchStrategy.PLAYWRIGHT_STEALTH
+
     # ── Phase 80: Granular Strategy Execution ──
     
     # 1. HTTPX-based strategies
     if strategy in [FetchStrategy.HTTPX_BASIC, FetchStrategy.HTTPX_WITH_UA, FetchStrategy.HTTPX_SMART, FetchStrategy.HYBRID]:
         try:
-            html, delay, method, retries = await _fetch_with_httpx(url, strategy=strategy)
+            html, delay, method, retries = await _fetch_with_httpx(
+                url,
+                strategy=strategy,
+                extra_headers=extra_headers,
+                timeout_ms=timeout_ms,
+            )
             if html:
                 # Basic anti-bot check on httpx result
                 from app.scrape_telemetry import detect_anti_bot
@@ -307,6 +339,7 @@ async def fetch_page_content(
 
     # 2. Playwright-based strategies
     page = None
+    network_payloads = []  # Pre-initialize for safety
     js_render_delay_ms = 0.0
     method_used = strategy.value
     
@@ -315,9 +348,19 @@ async def fetch_page_content(
         # Pass strategy to get_context for specialized setup
         context = await pool.get_context(domain, strategy=strategy)
         page = await context.new_page()
+        if extra_headers:
+            await page.set_extra_http_headers(extra_headers)
 
         # Phase 80: Lightweight mode filters more resources
         async def _route_filter(route):
+            req_url = route.request.url
+            try:
+                _validate_url_safe(req_url)
+            except ValueError as e:
+                logger.warning("[SSRF] Playwright request to %s rejected: %s", req_url, e)
+                await route.abort()
+                return
+
             abort_types = {"image", "media", "font"}
             if strategy == FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
                 abort_types.update({"stylesheet", "other"})
@@ -329,11 +372,36 @@ async def fetch_page_content(
 
         await page.route("**/*", _route_filter)
 
-        # Phase 1: Try networkidle
+        # Set up network response interception for API/XHR JSON capture
+        network_payloads = await setup_network_capture(page)
+
+        # Phase 1: Try networkidle with quick timeout for faster failure detection
         try:
-            wait_until = "networkidle" if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT else "domcontentloaded"
-            await page.goto(url, wait_until=wait_until, timeout=settings.PLAYWRIGHT_TIMEOUT)  # type: ignore[arg-type]
-            
+            if skip_networkidle:
+                wait_until = "domcontentloaded"
+            elif strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
+                wait_until = "networkidle"
+            else:
+                wait_until = "domcontentloaded"
+            # Use recovery timeout if provided, otherwise use a short initial timeout (15s) for networkidle
+            if timeout_ms is not None:
+                initial_timeout = timeout_ms
+            else:
+                initial_timeout = min(settings.PLAYWRIGHT_TIMEOUT, 15000)
+            await page.goto(url, wait_until=wait_until, timeout=initial_timeout)  # type: ignore[arg-type]
+
+            # SSRF: validate the final page URL is not private/internal after Playwright navigation
+            try:
+                final_url = page.url
+                _validate_url_safe(final_url)
+            except ValueError:
+                logger.warning(
+                    "[SSRF] Playwright navigated to blocked target %s from %s — aborting",
+                    page.url, url,
+                )
+                await page.close()
+                raise
+
             # Phase 79: Adaptive hydration and scroll from domain intelligence
             intel = get_domain_intelligence().get_intelligence(url)
 
@@ -343,19 +411,23 @@ async def fetch_page_content(
                 for sel in loading_selectors:
                     try:
                         await page.wait_for_selector(sel, state="hidden", timeout=2000)
-                    except Exception: pass
+                    except Exception:
+                        pass
 
             # Adaptive post-network buffer: check DOM stabilization
             from app.telemetry_state import get_telemetry_state
             telemetry = get_telemetry_state()
             avg_stabilization = telemetry.get_avg_stabilization(domain)
             stabilization_start = time.time()
-            settle_timeout = intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
-            settle_timeout = max(settle_timeout, 3.0) 
-            
-            min_wait_ms = 2500 
+            # Use recovery hydration wait if provided, otherwise domain intelligence or default
+            if hydration_wait_ms is not None:
+                settle_timeout = hydration_wait_ms / 1000.0
+            else:
+                settle_timeout = intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
+            settle_timeout = max(settle_timeout, 3.0)
+
+            min_wait_ms = 2500
             try:
-                # Stabilization logic (omitted for brevity in replace, but should be complete in real file)
                 await page.wait_for_function(
                     f"""() => {{
                          const body = document.body;
@@ -363,7 +435,7 @@ async def fetch_page_content(
                          const start = Date.now();
                          let lastHtml = body.innerHTML;
                          let stableSince = Date.now();
-                         
+
                          return new Promise(resolve => {{
                              const interval = setInterval(() => {{
                                  const currentHtml = document.body ? document.body.innerHTML : lastHtml;
@@ -383,32 +455,63 @@ async def fetch_page_content(
                      }}""",
                     timeout=settle_timeout * 1000,
                 )
-            except Exception: pass
+            except Exception:
+                pass
             js_render_delay_ms = (time.time() - stabilization_start) * 1000
             telemetry.record_stabilization(domain, js_render_delay_ms)
 
-            # Scroll handling
+            # Scroll handling — use recovery scroll_attempts if provided
             if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
-                scroll_attempts = 0
-                max_scrolls = getattr(settings, 'MAX_SCROLL_ATTEMPTS', 3)
+                _scroll_attempts = 0
+                max_scrolls = scroll_attempts if scroll_attempts is not None else getattr(settings, 'MAX_SCROLL_ATTEMPTS', 3)
                 last_height = await page.evaluate("document.body.scrollHeight")
-                while scroll_attempts < max_scrolls:
+                while _scroll_attempts < max_scrolls:
                     await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                     await asyncio.sleep(settings.PAGE_SCROLL_DELAY)
                     new_height = await page.evaluate("document.body.scrollHeight")
-                    if new_height == last_height: break
+                    if new_height == last_height:
+                        break
                     last_height = new_height
-                    scroll_attempts += 1
-                if scroll_attempts > 0: intel.infinite_scroll_required = True
+                    _scroll_attempts += 1
+                if _scroll_attempts > 0:
+                    intel.infinite_scroll_required = True
                 await page.evaluate("window.scrollTo(0, 0)")
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(settings.POST_SCROLL_RESET_DELAY)
 
         except Exception as e:
-            logger.warning("[Scraper] %s slow load for %s: %s. Continuing with fallback", strategy.value, url, e)
+            # Before falling back, check partial HTML for anti-bot signals
+            try:
+                partial_html = await page.content()
+                from app.scrape_telemetry import detect_anti_bot
+                if detect_anti_bot(partial_html) > 0.5:
+                    logger.warning(
+                        "[Scraper] Anti-bot detected during initial %s for %s — aborting early",
+                        wait_until, url,
+                    )
+                    raise ValueError(f"Anti-bot challenge detected during {wait_until}: {e}")
+            except ValueError:
+                raise  # Re-raise anti-bot detection so scraper records the proper failure reason
+            except Exception:
+                pass
+
+            logger.warning(
+                "[Scraper] %s slow load for %s: %s. Falling to domcontentloaded",
+                strategy.value, url, e,
+            )
             await page.wait_for_load_state("domcontentloaded")
-            await asyncio.sleep(settings.PAGE_FALLBACK_EXTRA_WAIT)
+            # Reduced fallback wait: 2s instead of 5s — JS has already had time to start
+            await asyncio.sleep(min(settings.PAGE_FALLBACK_EXTRA_WAIT, 2.0))
 
         html = await page.content()
+
+        # Store captured network payloads for later extraction
+        if network_payloads:
+            store_captures(url, network_payloads)
+            logger.info(
+                "[BrowserNetwork] Captured %d network payloads from %s",
+                len(network_payloads), url,
+            )
+
         return html, js_render_delay_ms, method_used, 0
     except Exception as e:
         html_content = ""
@@ -431,7 +534,12 @@ async def fetch_page_content(
             raise ValueError(f"Anti-bot challenge detected: {e}")
 
         logger.error("[Scraper] %s failed for %s: %s. Final fallback to httpx_basic", strategy.value, url, e)
-        return await _fetch_with_httpx(url, strategy=FetchStrategy.HTTPX_BASIC)
+        return await _fetch_with_httpx(
+            url,
+            strategy=FetchStrategy.HTTPX_BASIC,
+            extra_headers=extra_headers,
+            timeout_ms=timeout_ms,
+        )
     finally:
         if page:
             try:
@@ -440,9 +548,12 @@ async def fetch_page_content(
                 pass
 
 
+
 async def _fetch_with_httpx(
-    url: str, 
-    strategy: FetchStrategy = FetchStrategy.HTTPX_BASIC
+    url: str,
+    strategy: FetchStrategy = FetchStrategy.HTTPX_BASIC,
+    extra_headers: dict[str, str] | None = None,
+    timeout_ms: int | None = None,
 ) -> tuple[str, float, str, int]:
     """Internal helper for httpx fetching with retries."""
     method_used = strategy.value
@@ -460,22 +571,58 @@ async def _fetch_with_httpx(
         headers = {"User-Agent": settings.USER_AGENT}
         if strategy == FetchStrategy.HTTPX_BASIC:
             # Minimal headers for basic fetch
-            headers = {"User-Agent": "python-httpx/0.27.0"}
+            headers = {"User-Agent": settings.HTTPX_BASIC_USER_AGENT}
         
+    if extra_headers:
+        headers.update(extra_headers)
+
+    timeout_seconds = (timeout_ms / 1000.0) if timeout_ms is not None else settings.REQUEST_TIMEOUT
     async with httpx.AsyncClient(
-        timeout=httpx.Timeout(settings.REQUEST_TIMEOUT),
+        timeout=httpx.Timeout(timeout_seconds),
         headers=headers,
-        follow_redirects=True,
+        follow_redirects=False,
     ) as client:
         for attempt in range(max(1, settings.MAX_RETRIES)):
             retry_count = attempt
             try:
+                # Validate the initial URL before fetching
+                _validate_url_safe(url)
+                
                 # Phase 80: Smart mode simulates basic session
                 if strategy == FetchStrategy.HTTPX_SMART:
-                    await client.get(urlparse(url).scheme + "://" + urlparse(url).netloc)
+                    initial_host = urlparse(url).scheme + "://" + urlparse(url).netloc
+                    _validate_url_safe(initial_host)
+                    await client.get(initial_host)
                 
-                resp = await client.get(url)
+                current_url = url
+                max_redirects = 10
+                redirects_followed = 0
+                
+                while True:
+                    resp = await client.get(current_url)
+                    if resp.is_redirect:
+                        redirects_followed += 1
+                        if redirects_followed > max_redirects:
+                            raise ValueError(f"Too many redirects (max {max_redirects})")
+                        
+                        redirect_target = resp.headers.get("location", "")
+                        if not redirect_target:
+                            break
+                        
+                        from urllib.parse import urljoin
+                        redirect_url = urljoin(str(resp.url), redirect_target)
+                        
+                        # Validate the target redirect URL before fetching it!
+                        _validate_url_safe(redirect_url)
+                        current_url = redirect_url
+                    else:
+                        break
+                
                 resp.raise_for_status()
+
+                # SSRF: validate the final resolved URL is not private/internal
+                final_url = str(resp.url)
+                _validate_url_safe(final_url)
                 
                 # Persist cookies from response for future requests
                 set_cookie = resp.headers.get("set-cookie", "")

@@ -73,11 +73,11 @@ Input Data:
 {_prepare_records_for_ai(chunk, schema_fields)}
 
 Rules:
-1. Return ONLY a JSON list of objects matching the schema.
-2. Fix typos, normalize capitalization.
-3. Infer missing fields from available text where obvious.
-4. Use null for truly missing data.
-"""
+1. Return ONLY a JSON list of objects matching the schema exactly.
+2. DO NOT change, invent, or reorder any extracted values.
+3. Only fix obvious typos (e.g., double spaces → single space).
+4. DO NOT combine or split records — each input record is one output record.
+5. Use null for empty fields, preserve existing values as-is."""
 
         try:
             messages = [

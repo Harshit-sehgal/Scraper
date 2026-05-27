@@ -10,7 +10,8 @@ const API = (() => {
     const { protocol, hostname, port, origin } = window.location;
     if (protocol === 'http:' || protocol === 'https:') {
         // In local multi-port dev, frontend often runs on 3000/5173 while API is on 8000.
-        if ((hostname === 'localhost' || hostname === '127.0.0.1') && port !== '8000') {
+        // Do NOT use separate API port for nginx port 80 (production) — use same-origin.
+        if ((hostname === 'localhost' || hostname === '127.0.0.1') && ['3000', '5173'].includes(port)) {
             return 'http://127.0.0.1:8000';
         }
         return origin;
@@ -18,6 +19,88 @@ const API = (() => {
     // file:// or unknown protocol fallback for local static preview.
     return 'http://127.0.0.1:8000';
 })();
+
+// ═══════════════════════════════════════════
+// API Key Management (for production auth)
+// ═══════════════════════════════════════════
+
+function getApiKey() {
+    try { return localStorage.getItem('dataforge_api_key') || ''; } catch { return ''; }
+}
+
+function setApiKey(key) {
+    try { localStorage.setItem('dataforge_api_key', key); } catch { /* ignore storage errors */ }
+}
+
+function showApiKeyPrompt() {
+    const current = getApiKey();
+    const key = prompt('Enter your DataForge API key:', current);
+    if (key !== null) {
+        setApiKey(key.trim());
+        if (key.trim()) {
+            toast('API key set', 'success');
+            refreshSystemStatus();
+            refreshJobs();
+        }
+    }
+}
+
+// ─── Admin Key Management (for X-Admin-Key protected endpoints) ─────
+function getAdminKey() {
+    try { return localStorage.getItem('dataforge_admin_key') || ''; } catch { return ''; }
+}
+
+function setAdminKey(key) {
+    try { localStorage.setItem('dataforge_admin_key', key); } catch { /* ignore storage errors */ }
+}
+
+function showAdminKeyPrompt() {
+    const current = getAdminKey();
+    const key = prompt('Enter your DataForge Admin key:', current);
+    if (key !== null) {
+        setAdminKey(key.trim());
+        if (key.trim()) {
+            toast('Admin key set', 'success');
+        }
+    }
+}
+
+let lastApi403 = 0;
+
+// Central fetch wrapper that attaches X-API-Key header for API calls
+async function apiFetch(url, options = {}) {
+    // Destructure `admin` out of options to avoid mutating the caller's object
+    const { admin, ...rest } = options;
+    const headers = { ...(rest.headers || {}) };
+    const key = getApiKey();
+    if (key && (url.startsWith(API + '/api/') || url.startsWith('/api/'))) {
+        headers['X-API-Key'] = key;
+    }
+    // Admin key override: if admin is truthy, send X-Admin-Key
+    if (admin) {
+        const adminKey = getAdminKey();
+        if (adminKey) {
+            headers['X-Admin-Key'] = adminKey;
+        }
+    }
+    try {
+        const res = await fetch(url, { ...rest, headers });
+        // Auto-prompt on 403: API key may be missing or expired
+        // Throttled to once per 15s to avoid spamming on polling cycles
+        if (res.status === 403 && !admin) {
+            const now = Date.now();
+            if (now - lastApi403 > 15000) {
+                lastApi403 = now;
+                showApiKeyPrompt();
+            }
+        }
+        return res;
+    } catch (err) {
+        // Network errors are handled by callers
+        throw err;
+    }
+}
+
 const UI_STATE_KEY = 'dataforge_ui_state_v1';
 let currentJobId = null;
 let currentMode = "manual";
@@ -54,7 +137,7 @@ function switchView(name) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.getElementById(`view-${name}`).classList.add('active');
 
-    const tabMap = { jobs: 'tab-jobs', new: 'tab-new', results: 'tab-jobs', recycle: 'tab-recycle', cognition: 'tab-cognition' };
+    const tabMap = { jobs: 'tab-jobs', new: 'tab-new', results: 'tab-jobs', recycle: 'tab-recycle', cognition: 'tab-cognition', dashboard: 'tab-dashboard' };
     const tabEl = document.getElementById(tabMap[name]);
     if (tabEl) tabEl.classList.add('active');
 
@@ -62,6 +145,7 @@ function switchView(name) {
     if (name === 'new') initForm();
     if (name === 'recycle') refreshRecycleBin();
     if (name === 'cognition') refreshCognition();
+    if (name === 'dashboard') refreshDashboard();
 
     writeUIState({ view: name });
 }
@@ -102,7 +186,7 @@ function setEngineStatus(text, offline = false) {
 
 async function refreshSystemStatus() {
     try {
-        const r = await fetch(`${API}/api/system/status`);
+        const r = await apiFetch(`${API}/api/system/status`);
         if (!r.ok) throw new Error('status unavailable');
         const data = await r.json();
         const active = Number((data.jobs || {}).active || 0);
@@ -192,7 +276,7 @@ function onGlobalKeydown(e) {
 
 async function refreshJobs() {
     try {
-        const res = await fetch(`${API}/api/jobs`);
+        const res = await apiFetch(`${API}/api/jobs`);
         const data = await res.json();
         jobsCache = Array.isArray(data.jobs) ? data.jobs : [];
         renderJobs(applyJobFilters(jobsCache));
@@ -273,7 +357,7 @@ function onJobsFilterChanged() {
 function updateKPIs(jobs) {
     document.getElementById('kpi-total').textContent = jobs.length;
     document.getElementById('kpi-running').textContent = jobs.filter(j => j.status === 'running' || j.status === 'discovering' || j.status === 'pending').length;
-    document.getElementById('kpi-done').textContent = jobs.filter(j => j.status === 'completed' || j.status === 'canceled').length;
+    document.getElementById('kpi-done').textContent = jobs.filter(j => j.status === 'completed' || j.status === 'degraded' || j.status === 'empty_result' || j.status === 'canceled').length;
     document.getElementById('kpi-records').textContent = jobs.reduce((s, j) => s + (j.filtered_records || 0), 0);
 }
 
@@ -311,7 +395,7 @@ function renderJobs(jobs) {
                 <div><span class="badge ${j.status}">${j.status}</span></div>
                 <div class="job-records">${j.total_records > 0 ? `${j.filtered_records}` : '—'}</div>
                 <div class="job-actions">
-                    ${j.status === 'completed' ? `<button class="btn ghost small" onclick="viewResults('${j.id}')">View</button>` : ''}
+                    ${['completed', 'degraded', 'empty_result'].includes(j.status) ? `<button class="btn ghost small" onclick="viewResults('${j.id}')">View</button>` : ''}
                     ${isActive ? `<button class="btn warn-ghost small" onclick="cancelJob('${j.id}')">Cancel</button>` : ''}
                     <button class="btn danger-ghost small" onclick="deleteJob('${j.id}')">✕</button>
                 </div>
@@ -322,7 +406,7 @@ function renderJobs(jobs) {
 
 async function pollJob(id) {
     try {
-        const r = await fetch(`${API}/api/jobs/${id}`);
+        const r = await apiFetch(`${API}/api/jobs/${id}`);
         if (!r.ok) return;
         const j = await r.json();
 
@@ -347,16 +431,18 @@ async function pollJob(id) {
             }
             
             // If it's done, fully refresh to get results
-            if (j.status === 'completed' || j.status === 'failed' || j.status === 'canceled') {
+            if (j.status === 'completed' || j.status === 'degraded' || j.status === 'empty_result' || j.status === 'failed' || j.status === 'canceled') {
                 viewResults(id);
             }
         }
 
-        if (j.status === 'completed' || j.status === 'failed' || j.status === 'canceled') {
+        if (j.status === 'completed' || j.status === 'degraded' || j.status === 'empty_result' || j.status === 'failed' || j.status === 'canceled') {
             clearInterval(pollers[id]);
             delete pollers[id];
             refreshJobs();
             if (j.status === 'completed') toast(`"${j.name}" done — ${j.filtered_records} records`, 'success');
+            else if (j.status === 'degraded') toast(`"${j.name}" finished with partial results — ${j.filtered_records} records`, 'info');
+            else if (j.status === 'empty_result') toast(`"${j.name}" finished — 0 records. ${j.error || 'Page may be empty, blocked, or require JS rendering.'}`, 'warning');
             else if (j.status === 'canceled') toast(`"${j.name}" canceled`, 'info');
             else toast(`"${j.name}" failed: ${j.error}`, 'error');
         }
@@ -366,7 +452,7 @@ async function pollJob(id) {
 async function cancelJob(id) {
     if (!confirm('Cancel this running job?')) return;
     try {
-        const r = await fetch(`${API}/api/jobs/${id}/cancel`, { method: 'POST' });
+        const r = await apiFetch(`${API}/api/jobs/${id}/cancel`, { method: 'POST' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Cancel failed');
         toast(data.message || 'Cancellation requested', 'info');
@@ -379,7 +465,7 @@ async function cancelJob(id) {
 async function deleteJob(id) {
     if (!confirm('Delete this job?')) return;
     try {
-        const r = await fetch(`${API}/api/jobs/${id}`, { method: 'DELETE' });
+        const r = await apiFetch(`${API}/api/jobs/${id}`, { method: 'DELETE' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Delete failed');
         toast('Job deleted');
@@ -394,7 +480,7 @@ async function clearTerminalJobs() {
     if (!confirm(`Clear completed/failed/canceled jobs and keep the latest ${keepRecent}?`)) return;
 
     try {
-        const r = await fetch(`${API}/api/jobs/cleanup/terminal?keep_recent=${keepRecent}`, { method: 'DELETE' });
+        const r = await apiFetch(`${API}/api/jobs/cleanup/terminal?keep_recent=${keepRecent}`, { method: 'DELETE' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Terminal cleanup failed');
         toast(data.message || 'Terminal jobs cleared', 'info');
@@ -406,7 +492,7 @@ async function clearTerminalJobs() {
 
 async function refreshRecycleBin() {
     try {
-        const r = await fetch(`${API}/api/recycle_bin`);
+        const r = await apiFetch(`${API}/api/recycle_bin`);
         if (!r.ok) throw new Error('Failed to load recycle bin');
         const data = await r.json();
         const jobs = Array.isArray(data.jobs) ? data.jobs : [];
@@ -441,7 +527,7 @@ async function refreshRecycleBin() {
 
 async function restoreJob(id) {
     try {
-        const r = await fetch(`${API}/api/recycle_bin/${id}/restore`, { method: 'POST' });
+        const r = await apiFetch(`${API}/api/recycle_bin/${id}/restore`, { method: 'POST' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Restore failed');
         toast('Job restored');
@@ -454,7 +540,7 @@ async function restoreJob(id) {
 async function hardDeleteJob(id) {
     if (!confirm('Permanently delete this job? This cannot be undone.')) return;
     try {
-        const r = await fetch(`${API}/api/recycle_bin/${id}`, { method: 'DELETE' });
+        const r = await apiFetch(`${API}/api/recycle_bin/${id}`, { method: 'DELETE' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Permanent delete failed');
         toast('Job permanently deleted', 'error');
@@ -468,7 +554,7 @@ async function clearRecycleBin() {
     if (!confirm('Empty entire recycle bin? This cannot be undone.')) return;
 
     try {
-        const r = await fetch(`${API}/api/recycle_bin`, { method: 'DELETE' });
+        const r = await apiFetch(`${API}/api/recycle_bin`, { method: 'DELETE' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Failed to clear recycle bin');
         toast(data.message || 'Recycle bin cleared', 'info');
@@ -484,10 +570,56 @@ async function viewResults(id) {
     currentJobId = id;
     switchView('results');
     try {
-        const r = await fetch(`${API}/api/jobs/${id}`);
+        const r = await apiFetch(`${API}/api/jobs/${id}`);
         const j = await r.json();
         document.getElementById('res-title').textContent = j.name;
         document.getElementById('res-meta').textContent = `${j.filtered_records} records extracted (${j.total_records} total)`;
+        
+        // Show warning banner for degraded/empty results
+        const warnBanner = document.getElementById('result-warning');
+        if (warnBanner) {
+            if (j.status === 'empty_result') {
+                warnBanner.textContent = `No records extracted. ${j.error || 'The page may be session-bound, blocked, empty, or require JavaScript rendering.'}`;
+                warnBanner.className = 'banner banner-warning';
+                warnBanner.style.display = 'block';
+            } else if (j.status === 'degraded') {
+                warnBanner.textContent = j.error || 'Some URLs produced no results.';
+                warnBanner.className = 'banner banner-warning';
+                warnBanner.style.display = 'block';
+            } else {
+                warnBanner.style.display = 'none';
+            }
+        }
+
+        // ── Acquisition Lineage Summary ──
+        const lineageSummaryEl = document.getElementById('lineage-summary');
+        if (lineageSummaryEl) {
+            const resultsList = Array.isArray(j.results) ? j.results : [];
+            if (resultsList.length) {
+                // Collect unique acquisition states from records
+                const states = new Map();
+                resultsList.forEach(r => {
+                    const lin = r._acquisition_lineage;
+                    if (lin && lin.state) {
+                        const state = lin.state;
+                        states.set(state, (states.get(state) || 0) + 1);
+                    }
+                });
+                if (states.size) {
+                    const parts = [];
+                    states.forEach((count, state) => {
+                        parts.push(`${esc(state)}: ${count}`);
+                    });
+                    lineageSummaryEl.innerHTML = `📡 <strong>Acquisition:</strong> ${parts.join(' · ')}`;
+                    lineageSummaryEl.style.display = 'block';
+                } else {
+                    lineageSummaryEl.style.display = 'none';
+                }
+            } else {
+                lineageSummaryEl.style.display = 'none';
+            }
+        }
+        
         document.getElementById('export-group').style.display = j.results.length ? 'flex' : 'none';
         const tableWrap = document.querySelector('#view-results .table-wrap');
         if (tableWrap) tableWrap.scrollLeft = 0;
@@ -694,6 +826,10 @@ function renderTable(results, emptyMessage = 'No results') {
     const discoveredKeys = [];
     results.forEach((row) => {
         Object.keys(row || {}).forEach((k) => {
+            // Skip internal system fields (starting with _) — they carry
+            // metadata like acquisition lineage, provenance, etc. and are
+            // not useful as display columns.
+            if (k.startsWith('_')) return;
             if (!seen.has(k)) {
                 seen.add(k);
                 discoveredKeys.push(k);
@@ -707,8 +843,11 @@ function renderTable(results, emptyMessage = 'No results') {
         const rowClass = isUnstable ? 'unstable-row' : '';
         return `<tr class="${rowClass}">${keys.map(k => {
             let v = row[k];
+            if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+                v = JSON.stringify(v);
+            }
             if (Array.isArray(v)) v = v.join(', ');
-            if (v === null || v === undefined) v = '—';
+            if (v === null || v === undefined || v === '{}' || v === '') v = '—';
             const text = String(v);
             const cellClass = (k === '_is_unstable' && isUnstable) ? 'unstable-cell' : '';
             return `<td class="${cellClass}" data-raw="${esc(text)}" title="${esc(text)}">${esc(text)}</td>`;
@@ -728,7 +867,7 @@ async function recleanCurrentJob() {
     }
 
     try {
-        const res = await fetch(`${API}/api/jobs/${currentJobId}/reclean`, { method: 'POST' });
+        const res = await apiFetch(`${API}/api/jobs/${currentJobId}/reclean`, { method: 'POST' });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.detail || 'Re-clean failed');
 
@@ -745,9 +884,56 @@ async function recleanCurrentJob() {
     }
 }
 
-function exportCSV() { if (currentJobId) window.open(`${API}/api/jobs/${currentJobId}/export/csv`); }
-function exportJSON() { if (currentJobId) window.open(`${API}/api/jobs/${currentJobId}/export/json`); }
-function exportExcel() { if (currentJobId) window.open(`${API}/api/jobs/${currentJobId}/export/excel`); }
+async function exportCSV() {
+    if (!currentJobId) return;
+    try {
+        const res = await apiFetch(`${API}/api/jobs/${currentJobId}/export/csv`);
+        if (!res.ok) { toast('CSV export failed', 'error'); return; }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `job-${currentJobId}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        toast(`CSV export error: ${e.message}`, 'error');
+    }
+}
+
+async function exportJSON() {
+    if (!currentJobId) return;
+    try {
+        const res = await apiFetch(`${API}/api/jobs/${currentJobId}/export/json`);
+        if (!res.ok) { toast('JSON export failed', 'error'); return; }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `job-${currentJobId}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        toast(`JSON export error: ${e.message}`, 'error');
+    }
+}
+
+async function exportExcel() {
+    if (!currentJobId) return;
+    try {
+        const res = await apiFetch(`${API}/api/jobs/${currentJobId}/export/excel`);
+        if (!res.ok) { toast('Excel export failed', 'error'); return; }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `job-${currentJobId}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        toast(`Excel export error: ${e.message}`, 'error');
+    }
+}
 
 // ─── Form: Init ───
 
@@ -776,6 +962,7 @@ function initForm() {
     note.classList.add('hidden');
     setMode('manual');
     addField();
+    clearAnalysis();
 }
 
 // ─── Schema Fields ───
@@ -834,7 +1021,7 @@ async function suggestSchemaFromIntent() {
     btn.innerHTML = '<span class="spinner"></span> Suggesting...';
 
     try {
-        const res = await fetch(`${API}/api/schema/suggest`, {
+        const res = await apiFetch(`${API}/api/schema/suggest`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ intent, max_fields: 8 })
@@ -973,7 +1160,7 @@ async function previewDiscovery() {
     preview.innerHTML = '<div class="disc-loading"><span class="spinner"></span> Discovering URLs...</div>';
 
     try {
-        const res = await fetch(`${API}/api/discover`, {
+        const res = await apiFetch(`${API}/api/discover`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1009,6 +1196,265 @@ async function previewDiscovery() {
     } catch (e) {
         preview.innerHTML = `<div class="disc-loading">Discovery error: ${esc(e.message || 'Unknown error')}</div>`;
     }
+}
+
+// ─── URL Analyzer ───
+
+let _analyzedFields = [];
+let _selectorsMap = null;
+
+async function analyzeURL() {
+    const urlInput = document.getElementById('inp-analyze-url');
+    const url = urlInput.value.trim();
+    if (!url) {
+        toast('Enter a URL to analyze', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btn-analyze-url');
+    const btnText = btn.querySelector('.analyze-btn-text');
+    const spinner = document.getElementById('analyze-spinner');
+    const results = document.getElementById('analyze-results');
+    const error = document.getElementById('analyze-error');
+
+    // Reset UI
+    results.classList.add('hidden');
+    error.classList.add('hidden');
+    btn.disabled = true;
+    if (btnText) btnText.textContent = 'Analyzing...';
+    if (spinner) spinner.classList.remove('hidden');
+
+    // AbortController with 130s timeout — slightly longer than backend's 120s
+    // so the user gets the backend's timeout error message (408), not a
+    // browser-level "NetworkError" which is ambiguous and unhelpful.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 130_000);
+
+    try {
+        const res = await apiFetch(`${API}/api/url/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+            signal: controller.signal
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+            throw new Error(data.error || (data.detail || 'Analysis failed'));
+        }
+
+        _analyzedFields = Array.isArray(data.suggested_fields) ? data.suggested_fields : [];
+
+        // Build selectors_map from the analysis result
+        _selectorsMap = {
+            item_container: data.item_container || '',
+            fields: {}
+        };
+        _analyzedFields.forEach(f => {
+            if (f.selector) {
+                _selectorsMap.fields[f.name] = {
+                    selector: f.selector,
+                    type: f.type || 'string'
+                };
+            }
+        });
+
+        // Populate Info Bar
+        const structureEl = document.getElementById('ai-structure');
+        const recordsEl = document.getElementById('ai-records');
+        const antibotEl = document.getElementById('ai-antibot');
+        const fetchTimeEl = document.getElementById('ai-fetch-time');
+
+        if (structureEl) {
+            const structType = data.page_structure || 'unknown';
+            const structConf = data.structure_confidence ? ` (${(data.structure_confidence * 100).toFixed(0)}%)` : '';
+            structureEl.textContent = `📐 ${structType}${structConf}`;
+        }
+        if (recordsEl) {
+            recordsEl.textContent = `📊 ~${data.estimated_record_count || '?'} records`;
+        }
+        if (antibotEl) {
+            const score = data.anti_bot_score || 0;
+            const riskLabel = score < 0.3 ? 'Low' : score < 0.6 ? 'Medium' : 'High';
+            const color = score < 0.3 ? '#1f9a5f' : score < 0.6 ? '#c7851b' : '#d24646';
+            antibotEl.innerHTML = `🛡️ Anti-bot: <span style="color:${color};font-weight:700;">${riskLabel}</span> (${(score * 100).toFixed(0)}%)`;
+        }
+        if (fetchTimeEl) {
+            fetchTimeEl.textContent = `⏱️ ${(data.fetch_time_ms / 1000).toFixed(1)}s`;
+        }
+
+        // ── Acquisition Pipeline Banner (Phase 92) ──
+        const acqBanner = document.getElementById('acquisition-banner');
+        if (acqBanner) {
+            const lineage = data.acquisition_lineage || {};
+            const state = lineage.state || 'direct';
+            const userMsg = data.user_message || lineage.user_message || '';
+            const sessionBound = data.session_detection?.is_session_bound || lineage.session_bound || false;
+            const emptyCheck = data.empty_check || {};
+            const canonicalUrl = data.canonical_url || '';
+
+            let bannerClass = 'direct';
+            let bannerText = userMsg || 'Page loaded successfully.';
+
+            if (state === 'recovered') {
+                bannerClass = 'recovered';
+            } else if (state === 'session_expired' || state === 'recovery_failed' || state === 'no_search_form') {
+                bannerClass = 'expired';
+            } else if (state === 'empty_response' || emptyCheck.is_empty) {
+                bannerClass = 'empty';
+            } else if (sessionBound && state !== 'recovered') {
+                bannerClass = 'session';
+            }
+
+            const isSessionBound = state !== 'recovered' && (sessionBound || (data.session_detection?.ephemeral_params || []).length > 0);
+
+            let bannerHTML = `<strong>${esc(bannerText)}</strong>`;
+            if (canonicalUrl && canonicalUrl !== url) {
+                bannerHTML += `<br><small style="opacity:0.7">Canonical: ${esc(canonicalUrl)}</small>`;
+            }
+            if (state === 'recovered') {
+                bannerHTML += `<br><small style="opacity:0.7">Recovered fresh results via search form submission</small>`;
+            }
+            if (isSessionBound) {
+                bannerHTML += `<br><small style="opacity:0.7">Original URL contained ephemeral session parameters</small>`;
+            }
+            if (emptyCheck.is_empty) {
+                bannerHTML += `<br><small style="opacity:0.7">${esc(emptyCheck.message || 'Page returned 200 but contained no useful data')}</small>`;
+                if (emptyCheck.suggestions && emptyCheck.suggestions.length) {
+                    bannerHTML += `<br><small style="opacity:0.7">Suggestion: ${esc(emptyCheck.suggestions[0])}</small>`;
+                }
+            }
+
+            acqBanner.className = `acquisition-banner ${bannerClass}`;
+            acqBanner.innerHTML = bannerHTML;
+            acqBanner.classList.remove('hidden');
+        }
+
+        // Populate Field List
+        const fieldList = document.getElementById('analyze-field-list');
+        const fieldCount = document.getElementById('analyze-field-count');
+
+        if (fieldCount) fieldCount.textContent = String(_analyzedFields.length);
+
+        if (!_analyzedFields.length) {
+            fieldList.innerHTML = '<div class="empty"><p>No data fields detected on this page</p></div>';
+        } else {
+            fieldList.innerHTML = _analyzedFields.map((f, i) => {
+                const conf = Math.min(f.confidence || 0.5, 1.0);
+                const confPct = Math.round(conf * 100);
+                const example = f.example_value ? String(f.example_value).slice(0, 60) : '';
+                const typeLabel = f.type || 'string';
+                return `
+                    <div class="analyze-field-item selected" data-index="${i}" onclick="this.querySelector('.analyze-field-checkbox').click()">
+                        <input type="checkbox" class="analyze-field-checkbox" checked data-index="${i}" onchange="toggleField(${i})">
+                        <span class="analyze-field-name">${esc(f.name)}</span>
+                        <span class="analyze-field-type">${esc(typeLabel)}</span>
+                        ${example ? `<span class="analyze-field-example">${esc(example)}</span>` : ''}
+                        <span class="analyze-field-confidence">
+                            ${confPct}%
+                            <span class="conf-bar"><span class="conf-bar-fill" style="width:${confPct}%"></span></span>
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        results.classList.remove('hidden');
+        toast(`Found ${_analyzedFields.length} fields on ${url}`, 'success');
+    } catch (err) {
+        error.classList.remove('hidden');
+        if (err.name === 'AbortError') {
+            document.getElementById('analyze-error-text').textContent =
+                'Analysis timed out — the page may be too slow or protected by anti-bot measures. Try a different source URL.';
+            toast('Analysis timed out', 'error');
+        } else {
+            document.getElementById('analyze-error-text').textContent = err.message || 'Failed to analyze URL';
+            toast(`Analysis error: ${err.message}`, 'error');
+        }
+    } finally {
+        clearTimeout(timeoutId);
+        btn.disabled = false;
+        if (btnText) btnText.textContent = 'Analyze URL';
+        if (spinner) spinner.classList.add('hidden');
+    }
+}
+
+function toggleField(index) {
+    const items = document.querySelectorAll('.analyze-field-item');
+    const checkboxes = document.querySelectorAll('.analyze-field-checkbox');
+    if (items[index] && checkboxes[index]) {
+        const isChecked = checkboxes[index].checked;
+        items[index].classList.toggle('selected', isChecked);
+    }
+}
+
+function toggleAllFields(select) {
+    const checkboxes = document.querySelectorAll('.analyze-field-checkbox');
+    const items = document.querySelectorAll('.analyze-field-item');
+    checkboxes.forEach((cb, i) => {
+        cb.checked = select;
+        if (items[i]) items[i].classList.toggle('selected', select);
+    });
+}
+
+function applyAnalyzedFields() {
+    // Gather selected fields
+    const checkboxes = document.querySelectorAll('.analyze-field-checkbox:checked');
+    if (!checkboxes.length) {
+        toast('Select at least one field to apply', 'error');
+        return;
+    }
+
+    const selected = [];
+    checkboxes.forEach(cb => {
+        const idx = parseInt(cb.dataset.index, 10);
+        if (!isNaN(idx) && _analyzedFields[idx]) {
+            selected.push(_analyzedFields[idx]);
+        }
+    });
+
+    if (!selected.length) {
+        toast('No valid fields selected', 'error');
+        return;
+    }
+
+    // Clear existing schema fields
+    const schemaContainer = document.getElementById('schema-container');
+    schemaContainer.innerHTML = '';
+
+    // Add each selected field
+    selected.forEach(f => {
+        addField({
+            name: f.name,
+            field_type: f.type || 'string',
+            description: f.description || f.example_value || ''
+        });
+    });
+
+    // If in manual mode and URL is set, pre-populate the URLs textarea
+    const urlInput = document.getElementById('inp-analyze-url');
+    const urlsTextarea = document.getElementById('inp-urls');
+    if (urlInput && urlsTextarea && currentMode === 'manual') {
+        const url = urlInput.value.trim();
+        if (url && !urlsTextarea.value.includes(url)) {
+            const existing = urlsTextarea.value.trim();
+            urlsTextarea.value = existing ? existing + '\n' + url : url;
+        }
+    }
+
+    toast(`Applied ${selected.length} fields to schema`, 'success');
+
+    // Scroll to schema section
+    document.getElementById('schema-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function clearAnalysis() {
+    _analyzedFields = [];
+    _selectorsMap = null;
+    document.getElementById('analyze-results').classList.add('hidden');
+    document.getElementById('analyze-error').classList.add('hidden');
+    document.getElementById('inp-analyze-url').value = '';
 }
 
 // ─── Submit Job ───
@@ -1080,6 +1526,25 @@ async function submitJob(e) {
         if (!topic) { toast('Enter a topic', 'error'); return; }
     }
 
+    // Build selectors_map if we have one from URL analysis and it matches a URL being scraped
+    let selectorsMap = {};
+    if (_selectorsMap && _selectorsMap.fields && Object.keys(_selectorsMap.fields).length > 0) {
+        // Only include selectors for fields that are still in the schema
+        const schemaNames = new Set(schema.map(f => f.name));
+        const filteredFields = {};
+        Object.entries(_selectorsMap.fields).forEach(([name, sel]) => {
+            if (schemaNames.has(name)) {
+                filteredFields[name] = sel;
+            }
+        });
+        if (Object.keys(filteredFields).length > 0) {
+            selectorsMap = {
+                item_container: _selectorsMap.item_container || '',
+                fields: filteredFields
+            };
+        }
+    }
+
     const payload = {
         name, mode: currentMode, intent, urls, topic, location, preferred_domain: domain,
         origin_location: originLocation,
@@ -1087,6 +1552,7 @@ async function submitJob(e) {
         source_policy: sourcePolicy,
         max_per_domain: maxPerDomain,
         schema_fields: schema, filters,
+        selectors_map: selectorsMap,
         deduplicate: document.getElementById('chk-dedup').checked,
         deduplicate_field: document.getElementById('inp-dedup-field').value.trim(),
         pagination: document.getElementById('chk-pagination').checked,
@@ -1099,7 +1565,7 @@ async function submitJob(e) {
     btn.innerHTML = '<span class="spinner"></span> Starting...';
 
     try {
-        const res = await fetch(`${API}/api/jobs`, {
+        const res = await apiFetch(`${API}/api/jobs`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1125,7 +1591,7 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 
 async function refreshCognition() {
     try {
-        const res = await fetch(`${API}/api/system/topology`);
+        const res = await apiFetch(`${API}/api/system/topology`);
         if (!res.ok) throw new Error('Topology unavailable');
         const data = await res.json();
 
@@ -1215,6 +1681,305 @@ async function refreshCognition() {
     }
 }
 
+// ═══════════════════════════════════════════
+// Dashboard — Operational Intelligence
+// ═══════════════════════════════════════════
+
+let dashboardRefreshInterval = null;
+
+async function refreshDashboard() {
+    const btn = document.querySelector('#view-dashboard .btn.primary.small');
+    if (btn) btn.disabled = true;
+
+    try {
+        // Fetch all dashboard data in parallel
+        const [modeRes, dashRes, healthRes, predRes] = await Promise.all([
+            apiFetch(`${API}/api/operator/mode`).catch(() => null),
+            apiFetch(`${API}/api/operator/dashboard`).catch(() => null),
+            apiFetch(`${API}/api/operator/health`).catch(() => null),
+            apiFetch(`${API}/api/operator/predictions`).catch(() => null),
+        ]);
+
+        const modeData = modeRes?.ok ? await modeRes.json() : null;
+        const dashData = dashRes?.ok ? await dashRes.json() : null;
+        const healthData = healthRes?.ok ? await healthRes.json() : null;
+        const predData = predRes?.ok ? await predRes.json() : null;
+
+        // Mode switcher
+        const modeBadge = document.getElementById('dash-current-mode');
+        if (modeBadge && modeData) {
+            modeBadge.textContent = modeData.active_mode || 'unknown';
+            // Highlight active mode button
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                const isActive = btn.dataset.mode === (modeData.active_mode || '');
+                btn.classList.toggle('active', isActive);
+            });
+        }
+
+        // Health KPIs
+        if (healthData) {
+            const statusEl = document.getElementById('dash-status-val');
+            if (statusEl) {
+                statusEl.textContent = healthData.status || '—';
+                statusEl.style.color = healthData.status === 'healthy' ? 'var(--success)' :
+                    healthData.status === 'degraded' ? 'var(--warning)' : 'var(--danger)';
+            }
+            setEl('dash-success-rate', healthData.success_rate != null ? `${(healthData.success_rate * 100).toFixed(0)}%` : '—');
+            setEl('dash-active-browsers', String(healthData.active_browsers ?? '—'));
+            setEl('dash-domains-degraded', String(healthData.domains_degraded ?? '—'));
+        }
+
+        // Governance dashboard
+        if (dashData) {
+            renderGovernance(dashData);
+            renderDomainHealth(dashData);
+        }
+
+        // Predictions
+        if (predData) {
+            renderPredictions(predData);
+        }
+
+        // Telemetry (from dashData or healthData)
+        if (dashData?.telemetry) {
+            renderTelemetry(dashData.telemetry);
+        }
+
+    } catch (e) {
+        console.error('Dashboard refresh failed:', e);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function setEl(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+}
+
+function renderGovernance(data) {
+    const gov = document.getElementById('dash-governance');
+    if (!gov) return;
+
+    const resources = data.resources || {};
+    const browser = data.browser || {};
+    const governor = data.governor || {};
+
+    gov.innerHTML = `
+        <div class="dash-metrics-grid">
+            <div class="dash-metric">
+                <span class="dash-metric-label">Active Mode</span>
+                <span class="dash-metric-val">${esc(data.active_mode || '—')}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Active Browsers</span>
+                <span class="dash-metric-val">${browser.active_contexts ?? '—'} / ${browser.total_contexts ?? '—'}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Proxy Health</span>
+                <span class="dash-metric-val">${resources.proxy_health != null ? `${(resources.proxy_health * 100).toFixed(0)}%` : '—'}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Token Spend</span>
+                <span class="dash-metric-val">$${(governor.token_spend_dollars || 0).toFixed(3)}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Queue Sheds</span>
+                <span class="dash-metric-val">${governor.queue_sheds ?? 0}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Browser Prunes</span>
+                <span class="dash-metric-val">${governor.browser_prunes ?? 0}</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderDomainHealth(data) {
+    const el = document.getElementById('dash-domains');
+    if (!el) return;
+
+    const domains = data.domains || {};
+    const total = domains.total_monitored || 0;
+
+    if (!total) {
+        el.innerHTML = '<div class="dash-empty">No domains monitored yet</div>';
+        return;
+    }
+
+    const healthy = domains.healthy || 0;
+    const degrading = domains.degrading || 0;
+    const unhealthy = domains.unhealthy || 0;
+    const critical = domains.critical || 0;
+
+    const pctHealthy = total > 0 ? Math.round((healthy / total) * 100) : 0;
+
+    el.innerHTML = `
+        <div class="dash-metrics-grid">
+            <div class="dash-metric">
+                <span class="dash-metric-label">Monitored</span>
+                <span class="dash-metric-val">${total}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label" style="color:var(--success)">Healthy</span>
+                <span class="dash-metric-val" style="color:var(--success)">${healthy}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label" style="color:var(--warning)">Degrading</span>
+                <span class="dash-metric-val" style="color:var(--warning)">${degrading}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label" style="color:#8a3a10">Unhealthy</span>
+                <span class="dash-metric-val" style="color:#8a3a10">${unhealthy}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label" style="color:var(--danger)">Critical</span>
+                <span class="dash-metric-val" style="color:var(--danger)">${critical}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Health Rate</span>
+                <span class="dash-metric-val">${pctHealthy}%</span>
+            </div>
+        </div>
+        <div class="dash-health-bar">
+            <div class="dash-health-bar-track">
+                <div class="dash-health-fill dash-health-healthy" style="width:${total > 0 ? (healthy/total)*100 : 0}%"></div>
+                <div class="dash-health-fill dash-health-degrading" style="width:${total > 0 ? (degrading/total)*100 : 0}%"></div>
+                <div class="dash-health-fill dash-health-bad" style="width:${total > 0 ? ((unhealthy+critical)/total)*100 : 0}%"></div>
+            </div>
+        </div>
+    `;
+}
+
+function renderPredictions(data) {
+    const el = document.getElementById('dash-predictions');
+    if (!el) return;
+
+    const predictions = data.predictions || [];
+    const systemic = data.systemic_risk_level || 'low';
+
+    // Set systemic risk badge
+    const riskBadge = document.getElementById('dash-systemic-risk');
+    if (riskBadge) {
+        riskBadge.textContent = `Systemic: ${systemic.toUpperCase()}`;
+        riskBadge.className = `dash-badge risk-${systemic}`;
+    }
+
+    if (!predictions.length) {
+        el.innerHTML = '<div class="dash-empty">No degradation predictions — system looks stable</div>';
+        return;
+    }
+
+    el.innerHTML = predictions.map(p => {
+        const riskColors = {
+            critical: 'var(--danger)',
+            high: '#c7851b',
+            medium: '#8a5a10',
+            low: 'var(--success)',
+        };
+        const color = riskColors[p.risk_level] || 'var(--ink-soft)';
+        return `
+            <div class="dash-prediction">
+                <div class="dash-prediction-header">
+                    <span class="dash-prediction-domain">${esc(p.domain)}</span>
+                    <span class="dash-prediction-risk" style="color:${color}; background:${color}18;">
+                        ${esc(p.risk_level.toUpperCase())}
+                    </span>
+                </div>
+                <div class="dash-prediction-body">
+                    <div class="dash-prediction-detail">
+                        <span>Failure: <strong>${esc(p.predicted_failure_type)}</strong></span>
+                        <span>Confidence: <strong>${(p.confidence * 100).toFixed(0)}%</strong></span>
+                        <span>Health: <strong>${p.health_score_current?.toFixed(0) || '?'}/100</strong></span>
+                    </div>
+                    ${p.estimated_time_to_failure_hours ? `
+                        <div class="dash-prediction-timer">
+                            ⏱ ~${p.estimated_time_to_failure_hours.toFixed(0)}h to failure
+                        </div>
+                    ` : ''}
+                    ${p.evidence?.length ? `
+                        <div class="dash-prediction-evidence">
+                            ${p.evidence.map(e => `<span>• ${esc(e)}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    ${p.recommended_actions?.length ? `
+                        <div class="dash-prediction-actions">
+                            ${p.recommended_actions.map(a => `<button class="btn ghost small" onclick="toast('${esc(a)}', 'info')">${esc(a)}</button>`).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderTelemetry(data) {
+    const el = document.getElementById('dash-telemetry');
+    if (!el) return;
+
+    el.innerHTML = `
+        <div class="dash-metrics-grid">
+            <div class="dash-metric">
+                <span class="dash-metric-label">Recent Scrapes</span>
+                <span class="dash-metric-val">${data.recent_scrapes ?? 0}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label" style="color:var(--success)">Successes</span>
+                <span class="dash-metric-val" style="color:var(--success)">${data.recent_successes ?? 0}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label" style="color:var(--danger)">Failures</span>
+                <span class="dash-metric-val" style="color:var(--danger)">${data.recent_failures ?? 0}</span>
+            </div>
+            <div class="dash-metric">
+                <span class="dash-metric-label">Success Rate</span>
+                <span class="dash-metric-val">${(data.success_rate * 100).toFixed(0)}%</span>
+            </div>
+        </div>
+    `;
+}
+
+async function switchOperatorMode(mode) {
+    const feedback = document.getElementById('mode-feedback');
+    if (feedback) {
+        feedback.textContent = 'Switching mode...';
+        feedback.className = 'mode-feedback';
+        feedback.classList.remove('hidden');
+    }
+
+    try {
+        const res = await apiFetch(`${API}/api/operator/mode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode }),
+            admin: true
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || 'Mode switch failed');
+        }
+
+        const data = await res.json();
+
+        if (feedback) {
+            feedback.textContent = `✓ Switched to ${data.active_mode} mode`;
+            feedback.className = 'mode-feedback mode-feedback-success';
+            setTimeout(() => feedback.classList.add('hidden'), 3000);
+        }
+
+        toast(`Mode switched to ${data.active_mode}`, 'success');
+        refreshDashboard();
+    } catch (e) {
+        if (feedback) {
+            feedback.textContent = `✗ ${e.message}`;
+            feedback.className = 'mode-feedback mode-feedback-error';
+            setTimeout(() => feedback.classList.add('hidden'), 5000);
+        }
+        toast(`Mode switch failed: ${e.message}`, 'error');
+    }
+}
+
 // ─── Init ───
 document.addEventListener('DOMContentLoaded', () => {
     const uiState = readUIState();
@@ -1243,6 +2008,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultBody = document.getElementById('res-tbody');
     if (resultBody) resultBody.addEventListener('dblclick', onResultsCellDoubleClick);
 
+    // URL Analyzer: Enter key triggers analysis
+    const analyzeUrlInput = document.getElementById('inp-analyze-url');
+    if (analyzeUrlInput) {
+        analyzeUrlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                analyzeURL();
+            }
+        });
+    }
+
     document.addEventListener('keydown', onGlobalKeydown);
     window.addEventListener('focus', () => {
         refreshSystemStatus();
@@ -1260,7 +2036,7 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshSystemStatus();
     window.addEventListener('resize', syncResultsScrollSlider);
 
-    const initialView = ['jobs', 'new', 'recycle', 'cognition'].includes(String(uiState.view || ''))
+    const initialView = ['jobs', 'new', 'recycle', 'cognition', 'dashboard'].includes(String(uiState.view || ''))
         ? String(uiState.view)
         : 'jobs';
     switchView(initialView);
@@ -1272,4 +2048,11 @@ document.addEventListener('DOMContentLoaded', () => {
         updateJobsLastUpdatedLabel();
     }, refreshInterval);
     statusTimer = setInterval(refreshSystemStatus, statusInterval);
+
+    // Dashboard polling (every 30s)
+    setInterval(() => {
+        if (currentView === 'dashboard') {
+            refreshDashboard();
+        }
+    }, 30000);
 });

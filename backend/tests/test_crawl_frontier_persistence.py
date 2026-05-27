@@ -15,7 +15,13 @@ _DB_PATH = str(_BACKEND_ROOT / "data" / "crawl_frontier.db")
 
 
 @pytest.fixture(autouse=True)
-def clean_db():
+def clean_db(monkeypatch):
+    from app.config import settings
+    from app import crawl_policy
+
+    monkeypatch.setattr(settings, "CRAWL_RESPECT_ROBOTS", False)
+    crawl_policy._policy_engine = None
+
     db_path = _DB_PATH
     if os.path.exists(db_path):
         try:
@@ -23,6 +29,7 @@ def clean_db():
         except Exception:
             pass
     yield
+    crawl_policy._policy_engine = None
     if os.path.exists(db_path):
         try:
             os.remove(db_path)
@@ -123,4 +130,3 @@ async def test_domain_crawl_limit():
         
     finally:
         settings.CRAWL_MAX_PAGES_PER_DOMAIN = original_limit
-

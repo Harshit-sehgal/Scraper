@@ -91,7 +91,7 @@ async def run_diagnostics(
         report.memory_hit = memory.get_selectors(url) is not None
         
         ext_result = await orchestrate_extraction(
-            url, html, schema_fields, min_record_score, user_intent=""
+            url, html, schema_fields, min_record_score, user_intent="", provided_selectors=None
         )
         report.extraction_method = ext_result.method
         report.selector_success = ext_result.selector_success

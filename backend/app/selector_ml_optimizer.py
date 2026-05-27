@@ -68,7 +68,7 @@ class SelectorFeatureExtractor:
     """Extract features from CSS selectors for ML."""
     
     @staticmethod
-    def extract_features(selector: str, dom_context: Optional[str] = None) -> SelectorFeatures:
+    def extract_features(selector: str, _dom_context: Optional[str] = None) -> SelectorFeatures:
         """Extract ML features from a CSS selector.
         
         Args:

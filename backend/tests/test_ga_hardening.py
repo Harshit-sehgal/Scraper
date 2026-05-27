@@ -43,7 +43,7 @@ def test_job_results_disk_offload_and_retrieval(client, monkeypatch):
     job.results = []  # Clear in-memory results
     
     # 2. Test GET /api/jobs/{job_id} loads results dynamically from disk
-    r = client.get(f"/api/jobs/{job_id}")
+    r = client.get(f"/api/jobs/{job_id}?include_results=true")
     assert r.status_code == 200
     data = r.json()
     assert len(data["results"]) == 1005

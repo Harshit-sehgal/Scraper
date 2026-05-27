@@ -634,12 +634,12 @@ class ObservabilityState:
         self._telemetry_stream = deque(list(self._telemetry_stream)[-100:], maxlen=1000)
 
         # 2. Prune History
-        ws._history.trim_journal(200)
-        ws._history.trim_snapshots(50)
+        ws._history.trim_journal(200)  # type: ignore
+        ws._history.trim_snapshots(50)  # type: ignore
 
         # 3. Value-Aware Region Pruning (Phase 50)
         # Instead of just trimming from end, we sort by importance
-        regs = ws._topology._get_regions()
+        regs = ws._topology._get_regions()  # type: ignore
         if len(regs) > 50:
             # Rank by importance using snapshot centrality
             scored_regs = [(self.calculate_semantic_importance(r, snapshot.topology_centrality), r) for r in regs]
@@ -647,15 +647,15 @@ class ObservabilityState:
 
             # Keep top 50
             kept_regs = [r for score, r in scored_regs[:50]]
-            ws._topology.replace_all(kept_regs)
+            ws._topology.replace_all(kept_regs)  # type: ignore
 
         # 4. Prune Weak Motifs
-        ws._motif.prune_weak(threshold=0.2)
+        ws._motif.prune_weak(threshold=0.2)  # type: ignore
 
         self.emit_telemetry("resource_shedding", {
             "old_bytes": profile["total_estimated_bytes"],
             "telemetry_pruned": old_telemetry - len(self._telemetry_stream),
-            "regions_count": len(ws._topology._get_regions())
+            "regions_count": len(ws._topology._get_regions())  # type: ignore
         })
         return True
 # ─── Legacy Observability Utilities ──────────────────────────────────
@@ -663,10 +663,10 @@ class ObservabilityState:
 def field_summary(ws: SemanticWorldState) -> dict:
     """Return a summary of the field's current energetic state."""
     return {
-        "energy": ws.metrics.global_energy,
-        "entropy": ws.metrics.global_entropy,
-        "temperature": ws.metrics.semantic_temperature,
-        "integrity": ws.metrics.integrity_score
+        "energy": ws.metrics.global_energy,  # type: ignore
+        "entropy": ws.metrics.global_entropy,  # type: ignore
+        "temperature": ws.metrics.semantic_temperature,  # type: ignore
+        "integrity": ws.metrics.integrity_score  # type: ignore
     }
 
 def topology_report(ws: SemanticWorldState) -> dict:
