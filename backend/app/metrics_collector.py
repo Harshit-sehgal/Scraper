@@ -23,14 +23,28 @@ _worker_failures_lock = threading.Lock()
 _health_check_latencies: List[float] = []
 _health_check_latencies_lock = threading.Lock()
 
+# Generic error counters: type -> count (e.g. database, network, scraper)
+_errors_total: Dict[str, int] = {}
+_errors_total_lock = threading.Lock()
+
+# LLM call counters
+_llm_calls_total: int = 0
+_llm_calls_total_lock = threading.Lock()
+
+# Total request counter
+_requests_total: int = 0
+_requests_total_lock = threading.Lock()
+
 
 def record_request_latency(duration_seconds: float):
     """Record an API request duration for metrics export."""
-    global _request_latencies
+    global _request_latencies, _requests_total
     with _request_latencies_lock:
         _request_latencies.append(duration_seconds)
         if len(_request_latencies) > _MAX_METRIC_SAMPLES:
             _request_latencies = _request_latencies[-_MAX_METRIC_SAMPLES:]
+    with _requests_total_lock:
+        _requests_total += 1
 
 
 def record_worker_failure(task_type: str):
@@ -51,6 +65,19 @@ def record_health_check_latency(duration_seconds: float):
             _health_check_latencies = _health_check_latencies[-_MAX_METRIC_SAMPLES:]
 
 
+def record_error(error_type: str):
+    """Increment cumulative error counts by type."""
+    with _errors_total_lock:
+        _errors_total[error_type] = _errors_total.get(error_type, 0) + 1
+
+
+def record_llm_call():
+    """Increment cumulative LLM call count."""
+    global _llm_calls_total
+    with _llm_calls_total_lock:
+        _llm_calls_total += 1
+
+
 def get_request_latencies() -> List[float]:
     with _request_latencies_lock:
         return list(_request_latencies)
@@ -66,11 +93,33 @@ def get_health_check_latencies() -> List[float]:
         return list(_health_check_latencies)
 
 
+def get_errors() -> Dict[str, int]:
+    with _errors_total_lock:
+        return dict(_errors_total)
+
+
+def get_llm_calls() -> int:
+    with _llm_calls_total_lock:
+        return _llm_calls_total
+
+
+def get_requests_total() -> int:
+    with _requests_total_lock:
+        return _requests_total
+
+
 def reset_for_testing():
     """Reset all counters and buffers (for test isolation)."""
+    global _llm_calls_total, _requests_total
     with _request_latencies_lock:
         _request_latencies.clear()
     with _worker_failures_lock:
         _worker_failures.clear()
     with _health_check_latencies_lock:
         _health_check_latencies.clear()
+    with _errors_total_lock:
+        _errors_total.clear()
+    with _llm_calls_total_lock:
+        _llm_calls_total = 0
+    with _requests_total_lock:
+        _requests_total = 0

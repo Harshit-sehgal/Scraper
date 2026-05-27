@@ -104,6 +104,11 @@ def _conn() -> Iterator[psycopg2.extensions.connection]:
         conn.commit()
     except Exception:
         conn.rollback()
+        try:
+            from app.metrics_collector import record_error
+            record_error("database")
+        except Exception:
+            pass
         raise
     finally:
         pool.putconn(conn)

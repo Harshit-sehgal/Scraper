@@ -1234,6 +1234,23 @@ async def metrics(request: Request):
     error_total_gauge = Gauge("dataforge_metrics_collection_error_total", "Total collection errors encountered", registry=registry)
     error_total_gauge.set(METRICS_COLLECTION_ERRORS)
 
+    # ── Cumulative error counts by type (database, scraper, etc.) ───────
+    from app.metrics_collector import get_errors, get_llm_calls, get_requests_total
+    errors_dict = get_errors()
+    errors_gauge = Gauge("dataforge_errors_total", "Cumulative error count by type", ["type"], registry=registry)
+    for err_type, count in errors_dict.items():
+        errors_gauge.labels(type=err_type).set(count)
+    if "database" not in errors_dict:
+        errors_gauge.labels(type="database").set(0)
+
+    # ── Cumulative LLM calls count ──────────────────────────────────────
+    llm_gauge = Gauge("dataforge_llm_calls_total", "Cumulative LLM calls count", registry=registry)
+    llm_gauge.set(get_llm_calls())
+
+    # ── Cumulative requests count ───────────────────────────────────────
+    requests_gauge = Gauge("dataforge_requests_total", "Total requests count", registry=registry)
+    requests_gauge.set(get_requests_total())
+
     return Response(content=generate_latest(registry), media_type="text/plain")
 
 

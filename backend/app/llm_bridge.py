@@ -184,6 +184,11 @@ def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning
 
 
 async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
+    try:
+        from app.metrics_collector import record_llm_call
+        record_llm_call()
+    except Exception:
+        pass
     if temperature is None:
         temperature = settings.LLM_TEMPERATURE
     if timeout is None:
@@ -258,6 +263,11 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
 
 async def llm_json_fast(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     """Fast-path JSON call for throughput-sensitive cleaning tasks."""
+    try:
+        from app.metrics_collector import record_llm_call
+        record_llm_call()
+    except Exception:
+        pass
     if temperature is None:
         temperature = settings.LLM_FAST_TEMPERATURE
     if timeout is None:
@@ -309,6 +319,11 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
 
 
 async def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:
+    try:
+        from app.metrics_collector import record_llm_call
+        record_llm_call()
+    except Exception:
+        pass
     if temperature is None:
         temperature = settings.LLM_TEXT_TEMPERATURE
     if timeout is None:

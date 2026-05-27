@@ -17,7 +17,7 @@
       "title": "Active Jobs",
       "type": "stat",
       "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
-      "targets": [{"expr": "dataforge_jobs_active", "legendFormat": "Active"}]
+      "targets": [{"expr": "sum(dataforge_jobs_total{status='running'}) or vector(0)", "legendFormat": "Active"}]
     },
     {
       "title": "Queue Depth",
@@ -58,7 +58,7 @@
       "title": "95th Percentile Latency",
       "type": "graph",
       "gridPos": {"h": 8, "w": 6, "x": 18, "y": 4},
-      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(dataforge_request_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p95 Latency"}]
+      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(dataforge_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95 Latency"}]
     },
     {
       "title": "Memory Usage",
