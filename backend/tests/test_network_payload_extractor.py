@@ -1,7 +1,6 @@
 """Tests for network payload extraction and source arbitration."""
 
 import json
-import pytest
 from app.models import SchemaField, FieldType
 from app.network_payload_extractor import (
     find_record_arrays,
@@ -9,7 +8,6 @@ from app.network_payload_extractor import (
     map_json_records_to_schema,
     extract_from_network_payloads,
     arbitrate_sources,
-    RecordArrayCandidate,
 )
 
 

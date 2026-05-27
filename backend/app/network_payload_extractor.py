@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field as dc_field
 from typing import Any
 
 from app.models import SchemaField, FieldType
@@ -44,7 +44,7 @@ class RecordArrayCandidate:
     records: list[dict]
     source: str  # "network_payload" or "hydration_data"
     score: float = 0.0
-    field_map: dict[str, FieldMapping] = field(default_factory=dict)
+    field_map: dict[str, FieldMapping] = dc_field(default_factory=dict)
 
 
 @dataclass
