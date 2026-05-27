@@ -56,6 +56,7 @@ cd backend
 PYTHONPATH=. $PYTHON_EXE -m pytest tests/test_production_hardening.py -q -o "addopts="
 
 echo "=== 7. Running Full pytest Suite ==="
-PYTHONPATH=. $PYTHON_EXE -m pytest -q -o "addopts="
+# Skip Postgres/live-LLM tests (require Docker/RUN_LIVE_LLM_TESTS=1)
+PYTHONPATH=. $PYTHON_EXE -m pytest -q -o "addopts=" -k "not postgres and not test_profile_alignment_e2e"
 
 echo "=== SRE Quick Check Complete — ALL CHECKS PASSED ==="
