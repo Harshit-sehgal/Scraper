@@ -163,8 +163,7 @@ jobs:
         working-directory: backend
         run: |
           echo "=== Collect-only: verifying test discovery ==="
-          PYTHONPATH=. python -m pytest --collect-only -q -o "addopts=" -k "not postgres and not test_profile_alignment_e2e" 2>&1 || \
-            (echo "❌ Test collection FAILED" && exit 1)
+          PYTHONPATH=. python -m pytest --collect-only -q -o "addopts=" -k "not postgres and not test_profile_alignment_e2e" 2>&1 || { echo "❌ Test collection FAILED"; exit 1; }
 
       - name: Test with pytest
         working-directory: backend
