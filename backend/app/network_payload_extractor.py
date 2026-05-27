@@ -67,23 +67,26 @@ class NetworkExtractionResult:
     field_coverage: float
 
 
-def find_record_arrays(payload: Any, path: str = "$") -> list[RecordArrayCandidate]:
+def find_record_arrays(payload: Any, path: str = "$", max_depth: int = 10) -> list[RecordArrayCandidate]:
     """Recursively find arrays of objects inside a JSON payload.
-
-    Returns candidates sorted by likely record quality (array size descending).
+    
+    Depth-limited to max_depth to prevent infinite recursion on
+    circular or deeply nested structures.
     """
     candidates: list[RecordArrayCandidate] = []
 
-    def _recurse(obj: Any, current_path: str) -> None:
+    def _recurse(obj: Any, current_path: str, depth: int = 0) -> None:
+        if depth >= max_depth:
+            return
         if isinstance(obj, dict):
             for key, value in obj.items():
                 child_path = f"{current_path}.{key}" if current_path else key
                 if isinstance(value, list):
                     _check_array(value, child_path, "network_payload")
-                _recurse(value, child_path)
+                _recurse(value, child_path, depth + 1)
         elif isinstance(obj, list):
             for i, item in enumerate(obj):
-                _recurse(item, f"{current_path}[{i}]")
+                _recurse(item, f"{current_path}[{i}]", depth + 1)
 
     def _check_array(arr: list, arr_path: str, source: str) -> None:
         if not arr:
