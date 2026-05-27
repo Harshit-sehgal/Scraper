@@ -47,6 +47,47 @@ SESSION_VALUE_PATTERNS: list[re.Pattern] = [
     re.compile(r"^\d{10,}$"),
 ]
 
+SESSION_PATH_MARKERS: set[str] = {
+    "id",
+    "sid",
+    "session",
+    "sessionid",
+    "session-id",
+    "session_id",
+    "token",
+    "searchid",
+    "search-id",
+    "search_id",
+}
+
+SESSION_PATH_CONTEXTS: set[str] = {
+    "search",
+    "result",
+    "results",
+    "booking",
+    "checkout",
+    "quote",
+    "availability",
+}
+
+
+def _normalize_segment(segment: str) -> str:
+    return segment.strip().lower().replace("_", "-")
+
+
+def _looks_like_opaque_path_token(segment: str) -> bool:
+    """Return True when a path segment looks like a transient opaque token."""
+    if len(segment) < 8:
+        return False
+    if re.fullmatch(r"[0-9a-f]{16,}", segment, re.I):
+        return True
+    if re.fullmatch(r"[A-Za-z0-9_-]{10,}", segment):
+        has_alpha = bool(re.search(r"[A-Za-z]", segment))
+        has_digit = bool(re.search(r"\d", segment))
+        mixed_case = bool(re.search(r"[a-z]", segment)) and bool(re.search(r"[A-Z]", segment))
+        return has_alpha and (has_digit or mixed_case)
+    return False
+
 
 def detect_session_params(url: str) -> dict:
     """Detect ephemeral/session-bound parameters in a URL.
@@ -101,14 +142,38 @@ def detect_session_params(url: str) -> dict:
                     confidence_score = max(confidence_score, settings.SESSION_PARAM_VALUE_CONFIDENCE)
                     break
 
-    # Check 3: URL path contains long hash-like segments
+    # Check 3: URL path contains token-like segments.
+    # This catches generic session/search routes such as:
+    #   /search/id/<opaque-id>
+    #   /results/session/<opaque-id>
     path_segments = [s for s in parsed.path.split("/") if s]
-    for segment in path_segments:
+    ephemeral_path_indexes: set[int] = set()
+    for idx, segment in enumerate(path_segments):
         # Long hex-like path segments (e.g., /search/abc123def456ghi)
         if re.match(r"^[0-9a-f]{16,}$", segment, re.I):
             confidence_score = max(confidence_score, settings.SESSION_PATH_HASH_CONFIDENCE)
             ephemeral_params.append(f"path:/{segment}")
             details.append((f"path:/{segment}", "path segment looks like a session hash"))
+            ephemeral_path_indexes.add(idx)
+            continue
+
+        previous = _normalize_segment(path_segments[idx - 1]) if idx > 0 else ""
+        earlier_context = {_normalize_segment(s) for s in path_segments[:idx]}
+        if (
+            previous in SESSION_PATH_MARKERS
+            and _looks_like_opaque_path_token(segment)
+            and (
+                previous not in {"id"}
+                or bool(earlier_context & SESSION_PATH_CONTEXTS)
+            )
+        ):
+            confidence_score = max(confidence_score, settings.SESSION_PATH_HASH_CONFIDENCE)
+            ephemeral_params.append(f"path:/{previous}/{segment}")
+            details.append((f"path:/{previous}/{segment}", "path marker followed by opaque session/search token"))
+            ephemeral_path_indexes.add(idx)
+            # For marker/token pairs such as /search/id/<token>, strip both from canonical.
+            if previous in SESSION_PATH_MARKERS:
+                ephemeral_path_indexes.add(idx - 1)
 
     # Build canonical URL (with ephemeral params removed)
     canonical_params = {
@@ -116,10 +181,18 @@ def detect_session_params(url: str) -> dict:
         if k not in ephemeral_params
     }
     canonical_query = urlencode(canonical_params, doseq=True)
+    canonical_path_segments = [
+        segment for idx, segment in enumerate(path_segments)
+        if idx not in ephemeral_path_indexes
+    ]
+    canonical_path = "/" + "/".join(canonical_path_segments) if canonical_path_segments else parsed.path
+    if parsed.path.endswith("/") and not canonical_path.endswith("/"):
+        canonical_path += "/"
+
     canonical_url = urlunparse((
         parsed.scheme,
         parsed.netloc,
-        parsed.path,
+        canonical_path,
         parsed.params,
         canonical_query,
         parsed.fragment,

@@ -219,7 +219,6 @@ def _extract_segment_fields(raw_text: str) -> dict[str, str]:
         r'\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})\b',
         raw_text,
     )
-    lower = raw_text.lower()
     if org_match and org_match.group(1).lower() not in ("from", "to", "departure", "arrival", "return", "outbound", "inbound"):
         fields["organization"] = org_match.group(1).strip()
 

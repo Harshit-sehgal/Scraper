@@ -1019,10 +1019,12 @@ def _value_patterns_to_field_types(patterns) -> list[dict]:
             "example": patterns.phones[0],
             "description": "Phone numbers detected on page",
         })
-    if patterns.codes_3letter or patterns.airport_codes:
+    codes_3letter = getattr(patterns, "codes_3letter", []) or []
+    airport_codes = getattr(patterns, "airport_codes", []) or []
+    if codes_3letter or airport_codes:
         suggestions.append({
             "type": "code", "confidence": 0.75,
-            "example": (patterns.airport_codes or patterns.codes_3letter)[0],
+            "example": (airport_codes or codes_3letter)[0],
             "description": "Short codes (3-letter) detected on page",
         })
     if patterns.durations:
@@ -1156,7 +1158,7 @@ Determine its data type from: string, number, currency, email, phone, url, date,
 
 CRITICAL: NEVER use type names as field names.
   \u2716 BAD: {{"name": "string"}} or {{"name": "code"}} or {{"name": "time"}} or {{"name": "text"}} or {{"name": "number"}} or {{"name": "date"}} or {{"name": "currency"}}
-  \u2714 GOOD: {{"name": "airline_name"}} or {{"name": "flight_number"}} or {{"name": "departure_time"}} or {{"name": "price"}}
+  \u2714 GOOD: {{"name": "airline_name"}} or {{"name": "flight_number"}} or {{"name": "departure_airport"}} or {{"name": "departure_time"}} or {{"name": "price"}}
 
 Differentiate duplicate types — if two values share the same type, give them distinct context-specific names (e.g. "origin_airport_code" vs "destination_airport_code" instead of "code" and "code").
 
@@ -1350,9 +1352,15 @@ def _map_search_params_to_fields(
     param_variants: dict[str, list[str]] = {
         "query": ["query", "search", "q", "keyword"],
         "location": ["location", "place", "city"],
-        "from": ["from"],
-        "to": ["to"],
-        "date": ["date"],
+        "origin": ["origin", "from", "source", "departure", "depart", "start"],
+        "destination": ["destination", "to", "target", "arrival", "arrive", "end"],
+        "from": ["from", "origin", "source", "departure", "depart", "start"],
+        "to": ["to", "destination", "target", "arrival", "arrive", "end"],
+        "date": ["date", "when"],
+        "departure_date": ["departure_date", "departuredate", "departdate", "depart", "startdate", "date"],
+        "depart_date": ["depart_date", "departuredate", "departdate", "depart", "startdate", "date"],
+        "return_date": ["return_date", "returndate", "return", "enddate", "date"],
+        "arrival_date": ["arrival_date", "arrivaldate", "arrivedate", "arrival", "enddate", "date"],
     }
 
     used_fields: set[str] = set()
@@ -1626,7 +1634,7 @@ _FIELD_NAME_HINTS: list[tuple[str, str, str]] = [
     # Currency values
     ("currency", "", "price"),
     # 3-letter uppercase codes
-    ("code", "^[A-Z]{3}$", "short_code"),
+    ("code", "^[A-Z]{3}$", "airport_code"),
     # 2-letter uppercase codes
     ("code", "^[A-Z]{2}$", "code_abbreviation"),
     # Mixed letter-digit codes (flight numbers, product codes)
@@ -2046,7 +2054,9 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
     acquisition_lineage.anti_bot_score = round(anti_bot_score, 3)
     acquisition_lineage.containers_detected = content_quality.get("data_container_count", 0)
     acquisition_lineage.forms_detected = 1 if (search_form or {}).get("detected") else 0
-    acquisition_lineage.network_payloads_found = 0
+    from app.browser_network_capture import get_browser_state, get_captures
+    browser_state_evidence = get_browser_state(url)
+    acquisition_lineage.network_payloads_found = len(get_captures(url))
     if not acquisition_lineage.recommended_next_action:
         if empty_check.is_empty and anti_bot_score > 0.5:
             acquisition_lineage.recommended_next_action = "try_browser_mode_or_search_params"
@@ -2140,5 +2150,6 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
         "fetch_method": fetch_method,
         "fetch_time_ms": round((time.time() - start_time) * 1000, 1),
         "anti_bot_score": round(anti_bot_score, 3),
+        "browser_state_evidence": browser_state_evidence,
         "suggested_fields": suggested_fields,
     }

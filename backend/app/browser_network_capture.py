@@ -20,6 +20,8 @@ Usage:
 from __future__ import annotations
 
 import logging
+import hashlib
+import re
 from typing import Any
 from urllib.parse import urlparse
 
@@ -33,21 +35,45 @@ logger = logging.getLogger(__name__)
 _captured_payloads: dict[str, list[dict[str, Any]]] = {}
 """Maps URL → list of captured network JSON payloads for that URL."""
 
+_captured_browser_state: dict[str, dict[str, Any]] = {}
+"""Maps URL → sanitized browser-side state evidence captured after page load."""
+
 # Safety caps to prevent unbounded memory growth
 _MAX_PAYLOADS_PER_URL: int = 50
 """Maximum number of network payloads stored per URL."""
 _MAX_BYTES_PER_URL: int = 10 * 1024 * 1024
 """Maximum total bytes of network payloads stored per URL (10 MB)."""
+_MAX_STORAGE_ENTRIES_PER_AREA: int = 50
+"""Maximum cookies/storage entries stored per browser state area."""
+_MAX_STORAGE_NAME_CHARS: int = 128
+"""Maximum key/name length retained for browser state evidence."""
+
+_SESSION_STATE_KEY_PATTERNS: tuple[re.Pattern, ...] = tuple(
+    re.compile(pattern, re.I)
+    for pattern in (
+        r"session",
+        r"\bsid\b",
+        r"search[_-]?id",
+        r"request[_-]?id",
+        r"result[_-]?id",
+        r"token",
+        r"csrf",
+        r"xsrf",
+        r"auth",
+    )
+)
 
 
 def clear(url: str) -> None:
     """Clear captured payloads for a URL."""
     _captured_payloads.pop(url, None)
+    _captured_browser_state.pop(url, None)
 
 
 def clear_all() -> None:
     """Clear all captured payloads."""
     _captured_payloads.clear()
+    _captured_browser_state.clear()
 
 
 def get_captures(url: str) -> list[dict]:
@@ -61,6 +87,185 @@ def get_captures(url: str) -> list[dict]:
     - status: int — HTTP status code
     """
     return _captured_payloads.get(url, [])
+
+
+def get_browser_state(url: str) -> dict[str, Any]:
+    """Get sanitized browser state evidence captured for a URL."""
+    return _captured_browser_state.get(url, {})
+
+
+def store_browser_state(url: str, state: dict[str, Any]) -> None:
+    """Store sanitized browser state evidence for a URL."""
+    if not state:
+        return
+    _captured_browser_state[url] = state
+
+
+def _value_digest(value: Any) -> str:
+    text = "" if value is None else str(value)
+    return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+
+
+def _redacted_preview(value: Any) -> str:
+    text = "" if value is None else str(value)
+    if not text:
+        return ""
+    if len(text) <= 8:
+        return "***"
+    return f"{text[:4]}...{text[-4:]}"
+
+
+def _sanitize_name(name: Any) -> str:
+    return str(name or "")[:_MAX_STORAGE_NAME_CHARS]
+
+
+def _is_session_state_name(name: str) -> bool:
+    return any(pattern.search(name or "") for pattern in _SESSION_STATE_KEY_PATTERNS)
+
+
+def _sanitize_storage_entry(name: Any, value: Any, source: str) -> dict[str, Any]:
+    text = "" if value is None else str(value)
+    entry = {
+        "source": source,
+        "name": _sanitize_name(name),
+        "value_length": len(text),
+        "value_sha256": _value_digest(text),
+        "value_preview": _redacted_preview(text),
+        "session_candidate": _is_session_state_name(str(name or "")),
+    }
+    return entry
+
+
+def _sanitize_storage_mapping(mapping: Any, source: str) -> list[dict[str, Any]]:
+    if not isinstance(mapping, dict):
+        return []
+    entries: list[dict[str, Any]] = []
+    for name, value in list(mapping.items())[:_MAX_STORAGE_ENTRIES_PER_AREA]:
+        entries.append(_sanitize_storage_entry(name, value, source))
+    return entries
+
+
+def _sanitize_cookies(cookies: Any) -> list[dict[str, Any]]:
+    if not isinstance(cookies, list):
+        return []
+    sanitized: list[dict[str, Any]] = []
+    for cookie in cookies[:_MAX_STORAGE_ENTRIES_PER_AREA]:
+        if not isinstance(cookie, dict):
+            continue
+        entry = _sanitize_storage_entry(cookie.get("name", ""), cookie.get("value", ""), "cookie")
+        entry.update({
+            "domain": cookie.get("domain", ""),
+            "path": cookie.get("path", ""),
+            "expires": cookie.get("expires"),
+            "http_only": bool(cookie.get("httpOnly")),
+            "secure": bool(cookie.get("secure")),
+            "same_site": cookie.get("sameSite", ""),
+        })
+        sanitized.append(entry)
+    return sanitized
+
+
+def build_cookie_header(cookies: Any) -> str:
+    """Build a Cookie header from raw Playwright cookie dicts."""
+    if not isinstance(cookies, list):
+        return ""
+    pairs: list[str] = []
+    for cookie in cookies:
+        if not isinstance(cookie, dict):
+            continue
+        name = str(cookie.get("name") or "").strip()
+        value = str(cookie.get("value") or "")
+        if name and value:
+            pairs.append(f"{name}={value}")
+    return "; ".join(pairs)
+
+
+def _collect_session_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    for entry in state.get("cookies", []):
+        if entry.get("session_candidate"):
+            candidates.append(entry)
+    for area_name in ("localStorage", "sessionStorage"):
+        for entry in state.get("storage", {}).get(area_name, []):
+            if entry.get("session_candidate"):
+                candidates.append(entry)
+    return candidates[:_MAX_STORAGE_ENTRIES_PER_AREA]
+
+
+async def collect_browser_state(page) -> dict[str, Any]:
+    """Capture sanitized browser-side state evidence after a Playwright load.
+
+    Raw cookie and storage values are intentionally not returned. The live
+    browser context keeps the real values for navigation/API requests; this
+    evidence is only for diagnostics and recovery decisions.
+    """
+    raw_cookies: list[dict[str, Any]] = []
+    try:
+        raw_cookies = await page.context.cookies()
+    except Exception as exc:
+        logger.debug("[BrowserState] Could not read context cookies: %s", exc)
+
+    storage_snapshot: dict[str, Any] = {}
+    try:
+        storage_snapshot = await page.evaluate(
+            """async () => {
+                const readStorage = (storage) => {
+                    const out = {};
+                    if (!storage) return out;
+                    for (let i = 0; i < Math.min(storage.length, 50); i++) {
+                        const key = storage.key(i);
+                        if (key) out[key] = storage.getItem(key);
+                    }
+                    return out;
+                };
+                let indexedDbDatabases = [];
+                try {
+                    if (window.indexedDB && indexedDB.databases) {
+                        indexedDbDatabases = await indexedDB.databases();
+                    }
+                } catch (_) {}
+                let cacheStorageKeys = [];
+                try {
+                    if (window.caches && caches.keys) {
+                        cacheStorageKeys = await caches.keys();
+                    }
+                } catch (_) {}
+                return {
+                    localStorage: readStorage(window.localStorage),
+                    sessionStorage: readStorage(window.sessionStorage),
+                    indexedDbDatabases: indexedDbDatabases || [],
+                    cacheStorageKeys: cacheStorageKeys || []
+                };
+            }"""
+        )
+    except Exception as exc:
+        logger.debug("[BrowserState] Could not read browser storage: %s", exc)
+    if not isinstance(storage_snapshot, dict):
+        storage_snapshot = {}
+
+    state = {
+        "cookies": _sanitize_cookies(raw_cookies),
+        "storage": {
+            "localStorage": _sanitize_storage_mapping(storage_snapshot.get("localStorage", {}), "localStorage"),
+            "sessionStorage": _sanitize_storage_mapping(storage_snapshot.get("sessionStorage", {}), "sessionStorage"),
+        },
+        "indexed_db": [
+            {
+                "name": _sanitize_name(db.get("name", "")),
+                "version": db.get("version"),
+            }
+            for db in storage_snapshot.get("indexedDbDatabases", [])[:_MAX_STORAGE_ENTRIES_PER_AREA]
+            if isinstance(db, dict)
+        ],
+        "cache_storage_keys": [
+            _sanitize_name(key)
+            for key in storage_snapshot.get("cacheStorageKeys", [])[:_MAX_STORAGE_ENTRIES_PER_AREA]
+        ],
+    }
+    candidates = _collect_session_candidates(state)
+    state["session_candidates"] = candidates
+    state["session_candidate_count"] = len(candidates)
+    return state
 
 
 def get_all_hydration_objects(url: str) -> list[dict]:
@@ -364,6 +569,3 @@ def filter_structured_payloads(payloads: list[dict]) -> list[dict]:
                 continue
             filtered.append(payload)
     return filtered
-
-
-

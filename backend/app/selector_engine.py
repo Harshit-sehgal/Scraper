@@ -283,6 +283,7 @@ def _classify_text_value(text: str) -> str:
     t = text.strip()
     if not t:
         return "empty"
+    lower = t.lower()
     if _re.match(r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$', t):
         return "date"
     if _re.match(r'^\d{4}-\d{2}-\d{2}$', t):
@@ -691,6 +692,5 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
             results.append(record)
 
     return _apply_page_level_contact_fallback(results, schema_fields, page_email, page_phone)
-
 
 

@@ -69,6 +69,23 @@ class TestDetectSessionParams:
         assert len(result["ephemeral_params"]) >= 1
         assert any("path:/" in p for p in result["ephemeral_params"])
 
+    def test_search_id_path_token_is_session_bound(self):
+        result = detect_session_params(
+            "https://example.com/search/id/OiY7K59Lw3SFYA8wjLbgObYr20260527T184144141Z"
+        )
+        assert result["is_session_bound"] is True
+        assert result["confidence"] >= 0.6
+        assert "path:/id/OiY7K59Lw3SFYA8wjLbgObYr20260527T184144141Z" in result["ephemeral_params"]
+        assert result["canonical_url"] == "https://example.com/search"
+
+    def test_short_opaque_search_id_path_token_is_session_bound(self):
+        result = detect_session_params(
+            "https://example.com/search/id/u21C6d6Q9SC6"
+        )
+        assert result["is_session_bound"] is True
+        assert "path:/id/u21C6d6Q9SC6" in result["ephemeral_params"]
+        assert result["canonical_url"] == "https://example.com/search"
+
     def test_url_without_query_params(self):
         result = detect_session_params("https://example.com/flights/LAX-LHR")
         assert result["is_session_bound"] is False

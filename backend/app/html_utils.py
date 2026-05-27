@@ -13,7 +13,13 @@ from app.semantic_segmentation import segment_single_text, is_likely_noise_field
 from app.browser_pool import get_browser_pool
 from app.domain_intelligence import get_domain_intelligence
 from app.strategy_evolution import FetchStrategy
-from app.browser_network_capture import setup_network_capture, store_captures
+from app.browser_network_capture import (
+    build_cookie_header,
+    collect_browser_state,
+    setup_network_capture,
+    store_browser_state,
+    store_captures,
+)
 
 
 # ─── SSRF / private-network IP validation ──────────────────────────────
@@ -502,6 +508,24 @@ async def fetch_page_content(
             # Reduced fallback wait: 2s instead of 5s — JS has already had time to start
             await asyncio.sleep(min(settings.PAGE_FALLBACK_EXTRA_WAIT, 2.0))
 
+        browser_state = await collect_browser_state(page)
+        if browser_state:
+            store_browser_state(url, browser_state)
+            logger.info(
+                "[BrowserState] Captured %d session candidate(s) from browser storage for %s",
+                browser_state.get("session_candidate_count", 0),
+                url,
+            )
+
+        try:
+            raw_cookies = await context.cookies()
+            cookie_header = build_cookie_header(raw_cookies)
+            if cookie_header:
+                from app.anti_bot_engine import get_anti_bot_engine
+                get_anti_bot_engine().update_cookies(domain, cookie_header)
+        except Exception as cookie_err:
+            logger.debug("[BrowserState] Cookie persistence skipped for %s: %s", url, cookie_err)
+
         html = await page.content()
 
         # Store captured network payloads for later extraction
@@ -575,6 +599,9 @@ async def _fetch_with_httpx(
         
     if extra_headers:
         headers.update(extra_headers)
+    cookie_string = anti_bot.get_cookies(domain)
+    if cookie_string and "Cookie" not in headers and "cookie" not in {k.lower() for k in headers}:
+        headers["Cookie"] = cookie_string
 
     timeout_seconds = (timeout_ms / 1000.0) if timeout_ms is not None else settings.REQUEST_TIMEOUT
     async with httpx.AsyncClient(
