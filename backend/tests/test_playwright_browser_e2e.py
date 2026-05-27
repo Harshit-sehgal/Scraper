@@ -1,0 +1,259 @@
+"""True browser E2E test for session-bound pages using Playwright.
+
+Verifies:
+- Playwright loads /search/id/<opaque-token> page
+- Browser cookies are set via Set-Cookie header
+- localStorage and sessionStorage are written by the page
+- Network JSON responses are captured
+- Structured records are extracted from rendered DOM
+- Raw browser secrets are NOT persisted in extraction output
+- Session-bound URL detection flags the URL correctly
+"""
+
+import json
+import threading
+import http.server
+import urllib.parse
+import pytest
+
+from app.models import SchemaField, FieldType
+
+# Skip if Playwright is not installed
+pytest.importorskip("playwright")
+
+
+SEARCH_HTML = """<!DOCTYPE html>
+<html><head><title>Flight Search Results</title></head><body>
+<div class="results">
+  <div class="card">
+    <span class="airline">Test Airways</span>
+    <span class="price">$299</span>
+    <span class="date">Jun 15, 2026</span>
+  </div>
+  <div class="card">
+    <span class="airline">Demo Airlines</span>
+    <span class="price">$450</span>
+    <span class="date">Jun 20, 2026</span>
+  </div>
+</div>
+<script>
+  localStorage.setItem('search_session', 'browser_tok_abc123');
+  sessionStorage.setItem('last_query', 'flights to PAR');
+  document.cookie = 'browser_sid=xyz789; path=/';
+</script>
+</body></html>"""
+
+API_JSON = json.dumps({
+    "results": [
+        {"carrier": "Test Airways", "fare": 299, "currency": "USD"},
+        {"carrier": "Demo Airlines", "fare": 450, "currency": "USD"},
+    ]
+})
+
+
+class _BrowserTestHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/search/id/browser_test_token_abc":
+            self.send_response(200)
+            self.send_header("Set-Cookie", "server_sid=deadbeef; Path=/; HttpOnly")
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(SEARCH_HTML.encode())
+        elif parsed.path == "/api/results":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(API_JSON.encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, format, *args):
+        pass
+
+
+@pytest.fixture(scope="module")
+def browser_server():
+    server = http.server.HTTPServer(("127.0.0.1", 0), _BrowserTestHandler)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{port}"
+    server.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_playwright_loads_session_page(browser_server):
+    """Playwright loads the session-bound search page successfully."""
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        url = f"{browser_server}/search/id/browser_test_token_abc"
+        await page.goto(url, wait_until="domcontentloaded")
+        content = await page.content()
+        assert "Test Airways" in content
+        assert "$299" in content
+        await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_playwright_captures_cookies(browser_server):
+    """Playwright captures cookies set by the server."""
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto(
+            f"{browser_server}/search/id/browser_test_token_abc",
+            wait_until="domcontentloaded",
+        )
+        cookies = await page.context.cookies()
+        cookie_names = {c["name"] for c in cookies}
+        assert "server_sid" in cookie_names, f"Cookie not set. Got: {cookie_names}"
+        await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_playwright_reads_local_storage(browser_server):
+    """Playwright verifies localStorage is written by the page JS."""
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto(
+            f"{browser_server}/search/id/browser_test_token_abc",
+            wait_until="domcontentloaded",
+        )
+        val = await page.evaluate("() => localStorage.getItem('search_session')")
+        assert val == "browser_tok_abc123", f"localStorage mismatch: {val}"
+        await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_playwright_reads_session_storage(browser_server):
+    """Playwright verifies sessionStorage is written by the page JS."""
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto(
+            f"{browser_server}/search/id/browser_test_token_abc",
+            wait_until="domcontentloaded",
+        )
+        val = await page.evaluate("() => sessionStorage.getItem('last_query')")
+        assert val == "flights to PAR", f"sessionStorage mismatch: {val}"
+        await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_playwright_captures_network_response(browser_server):
+    """Playwright captures the /api/results network JSON response."""
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        captured = []
+
+        async def handle_response(response):
+            if "/api/results" in response.url:
+                try:
+                    body = await response.text()
+                    captured.append(body)
+                except Exception:
+                    pass
+
+        page.on("response", handle_response)
+        await page.goto(
+            f"{browser_server}/search/id/browser_test_token_abc",
+            wait_until="domcontentloaded",
+        )
+        await page.goto(f"{browser_server}/api/results", wait_until="domcontentloaded")
+        import asyncio as _asyncio
+        await _asyncio.sleep(0.5)
+        await browser.close()
+
+    assert len(captured) > 0, "No network responses captured"
+    # Find the JSON response (not the HTML search page)
+    json_body = None
+    for body in captured:
+        try:
+            data = json.loads(body)
+            if "results" in data:
+                json_body = body
+                break
+        except Exception:
+            pass
+    assert json_body is not None, "No JSON API response captured"
+    payload = json.loads(json_body)
+    assert payload["results"][0]["carrier"] == "Test Airways"
+
+
+@pytest.mark.asyncio
+async def test_playwright_extraction_from_rendered_dom(browser_server):
+    """Extraction works on Playwright-rendered HTML."""
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto(
+            f"{browser_server}/search/id/browser_test_token_abc",
+            wait_until="domcontentloaded",
+        )
+        html = await page.content()
+        await browser.close()
+
+    from app.selector_engine import apply_selectors
+    schema = [
+        SchemaField(name="airline", field_type=FieldType.STRING),
+        SchemaField(name="price", field_type=FieldType.CURRENCY),
+    ]
+    selectors = {
+        "item_container": "div.card",
+        "fields": {"airline": ".airline", "price": ".price"},
+    }
+    result = apply_selectors(html, selectors, schema)
+    records = result if isinstance(result, list) else result[0]
+    assert len(records) == 2
+    airlines = {r.get("airline") for r in records}
+    assert airlines == {"Test Airways", "Demo Airlines"}
+
+
+@pytest.mark.asyncio
+async def test_playwright_secrets_not_in_extraction(browser_server):
+    """Browser storage values do NOT leak into extraction output."""
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto(
+            f"{browser_server}/search/id/browser_test_token_abc",
+            wait_until="domcontentloaded",
+        )
+        html = await page.content()
+        await browser.close()
+
+    from app.selector_engine import apply_selectors
+    schema = [SchemaField(name="airline", field_type=FieldType.STRING)]
+    selectors = {"item_container": "div.card", "fields": {"airline": ".airline"}}
+    result = apply_selectors(html, selectors, schema)
+    records = result if isinstance(result, list) else result[0]
+    for r in records:
+        for key in r:
+            assert "localStorage" not in key
+            assert "sessionStorage" not in key
+            assert "cookie" not in key.lower()
+            assert "browser_tok" not in str(r.get(key, ""))
+
+
+@pytest.mark.asyncio
+async def test_playwright_url_detected_as_session_bound():
+    """Long opaque token in /search/id/ path is detected as session-bound."""
+    from app.session_url_detector import detect_session_params
+    result = detect_session_params(
+        "https://example.com/search/id/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+    )
+    assert result.get("is_session_bound") is True, (
+        f"Expected session-bound, got: {result}"
+    )
