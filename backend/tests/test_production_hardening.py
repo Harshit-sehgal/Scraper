@@ -287,7 +287,7 @@ def test_body_size_limit_oversized_payload(client, monkeypatch):
     
     resp = client.post(
         "/api/jobs",
-        data=large_data,
+        content=large_data.encode("utf-8"),
         headers={"X-API-Key": "testkey", "Content-Type": "application/json"}
     )
     assert resp.status_code == 413
