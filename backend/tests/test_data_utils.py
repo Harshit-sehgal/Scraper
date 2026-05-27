@@ -252,12 +252,17 @@ class TestAlignProfileKeysToSchema:
     def test_t15_custom_schema_mapping(self):
         """Regression: custom schema must map full profile field set via semantic alignment."""
         from app.data_utils import align_profile_keys_to_schema
-        from app.selector_profiles.loader import _load_all_profiles
 
-        all_profiles = _load_all_profiles()
-        assert all_profiles, "need at least one selector profile for mapping test"
-        profile = next(iter(all_profiles.values()))
-        profile_fields = profile.get("fields", {})
+        # Use an inline profile so this test is hermetic (independent of disk state).
+        profile_fields = {
+            "airline": {"selector": ".airline", "type": "text"},
+            "origin": {"selector": ".origin", "type": "text"},
+            "destination": {"selector": ".dest", "type": "text"},
+            "date": {"selector": ".dep-date", "type": "text"},
+            "return_date": {"selector": ".ret-date", "type": "text"},
+            "price": {"selector": ".price", "type": "currency"},
+            "stops": {"selector": ".stops", "type": "text"},
+        }
         sample_values = {
             "airline": "Sample Air", "origin": "AAA", "destination": "BBB",
             "date": "01-01-2026", "return_date": "02-01-2026", "price": "100", "stops": "Direct",
@@ -273,18 +278,12 @@ class TestAlignProfileKeysToSchema:
         ]
         aligned = align_profile_keys_to_schema([record], schema, profile_fields=profile_fields)
         row = aligned[0]
-        if "airline" in profile_fields:
-            assert row["airlines_name"] == "Sample Air"
-        if "origin" in profile_fields:
-            assert row["origin_airport"] == "AAA"
-        if "destination" in profile_fields:
-            assert row["destination_airport"] == "BBB"
-        if "price" in profile_fields:
-            assert row["prices"] == "100"
-        if "date" in profile_fields:
-            assert row["departure_date"] == "01-01-2026"
-        if "return_date" in profile_fields:
-            assert row["arrival_date"] == sample_values["return_date"]
+        assert row["airlines_name"] == "Sample Air"
+        assert row["origin_airport"] == "AAA"
+        assert row["destination_airport"] == "BBB"
+        assert row["prices"] == "100"
+        assert row["departure_date"] == "01-01-2026"
+        assert row["arrival_date"] == "02-01-2026"
         assert "stops" not in row
 
     def test_return_date_maps_to_arrival_date(self):
