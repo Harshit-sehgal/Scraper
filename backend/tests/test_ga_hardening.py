@@ -84,6 +84,10 @@ async def test_browser_pool_hard_recycling(monkeypatch):
     """Test Component 2: Playwright Hard Process Recycling conditions."""
     pool = BrowserPool()
     
+    # Pin settings to known values to stay immune to state pollution from other tests
+    monkeypatch.setattr(settings, "BROWSER_MAX_CUMULATIVE_FETCHES", 200)
+    monkeypatch.setattr(settings, "BROWSER_MAX_RSS_MEMORY_MB", 1024)
+    
     # 1. Test cumulative page fetches limit BROWSER_MAX_CONTEXTS / 200 trigger recycling
     pool._cumulative_fetches = 199
     assert pool._should_recycle() is False
