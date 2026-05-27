@@ -45,16 +45,20 @@ fi
 
 # ─── pytest ────────────────────────────────────────────────────
 echo "[3/6] pytest"
+PYTEST_TMP=$(mktemp)
 PYTHONPATH="$BACKEND_DIR" python3 -m pytest "$BACKEND_DIR/tests" \
     -q -o "addopts=" \
     --ignore="$BACKEND_DIR/tests/test_profile_alignment_e2e.py" \
-    --timeout=120 \
-    2>&1 | tail -3
-if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    > "$PYTEST_TMP" 2>&1
+PYTEST_EXIT=$?
+tail -3 "$PYTEST_TMP"
+if [ $PYTEST_EXIT -eq 0 ]; then
     pass_check "pytest"
 else
     fail_check "pytest — failures"
+    grep -E "FAILED|ERROR" "$PYTEST_TMP" | head -10
 fi
+rm -f "$PYTEST_TMP"
 
 # ─── frontend JS ───────────────────────────────────────────────
 echo "[4/6] frontend JS validation"
