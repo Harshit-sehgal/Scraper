@@ -72,7 +72,7 @@ def _make_telemetry_event(
     }
 
 
-def _healthy_domain_trend() -> dict:
+def _healthy_domain_trend() -> DomainTrend:
     return _make_domain_trend(
         health_score=92.0,
         avg_quality_score=0.88,
@@ -81,7 +81,7 @@ def _healthy_domain_trend() -> dict:
     )
 
 
-def _degrading_domain_trend() -> dict:
+def _degrading_domain_trend() -> DomainTrend:
     return _make_domain_trend(
         health_score=38.0,
         sample_count=25,
@@ -97,7 +97,7 @@ def _degrading_domain_trend() -> dict:
     )
 
 
-def _critical_domain_trend() -> dict:
+def _critical_domain_trend() -> DomainTrend:
     return _make_domain_trend(
         health_score=15.0,
         sample_count=50,
@@ -115,7 +115,7 @@ def _critical_domain_trend() -> dict:
     )
 
 
-def _latency_creep_trend() -> dict:
+def _latency_creep_trend() -> DomainTrend:
     return _make_domain_trend(
         health_score=55.0,
         avg_quality_score=0.6,
@@ -125,7 +125,7 @@ def _latency_creep_trend() -> dict:
     )
 
 
-def _zero_result_trend() -> dict:
+def _zero_result_trend() -> DomainTrend:
     return _make_domain_trend(
         health_score=45.0,
         avg_quality_score=0.08,
