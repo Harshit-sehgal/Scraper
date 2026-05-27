@@ -75,9 +75,13 @@ STEP=6
 cd backend 2>&1
 PYTHONPATH=. $PYTHON_EXE -m pytest tests/test_production_hardening.py -q -o "addopts=" 2>&1
 
-echo "=== 7. Running Full pytest Suite ==="
-STEP=7
-# Skip Postgres/live-LLM tests (require Docker/RUN_LIVE_LLM_TESTS=1)
-PYTHONPATH=. $PYTHON_EXE -m pytest -q -o "addopts=" -k "not postgres and not test_profile_alignment_e2e" 2>&1
+if [ "${GITHUB_ACTIONS:-false}" = "true" ]; then
+    echo "=== Skipping Step 7 in CI (redundant, handled by the 'test' job) ==="
+else
+    echo "=== 7. Running Full pytest Suite ==="
+    STEP=7
+    # Skip Postgres/live-LLM tests (require Docker/RUN_LIVE_LLM_TESTS=1)
+    PYTHONPATH=. $PYTHON_EXE -m pytest -q -o "addopts=" -k "not postgres and not test_profile_alignment_e2e" 2>&1
+fi
 
 echo "=== SRE Quick Check Complete — ALL CHECKS PASSED ==="
