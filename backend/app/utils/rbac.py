@@ -6,7 +6,7 @@ Enforces administrative, operator, and user privilege boundaries.
 from enum import Enum
 import logging
 import secrets
-from fastapi import Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,8 @@ def require_role(allowed_roles: list[UserRole]):
     """
     FastAPI route guard dependency to enforce role permission boundaries.
     """
-    async def dependency(role: UserRole = Depends(get_current_role)):
+    async def dependency(request: Request):
+        role = get_current_role(request)
         if role not in allowed_roles:
             raise HTTPException(
                 status_code=403,

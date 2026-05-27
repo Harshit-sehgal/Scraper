@@ -296,7 +296,7 @@ def get_job_repository() -> JobRepository:
                     "Cannot use Postgres backend. Check DATAFORGE_DATABASE_URL and ensure "
                     "the database is running."
                 )
-            repo = PostgresJobRepository()
+            repo: JobRepository = PostgresJobRepository()
             _repository_instance = repo
             logger.info("Using PostgresJobRepository (explicit STORAGE_BACKEND=postgres)")
             return repo
@@ -308,9 +308,9 @@ def get_job_repository() -> JobRepository:
                 "Install psycopg2-binary: pip install psycopg2-binary"
             ) from e
 
-    repo = SQLiteJobRepository()
-    _repository_instance = repo
-    return repo
+    repo_sqlite: JobRepository = SQLiteJobRepository()
+    _repository_instance = repo_sqlite
+    return repo_sqlite
 
 
 _repository_instance: JobRepository | None = None

@@ -58,28 +58,40 @@ def validate_public_http_url(url: str) -> None:
     if hostname_lower in ("169.254.169.254", "metadata.google.internal", "instance-data"):
         raise ValueError(f"URL hostname '{hostname}' is a restricted cloud metadata endpoint.")
 
-    # 4. Reject internal TLDs (misconfiguration / SSRF trick)
+    # 4. Reject direct IP literals without depending on DNS.
+    try:
+        ip_literal = ipaddress.ip_address(hostname_lower.strip("[]"))
+    except ValueError:
+        ip_literal = None
+    if ip_literal is not None:
+        if not is_safe_ip(str(ip_literal)):
+            raise ValueError(
+                f"URL hostname '{hostname}' resolves to restricted IP {ip_literal} — rejected for security (SSRF protection)."
+            )
+        return
+
+    # 5. Reject internal TLDs (misconfiguration / SSRF trick)
     internal_tlds = (".local", ".internal", ".lan", ".corp")
     for tld in internal_tlds:
         if hostname_lower.endswith(tld):
             raise ValueError(
                 f"URL hostname '{hostname}' uses internal TLD '{tld}' which is restricted for security."
             )
+
+    is_production = settings.ENV.lower() in ("production", "staging")
+    if not is_production or is_smoke:
+        return
         
-    # 5. Try DNS resolution to check resolved IPs
+    # 6. Try DNS resolution to check resolved IPs in production-like modes.
     try:
         addrs = socket.getaddrinfo(hostname, None)
         for addr in addrs:
-            ip = addr[4][0]
+            ip = str(addr[4][0])
             if not is_safe_ip(ip):
                 raise ValueError(
                     f"URL hostname '{hostname}' resolves to restricted IP {ip} — rejected for security (SSRF protection)."
                 )
     except (socket.gaierror, OSError):
-        is_production = settings.ENV.lower() in ("production", "staging")
-        if is_production and not is_smoke:
-            raise ValueError(
-                f"URL hostname '{hostname}' could not be resolved (DNS failure) — rejected in production for security."
-            )
-        # In dev/test, unresolved hostnames that are not internal TLDs are allowed through
-        pass
+        raise ValueError(
+            f"URL hostname '{hostname}' could not be resolved (DNS failure) — rejected in production for security."
+        )

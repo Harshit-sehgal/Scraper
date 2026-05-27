@@ -26,7 +26,7 @@ import time
 import uuid
 from enum import IntEnum, StrEnum
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -857,7 +857,7 @@ _queue_lock = threading.Lock()
 def get_worker_queue(
     db_path: Optional[Path] = None,
     backend: Optional[str] = None,
-) -> "WorkerQueue":
+) -> Any:
     """Get or create the global WorkerQueue instance.
 
     Args:

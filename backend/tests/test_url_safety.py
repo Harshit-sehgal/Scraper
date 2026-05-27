@@ -44,6 +44,8 @@ def test_validate_public_http_url_basic_safety():
             validate_public_http_url(f"http://{host}")
 
 def test_validate_public_http_url_dns_resolution(monkeypatch):
+    monkeypatch.setattr(settings, "ENV", "production")
+
     # Mock socket.getaddrinfo to resolve safe-dns.com to 8.8.8.8
     def mock_getaddrinfo_safe(host, port, *args, **kwargs):
         if host == "safe-dns.com":
@@ -67,8 +69,6 @@ def test_validate_public_http_url_dns_resolution(monkeypatch):
         validate_public_http_url("http://bad-dns.com")
 
     # Verify DNS failure fails closed in production
-    monkeypatch.setattr(settings, "ENV", "production")
-    
     # Mock socket.getaddrinfo to raise gaierror for unresolvable domain
     def mock_getaddrinfo_fail(host, port, *args, **kwargs):
         raise socket.gaierror(-2, "Name or service not known")
@@ -193,6 +193,8 @@ def test_validate_unresolved_host_in_dev(monkeypatch):
 
 def test_validate_resolved_private_ip_via_dns_ipv6(monkeypatch):
     """Hostname resolving to IPv6 private address is rejected."""
+    monkeypatch.setattr(settings, "ENV", "production")
+
     # Use a non-internal-TLD hostname so DNS resolution kicks in
     def mock_getaddrinfo_v6(host, port, *args, **kwargs):
         return [
@@ -219,6 +221,8 @@ def test_validate_resolved_private_ip_via_dns_decimal_ip(monkeypatch):
     On Linux, decimal IPs like 2130706433 resolve to 127.0.0.1 via DNS.
     We test this by monkeypatching getaddrinfo to simulate the resolution.
     """
+    monkeypatch.setattr(settings, "ENV", "production")
+
     # Simulate decimal IP resolution (2130706433 = 127.0.0.1)
     def mock_getaddrinfo_decimal(host, port, *args, **kwargs):
         if host == "2130706433":

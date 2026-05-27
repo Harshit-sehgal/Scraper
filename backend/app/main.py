@@ -11,7 +11,7 @@ from typing import Dict, Any
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from pydantic import BaseModel, Field
@@ -29,7 +29,6 @@ from app.storage_interface import get_job_repository
 # during startup and referenced by route handlers.
 job_repo = None
 from app.rate_limiter import RateLimiterMiddleware
-from app.postgres_repository import shutdown_postgres
 import time
 
 
@@ -220,7 +219,11 @@ async def lifespan(app: FastAPI):
 
     # Close Postgres connection pool if active
     try:
+        from app.postgres_repository import shutdown_postgres
+
         shutdown_postgres()
+    except ImportError:
+        logger.debug("Postgres support is not installed; no Postgres pool to close")
     except Exception as e:
         logger.warning("Failed to close Postgres connection pool during shutdown: %s", e)
 
@@ -278,60 +281,44 @@ MAX_BODY_SIZE = 5 * 1024 * 1024  # 5MB
 @app.middleware("http")
 async def body_size_middleware(request: Request, call_next):
     """Limit request body size to prevent abuse."""
-    request.state.body_limit_exceeded = False
+    if request.method not in ("POST", "PUT", "PATCH") or not request.url.path.startswith("/api/"):
+        return await call_next(request)
 
-    if request.method in ("POST", "PUT", "PATCH") and request.url.path.startswith("/api/"):
-        # 1. Fast-path check on Content-Length header
-        content_length = request.headers.get("content-length")
-        if content_length:
-            try:
-                if int(content_length) > MAX_BODY_SIZE:
-                    return JSONResponse(
-                        status_code=413,
-                        content={"detail": "Request body too large (max 5MB)"},
-                    )
-            except (ValueError, TypeError):
-                pass
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > MAX_BODY_SIZE:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "Request body too large (max 5MB)"},
+                )
+            return await call_next(request)
+        except (ValueError, TypeError):
+            pass
 
-        # 2. Wrap Starlette receive callable to dynamically enforce size limit for chunked/streamed bodies
-        original_receive = request.receive
-        bytes_received = 0
-
-        async def custom_receive():
-            nonlocal bytes_received
-            message = await original_receive()
-            if message.get("type") == "http.request":
-                body = message.get("body", b"")
-                bytes_received += len(body)
-                if bytes_received > MAX_BODY_SIZE:
-                    request.state.body_limit_exceeded = True
-                    raise ValueError("Body size limit exceeded")
-            return message
-
-        request._receive = custom_receive
-
-    try:
-        response = await call_next(request)
-        if getattr(request.state, "body_limit_exceeded", False):
+    chunks: list[bytes] = []
+    bytes_received = 0
+    async for chunk in request.stream():
+        bytes_received += len(chunk)
+        if bytes_received > MAX_BODY_SIZE:
             return JSONResponse(
                 status_code=413,
                 content={"detail": "Request body too large (max 5MB)"},
             )
-        return response
-    except ValueError as exc:
-        if str(exc) == "Body size limit exceeded" or getattr(request.state, "body_limit_exceeded", False):
-            return JSONResponse(
-                status_code=413,
-                content={"detail": "Request body too large (max 5MB)"},
-            )
-        raise exc
-    except Exception as exc:
-        if getattr(request.state, "body_limit_exceeded", False):
-            return JSONResponse(
-                status_code=413,
-                content={"detail": "Request body too large (max 5MB)"},
-            )
-        raise exc
+        chunks.append(chunk)
+
+    body = b"".join(chunks)
+    replayed = False
+
+    async def replay_body():
+        nonlocal replayed
+        if replayed:
+            return {"type": "http.request", "body": b"", "more_body": False}
+        replayed = True
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    request._receive = replay_body
+    return await call_next(request)
 
 
 # ─── API Key Auth Middleware ────────────────────────────────────────────────
@@ -1103,6 +1090,93 @@ async def analyze_url(req: URLPreviewRequest):
 METRICS_COLLECTION_ERRORS = 0
 
 
+def _prometheus_label_text(labels: dict[str, str]) -> str:
+    if not labels:
+        return ""
+    escaped = {
+        key: str(value).replace("\\", "\\\\").replace('"', '\\"')
+        for key, value in labels.items()
+    }
+    return "{" + ",".join(f'{key}="{value}"' for key, value in escaped.items()) + "}"
+
+
+def _basic_metric_line(name: str, value: float | int, labels: dict[str, str] | None = None) -> str:
+    return f"{name}{_prometheus_label_text(labels or {})} {value}"
+
+
+def _render_basic_metrics_text() -> str:
+    """Render a minimal Prometheus exposition if prometheus_client is unavailable."""
+    from app.metrics_collector import (
+        get_errors,
+        get_health_check_latencies,
+        get_llm_calls,
+        get_request_latencies,
+        get_requests_total,
+        get_worker_failures,
+    )
+    from app.models import JobStatus
+
+    lines: list[str] = []
+
+    counts = {s.value: 0 for s in JobStatus}
+    for job in jobs_store.values():
+        status_key = str(job.status.value if isinstance(job.status, JobStatus) else job.status)
+        counts[status_key] = counts.get(status_key, 0) + 1
+    for status, count in counts.items():
+        lines.append(_basic_metric_line("dataforge_jobs_total", count, {"status": status}))
+
+    lines.append(_basic_metric_line("dataforge_recycle_bin_total", len(recycle_bin_store)))
+
+    backend_ok = 1
+    try:
+        repo = get_job_repository()
+        backend = getattr(repo, "backend", "sqlite")
+        lines.append(_basic_metric_line("dataforge_backend", 1, {"backend": backend}))
+    except Exception as e:
+        backend_ok = 0
+        logging.getLogger(__name__).error("Metrics fallback: backend collection failed: %s", e)
+    lines.append(_basic_metric_line("dataforge_backend_collection_ok", backend_ok))
+
+    queue_ok = 1
+    try:
+        from app.worker_queue import get_worker_queue
+        q_status = get_worker_queue().get_status()
+        lines.append(_basic_metric_line("dataforge_queue_pending", q_status.get("pending", 0)))
+        lines.append(_basic_metric_line("dataforge_queue_running", q_status.get("running", 0)))
+        lines.append(_basic_metric_line("dataforge_queue_dead_letter", q_status.get("dead_letter", 0)))
+    except Exception as e:
+        queue_ok = 0
+        logging.getLogger(__name__).error("Metrics fallback: queue collection failed: %s", e)
+    lines.append(_basic_metric_line("dataforge_queue_collection_ok", queue_ok))
+
+    for task_type, count in get_worker_failures().items():
+        lines.append(_basic_metric_line("dataforge_worker_failures_total", count, {"task_type": task_type}))
+
+    if settings.METRICS_ENABLE_HISTOGRAMS:
+        request_latencies = get_request_latencies()
+        if request_latencies:
+            lines.append(_basic_metric_line("dataforge_request_duration_seconds_count", len(request_latencies)))
+            lines.append(_basic_metric_line("dataforge_request_duration_seconds_sum", sum(request_latencies)))
+
+        health_latencies = get_health_check_latencies()
+        if health_latencies:
+            lines.append(_basic_metric_line("dataforge_backend_health_check_duration_seconds_count", len(health_latencies)))
+            lines.append(_basic_metric_line("dataforge_backend_health_check_duration_seconds_sum", sum(health_latencies)))
+
+    lines.append(_basic_metric_line("dataforge_metrics_collection_error_total", METRICS_COLLECTION_ERRORS))
+
+    errors_dict = get_errors()
+    for err_type, count in errors_dict.items():
+        lines.append(_basic_metric_line("dataforge_errors_total", count, {"type": err_type}))
+    if "database" not in errors_dict:
+        lines.append(_basic_metric_line("dataforge_errors_total", 0, {"type": "database"}))
+
+    lines.append(_basic_metric_line("dataforge_llm_calls_total", get_llm_calls()))
+    lines.append(_basic_metric_line("dataforge_requests_total", get_requests_total()))
+
+    return "\n".join(lines) + "\n"
+
+
 @app.get("/metrics")
 async def metrics(request: Request):
     """Prometheus-formatted metrics endpoint for DataForge scraper.
@@ -1128,9 +1202,11 @@ async def metrics(request: Request):
             )
 
     global METRICS_COLLECTION_ERRORS
-    from prometheus_client import generate_latest, Gauge, Histogram
+    try:
+        from prometheus_client import generate_latest, Gauge, Histogram
+    except ModuleNotFoundError:
+        return Response(content=_render_basic_metrics_text(), media_type="text/plain")
     from prometheus_client.core import CollectorRegistry
-    from fastapi.responses import Response
 
     # Clear registry to avoid duplicate registration errors on hot-reload
     registry = CollectorRegistry()
@@ -1261,4 +1337,3 @@ if FRONTEND_DIR.exists():
     DASHBOARD_DIR = FRONTEND_DIR / "dashboard"
     if DASHBOARD_DIR.exists():
         app.mount("/dashboard", StaticFiles(directory=str(DASHBOARD_DIR), html=True), name="dashboard")
-

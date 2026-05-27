@@ -109,7 +109,7 @@ def load_paginated_job_results_from_disk(
     if not path.exists():
         return [], 0
         
-    records = []
+    records: list[dict] = []
     total_count = 0
     try:
         with gzip.open(path, "rt", encoding="utf-8") as f:

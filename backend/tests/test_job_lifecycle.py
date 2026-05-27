@@ -289,6 +289,9 @@ def test_enqueue_failure_rollback_in_production(client, monkeypatch):
 
     # Patch at the import target used inside create_job's lazy import
     monkeypatch.setattr("app.worker_queue.get_worker_queue", fake_broken_queue)
+    # This test exercises enqueue rollback, not URL safety. Keep it independent
+    # from DNS availability in production-mode validation.
+    monkeypatch.setattr("app.url_safety.validate_public_http_url", lambda url: None)
 
     # Track hard_delete calls to verify rollback
     deleted_jobs = []
