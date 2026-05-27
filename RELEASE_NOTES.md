@@ -36,7 +36,7 @@ This staging candidate is **officially frozen**. Do not apply any further patche
 * **Telemetry Regression Coverage**: Comprehensive API metrics and Bearer token auth validation inside `test_metrics.py`.
 * **Full Test Suite Results**:
   ```
-  1584 passed, 37 skipped, 1 warning in 115.68s (100% success)
+  1584 passed, 37 skipped in 116.17s (100% success)
   ```
 
 ---
