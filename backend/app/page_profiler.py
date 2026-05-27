@@ -127,14 +127,14 @@ VALUE_PATTERNS = {
         r"\b(?:dozen|pack|box|carton|case|bundle|pair|set)\b",
     ],
     "airport_code": [
-        r"\b[A-Z]{3}\b",  # LHR, JFK, DXB, SFO — shared with codes_3letter but kept separate for flight context
+        r"\b[A-Z]{3}\b",  # 3-letter codes like MIA, JFK, LHR
     ],
     "address": [
         r"\d+\s+[A-Za-z]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Drive|Dr|Boulevard|Blvd|Way|Circle|Cir|Court|Ct|Plaza|Square)",  # 123 Main St
         r"[A-Za-z ,]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln)\s+\d+",
         r"\b(?:P\.?\s*O\.?\s*Box)\s+\d+",
-        r"\b[\w\s]+,\s*(?:NY|CA|TX|FL|IL|OH|PA|GA|NC|MI|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|AL|SC|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|WV|ID|HI|NH|ME|RI|MT|DE|SD|ND|AK|VT|WY|DC)\b",  # New York, NY
-    ],
+        r"\b[\w\s]+,\s*(?:NY|CA|TX|FL|IL|OH|PA|GA|NC|MI|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|AL|SC|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|WV|ID|HI|NH|ME|RI|MT|DE|SD|ND|AK|VT|WY|DC)\b",
+    ]
 }
 
 
@@ -220,7 +220,7 @@ def _detect_cards_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
     """Detect if page uses card/listings structure."""
     # Card indicators (generic, not domain-specific)
     card_selectors = [
-        ("div", {"class": re.compile(r"(card|item|result|listing|product|hotel|flight|job|property)", re.I)}),
+        ("div", {"class": re.compile(r"(card|item|result|listing|product)", re.I)}),
         ("article", {}),
         ("li", {"class": re.compile(r"(item|result)", re.I)}),
         ("div", {"class": re.compile(r"(grid|grid-item|col)", re.I)}),

@@ -400,8 +400,8 @@ def _score_card(blocks: list[VisibleTextBlock], combined: str) -> float:
     if has_values:
         score += 0.15
 
-    # Has organization / carrier / name type
-    has_org = any(b.pattern_type in ("organization", "airline_code") for b in blocks)
+    # Has organization / name type
+    has_org = any(b.pattern_type == "organization" for b in blocks)
     if has_org:
         score += 0.1
 
@@ -597,7 +597,9 @@ def _collect_card_pattern_matches(
     org_pattern = re.compile(r'\b([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+){1,4})\b')
     for m in org_pattern.finditer(full_text):
         val = m.group(1).strip()
-        if val.lower() not in ("departure", "return", "outbound", "inbound", "arrival", "duration", "total amount", "booking details"):
+        # Skip common non-org patterns (descriptive labels and navigation text)
+        skip_org_words = {"departure", "return", "arrival", "duration", "total", "details"}
+        if val.lower() not in skip_org_words:
             matches["organization"].append((val, m.start(), m.end()))
 
     # Deduplicate each list
@@ -626,10 +628,6 @@ def _extract_card_field_stateful(
     """Extract a field value with stateful span tracking."""
     def _consume_match(matches: list) -> str | None:
         use_last = any(w in field_name for w in ("return", "arrival", "arrive", "end", "to_", "dest"))
-        if field_name in ("destination", "arrival", "arrival_city", "arrival_airport"):
-            use_last = True
-        if field_name in ("origin", "source", "departure", "departure_city", "departure_airport"):
-            use_last = False
 
         if use_last:
             for i in range(len(matches) - 1, -1, -1):
@@ -706,7 +704,7 @@ def _extract_card_field_stateful(
         return _consume_match(matches_by_type["date"])
 
     # ── Time ───────────────────────────────────────────────────────────
-    time_field_names = {"time", "departure_time", "arrival_time", "start_time", "end_time", "duration", "travel_time"}
+    time_field_names = {"time", "start_time", "end_time", "duration"}
     if field_type in (FieldType.STRING,) and (field_name in time_field_names or field_name.endswith("_time")):
         return _consume_match(matches_by_type["time"])
 
@@ -724,7 +722,7 @@ def _extract_card_field_stateful(
         return None
 
     # ── Organization / Brand / Name ────────────────────────────────────
-    name_parts = ["name", "title", "company", "organization", "brand", "carrier", "airline", "vendor", "provider"]
+    name_parts = ["name", "title", "company", "organization", "brand", "vendor", "provider"]
     is_name_field = any(p in field_name for p in name_parts) or field_type == FieldType.STRING
 
     if is_name_field:

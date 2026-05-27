@@ -721,9 +721,9 @@ def _assess_content_quality(html: str, profile) -> dict:
     # Welcome/landing page text patterns (generic, domain-agnostic)
     body_text = soup.get_text().lower()[:2000]
     welcome_patterns = [
-        "welcome", "find your", "search for", "book now", "get started",
+        "welcome", "find your", "search for", "get started",
         "start your", "explore", "discover", "find the best",
-        "looking for", "where are you going", "destination",
+        "looking for",
     ]
     for pattern in welcome_patterns:
         if pattern in body_text:
@@ -1113,32 +1113,32 @@ def build_url_analysis_prompt(values: list[str], page_analysis: dict) -> str:
 
     few_shot = """
 === EXAMPLE ===
-Input values from a flight search page:
-  #1   "New York"           type: location
-  #2   "JFK"                type: code
-  #3   "London-Stansted"    type: location
-  #4   "STN"                type: code
-  #5   "\u00a3450"          type: currency
-  #6   "30/05/2026"         type: date
-  #7   "2h 30m"             type: string
-  #8   "British Airways"    type: string
-  #9   "BA178"              type: code
-  #10  "08:30"              type: time
-  #11  "11:00"              type: time
+Input values from a product listing page:
+  #1   "Ergonomic Office Chair"           type: string
+  #2   "FURN-4032"                        type: code
+  #3   "$299.99"                          type: currency
+  #4   "4.5/5"                            type: rating
+  #5   "Free shipping"                    type: string
+  #6   "2-3 business days"                type: string
+  #7   "In Stock"                         type: boolean
+  #8   "SteelFrame Co."                   type: string
+  #9   "Leather, Aluminum"                type: string
+  #10  "450"                              type: number
+  #11  "Black, White"                     type: string
 
 Expected output:
-{"page_type": "cards", "estimated_record_count": 24, "fields": [
-  {"name": "origin_city", "type": "location", "example_value": "New York", "confidence": 0.95, "description": "Departure city"},
-  {"name": "departure_airport", "type": "code", "example_value": "JFK", "confidence": 0.95, "description": "Departure airport code"},
-  {"name": "destination_city", "type": "location", "example_value": "London-Stansted", "confidence": 0.95, "description": "Arrival city and airport"},
-  {"name": "arrival_airport", "type": "code", "example_value": "STN", "confidence": 0.95, "description": "Arrival airport code"},
-  {"name": "price", "type": "currency", "example_value": "\u00a3450", "confidence": 0.95, "description": "Ticket price"},
-  {"name": "travel_date", "type": "date", "example_value": "30/05/2026", "confidence": 0.95, "description": "Date of travel"},
-  {"name": "duration", "type": "string", "example_value": "2h 30m", "confidence": 0.85, "description": "Flight duration"},
-  {"name": "airline_name", "type": "string", "example_value": "British Airways", "confidence": 0.95, "description": "Airline operating the flight"},
-  {"name": "flight_number", "type": "code", "example_value": "BA178", "confidence": 0.95, "description": "Flight number"},
-  {"name": "departure_time", "type": "time", "example_value": "08:30", "confidence": 0.95, "description": "Scheduled departure time"},
-  {"name": "arrival_time", "type": "time", "example_value": "11:00", "confidence": 0.95, "description": "Scheduled arrival time"}
+{"page_type": "cards", "estimated_record_count": 36, "fields": [
+  {"name": "product_name", "type": "string", "example_value": "Ergonomic Office Chair", "confidence": 0.95, "description": "Product name"},
+  {"name": "sku", "type": "code", "example_value": "FURN-4032", "confidence": 0.95, "description": "Product SKU or item code"},
+  {"name": "price", "type": "currency", "example_value": "$299.99", "confidence": 0.95, "description": "Product price"},
+  {"name": "rating", "type": "rating", "example_value": "4.5/5", "confidence": 0.90, "description": "Customer rating"},
+  {"name": "delivery_info", "type": "string", "example_value": "Free shipping", "confidence": 0.80, "description": "Shipping or delivery information"},
+  {"name": "delivery_time", "type": "string", "example_value": "2-3 business days", "confidence": 0.80, "description": "Estimated delivery time"},
+  {"name": "availability", "type": "boolean", "example_value": "In Stock", "confidence": 0.90, "description": "Stock availability status"},
+  {"name": "brand", "type": "string", "example_value": "SteelFrame Co.", "confidence": 0.95, "description": "Brand or manufacturer"},
+  {"name": "materials", "type": "string", "example_value": "Leather, Aluminum", "confidence": 0.85, "description": "Product materials or features"},
+  {"name": "weight_lbs", "type": "number", "example_value": "450", "confidence": 0.75, "description": "Product weight"},
+  {"name": "color", "type": "string", "example_value": "Black, White", "confidence": 0.90, "description": "Available colors"}
 ]}
 === END EXAMPLE ===
 """
@@ -1210,22 +1210,16 @@ def _detect_search_form(html: str) -> dict:
 
     # Keywords that suggest a field is a search/query parameter
     SEARCH_FIELD_NAMES: set[str] = {
-        "fro", "from", "to", "destination", "origin", "source", "target",
-        "depart", "arrive", "arrival", "return",
-        "city", "airport", "location", "place",
-        "date", "checkin", "checkout", "check_in", "check_out",
-        "departure_date", "return_date", "travel_date",
-        "adult", "child", "infant", "passenger", "guest",
-        "cabin", "class", "cabinclass", "cabin_class",
+        "from", "to", "source", "target",
+        "location", "place", "city",
+        "date",
         "query", "search", "q", "keyword",
     }
     SEARCH_PLACEHOLDER_PATTERNS: list[str] = [
-        r"from|to", r"destination|origin", r"city|airport|location",
-        r"depart|arrive|return",
-        r"date|when|check.?in|check.?out",
-        r"search|find|fly|flight|book",
-        r"adult|child|infant|passenger|guest",
-        r"leaving|going|where",
+        r"from|to", r"location|place",
+        r"date|when",
+        r"search|find",
+        r"keyword|query",
     ]
 
     best_form = None
@@ -1354,16 +1348,11 @@ def _map_search_params_to_fields(
 
     # Build a list of (field_entry, match_keywords) for fuzzy matching
     param_variants: dict[str, list[str]] = {
-        "origin": ["origin", "from", "fro", "frocity", "departure", "depart", "leaving"],
-        "destination": ["destination", "dest", "to", "tocity", "arrival", "arrive", "going"],
-        "departure_date": ["departure_date", "departdate", "frodate", "depart", "checkin", "check_in"],
-        "return_date": ["return_date", "returndate", "todate", "return", "checkout", "check_out"],
-        "date": ["date", "travel_date", "traveldate"],
-        "adults": ["adult", "adults", "passenger", "passengers"],
-        "children": ["child", "children", "kid", "kids"],
-        "infants": ["infant", "infants"],
-        "cabin_class": ["cabin", "cabinclass", "cabin_class", "class"],
         "query": ["query", "search", "q", "keyword"],
+        "location": ["location", "place", "city"],
+        "from": ["from"],
+        "to": ["to"],
+        "date": ["date"],
     }
 
     used_fields: set[str] = set()
@@ -1636,8 +1625,8 @@ def _rename_generic_fields(fields: list[dict]) -> list[dict]:
 _FIELD_NAME_HINTS: list[tuple[str, str, str]] = [
     # Currency values
     ("currency", "", "price"),
-    # 3-letter uppercase codes (airport codes)
-    ("code", "^[A-Z]{3}$", "airport_code"),
+    # 3-letter uppercase codes
+    ("code", "^[A-Z]{3}$", "short_code"),
     # 2-letter uppercase codes
     ("code", "^[A-Z]{2}$", "code_abbreviation"),
     # Mixed letter-digit codes (flight numbers, product codes)

@@ -72,22 +72,17 @@ class CompoundRecord:
 # ---------------------------------------------------------------------------
 
 SEGMENT_LABELS = [
-    "segment", "leg", "part", "section",
-    "outbound", "inbound",
-    "departure", "arrival", "return",
+    "segment", "part", "section",
     "from", "to",
-    "going", "coming",
-    "trip", "stop",
+    "item", "entry",
 ]
 
 # Labels that act as segment separators
 SEGMENT_SEPARATORS = [
-    "departure", "return", "outbound", "inbound",
-    "leg 1", "leg 2", "leg1", "leg2",
-    "segment 1", "segment 2",
-    "going", "coming",
     "from", "to",
-    "trip", "stop",
+    "item", "entry",
+    "segment 1", "segment 2",
+    "part 1", "part 2",
 ]
 
 
@@ -219,13 +214,14 @@ def _extract_segment_fields(raw_text: str) -> dict[str, str]:
     """
     fields: dict[str, str] = {}
 
-    # Carrier / airline / organization
+    # Organization (capitalized multi-word names)
     org_match = re.search(
-        r'\b([A-Z][a-zA-Z\s]{2,30}(?:Airlines?|Airways?|Express|Air|Lines?|Fly|Jet|Star|Aviation|Travel|Tours?))\b',
+        r'\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})\b',
         raw_text,
     )
-    if org_match:
-        fields["carrier"] = org_match.group(1).strip()
+    lower = raw_text.lower()
+    if org_match and org_match.group(1).lower() not in ("from", "to", "departure", "arrival", "return", "outbound", "inbound"):
+        fields["organization"] = org_match.group(1).strip()
 
     # Time patterns (start and end times)
     times = re.findall(r'\d{1,2}:\d{2}\s*(?:am|pm)?', raw_text, re.I)
@@ -235,13 +231,13 @@ def _extract_segment_fields(raw_text: str) -> dict[str, str]:
     elif len(times) == 1:
         fields["time_start"] = times[0]
 
-    # 3-letter location codes
+    # 3-letter codes
     codes = re.findall(r'\b[A-Z]{3}\b', raw_text)
     if len(codes) >= 2:
-        fields["origin"] = codes[0]
-        fields["destination"] = codes[1]
+        fields["code_from"] = codes[0]
+        fields["code_to"] = codes[1]
     elif len(codes) == 1:
-        fields["location"] = codes[0]
+        fields["code"] = codes[0]
 
     # Date
     date_match = re.search(r'\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}', raw_text)
@@ -252,16 +248,6 @@ def _extract_segment_fields(raw_text: str) -> dict[str, str]:
     price_match = re.search(r'[\$\€\£\¥\₹]\s*\d+[\d,.]*', raw_text)
     if price_match:
         fields["price"] = price_match.group(0).replace(" ", "")
-
-    # Duration
-    dur_match = re.search(r'(\d+h\s*\d*m|\d{1,2}:\d{2})\s*(?:duration|travel|flight|trip)', raw_text, re.I)
-    if dur_match:
-        fields["duration"] = dur_match.group(1)
-
-    # Flight/route numbers
-    fn_match = re.search(r'\b[A-Z]{2}\d{3,4}\b', raw_text)
-    if fn_match:
-        fields["flight_number"] = fn_match.group(0)
 
     return fields
 
@@ -290,14 +276,9 @@ def _extract_shared_fields(segments: list[dict[str, Any]], full_text: str) -> di
         shared["rating"] = rating_match.group(1)
 
     # Status / availability
-    status_patterns = {
-        "status": r'\b(available|sold\s*out|in\s*stock|out\s*of\s*stock|booked|confirmed|cancelled|canceled|pending)\b',
-        "fare_type": r'\b(basic\s*economy|economy|premium\s*economy|business\s*class|first\s*class|flexible|saver|standard)\b',
-    }
-    for field_name, pattern in status_patterns.items():
-        match = re.search(pattern, full_text, re.I)
-        if match:
-            shared[field_name] = match.group(1)
+    status_match = re.search(r'\b(available|sold\s*out|in\s*stock|out\s*of\s*stock|pending)\b', full_text, re.I)
+    if status_match:
+        shared["status"] = status_match.group(1)
 
     return shared
 
@@ -356,9 +337,9 @@ def assemble_compound_records(
 
             for seg in segments:
                 seg_fields = _extract_segment_fields(seg.get("raw_text", ""))
-                # Also copy any record fields that match segment patterns
+                # Also copy any record fields that look like they belong to a segment
                 for k, v in record.items():
-                    if k in ("carrier", "airline", "origin", "destination", "departure", "arrival"):
+                    if k in ("organization", "name", "price", "date", "code"):
                         if k not in seg_fields:
                             seg_fields[k] = str(v)
 

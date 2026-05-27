@@ -561,7 +561,9 @@ def _collect_all_pattern_matches(
     for m in org_pattern.finditer(full_text):
         val = m.group(1).strip()
         # Skip common non-org patterns
-        if val.lower() not in ("departure", "return", "outbound", "inbound", "arrival", "duration", "total amount", "booking details"):
+        # Skip common non-org patterns (time/location labels, navigation text)
+        skip_org_words = {"departure", "return", "arrival", "duration", "total", "details"}
+        if val.lower() not in skip_org_words:
             matches["organization"].append((val, m.start(), m.end()))
 
     # Deduplicate each list (same value, keep first occurrence)
@@ -595,11 +597,6 @@ def _extract_field_value_stateful(
     def _consume_match(matches: list) -> str | None:
         """Pop the next available match, respecting use_last."""
         use_last = any(w in field_name for w in ("return", "arrival", "arrive", "end", "to_", "dest"))
-        # Also: "destination" → use last, "origin" → use first
-        if field_name in ("destination", "arrival", "arrival_city", "arrival_airport"):
-            use_last = True
-        if field_name in ("origin", "source", "departure", "departure_city", "departure_airport"):
-            use_last = False
 
         if use_last:
             # Try from end to find an unused span
@@ -676,7 +673,7 @@ def _extract_field_value_stateful(
         return _consume_match(matches_by_type["date"])
 
     # ── Time ───────────────────────────────────────────────────────────
-    time_field_names = {"time", "departure_time", "arrival_time", "start_time", "end_time", "duration", "travel_time"}
+    time_field_names = {"time", "start_time", "end_time", "duration"}
     if field_type in (FieldType.STRING,) and (field_name in time_field_names or field_name.endswith("_time")):
         return _consume_match(matches_by_type["time"])
 
@@ -685,8 +682,8 @@ def _extract_field_value_stateful(
         return _consume_match(matches_by_type["code"])
 
     # ── Organization / Brand / Name ────────────────────────────────────
-    org_field_names = {"organization", "company", "carrier", "airline", "brand", "vendor", "provider", "name", "title"}
-    if field_name in org_field_names or any(fn in field_name for fn in ["company", "carrier", "airline", "vendor", "brand", "organization"]):
+    org_field_names = {"organization", "company", "brand", "vendor", "provider", "name", "title"}
+    if field_name in org_field_names or any(fn in field_name for fn in ["company", "vendor", "brand", "organization"]):
         result = _consume_match(matches_by_type["organization"])
         if result:
             return result

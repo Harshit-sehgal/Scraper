@@ -108,15 +108,15 @@ def _infer_field_type_from_name(field_name: str) -> FieldType | None:
     if not n:
         return None
     type_keywords = {
-        FieldType.CURRENCY: ("price", "cost", "fare", "amount", "fee", "total", "rate", "value", "sum", "charge", "payment"),
+        FieldType.CURRENCY: ("price", "cost", "amount", "fee", "total", "rate", "value", "sum", "charge", "payment"),
         FieldType.EMAIL: ("email", "mail", "e-mail", "contact", "e_mail"),
         FieldType.PHONE: ("phone", "tel", "mobile", "cell", "contact_no", "telephone", "contact_number"),
         FieldType.URL: ("url", "link", "href", "website", "profile_url", "source"),
-        FieldType.DATE: ("_date", "date_", " day ", "_day", "checkin", "checkout", "created_", "updated_", "published_", "due_date"),
-        FieldType.NUMBER: ("count", "quantity", "qty", "stock", "rank", "position", "index", "num", "adults", "children", "infants", "passengers", "seats", "rooms"),
+        FieldType.DATE: ("_date", "date_", " day ", "_day", "created_", "updated_", "published_", "due_date"),
+        FieldType.NUMBER: ("count", "quantity", "qty", "stock", "rank", "position", "index", "num"),
         FieldType.RATING: ("rating", "score", "stars", "review_score", "grade", "review"),
-        FieldType.LOCATION: ("location", "address", "city", "country", "region", "state", "place", "area", "origin_", "destination_", "_from", "_to"),
-        FieldType.CODE: ("code", "id", "ref", "flight_number", "sku", "isbn", "upc", "identifier", "flight_no", "ref_no"),
+        FieldType.LOCATION: ("location", "address", "city", "country", "region", "state", "place", "area"),
+        FieldType.CODE: ("code", "id", "ref", "sku", "isbn", "upc", "identifier", "ref_no"),
     }
     for ftype, keywords in type_keywords.items():
         if any(kw in n for kw in keywords):
@@ -255,7 +255,7 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
         return None
     n_lower = field_name.lower()
     use_last = any(w in n_lower for w in ("return", "arrival", "arrive", "end", "to_", "dest"))
-    name_entity_fields = ("airline", "carrier", "operator", "provider", "company", "brand")
+    name_entity_fields = ("operator", "provider", "company", "brand")
     if not use_last:
         use_last = any(w in n_lower for w in name_entity_fields)
     best_match = None
@@ -293,16 +293,9 @@ def _classify_text_value(text: str) -> str:
         return "currency"
     if _re.match(r'^[A-Z]{3,4}$', t):
         return "code"
-    if _re.match(r'^\d+\s*[Ss]top', t):
-        return "stops"
-    lower = t.lower()
-    if any(w in lower for w in ("direct", "non-stop", "nonstop", "connecting")):
-        return "stops"
-    if any(w in lower for w in ("economy", "business", "first class", "premium", "coach")):
-        return "cabin_class"
     if _re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){2,}$', t):
         return "location"
-    label_patterns = ("starting from", "per person", "book now", "price per", "call now", "learn more", "view deal", "select", "adults", "child", "age")
+    label_patterns = ("starting from", "call now", "learn more", "select", "age")
     if any(w in lower for w in label_patterns):
         return "label"
     if _re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$', t) and len(t) > 1:
@@ -314,18 +307,16 @@ def _field_matches_classification(field_name: str, classification: str) -> bool:
     """Check if a field name is compatible with a text classification."""
     n = field_name.lower()
     mapping = {
-        "date": ("date", "day", "departure_date", "return_date", "arrival_date", "travel_date"),
-        "currency": ("price", "cost", "fare", "amount", "fee", "total"),
-        "stops": ("stops", "stop", "layover", "connection"),
-        "cabin_class": ("class", "cabin", "seat_class", "travel_class"),
-        "name": ("airline", "name", "title", "carrier", "operator", "provider", "company"),
-        "location": ("city", "location", "place", "area", "departure_city", "arrival_city", "origin", "destination"),
-        "code": ("code", "flight_number", "airport_code", "identifier", "ref", "sku"),
+        "date": ("date", "day"),
+        "currency": ("price", "cost", "amount", "fee", "total"),
+        "name": ("name", "title", "operator", "provider", "company"),
+        "location": ("city", "location", "place", "area"),
+        "code": ("code", "identifier", "ref", "sku"),
         "text": (),  # matched via field ordering priority — STRING fields can match text
     }
     keywords = mapping.get(classification, ())
     if classification == "code":
-        keywords = keywords + mapping.get("location", ())
+        keywords = keywords + ("id", "ref")
     if not keywords and classification == "text":
         return True
     return any(kw in n for kw in keywords)
@@ -525,7 +516,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
     
     # Priority 1: Common data container classes
     containers = list(soup.find_all(["article", "li", "tr", "div"], class_=re.compile(
-        r"item|card|listing|row|result|itinerary|entry", re.I
+        r"item|card|listing|row|result|entry", re.I
     )))
     
     # Priority 2: Headings and their parents
@@ -658,7 +649,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                     if not heading and container.name == "tr":
                         heading = container.find("td")
                     
-                    # Strategy 2: Look for img alt text (e.g. airline logo, company logo)
+                    # Strategy 2: Look for img alt text (e.g. company logo)
                     if not heading:
                         img = container.find("img", alt=True)
                         if img and img.get("alt", "").strip() and len(img["alt"].strip()) > 2:

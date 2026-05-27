@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 EMPTY_TOKENS = {"-", "n/a", "na", "null", "none", "", "not available", "empty", "0", "false", "undefined"}
 PLACEHOLDER_PHRASES = {"no data", "not specified", "coming soon", "tbd", "unknown"}
-LIKELY_LOCATION_WORDS = {"india", "usa", "uk", "chennai", "bangalore", "delhi", "mumbai", "london", "new york", "city", "country", "state"}
+LIKELY_LOCATION_WORDS = {"city", "country", "state"}
 NAME_FIELD_NOISE_PREFIXES = {
     "privacy policy", "terms of", "cookie", "copyright", "all rights",
     "contact us", "about us", "home", "search", "menu", "login", "sign up",

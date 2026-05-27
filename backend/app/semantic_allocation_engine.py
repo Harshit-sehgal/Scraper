@@ -91,13 +91,13 @@ def _adaptive_runtime_exclusion_threshold() -> float:
 # Bootstrap seeds for role-type compatibility.
 # These are TEMPORARY priors — learning overrides them over time.
 _UNIVERSAL_ROOTS = [
-    (['pric', 'cost', 'salar', 'fare', 'preci', 'prix', 'wert'], SemanticType.PRICE),
+    (['pric', 'cost', 'salar', 'preci', 'prix', 'wert'], SemanticType.PRICE),
     (['date', 'time', 'schedule', 'fecha', 'zeit', 'horar'], SemanticType.DATE),
-    # Airport / IATA field names (e.g. origin_airport) expect codes, not full locations
-    (['airport', 'iata', 'icao'], SemanticType.CODE),
+    # Short codes / identifiers (product codes, SKUs, etc.)
+    (['code', 'currenc', 'ident', 'id', 'codig', 'sku'], SemanticType.CODE),
     (['loc', 'city', 'addr', 'place', 'dest', 'orig', 'ubica', 'stadt'], SemanticType.LOCATION),
-    (['code', 'currenc', 'ident', 'id', 'codig'], SemanticType.CODE),
-    (['nam', 'comp', 'firm', 'brand', 'make', 'model', 'builder', 'nombr', 'hotel', 'resort', 'title'], SemanticType.ORGANIZATION),
+
+    (['nam', 'comp', 'firm', 'brand', 'make', 'model', 'builder', 'nombr', 'title'], SemanticType.ORGANIZATION),
     (['rat', 'scor', 'review', 'calif', 'bewert'], SemanticType.RATING),
     (['count', 'number', 'year', 'mileage', 'age', 'experien', 'num', 'jahr'], SemanticType.NUMBER),
     (['avail', 'stock', 'status', 'state'], SemanticType.TEXT),

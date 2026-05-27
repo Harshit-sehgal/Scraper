@@ -39,7 +39,7 @@ SEMANTIC_NEED_KEYWORDS = {
     "link": ["link", "url", "website", "book", "visit", "apply"],
     "availability": ["available", "stock", "in stock", "slots", "open", "vacancy"],
     "size": ["size", "sqft", "sq ft", "bedroom", "bathroom", "area", "capacity"],
-    "seller": ["seller", "vendor", "provider", "company", "brand", "airline", "hotel chain"],
+    "seller": ["seller", "vendor", "provider", "company", "brand"],
     "status": ["status", "stops", "direct", "stop", "class", "type", "category"],
 }
 
@@ -96,8 +96,7 @@ def parse_user_intent(query: str) -> IntentSchema:
 def _detect_entity_hint(query_lower: str) -> str:
     """Detect weak entity hint for metadata only, NOT core logic."""
     entity_patterns = {
-        "flight": ["flight", "flights", "airline", "airport", "airfare"],
-        "hotel": ["hotel", "hotels", "resort", "stay", "accommodation", "inn", "lodge"],
+        "travel": ["flight", "flights", "airline", "airport", "hotel", "hotels", "resort", "stay", "accommodation"],
         "product": ["product", "products", "item", "items", "buy", "purchase", "shopping"],
         "job": ["job", "jobs", "vacancy", "vacancies", "career", "hiring", "employment"],
         "restaurant": ["restaurant", "restaurants", "food", "dining", "eat"],

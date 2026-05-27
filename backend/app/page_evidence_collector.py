@@ -133,7 +133,6 @@ PATTERN_DEFINITIONS: list[tuple[str, re.Pattern]] = [
     ("url", re.compile(r'https?://[^\s<>"\'\]\)]+')),
     ("rating", re.compile(r'(?:rating|score|stars?)\s*:?\s*\d+(?:\.\d+)?(?:\s*\/\s*\d+)?', re.I)),
     ("location_code", re.compile(r'\b[A-Z]{3}\b')),  # 3-letter codes like MIA, JFK
-    ("airline_code", re.compile(r'\b[A-Z]{2}\d{3,4}\b')),  # Flight numbers like AA1234
 ]
 
 # Repeated structure detection
@@ -552,7 +551,7 @@ def _score_container(element: Tag, selector: str, siblings: list[Tag]) -> Candid
     has_time = bool(re.search(r'\d{1,2}:\d{2}\s*(?:am|pm)?', text, re.I))
     has_currency = bool(re.search(r'[\$\€\£\¥\₹]', text))
     has_location = bool(re.search(r'\b[A-Z]{3}\b', text) and len(text) > 20)  # 3-letter codes with enough context
-    has_organization = bool(re.search(r'(?:inc\.?|llc|ltd\.?|corp\.?|co\.?|airlines?|airways?|hotel|resort|hospital|university|school)\b', text, re.I))
+    has_organization = bool(re.search(r'(?:inc\.?|llc|ltd\.?|corp\.?|co\.?|hospital|university|school)\b', text, re.I))
     has_contact = bool(re.search(r'[\w.+-]+@[\w-]+\.[\w.-]+|\+?\d{7,}', text))
     has_link = bool(element.find("a"))
     has_button = bool(element.find(["button", "input[type=submit]"]))
@@ -562,9 +561,9 @@ def _score_container(element: Tag, selector: str, siblings: list[Tag]) -> Candid
     # Text density (chars per descendant)
     text_density = text_len / max(1, len(descendants))
 
-    # Detect internal segments (like outbound/return)
+    # Detect internal segments (compound records with sub-sections)
     internal_segments = 0
-    for sep in ["Departure", "Return", "Outbound", "Inbound", "Leg 1", "Leg 2", "Segment"]:
+    for sep in ["Segment", "Section", "Part", "Item"]:
         if sep.lower() in text.lower():
             internal_segments += 1
 
