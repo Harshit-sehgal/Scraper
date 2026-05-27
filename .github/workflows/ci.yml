@@ -159,12 +159,21 @@ jobs:
       - name: Install Playwright browsers
         run: |
           python -m playwright install --with-deps chromium
+      - name: Verify test collection
+        working-directory: backend
+        run: |
+          echo "=== Collect-only: verifying test discovery ==="
+          PYTHONPATH=. python -m pytest --collect-only -q -o "addopts=" -k "not postgres and not test_profile_alignment_e2e" 2>&1 || \
+            (echo "❌ Test collection FAILED" && exit 1)
+
       - name: Test with pytest
         working-directory: backend
         run: |
+          echo "=== Running pytest with coverage ==="
           # Skip Postgres tests (need --run-postgres + Docker) and
           # live-LLM E2E tests (need RUN_LIVE_LLM_TESTS=1 + Groq API key)
-          PYTHONPATH=. python -m pytest -q -o "addopts=" -k "not postgres and not test_profile_alignment_e2e" --cov=app --cov-fail-under=70
+          PYTHONPATH=. python -m pytest -v -o "addopts=" -k "not postgres and not test_profile_alignment_e2e" --cov=app --cov-fail-under=70 2>&1
+          echo "=== pytest completed ==="
 
   docker-build:
     runs-on: ubuntu-latest
