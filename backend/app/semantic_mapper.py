@@ -87,7 +87,7 @@ for stype, patterns in _SEMANTIC_PATTERNS_RAW.items():
 # Pre-compile common regex patterns used in detect_semantic_type
 _DIGIT_PATTERN = re.compile(r"\d+")
 _NUMERIC_PATTERN = re.compile(r"^\d+\.?\d*$")
-_QUANTIFIER_PATTERN = re.compile(r"\d+\s*(stop|direct|non.?stop)", re.IGNORECASE)
+# (quantifier pattern removed — now handled by NUMBER type detection)
 
 
 @lru_cache(maxsize=4096)
@@ -102,10 +102,6 @@ def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType
 
     # 1. Field-name hinting (higher priority for disambiguation)
     name_lower = (field_name or "").lower()
-    if any(k in name_lower for k in ("airport", "iata", "icao")):
-        for pattern, _ in SEMANTIC_PATTERNS.get(SemanticType.CODE, []):
-            if pattern.search(str(value).strip()):
-                return SemanticType.CODE, 0.95
 
     # 2. Pattern-based matching (universal physics) - using pre-compiled patterns
     for stype, compiled_patterns in SEMANTIC_PATTERNS.items():
@@ -121,10 +117,6 @@ def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType
             return SemanticType.PRICE, 0.80
         if any(k in name_lower for k in ["date", "time", "start", "end", "schedule"]):
             return SemanticType.DATE, 0.80
-        
-        # Numeric with quantifier
-        if _QUANTIFIER_PATTERN.search(str(value)):
-            return SemanticType.NUMBER, 0.70
         
         # Generic number
         if _NUMERIC_PATTERN.match(str(value).strip()):

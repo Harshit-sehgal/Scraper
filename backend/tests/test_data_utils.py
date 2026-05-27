@@ -242,7 +242,7 @@ class TestAlignProfileKeysToSchema:
 
     def test_synonym_group_mapping(self):
         from app.data_utils import align_profile_keys_to_schema
-        records = [{"fare": "250"}]
+        records = [{"fee": "250"}]
         schema = [
             SchemaField(name="ticket_price", field_type=FieldType.CURRENCY, description="", required=False),
         ]
@@ -300,13 +300,13 @@ class TestAlignProfileKeysToSchema:
 
     def test_intent_boost_mapping(self):
         from app.data_utils import align_extracted_keys_to_schema
-        records = [{"fare": "250"}]
+        records = [{"fee": "250"}]
         schema = [
             SchemaField(name="ticket_price", field_type=FieldType.CURRENCY, description="", required=False)]
         aligned = align_extracted_keys_to_schema(
             records,
             schema,
-            user_intent="find cheap fares and ticket prices",
+            user_intent="find cheap fees and ticket prices",
         )
         assert aligned[0]["ticket_price"] == "250"
 

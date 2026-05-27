@@ -58,9 +58,8 @@ class URLPreviewRequest(BaseModel):
         default=None,
         description=(
             "Optional search parameters to submit to the site's search form if "
-            "the URL has expired (e.g. expired session token). Keys are semantic: "
-            "origin, destination, departure_date, return_date, adults, children. "
-            "Values are the search values (e.g. 'NYC', 'LHR', '05/15/2026')."
+            "the URL has expired (e.g. expired session token). Keys are semantic field names "
+            "and values are the search values (e.g. 'location', 'date', 'query')."
         ),
     )
     acquisition_mode: AcquisitionMode = Field(

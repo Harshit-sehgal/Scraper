@@ -44,7 +44,6 @@ class ValuePatterns:
     quantities: List[str] = field(default_factory=list)  # ["Pack of 6", "12 pieces", "500ml"]
     product_codes: List[str] = field(default_factory=list)  # ["SKU-12345", "#ABC123", "EAN 123456789"]
     units: List[str] = field(default_factory=list)  # ["per kg", "per item", "each", "dozen"]
-    airport_codes: List[str] = field(default_factory=list)  # ["LHR", "JFK", "DXB", "SFO"]
     address_fragments: List[str] = field(default_factory=list)  # ["123 Main St", "New York, NY"]
 
 
@@ -125,11 +124,7 @@ VALUE_PATTERNS = {
         r"per\s*(?:kg|g|lb|piece|item|unit|dozen|litre|ml|pack|box|serving)",  # per kg, per piece
         r"(?:each|per\s*kg|per\s*g|per\s*lb|/\s*kg|/\s*piece|/\s*item)",  # each, /kg
         r"\b(?:dozen|pack|box|carton|case|bundle|pair|set)\b",
-    ],
-    "airport_code": [
-        r"\b[A-Z]{3}\b",  # 3-letter codes like MIA, JFK, LHR
-    ],
-    "address": [
+    ],    "address": [
         r"\d+\s+[A-Za-z]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Drive|Dr|Boulevard|Blvd|Way|Circle|Cir|Court|Ct|Plaza|Square)",  # 123 Main St
         r"[A-Za-z ,]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln)\s+\d+",
         r"\b(?:P\.?\s*O\.?\s*Box)\s+\d+",
@@ -397,7 +392,6 @@ def detect_value_patterns(html: str) -> ValuePatterns:
         "quantity": "quantities",
         "product_code": "product_codes",
         "unit_type": "units",
-        "airport_code": "airport_codes",
         "address": "address_fragments",
     }
 
@@ -414,7 +408,7 @@ def detect_value_patterns(html: str) -> ValuePatterns:
         unique = list(set(samples))
 
         # Special handling for 3-letter codes (filter common words)
-        if pattern_type in ("code_3letter", "airport_code"):
+        if pattern_type == "code_3letter":
             unique = [s for s in unique if s.upper() not in COMMON_3LETTER_WORDS]
 
         setattr(patterns, attr_name, unique[:10])

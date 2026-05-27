@@ -52,7 +52,7 @@ class RegionType(Enum):
     PRICE_REGION = "price_region"       # Price-related tokens
     DATE_REGION = "date_region"         # Date/time-related tokens
     LOCATION_REGION = "location_region" # Location identifiers (codes, names)
-    QUANTIFIER = "quantifier"           # Numeric modifiers (count, quantity, stops)
+    QUANTIFIER = "quantifier"           # Numeric modifiers (count, quantity)
     DESCRIPTOR = "descriptor"           # Descriptive/adjective text
     IDENTIFIER_REGION = "identifier_region"  # Codes, SKUs, IDs
     RATING_REGION = "rating_region"     # Rating/score tokens
@@ -307,7 +307,7 @@ class SemanticRole:
     Roles compete globally - each candidate can fill at most one role,
     and each role can be filled by at most one candidate.
     """
-    role_name: str           # "origin", "destination", "price", "date", "name", "stops"
+    role_name: str           # "price", "date", "name", "location", "code"
     field_type: SemanticType # Expected type for this role
     required: bool = False
     exclusivity: float = 1.0  # How exclusive this role is (1.0 = strictly one candidate)

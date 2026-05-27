@@ -27,10 +27,10 @@ class IntentSchema:
 
 # Universal semantic need mappings (not domain-specific)
 SEMANTIC_NEED_KEYWORDS = {
-    "name": ["name", "title", "title", "entity", "business", "company", "item", "product", "hotel", "flight", "job", "property"],
-    "price": ["price", "fare", "cost", "amount", "rate", "fee", "rent", "sale", "budget", "cheap", "expensive", "under", "above"],
-    "date": ["date", "departure", "arrival", "return", "when", "check-in", "check-out", "schedule", "timing", "time"],
-    "duration": ["duration", "hours", "time", "takes", "travel time", "flight time"],
+    "name": ["name", "title", "entity", "business", "company", "item", "product", "job", "property"],
+    "price": ["price", "cost", "amount", "rate", "fee", "rent", "sale", "budget", "cheap", "expensive", "under", "above"],
+    "date": ["date", "when", "schedule", "timing", "time"],
+    "duration": ["duration", "hours", "time", "takes"],
     "rating": ["rating", "stars", "review", "score", "feedback", "rank", "out of"],
     "location": ["location", "address", "place", "area", "city", "near", "around", "from", "to", "destination", "origin"],
     "phone": ["phone", "contact", "call", "mobile", "tel"],
@@ -40,7 +40,7 @@ SEMANTIC_NEED_KEYWORDS = {
     "availability": ["available", "stock", "in stock", "slots", "open", "vacancy"],
     "size": ["size", "sqft", "sq ft", "bedroom", "bathroom", "area", "capacity"],
     "seller": ["seller", "vendor", "provider", "company", "brand"],
-    "status": ["status", "stops", "direct", "stop", "class", "type", "category"],
+    "status": ["status", "class", "type", "category"],
 }
 
 # Map semantic needs to field types
@@ -96,7 +96,7 @@ def parse_user_intent(query: str) -> IntentSchema:
 def _detect_entity_hint(query_lower: str) -> str:
     """Detect weak entity hint for metadata only, NOT core logic."""
     entity_patterns = {
-        "travel": ["flight", "flights", "airline", "airport", "hotel", "hotels", "resort", "stay", "accommodation"],
+        "travel": ["travel", "trip", "transport", "accommodation"],
         "product": ["product", "products", "item", "items", "buy", "purchase", "shopping"],
         "job": ["job", "jobs", "vacancy", "vacancies", "career", "hiring", "employment"],
         "restaurant": ["restaurant", "restaurants", "food", "dining", "eat"],
