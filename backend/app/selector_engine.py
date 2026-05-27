@@ -355,8 +355,11 @@ def _read_node_value(target, field_type: FieldType | None = None, field_name: st
         if title_clean:
             if text_val.endswith("...") or text_val.endswith("…"):
                 use_title = True
-            elif field_type in (None, FieldType.STRING) and len(title_clean) > len(text_val):
-                # For generic string fields, prefer the title attribute if it's longer
+            elif (
+                (field_type in (None, FieldType.STRING) or any(k in field_name.lower() for k in ["title", "name", "company", "product"]))
+                and len(title_clean) > len(text_val)
+            ):
+                # Prefer title attribute if it's longer
                 use_title = True
     if use_title and title_val:
         return title_val.strip()

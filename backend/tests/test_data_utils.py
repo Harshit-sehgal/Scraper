@@ -293,8 +293,7 @@ class TestAlignProfileKeysToSchema:
             SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure", required=False),
             SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival", required=False),
         ]
-        aligned = align_profile_keys_to_schema(records, schema, profile_fields={"return_date": {"type": "text"}, "date": {"type": "text"}}
-        )
+        aligned = align_profile_keys_to_schema(records, schema, profile_fields={"return_date": {"type": "text"}, "date": {"type": "text"}})
         assert aligned[0]["departure_date"] == "30-05-2026"
         assert aligned[0]["arrival_date"] == "01-06-2026"
 

@@ -7,7 +7,6 @@ CI skips these tests by default. Run manually with:
 from __future__ import annotations
 
 import os
-
 import pytest
 
 from app.data_utils import align_profile_keys_to_schema
