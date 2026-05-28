@@ -267,8 +267,16 @@ def check_db_password(value: str) -> bool:
 
 
 
-def check_api_key_not_default(value: str) -> bool:
-    """Validate an API key is not a default/placeholder value."""
+def _check_api_key_not_default(name: str, value: str) -> bool:
+    """Validate an API key is not a default/placeholder value.
+
+    Args:
+        name: The env var name (for error messages).
+        value: The key value to validate.
+
+    Returns:
+        True if valid, False otherwise.
+    """
     default_values = {
         "change-me",
         "change-me-to-a-random-secret",
@@ -282,14 +290,14 @@ def check_api_key_not_default(value: str) -> bool:
     }
     if value.lower() in default_values:
         print(
-            f"  [FAIL]  (name)={_mask_value('(name)', value)} "
+            f"  [FAIL]  {name}={_mask_value(name, value)} "
             "is a known default/placeholder value. "
             "Generate a strong random key with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
         )
         return False
     if len(value) < 16:
         print(
-            f"  [FAIL]  (name) is too short ({len(value)} chars). "
+            f"  [FAIL]  {name} is too short ({len(value)} chars). "
             "Must be at least 16 characters."
         )
         return False
@@ -336,9 +344,9 @@ def main() -> int:
         ("DATAFORGE_ENV", True, check_env,
          "Must be set to 'production'"),
         ("DATAFORGE_OPERATOR_API_KEY", True, lambda v: _check_api_key_not_default("DATAFORGE_OPERATOR_API_KEY", v),
-         "Operator key for job/selector mutations. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))""),
+         'Operator key for job/selector mutations. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"'),
         ("DATAFORGE_ADMIN_API_KEY", True, lambda v: _check_api_key_not_default("DATAFORGE_ADMIN_API_KEY", v),
-         "Admin key for system-level operations. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))""),
+         'Admin key for system-level operations. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"'),
         ("GRAFANA_PASSWORD", True, check_grafana_password,
          "Set a strong Grafana admin password (reject: admin, password, grafana, change-me)"),
     ]
