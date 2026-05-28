@@ -1085,7 +1085,6 @@ async def analyze_url(req: URLPreviewRequest, _role: UserRole = Depends(require_
         anti_bot_score: Likelihood the page has anti-bot protection
         suggested_fields: List of detected fields with name, type, selector, example, confidence
     """
-    from app.selector_discovery import analyze_url_for_fields
     from app.url_safety import validate_public_http_url
     
     try:
@@ -1105,35 +1104,19 @@ async def analyze_url(req: URLPreviewRequest, _role: UserRole = Depends(require_
             }
         )
 
-    URL_ANALYZER_TIMEOUT = settings.URL_ANALYZER_TIMEOUT
-    
-    try:
-        result = await asyncio.wait_for(
-            analyze_url_for_fields(url=req.url, search_params=req.search_params, acquisition_mode=req.acquisition_mode),
-            timeout=URL_ANALYZER_TIMEOUT,
-        )
-    except asyncio.TimeoutError:
-        logger.warning("[URLAnalyzer] Timeout after %ds analyzing %s", URL_ANALYZER_TIMEOUT, req.url)
-        return JSONResponse(
-            status_code=408,
-            content={
-                "url": req.url,
-                "error": f"Analysis timed out after {URL_ANALYZER_TIMEOUT} seconds. The page may be too slow, heavy, or protected by anti-bot measures.",
-                "redirect_info": None,
-                "content_quality": None,
-                "page_structure": "unknown",
-                "structure_confidence": 0.0,
-                "estimated_record_count": 0,
-                "item_container": None,
-                "suggested_fields": [],
-                "anti_bot_score": 0.0,
-            },
-        )
-    
-    if "error" in result and result["error"]:
-        return JSONResponse(status_code=422, content=result)
-    
-    return result
+    # URL Analyzer has been deprecated in favor of Direct LLM extraction.
+    # We return a stub response to keep frontend API compatibility.
+    return {
+        "url": req.url,
+        "page_structure": "unknown",
+        "structure_confidence": 1.0,
+        "estimated_record_count": 0,
+        "item_container": "",
+        "fetch_method": "direct_llm",
+        "fetch_time_ms": 0,
+        "anti_bot_score": 0.0,
+        "suggested_fields": []
+    }
 
 
 # ─── Prometheus /metrics endpoint ───────────────────────────────────────

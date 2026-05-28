@@ -47,11 +47,7 @@ echo ""
 # 4. Pytest
 echo "[4/5] Pytest (full suite)"
 set +e
-PYTHONPATH="$BACKEND_DIR" python3 -m pytest "$BACKEND_DIR/tests" -q --tb=line \
-    --ignore="$BACKEND_DIR/tests/test_profile_alignment_e2e.py" \
-    --ignore="$BACKEND_DIR/tests/test_job_api_e2e.py" \
-    --ignore="$BACKEND_DIR/tests/test_session_bound_e2e.py" \
-    --ignore="$BACKEND_DIR/tests/test_playwright_browser_e2e.py" 2>&1 | tail -5
+PYTHONPATH="$BACKEND_DIR" python3 -m pytest "$BACKEND_DIR/tests" -q --tb=line 2>&1 | tail -5
 PYTEST_EXIT=$?
 set -e
 if [ $PYTEST_EXIT -eq 0 ]; then

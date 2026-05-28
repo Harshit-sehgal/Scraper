@@ -106,7 +106,8 @@ class GlobalCognitiveScheduler:
                             severity="warning",
                             cause=f"Task [{task.task_id}] failed: {e}",
                         )
-                except Exception:
+                except Exception as e:
+                    logging.getLogger(__name__).warning("Suppressed exception: %s", e)
                     pass
 
             duration = time.time() - t0

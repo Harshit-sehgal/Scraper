@@ -120,6 +120,7 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
 
     # Enable worker queue
     monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
+    monkeypatch.setattr(settings, "WORKER_QUEUE", True)
 
     # 2. Configure temp state databases
     from app.job_store import reset_job_store_for_tests

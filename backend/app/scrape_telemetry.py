@@ -82,7 +82,8 @@ class ScrapeTelemetryCollector:
         try:
             from app.domain_intelligence import get_domain_intelligence
             get_domain_intelligence().update_from_telemetry(telemetry.to_dict())
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
             pass
 
         # Emit to semantic world state observability if available
@@ -109,7 +110,8 @@ class ScrapeTelemetryCollector:
                 "anti_bot": telemetry.anti_bot_score,
                 "retries": telemetry.retry_count,
             })
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
             pass
 
         return telemetry

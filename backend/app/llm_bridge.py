@@ -97,7 +97,10 @@ async def _call_openai_compatible_json(
                 content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
                 return _extract_json_payload(content)
         except Exception as error:
-            logging.exception(error)
+            if isinstance(error, httpx.HTTPError):
+                logging.error("HTTP error during LLM call: %s", error)
+            else:
+                logging.exception(error)
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
@@ -142,7 +145,10 @@ async def _call_openai_compatible_text(
                 data = response.json()
                 return ((data.get("choices") or [{}])[0].get("message", {}).get("content", "") or "").strip()
         except Exception as error:
-            logging.exception(error)
+            if isinstance(error, httpx.HTTPError):
+                logging.error("HTTP error during LLM text call: %s", error)
+            else:
+                logging.exception(error)
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
@@ -187,7 +193,8 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
     try:
         from app.metrics_collector import record_llm_call
         record_llm_call()
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
         pass
     if temperature is None:
         temperature = settings.LLM_TEMPERATURE
@@ -266,7 +273,8 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
     try:
         from app.metrics_collector import record_llm_call
         record_llm_call()
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
         pass
     if temperature is None:
         temperature = settings.LLM_FAST_TEMPERATURE
@@ -322,7 +330,8 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
     try:
         from app.metrics_collector import record_llm_call
         record_llm_call()
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
         pass
     if temperature is None:
         temperature = settings.LLM_TEXT_TEMPERATURE

@@ -226,7 +226,8 @@ class ProvenanceBuilder:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
             return "unknown"
 
 

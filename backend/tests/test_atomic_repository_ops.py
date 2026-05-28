@@ -3,8 +3,12 @@ from app.models import Job, JobStatus
 from app.storage_interface import SQLiteJobRepository
 
 @pytest.fixture(autouse=True)
-def clean_job_store():
+def clean_job_store(tmp_path, monkeypatch):
     from app.job_store import reset_job_store_for_tests, _get_connection, _DB_LOCK
+    from app.config import settings
+    db_file = tmp_path / "test_atomic_jobs.db"
+    monkeypatch.setenv("DATAFORGE_STATE_FILE", str(db_file))
+    monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_file))
     reset_job_store_for_tests()
     with _DB_LOCK:
         conn = _get_connection()

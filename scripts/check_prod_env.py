@@ -182,20 +182,18 @@ def check_queue_backend(value: str) -> bool:
     return True
 
 
+def _contains_bad_substring(value: str) -> bool:
+    """Check if value contains generic placeholder strings."""
+    bad_substrings = ["change-me", "changeme", "secret", "password", "example", "admin", "dev-key", "test-key"]
+    val_lower = value.lower()
+    return any(bad in val_lower for bad in bad_substrings)
+
 def check_grafana_password(value: str) -> bool:
     """Validate GRAFANA_PASSWORD is not a default/placeholder value."""
-    default_values = {
-        "admin",
-        "password",
-        "grafana",
-        "change-me",
-        "change-me-to-a-strong-password",
-        "change-this-to-a-strong-password",
-    }
-    if value.lower() in default_values:
+    if _contains_bad_substring(value) or value.lower() == "grafana":
         print(
             f"  [FAIL]  GRAFANA_PASSWORD={_mask_value('GRAFANA_PASSWORD', value)} "
-            "is a known default/placeholder value. "
+            "contains a placeholder or default value. "
             "Set a strong, unique Grafana admin password."
         )
         return False
@@ -221,16 +219,7 @@ def check_database_url(value: str) -> bool:
     try:
         parsed = urllib.parse.urlparse(value)
         if parsed.password:
-            default_values = {
-                "dataforge",
-                "change-me",
-                "change-me-to-a-strong-password",
-                "change-this-to-a-strong-password",
-                "password",
-                "postgres",
-                "wrong-password",
-            }
-            if parsed.password.lower() in default_values:
+            if _contains_bad_substring(parsed.password) or parsed.password.lower() in {"dataforge", "postgres"}:
                 print(
                     f"  [FAIL]  DATAFORGE_DATABASE_URL contains a placeholder/default password '{parsed.password}'."
                 )
@@ -244,18 +233,10 @@ def check_database_url(value: str) -> bool:
 
 def check_api_key(value: str) -> bool:
     """Validate DATAFORGE_API_KEY is not a default/placeholder value."""
-    default_values = {
-        "change-me",
-        "change-me-to-a-random-secret",
-        "change-this-to-a-strong-password",
-        "dev-key",
-        "test-key",
-        "your-api-key-here",
-    }
-    if value.lower() in default_values:
+    if _contains_bad_substring(value):
         print(
             f"  [FAIL]  DATAFORGE_API_KEY={_mask_value('DATAFORGE_API_KEY', value)} "
-            "is a known default/placeholder value. "
+            "contains a placeholder or default value. "
             "Generate a strong random key with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
         )
         return False
@@ -270,18 +251,10 @@ def check_api_key(value: str) -> bool:
 
 def check_db_password(value: str) -> bool:
     """Validate DATAFORGE_DB_PASSWORD is not a default/placeholder value."""
-    default_values = {
-        "dataforge",
-        "change-me",
-        "change-me-to-a-strong-password",
-        "change-this-to-a-strong-password",
-        "password",
-        "postgres",
-    }
-    if value.lower() in default_values:
+    if _contains_bad_substring(value) or value.lower() in {"dataforge", "postgres"}:
         print(
             f"  [FAIL]  DATAFORGE_DB_PASSWORD={_mask_value('DATAFORGE_DB_PASSWORD', value)} "
-            "is a known default/placeholder value. "
+            "contains a placeholder or default value. "
             "Use a strong, unique password."
         )
         return False
@@ -306,21 +279,10 @@ def _check_api_key_not_default(name: str, value: str) -> bool:
     Returns:
         True if valid, False otherwise.
     """
-    default_values = {
-        "change-me",
-        "change-me-to-a-random-secret",
-        "change-this-to-a-strong-password",
-        "dev-key",
-        "test-key",
-        "your-api-key-here",
-        "change-me-admin-key",
-        "change-me-operator-key",
-        "change-me-user-key",
-    }
-    if value.lower() in default_values:
+    if _contains_bad_substring(value):
         print(
             f"  [FAIL]  {name}={_mask_value(name, value)} "
-            "is a known default/placeholder value. "
+            "contains a placeholder or default value. "
             "Generate a strong random key with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
         )
         return False

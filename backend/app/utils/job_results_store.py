@@ -47,7 +47,8 @@ def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
         if temp_path.exists():
             try:
                 temp_path.unlink()
-            except Exception:
+            except Exception as e:
+                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
                 pass
         raise e
         

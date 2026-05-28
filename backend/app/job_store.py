@@ -466,7 +466,8 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
                 ws_path = _get_db_path().parent / "world_state.json"
                 if ws_path.exists():
                     world_state_data = json.loads(ws_path.read_text())
-            except Exception:
+            except Exception as e:
+                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
                 pass
 
             return jobs_store, recycle_bin_store, world_state_data

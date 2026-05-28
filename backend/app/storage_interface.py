@@ -155,7 +155,8 @@ class SQLiteJobRepository(JobRepository):
         if ws_path.exists():
             try:
                 return json.loads(ws_path.read_text())
-            except Exception:
+            except Exception as e:
+                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
                 return None
         return None
 
@@ -361,6 +362,7 @@ def reset_repository():
             try:
                 from app.postgres_repository import shutdown_postgres
                 shutdown_postgres()
-            except Exception:
+            except Exception as e:
+                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
                 pass
     _repository_instance = None

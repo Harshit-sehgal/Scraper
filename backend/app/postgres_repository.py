@@ -103,7 +103,8 @@ def _conn() -> Iterator[psycopg2.extensions.connection]:
         try:
             from app.metrics_collector import record_error
             record_error("database")
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
             pass
         raise
     finally:

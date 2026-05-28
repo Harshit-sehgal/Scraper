@@ -373,7 +373,8 @@ def extract_from_network_payloads(
                 payload = json.loads(raw)
             else:
                 payload = raw
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
             continue
 
         candidates = find_record_arrays(payload)

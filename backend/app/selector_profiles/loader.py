@@ -296,12 +296,14 @@ async def extract_with_profile(
         if context is not None:
             try:
                 await context.close()
-            except Exception:
+            except Exception as e:
+                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
                 pass
         if browser is not None:
             try:
                 await browser.close()
-            except Exception:
+            except Exception as e:
+                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
                 pass
 
 

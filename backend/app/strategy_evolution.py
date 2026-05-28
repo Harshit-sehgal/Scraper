@@ -326,7 +326,8 @@ class StrategyEvolutionEngine:
                         confidence=0.7,
                         estimated_success_rate=0.5,
                     )
-            except Exception:
+            except Exception as e:
+                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
                 pass
                 
             return StrategyRecommendation(
@@ -348,7 +349,8 @@ class StrategyEvolutionEngine:
                     confidence=0.8,
                     estimated_success_rate=0.6,
                 )
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
             pass
         
         best_strategy = state.get_best_strategy()

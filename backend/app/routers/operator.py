@@ -43,7 +43,7 @@ class ModeBody(BaseModel):
 
 
 @router.get("/mode")
-async def get_current_mode():
+async def get_current_mode(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Get the current operator mode and its configuration.
 
     Returns the active operator profile and the corresponding
@@ -109,7 +109,7 @@ async def set_operator_mode(request: Request, body: ModeBody, _role: UserRole = 
 
 
 @router.get("/dashboard")
-async def get_system_dashboard():
+async def get_system_dashboard(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Get the complete system governance dashboard.
 
     Returns a consolidated view of:
@@ -172,6 +172,7 @@ async def get_system_dashboard():
 async def get_degradation_predictions(
     window: int = Query(100, ge=10, le=500),
     min_confidence: float = Query(0.0, ge=0.0, le=1.0),
+    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
 ):
     """Get degradation predictions for all domains.
 
@@ -233,6 +234,7 @@ async def get_degradation_predictions(
 async def get_domain_prediction(
     domain: str,
     window: int = Query(100, ge=10, le=500),
+    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
 ):
     """Get degradation predictions for a specific domain.
 
@@ -284,7 +286,7 @@ async def get_domain_prediction(
 
 
 @router.get("/health")
-async def get_operator_health_summary():
+async def get_operator_health_summary(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Get a lightweight system health overview for the dashboard.
 
     Returns essential health indicators at a glance.

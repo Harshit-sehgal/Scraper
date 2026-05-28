@@ -478,39 +478,10 @@ async def scrape_url(
             from app.session_url_detector import detect_session_params
             session_detect = detect_session_params(url)
             if session_detect.get("is_session_bound"):
-                logger.info(
-                    "[SessionRecovery] URL %s is session-bound — checking for search form",
+                logger.warning(
+                    "[SessionRecovery] URL %s is session-bound. Form recovery is deprecated.",
                     url,
                 )
-                from app.selector_discovery import _detect_search_form, _try_form_search_recovery
-                form_info = _detect_search_form(html)
-                if form_info.get("detected"):
-                    logger.info(
-                        "[SessionRecovery] Search form detected at '%s' — attempting recovery",
-                        form_info.get("action", ""),
-                    )
-                    recovery_result = await _try_form_search_recovery(
-                        landing_page_html=html,
-                        landing_page_url=url,
-                        search_params=search_params,
-                    )
-                    if recovery_result.get("success") and recovery_result.get("fresh_html"):
-                        recovered_html = recovery_result["fresh_html"]
-                        html = recovered_html
-                        logger.info(
-                            "[SessionRecovery] Recovery succeeded — using fresh session page: %s",
-                            recovery_result.get("fresh_url", url),
-                        )
-                    else:
-                        logger.warning(
-                            "[SessionRecovery] Recovery failed for %s: %s",
-                            url, recovery_result.get("error", "unknown"),
-                        )
-                else:
-                    logger.info(
-                        "[SessionRecovery] No search form detected on %s — proceeding with original HTML",
-                        url,
-                    )
         except Exception as recovery_err:
             logger.warning(
                 "[SessionRecovery] Recovery attempt failed for %s: %s",
@@ -526,7 +497,8 @@ async def scrape_url(
                     "page may be stale",
                     url,
                 )
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
             pass
 
     anti_bot = detect_anti_bot(html)
@@ -543,7 +515,8 @@ async def scrape_url(
     if world_state and hasattr(world_state, 'solidified_motifs'):
         try:
             solidified_motifs_count = len(world_state.solidified_motifs)
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
             pass
 
     result_warnings: list[str] = []

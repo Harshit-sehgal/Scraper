@@ -50,7 +50,8 @@ async def run_job(
         """Check the persistent store for a cross-process cancellation signal."""
         try:
             return get_job_repository().is_cancel_requested(job_id)
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
             return False
 
     # Optimize persistence: use single-row updates for job-local saves

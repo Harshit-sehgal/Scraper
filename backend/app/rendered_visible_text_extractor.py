@@ -127,7 +127,8 @@ async def capture_bounding_boxes(page) -> list[dict]:
             return results;
         }""")
         return boxes if isinstance(boxes, list) else []
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
         return []
 
 

@@ -276,6 +276,7 @@ def test_enqueue_failure_rollback_in_production(client, monkeypatch):
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "test-key")
     # Make the create_job endpoint enter the worker queue branch
     monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "1")
+    monkeypatch.setattr(settings, "WORKER_QUEUE", True)
     # Patch get_worker_queue to return a broken queue
     class BrokenQueue:
         async def enqueue(self, **kwargs):

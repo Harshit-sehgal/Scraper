@@ -228,7 +228,8 @@ def _ensure_schema(db_path: Optional[Path] = None):
                     # Add result column to task_history (used for storing successful task results)
                     try:
                         conn.execute("ALTER TABLE task_history ADD COLUMN result TEXT")
-                    except Exception:
+                    except Exception as e:
+                        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
                         pass
                     current = 2
 
@@ -463,7 +464,8 @@ class WorkerQueue:
                         try:
                             from app.metrics_collector import record_worker_failure
                             record_worker_failure(actual_type)
-                        except Exception:
+                        except Exception as e:
+                            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
                             pass
                         conn.execute(
                             """INSERT OR REPLACE INTO task_history
@@ -697,7 +699,8 @@ class WorkerQueue:
                             "Task %s cooling down %.1fs for %s",
                             task.id, cooldown, task.type,
                         )
-            except Exception:
+            except Exception as e:
+                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
                 pass
             await self.fail(task.id, error_msg, retry=True, retry_after=retry_after, task_type=task.type)
 

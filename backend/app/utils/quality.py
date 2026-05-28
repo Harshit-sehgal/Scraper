@@ -1,6 +1,7 @@
 from typing import Any
 import re
 from statistics import mean
+import logging
 from app.models import SchemaField, FieldType
 from app.config import settings
 
@@ -30,7 +31,8 @@ def compute_source_breakdown(results: list[dict]) -> dict:
 def safe_score(value: Any) -> float:
     try:
         return float(value)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
         return 0.0
 
 def _value_quality(field: SchemaField, value) -> float:

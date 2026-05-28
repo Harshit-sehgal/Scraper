@@ -220,14 +220,16 @@ class CrawlPolicyEngine:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
             return None
 
     @staticmethod
     def _extract_path(url: str) -> str:
         try:
             return urlparse(url).path or "/"
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
             return "/"
 
     async def _check_robots_txt(self, domain: str) -> None:

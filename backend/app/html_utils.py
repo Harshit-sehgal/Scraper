@@ -417,7 +417,8 @@ async def fetch_page_content(
                 for sel in loading_selectors:
                     try:
                         await page.wait_for_selector(sel, state="hidden", timeout=2000)
-                    except Exception:
+                    except Exception as e:
+                        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
                         pass
 
             # Adaptive post-network buffer: check DOM stabilization
@@ -504,7 +505,7 @@ async def fetch_page_content(
                 "[Scraper] %s slow load for %s: %s. Falling to domcontentloaded",
                 strategy.value, url, e,
             )
-            await page.wait_for_load_state("domcontentloaded")
+            await page.wait_for_load_state("domcontentloaded", timeout=5000)
             # Reduced fallback wait: 2s instead of 5s — JS has already had time to start
             await asyncio.sleep(min(settings.PAGE_FALLBACK_EXTRA_WAIT, 2.0))
 

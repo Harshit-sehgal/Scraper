@@ -158,41 +158,14 @@ class BrowserPool:
             
             # Phase 80: Advanced Stealth Evasion
             if settings.PLAYWRIGHT_STEALTH or is_stealth:
-                # Basic stealth
-                _nav_langs = settings.STEALTH_NAVIGATOR_LANGUAGES.split(",")
-                stealth_js = f"""
-                Object.defineProperty(navigator, 'webdriver', {{get: () => undefined}});
-                window.chrome = {{ runtime: {{}} }};
-                Object.defineProperty(navigator, 'plugins', {{get: () => [1, 2, 3, 4, 5]}});
-                Object.defineProperty(navigator, 'languages', {{get: () => {_nav_langs}}});
-                """
-                await context.add_init_script(stealth_js)
-                
-                if is_stealth:
-                    # Advanced fingerprint randomization
-                    advanced_stealth = f"""
-                    // WebGL spoofing
-                    const getParameter = WebGLRenderingContext.prototype.getParameter;
-                    WebGLRenderingContext.prototype.getParameter = function(parameter) {{
-                        if (parameter === 37445) return 'Intel Open Source Technology Center';
-                        if (parameter === 37446) return 'Mesa DRI Intel(R) Ivybridge Mobile ';
-                        return getParameter.apply(this, arguments);
-                    }};
-                    
-                    // Hardware concurrency randomization
-                    Object.defineProperty(navigator, 'hardwareConcurrency', {{get: () => {settings.STEALTH_HARDWARE_CONCURRENCY}}});
-                    
-                    // Battery status spoofing
-                    if (navigator.getBattery) {{
-                        navigator.getBattery = () => Promise.resolve({{
-                            charging: true,
-                            chargingTime: 0,
-                            dischargingTime: Infinity,
-                            level: 1
-                        }});
-                    }}
-                    """
-                    await context.add_init_script(advanced_stealth)
+                try:
+                    from playwright_stealth.stealth import Stealth
+                    await Stealth().apply_stealth_async(context)
+                    logger.debug("[BrowserPool] Applied playwright-stealth to context")
+                except ImportError:
+                    logger.warning("[BrowserPool] playwright-stealth not installed, skipping advanced stealth")
+                except Exception as e:
+                    logger.warning("[BrowserPool] Failed to apply playwright-stealth: %s", e)
                 
             self._contexts[context_key] = context
             self._context_use_count[context_key] = 1

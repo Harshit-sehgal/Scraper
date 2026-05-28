@@ -33,7 +33,7 @@ def _load_fixture(name: str) -> str:
 
 
 @pytest.mark.asyncio
-async def test_deterministic_benchmark_run():
+async def test_deterministic_benchmark_run(monkeypatch):
     """Execute the extraction benchmark suite and verify target performance metrics."""
     metrics = {
         "success_rate": 0.0,
@@ -140,28 +140,19 @@ async def test_deterministic_benchmark_run():
     telemetry = get_scrape_telemetry()
 
     # Save original references to restore after test
-    import app.scraper_recovery_integration
-    orig_attempt = app.scraper_recovery_integration.scrape_url_attempt
-    orig_get_last = telemetry.get_last_for_url
+    monkeypatch.setattr("app.scraper.scrape_url_attempt", mock_scrape_url_attempt)
+    monkeypatch.setattr(telemetry, "get_last_for_url", lambda url: None)
 
-    app.scraper_recovery_integration.scrape_url_attempt = mock_scrape_url_attempt
-    telemetry.get_last_for_url = lambda url: None
-
-    try:
-        results, recovery_stats = await scrape_url_with_recovery(
-            url="https://example.com/item",
-            schema_fields=[_schema_field("title"), _schema_field("price")],
-            max_recovery_attempts=3
-        )
-        assert recovery_stats["success"] is True
-        assert recovery_stats["attempts"] == 2
-        assert len(results) == 1
-        assert results[0]["title"] == "Recovered Product Title"
-        metrics["recovery_success_rate"] = 1.0 if recovery_stats["success"] else 0.0
-    finally:
-        # Restore original functions
-        app.scraper_recovery_integration.scrape_url_attempt = orig_attempt
-        telemetry.get_last_for_url = orig_get_last
+    results, recovery_stats = await scrape_url_with_recovery(
+        url="https://example.com/item",
+        schema_fields=[_schema_field("title"), _schema_field("price")],
+        max_recovery_attempts=3
+    )
+    assert recovery_stats["success"] is True
+    assert recovery_stats["attempts"] == 2
+    assert len(results) == 1
+    assert results[0]["title"] == "Recovered Product Title"
+    metrics["recovery_success_rate"] = 1.0 if recovery_stats["success"] else 0.0
 
     # 4. Cancellation Response Time
     # We test how fast the runner checks and respects cancel_requested flags
