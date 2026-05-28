@@ -1347,7 +1347,7 @@ async function analyzeURL() {
                 const example = f.example_value ? String(f.example_value).slice(0, 60) : '';
                 const typeLabel = f.type || 'string';
                 return `
-                    <div class="analyze-field-item selected" data-index="${i}" onclick="this.querySelector('.analyze-field-checkbox').click()">
+                    <div class="analyze-field-item selected" data-index="${i}" data-action="toggle-field-item">
                         <input type="checkbox" class="analyze-field-checkbox" checked data-index="${i}" onchange="toggleField(${i})">
                         <span class="analyze-field-name">${esc(f.name)}</span>
                         <span class="analyze-field-type">${esc(typeLabel)}</span>
@@ -2073,7 +2073,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 30000);
 
     // ── Central event delegation for all inline actions ─────────────
-    // Replaces unsafe inline onclick="fn('${id}')" patterns.
+    // Replaces all unsafe inline onclick="fn(...)" patterns with data-action attributes.
     // Usage in templates: data-action="action-name" data-id="..."
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-action]');
@@ -2121,6 +2121,93 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (msg) toast(msg, 'info');
                 break;
             }
+            case 'show-api-key':
+                showApiKeyPrompt();
+                break;
+            case 'show-admin-key':
+                showAdminKeyPrompt();
+                break;
+            case 'switch-view':
+                {
+                    const view = btn.getAttribute('data-view');
+                    if (view) switchView(view);
+                }
+                break;
+            case 'clear-terminal-jobs':
+                clearTerminalJobs();
+                break;
+            case 'refresh-jobs':
+                refreshJobsManual();
+                break;
+            case 'clear-recycle-bin':
+                clearRecycleBin();
+                break;
+            case 'refresh-dashboard':
+                refreshDashboard();
+                break;
+            case 'switch-operator-mode':
+                {
+                    const mode = btn.getAttribute('data-mode');
+                    if (mode) switchOperatorMode(mode);
+                }
+                break;
+            case 'analyze-url':
+                analyzeURL();
+                break;
+            case 'toggle-all-fields':
+                {
+                    const select = btn.getAttribute('data-select') === 'true';
+                    toggleAllFields(select);
+                }
+                break;
+            case 'apply-fields':
+                applyAnalyzedFields();
+                break;
+            case 'clear-analysis':
+                clearAnalysis();
+                break;
+            case 'set-mode':
+                {
+                    const mode = btn.getAttribute('data-mode');
+                    if (mode) setMode(mode);
+                }
+                break;
+            case 'suggest-schema':
+                suggestSchemaFromIntent();
+                break;
+            case 'preview-discovery':
+                previewDiscovery();
+                break;
+            case 'add-field':
+                addField();
+                break;
+            case 'add-filter':
+                addFilter();
+                break;
+            case 'reclean-job':
+                recleanCurrentJob();
+                break;
+            case 'export-csv':
+                exportCSV();
+                break;
+            case 'export-json':
+                exportJSON();
+                break;
+            case 'export-excel':
+                exportExcel();
+                break;
+            case 'refresh-cognition':
+                refreshCognition();
+                break;
+            case 'toggle-field-item':
+                {
+                    const checkbox = btn.querySelector('.analyze-field-checkbox');
+                    if (checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        btn.classList.toggle('selected', checkbox.checked);
+                    }
+                }
+                break;
         }
         e.stopPropagation();
     });

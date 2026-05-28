@@ -29,8 +29,8 @@
                 </nav>
             </div>
             <div class="topbar-right">
-                            <button class="btn ghost small" onclick="showApiKeyPrompt()" title="Set API key for production access" style="font-size:0.75rem; padding:0.2rem 0.5rem;">🔑 Key</button>
-                            <button class="btn ghost small" onclick="showAdminKeyPrompt()" title="Set admin key for protected actions" style="font-size:0.75rem; padding:0.2rem 0.5rem;">🛡️ Admin</button>
+                            <button class="btn ghost small" data-action="show-api-key" title="Set API key for production access" style="font-size:0.75rem; padding:0.2rem 0.5rem;">🔑 Key</button>
+                            <button class="btn ghost small" data-action="show-admin-key" title="Set admin key for protected actions" style="font-size:0.75rem; padding:0.2rem 0.5rem;">🛡️ Admin</button>
                             <span class="shortcut-hint" title="Keyboard shortcuts">N new • / search • Esc clear</span>
                 <span class="engine-status" id="engine-status"><span class="dot"></span><span id="engine-status-text">Ready</span></span>
             </div>
@@ -46,7 +46,7 @@
                         <h1>Scraping Jobs</h1>
                         <p class="subtle">Manage and track your data extraction tasks</p>
                     </div>
-                    <button class="btn primary" onclick="switchView('new')" id="btn-create-new">Create Job</button>
+                    <button class="btn primary" data-action="switch-view" data-view="new" id="btn-create-new">Create Job</button>
                 </div>
 
                 <div class="jobs-toolbar">
@@ -64,8 +64,8 @@
                     </div>
                     <div class="jobs-toolbar-right">
                         <span class="jobs-last-updated" id="jobs-last-updated">Never updated</span>
-                        <button class="btn ghost small" onclick="clearTerminalJobs()" id="btn-clear-terminal">Clear terminal</button>
-                        <button class="btn ghost small" onclick="refreshJobsManual()" id="btn-refresh-jobs">Refresh</button>
+                        <button class="btn ghost small" data-action="clear-terminal-jobs" id="btn-clear-terminal">Clear terminal</button>
+                        <button class="btn ghost small" data-action="refresh-jobs" id="btn-refresh-jobs">Refresh</button>
                     </div>
                 </div>
 
@@ -105,7 +105,7 @@
                         <h1>Recycle Bin</h1>
                         <p class="subtle">Restore or permanently delete jobs</p>
                     </div>
-                    <button class="btn ghost small" onclick="clearRecycleBin()" id="btn-clear-recycle">Empty Bin</button>
+                    <button class="btn ghost small" data-action="clear-recycle-bin" id="btn-clear-recycle">Empty Bin</button>
                 </div>
 
                 <div class="list-head recycle-list-head">
@@ -134,7 +134,7 @@
                         <p class="subtle">Real-time system health, operator mode, degradation predictions</p>
                     </div>
                     <div style="display:flex; gap:0.5rem;">
-                        <button class="btn primary small" onclick="refreshDashboard()">Refresh ↻</button>
+                        <button class="btn primary small" data-action="refresh-dashboard">Refresh ↻</button>
                     </div>
                 </div>
 
@@ -145,11 +145,11 @@
                         <span class="dash-badge" id="dash-current-mode">loading...</span>
                     </div>
                     <div class="mode-switcher">
-                        <button class="mode-btn" data-mode="production" onclick="switchOperatorMode('production')">Production</button>
-                        <button class="mode-btn" data-mode="benchmark" onclick="switchOperatorMode('benchmark')">Benchmark</button>
-                        <button class="mode-btn" data-mode="forensic" onclick="switchOperatorMode('forensic')">Forensic</button>
-                        <button class="mode-btn" data-mode="stealth" onclick="switchOperatorMode('stealth')">Stealth</button>
-                        <button class="mode-btn" data-mode="low_cost" onclick="switchOperatorMode('low_cost')">Low Cost</button>
+                        <button class="mode-btn" data-mode="production" data-action="switch-operator-mode">Production</button>
+                        <button class="mode-btn" data-mode="benchmark" data-action="switch-operator-mode">Benchmark</button>
+                        <button class="mode-btn" data-mode="forensic" data-action="switch-operator-mode">Forensic</button>
+                        <button class="mode-btn" data-mode="stealth" data-action="switch-operator-mode">Stealth</button>
+                        <button class="mode-btn" data-mode="low_cost" data-action="switch-operator-mode">Low Cost</button>
                     </div>
                     <div id="mode-feedback" class="mode-feedback hidden"></div>
                 </div>
@@ -250,7 +250,7 @@
                     
                     <div class="analyzer-input-row">
                         <input type="url" id="inp-analyze-url" placeholder="https://example.com/products" class="analyzer-url-input">
-                        <button type="button" class="btn primary" onclick="analyzeURL()" id="btn-analyze-url">
+                        <button type="button" class="btn primary" data-action="analyze-url" id="btn-analyze-url">
                             <span class="analyze-btn-text">Analyze URL</span>
                             <span class="spinner hidden" id="analyze-spinner"></span>
                         </button>
@@ -273,8 +273,8 @@
                         <div class="analyze-fields-header">
                             <span>Detected Fields <span id="analyze-field-count" class="field-count-badge">0</span></span>
                             <div class="analyze-field-actions">
-                                <button type="button" class="btn ghost small" onclick="toggleAllFields(true)" id="btn-select-all">Select All</button>
-                                <button type="button" class="btn ghost small" onclick="toggleAllFields(false)">Deselect All</button>
+                                <button type="button" class="btn ghost small" data-action="toggle-all-fields" data-select="true" id="btn-select-all">Select All</button>
+                                <button type="button" class="btn ghost small" data-action="toggle-all-fields" data-select="false">Deselect All</button>
                             </div>
                         </div>
                         <div id="analyze-field-list" class="analyze-field-list">
@@ -283,10 +283,10 @@
 
                         <!-- Apply Button -->
                         <div class="analyze-apply-row">
-                            <button type="button" class="btn primary" onclick="applyAnalyzedFields()" id="btn-apply-fields">
+                            <button type="button" class="btn primary" data-action="apply-fields" id="btn-apply-fields">
                                 Apply Selected Fields to Schema
                             </button>
-                            <button type="button" class="btn ghost small" onclick="clearAnalysis()">Clear</button>
+                            <button type="button" class="btn ghost small" data-action="clear-analysis">Clear</button>
                         </div>
                     </div>
 
@@ -303,8 +303,8 @@
                     <div class="section">
                         <label class="section-label">Source Mode</label>
                         <div class="toggle-group" id="mode-toggle">
-                            <button type="button" class="toggle active" data-mode="manual" onclick="setMode('manual')" aria-label="Manual URLs mode">Manual URLs</button>
-                            <button type="button" class="toggle" data-mode="auto" onclick="setMode('auto')" aria-label="Auto Discover mode">Auto Discover</button>
+                            <button type="button" class="toggle active" data-mode="manual" data-action="set-mode" aria-label="Manual URLs mode">Manual URLs</button>
+                            <button type="button" class="toggle" data-mode="auto" data-action="set-mode" aria-label="Auto Discover mode">Auto Discover</button>
                         </div>
                     </div>
 
@@ -319,7 +319,7 @@
                         <label class="section-label" for="inp-intent">Describe The Data You Want</label>
                         <textarea id="inp-intent" rows="3" placeholder="Example: Find interior designers in Chennai, include company name, phone, email, address and keep only businesses within 15 km of T Nagar."></textarea>
                         <div class="form-actions" style="border-top: 0; margin-top: 0.5rem; padding-top: 0; justify-content: flex-start;">
-                            <button type="button" class="btn secondary small" onclick="suggestSchemaFromIntent()" id="btn-suggest-schema">Suggest topic + schema from intent</button>
+                            <button type="button" class="btn secondary small" data-action="suggest-schema" id="btn-suggest-schema">Suggest topic + schema from intent</button>
                         </div>
                         <p id="suggestion-note" class="hint-block hidden"></p>
                     </div>
@@ -366,7 +366,7 @@
                             </div>
                         </div>
 
-                        <button type="button" class="btn secondary small" onclick="previewDiscovery()" id="btn-preview" style="margin-top: 0.75rem;">
+                        <button type="button" class="btn secondary small" data-action="preview-discovery" id="btn-preview" style="margin-top: 0.75rem;">
                             Preview discovered URLs
                         </button>
                         <div id="discovery-preview" class="discovery-preview hidden"></div>
@@ -387,7 +387,7 @@
                         <label class="section-label">Data Schema</label>
                         <p class="hint-block">Define the columns of data you want extracted</p>
                         <div id="schema-container"></div>
-                        <button type="button" class="btn ghost small" onclick="addField()" id="btn-add-field">+ Add Field</button>
+                        <button type="button" class="btn ghost small" data-action="add-field" id="btn-add-field">+ Add Field</button>
                     </div>
 
                     <!-- Filters -->
@@ -398,7 +398,7 @@
                         </div>
                         <p class="hint-block">Remove records that don't match your criteria</p>
                         <div id="filters-container"></div>
-                        <button type="button" class="btn ghost small" onclick="addFilter()" id="btn-add-filter">+ Add Filter</button>
+                        <button type="button" class="btn ghost small" data-action="add-filter" id="btn-add-filter">+ Add Filter</button>
                     </div>
 
                     <!-- Advanced -->
@@ -434,7 +434,7 @@
 
                     <!-- Actions -->
                     <div class="form-actions">
-                        <button type="button" class="btn ghost" onclick="switchView('jobs')">Cancel</button>
+                        <button type="button" class="btn ghost" data-action="switch-view" data-view="jobs">Cancel</button>
                         <button type="submit" class="btn primary" id="btn-submit">Start Scraping →</button>
                     </div>
                 </form>
@@ -448,7 +448,7 @@
             <div class="container">
                 <div class="page-head">
                     <div>
-                        <button class="btn ghost small" onclick="switchView('jobs')" style="margin-bottom: 0.5rem;">← Back</button>
+                        <button class="btn ghost small" data-action="switch-view" data-view="jobs" style="margin-bottom: 0.5rem;">← Back</button>
                          <h1 id="res-title">Results</h1>
                          <p class="subtle" id="res-meta"></p>
                          <div id="result-warning" style="display:none; margin: 0.5rem 0; padding: 0.5rem 0.75rem; border-radius: 4px; font-size: 0.875rem;"></div>
@@ -459,10 +459,10 @@
                         </div>
                     </div>
                     <div class="btn-group" id="export-group" style="display:none;">
-                        <button class="btn secondary small" onclick="recleanCurrentJob()" id="btn-reclean">AI Re-clean</button>
-                        <button class="btn secondary small" onclick="exportCSV()" id="btn-csv">CSV ↓</button>
-                        <button class="btn secondary small" onclick="exportJSON()" id="btn-json">JSON ↓</button>
-                        <button class="btn secondary small" onclick="exportExcel()" id="btn-excel">Excel ↓</button>
+                        <button class="btn secondary small" data-action="reclean-job" id="btn-reclean">AI Re-clean</button>
+                        <button class="btn secondary small" data-action="export-csv" id="btn-csv">CSV ↓</button>
+                        <button class="btn secondary small" data-action="export-json" id="btn-json">JSON ↓</button>
+                        <button class="btn secondary small" data-action="export-excel" id="btn-excel">Excel ↓</button>
                     </div>
                 </div>
 
@@ -513,7 +513,7 @@
                         <p class="subtle">Live topological map of the semantic fields</p>
                     </div>
                     <div style="display:flex; gap:0.5rem;">
-                        <button class="btn ghost small" onclick="refreshCognition()">Refresh</button>
+                        <button class="btn ghost small" data-action="refresh-cognition">Refresh</button>
                         <a href="/api/system/export/knowledge" download="knowledge-manifold.json" class="btn small">Download Knowledge</a>
                     </div>
                 </div>
