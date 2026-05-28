@@ -65,10 +65,25 @@ def _safe_cell(value):
 def create_exports_router(jobs_store: dict):
     router = APIRouter()
 
+    def _refresh_job_for_export(job_id: str):
+        """Refresh job from repository in worker mode to avoid stale exports."""
+        import os
+        wq = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
+        if wq and wq.lower() in ("1", "true", "yes"):
+            try:
+                from app.storage_interface import get_job_repository
+                repo = get_job_repository()
+                fresh_jobs = repo.load_jobs()
+                if job_id in fresh_jobs:
+                    jobs_store[job_id] = fresh_jobs[job_id]
+            except Exception:
+                pass
+
     @router.get("/api/jobs/{job_id}/export/csv")
     async def export_csv(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
+        _refresh_job_for_export(job_id)
         job = jobs_store[job_id]
 
         if job.results_on_disk:
@@ -151,6 +166,7 @@ def create_exports_router(jobs_store: dict):
     async def export_json(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
+        _refresh_job_for_export(job_id)
         job = jobs_store[job_id]
 
         if job.results_on_disk:
@@ -213,6 +229,7 @@ def create_exports_router(jobs_store: dict):
     async def export_excel(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
+        _refresh_job_for_export(job_id)
         job = jobs_store[job_id]
 
         results_list = list(job.results)

@@ -112,9 +112,13 @@ async def clear_telemetry(_role: UserRole = Depends(require_role([UserRole.ADMIN
 async def get_scraper_diagnostics(
     url: str,
     fields: list[SchemaField],
-    min_score: float = 0.3
+    min_score: float = 0.3,
+    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
 ):
-    """Run a deep diagnostic scrape for a URL."""
+    """Run a deep diagnostic scrape for a URL.
+
+    Requires operator or admin role — triggers browser/network work.
+    """
     report = await run_diagnostics(url, fields, min_record_score=min_score)
     return report.to_dict()
 
@@ -547,7 +551,11 @@ async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)
 
 
 @router.post("/ml/optimize/domain/{domain}")
-async def optimize_domain_selectors(domain: str, selectors: Optional[dict] = None):
+async def optimize_domain_selectors(
+    domain: str,
+    selectors: Optional[dict] = None,
+    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
+):
     """Optimize selectors for a domain using ML predictions.
     
     Analyzes CSS selector patterns and predicts quality.
@@ -558,6 +566,7 @@ async def optimize_domain_selectors(domain: str, selectors: Optional[dict] = Non
         - selectors: Optional dict of {field: css_selector} to analyze
     
     If no selectors provided, uses cached selectors from memory.
+    Requires operator or admin role — triggers ML computation.
     """
     from app.selector_ml_optimizer import get_selector_optimizer
     

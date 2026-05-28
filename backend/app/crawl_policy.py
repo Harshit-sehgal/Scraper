@@ -18,6 +18,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections import defaultdict
@@ -59,6 +60,9 @@ class CrawlPolicyEngine:
         self._cooldown_seconds = settings.CRAWL_COOLDOWN_SECONDS
         self._respect_robots = settings.CRAWL_RESPECT_ROBOTS
         self._max_pages_per_domain = settings.CRAWL_MAX_PAGES_PER_DOMAIN
+        # Async lock to prevent race conditions on domain budget reservations.
+        # See the "Reserve Domain Capacity" section in check_domain().
+        self._reserve_lock = asyncio.Lock()
 
     # ─── Public API ────────────────────────────────────────────────────
 
@@ -110,10 +114,22 @@ class CrawlPolicyEngine:
                 logger.info("robots.txt disallows %s on %s", path, domain)
                 return f"robots.txt disallows {path} on {domain}"
 
-        # All checks passed — increment active fetches
-        state.active_fetches += 1
-        self._global_active_fetches += 1
-        return None
+        # ── Reserve Domain Capacity (under lock) ────────────────────────
+        # The check-and-increment section must be atomic to prevent races:
+        # without the lock, two concurrent tasks could both see capacity
+        # available and both pass, exceeding the configured limits.
+        async with self._reserve_lock:
+            state = self._get_state(domain)
+
+            # Re-check under lock — another task may have taken the slot
+            if state.active_fetches >= self._max_concurrency:
+                return f"Domain {domain} at max concurrency ({self._max_concurrency})"
+            if self._global_active_fetches >= self._max_global_concurrency:
+                return f"Global concurrency limit reached ({self._max_global_concurrency})"
+
+            state.active_fetches += 1
+            self._global_active_fetches += 1
+            return None
 
     def record_result(self, url: str, success: bool) -> None:
         """Record the outcome of a fetch for a domain."""

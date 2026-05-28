@@ -396,9 +396,9 @@ function renderJobs(jobs) {
                 <div><span class="badge ${j.status}">${j.status}</span></div>
                 <div class="job-records">${j.total_records > 0 ? `${j.filtered_records}` : '—'}</div>
                 <div class="job-actions">
-                    ${['completed', 'degraded', 'empty_result'].includes(j.status) ? `<button class="btn ghost small" onclick="viewResults('${jsStr(j.id)}')">View</button>` : ''}
-                    ${isActive ? `<button class="btn warn-ghost small" onclick="cancelJob('${jsStr(j.id)}')">Cancel</button>` : ''}
-                    <button class="btn danger-ghost small" onclick="deleteJob('${jsStr(j.id)}')">✕</button>
+                    ${['completed', 'degraded', 'empty_result'].includes(j.status) ? `<button class="btn ghost small" data-action="view-results" data-id="${j.id}">View</button>` : ''}
+                    ${isActive ? `<button class="btn warn-ghost small" data-action="cancel-job" data-id="${j.id}">Cancel</button>` : ''}
+                    <button class="btn danger-ghost small" data-action="delete-job" data-id="${j.id}">✕</button>
                 </div>
             </div>
         `;
@@ -516,8 +516,8 @@ async function refreshRecycleBin() {
                 <div><span class="badge ${j.status}">${j.status}</span></div>
                 <div class="job-records">${j.total_records > 0 ? `${j.filtered_records}` : '—'}</div>
                 <div class="job-actions">
-                    <button class="btn ghost small" onclick="restoreJob('${jsStr(j.id)}')">Restore</button>
-                    <button class="btn danger-ghost small" onclick="hardDeleteJob('${jsStr(j.id)}')">Delete Forever</button>
+                    <button class="btn ghost small" data-action="restore-job" data-id="${j.id}">Restore</button>
+                    <button class="btn danger-ghost small" data-action="hard-delete-job" data-id="${j.id}">Delete Forever</button>
                 </div>
             </div>
         `).join('');
@@ -1005,7 +1005,7 @@ function addField(preset = null) {
             <label for="sf-desc-${fid}">Hint for AI</label>
             <input type="text" class="sf-desc" id="sf-desc-${fid}" placeholder="e.g. star rating out of 5" value="${desc}">
         </div>
-        <button type="button" class="btn-x" onclick="this.parentElement.remove()" aria-label="Remove field">✕</button>
+        <button type="button" class="btn-x" data-action="remove-field" aria-label="Remove field">✕</button>
     `;
     c.appendChild(row);
 }
@@ -1085,7 +1085,7 @@ function addFilter() {
         </div>
         <div class="form-group">
             <label for="ff-op-${fid}">Operator</label>
-            <select class="ff-op" id="ff-op-${fid}" onchange="onFilterOpChange(this)">
+            <select class="ff-op" id="ff-op-${fid}" data-action="filter-op-change">
                 <option value="equals">Equals</option>
                 <option value="not_equals">Not Equals</option>
                 <option value="greater_than">&gt; Greater</option>
@@ -1107,7 +1107,7 @@ function addFilter() {
             <label for="ff-value-${fid}">Value</label>
             <input type="text" class="ff-value" id="ff-value-${fid}" placeholder="e.g. 50">
         </div>
-        <button type="button" class="btn-x" onclick="this.parentElement.remove()" aria-label="Remove field">✕</button>
+        <button type="button" class="btn-x" data-action="remove-filter" aria-label="Remove field">✕</button>
     `;
     c.appendChild(row);
 }
@@ -1920,7 +1920,7 @@ function renderPredictions(data) {
                     ` : ''}
                     ${p.recommended_actions?.length ? `
                         <div class="dash-prediction-actions">
-                            ${p.recommended_actions.map(a => `<button class="btn ghost small" onclick="toast('${jsStr(a)}', 'info')">${esc(a)}</button>`).join('')}
+                            ${p.recommended_actions.map(a => `<button class="btn ghost small" data-action="toast-info" data-message="${jsStr(a)}">${esc(a)}</button>`).join('')}
                         </div>
                     ` : ''}
                 </div>
@@ -2071,4 +2071,57 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshDashboard();
         }
     }, 30000);
+
+    // ── Central event delegation for all inline actions ─────────────
+    // Replaces unsafe inline onclick="fn('${id}')" patterns.
+    // Usage in templates: data-action="action-name" data-id="..."
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+
+        const action = btn.getAttribute('data-action');
+        const id = btn.getAttribute('data-id') || '';
+        switch (action) {
+            case 'view-results':
+                if (id) viewResults(id);
+                break;
+            case 'cancel-job':
+                if (id) cancelJob(id);
+                break;
+            case 'delete-job':
+                if (id) deleteJob(id);
+                break;
+            case 'restore-job':
+                if (id) restoreJob(id);
+                break;
+            case 'hard-delete-job':
+                if (id) hardDeleteJob(id);
+                break;
+            case 'remove-field':
+                btn.closest('.field-row')?.remove();
+                break;
+            case 'remove-filter':
+                btn.closest('.filter-row')?.remove();
+                break;
+            case 'toggle-field': {
+                const index = btn.getAttribute('data-index');
+                if (index !== null) {
+                    const items = document.querySelectorAll('.analyze-field-item');
+                    const checkboxes = document.querySelectorAll('.analyze-field-checkbox');
+                    const idx = parseInt(index, 10);
+                    if (!isNaN(idx) && checkboxes[idx]) {
+                        checkboxes[idx].checked = !checkboxes[idx].checked;
+                        if (items[idx]) items[idx].classList.toggle('selected', checkboxes[idx].checked);
+                    }
+                }
+                break;
+            }
+            case 'toast-info': {
+                const msg = btn.getAttribute('data-message');
+                if (msg) toast(msg, 'info');
+                break;
+            }
+        }
+        e.stopPropagation();
+    });
 });

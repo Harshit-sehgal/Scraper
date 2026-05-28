@@ -544,13 +544,17 @@ class PostgresJobRepository(JobRepository):
 
             return jobs_store, recycle_store, world_state_data
 
-    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job]) -> None:
+    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
         """Save all jobs and recycle bin entries using UPSERT semantics.
 
         Uses INSERT ... ON CONFLICT DO UPDATE instead of DELETE+INSERT to avoid
         destroying data that was concurrently written by other processes (e.g.
-        worker single-job saves). Stale rows that exist in the DB but not in
-        the in-memory store are cleaned up at the end.
+        worker single-job saves).
+
+        Only removes stale rows when ``prune_missing=True``. In multi-process
+        production (API + separate worker), keep this ``False`` to prevent
+        one process from deleting jobs created by another process. Use
+        ``save_single()`` for individual job updates in production.
         """
         self._ensure()
         with _conn() as conn:
@@ -566,13 +570,14 @@ class PostgresJobRepository(JobRepository):
                     list(row.values()),
                 )
 
-            # Remove stale jobs that are in the DB but not in the in-memory store
-            active_ids = list(jobs.keys())
-            _execute(
-                conn,
-                "DELETE FROM jobs WHERE deleted_at IS NULL AND id != ALL(%s)",
-                (active_ids,) if active_ids else (["__no_active_ids__"],),
-            )
+            # Only remove stale rows when explicitly requested (single-process mode)
+            if prune_missing:
+                active_ids = list(jobs.keys())
+                _execute(
+                    conn,
+                    "DELETE FROM jobs WHERE deleted_at IS NULL AND id != ALL(%s)",
+                    (active_ids,) if active_ids else (["__no_active_ids__"],),
+                )
 
             # Upsert recycle bin — do NOT delete first
             for job in recycle_bin.values():
@@ -586,13 +591,14 @@ class PostgresJobRepository(JobRepository):
                     list(row.values()),
                 )
 
-            # Remove stale recycle bin entries
-            recycle_ids = list(recycle_bin.keys())
-            _execute(
-                conn,
-                "DELETE FROM recycle_bin WHERE id != ALL(%s)",
-                (recycle_ids,) if recycle_ids else (["__no_recycle_ids__"],),
-            )
+            # Only remove stale recycle bin entries when explicitly requested
+            if prune_missing:
+                recycle_ids = list(recycle_bin.keys())
+                _execute(
+                    conn,
+                    "DELETE FROM recycle_bin WHERE id != ALL(%s)",
+                    (recycle_ids,) if recycle_ids else (["__no_recycle_ids__"],),
+                )
 
     def save_single(self, job: Job) -> None:
         self._ensure()
@@ -608,6 +614,24 @@ class PostgresJobRepository(JobRepository):
             )
 
     # ─── Individual repository operations (avoid full-state rewrites) ────
+
+    def is_cancel_requested(self, job_id: str) -> bool:
+        """Check from Postgres whether a job has a pending cancellation request.
+
+        Required for cross-process cancellation: the worker polls this method
+        during long-running operations to detect cancellations requested by
+        the API process.
+        """
+        self._ensure()
+        with _conn() as conn:
+            row = _fetch_one(
+                conn,
+                "SELECT cancel_requested FROM jobs WHERE id = %s AND deleted_at IS NULL",
+                (job_id,),
+            )
+            if row:
+                return bool(row.get("cancel_requested", False))
+            return False
 
     def move_to_recycle_bin(self, job_id: str) -> bool:
         """Move a job to the recycle bin by soft-deleting it and copying to recycle_bin table."""

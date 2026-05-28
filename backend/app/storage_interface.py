@@ -39,6 +39,15 @@ class JobRepository(ABC):
 
     # ─── Individual repository operations (avoid full-state rewrites) ────
 
+    def is_cancel_requested(self, job_id: str) -> bool:
+        """Check from the persistent store whether a job has a pending cancellation request.
+
+        Required for cross-process cancellation: the worker polls this method
+        during long-running operations to detect cancellations requested by
+        the API process. Returns True if the cancellation flag is set.
+        """
+        return False
+
     def move_to_recycle_bin(self, job_id: str) -> bool:
         """Move a job to the recycle bin. Returns True if the job was moved."""
         raise NotImplementedError
@@ -90,6 +99,22 @@ class SQLiteJobRepository(JobRepository):
         from app.job_store import save_state
         save_state(jobs, recycle_bin)
         
+    def is_cancel_requested(self, job_id: str) -> bool:
+        """Check from SQLite whether a job has a pending cancellation request."""
+        from app.job_store import _get_connection, _DB_LOCK
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                row = conn.execute(
+                    "SELECT cancel_requested FROM jobs WHERE id = ? AND deleted_at IS NULL",
+                    (job_id,),
+                ).fetchone()
+                if row:
+                    return bool(row[0])
+                return False
+            finally:
+                conn.close()
+
     def save_single(self, job: Job) -> None:
         from app.job_store import persist_state_single
         persist_state_single(job)

@@ -182,40 +182,61 @@ class PostgresWorkerQueue:
         )
 
         async with self._in_flight_lock:
-            with _conn() as conn:
-                _execute(
-                    conn,
-                    """INSERT INTO queue_tasks
-                       (id, type, payload, priority, status, created_at,
-                        scheduled_at, attempts, max_attempts, timeout_seconds)
-                       VALUES (%s, %s, %s, %s, %s, NOW(), %s, %s, %s, %s)
-                       ON CONFLICT (id) DO NOTHING""",
-                    (
-                        task.id, task.type, json.dumps(task.payload),
-                        int(task.priority), task.status,
-                        task.scheduled_at, task.attempts,
-                        task.max_attempts, task.timeout_seconds,
-                    ),
-                )
+            await asyncio.to_thread(
+                self._enqueue_sync,
+                task.id, task.type, json.dumps(task.payload),
+                int(task.priority), task.status,
+                task.scheduled_at, task.attempts,
+                task.max_attempts, task.timeout_seconds,
+            )
 
         return task.id
+
+    def _enqueue_sync(
+        self,
+        task_id: str, task_type: str, payload_json: str,
+        priority: int, status: str, scheduled_at: str,
+        attempts: int, max_attempts: int, timeout_seconds: int,
+    ) -> None:
+        """Synchronous enqueue — runs in a thread to avoid blocking the event loop."""
+        with _conn() as conn:
+            _execute(
+                conn,
+                """INSERT INTO queue_tasks
+                   (id, type, payload, priority, status, created_at,
+                    scheduled_at, attempts, max_attempts, timeout_seconds)
+                   VALUES (%s, %s, %s, %s, %s, NOW(), %s, %s, %s, %s)
+                   ON CONFLICT (id) DO NOTHING""",
+                (
+                    task_id, task_type, payload_json,
+                    priority, status,
+                    scheduled_at, attempts,
+                    max_attempts, timeout_seconds,
+                ),
+            )
 
     async def dequeue(self, timeout: float = 5.0) -> Optional[QueueTask]:
         """Dequeue the highest-priority pending task.
 
         Blocks up to *timeout* seconds if the queue is empty.
         Returns None if the timeout expires.
+        Uses ``asyncio.to_thread`` to avoid blocking the event loop
+        on the synchronous ``_dequeue_one`` call.
         """
         deadline = time.time() + timeout
         while time.time() < deadline:
-            task = self._dequeue_one()
+            task = await asyncio.to_thread(self._dequeue_one)
             if task:
                 return task
             await asyncio.sleep(0.25)
         return None
 
     def _dequeue_one(self) -> Optional[QueueTask]:
-        """Synchronous dequeue from Postgres with priority ordering."""
+        """Synchronous dequeue from Postgres with priority ordering.
+
+        This is called from an async dequeue loop wrapped via
+        ``asyncio.to_thread`` to avoid blocking the event loop.
+        """
         try:
             with _conn() as conn:
                 # Atomically claim the highest-priority pending task
@@ -257,28 +278,35 @@ class PostgresWorkerQueue:
     async def complete(self, task_id: str, result: Optional[dict] = None):
         """Mark a task as completed successfully."""
         async with self._in_flight_lock:
-            with _conn() as conn:
-                row = _fetch_one(conn, "SELECT * FROM queue_tasks WHERE id = %s", (task_id,))
-                if row:
-                    _execute(
-                        conn,
-                        """INSERT INTO queue_task_history
-                           (id, type, payload, priority, status, created_at,
-                            started_at, completed_at, attempts, max_attempts,
-                            last_error, result, timeout_seconds, finished_at)
-                           VALUES (%s, %s, %s, %s, 'completed', %s,
-                                   %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
-                        (
-                            row["id"], row["type"], row["payload"],
-                            row["priority"], row["created_at"],
-                            row.get("started_at"),
-                            row["attempts"], row["max_attempts"],
-                            None,
-                            json.dumps(result) if result else None,
-                            row.get("timeout_seconds", 300),
-                        ),
-                    )
-                    _execute(conn, "DELETE FROM queue_tasks WHERE id = %s", (task_id,))
+            await asyncio.to_thread(
+                self._complete_sync, task_id,
+                json.dumps(result) if result else None,
+            )
+
+    def _complete_sync(self, task_id: str, result_json: Optional[str]) -> None:
+        """Synchronous complete — runs in a thread to avoid blocking the event loop."""
+        with _conn() as conn:
+            row = _fetch_one(conn, "SELECT * FROM queue_tasks WHERE id = %s", (task_id,))
+            if row:
+                _execute(
+                    conn,
+                    """INSERT INTO queue_task_history
+                       (id, type, payload, priority, status, created_at,
+                        started_at, completed_at, attempts, max_attempts,
+                        last_error, result, timeout_seconds, finished_at)
+                       VALUES (%s, %s, %s, %s, 'completed', %s,
+                               %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
+                    (
+                        row["id"], row["type"], row["payload"],
+                        row["priority"], row["created_at"],
+                        row.get("started_at"),
+                        row["attempts"], row["max_attempts"],
+                        None,
+                        result_json,
+                        row.get("timeout_seconds", 300),
+                    ),
+                )
+                _execute(conn, "DELETE FROM queue_tasks WHERE id = %s", (task_id,))
 
     async def fail(
         self,
@@ -288,55 +316,61 @@ class PostgresWorkerQueue:
     ):
         """Mark a task as failed. Retries if attempts remain."""
         async with self._in_flight_lock:
-            with _conn() as conn:
-                row = _fetch_one(
-                    conn,
-                    "SELECT attempts, max_attempts, * FROM queue_tasks WHERE id = %s",
-                    (task_id,),
-                )
+            await asyncio.to_thread(
+                self._fail_sync, task_id, error, retry,
+            )
 
-                if row:
-                    attempts = row["attempts"]
-                    max_attempts = row["max_attempts"]
+    def _fail_sync(self, task_id: str, error: str, retry: bool = True) -> None:
+        """Synchronous fail — runs in a thread to avoid blocking the event loop."""
+        with _conn() as conn:
+            row = _fetch_one(
+                conn,
+                "SELECT attempts, max_attempts, * FROM queue_tasks WHERE id = %s",
+                (task_id,),
+            )
 
-                    if retry and attempts < max_attempts:
-                        # Schedule retry with exponential backoff
-                        backoff = min(2 ** (attempts - 1) * 30, 3600)
-                        _execute(
-                            conn,
-                            "UPDATE queue_tasks SET status = 'pending', last_error = %s, "
-                            "scheduled_at = NOW() + (%s * INTERVAL '1 second') WHERE id = %s",
-                            (error, backoff, task_id),
-                        )
-                        logger.info(
-                            "Task %s failed (attempt %d/%d). Retrying in %ds: %s",
-                            task_id, attempts, max_attempts, backoff, error,
-                        )
-                    else:
-                        # Move to dead letter (archive to history)
-                        _execute(
-                            conn,
-                            """INSERT INTO queue_task_history
-                               (id, type, payload, priority, status, created_at,
-                                started_at, completed_at, attempts, max_attempts,
-                                last_error, result, timeout_seconds, finished_at)
-                               VALUES (%s, %s, %s, %s, 'dead_letter', %s,
-                                       %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
-                            (
-                                row["id"], row["type"], row["payload"],
-                                row["priority"], row["created_at"],
-                                row.get("started_at"),
-                                row["attempts"], row["max_attempts"],
-                                error,
-                                None,
-                                row.get("timeout_seconds", 300),
-                            ),
-                        )
-                        _execute(conn, "DELETE FROM queue_tasks WHERE id = %s", (task_id,))
-                        logger.warning(
-                            "Task %s moved to dead letter after %d attempts: %s",
-                            task_id, attempts, error,
-                        )
+            if row:
+                attempts = row["attempts"]
+                max_attempts = row["max_attempts"]
+
+                if retry and attempts < max_attempts:
+                    # Schedule retry with exponential backoff
+                    backoff = min(2 ** (attempts - 1) * 30, 3600)
+                    _execute(
+                        conn,
+                        "UPDATE queue_tasks SET status = 'pending', last_error = %s, "
+                        "scheduled_at = NOW() + (%s * INTERVAL '1 second') WHERE id = %s",
+                        (error, backoff, task_id),
+                    )
+                    logger.info(
+                        "Task %s failed (attempt %d/%d). Retrying in %ds: %s",
+                        task_id, attempts, max_attempts, backoff, error,
+                    )
+                else:
+                    # Move to dead letter (archive to history)
+                    _execute(
+                        conn,
+                        """INSERT INTO queue_task_history
+                           (id, type, payload, priority, status, created_at,
+                            started_at, completed_at, attempts, max_attempts,
+                            last_error, result, timeout_seconds, finished_at)
+                           VALUES (%s, %s, %s, %s, 'dead_letter', %s,
+                                   %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
+                        (
+                            row["id"], row["type"], row["payload"],
+                            row["priority"], row["created_at"],
+                            row.get("started_at"),
+                            row["attempts"], row["max_attempts"],
+                            error,
+                            None,
+                            row.get("timeout_seconds", 300),
+                        ),
+                    )
+                    _execute(conn, "DELETE FROM queue_tasks WHERE id = %s", (task_id,))
+                    logger.warning(
+                        "Task %s moved to dead letter after %d attempts: %s",
+                        task_id, attempts, error,
+                    )
 
     async def cancel(self, task_id: str) -> bool:
         """Cancel a task. Handles both pending and in-flight tasks.
@@ -347,41 +381,24 @@ class PostgresWorkerQueue:
             if task_id in self._in_flight:
                 flight_task = self._in_flight[task_id]
                 flight_task.cancel()
-                with _conn() as conn:
-                    row = _fetch_one(
-                        conn, "SELECT * FROM queue_tasks WHERE id = %s", (task_id,),
-                    )
-                    if row:
-                        _execute(
-                            conn,
-                            """INSERT INTO queue_task_history
-                               (id, type, payload, priority, status, created_at,
-                                started_at, completed_at, attempts, max_attempts,
-                                last_error, result, timeout_seconds, finished_at)
-                               VALUES (%s, %s, %s, %s, 'cancelled', %s,
-                                       %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
-                            (
-                                row["id"], row["type"], row["payload"],
-                                row["priority"], row["created_at"],
-                                row.get("started_at"),
-                                row["attempts"], row["max_attempts"],
-                                "Cancelled by user (in-flight)",
-                                None,
-                                row.get("timeout_seconds", 300),
-                            ),
-                        )
-                        _execute(conn, "DELETE FROM queue_tasks WHERE id = %s", (task_id,))
-                return True
+                result = await asyncio.to_thread(
+                    self._cancel_in_flight_sync, task_id,
+                )
+                return result
 
             # Check pending tasks
-            with _conn() as conn:
-                row = _fetch_one(
-                    conn,
-                    "SELECT * FROM queue_tasks WHERE id = %s AND status = 'pending'",
-                    (task_id,),
-                )
-                if row is None:
-                    return False
+            result = await asyncio.to_thread(
+                self._cancel_pending_sync, task_id,
+            )
+            return result
+
+    def _cancel_in_flight_sync(self, task_id: str) -> bool:
+        """Synchronous cancel for in-flight tasks — runs in a thread."""
+        with _conn() as conn:
+            row = _fetch_one(
+                conn, "SELECT * FROM queue_tasks WHERE id = %s", (task_id,),
+            )
+            if row:
                 _execute(
                     conn,
                     """INSERT INTO queue_task_history
@@ -395,13 +412,44 @@ class PostgresWorkerQueue:
                         row["priority"], row["created_at"],
                         row.get("started_at"),
                         row["attempts"], row["max_attempts"],
-                        "Cancelled by user",
+                        "Cancelled by user (in-flight)",
                         None,
                         row.get("timeout_seconds", 300),
                     ),
                 )
                 _execute(conn, "DELETE FROM queue_tasks WHERE id = %s", (task_id,))
-                return True
+            return True
+
+    def _cancel_pending_sync(self, task_id: str) -> bool:
+        """Synchronous cancel for pending tasks — runs in a thread."""
+        with _conn() as conn:
+            row = _fetch_one(
+                conn,
+                "SELECT * FROM queue_tasks WHERE id = %s AND status = 'pending'",
+                (task_id,),
+            )
+            if row is None:
+                return False
+            _execute(
+                conn,
+                """INSERT INTO queue_task_history
+                   (id, type, payload, priority, status, created_at,
+                    started_at, completed_at, attempts, max_attempts,
+                    last_error, result, timeout_seconds, finished_at)
+                   VALUES (%s, %s, %s, %s, 'cancelled', %s,
+                           %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
+                (
+                    row["id"], row["type"], row["payload"],
+                    row["priority"], row["created_at"],
+                    row.get("started_at"),
+                    row["attempts"], row["max_attempts"],
+                    "Cancelled by user",
+                    None,
+                    row.get("timeout_seconds", 300),
+                ),
+            )
+            _execute(conn, "DELETE FROM queue_tasks WHERE id = %s", (task_id,))
+            return True
 
     # ─── Worker loop ───────────────────────────────────────────────────
 
@@ -409,7 +457,7 @@ class PostgresWorkerQueue:
         """Start the background worker loop with recovery of stuck tasks."""
         if self._running:
             return
-        self._recover_stuck_tasks()
+        await asyncio.to_thread(self._recover_stuck_tasks)
         self._running = True
         self._worker_task = asyncio.create_task(self._worker_loop())
         logger.info(
@@ -418,7 +466,10 @@ class PostgresWorkerQueue:
         )
 
     def _recover_stuck_tasks(self):
-        """Reset any tasks stuck in 'running' state back to 'pending' for retry."""
+        """Reset any tasks stuck in 'running' state back to 'pending' for retry.
+
+        Synchronous — called via ``asyncio.to_thread`` to avoid blocking the event loop.
+        """
         try:
             with _conn() as conn:
                 stuck = _fetch_one(
@@ -521,6 +572,10 @@ class PostgresWorkerQueue:
 
         Checks the active queue_tasks first, then falls back to queue_task_history.
         Returns None if the task is not found.
+
+        This method is synchronous and performs blocking DB calls. When called
+        from an async context, wrap it with ``await asyncio.to_thread(...)``
+        to avoid blocking the event loop.
         """
         try:
             with _conn() as conn:
@@ -539,8 +594,16 @@ class PostgresWorkerQueue:
             logger.error("Failed to get task state for %s: %s", task_id, e)
             return None
 
+    async def get_task_state_async(self, task_id: str) -> Optional[dict]:
+        """Async version of ``get_task_state`` — runs the blocking DB call in a thread."""
+        return await asyncio.to_thread(self.get_task_state, task_id)
+
     def get_status(self) -> dict:
-        """Return queue status for monitoring."""
+        """Return queue status for monitoring.
+
+        This method is synchronous and performs blocking DB calls. When called
+        from an async context, use ``await get_status_async()`` instead.
+        """
         try:
             with _conn() as conn:
                 pending = _fetch_one(
@@ -582,6 +645,10 @@ class PostgresWorkerQueue:
             logger.error("Failed to get Postgres queue status: %s", e)
             return {"ok": False, "backend": "postgres", "error": str(e), "pending": 0, "running": 0}
 
+    async def get_status_async(self) -> dict:
+        """Async version of ``get_status`` — runs the blocking DB call in a thread."""
+        return await asyncio.to_thread(self.get_status)
+
     def get_dead_letter_queue(self, limit: int = 50) -> list[dict]:
         """Return dead letter queue entries."""
         try:
@@ -597,6 +664,10 @@ class PostgresWorkerQueue:
         except Exception as e:
             logger.error("Failed to get dead letter queue: %s", e)
             return []
+
+    async def get_dead_letter_queue_async(self, limit: int = 50) -> list[dict]:
+        """Async version of ``get_dead_letter_queue`` — runs the blocking DB call in a thread."""
+        return await asyncio.to_thread(self.get_dead_letter_queue, limit)
 
     def retry_dead_letter(self, task_id: str) -> bool:
         """Re-queue a dead letter task."""
@@ -634,8 +705,16 @@ class PostgresWorkerQueue:
             logger.error("Failed to retry dead letter task %s: %s", task_id, e)
             return False
 
+    async def retry_dead_letter_async(self, task_id: str) -> bool:
+        """Async version of ``retry_dead_letter`` — runs the blocking DB call in a thread."""
+        return await asyncio.to_thread(self.retry_dead_letter, task_id)
+
     def clear_completed_history(self, older_than_days: int = 7):
-        """Clean up old completed task history."""
+        """Clean up old completed task history.
+
+        This method is synchronous and performs blocking DB calls. When called
+        from an async context, use ``await clear_completed_history_async()`` instead.
+        """
         try:
             with _conn() as conn:
                 _execute(
@@ -647,6 +726,10 @@ class PostgresWorkerQueue:
                 )
         except Exception as e:
             logger.error("Failed to clear completed history: %s", e)
+
+    async def clear_completed_history_async(self, older_than_days: int = 7):
+        """Async version of ``clear_completed_history`` — runs the blocking DB call in a thread."""
+        await asyncio.to_thread(self.clear_completed_history, older_than_days)
 
 
 # ───────────────────────────────────────────────────────────────────────

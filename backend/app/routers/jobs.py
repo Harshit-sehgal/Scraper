@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+import os
 import threading
 from typing import Callable
 
@@ -32,6 +33,43 @@ def _save_job(job) -> None:
     get_job_repository().save_single(job)
 
 
+def _is_worker_mode() -> bool:
+    """Check if worker queue mode is enabled (multi-process deployment).
+
+    In worker mode, the API process and worker process have separate
+    in-memory stores. Read endpoints should check the persistent store
+    as a fallback to avoid serving stale data.
+    """
+    wq = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
+    return bool(wq and wq.lower() in ("1", "true", "yes"))
+
+
+def _refresh_job_from_repo(job: Job, jobs_store: dict) -> Job:
+    """Refresh a job's state from the persistent repository.
+
+    In worker mode, the API's in-memory copy may be stale because the
+    worker process updates jobs independently. This function re-reads
+    the job from the DB and updates the in-memory store with the latest
+    state, then returns the refreshed job.
+
+    Falls back to the in-memory copy if the DB read fails.
+    """
+    if not _is_worker_mode():
+        return job
+    try:
+        repo = get_job_repository()
+        fresh_jobs = repo.load_jobs()
+        if job.id in fresh_jobs:
+            fresh = fresh_jobs[job.id]
+            jobs_store[job.id] = fresh
+            return fresh
+    except Exception:
+        logging.getLogger(__name__).debug(
+            "Failed to refresh job %s from repo, using in-memory copy", job.id
+        )
+    return job
+
+
 def create_jobs_router(
     jobs_store: dict,
     recycle_bin_store: dict,
@@ -49,11 +87,30 @@ def create_jobs_router(
     _store_lock = threading.Lock()
 
     def _get_job(job_id: str) -> Job:
-        """Thread-safe lookup returning the job or raising 404."""
+        """Thread-safe lookup returning the job or raising 404.
+
+        In worker mode, refreshes from the persistent store so the API
+        returns the latest state even when a separate worker process
+        has updated the job.
+        """
         with _store_lock:
             if job_id not in jobs_store:
                 raise HTTPException(status_code=404, detail="Job not found")
-            return jobs_store[job_id]
+            job = jobs_store[job_id]
+            # In worker mode, refresh from repo to pick up cross-process updates
+            if _is_worker_mode():
+                try:
+                    repo = get_job_repository()
+                    fresh_jobs = repo.load_jobs()
+                    if job_id in fresh_jobs:
+                        fresh = fresh_jobs[job_id]
+                        jobs_store[job_id] = fresh
+                        return fresh
+                except Exception:
+                    logging.getLogger(__name__).debug(
+                        "Failed to refresh job %s from repo", job_id
+                    )
+            return job
 
     def _pop_job(job_id: str) -> Job:
         """Thread-safe pop from jobs_store, raising 404 if missing."""
@@ -76,7 +133,7 @@ def create_jobs_router(
             return recycle_bin_store.pop(job_id)
 
     @router.post("/api/discover")
-    async def discover(req: DiscoveryRequest):
+    async def discover(req: DiscoveryRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         """Auto-discover best URLs to scrape for a topic."""
         try:
             results = await discover_urls(
@@ -105,13 +162,30 @@ def create_jobs_router(
         return {"urls": safe_results}
 
     @router.post("/api/schema/suggest")
-    async def suggest_schema(req: SchemaSuggestionRequest):
+    async def suggest_schema(req: SchemaSuggestionRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         """Infer topic + schema fields from plain-language user intent."""
         suggestion = await suggest_schema_from_intent(req.intent, max_fields=req.max_fields)
         return suggestion
 
     @router.get("/api/jobs")
     async def list_jobs():
+        # In worker mode, refresh from repo to pick up cross-process updates
+        if _is_worker_mode():
+            try:
+                repo = get_job_repository()
+                fresh_jobs = repo.load_jobs()
+                with _store_lock:
+                    # Merge fresh data into in-memory store, preserving any jobs
+                    # that the worker doesn't track (e.g., newly created via API)
+                    for jid, fresh in fresh_jobs.items():
+                        jobs_store[jid] = fresh
+                    # Remove jobs that were hard-deleted by the worker
+                    stale_ids = [jid for jid in jobs_store if jid not in fresh_jobs]
+                    for jid in stale_ids:
+                        jobs_store.pop(jid, None)
+            except Exception:
+                logging.getLogger(__name__).debug("Failed to refresh jobs list from repo")
+
         with _store_lock:
             ordered = sorted(jobs_store.values(), key=lambda j: j.created_at, reverse=True)
             return {"jobs": [job.model_dump() for job in ordered]}

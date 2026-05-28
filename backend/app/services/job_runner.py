@@ -17,6 +17,7 @@ from app.semantic_persistence import load_semantic_state, save_semantic_state
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
 from app.llm_bridge import get_llm_call_count, reset_llm_call_count
+from app.storage_interface import get_job_repository
 
 def _add_job_log(job, message: str, level: str = "info", persist_fn=None, persist_single_fn=None):
     from app.models import LogEntry
@@ -41,6 +42,16 @@ async def run_job(
     job = jobs_store.get(job_id)
     if not job:
         return
+
+    # ── Cross-process cancellation check ───────────────────────────────
+    # In worker mode (separate process), the API may have cancelled this job
+    # via the database. Poll the repository for the latest flag.
+    def _cancel_requested_from_db() -> bool:
+        """Check the persistent store for a cross-process cancellation signal."""
+        try:
+            return get_job_repository().is_cancel_requested(job_id)
+        except Exception:
+            return False
 
     # Optimize persistence: use single-row updates for job-local saves
     # when available, while preserving persist_state_fn for full-store saves.
@@ -71,7 +82,8 @@ async def run_job(
     if not job.started_at:
         job.started_at = datetime.datetime.now().isoformat()
 
-    if job.cancel_requested:
+    if job.cancel_requested or _cancel_requested_from_db():
+        job.cancel_requested = True
         mark_job_canceled(job, "Canceled before execution.")
         if persist_state_single_critical_fn:
             persist_state_single_critical_fn()
@@ -123,7 +135,8 @@ async def run_job(
             job.urls = safe_urls
 
             if not job.urls:
-                if job.cancel_requested:
+                if job.cancel_requested or _cancel_requested_from_db():
+                    job.cancel_requested = True
                     mark_job_canceled(job)
                     _add_job_log(job, "Job canceled during discovery", level="warning", persist_fn=persist_job_state_fn)
                     if persist_state_single_critical_fn:
@@ -146,14 +159,15 @@ async def run_job(
             job.progress_current = 1
             logging.info("Job %s: Discovered %d URLs", job_id, len(job.urls))
 
-            if job.cancel_requested:
-                mark_job_canceled(job)
-                _add_job_log(job, "Job canceled after discovery", level="warning", persist_fn=persist_job_state_fn)
-                if persist_state_single_critical_fn:
-                    persist_state_single_critical_fn()
-                else:
-                    persist_state_fn()
-                return
+            if job.cancel_requested or _cancel_requested_from_db():
+                        job.cancel_requested = True
+                        mark_job_canceled(job)
+                        _add_job_log(job, "Job canceled after discovery", level="warning", persist_fn=persist_job_state_fn)
+                        if persist_state_single_critical_fn:
+                            persist_state_single_critical_fn()
+                        else:
+                            persist_state_fn()
+                        return
 
         job.status = JobStatus.RUNNING
         if job.mode == ScrapeMode.MANUAL:
@@ -184,7 +198,8 @@ async def run_job(
                 warnings.append(msg)
 
         async def _scrape_single_url(idx: int, url: str) -> tuple[int, list[dict], bool, dict]:
-            if job.cancel_requested:
+            if job.cancel_requested or _cancel_requested_from_db():
+                job.cancel_requested = True
                 return idx, [], False, {}
             elapsed = time.monotonic() - started_at
             if elapsed > max_job_runtime_seconds:
@@ -336,13 +351,15 @@ async def run_job(
         # Active cancellation watcher — polls cancel_requested while tasks run
         # so in-flight scrapes are interrupted promptly instead of waiting
         # for all tasks to finish before checking the cancel flag.
+        # Also polls the DB for cross-process cancellation signals.
         # NOTE: check all(done) BEFORE cancel_requested to avoid a tight race
         # where all tasks finish and cancel is flagged in the same polling cycle.
         while True:
             if all(task.done() for task in scrape_tasks):
                 break
 
-            if job.cancel_requested:
+            if job.cancel_requested or _cancel_requested_from_db():
+                job.cancel_requested = True
                 for task in scrape_tasks:
                     if not task.done():
                         task.cancel()
@@ -362,7 +379,8 @@ async def run_job(
         ]
 
         for idx, results, success, meta in sorted(scraped, key=lambda x: x[0]):
-            if job.cancel_requested:
+            if job.cancel_requested or _cancel_requested_from_db():
+                job.cancel_requested = True
                 mark_job_canceled(job)
                 if persist_state_single_critical_fn:
                     persist_state_single_critical_fn()
@@ -391,7 +409,8 @@ async def run_job(
                 _add_job_log(job, "Skipping AI structuring — records extracted via structured method (not regex)", persist_fn=persist_job_state_fn)
                 run_global_ai_structuring = False
 
-        if job.cancel_requested:
+        if job.cancel_requested or _cancel_requested_from_db():
+            job.cancel_requested = True
             mark_job_canceled(job)
             if persist_state_single_critical_fn:
                 persist_state_single_critical_fn()
@@ -531,7 +550,8 @@ async def run_job(
         
         # AI Insight Phase
         if job.results:
-            if job.cancel_requested:
+            if job.cancel_requested or _cancel_requested_from_db():
+                job.cancel_requested = True
                 mark_job_canceled(job)
                 _add_job_log(job, "Job canceled before AI insight", level="warning", persist_fn=persist_job_state_fn)
                 return

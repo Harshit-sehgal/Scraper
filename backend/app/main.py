@@ -1016,7 +1016,7 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
 
 
 @app.post("/api/url/analyze")
-async def analyze_url(req: URLPreviewRequest):
+async def analyze_url(req: URLPreviewRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Analyze a URL and auto-detect what data fields can be extracted.
     
     Fetches the URL, analyzes page structure, detects value patterns,
