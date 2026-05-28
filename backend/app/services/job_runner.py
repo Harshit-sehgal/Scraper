@@ -513,7 +513,7 @@ async def run_job(
             for field in job.schema_fields
         )
         if has_contact_fields and ai_source_prediction["sources_attempted"] > 0:
-            import os
+
             if ai_source_prediction["records_ai_structured"] == 0:
                 if (settings.GROQ_API_KEY or "").strip():
                     warnings.append(

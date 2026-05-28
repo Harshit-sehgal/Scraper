@@ -15,7 +15,7 @@ Usage:
 import datetime
 import json
 import logging
-import os
+
 import threading
 from contextlib import contextmanager
 from typing import Iterator, Optional
