@@ -1348,7 +1348,7 @@ async function analyzeURL() {
                 const typeLabel = f.type || 'string';
                 return `
                     <div class="analyze-field-item selected" data-index="${i}" data-action="toggle-field-item">
-                        <input type="checkbox" class="analyze-field-checkbox" checked data-index="${i}" onchange="toggleField(${i})">
+                        <input type="checkbox" class="analyze-field-checkbox" checked data-index="${i}">
                         <span class="analyze-field-name">${esc(f.name)}</span>
                         <span class="analyze-field-type">${esc(typeLabel)}</span>
                         ${example ? `<span class="analyze-field-example">${esc(example)}</span>` : ''}
@@ -2073,7 +2073,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 30000);
 
     // ── Central event delegation for all inline actions ─────────────
-    // Replaces all unsafe inline onclick="fn(...)" patterns with data-action attributes.
+    // Replaces all unsafe inline onclick / onchange / onsubmit patterns
+    // with data-action attributes and delegated listeners.
     // Usage in templates: data-action="action-name" data-id="..."
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-action]');
@@ -2211,4 +2212,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         e.stopPropagation();
     });
+
+    // ── Delegated change handler for dynamic field checkboxes ──
+    // Replaces inline onchange="toggleField(i)" on dynamically-generated
+    // .analyze-field-checkbox elements inside the URL analyzer.
+    document.addEventListener('change', (e) => {
+        const checkbox = e.target.closest('.analyze-field-checkbox');
+        if (!checkbox) return;
+        const item = checkbox.closest('.analyze-field-item');
+        if (item) {
+            item.classList.toggle('selected', checkbox.checked);
+        }
+    });
+
+    // ── Delegated submit handler for job form ──
+    // Replaces inline onsubmit="submitJob(event)" on #job-form.
+    const jobForm = document.getElementById('job-form');
+    if (jobForm) {
+        jobForm.addEventListener('submit', submitJob);
+    }
 });
