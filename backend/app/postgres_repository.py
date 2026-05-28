@@ -50,7 +50,7 @@ def _get_database_url() -> str:
     if url:
         return url
     # Check environment override for backwards compatibility
-    url = os.getenv("DATAFORGE_DATABASE_URL", "").strip()
+    url = settings.DATABASE_URL
     if url:
         return url
     # Only allow fallback default in development mode

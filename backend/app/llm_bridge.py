@@ -200,7 +200,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
         temperature = settings.LLM_TEMPERATURE
     if timeout is None:
         timeout = settings.LLM_TIMEOUT
-    groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
+    groq_key = (settings.GROQ_API_KEY or "").strip()
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
             try:
@@ -280,7 +280,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
         temperature = settings.LLM_FAST_TEMPERATURE
     if timeout is None:
         timeout = settings.LLM_FAST_TIMEOUT
-    groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
+    groq_key = (settings.GROQ_API_KEY or "").strip()
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
             try:
@@ -337,7 +337,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
         temperature = settings.LLM_TEXT_TEMPERATURE
     if timeout is None:
         timeout = settings.LLM_TIMEOUT
-    groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
+    groq_key = (settings.GROQ_API_KEY or "").strip()
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
             try:

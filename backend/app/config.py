@@ -243,6 +243,7 @@ class Settings(BaseSettings):
     SEMANTIC_STATE_PATH: str = "data/semantic_state.json"
     STATE_FILE_PATH: str = ""
     """Override for jobs_state.json path. Empty = use default ./backend/data/jobs_state.json"""
+    GROQ_API_KEY: str = ""
     DATABASE_URL: str = ""
     """Postgres connection URL (e.g. postgresql://user:pass@host:port/db)"""
     STORAGE_BACKEND: str = "sqlite"
