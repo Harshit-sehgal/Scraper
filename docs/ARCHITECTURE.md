@@ -93,27 +93,21 @@ Response (HTML/JS-rendered)
 
 **Components**:
 - `selector_engine.py`: CSS/XPath evaluation
-- `selector_ml_optimizer.py`: Selector quality prediction
-- `selector_decay_predictor.py`: Early warning for degrading selectors
-- `selector_discovery.py`: Automated selector finding
 - `selector_memory.py`: Learned selector patterns
+- `llm_extractor.py`: Direct LLM JSON extraction fallback
 - `field_validator.py`: Output correctness checking
 
 **Data Flow**:
 ```
 Rendered HTML/DOM
     ↓
-Selector ML Optimizer Predicts Quality
-    (Which selectors are reliable?)
-    ↓
-Selector Engine Applies Selectors
-    (Extract values from DOM)
+Check Network/Hydration JSON
+    ↓ (If none)
+Direct LLM Extraction
+    ↓ (If fallback needed)
+Regex & Memory Selectors
     ↓
 Field Validator Checks Output
-    (Is extracted data valid?)
-    ↓
-Decay Predictor Monitors Quality
-    (Early warning if degrading)
     ↓
 Extracted Fields
 ```
@@ -210,24 +204,23 @@ Persist State
 **Responsibility**: LLM reasoning, semantic understanding, structured synthesis
 
 **Components**:
-- `llm_bridge.py`: Claude API integration
+- `llm_extractor.py`: Groq/Claude API integration
 - `semantic_pipeline.py`: Structured reasoning workflow
 - `semantic_world_state.py`: Knowledge representation
 
 **Use Cases**:
-- Complex field extraction (multi-step reasoning)
+- Complex field extraction directly from HTML to JSON
 - Schema inference (understand data structure)
 - Quality validation (semantic correctness)
-- Recovery escalation (when automated recovery insufficient)
 
 **Data Flow**:
 ```
 Complex Extraction Challenge
     ↓
-LLM Bridge Formulates Query
-    (Structure problem for Claude)
+LLM Extractor Formulates Query
+    (Structure problem for LLM)
     ↓
-Claude Provides Reasoning
+LLM Provides Reasoning & JSON
     (Structured output)
     ↓
 Results Integrated Back
@@ -398,21 +391,19 @@ Consensus Protocol Agrees on State
 
 ## The Four Learning Loops
 
-### Loop 1: Selector Quality Learning
-**Frequency**: Per extraction attempt  
-**Learning Mechanism**: Weight updates based on actual results
+### Loop 1: Direct LLM Prompt Refinement
+**Frequency**: Iterative development
+**Learning Mechanism**: Manual prompt engineering and fallback validation
 
 ```
-Extract with selector → Measure success/quality
+Extract with LLM → Measure schema compliance
     ↓
-Compare to ML prediction → Calculate error
+Review errors/hallucinations → Calculate error
     ↓
-Update predictor weights → Improve future predictions
-    ↓
-Store in selector memory → Per-domain pattern tracking
+Update system prompt → Improve future extraction
 ```
 
-**Impact**: Selectors automatically improve over time
+**Impact**: LLM reliability improves over time
 
 ### Loop 2: Strategy Evolution
 **Frequency**: Per fetch attempt  
