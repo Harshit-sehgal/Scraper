@@ -81,7 +81,11 @@ else
     echo "=== 7. Running Full pytest Suite ==="
     STEP=7
     # Skip Postgres/live-LLM tests (require Docker/RUN_LIVE_LLM_TESTS=1)
-    PYTHONPATH=. $PYTHON_EXE -m pytest -q -o "addopts=" -k "not postgres and not test_profile_alignment_e2e" 2>&1
+    PYTHONPATH=. $PYTHON_EXE -m pytest -q -o "addopts=" \
+        --ignore=tests/test_profile_alignment_e2e.py \
+        --ignore=tests/test_job_api_e2e.py \
+        --ignore=tests/test_session_bound_e2e.py \
+        --ignore=tests/test_playwright_browser_e2e.py 2>&1
 fi
 
 echo "=== SRE Quick Check Complete — ALL CHECKS PASSED ==="

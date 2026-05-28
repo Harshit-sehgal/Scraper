@@ -203,6 +203,17 @@ async def run_benchmarks():
     print(" BENCHMARKS COMPLETE")
     print("="*60 + "\n")
 
+def test_hostile_benchmark_app_endpoints():
+    """Verify that hostile benchmark FastAPI app routes are configured correctly."""
+    routes = [r.path for r in app.routes]
+    assert "/broken" in routes
+    assert "/dynamic" in routes
+    assert "/anti-bot" in routes
+    assert "/lazy" in routes
+    assert "/infinite" in routes
+    assert "/malformed" in routes
+
+
 if __name__ == "__main__":
     # Allow rapid requests to local server
     settings.CRAWL_DEFAULT_DELAY_SECONDS = 0.0

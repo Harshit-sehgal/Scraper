@@ -214,3 +214,33 @@ jobs:
           from app.config import settings
           print(f'config: OK (env={settings.ENV})')
           PY
+
+  postgres-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dataforge
+          POSTGRES_PASSWORD: dataforge
+          POSTGRES_DB: dataforge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r backend/requirements-dev.txt
+      - run: |
+          cd backend
+          DATAFORGE_ENV=test \
+          DATAFORGE_STORAGE_BACKEND=postgres \
+          DATAFORGE_QUEUE_BACKEND=postgres \
+          DATAFORGE_DATABASE_URL=postgresql://dataforge:dataforge@localhost:5432/dataforge \
+          PYTHONPATH=. pytest --run-postgres -m postgres -q

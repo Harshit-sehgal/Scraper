@@ -365,7 +365,7 @@ class SiteResult:
 # Test Runner
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def test_site(site: SiteTest, index: int, total: int) -> SiteResult:
+async def run_site_benchmark(site: SiteTest, index: int, total: int) -> SiteResult:
     """Run scrape_url against one site and return structured results."""
     print(f"\n  [{index}/{total}] {site.name:25} ({site.category:15}) {site.url[:60]}...")
     print(f"         Schema: {[f.name for f in site.schema]}")
@@ -485,7 +485,7 @@ async def run_all_tests():
     results: list[SiteResult] = []
 
     for i, site in enumerate(SITES, 1):
-        result = await test_site(site, i, len(SITES))
+        result = await run_site_benchmark(site, i, len(SITES))
         results.append(result)
         # Respectful delay between sites
         if i < len(SITES):
@@ -693,9 +693,14 @@ def save_to_history(results: list[SiteResult], history_dir: str = "smoke_test_hi
     save_report(results, path)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Main
-# ─────────────────────────────────────────────────────────────────────────────
+def test_smoke_benchmark_fixtures_exist():
+    """Verify that universal extraction smoke test fixtures are populated correctly."""
+    assert len(SITES) >= 15
+    for site in SITES:
+        assert site.name
+        assert site.url
+        assert isinstance(site.schema, list)
+
 
 async def main():
     print("Running 15-site smoke test (this will take several minutes)...")

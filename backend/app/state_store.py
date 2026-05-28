@@ -36,7 +36,7 @@ def _now_iso() -> str:
 
 
 def get_state_file_path() -> Path:
-    env_path = os.getenv("DATAFORGE_STATE_FILE", "").strip()
+    env_path = os.getenv("DATAFORGE_STATE_FILE_PATH", "").strip() or os.getenv("DATAFORGE_STATE_FILE", "").strip()
     if env_path:
         return Path(env_path).expanduser()
 

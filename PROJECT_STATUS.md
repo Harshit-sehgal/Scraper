@@ -34,6 +34,7 @@
 - **Silent exception blocks**: Multiple broad `except Exception` blocks exist across the codebase for resilience. These are intentional for operational stability but mean some failures may be logged rather than raised.
 - **CDN dashboard dependencies**: The semantic reliability dashboard loads Chart.js and Tailwind CSS from CDNs. The nginx CSP has been updated to allow these, but vendoring is recommended for full isolation.
 - **Dependency reproducibility**: Pinned dependencies from `requirements.lock.txt` are enforced in Docker builds.
+- **Benchmark / Accuracy Framework**: Deterministic benchmark coverage exists for selected fixture scenarios. Live benchmark and hostile-site reliability require separate validation. Recovery logic has deterministic unit coverage and simulated recovery checks; real recovery success must be measured through live or replayed failure benchmarks.
 
 ## Production Blockers
 

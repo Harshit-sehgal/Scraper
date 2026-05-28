@@ -58,5 +58,10 @@ def benchmark_replay(transaction_count: int = 10000):
     print(f"  Replay Efficiency: {duration_replay / duration_gen:.2f}x generation speed")
     return True
 
+def test_replay_benchmark_run():
+    """Verify that state reconstruction via deterministic replay works perfectly with low transaction volume."""
+    assert benchmark_replay(transaction_count=20) is True
+
+
 if __name__ == "__main__":
     benchmark_replay(transaction_count=5000)
