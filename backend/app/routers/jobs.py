@@ -159,7 +159,7 @@ def create_jobs_router(
         }
 
     @router.post("/api/jobs/{job_id}/backfill-metadata")
-    async def backfill_job_metadata(job_id: str):
+    async def backfill_job_metadata(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         """Explicitly backfill source metadata for manual-mode job results."""
         job = _get_job(job_id)
 

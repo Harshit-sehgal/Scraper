@@ -80,6 +80,13 @@ echo -e "  $PASS  .env file exists"
 
 # Read env values safely through Python
 DATAFORGE_API_KEY="$(_get_env DATAFORGE_API_KEY)"
+DATAFORGE_OPERATOR_API_KEY="$(_get_env DATAFORGE_OPERATOR_API_KEY)"
+
+if [ -z "${DATAFORGE_OPERATOR_API_KEY:-}" ]; then
+    echo -e "  $INFO  DATAFORGE_OPERATOR_API_KEY not set — job creation may fail if ADMIN is required"
+    # Fall back to API_KEY for backward compatibility
+    DATAFORGE_OPERATOR_API_KEY="$DATAFORGE_API_KEY"
+fi
 
 if [ -z "${DATAFORGE_API_KEY:-}" ]; then
     echo -e "  $FAIL  DATAFORGE_API_KEY is not set in .env"
@@ -204,7 +211,7 @@ echo ""
 echo "─── Step 8: Create a job against local smoke page ────────────────────"
 
 JOB_RESPONSE=$(curl -s -X POST \
-    -H "X-API-Key: $DATAFORGE_API_KEY" \
+    -H "X-API-Key: $DATAFORGE_OPERATOR_API_KEY" \
     -H "Content-Type: application/json" \
     -d '{"name":"Smoke Test Job","mode":"manual","urls":["http://nginx/smoke/records.html"]}' \
     http://localhost/api/jobs 2>/dev/null || echo '{"error":"unreachable"}')

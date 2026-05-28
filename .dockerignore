@@ -53,7 +53,9 @@ ARCHITECTURE_LAWS.md
 ARCHITECTURE.md
 data_flow_diagrams.md
 *.pdf
+# SVG: exclude everything except the frontend favicon
 *.svg
+!frontend/favicon.svg
 
 # ─── Test Artifacts ────────────────────────────────────────────────────────
 .coverage

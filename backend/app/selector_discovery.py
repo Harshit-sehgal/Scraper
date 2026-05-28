@@ -1743,14 +1743,39 @@ async def analyze_url_for_fields(url: str, search_params: dict[str, str] | None 
     final_url = url
     try:
         async with httpx.AsyncClient(
-            follow_redirects=True,
+            follow_redirects=False,
             timeout=httpx.Timeout(10.0),
         ) as client:
-            resp = await client.get(url)
+            resp = await client.get(url, follow_redirects=False)
+            
+            # Manually follow redirects with SSRF validation at each hop
+            max_hops = 10
+            hops = 0
+            while resp.is_redirect and hops < max_hops:
+                hops += 1
+                location = resp.headers.get("location", "")
+                if not location:
+                    break
+                from urllib.parse import urljoin as _urljoin
+                redirect_target = _urljoin(str(resp.url), location)
+                
+                # SSRF: Validate each redirect hop target
+                from app.url_safety import validate_public_http_url
+                try:
+                    validate_public_http_url(redirect_target)
+                except ValueError as e:
+                    logger.warning(
+                        "[URLAnalyzer] Redirect target blocked by SSRF validation: %s → %s: %s",
+                        url, redirect_target, e
+                    )
+                    break
+                
+                resp = await client.get(redirect_target, follow_redirects=False)
+            
             if str(resp.url) != url:
                 final_url = str(resp.url)
                 logger.info(
-                    "[URLAnalyzer] URL redirected: %s → %s", url, final_url
+                    "[URLAnalyzer] URL resolved: %s → %s (after %d redirect hops)", url, final_url, hops
                 )
     except Exception:
         logger.debug("[URLAnalyzer] Could not determine final URL via httpx for %s", url)

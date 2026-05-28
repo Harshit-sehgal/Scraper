@@ -1,8 +1,8 @@
 # DataForge Current State: Architectural Reference
 
 **As of**: May 26, 2026  
-**Maturity Level**: 97% (Production Hardening Phase)  
-**Status**: Production-ready with CI pipeline, Postgres worker queue, role-based API keys
+**Maturity Level**: Production Hardening Phase  
+**Status**: Under active hardening — CI pipeline, Postgres worker queue, role-based API keys
 
 ---
 
@@ -72,7 +72,7 @@
 
 ### System Health
 - **Type Safety**: 100% (mypy: 0 errors across 103 files)
-- **Test Coverage**: 656 tests passing (38.1s execution time)
+- **Test Coverage**: ~1708 tests (run `pytest -q` for current count)
 - **Config Quality**: 100% (no hardcoded values)
 - **Code Stability**: 99% of core engine stable
 
@@ -310,7 +310,7 @@ Learn from outcome
 ✓ Selector ML optimization  
 ✓ Strategy evolution  
 ✓ Observability & telemetry  
-✓ Test coverage (656 tests)  
+✓ Test coverage (~1708 tests)  
 ✓ Type safety (100%)  
 
 ---

@@ -45,22 +45,23 @@ function showApiKeyPrompt() {
     }
 }
 
-// ─── Admin Key Management (for X-Admin-Key protected endpoints) ─────
+// ─── Admin Key Management (session-scoped, never persisted to localStorage) ─
+let _adminKey = '';
+
 function getAdminKey() {
-    try { return localStorage.getItem('dataforge_admin_key') || ''; } catch { return ''; }
+    return _adminKey;
 }
 
 function setAdminKey(key) {
-    try { localStorage.setItem('dataforge_admin_key', key); } catch { /* ignore storage errors */ }
+    _adminKey = key;
 }
 
 function showAdminKeyPrompt() {
-    const current = getAdminKey();
-    const key = prompt('Enter your DataForge Admin key:', current);
+    const key = prompt('Enter your DataForge Admin key (for this session only):');
     if (key !== null) {
         setAdminKey(key.trim());
         if (key.trim()) {
-            toast('Admin key set', 'success');
+            toast('Admin key set for this session', 'success');
         }
     }
 }
@@ -395,9 +396,9 @@ function renderJobs(jobs) {
                 <div><span class="badge ${j.status}">${j.status}</span></div>
                 <div class="job-records">${j.total_records > 0 ? `${j.filtered_records}` : '—'}</div>
                 <div class="job-actions">
-                    ${['completed', 'degraded', 'empty_result'].includes(j.status) ? `<button class="btn ghost small" onclick="viewResults('${j.id}')">View</button>` : ''}
-                    ${isActive ? `<button class="btn warn-ghost small" onclick="cancelJob('${j.id}')">Cancel</button>` : ''}
-                    <button class="btn danger-ghost small" onclick="deleteJob('${j.id}')">✕</button>
+                    ${['completed', 'degraded', 'empty_result'].includes(j.status) ? `<button class="btn ghost small" onclick="viewResults('${jsStr(j.id)}')">View</button>` : ''}
+                    ${isActive ? `<button class="btn warn-ghost small" onclick="cancelJob('${jsStr(j.id)}')">Cancel</button>` : ''}
+                    <button class="btn danger-ghost small" onclick="deleteJob('${jsStr(j.id)}')">✕</button>
                 </div>
             </div>
         `;
@@ -515,8 +516,8 @@ async function refreshRecycleBin() {
                 <div><span class="badge ${j.status}">${j.status}</span></div>
                 <div class="job-records">${j.total_records > 0 ? `${j.filtered_records}` : '—'}</div>
                 <div class="job-actions">
-                    <button class="btn ghost small" onclick="restoreJob('${j.id}')">Restore</button>
-                    <button class="btn danger-ghost small" onclick="hardDeleteJob('${j.id}')">Delete Forever</button>
+                    <button class="btn ghost small" onclick="restoreJob('${jsStr(j.id)}')">Restore</button>
+                    <button class="btn danger-ghost small" onclick="hardDeleteJob('${jsStr(j.id)}')">Delete Forever</button>
                 </div>
             </div>
         `).join('');
@@ -1587,6 +1588,21 @@ async function submitJob(e) {
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+// Safer escaping for JavaScript string contexts (onclick handlers).
+// HTML-escapes AND escapes characters that could break out of JS strings:
+//   ' (single quote), " (double quote), \ (backslash), 
+ (newline),  (carriage return)
+function jsStr(s) {
+    if (typeof s !== 'string') s = String(s || '');
+    return s
+        .replace(/\\/g, '\\')
+        .replace(/'/g, "\'")
+        .replace(/"/g, '\"')
+        .replace(/
+/g, '\n')
+        .replace(//g, '\r');
+}
+
 // ─── Cognition State ───
 
 async function refreshCognition() {
@@ -1904,7 +1920,7 @@ function renderPredictions(data) {
                     ` : ''}
                     ${p.recommended_actions?.length ? `
                         <div class="dash-prediction-actions">
-                            ${p.recommended_actions.map(a => `<button class="btn ghost small" onclick="toast('${esc(a)}', 'info')">${esc(a)}</button>`).join('')}
+                            ${p.recommended_actions.map(a => `<button class="btn ghost small" onclick="toast('${jsStr(a)}', 'info')">${esc(a)}</button>`).join('')}
                         </div>
                     ` : ''}
                 </div>

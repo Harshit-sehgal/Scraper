@@ -186,12 +186,13 @@ def test_diagnostics_exporter_endpoint(client, monkeypatch):
         
     monkeypatch.setattr("app.semantic_world_state.get_world_state", lambda: FakeWorldState())
     
-    # Set config settings values
+    # Set config settings values (use ADMIN_API_KEY since endpoint requires ADMIN role)
     monkeypatch.setattr(settings, "API_KEY", "super_secret_api_key_123")
+    monkeypatch.setattr(settings, "ADMIN_API_KEY", "super_secret_admin_key_456")
     monkeypatch.setattr(settings, "ALERT_WEBHOOK_URL", "http://alert.webhook/endpoint")
     
     # Retrieve diagnostics zip
-    r = client.get("/api/system/diagnostics/export", headers={"X-API-Key": "super_secret_api_key_123"})
+    r = client.get("/api/system/diagnostics/export", headers={"X-API-Key": "super_secret_admin_key_456"})
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/zip"
     

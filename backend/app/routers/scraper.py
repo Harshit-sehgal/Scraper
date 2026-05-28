@@ -8,9 +8,10 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 
 from app.config import settings
+from app.utils.rbac import UserRole, require_role
 from app.scrape_telemetry import get_scrape_telemetry
 from app.selector_memory import get_selector_memory
 from app.scraper_diagnostics import run_diagnostics
@@ -101,7 +102,7 @@ async def get_scraper_stats():
 
 
 @router.delete("/telemetry")
-async def clear_telemetry():
+async def clear_telemetry(_role: UserRole = Depends(require_role([UserRole.ADMIN]))):
     """Clear all scrape telemetry history."""
     get_scrape_telemetry().clear()
     return {"status": "ok"}
@@ -484,7 +485,7 @@ async def get_domain_selector_confidence(domain: str):
 
 
 @router.post("/selectors/cleanup")
-async def trigger_selector_cleanup():
+async def trigger_selector_cleanup(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Manually trigger selector memory cleanup.
     
     Forces deletion of all selectors below the confidence threshold,
@@ -612,7 +613,7 @@ async def get_optimization_history(domain: str, limit: int = Query(10, ge=1, le=
 
 
 @router.post("/ml/learn")
-async def record_selector_learning(domain: str, selector: str, quality: float = Query(0.0, ge=0, le=1)):
+async def record_selector_learning(domain: str, selector: str, quality: float = Query(0.0, ge=0, le=1), _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Record actual selector performance for ML model improvement.
     
     This feedback helps the ML model learn which selectors work best.
@@ -666,6 +667,7 @@ async def record_strategy_attempt(
     time_ms: float = Query(0, ge=0),
     quality: float = Query(0.5, ge=0, le=1),
     failure_reason: Optional[str] = None,
+    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
 ):
     """Record a strategy attempt for learning.
     
@@ -728,7 +730,7 @@ async def get_all_strategies_report():
 
 
 @router.post("/strategy/evolve/{domain}")
-async def evolve_domain_strategy(domain: str):
+async def evolve_domain_strategy(domain: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Manually trigger strategy evolution for a domain.
     
     Useful when current strategy is degraded.

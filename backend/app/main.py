@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -29,6 +29,7 @@ from app.storage_interface import get_job_repository
 # during startup and referenced by route handlers.
 job_repo = None
 from app.rate_limiter import RateLimiterMiddleware
+from app.utils.rbac import UserRole, require_role
 import time
 
 
@@ -691,7 +692,7 @@ def _require_admin_key(request: Request):
 
 
 @app.post("/api/system/merge/knowledge")
-async def merge_knowledge(request: Request, data: dict):
+async def merge_knowledge(request: Request, data: dict, _role=Depends(require_role([UserRole.ADMIN]))):
     """Merge an external knowledge manifold into the current field.
 
     Validated with size caps: max 500 roles, max 500 exclusions.
@@ -810,7 +811,7 @@ async def system_topology_history(limit: int = 20):
 
 
 @app.post("/api/system/scheduler/step")
-async def process_cognitive_tasks(budget_ms: float = 100.0):
+async def process_cognitive_tasks(budget_ms: float = 100.0, _role=Depends(require_role([UserRole.ADMIN]))):
     """Manually trigger processing of the cognitive task queue."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
@@ -876,7 +877,7 @@ async def system_replay_events(start_idx: int = 0, end_idx: int = -1):
 
 
 @app.post("/api/system/refactor/compress")
-async def trigger_manifold_compression():
+async def trigger_manifold_compression(_role=Depends(require_role([UserRole.ADMIN]))):
     """Trigger an autonomous manifold compression cycle."""
     from app.semantic_world_state import get_world_state
     from app.llm_bridge import get_plugin_manager
@@ -886,7 +887,7 @@ async def trigger_manifold_compression():
 
 
 @app.get("/api/system/diagnostics/export")
-async def export_system_diagnostics():
+async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN]))):
     """Generates and exports an authenticated and sanitized system diagnostics ZIP bundle."""
     import io
     import zipfile
@@ -902,18 +903,20 @@ async def export_system_diagnostics():
     phone_regex = re.compile(r"\+?\b\d[\d\s()\-]{8,14}\d\b")
     sensitive_keys = {"authorization", "auth", "api_key", "key", "password", "token", "secret", "signature", "alert_webhook_url", "credential", "session", "cookie", "bearer", "private", "client_secret", "api_secret", "access_key", "secret_key"}
 
-    def sanitize_value(val):
+    def sanitize_value(val, _depth=0, _max_depth=50):
+        if _depth >= _max_depth:
+            return val
         if isinstance(val, str):
             val = email_regex.sub("<redacted_email>", val)
             val = phone_regex.sub("<redacted_phone>", val)
             return val
         elif isinstance(val, dict):
             return {
-                k: ("********" if any(s in k.lower() for s in sensitive_keys) else sanitize_value(v))
+                k: ("********" if any(s in k.lower() for s in sensitive_keys) else sanitize_value(v, _depth=_depth + 1, _max_depth=_max_depth))
                 for k, v in val.items()
             }
         elif isinstance(val, list):
-            return [sanitize_value(item) for item in val]
+            return [sanitize_value(item, _depth=_depth + 1, _max_depth=_max_depth) for item in val]
         else:
             return val
 

@@ -49,7 +49,7 @@ This commit shifted focus from feature velocity to **architectural stability**.
 ### ✓ 64 New Tests (31 + 33)
 - 31 selector ML tests (feature extraction, prediction, learning)
 - 33 strategy evolution tests (recommendations, switching, learning)
-- 656 total tests passing (zero regressions)
+- 656+ total tests at time of writing (now ~1708, zero regressions)
 
 ### ✓ Comprehensive Documentation (500+ lines)
 - ML_STRATEGY_EVOLUTION.md guide
@@ -312,7 +312,7 @@ Ask:
 
 ### 2. Tests as Documentation
 
-Your 656 tests are NOT just regression protection.
+Your ~1708 tests are NOT just regression protection.
 
 They are **executable documentation** of how systems interact.
 

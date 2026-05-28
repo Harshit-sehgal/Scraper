@@ -142,8 +142,14 @@ def _extract_nested_value_with_suffix(val: Any) -> tuple[Any, str]:
     return val, ""
 
 
-def _sanitize_payload(obj: Any) -> Any:
-    """Recursively remove sensitive keys/branches from a JSON structure."""
+def _sanitize_payload(obj: Any, _depth: int = 0, _max_depth: int = 50) -> Any:
+    """Recursively remove sensitive keys/branches from a JSON structure.
+
+    Depth-limited to ``_max_depth`` to prevent stack overflow on
+    pathological or circular-reference payloads.
+    """
+    if _depth >= _max_depth:
+        return obj
     if isinstance(obj, dict):
         sanitized = {}
         sensitive_patterns = ("cookie", "token", "session", "secret", "password", "jwt", "auth", "bearer", "csrf", "private_key", "client_secret")
@@ -151,10 +157,10 @@ def _sanitize_payload(obj: Any) -> Any:
             k_lower = k.lower()
             if any(pattern in k_lower for pattern in sensitive_patterns):
                 continue
-            sanitized[k] = _sanitize_payload(v)
+            sanitized[k] = _sanitize_payload(v, _depth=_depth + 1, _max_depth=_max_depth)
         return sanitized
     elif isinstance(obj, list):
-        return [_sanitize_payload(item) for item in obj]
+        return [_sanitize_payload(item, _depth=_depth + 1, _max_depth=_max_depth) for item in obj]
     return obj
 
 

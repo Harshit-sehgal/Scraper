@@ -43,6 +43,10 @@ _MAX_PAYLOADS_PER_URL: int = 50
 """Maximum number of network payloads stored per URL."""
 _MAX_BYTES_PER_URL: int = 10 * 1024 * 1024
 """Maximum total bytes of network payloads stored per URL (10 MB)."""
+_MAX_URLS: int = 1000
+"""Maximum number of distinct URLs tracked globally (LRU eviction)."""
+_MAX_GLOBAL_BYTES: int = 256 * 1024 * 1024
+"""Maximum total bytes across all URLS (256 MB)."""
 _MAX_STORAGE_ENTRIES_PER_AREA: int = 50
 """Maximum cookies/storage entries stored per browser state area."""
 _MAX_STORAGE_NAME_CHARS: int = 128
@@ -74,6 +78,18 @@ def clear_all() -> None:
     """Clear all captured payloads."""
     _captured_payloads.clear()
     _captured_browser_state.clear()
+
+
+def clear_job_captures(urls: list[str]) -> None:
+    """Clear captured payloads for a list of job-specific URLs.
+
+    Called after job extraction completes to free memory.
+    """
+    for url in urls:
+        _captured_payloads.pop(url, None)
+        _captured_browser_state.pop(url, None)
+    if urls:
+        logger.info("[BrowserNetwork] Cleared captures for %d job URLs", len(urls))
 
 
 def get_captures(url: str) -> list[dict]:
@@ -334,10 +350,62 @@ def store_captures(url: str, payloads: list[dict]) -> None:
             total_bytes -= 1024
 
     _captured_payloads[url] = existing
+    
+    # Global LRU eviction: keep most recently accessed URLs
+    # Order by recency and cap at _MAX_URLS / _MAX_GLOBAL_BYTES
+    _evict_lru_captures()
+    
     logger.info(
-        "[BrowserNetwork] Stored %d network payloads for %s (total ~%.1f KB)",
-        len(payloads), url, total_bytes / 1024,
+        "[BrowserNetwork] Stored %d network payloads for %s (total ~%.1f KB, %d URLs tracked)",
+        len(payloads), url, total_bytes / 1024, len(_captured_payloads),
     )
+
+
+# ---------------------------------------------------------------------------
+# LRU eviction
+# ---------------------------------------------------------------------------
+
+
+def _evict_lru_captures() -> None:
+    """Evict the least-recently-used URLs when global caps are exceeded.
+
+    Maintains a simple LRU order by URL key insertion order (Python 3.7+).
+    When _MAX_URLS or _MAX_GLOBAL_BYTES is exceeded, drops the oldest URLs
+    until both limits are satisfied.
+    """
+    import json as _json
+
+    # Cap by total URLs first
+    while len(_captured_payloads) > _MAX_URLS:
+        oldest_url = next(iter(_captured_payloads))
+        dropped = _captured_payloads.pop(oldest_url, None)
+        if dropped:
+            logger.debug(
+                "[BrowserNetwork] LRU evicted %s (%d payloads, %d URLs remain)",
+                oldest_url, len(dropped), len(_captured_payloads),
+            )
+
+    # Cap by total bytes
+    total_bytes = 0
+    url_bytes: list[tuple[str, int]] = []
+    for u, payloads in _captured_payloads.items():
+        try:
+            bytes_for_url = sum(len(_json.dumps(p, ensure_ascii=False, default=str)) for p in payloads)
+        except Exception:
+            bytes_for_url = len(payloads) * 1024
+        url_bytes.append((u, bytes_for_url))
+        total_bytes += bytes_for_url
+
+    while total_bytes > _MAX_GLOBAL_BYTES and len(url_bytes) > 1:
+        # Drop from the oldest URL (first in insertion order)
+        oldest_url, oldest_bytes = url_bytes.pop(0)
+        dropped = _captured_payloads.pop(oldest_url, None)
+        if dropped:
+            total_bytes -= oldest_bytes
+            logger.debug(
+                "[BrowserNetwork] LRU byte-evicted %s (~%.1f KB, %d URLs remain)",
+                oldest_url, oldest_bytes / 1024, len(_captured_payloads),
+            )
 
 
 # ---------------------------------------------------------------------------
