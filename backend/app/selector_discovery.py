@@ -159,10 +159,12 @@ async def analyze_url_for_fields(
             # Manually follow redirects with SSRF validation at each hop
             max_hops = 10
             hops = 0
-            while resp.is_redirect and hops < max_hops:
+            is_redirect = getattr(resp, "is_redirect", False)
+            while isinstance(is_redirect, bool) and is_redirect and hops < max_hops:
                 hops += 1
-                location = resp.headers.get("location", "")
-                if not location:
+                headers = getattr(resp, "headers", None)
+                location = headers.get("location", "") if hasattr(headers, "get") else ""
+                if not location or not isinstance(location, str):
                     break
                 from urllib.parse import urljoin as _urljoin
                 redirect_target = _urljoin(str(resp.url), location)
@@ -179,6 +181,7 @@ async def analyze_url_for_fields(
                     break
 
                 resp = await client.get(redirect_target, follow_redirects=False)
+                is_redirect = getattr(resp, "is_redirect", False)
 
             if str(resp.url) != url:
                 final_url = str(resp.url)

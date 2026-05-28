@@ -225,6 +225,7 @@ def test_auto_discovery_url_filtering(client, monkeypatch):
     """Verify that auto-discovered URLs are filtered against SSRF protections in both API and Job runner contexts."""
     from app.config import settings
     monkeypatch.setattr(settings, "ENV", "production")
+    monkeypatch.setattr(settings, "OPERATOR_API_KEY", "test-operator-key")
 
     # Mock discover_urls to return a mix of safe and unsafe URLs
     async def mock_discover(*args, **kwargs):
@@ -244,7 +245,7 @@ def test_auto_discovery_url_filtering(client, monkeypatch):
         "num_results": 5,
         "schema_field_names": ["title"]
     }
-    resp = client.post("/api/discover", json=payload)
+    resp = client.post("/api/discover", json=payload, headers={"X-API-Key": "test-operator-key"})
     assert resp.status_code == 200
     urls = resp.json()["urls"]
     assert len(urls) == 2

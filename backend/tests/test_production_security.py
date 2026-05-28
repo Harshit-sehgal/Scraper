@@ -29,3 +29,18 @@ async def test_production_security_enforcement_empty_api_key(monkeypatch):
         async with lifespan(app):
             pass
     assert "API_KEY is empty or not configured" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_production_security_enforcement_placeholder_secrets(monkeypatch):
+    monkeypatch.setattr(settings, "ENV", "production")
+    monkeypatch.setattr(settings, "CORS_ORIGINS", ["https://trusted.com"])
+    monkeypatch.setattr(settings, "API_KEY", "change-me")
+
+    app = FastAPI()
+    
+    with pytest.raises(SystemExit) as exc:
+        async with lifespan(app):
+            pass
+    assert "contains a known placeholder/default value" in str(exc.value)
+

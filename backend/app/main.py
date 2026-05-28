@@ -123,6 +123,30 @@ async def lifespan(app: FastAPI):
                 "API_KEY must be explicitly set to secure all API endpoints."
             )
 
+        # Reject known placeholder/default secrets in production
+        _placeholder_values = {
+            'change-me', 'change-me-to-a-random-secret',
+            'change-this-to-a-strong-password',
+            'dev-key', 'test-key', 'your-api-key-here',
+            'change-me-admin-key', 'change-me-operator-key',
+        }
+        _secrets_to_check = {
+            'API_KEY': getattr(settings, 'API_KEY', None),
+            'ADMIN_API_KEY': getattr(settings, 'ADMIN_API_KEY', None),
+            'OPERATOR_API_KEY': getattr(settings, 'OPERATOR_API_KEY', None),
+        }
+        for _key_name, _key_val in _secrets_to_check.items():
+            if _key_val and _key_val.strip().lower() in _placeholder_values:
+                logger.critical(
+                    "FATAL: %s contains a known placeholder value. "
+                    "Refusing to start in production with insecure defaults.",
+                    _key_name,
+                )
+                raise SystemExit(
+                    f"{_key_name} contains a known placeholder/default value. "
+                    f"Set a strong, unique secret before running in production."
+                )
+
     # Initialize event cascade (safe: scheduler is lazy-created, no circular import)
     from app.graph_update_scheduler import get_scheduler
     get_scheduler()

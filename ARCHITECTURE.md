@@ -9,13 +9,13 @@
 
 ## Quick Start: System Overview
 
-DataForge is a **self-adaptive web scraping infrastructure** with:
+DataForge is a **resilient and adaptive web scraping infrastructure** with:
 - **14 interconnected systems** (crawl, fetch, extract, recovery, memory, intelligence, telemetry, distributed)
 - **4 continuous learning loops** (selectors, strategies, domain evolution, degradation prediction)
-- **Predictive intelligence** (anticipates failures before they occur)
-- **Autonomous adaptation** (adjusts without human intervention)
-- **100% type-safe** (mypy clean across 103 files)
-- **698 comprehensive tests** (0 failures)
+- **Predictive intelligence** (anticipates potential failures)
+- **Autonomous adaptation** (adjusts without human intervention in most cases)
+- **Type-annotated codebase** (progressive typing across core backend modules)
+- **Extensive test coverage** (~1708 tests verifying system components)
 
 ---
 

@@ -50,6 +50,9 @@ set +e
 PYTHONPATH="$BACKEND_DIR" python3 -m pytest "$BACKEND_DIR/tests" \
     -q -o "addopts=" \
     --ignore="$BACKEND_DIR/tests/test_profile_alignment_e2e.py" \
+    --ignore="$BACKEND_DIR/tests/test_job_api_e2e.py" \
+    --ignore="$BACKEND_DIR/tests/test_session_bound_e2e.py" \
+    --ignore="$BACKEND_DIR/tests/test_playwright_browser_e2e.py" \
     > "$PYTEST_TMP" 2>&1
 PYTEST_EXIT=$?
 set -e

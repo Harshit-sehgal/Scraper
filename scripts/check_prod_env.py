@@ -82,7 +82,8 @@ def check_var(
     Returns:
         True if the check passed, False otherwise.
     """
-    value = env.get(name, "").strip()
+    import os
+    value = env.get(name, os.environ.get(name, "")).strip()
 
     if not value:
         if required:
