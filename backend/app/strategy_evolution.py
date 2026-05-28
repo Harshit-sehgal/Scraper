@@ -197,7 +197,7 @@ class StrategyEvolutionEngine:
         # Domain-aware cold-start sets (matched via _match_domain_set)
         # These do NOT replace learning — they seed the initial strategy choice
         # so common difficult domains get a sensible default on first contact.
-        self._antiboot_heavy_domains: set[str] = {
+        self._antibot_heavy_domains: set[str] = {
             "yelp.com", "indeed.com", "ebay.com", "walmart.com",
             "amazon.com", "linkedin.com", "zillow.com",
         }
@@ -291,7 +291,7 @@ class StrategyEvolutionEngine:
         if total_attempts < self.min_samples_for_recommendation:
             # Cold start: domain-aware strategy selection
             # Check anti-bot heavy domains first (need stealth)
-            if self._match_domain_set(domain, self._antiboot_heavy_domains):
+            if self._match_domain_set(domain, self._antibot_heavy_domains):
                 return StrategyRecommendation(
                     recommended_strategy=FetchStrategy.PLAYWRIGHT_STEALTH,
                     alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],

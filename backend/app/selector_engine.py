@@ -315,7 +315,8 @@ def _field_matches_classification(field_name: str, classification: str) -> bool:
         "code": ("code", "identifier", "ref", "sku"),
         "text": (),  # matched via field ordering priority — STRING fields can match text
     }
-    keywords = mapping.get(classification, ())            if classification == "code":
+    keywords = mapping.get(classification, ())
+    if classification == "code":
         keywords = keywords + ("id", "ref")
     if classification == "name":
         # Broader matching for entity-name fields: airline text should match
