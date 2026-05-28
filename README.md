@@ -150,4 +150,4 @@ For developers and researchers interested in the under-the-hood intelligence lay
 3. **Contradiction-Aware Reasoning**: Semantic conflicts propagate as energy pressure through the graph via `ExclusionEdge` topology.
 4. **Adaptive Memory**: Structural motifs are reinforced by extraction successes and decayed by time/neglect to counter element change (selector decay).
 
-For deep structural details and research notes, see [ARCHITECTURE.md](backend/ARCHITECTURE.md) and [RESEARCH_NOTES.md](backend/RESEARCH_NOTES.md).
+For deep structural details and research notes, see [ARCHITECTURE.md](docs/ARCHITECTURE.md) and [RESEARCH_NOTES.md](docs/RESEARCH_NOTES.md).
