@@ -320,8 +320,8 @@ def create_jobs_router(
                     try:
                         repo = get_job_repository()
                         repo.hard_delete(job.id)
-                    except Exception as e:
-                        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+                    except Exception as db_err:
+                        logging.getLogger(__name__).warning("Suppressed exception: %s", db_err)
                         pass
                     raise HTTPException(
                         status_code=503,

@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import random
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 import re
 from app.config import settings
@@ -233,10 +233,12 @@ class AntiBotEngine:
             if conservative_heights:
                 viewport_height = random.choice(conservative_heights)
         
-        profile = {
+        viewport = {"width": viewport_width, "height": viewport_height}
+
+        profile: Dict[str, Any] = {
             "user_agent": ua,
+            "viewport": viewport,
             "extra_headers": extra_headers,
-            "viewport": {"width": viewport_width, "height": viewport_height},
             "cookie_string": self._cookies.get(domain, ""),
             "timezone": random.choice(settings.STEALTH_TIMEZONE_POOL.split(",")),
             "locale": settings.STEALTH_DEFAULT_LOCALE,
