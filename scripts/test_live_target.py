@@ -44,6 +44,9 @@ async def main():
             
     except Exception as e:
         print(f"Extraction failed: {e}")
+    finally:
+        from app.browser_pool import get_browser_pool
+        await get_browser_pool().close()
 
 if __name__ == "__main__":
     asyncio.run(main())
