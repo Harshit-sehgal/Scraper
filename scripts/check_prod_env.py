@@ -184,7 +184,7 @@ def check_queue_backend(value: str) -> bool:
 
 def _contains_bad_substring(value: str) -> bool:
     """Check if value contains generic placeholder strings."""
-    bad_substrings = ["change-me", "changeme", "secret", "password", "example", "admin", "dev-key", "test-key"]
+    bad_substrings = ["change-me", "changeme", "secret", "password", "example", "admin", "dev-key", "test-key", "your-api-key"]
     val_lower = value.lower()
     return any(bad in val_lower for bad in bad_substrings)
 

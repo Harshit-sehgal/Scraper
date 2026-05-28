@@ -219,7 +219,7 @@ class TestCheckProdEnvValidators:
     def test_check_db_password_accepts_strong_password(self):
         """A strong, unique password should pass."""
         mod = self._import_module()
-        assert mod.check_db_password("secure-password-123!@#")
+        assert mod.check_db_password("secure-db-key-123!@#")
 
     def test_check_env_accepts_production(self):
         """'production' should pass."""
@@ -256,12 +256,12 @@ class TestCheckProdEnvIntegration:
         _write_env(env_file, {
             "DATAFORGE_API_KEY": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
             "DATAFORGE_CORS_ORIGINS": '["https://myapp.example.com"]',
-            "DATAFORGE_DB_PASSWORD": "secure-password-123",
+            "DATAFORGE_DB_PASSWORD": "secure-db-cred-123",
             "DATAFORGE_STORAGE_BACKEND": "postgres",
-            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:secure-password-123@postgres:5432/dataforge",
+            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:secure-db-cred-123@postgres:5432/dataforge",
             "DATAFORGE_WORKER_QUEUE": "true",
             "DATAFORGE_ENV": "production",
-            "GRAFANA_PASSWORD": "strong-grafana-password-123",
+            "GRAFANA_PASSWORD": "strong-grafana-cred-123",
         })
 
         env = mod.load_env_file(env_file)
@@ -355,12 +355,12 @@ class TestCheckProdEnvIntegration:
         _write_env(env_file, {
             "DATAFORGE_API_KEY": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
             "DATAFORGE_CORS_ORIGINS": '["https://app.example.com", "https://dashboard.example.com"]',
-            "DATAFORGE_DB_PASSWORD": "strong-password-xyz",
+            "DATAFORGE_DB_PASSWORD": "strong-cred-xyz",
             "DATAFORGE_STORAGE_BACKEND": "postgres",
-            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:strong-password-xyz@postgres:5432/dataforge",
+            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:strong-cred-xyz@postgres:5432/dataforge",
             "DATAFORGE_WORKER_QUEUE": "true",
             "DATAFORGE_ENV": "production",
-            "GRAFANA_PASSWORD": "strong-grafana-password-xyz",
+            "GRAFANA_PASSWORD": "strong-grafana-cred-xyz",
         })
 
         env = mod.load_env_file(env_file)
