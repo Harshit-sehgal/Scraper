@@ -474,31 +474,45 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
             conn.close()
 
 
-def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) -> None:
-    """Persist all jobs and recycle bin to SQLite transactionally."""
+def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job], prune_missing: bool = False) -> None:
+    """Persist all jobs and recycle bin to SQLite transactionally.
+
+    Args:
+        jobs_store: Current in-memory jobs dict.
+        recycle_bin_store: Current in-memory recycle bin dict.
+        prune_missing: If True, delete rows from the DB that are not present
+            in ``jobs_store`` / ``recycle_bin_store`` *before* upserting.
+            Default False — prevents accidental data loss when the in-memory
+            snapshot differs from the persistent store (e.g. multi-process).
+            Only set True when a complete state replacement is explicitly desired.
+    """
     path = _get_db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
 
     with _DB_LOCK:
         conn = _get_connection()
         try:
-            conn.execute("DELETE FROM jobs")
+            if prune_missing:
+                conn.execute("DELETE FROM jobs")
+
             for job in jobs_store.values():
                 row = _job_to_row(job)
                 columns = ", ".join(row.keys())
                 placeholders = ", ".join("?" for _ in row)
                 conn.execute(
-                    f"INSERT INTO jobs ({columns}) VALUES ({placeholders})",
+                    f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",
                     list(row.values()),
                 )
 
-            conn.execute("DELETE FROM recycle_bin")
+            if prune_missing:
+                conn.execute("DELETE FROM recycle_bin")
+
             for job in recycle_bin_store.values():
                 row = _job_to_row(job)
                 columns = ", ".join(row.keys())
                 placeholders = ", ".join("?" for _ in row)
                 conn.execute(
-                    f"INSERT INTO recycle_bin ({columns}) VALUES ({placeholders})",
+                    f"INSERT OR REPLACE INTO recycle_bin ({columns}) VALUES ({placeholders})",
                     list(row.values()),
                 )
 

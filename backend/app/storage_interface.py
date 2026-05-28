@@ -28,8 +28,16 @@ class JobRepository(ABC):
         pass
         
     @abstractmethod
-    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job]) -> None:
-        """Atomically persist the entire state to the persistent store."""
+    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
+        """Atomically persist the entire state to the persistent store.
+
+        Args:
+            jobs: Current in-memory jobs dict.
+            recycle_bin: Current in-memory recycle bin dict.
+            prune_missing: If True, delete rows from the persistent store that are not
+                present in the provided dicts before upserting. Default False — prevents
+                accidental data loss in multi-process scenarios.
+        """
         pass
         
     @abstractmethod
@@ -95,9 +103,9 @@ class SQLiteJobRepository(JobRepository):
         from app.job_store import load_state
         return load_state()
         
-    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job]) -> None:
+    def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
         from app.job_store import save_state
-        save_state(jobs, recycle_bin)
+        save_state(jobs, recycle_bin, prune_missing=prune_missing)
         
     def is_cancel_requested(self, job_id: str) -> bool:
         """Check from SQLite whether a job has a pending cancellation request."""
