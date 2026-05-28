@@ -22,6 +22,7 @@ from app.selector_engine import apply_selectors, extract_with_regex
 from app.extraction_provenance import ProvenanceBuilder, ExtractionMethod
 from app.container_discovery import multi_pass_container_extraction, classify_container_failure
 from app.network_extractor import extract_from_network
+from app.network_payload_extractor import extract_from_network_payloads, arbitrate_sources
 from app.rendered_visible_text_extractor import extract_from_visible_blocks
 from app.page_evidence_collector import collect_page_evidence
 
@@ -239,6 +240,86 @@ async def orchestrate_extraction(
                     selector=selector,
                     confidence=record.get("record_score", 0.5),
                 )
+
+    # ── Try network payload extraction using the new semantic payload extractor ──
+    from app.browser_network_capture import get_captures
+    captured_payloads = get_captures(url)
+    network_payloads_to_extract = []
+    if captured_payloads:
+        network_payloads_to_extract.extend(captured_payloads)
+
+    network_result = None
+    if network_payloads_to_extract:
+        bodies = []
+        for p in network_payloads_to_extract:
+            if isinstance(p, dict):
+                body = p.get("body")
+                if body is not None:
+                    bodies.append(body)
+                else:
+                    bodies.append(p)
+            else:
+                bodies.append(p)
+        network_result = extract_from_network_payloads(bodies, schema_fields)
+        if network_result:
+            logger.info(
+                "[Orchestrator] Network payload extraction found candidate with score %.1f and coverage %.2f",
+                network_result.score, network_result.field_coverage,
+            )
+
+    def _arbitrate_and_return(dom_res: ExtractionResult) -> ExtractionResult:
+        if not network_result:
+            return dom_res
+
+        # Calculate DOM score
+        dom_records = dom_res.records
+        scores = [r.get("record_score", 0.0) for r in dom_records]
+        dom_score = sum(scores) / len(scores) if scores else 0.0
+
+        # Arbitrate sources
+        winning_records, winning_source, field_map = arbitrate_sources(
+            dom_records,
+            dom_score,
+            network_result,
+            schema_fields,
+        )
+
+        if winning_source == "dom" or winning_source == dom_res.method:
+            return dom_res
+
+        # If network won:
+        logger.info(
+            "[Orchestrator] Network Payload won arbitration against DOM (%s vs %s)",
+            winning_source, dom_res.method,
+        )
+
+        # Record field-level provenance for the network extraction
+        if provenance_builder:
+            provenance_builder.set_extraction_method(winning_source)
+            for idx, record in enumerate(winning_records):
+                for field in schema_fields:
+                    val = record.get(field.name)
+                    mapping = field_map.get(field.name)
+                    provenance_builder.add_field_provenance(
+                        record_idx=idx,
+                        field_name=field.name,
+                        value=val,
+                        method=winning_source,
+                        selector=mapping.mapped_from if mapping else None,
+                        confidence=mapping.confidence if mapping else 0.5,
+                    )
+
+        # Return winning network extraction result
+        net_selectors = {
+            "source_path": network_result.source,
+            "fields": {k: v.mapped_from for k, v in field_map.items()},
+        }
+        return ExtractionResult(
+            winning_records,
+            winning_source,
+            selector_success=True,
+            selectors=net_selectors,
+        )
     
     # ── Layer 0: Network / JSON Extraction (highest priority) ─────────
     # Before trying any DOM-based selectors, check if structured data is
@@ -274,7 +355,7 @@ async def orchestrate_extraction(
                 len(network_results), avg_score,
             )
             _record_field_provenance(network_results, ExtractionMethod.DISCOVERY)
-            return ExtractionResult(network_results, "network_json", selector_success=True)
+            return _arbitrate_and_return(ExtractionResult(network_results, "network_json", selector_success=True))
         else:
             logger.info(
                 "[Orchestrator] Network/JSON extraction LOW QUALITY (avg score: %.2f), falling through",
@@ -309,7 +390,7 @@ async def orchestrate_extraction(
                 logger.info("[Orchestrator] Provided selectors SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, provided_selectors)
                 _record_field_provenance(provided_results, ExtractionMethod.DISCOVERY, provided_selectors)
-                return ExtractionResult(provided_results, "discovery", selector_success=True, selectors=provided_selectors)
+                return _arbitrate_and_return(ExtractionResult(provided_results, "discovery", selector_success=True, selectors=provided_selectors))
             else:
                 logger.info("[Orchestrator] Provided selectors LOW QUALITY (avg score: %.2f), falling through", avg_score)
                 if provenance_builder:
@@ -360,7 +441,7 @@ async def orchestrate_extraction(
                 logger.info("[Orchestrator] Memory SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, remembered_selectors)
                 _record_field_provenance(raw_results, ExtractionMethod.MEMORY, remembered_selectors)
-                return ExtractionResult(raw_results, "memory", selector_success=True, selectors=remembered_selectors)
+                return _arbitrate_and_return(ExtractionResult(raw_results, "memory", selector_success=True, selectors=remembered_selectors))
             else:
                 logger.info("[Orchestrator] Memory FAILURE (avg score: %.2f)", avg_score)
                 memory.record_failure(url)
@@ -443,7 +524,7 @@ async def orchestrate_extraction(
                 logger.info("[Orchestrator] Discovery SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, discovered_selectors)
                 _record_field_provenance(raw_results, ExtractionMethod.DISCOVERY, discovered_selectors)
-                return ExtractionResult(raw_results, "discovery", selector_success=True, selectors=discovered_selectors)
+                return _arbitrate_and_return(ExtractionResult(raw_results, "discovery", selector_success=True, selectors=discovered_selectors))
             else:
                 logger.info("[Orchestrator] Discovery LOW QUALITY (avg score: %.2f)", avg_score)
                 if provenance_builder:
@@ -460,11 +541,11 @@ async def orchestrate_extraction(
             container_result.total_records, container_result.best_selector,
         )
         _record_field_provenance(container_result.final_records, ExtractionMethod.DISCOVERY)
-        return ExtractionResult(
+        return _arbitrate_and_return(ExtractionResult(
             container_result.final_records, "container_discovery",
             selector_success=True,
             selectors={"item_container": container_result.best_selector},
-        )
+        ))
     elif container_result.final_records:
         logger.info(
             "[Orchestrator] Container discovery PARTIAL (%d low-quality records)",
@@ -495,7 +576,7 @@ async def orchestrate_extraction(
                 len(visible_results), avg_score,
             )
             _record_field_provenance(visible_results, ExtractionMethod.REGEX)
-            return ExtractionResult(visible_results, "visible_text", selector_success=False)
+            return _arbitrate_and_return(ExtractionResult(visible_results, "visible_text", selector_success=False))
         else:
             logger.info(
                 "[Orchestrator] Visible-text extraction LOW QUALITY (avg score: %.2f)",
@@ -518,11 +599,11 @@ async def orchestrate_extraction(
     if container_result.final_records:
         if provenance_builder:
             provenance_builder.add_fallback_step("container_discovery_partial_result")
-        return ExtractionResult(container_result.final_records, "container_discovery")
+        return _arbitrate_and_return(ExtractionResult(container_result.final_records, "container_discovery"))
     
     if provenance_builder:
         provenance_builder.add_fallback_step("regex_fallback")
-    return ExtractionResult(regex_results, "regex")
+    return _arbitrate_and_return(ExtractionResult(regex_results, "regex"))
 
 
 def _detect_field_swaps(

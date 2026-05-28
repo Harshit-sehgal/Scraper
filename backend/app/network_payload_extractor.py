@@ -94,6 +94,12 @@ def find_record_arrays(payload: Any, path: str = "$", max_depth: int = 10) -> li
         records = [item for item in arr if isinstance(item, dict)]
         if len(records) < 2:
             return
+
+        # GraphQL unwrap: if all records contain a "node" dictionary, unwrap it
+        if all("node" in r and isinstance(r["node"], dict) for r in records):
+            records = [r["node"] for r in records]
+            arr_path = f"{arr_path}[*].node"
+
         candidates.append(RecordArrayCandidate(
             path=arr_path,
             records=records,
@@ -105,8 +111,22 @@ def find_record_arrays(payload: Any, path: str = "$", max_depth: int = 10) -> li
     return candidates
 
 
+def _extract_nested_value(val: Any) -> Any:
+    """Helper to extract a nested scalar value from a dictionary (e.g. {"total": "$500"})."""
+    if isinstance(val, dict):
+        for k in ("total", "amount", "value", "formatted", "raw", "text", "display", "name"):
+            if k in val and val[k] is not None and not isinstance(val[k], (dict, list)):
+                return val[k]
+        if len(val) == 1:
+            sub_val = list(val.values())[0]
+            if not isinstance(sub_val, (dict, list)):
+                return sub_val
+    return val
+
+
 def _value_matches_type(value: Any, field_type: FieldType) -> bool:
     """Check if a JSON value is compatible with the expected field type."""
+    value = _extract_nested_value(value)
     if value is None:
         return False
     s = str(value).strip()
@@ -133,6 +153,11 @@ def _key_matches_field(key: str, field: SchemaField) -> float:
     """Score how well a JSON key matches a schema field, using synonyms."""
     key_lower = key.lower().replace("_", " ").replace("-", " ")
     field_lower = field.name.lower().replace("_", " ")
+
+    # Avoid matching sensitive keys that could contain secrets/credentials
+    sensitive_patterns = ("cookie", "token", "session", "secret", "password", "jwt", "auth", "bearer", "csrf")
+    if any(pattern in key_lower for pattern in sensitive_patterns):
+        return 0.0
 
     if key_lower == field_lower:
         return 1.0
@@ -241,7 +266,7 @@ def map_json_records_to_schema(
         mapped: dict = {}
         for key, (field, confidence) in key_to_field.items():
             if key in record and record[key] is not None:
-                mapped[field.name] = record[key]
+                mapped[field.name] = _extract_nested_value(record[key])
                 if field.name not in field_map:
                     field_map[field.name] = FieldMapping(
                         requested_field=field.name,

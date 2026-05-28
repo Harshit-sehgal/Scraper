@@ -188,6 +188,115 @@ class TestSourceArbitration:
         assert source == "dom"
         assert records == dom_records
 
+    def test_weak_dom_strong_network_chooses_network(self):
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        # Strong network data: has high field coverage and high score
+        net_result = extract_from_network_payloads([FLIGHT_PAYLOAD], schema)
+
+        # Weak DOM data: low coverage (e.g. missing prices, only 1 record, low score)
+        dom_records = [{"airline": "PoorDOM"}]
+
+        records, source, _ = arbitrate_sources(dom_records, 15.0, net_result, schema)
+        assert source == net_result.source
+        assert len(records) == 3
+
+    def test_strong_dom_weak_network_chooses_dom(self):
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        # Weak network data
+        net_result = extract_from_network_payloads(
+            [json.dumps({"results": [{"carrier": "Indigo"}]})], schema,
+        )
+
+        # Strong DOM data
+        dom_records = [
+            {"airline": "IndiGo", "price": 4500},
+            {"airline": "Vistara", "price": 6100},
+        ]
+
+        records, source, _ = arbitrate_sources(dom_records, 95.0, net_result, schema)
+        assert source == "dom"
+        assert len(records) == 2
+
+    def test_both_weak_arbitration_flow(self):
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        # Both DOM and network have very low quality data
+        net_result = extract_from_network_payloads(
+            [json.dumps({"results": [{"x": 1, "y": 2}]})], schema,
+        )
+        dom_records = [{"airline": "BadDOM"}]
+
+        records, source, _ = arbitrate_sources(dom_records, 5.0, net_result, schema)
+        # Should fallback gracefully to DOM
+        assert source == "dom"
+        assert records == dom_records
+
+    def test_graphql_shape_unwrapping(self):
+        graphql_payload = json.dumps({
+            "data": {
+                "flights": {
+                    "edges": [
+                        {"node": {"carrier": "AirIndia", "fare": 3200}},
+                        {"node": {"carrier": "GoAir", "fare": 2900}},
+                    ]
+                }
+            }
+        })
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        result = extract_from_network_payloads([graphql_payload], schema)
+        assert result is not None
+        assert result.record_count == 2
+        assert result.records[0].get("airline") == "AirIndia"
+        assert result.records[1].get("price") == 2900
+
+    def test_nextjs_props_handling(self):
+        nextjs_payload = json.dumps({
+            "props": {
+                "pageProps": {
+                    "results": [
+                        {"carrier": "Delta", "fare": "$500"},
+                        {"carrier": "United", "fare": "$600"},
+                    ]
+                }
+            }
+        })
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        result = extract_from_network_payloads([nextjs_payload], schema)
+        assert result is not None
+        assert result.record_count == 2
+        assert result.records[0].get("airline") == "Delta"
+
+    def test_nested_value_extraction(self):
+        nested_val_payload = json.dumps({
+            "results": [
+                {"carrier": {"name": "Lufthansa"}, "fare": {"total": "$700"}},
+                {"carrier": {"name": "Emirates"}, "fare": {"total": "$950"}},
+            ]
+        })
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        result = extract_from_network_payloads([nested_val_payload], schema)
+        assert result is not None
+        assert result.record_count == 2
+        assert result.records[0].get("airline") == "Lufthansa"
+        assert result.records[0].get("price") == "$700"
+
     def test_secrets_not_in_field_map(self):
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
