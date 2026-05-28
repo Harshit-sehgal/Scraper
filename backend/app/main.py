@@ -536,9 +536,16 @@ async def ready():
         _rchl(duration)
 
         if not health["ok"]:
+            error_msg = health.get("error", "Backend unhealthy")
+            logging.error("Readiness check failed: %s", error_msg)
+            if settings.ENV.lower() == "production":
+                return JSONResponse(
+                    status_code=503,
+                    content={"status": "not_ready"},
+                )
             return JSONResponse(
                 status_code=503,
-                content={"status": "not_ready", "error": health.get("error", "Backend unhealthy")},
+                content={"status": "not_ready", "error": error_msg},
             )
 
         # In production return minimal info to avoid leaking backend/schema details
@@ -556,9 +563,15 @@ async def ready():
             "recycle_bin_count": health.get("recycle_bin_count", len(recycle_bin_store)),
         }
     except Exception as e:
+        logging.exception("Readiness check exception occurred")
         duration = time.time() - start_time
         from app.metrics_collector import record_health_check_latency
         record_health_check_latency(duration)
+        if settings.ENV.lower() == "production":
+            return JSONResponse(
+                status_code=503,
+                content={"status": "not_ready"},
+            )
         return JSONResponse(
             status_code=503,
             content={"status": "not_ready", "error": str(e)},
@@ -585,7 +598,7 @@ async def storage_status():
 
 
 @app.get("/api/system/status")
-async def system_status():
+async def system_status(_role=Depends(require_role([UserRole.ADMIN]))):
     from app.models import JobStatus
     counts = {s.value: 0 for s in JobStatus}
     for job in jobs_store.values():
@@ -600,7 +613,7 @@ async def system_status():
     from app.storage_interface import get_job_repository
     repo = get_job_repository()
     backend = getattr(repo, "backend", "sqlite")
-    return {
+    response_data = {
         "status": "online",
         "backend": backend,
         "jobs": {
@@ -613,12 +626,17 @@ async def system_status():
             "canceled": counts.get(JobStatus.CANCELED.value, 0),
         },
         "runtime_limits": CONFIG,
-        "state_file": str(get_state_file_path()),
     }
+
+    # Only expose state file path in non-production environments
+    if settings.ENV.lower() != "production":
+        response_data["state_file"] = str(get_state_file_path())
+
+    return response_data
 
 
 @app.get("/api/system/topology")
-async def system_topology():
+async def system_topology(_role=Depends(require_role([UserRole.ADMIN]))):
     """Exposes the raw state of the semantic cognition substrate."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
@@ -650,7 +668,7 @@ async def system_topology():
 
 
 @app.get("/api/system/crystalline")
-async def system_crystalline():
+async def system_crystalline(_role=Depends(require_role([UserRole.ADMIN]))):
     """Returns the synthesized high-integrity knowledge units."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
@@ -661,7 +679,7 @@ async def system_crystalline():
 
 
 @app.get("/api/system/export/knowledge")
-async def export_knowledge():
+async def export_knowledge(_role=Depends(require_role([UserRole.ADMIN]))):
     """Export the synthesized knowledge manifold as a portable schema."""
     import time
     from app.semantic_world_state import get_world_state
@@ -723,6 +741,7 @@ async def merge_knowledge(request: Request, data: dict, _role=Depends(require_ro
     Requires admin API key if DATAFORGE_ADMIN_API_KEY is configured.
     """
     _require_admin_key(request)
+    
     # Validate payload with size caps
     try:
         req = KnowledgeMergeRequest.validate_payload(data)
@@ -760,7 +779,7 @@ async def merge_knowledge(request: Request, data: dict, _role=Depends(require_ro
 
 
 @app.get("/api/system/search")
-async def system_search(query: str, limit: int = 5):
+async def system_search(query: str, limit: int = 5, _role=Depends(require_role([UserRole.ADMIN]))):
     """Perform topological search on crystalline records."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
@@ -769,7 +788,7 @@ async def system_search(query: str, limit: int = 5):
 
 
 @app.get("/api/system/observability")
-async def system_observability():
+async def system_observability(_role=Depends(require_role([UserRole.ADMIN]))):
     """Exposes real-time telemetry and activity heatmaps."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
@@ -786,7 +805,7 @@ async def system_observability():
 
 
 @app.get("/api/system/domain-policy")
-async def system_domain_policy():
+async def system_domain_policy(_role=Depends(require_role([UserRole.ADMIN]))):
     """Return the current domain runtime policy summaries."""
     from app.domain_runtime_policy import get_domain_runtime_policy
     policy = get_domain_runtime_policy()
@@ -804,14 +823,14 @@ async def system_domain_policy():
 
 
 @app.get("/api/system/acquisition/telemetry")
-async def acquisition_telemetry():
+async def acquisition_telemetry(_role=Depends(require_role([UserRole.ADMIN]))):
     """Exposes acquisition telemetry: state distribution, recovery rates, recent events."""
     from app.acquisition_telemetry import get_acquisition_telemetry
     return get_acquisition_telemetry().get_summary()
 
 
 @app.get("/api/system/history/topology")
-async def system_topology_history(limit: int = 20):
+async def system_topology_history(limit: int = 20, _role=Depends(require_role([UserRole.ADMIN]))):
     """Returns a timeline of historical topology states for replay."""
     from app.event_journal import get_journal
     journal = get_journal()
@@ -844,7 +863,7 @@ async def process_cognitive_tasks(budget_ms: float = 100.0, _role=Depends(requir
 
 
 @app.get("/api/system/agency")
-async def system_agency():
+async def system_agency(_role=Depends(require_role([UserRole.ADMIN]))):
     """Returns the state of autonomous agency and tools."""
     from app.semantic_world_state import get_world_state
     from app.llm_bridge import get_plugin_manager
@@ -859,7 +878,7 @@ async def system_agency():
 
 
 @app.get("/api/system/replay/status")
-async def system_replay_status():
+async def system_replay_status(_role=Depends(require_role([UserRole.ADMIN]))):
     """Returns the status of the large-scale persistent replay buffer."""
     from app.replay_buffer import get_replay_buffer
     rb = get_replay_buffer()
@@ -871,7 +890,7 @@ async def system_replay_status():
 
 
 @app.get("/api/system/replay/chain")
-async def system_replay_chains(limit: int = 20):
+async def system_replay_chains(limit: int = 20, _role=Depends(require_role([UserRole.ADMIN]))):
     """Returns causal chains reconstructed from the persistent replay buffer."""
     from app.replay_buffer import get_replay_buffer
     rb = get_replay_buffer()
@@ -884,7 +903,7 @@ async def system_replay_chains(limit: int = 20):
 
 
 @app.get("/api/system/replay/events")
-async def system_replay_events(start_idx: int = 0, end_idx: int = -1):
+async def system_replay_events(start_idx: int = 0, end_idx: int = -1, _role=Depends(require_role([UserRole.ADMIN]))):
     """Returns a range of events from the persistent replay buffer."""
     from app.replay_buffer import get_replay_buffer
     rb = get_replay_buffer()

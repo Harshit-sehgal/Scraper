@@ -1,8 +1,7 @@
 # DataForge Current State: Architectural Reference
 
 **As of**: May 26, 2026  
-**Maturity Level**: Production Hardening Phase  
-**Status**: Under active hardening — CI pipeline, Postgres worker queue, role-based API keys
+**Status**: Pre-production candidate — CI pipeline, Postgres worker queue, role-based API keys
 
 ---
 
@@ -71,10 +70,10 @@
 ## Core Metrics
 
 ### System Health
-- **Type Safety**: 100% (mypy: 0 errors across 103 files)
-- **Test Coverage**: ~1708 tests (run `pytest -q` for current count)
-- **Config Quality**: 100% (no hardcoded values)
-- **Code Stability**: 99% of core engine stable
+- **Type Safety**: Progressive type annotations across core modules (strict mypy compliance not continuously verified)
+- **Test Coverage**: ~1708 tests exist (run `pytest -q` for current count)
+- **Config Quality**: All configuration via env vars (no hardcoded secrets)
+- **Code Stability**: Core engine structure stable; full production validation pending
 
 ### Performance
 - **Selector ML**: 0.1ms feature extraction, 0.05ms prediction
@@ -82,10 +81,10 @@
 - **Full test suite**: 38.1 seconds
 
 ### Adaptive Capabilities
-- **Selector Quality Prediction**: 12+ features, weighted model
+- **Selector Quality Prediction**: 12+ features, weighted model (deterministic test coverage)
 - **Strategy Evolution**: Per-domain learning, 6 strategies
-- **Recovery Accuracy**: 95% correct failure classification
-- **Domain Health**: Real-time degradation detection
+- **Recovery Classification**: Failure categorization with unit test coverage
+- **Domain Health**: Degradation detection with monitoring hooks
 
 ---
 
@@ -300,33 +299,33 @@ Learn from outcome
 
 ---
 
-## What's Ready for Production
+## Currently Functional
 
 ✓ Core scraping engine  
 ✓ Browser pool management  
-✓ Anti-bot evasion  
-✓ Failure recovery  
+✓ Anti-bot evasion patterns  
+✓ Failure recovery framework  
 ✓ Domain health monitoring  
 ✓ Selector ML optimization  
 ✓ Strategy evolution  
 ✓ Observability & telemetry  
-✓ Test coverage (~1708 tests)  
-✓ Type safety (100%)  
+✓ Large test suite (~1708 tests)  
+✓ Type annotations across modules  
 
 ---
 
-## What Still Needs Work
+## Completed Work
 
-✅ System topology mapping (visibility)  
-✅ Hard architectural boundaries (validation)  
-✅ Chaos engineering tests (resilience)  
-✅ Resource governance enforcement (limits)  
-✅ Predictive degradation (forecasting)  
-✅ Operator modes (flexibility)  
-✅ CI pipeline (lint, typecheck, test, arch-validation, Docker build)  
-✅ Postgres-backed worker queue (multi-node capable)  
-✅ Role-based API keys (read-only, operator, admin)  
-✅ Prometheus /metrics endpoint  
+✓ System topology mapping (visibility)  
+✓ Hard architectural boundaries (validation)  
+✓ Chaos engineering tests (resilience)  
+✓ Resource governance enforcement (limits)  
+✓ Predictive degradation (forecasting)  
+✓ Operator modes (flexibility)  
+✓ CI pipeline (lint, typecheck, test, arch-validation, Docker build)  
+✓ Postgres-backed worker queue (multi-node capable)  
+✓ Role-based API keys (read-only, operator, admin)  
+✓ Prometheus /metrics endpoint  
 
 ---
 
@@ -346,10 +345,10 @@ Learn from outcome
 ## Contact Points
 
 ### For Questions About:
-- **Selector ML**: See `ML_STRATEGY_EVOLUTION.md`, `backend/app/selector_ml_optimizer.py`
-- **Strategy Evolution**: See `ML_STRATEGY_EVOLUTION.md`, `backend/app/strategy_evolution.py`
-- **Recovery**: See `RECOVERY_FRAMEWORK.md`
-- **Architecture**: See this document + new `ARCHITECTURE.md` (to be created)
+- **Selector ML**: See `backend/app/selector_ml_optimizer.py`
+- **Strategy Evolution**: See `backend/app/strategy_evolution.py`
+- **Recovery**: See `docs/archive/RECOVERY_FRAMEWORK.md` (archived)
+- **Project Status**: See `PROJECT_STATUS.md`
 
 ### Tests:
 - ML tests: `backend/tests/test_selector_ml_optimizer.py` (31 tests)

@@ -51,6 +51,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 # Keep test state isolated from developer runtime state.
+os.environ.setdefault("DATAFORGE_STATE_FILE_PATH", str(ROOT / "backend" / "data" / "jobs_state_test.json"))
 os.environ.setdefault("DATAFORGE_STATE_FILE", str(ROOT / "backend" / "data" / "jobs_state_test.json"))
 
 try:
@@ -111,7 +112,7 @@ class LocalASGIClient:
 
 @pytest.fixture()
 def client(monkeypatch):
-    async def fake_run_job(job_id: str):
+    async def fake_run_job(job_id: str, **kwargs):
         # Keep jobs in pending state unless a test explicitly changes them.
         await asyncio.sleep(0.01)
 

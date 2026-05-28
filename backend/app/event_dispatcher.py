@@ -50,8 +50,8 @@ class EventDispatcher:
                         severity="warning",
                         cause=f"Event callback failed for {event.event_type.value} from {event.source}: {e}",
                     )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logging.getLogger(__name__).warning("[EventDispatcher] Failed to record degradation telemetry: %s", exc)
 
 # Global Dispatcher
 _dispatcher = EventDispatcher()

@@ -32,6 +32,22 @@ scrape_configs:
   # ─── DataForge Application Metrics ──────────────────────────────────
   - job_name: 'dataforge'
     metrics_path: '/metrics'
+    # If DATAFORGE_METRICS_TOKEN is set on the dataforge container, you MUST
+    # configure Prometheus to authenticate. Choose ONE of:
+    #
+    # Option A — Direct token (for testing only):
+    #   bearer_token: "<your-metrics-token>"
+    #
+    # Option B — Token from file (production, via docker secret):
+    #   bearer_token_file: "/etc/prometheus/metrics_token"
+    #
+    # The docker-compose.prod.yml sets DATAFORGE_METRICS_TOKEN via
+    # environment variable. Mount the token into the Prometheus container
+    # as a file and use bearer_token_file for production.
+    #
+    # Alternatively, if DATAFORGE_METRICS_TOKEN is empty/not set, the
+    # /metrics endpoint accepts requests without auth (recommended when
+    # /metrics is served only on an internal Docker network).
     static_configs:
       - targets: ['dataforge:8000']
         labels:

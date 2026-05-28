@@ -62,7 +62,7 @@ def reset_state():
 def client(monkeypatch):
     """Create a test client with mocked run_job and background scheduling."""
     # Mock run_job to keep jobs in pending state
-    async def fake_run_job(job_id: str):
+    async def fake_run_job(job_id: str, **kwargs):
         await asyncio.sleep(0.01)
 
     from app import main as main_mod
@@ -94,8 +94,9 @@ class TestApiEnqueuesJob:
     def test_job_is_enqueued_when_worker_queue_enabled(
         self, client, tmp_queue_db, monkeypatch
     ):
-        """When DATAFORGE_WORKER_QUEUE=true, creating a job should enqueue it."""
-        monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
+        """When worker queue is enabled, creating a job should enqueue it."""
+        from app.config import settings as _settings
+        monkeypatch.setattr(_settings, "WORKER_QUEUE", True)
 
         from app.worker_queue import get_worker_queue
 
@@ -126,8 +127,9 @@ class TestApiEnqueuesJob:
     def test_job_is_not_enqueued_when_worker_queue_disabled(
         self, client, tmp_queue_db, monkeypatch
     ):
-        """When DATAFORGE_WORKER_QUEUE is not set, job should not be enqueued."""
-        monkeypatch.delenv("DATAFORGE_WORKER_QUEUE", raising=False)
+        """When worker queue is disabled, job should not be enqueued."""
+        from app.config import settings as _settings
+        monkeypatch.setattr(_settings, "WORKER_QUEUE", False)
 
         from app.worker_queue import get_worker_queue
 
@@ -164,7 +166,8 @@ class TestWorkerPicksQueuedJob:
         from app.worker_queue import get_worker_queue, reset_worker_queue
 
         reset_worker_queue()
-        monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
+        from app.config import settings as _settings
+        monkeypatch.setattr(_settings, "WORKER_QUEUE", True)
 
         queue = get_worker_queue(db_path=tmp_queue_db)
 
@@ -310,7 +313,8 @@ class TestRealWorkerHandler:
         monkeypatch.setattr("app.scraper.generate_data_insight", mock_generate_data_insight)
 
         # ── Setup: enable worker queue, point SQLite at temp path ───────
-        monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
+        from app.config import settings as _settings
+        monkeypatch.setattr(_settings, "WORKER_QUEUE", True)
 
         from app.job_store import reset_job_store_for_tests
         from app.config import settings

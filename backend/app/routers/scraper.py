@@ -264,7 +264,7 @@ async def get_regression_detail(entry_id: str):
 
 
 @router.post("/regressions/{entry_id}/generate-test")
-async def generate_regression_replay_test(entry_id: str):
+async def generate_regression_replay_test(entry_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Generate a pytest replay test for a captured regression."""
     capture = get_regression_capture()
     test_code = capture.generate_replay_test(entry_id)
@@ -277,7 +277,7 @@ async def generate_regression_replay_test(entry_id: str):
 
 
 @router.post("/regressions/generate-all-tests")
-async def generate_all_replay_tests():
+async def generate_all_replay_tests(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Generate replay tests for all captured regressions that lack one."""
     capture = get_regression_capture()
     all_tests = capture.generate_all_replay_tests()

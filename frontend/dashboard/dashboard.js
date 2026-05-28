@@ -4,6 +4,9 @@
  */
 
 // ─── API key management (shared with main dashboard) ───────────────────
+// NOTE: Storing the API key in localStorage is suitable for operator-local private
+// deployments. For enterprise-grade secure hosting, keep keys session-only in memory
+// or use HttpOnly secure cookies behind an auth proxy.
 function getDashboardApiKey() {
     try { return localStorage.getItem("dataforge_api_key") || ""; } catch { return ""; }
 }

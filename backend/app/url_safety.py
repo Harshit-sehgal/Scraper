@@ -42,9 +42,7 @@ def validate_public_http_url(url: str) -> None:
     hostname_lower = hostname.lower()
     
     # 1. Allowlist override check (for local integration / Docker smoke test)
-    import os
-    is_smoke = os.getenv("DATAFORGE_SMOKE_TEST_MODE", "").lower() in ("true", "1", "yes")
-    if is_smoke:
+    if settings.SMOKE_TEST_MODE:
         allowed_hosts = [h.strip().lower() for h in settings.ALLOWED_INTERNAL_HOSTS.split(",") if h.strip()]
         if hostname_lower in allowed_hosts:
             return
@@ -79,7 +77,7 @@ def validate_public_http_url(url: str) -> None:
             )
 
     is_production = settings.ENV.lower() in ("production", "staging")
-    if not is_production or is_smoke:
+    if not is_production or settings.SMOKE_TEST_MODE:
         return
         
     # 6. Try DNS resolution to check resolved IPs in production-like modes.

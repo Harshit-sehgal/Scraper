@@ -20,8 +20,10 @@ def mock_ai_clean_and_align(monkeypatch):
     monkeypatch.setattr("app.services.job_runner.ai_clean_and_align_records", fake_ai_clean_and_align)
 
 
-def test_system_status_shape(client):
-    r = client.get("/api/system/status")
+def test_system_status_shape(client, monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "ADMIN_API_KEY", "test-admin-key")
+    r = client.get("/api/system/status", headers={"X-API-Key": "test-admin-key"})
     assert r.status_code == 200
     data = r.json()
 

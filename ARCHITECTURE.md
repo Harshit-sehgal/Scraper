@@ -2,20 +2,20 @@
 
 **Purpose**: Single source of truth for DataForge system architecture  
 **Audience**: Engineers, operators, new team members  
-**Status**: Phase 5 Complete + Production Hardening  
+**Status**: Pre-production candidate — production hardening in progress  
 **Last Updated**: May 26, 2026
 
 ---
 
 ## Quick Start: System Overview
 
-DataForge is a **resilient and adaptive web scraping infrastructure** with:
+DataForge is a **web scraping and extraction platform** with:
 - **14 interconnected systems** (crawl, fetch, extract, recovery, memory, intelligence, telemetry, distributed)
-- **4 continuous learning loops** (selectors, strategies, domain evolution, degradation prediction)
-- **Predictive intelligence** (anticipates potential failures)
-- **Autonomous adaptation** (adjusts without human intervention in most cases)
+- **4 learning loop designs** (selectors, strategies, domain evolution, degradation prediction)
+- **Predictive features** (degradation detection, failure forecasting)
+- **Adaptive fallback logic** (selector memory, recovery strategies, replay tools)
 - **Type-annotated codebase** (progressive typing across core backend modules)
-- **Extensive test coverage** (~1708 tests verifying system components)
+- **Large test suite** (~1708 tests)
 
 ---
 
@@ -708,32 +708,31 @@ Memory Layer (depends on: all layers)
 
 ## Future Enhancements
 
-### Phase 5 (Current)
-- [x] System topology visualization ✓
-- [x] Dependency graph and data flow diagrams ✓
-- [x] Architectural validation tests (40 tests passing) ✓
-- [x] Chaos engineering framework (22 scenarios, 5 tests) ✓
-- [x] Hard boundary enforcement ✓
-- [x] Operational Intelligence (Week 9-12) ✓
-  - Degradation predictor (6 failure patterns detected)
-  - Operator mode switching (5 modes: production, benchmark, forensic, stealth, low_cost)
-  - Frontend dashboard with health/predictions/mode controls
-  - 35 tests (22 + 13), mypy clean
-  - PLAYBOOKS.md with 6 issue resolution playbooks
+### Completed Features
 
-### Phase 6 (Production Hardening — Complete)
-- [x] Prometheus /metrics endpoint ✓
-- [x] Admin API key for powerful routes ✓
-- [x] Postgres world-state persistence ✓
-- [x] Postgres-backed worker queue (multi-node capable) ✓
-- [x] Role-based API keys (read-only, operator, admin) ✓
-- [x] secrets.compare_digest for timing-attack resistance ✓
-- [x] Rate limiter respects X-Forwarded-For header ✓
-- [x] CI pipeline (lint, typecheck, test, arch-validation, Docker build) ✓
+- [x] System topology visualization  
+- [x] Dependency graph and data flow diagrams  
+- [x] Architectural validation tests  
+- [x] Chaos engineering framework  
+- [x] Hard boundary enforcement  
+- [x] Degradation predictor  
+- [x] Operator mode switching (5 modes)  
+- [x] Frontend dashboard  
+- [x] Prometheus /metrics endpoint  
+- [x] Admin API key for powerful routes  
+- [x] Postgres world-state persistence  
+- [x] Postgres-backed worker queue  
+- [x] Role-based API keys (read-only, operator, admin)  
+- [x] secrets.compare_digest for timing-attack resistance  
+- [x] Rate limiter respects X-Forwarded-For header  
+- [x] CI pipeline (lint, typecheck, test, arch-validation, Docker build)  
 
-### Phase 7
-- [ ] Production deployment guide
-- [ ] Self-healing automation
+### Future Work
+
+- [ ] Production deployment guide  
+- [ ] Self-healing automation  
+
+> **Note**: See `PROJECT_STATUS.md` for the current honest assessment of what is verified, partially verified, and not yet verified.
 
 ---
 

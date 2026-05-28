@@ -82,7 +82,7 @@ def test_validate_public_http_url_allowlist(monkeypatch):
     monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "nginx,smoke-host")
     
     # By default, internal hosts should be rejected in production/test unless smoke test mode is active
-    monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "false")
+    monkeypatch.setattr(settings, "SMOKE_TEST_MODE", False)
     # Mock socket.getaddrinfo to simulate unresolvable hosts for internal network names
     def mock_getaddrinfo_fail(host, port, *args, **kwargs):
         raise socket.gaierror(-2, "Name or service not known")
@@ -95,7 +95,7 @@ def test_validate_public_http_url_allowlist(monkeypatch):
         validate_public_http_url("http://nginx/smoke/records.html")
 
     # Set smoke test mode to active
-    monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "true")
+    monkeypatch.setattr(settings, "SMOKE_TEST_MODE", True)
     
     # Now it should bypass validation and return successfully!
     validate_public_http_url("http://nginx/smoke/records.html")
@@ -334,7 +334,7 @@ async def test_fetch_redirect_to_cloud_metadata(monkeypatch):
 
 def test_smoke_mode_internal_tld_allowed(monkeypatch):
     """Internal TLDs are still rejected even in smoke mode (separate from ALLOWED_INTERNAL_HOSTS)."""
-    monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "true")
+    monkeypatch.setattr(settings, "SMOKE_TEST_MODE", True)
     monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "nginx,smoke-host")
     monkeypatch.setattr(settings, "ENV", "production")
 

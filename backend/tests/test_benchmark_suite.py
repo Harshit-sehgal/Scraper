@@ -101,14 +101,67 @@ async def test_deterministic_benchmark_run():
     metrics["zero_result_truthfulness"] = correct_classifications / len(blocked_fixtures)
     metrics["false_positive_records"] = false_positives / len(blocked_fixtures)
 
-    # 3. Recovery Success (Simulated network failure -> retry success)
-    # We simulate scraper retry logic: 1st attempt fails, remaining 3 succeed (75% recovery rate)
-    attempts = [False, True, True, True]
-    success_retries = 0
-    for attempt in attempts:
-        if attempt:
-            success_retries += 1
-    metrics["recovery_success_rate"] = success_retries / len(attempts)
+    # 3. Recovery Success (Real failure/retry validation using WAF block mock)
+    # We execute a real scrape_url_with_recovery call and use a mock that simulates
+    # a WAF block / rate-limit failure on the first attempt and succeeds on the second.
+    from app.scraper_recovery_integration import scrape_url_with_recovery
+
+    call_count = 0
+    async def mock_scrape_url_attempt(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            # Simulate initial failure (e.g., anti-bot blocked)
+            return type("AttemptResult", (), {
+                "anti_bot_score": 0.9,
+                "fetch_method": "playwright_full",
+                "recommended_next_action": "rotate_proxy",
+                "final_url": "https://example.com/item",
+                "data_evidence_score": 0.0,
+                "network_diagnostics": [{"event": "block", "detail": "403 Forbidden"}],
+                "warnings": ["First attempt blocked by WAF"],
+                "__iter__": lambda self: iter([]) # Yields 0 records
+            })()
+        else:
+            # Second attempt succeeds!
+            return type("AttemptResult", (), {
+                "anti_bot_score": 0.1,
+                "fetch_method": "playwright_full",
+                "recommended_next_action": "none",
+                "final_url": "https://example.com/item",
+                "data_evidence_score": 0.9,
+                "network_diagnostics": [],
+                "warnings": [],
+                "__iter__": lambda self: iter([{"title": "Recovered Product Title", "price": "$99.99"}])
+            })()
+
+    # Mock telemetry to avoid missing event key errors
+    from app.scrape_telemetry import get_scrape_telemetry
+    telemetry = get_scrape_telemetry()
+
+    # Save original references to restore after test
+    import app.scraper_recovery_integration
+    orig_attempt = app.scraper_recovery_integration.scrape_url_attempt
+    orig_get_last = telemetry.get_last_for_url
+
+    app.scraper_recovery_integration.scrape_url_attempt = mock_scrape_url_attempt
+    telemetry.get_last_for_url = lambda url: None
+
+    try:
+        results, recovery_stats = await scrape_url_with_recovery(
+            url="https://example.com/item",
+            schema_fields=[_schema_field("title"), _schema_field("price")],
+            max_recovery_attempts=3
+        )
+        assert recovery_stats["success"] is True
+        assert recovery_stats["attempts"] == 2
+        assert len(results) == 1
+        assert results[0]["title"] == "Recovered Product Title"
+        metrics["recovery_success_rate"] = 1.0 if recovery_stats["success"] else 0.0
+    finally:
+        # Restore original functions
+        app.scraper_recovery_integration.scrape_url_attempt = orig_attempt
+        telemetry.get_last_for_url = orig_get_last
 
     # 4. Cancellation Response Time
     # We test how fast the runner checks and respects cancel_requested flags
@@ -130,7 +183,7 @@ async def test_deterministic_benchmark_run():
     print(f"Zero-Result Truthfulness:         {metrics['zero_result_truthfulness']*100:.1f}% (Target: >90%)")
     print(f"False-Positive Records:           {metrics['false_positive_records']*100:.1f}% (Target: <10%)")
     print(f"Average Scrape Time:              {metrics['average_scrape_time_ms']:.2f} ms")
-    print(f"Recovery Success Rate:            {metrics['recovery_success_rate']*100:.1f}% (Target: >70%)")
+    print(f"Recovery Success Rate (Simulated):{metrics['recovery_success_rate']*100:.1f}% (Target: >70%)")
     print(f"Cancellation Response Time:       {metrics['cancellation_response_time_ms']:.4f} ms (Target: <1000ms)")
     print("="*50 + "\n")
 

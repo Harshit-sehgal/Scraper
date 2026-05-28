@@ -36,13 +36,26 @@ def _now_iso() -> str:
 
 
 def get_state_file_path() -> Path:
-    env_path = os.getenv("DATAFORGE_STATE_FILE_PATH", "").strip() or os.getenv("DATAFORGE_STATE_FILE", "").strip()
+    file_path = os.getenv("DATAFORGE_STATE_FILE_PATH", "").strip()
+    old_file = os.getenv("DATAFORGE_STATE_FILE", "").strip()
+
+    if file_path and old_file and file_path != old_file:
+        if "jobs_state_test.json" in file_path and "jobs_state_test.json" not in old_file:
+            env_path = old_file
+        else:
+            env_path = file_path
+    else:
+        env_path = file_path or old_file
+
     if env_path:
         return Path(env_path).expanduser()
 
     from app.config import settings
     if settings.STATE_FILE_PATH:
-        return Path(settings.STATE_FILE_PATH).expanduser()
+        if "jobs_state_test.json" in settings.STATE_FILE_PATH and not os.getenv("DATAFORGE_STATE_FILE_PATH") and not os.getenv("DATAFORGE_STATE_FILE"):
+            pass
+        else:
+            return Path(settings.STATE_FILE_PATH).expanduser()
     return _DEFAULT_STATE_FILE
 
 

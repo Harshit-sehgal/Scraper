@@ -279,8 +279,8 @@ async def orchestrate_extraction(
             from app.network_payload_extractor import find_record_arrays
             candidates = find_record_arrays(payload)
             record_arrays_found += len(candidates)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to analyze payload body for record arrays: %s", e)
 
     # Extract network results
     from app.network_payload_extractor import extract_from_network_payloads, arbitrate_sources

@@ -870,10 +870,10 @@ def get_worker_queue(
     Returns:
         WorkerQueue (SQLite) or PostgresWorkerQueue depending on backend.
     """
-    import os
+    from app.config import settings
 
     # Resolve backend: explicit param > env var > default
-    resolved_backend = backend or os.getenv("DATAFORGE_QUEUE_BACKEND", "sqlite").strip().lower()
+    resolved_backend = backend or settings.QUEUE_BACKEND.strip().lower()
 
     if resolved_backend == "postgres":
         from app.worker_queue_postgres import get_postgres_worker_queue

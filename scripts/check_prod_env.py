@@ -140,6 +140,11 @@ def check_cors_origins(value: str) -> bool:
                 "Must be a valid URL starting with http:// or https://."
             )
             return False
+        if "yourdomain.com" in origin:
+            print(
+                "  [FAIL]  DATAFORGE_CORS_ORIGINS contains placeholder domain 'yourdomain.com'."
+            )
+            return False
 
     return True
 
@@ -204,13 +209,36 @@ def check_grafana_password(value: str) -> bool:
 
 
 def check_database_url(value: str) -> bool:
-    """Validate DATAFORGE_DATABASE_URL is a postgresql:// URL."""
+    """Validate DATAFORGE_DATABASE_URL is a postgresql:// URL and doesn't use placeholder passwords."""
     if not value.startswith(("postgresql://", "postgres://")):
         print(
             f"  [FAIL]  DATAFORGE_DATABASE_URL={value!r}. "
             "Must be a postgresql:// or postgres:// URL."
         )
         return False
+    
+    import urllib.parse
+    try:
+        parsed = urllib.parse.urlparse(value)
+        if parsed.password:
+            default_values = {
+                "dataforge",
+                "change-me",
+                "change-me-to-a-strong-password",
+                "change-this-to-a-strong-password",
+                "password",
+                "postgres",
+                "wrong-password",
+            }
+            if parsed.password.lower() in default_values:
+                print(
+                    f"  [FAIL]  DATAFORGE_DATABASE_URL contains a placeholder/default password '{parsed.password}'."
+                )
+                return False
+    except Exception as e:
+        print(f"  [FAIL]  DATAFORGE_DATABASE_URL failed to parse: {e}")
+        return False
+        
     return True
 
 
@@ -364,6 +392,22 @@ def main() -> int:
         passed = check_var(env, name, required=required, validator=validator, hint=hint)
         if not passed:
             all_pass = False
+
+    # ── DB Password Consistency Validation ────────────────────────────────
+    import os
+    import urllib.parse
+    db_password = env.get("DATAFORGE_DB_PASSWORD", os.environ.get("DATAFORGE_DB_PASSWORD", "")).strip()
+    db_url = env.get("DATAFORGE_DATABASE_URL", os.environ.get("DATAFORGE_DATABASE_URL", "")).strip()
+    if db_password and db_url:
+        try:
+            parsed = urllib.parse.urlparse(db_url)
+            if parsed.password and parsed.password != db_password:
+                print(
+                    "  [FAIL]  DATAFORGE_DB_PASSWORD does not match the password specified in DATAFORGE_DATABASE_URL!"
+                )
+                all_pass = False
+        except Exception:
+            pass
 
     # ── Summary ──────────────────────────────────────────────────────
     print()

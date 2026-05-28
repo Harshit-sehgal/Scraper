@@ -65,3 +65,24 @@ def test_hallucination_indicators():
     res = calculate_extraction_accuracy(extracted, golden)
     assert res.hallucination_rate > 0.0
     assert res.precision == 0.0
+
+def test_punishes_garbage_records():
+    golden = [{"name": "A", "price": "10"}]
+    
+    # 1 correct record + 2 completely irrelevant/garbage extra records
+    extracted = [
+        {"name": "A", "price": "10"},
+        {"name": "Irrelevant X", "price": "999"},
+        {"name": "Irrelevant Y", "price": "0"}
+    ]
+    
+    res = calculate_extraction_accuracy(extracted, golden)
+    
+    # Expected fields: 2. Extracted non-meta fields: 6.
+    # True positives: 2.
+    # Precision should be 2/6 = 0.333 (punishing extra junk!), recall is 2/2 = 1.0.
+    assert res.recall == 1.0
+    assert res.precision == 2/6
+    assert res.record_precision == 1/3
+    assert res.extra_record_rate == 2/3
+    assert res.schema_compliance == 1.0

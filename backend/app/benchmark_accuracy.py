@@ -25,6 +25,14 @@ class AccuracyMetrics:
     duplicate_rate: float = 0.0
     hallucination_rate: float = 0.0
     field_accuracy: Dict[str, float] = field(default_factory=dict)
+    
+    # Advanced metrics added to resolve the "truth gap" and punish false-positives
+    field_recall: float = 0.0
+    field_precision: float = 0.0
+    record_precision: float = 0.0
+    extra_record_rate: float = 0.0
+    schema_compliance: float = 0.0
+    
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -47,19 +55,23 @@ def calculate_extraction_accuracy(
     
     # 1. Record Matching & Field Accuracy
     true_positives = 0
-    total_expected_fields = sum(len(r) for r in expected)
+    total_expected_fields = sum(len([k for k in r.keys() if not k.startswith("_")]) for r in expected)
+    expected_keys = {k for r in expected for k in r.keys() if not k.startswith("_")}
     
-    field_hits = {k: 0 for r in expected for k in r.keys()}
-    field_totals = {k: 0 for r in expected for k in r.keys()}
+    field_hits = {k: 0 for r in expected for k in r.keys() if not k.startswith("_")}
+    field_totals = {k: 0 for r in expected for k in r.keys() if not k.startswith("_")}
     
-    # Count total extracted fields
-    total_extracted_fields = sum(len(r) for r in extracted)
+    # Count total extracted fields (excluding metadata keys)
+    total_extracted_fields = sum(len([k for k in r.keys() if not k.startswith("_") and k != "record_score"]) for r in extracted)
+    
+    matched_records_count = 0
     
     # Local copies to track matched records
     available_extracted = list(extracted)
     
     for exp_rec in expected:
-        for k in exp_rec.keys():
+        exp_non_meta = {k: v for k, v in exp_rec.items() if not k.startswith("_")}
+        for k in exp_non_meta.keys():
             field_totals[k] = field_totals.get(k, 0) + 1
             
         best_match_idx = -1
@@ -67,37 +79,52 @@ def calculate_extraction_accuracy(
         
         for i, ext_rec in enumerate(available_extracted):
             score = 0
-            for k, v in exp_rec.items():
+            for k, v in exp_non_meta.items():
                 if k in ext_rec and _values_match(ext_rec[k], v):
                     score += 1
             if score > best_score:
                 best_score = score
                 best_match_idx = i
         
-        if best_match_idx >= 0:
+        # A record is considered a match if it has at least one correct field
+        if best_match_idx >= 0 and best_score > 0:
             matched_rec = available_extracted.pop(best_match_idx)
             true_positives += best_score
-            for k, v in exp_rec.items():
+            matched_records_count += 1
+            for k, v in exp_non_meta.items():
                 if k in matched_rec and _values_match(matched_rec[k], v):
                     field_hits[k] = field_hits.get(k, 0) + 1
 
-    # 2. Precision & Recall Calculation
-    # We only count fields from matched records for precision to avoid penalizing
-    # the scraper for extracting valid records that just aren't in the small golden set.
-    # The true positives are the matched fields in the matched records
-    # So precision should be true_positives / total_fields_in_golden_set (since we only care if we got the fields right for the ones we checked)
-    # Actually, precision for a golden set subset should be:
-    # Of the records we tried to match to the golden set, how many fields were correct?
-    # True positives = matched fields
-    # We shouldn't penalize for extra records, so we can just use recall as precision for subset evaluation,
-    # or just say precision = true_positives / total_expected_fields
-    metrics.precision = true_positives / total_expected_fields if total_expected_fields > 0 else 0.0
-    metrics.recall = true_positives / total_expected_fields if total_expected_fields > 0 else 0.0
+    # 2. Precision & Recall Calculation (Rigorous, Punishing False-Positives)
+    field_recall = true_positives / total_expected_fields if total_expected_fields > 0 else 0.0
+    field_precision = true_positives / total_extracted_fields if total_extracted_fields > 0 else 0.0
+    
+    metrics.recall = field_recall
+    metrics.precision = field_precision
     
     if metrics.precision + metrics.recall > 0:
         metrics.f1_score = 2 * (metrics.precision * metrics.recall) / (metrics.precision + metrics.recall)
+    
+    # Set advanced metrics
+    metrics.field_recall = field_recall
+    metrics.field_precision = field_precision
+    metrics.record_precision = matched_records_count / len(extracted) if extracted else 0.0
+    metrics.extra_record_rate = (len(extracted) - matched_records_count) / len(extracted) if extracted else 0.0
 
-    # 3. Completeness & Schema Conformity
+    # 3. Schema Compliance
+    compliant_fields = 0
+    total_non_metadata_fields = 0
+    for r in extracted:
+        non_meta_keys = [k for k in r.keys() if not k.startswith("_") and k != "record_score"]
+        total_non_metadata_fields += len(non_meta_keys)
+        for k in non_meta_keys:
+            if k in expected_keys:
+                compliant_fields += 1
+                
+    metrics.schema_compliance = compliant_fields / total_non_metadata_fields if total_non_metadata_fields > 0 else 0.0
+    metrics.schema_conformity = metrics.schema_compliance
+
+    # 4. Completeness & Schema Conformity
     metrics.completeness = min(1.0, len(extracted) / max(1, len(expected)))
     
     # Per-field accuracy
@@ -105,12 +132,11 @@ def calculate_extraction_accuracy(
         if field_totals[k] > 0:
             metrics.field_accuracy[k] = round(field_hits[k] / field_totals[k], 3)
 
-    # 4. Duplicate Rate
+    # 5. Duplicate Rate
     unique_count = len({_record_hash(r) for r in extracted})
     metrics.duplicate_rate = 1.0 - (unique_count / len(extracted)) if extracted else 0.0
 
-    # 5. Hallucination Detection (Indicators)
-    # Very basic: look for common placeholder strings or "I don't know" phrases from LLM
+    # 6. Hallucination Detection (Indicators)
     hallucinations = 0
     for r in extracted:
         for v in r.values():

@@ -461,8 +461,8 @@ async def fetch_page_content(
                      }}""",
                     timeout=settle_timeout * 1000,
                 )
-            except Exception:
-                pass
+            except Exception as stabilization_err:
+                logger.debug("Stabilization check evaluate failed: %s", stabilization_err)
             js_render_delay_ms = (time.time() - stabilization_start) * 1000
             telemetry.record_stabilization(domain, js_render_delay_ms)
 
@@ -497,8 +497,8 @@ async def fetch_page_content(
                     raise ValueError(f"Anti-bot challenge detected during {wait_until}: {e}")
             except ValueError:
                 raise  # Re-raise anti-bot detection so scraper records the proper failure reason
-            except Exception:
-                pass
+            except Exception as partial_content_err:
+                logger.debug("Failed to extract partial HTML content for anti-bot validation: %s", partial_content_err)
 
             logger.warning(
                 "[Scraper] %s slow load for %s: %s. Falling to domcontentloaded",
@@ -542,8 +542,8 @@ async def fetch_page_content(
         if page:
             try:
                 html_content = await page.content()
-            except Exception:
-                pass
+            except Exception as content_err:
+                logger.debug("Failed to extract HTML content from failed page context: %s", content_err)
         
         err_msg = str(e).lower()
         is_antibot = False
@@ -568,8 +568,8 @@ async def fetch_page_content(
         if page:
             try:
                 await page.close()
-            except Exception:
-                pass
+            except Exception as close_err:
+                logger.debug("Failed to close page cleanly: %s", close_err)
 
 
 

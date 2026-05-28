@@ -40,25 +40,21 @@ _pool_lock = threading.Lock()
 
 
 def _get_database_url() -> str:
-    """Resolve the Postgres DSN from environment or settings.
+    """Resolve the Postgres DSN from settings or environment.
 
-    In non-development environments, the DSN MUST be explicitly set via
-    DATAFORGE_DATABASE_URL. The fallback default only applies in development.
+    In non-development environments, the DSN MUST be explicitly configured.
+    The fallback default only applies in development.
     """
+    from app.config import settings
+    url = getattr(settings, "DATABASE_URL", "") or ""
+    if url:
+        return url
+    # Check environment override for backwards compatibility
     url = os.getenv("DATAFORGE_DATABASE_URL", "").strip()
     if url:
         return url
-    try:
-        from app.config import settings
-        url = getattr(settings, "DATABASE_URL", "")
-    except (ImportError, AttributeError):
-        # Settings might not be initialized yet or DATABASE_URL attribute is absent; fallback to env/development defaults
-        pass
-    if url:
-        return url
     # Only allow fallback default in development mode
-    env = os.getenv("DATAFORGE_ENV", "development").strip().lower()
-    if env == "development":
+    if settings.ENV.lower() in ("", "development", "dev"):
         return "postgresql://dataforge:dataforge@localhost:5432/dataforge"
     raise RuntimeError(
         "DATAFORGE_DATABASE_URL is required in non-development environments. "
@@ -236,7 +232,6 @@ def _ensure_required_tables(conn):
             _execute(conn, "RELEASE SAVEPOINT alter_jobs_col")
         except Exception:
             _execute(conn, "ROLLBACK TO SAVEPOINT alter_jobs_col")
-            pass
 
     _execute(conn, _build_create_recycle_bin_sql())
 
@@ -247,7 +242,6 @@ def _ensure_required_tables(conn):
             _execute(conn, "RELEASE SAVEPOINT alter_recycle_col")
         except Exception:
             _execute(conn, "ROLLBACK TO SAVEPOINT alter_recycle_col")
-            pass
 
     for idx_sql in [
         "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
@@ -259,7 +253,6 @@ def _ensure_required_tables(conn):
             _execute(conn, "RELEASE SAVEPOINT create_index")
         except Exception:
             _execute(conn, "ROLLBACK TO SAVEPOINT create_index")
-            pass
 
 
 def _ensure_schema():
