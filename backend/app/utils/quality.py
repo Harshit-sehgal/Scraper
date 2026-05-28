@@ -60,6 +60,12 @@ def _value_quality(field: SchemaField, value) -> float:
 
     # Negative Evidence: identify "swapped" or "noise" text in identifying fields
     field_name_lower = field.name.lower()
+    
+    # Strict airport/IATA code validation
+    if "airport_code" in field_name_lower or "iata" in field_name_lower:
+        if not re.match(r"^[A-Z]{3}$", text):
+            return 0.0
+
     is_identity_field = any(k in field_name_lower for k in ["name", "title", "company"])
     is_status_field = any(k in field_name_lower for k in ["availability", "stock", "status", "condition"])
     
@@ -246,3 +252,49 @@ def build_quality_report(
         "radius": radius_report,
         "acquisition": acquisition_summary,
     }
+
+
+def post_extract_validate_records(
+    results: list[dict], 
+    schema_fields: list[SchemaField], 
+    warnings: list[str] | None = None
+) -> list[dict]:
+    """Validate extracted records against semantic field rules.
+    
+    If a required field fails validation, the record is rejected.
+    If an optional field fails validation, it is set to None (lowering score).
+    """
+    import logging
+    val_logger = logging.getLogger("app.utils.quality")
+    valid_records = []
+    airport_failed = False
+    for r in results:
+        validated = dict(r)
+        discard = False
+        for field in schema_fields:
+            val = validated.get(field.name)
+            if val is not None and str(val).strip() != "":
+                field_name_lower = field.name.lower()
+                # Strict airport code or IATA code validation
+                if "airport_code" in field_name_lower or "iata" in field_name_lower:
+                    text = str(val).strip()
+                    # Must be exactly 3 uppercase letters (e.g. JFK, MIA)
+                    if not re.match(r"^[A-Z]{3}$", text):
+                        airport_failed = True
+                        val_logger.warning(
+                            "[Validation] Field '%s' has invalid airport/IATA code value '%s' (must match ^[A-Z]{3}$)",
+                            field.name, text,
+                        )
+                        if field.required:
+                            discard = True
+                            break
+                        else:
+                            validated[field.name] = None
+        if not discard:
+            valid_records.append(validated)
+
+    if airport_failed and warnings is not None:
+        if "Airport-code fields failed semantic validation" not in warnings:
+            warnings.append("Airport-code fields failed semantic validation")
+
+    return valid_records

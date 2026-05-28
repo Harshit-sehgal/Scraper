@@ -164,6 +164,10 @@ async def scrape_url_with_recovery(
                 raise Exception("zero_records_extracted")
 
             recovery_stats["success"] = True
+            if hasattr(result, "network_diagnostics"):
+                recovery_stats["network_diagnostics"] = result.network_diagnostics
+            if hasattr(result, "warnings"):
+                recovery_stats["warnings"] = result.warnings
             recovery_stats["total_time_ms"] = (time.time() - start_time) * 1000
 
             # Build acquisition lineage from enriched result metadata

@@ -22,7 +22,6 @@ from app.selector_engine import apply_selectors, extract_with_regex
 from app.extraction_provenance import ProvenanceBuilder, ExtractionMethod
 from app.container_discovery import multi_pass_container_extraction, classify_container_failure
 from app.network_extractor import extract_from_network
-from app.network_payload_extractor import extract_from_network_payloads, arbitrate_sources
 from app.rendered_visible_text_extractor import extract_from_visible_blocks
 from app.page_evidence_collector import collect_page_evidence
 
@@ -35,12 +34,14 @@ class ExtractionResult:
         records: list[dict], 
         method: str, 
         selector_success: bool = False,
-        selectors: dict | None = None
+        selectors: dict | None = None,
+        network_diagnostics: list[str] | None = None,
     ):
         self.records = records
         self.method = method
         self.selector_success = selector_success
         self.selectors = selectors or {}
+        self.network_diagnostics = network_diagnostics or []
 
 
 def _merge_composite_records(
@@ -198,6 +199,7 @@ async def orchestrate_extraction(
     world_state=None,
     user_intent: str = "",
     provided_selectors: dict | None = None,
+    warnings: list[str] | None = None,
 ) -> ExtractionResult:
     """Cascade through extraction methods until high-quality data is found.
 
@@ -241,34 +243,71 @@ async def orchestrate_extraction(
                     confidence=record.get("record_score", 0.5),
                 )
 
-    # ── Try network payload extraction using the new semantic payload extractor ──
+    # ── Gather network diagnostics ──
+    import json
+    from app.session_url_detector import detect_session_params
+    session_detect = detect_session_params(url)
+    is_session = bool(session_detect.get("is_session_bound") or "/search/id/" in url)
+
     from app.browser_network_capture import get_captures
     captured_payloads = get_captures(url)
-    network_payloads_to_extract = []
-    if captured_payloads:
-        network_payloads_to_extract.extend(captured_payloads)
+    captured_count = len(captured_payloads) if captured_payloads else 0
 
-    network_result = None
-    if network_payloads_to_extract:
-        bodies = []
-        for p in network_payloads_to_extract:
+    parsed_json_count = 0
+    bodies = []
+    if captured_payloads:
+        for p in captured_payloads:
             if isinstance(p, dict):
                 body = p.get("body")
-                if body is not None:
-                    bodies.append(body)
-                else:
-                    bodies.append(p)
             else:
-                bodies.append(p)
-        network_result = extract_from_network_payloads(bodies, schema_fields)
-        if network_result:
-            logger.info(
-                "[Orchestrator] Network payload extraction found candidate with score %.1f and coverage %.2f",
-                network_result.score, network_result.field_coverage,
-            )
+                body = p
+            if body is not None:
+                bodies.append(body)
+                try:
+                    if isinstance(body, str):
+                        json.loads(body)
+                    parsed_json_count += 1
+                except Exception:
+                    if isinstance(body, dict):
+                        parsed_json_count += 1
 
-    def _arbitrate_and_return(dom_res: ExtractionResult) -> ExtractionResult:
+    # Count record arrays found in network payloads
+    record_arrays_found = 0
+    for body in bodies:
+        try:
+            payload = json.loads(body) if isinstance(body, str) else body
+            from app.network_payload_extractor import find_record_arrays
+            candidates = find_record_arrays(payload)
+            record_arrays_found += len(candidates)
+        except Exception:
+            pass
+
+    # Extract network results
+    from app.network_payload_extractor import extract_from_network_payloads, arbitrate_sources
+    network_result = extract_from_network_payloads(bodies, schema_fields)
+    
+    best_candidate_path = network_result.source if network_result else None
+    network_score = network_result.score if network_result else 0.0
+
+    network_diagnostics = [
+        f"session-bound detection result: {is_session}",
+        f"captured payload count: {captured_count}",
+        f"parsed JSON payload count: {parsed_json_count}",
+        f"record arrays found: {record_arrays_found}",
+        f"best candidate path: {best_candidate_path}",
+        f"network extraction score: {network_score}",
+    ]
+
+    if network_result:
+        logger.info(
+            "[Orchestrator] Network payload extraction found candidate with score %.1f and coverage %.2f",
+            network_result.score, network_result.field_coverage,
+        )
+
+    def _arbitrate_and_return(dom_res: ExtractionResult, warnings: list[str] | None = None) -> ExtractionResult:
         if not network_result:
+            network_diagnostics.append("arbitration winner: dom (Reason: No network extraction result available)")
+            dom_res.network_diagnostics = list(network_diagnostics)
             return dom_res
 
         # Calculate DOM score
@@ -284,10 +323,30 @@ async def orchestrate_extraction(
             schema_fields,
         )
 
+        dom_cov = sum(
+            1 for r in dom_records[:20] for f in schema_fields
+            if r.get(f.name) is not None and str(r.get(f.name, "")).strip()
+        ) / max(len(dom_records[:20]) * len(schema_fields), 1)
+        net_cov = network_result.field_coverage
+        net_score = network_result.score
+
         if winning_source == "dom" or winning_source == dom_res.method:
+            reason = "DOM coverage/score (%.2f / %.1f) is equal/better than Network (%.2f / %.1f)" % (dom_cov, dom_score, net_cov, net_score)
+            network_diagnostics.append(f"arbitration winner: dom (Reason: {reason})")
+            dom_res.network_diagnostics = list(network_diagnostics)
             return dom_res
 
         # If network won:
+        reason = ""
+        if net_cov >= dom_cov + 0.2:
+            reason = "Network field coverage (%.2f) significantly exceeds DOM coverage (%.2f)" % (net_cov, dom_cov)
+        elif net_score > dom_score and net_cov >= dom_cov:
+            reason = "Network score (%.1f) exceeds DOM score (%.1f) with equal/better coverage" % (net_score, dom_score)
+        else:
+            reason = "Network payload won arbitration"
+        
+        network_diagnostics.append(f"arbitration winner: network_payload (Reason: {reason})")
+
         logger.info(
             "[Orchestrator] Network Payload won arbitration against DOM (%s vs %s)",
             winning_source, dom_res.method,
@@ -314,12 +373,14 @@ async def orchestrate_extraction(
             "source_path": network_result.source,
             "fields": {k: v.mapped_from for k, v in field_map.items()},
         }
-        return ExtractionResult(
+        res = ExtractionResult(
             winning_records,
             winning_source,
             selector_success=True,
             selectors=net_selectors,
         )
+        res.network_diagnostics = list(network_diagnostics)
+        return res
     
     # ── Layer 0: Network / JSON Extraction (highest priority) ─────────
     # Before trying any DOM-based selectors, check if structured data is
@@ -435,13 +496,36 @@ async def orchestrate_extraction(
             # Safely ensure raw_results is a list
             if not isinstance(raw_results, list):
                 raw_results = []
+
+            # Apply post-extraction semantic validation to memory results
+            from app.utils.quality import post_extract_validate_records
+            raw_results = post_extract_validate_records(raw_results, schema_fields, warnings=warnings)
+
             scores = [r.get("record_score", 0.0) for r in raw_results]
             avg_score = sum(scores) / len(scores) if scores else 0.0
-            if avg_score >= gate_threshold:
+
+            # Downgrade memory extraction on session-bound URLs
+            from app.session_url_detector import detect_session_params
+            session_detect = detect_session_params(url)
+            is_session = bool(session_detect.get("is_session_bound") or "/search/id/" in url)
+            fields_sel = remembered_selectors.get("fields", {})
+            selectors_empty = not fields_sel or all(not sel for sel in fields_sel.values())
+
+            if is_session and selectors_empty and avg_score < 0.8:
+                logger.warning(
+                    "[Orchestrator] Downgrading memory extraction on session-bound URL: empty selectors and score %.2f < 0.8",
+                    avg_score,
+                )
+                memory.record_failure(url)
+                if provenance_builder:
+                    provenance_builder.add_fallback_step("memory_session_downgraded")
+                if warnings is not None and "Memory extraction returned low-confidence records on session-bound URL" not in warnings:
+                    warnings.append("Memory extraction returned low-confidence records on session-bound URL")
+            elif avg_score >= gate_threshold:
                 logger.info("[Orchestrator] Memory SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, remembered_selectors)
                 _record_field_provenance(raw_results, ExtractionMethod.MEMORY, remembered_selectors)
-                return _arbitrate_and_return(ExtractionResult(raw_results, "memory", selector_success=True, selectors=remembered_selectors))
+                return _arbitrate_and_return(ExtractionResult(raw_results, "memory", selector_success=True, selectors=remembered_selectors), warnings=warnings)
             else:
                 logger.info("[Orchestrator] Memory FAILURE (avg score: %.2f)", avg_score)
                 memory.record_failure(url)

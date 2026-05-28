@@ -9,7 +9,6 @@ Prints session-bound detection, network captures, source arbitration, and securi
 
 import json
 import sys
-import re
 import asyncio
 from pathlib import Path
 
@@ -22,6 +21,9 @@ from app.network_payload_extractor import (
     find_record_arrays,
     extract_from_network_payloads,
     arbitrate_sources,
+    _sanitize_payload,
+    _is_candidate_secret_heavy,
+    score_record_array,
 )
 from app.page_evidence_collector import collect_page_evidence
 from app.selector_engine import apply_selectors
@@ -77,22 +79,24 @@ async def fetch_and_capture(url: str) -> tuple[str, list[dict], dict]:
     return html, captured_payloads, state
 
 
-def check_secret_leakage(data: dict) -> bool:
+def check_secret_leakage(records: list[dict], field_map: any) -> bool:
     """Check if raw secrets leak into serialized output."""
-    serialized = json.dumps(data).lower()
+    data_to_serialize = {
+        "records": records,
+        "field_map": {k: v.__dict__ for k, v in field_map.items()} if field_map else {}
+    }
+    serialized = json.dumps(data_to_serialize).lower()
     secret_patterns = (
         "bearer", "csrf", "session_id", "api_key", "password",
         "secret", "token", "jwt", "cookie"
     )
-    # If any secret pattern is found in key mapping/extraction metadata
-    # but not inside expected fields
     for pattern in secret_patterns:
         if pattern in serialized:
             return True
     return False
 
 
-async def smoke(url: str):
+async def smoke(url: str, fields_str: str = None):
     # 1. Session detection
     session = detect_session_params(url)
     session_bound = session.get("is_session_bound", False)
@@ -101,17 +105,44 @@ async def smoke(url: str):
     # 2. Fetch and capture
     html, payloads, state = await fetch_and_capture(url)
 
-    # Count record arrays found in network payloads
-    record_arrays_found = 0
-    schema_fields = [
-        SchemaField(name="name", field_type=FieldType.STRING, required=False),
-        SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
-        SchemaField(name="description", field_type=FieldType.STRING, required=False),
-    ]
+    # Parse custom fields
+    if fields_str:
+        field_names = [f.strip() for f in fields_str.split(",") if f.strip()]
+        schema_fields = []
+        for name in field_names:
+            name_lower = name.lower()
+            if any(syn in name_lower for syn in ("price", "fare", "cost", "total", "amount", "fee", "rate", "value", "sum", "charge")):
+                f_type = FieldType.CURRENCY
+            elif any(syn in name_lower for syn in ("date", "day", "time", "schedule")):
+                f_type = FieldType.DATE
+            elif "rating" in name_lower or "score" in name_lower:
+                f_type = FieldType.NUMBER
+            else:
+                f_type = FieldType.STRING
+            schema_fields.append(SchemaField(name=name, field_type=f_type, required=False))
+    else:
+        schema_fields = [
+            SchemaField(name="name", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="description", field_type=FieldType.STRING, required=False),
+        ]
 
+    # Find record arrays found in network payloads, printing their candidate paths and details
+    candidates_list = []
     for p in payloads:
         candidates = find_record_arrays(p)
-        record_arrays_found += len(candidates)
+        for c in candidates:
+            is_secret = _is_candidate_secret_heavy(c)
+            # Sanitized records
+            sanitized_records = _sanitize_payload(c.records)
+            c.records = sanitized_records
+            score = score_record_array(c, schema_fields)
+            candidates_list.append({
+                "path": c.path,
+                "record_count": len(sanitized_records),
+                "score": round(score, 1),
+                "is_secret_heavy": is_secret
+            })
 
     # 3. Extract from Network Payloads
     net_result = extract_from_network_payloads(payloads, schema_fields)
@@ -125,7 +156,7 @@ async def smoke(url: str):
             best = evidence.candidate_containers[0]
             selectors = {
                 "item_container": best.selector,
-                "fields": {"name": "", "price": "", "description": ""},
+                "fields": {sf.name: "" for sf in schema_fields},
             }
             res = apply_selectors(html, selectors, schema_fields)
             dom_records = res if isinstance(res, list) else res[0]
@@ -140,10 +171,6 @@ async def smoke(url: str):
         schema_fields,
     )
 
-    best_source = "dom"
-    if winning_source != "dom" and net_result:
-        best_source = f"network_payload ({net_result.source})"
-
     # Calculate coverage
     if winning_source == "dom":
         coverage = sum(
@@ -154,24 +181,26 @@ async def smoke(url: str):
         coverage = net_result.field_coverage if net_result else 0.0
 
     # 6. Check for secret leakage
-    secrets_leaked = False
-    if net_result:
-        # Check if the field map contains mapped paths with tokens/cookies
-        secrets_leaked = check_secret_leakage(net_result.field_map)
+    secrets_leaked = check_secret_leakage(winning_records, field_map)
 
     # Output formatting
     print(f"session_bound: {str(session_bound).lower()}")
     print(f"canonical_url: {canonical}")
     print(f"network_payloads_found: {len(payloads)}")
-    print(f"record_arrays_found: {record_arrays_found}")
-    print(f"best_source: {best_source}")
-    print(f"records_extracted: {len(winning_records)}")
+    print(f"record_array_candidates: {json.dumps(candidates_list)}")
+    print(f"winning_source: {winning_source}")
+    print(f"record_count: {len(winning_records)}")
     print(f"field_coverage: {coverage:.2f}")
+    
+    provenance_paths = {k: v.mapped_from for k, v in field_map.items()} if field_map else {}
+    print(f"provenance_paths: {json.dumps(provenance_paths)}")
     print(f"raw_secrets_persisted: {str(secrets_leaked).lower()}")
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python scripts/smoke_session_url.py <URL>")
+        print("Usage: python scripts/smoke_session_url.py <URL> [comma_separated_schema_fields]")
         sys.exit(1)
-    asyncio.run(smoke(sys.argv[1]))
+    url = sys.argv[1]
+    fields_str = sys.argv[2] if len(sys.argv) > 2 else None
+    asyncio.run(smoke(url, fields_str))

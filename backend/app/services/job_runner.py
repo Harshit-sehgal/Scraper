@@ -256,6 +256,14 @@ async def run_job(
                             timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
                         )
 
+                        # Log network diagnostics and warnings to job Activity Logs
+                        if "network_diagnostics" in recovery_stats:
+                            for diag in recovery_stats["network_diagnostics"]:
+                                await _safe_log(f"[NetworkDiagnostics] {diag}", level="info")
+                        if "warnings" in recovery_stats:
+                            for warn in recovery_stats["warnings"]:
+                                await _safe_warning(warn)
+
                         # Record success if results were extracted
                         if results:
                             policy.record_success(url)

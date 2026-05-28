@@ -77,6 +77,7 @@ class ScrapeAttemptResult(list):
         data_evidence_score: float = 0.0,
         recommended_next_action: str = "",
         warnings: list[str] | None = None,
+        network_diagnostics: list[str] | None = None,
     ):
         super().__init__(records)
         self.html = html
@@ -90,6 +91,7 @@ class ScrapeAttemptResult(list):
         self.data_evidence_score = data_evidence_score
         self.recommended_next_action = recommended_next_action
         self.warnings = warnings or []
+        self.network_diagnostics = network_diagnostics or []
 
     def to_telemetry_dict(self) -> dict:
         """Return scrape metadata as a dict for diagnostics."""
@@ -234,6 +236,7 @@ async def scrape_url_attempt(
         recommended_next_action=result_recommended_action,
         warnings=result_warnings,
     )
+    result.network_diagnostics = getattr(raw, "network_diagnostics", [])
     # Build acquisition lineage from the enriched result
     result.acquisition_lineage = _build_acquisition_lineage_from_result(
         url=url, result=result, state=state,
@@ -543,14 +546,21 @@ async def scrape_url(
         except Exception:
             pass
 
+    result_warnings: list[str] = []
+
     ext_result = await orchestrate_extraction(
         url, html, schema_fields, min_record_score,
         provenance_builder=provenance_builder,
         world_state=world_state,
         user_intent=user_intent,
         provided_selectors=selectors_map,
+        warnings=result_warnings,
     )
-    results = ext_result.records
+    
+    # Run post-extraction semantic validation
+    from app.utils.quality import post_extract_validate_records
+    results = post_extract_validate_records(ext_result.records, schema_fields, warnings=result_warnings)
+    
     for r in results:
         r["_extraction_method"] = ext_result.method
         r["_extraction_source"] = ext_result.method
@@ -879,6 +889,7 @@ async def scrape_url(
     # ── Return with zero-result diagnostic logging ─────────────────
     # Log the failure class for diagnostics. The empty results signal
     # the caller that extraction ran to completion but found nothing.
+    res_warnings = list(result_warnings)
     if not results and zero_result_failure_class:
         logger.info(
             "[Scraper] Zero records for %s — failure_class=%s (not returning marker record)",
@@ -887,7 +898,8 @@ async def scrape_url(
         recommended_next_action = ""
         if zero_classification:
             recommended_next_action = zero_classification.recommended_action
-        return ScrapeAttemptResult(
+        
+        attempt_res = ScrapeAttemptResult(
             [],
             html=html,
             final_url=url,
@@ -897,10 +909,13 @@ async def scrape_url(
             zero_result_classification=zero_classification,
             anti_bot_score=anti_bot,
             recommended_next_action=recommended_next_action,
+            warnings=res_warnings,
+            network_diagnostics=getattr(ext_result, "network_diagnostics", []),
         )
+        return attempt_res
 
     data_evidence_score = min(1.0, len(results) / 10.0) if results else 0.0
-    return ScrapeAttemptResult(
+    attempt_res = ScrapeAttemptResult(
         results,
         html=html,
         final_url=url,
@@ -910,4 +925,7 @@ async def scrape_url(
         zero_result_classification=zero_classification,
         anti_bot_score=anti_bot,
         data_evidence_score=data_evidence_score,
+        warnings=res_warnings,
+        network_diagnostics=getattr(ext_result, "network_diagnostics", []),
     )
+    return attempt_res

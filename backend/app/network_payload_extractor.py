@@ -128,6 +128,58 @@ def _extract_nested_value(val: Any) -> Any:
     return val
 
 
+def _extract_nested_value_with_suffix(val: Any) -> tuple[Any, str]:
+    """Helper to extract a nested scalar value from a dictionary and return the suffix of the key used."""
+    if isinstance(val, dict):
+        for k in ("total", "amount", "value", "formatted", "raw", "text", "display", "name"):
+            if k in val and val[k] is not None and not isinstance(val[k], (dict, list)):
+                return val[k], f".{k}"
+        if len(val) == 1:
+            k = list(val.keys())[0]
+            sub_val = val[k]
+            if not isinstance(sub_val, (dict, list)):
+                return sub_val, f".{k}"
+    return val, ""
+
+
+def _sanitize_payload(obj: Any) -> Any:
+    """Recursively remove sensitive keys/branches from a JSON structure."""
+    if isinstance(obj, dict):
+        sanitized = {}
+        sensitive_patterns = ("cookie", "token", "session", "secret", "password", "jwt", "auth", "bearer", "csrf", "private_key", "client_secret")
+        for k, v in obj.items():
+            k_lower = k.lower()
+            if any(pattern in k_lower for pattern in sensitive_patterns):
+                continue
+            sanitized[k] = _sanitize_payload(v)
+        return sanitized
+    elif isinstance(obj, list):
+        return [_sanitize_payload(item) for item in obj]
+    return obj
+
+
+def _is_candidate_secret_heavy(candidate: RecordArrayCandidate) -> bool:
+    """Check if the candidate array itself is secret-heavy (contains sensitive info in path or records)."""
+    sensitive_patterns = ("cookie", "token", "session", "secret", "password", "jwt", "auth", "bearer", "csrf", "private_key", "client_secret")
+    path_lower = candidate.path.lower()
+    if any(pat in path_lower for pat in sensitive_patterns):
+        return True
+
+    if not candidate.records:
+        return False
+
+    first_record = candidate.records[0]
+    if not isinstance(first_record, dict) or not first_record:
+        return False
+
+    sensitive_count = sum(1 for k in first_record.keys() if any(pat in k.lower() for pat in sensitive_patterns))
+    if len(first_record) > 0:
+        if sensitive_count >= 3 or (sensitive_count / len(first_record)) > 0.30:
+            return True
+
+    return False
+
+
 def _value_matches_type(value: Any, field_type: FieldType) -> bool:
     """Check if a JSON value is compatible with the expected field type."""
     value = _extract_nested_value(value)
@@ -271,16 +323,17 @@ def map_json_records_to_schema(
         mapped: dict = {}
         for key, (field, confidence) in key_to_field.items():
             if key in record and record[key] is not None:
-                mapped[field.name] = _extract_nested_value(record[key])
+                val_extracted, suffix = _extract_nested_value_with_suffix(record[key])
+                mapped[field.name] = val_extracted
                 if field.name not in field_map:
                     # Construct exact path
                     if candidate_path.endswith(".node") or candidate_path.endswith("[*].node"):
-                        exact_path = f"{candidate_path}.{key}"
+                        exact_path = f"{candidate_path}.{key}{suffix}"
                     elif candidate_path == "$":
-                        exact_path = f"$[*].{key}"
+                        exact_path = f"$[*].{key}{suffix}"
                     else:
                         prefix = "" if candidate_path.startswith("$") else "$."
-                        exact_path = f"{prefix}{candidate_path}[*].{key}"
+                        exact_path = f"{prefix}{candidate_path}[*].{key}{suffix}"
 
                     field_map[field.name] = FieldMapping(
                         requested_field=field.name,
@@ -317,14 +370,14 @@ def extract_from_network_payloads(
         except Exception:
             continue
 
-        # Filter out secret-heavy payloads (auth metadata, token lists, cookie blocks)
-        raw_str = json.dumps(payload).lower() if not isinstance(payload, str) else payload.lower()
-        secret_keys = ("cookie", "auth_token", "bearer", "csrf", "session_id", "private_key", "client_secret")
-        if sum(1 for sk in secret_keys if sk in raw_str) >= 3:
-            continue
-
         candidates = find_record_arrays(payload)
         for candidate in candidates:
+            if _is_candidate_secret_heavy(candidate):
+                continue
+
+            # Recursively sanitize candidate records to remove sensitive keys/branches
+            candidate.records = _sanitize_payload(candidate.records)
+
             score = score_record_array(candidate, schema)
             if score > best_score:
                 best_score = score

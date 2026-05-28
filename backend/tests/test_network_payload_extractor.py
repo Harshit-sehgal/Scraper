@@ -1,6 +1,7 @@
 """Tests for network payload extraction and source arbitration."""
 
 import json
+import pytest
 from app.models import SchemaField, FieldType
 from app.network_payload_extractor import (
     find_record_arrays,
@@ -334,7 +335,7 @@ class TestSourceArbitration:
         result = extract_from_network_payloads([payload], schema)
         assert result is None
 
-    def test_secret_heavy_payloads_ignored(self):
+    def test_secret_heavy_payloads_not_ignored_but_sanitized(self):
         payload = json.dumps({
             "session_id": "sess_12345",
             "auth_token": "bearer_token_abc_xyz_789",
@@ -347,6 +348,21 @@ class TestSourceArbitration:
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        result = extract_from_network_payloads([payload], schema)
+        assert result is not None
+        assert result.record_count == 2
+        assert result.records[0].get("airline") == "IndiGo"
+
+    def test_candidate_array_secret_heavy_ignored(self):
+        payload = json.dumps({
+            "tokens": [
+                {"session_id": "sess_1", "cookie": "abc", "token": "t1"},
+                {"session_id": "sess_2", "cookie": "def", "token": "t2"},
+            ]
+        })
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
         ]
         result = extract_from_network_payloads([payload], schema)
         assert result is None
@@ -370,3 +386,137 @@ class TestSourceArbitration:
         assert "price" in result.field_map
         assert result.field_map["airline"].mapped_from == "$.data.flights[*].airlineName"
         assert result.field_map["price"].mapped_from == "$.data.flights[*].fareCost"
+
+    def test_strong_dom_weak_network_chooses_dom_explicit(self):
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        net_result = extract_from_network_payloads(
+            [json.dumps({"results": [{"x": 1}]})], schema
+        )
+        dom_records = [
+            {"airline": "Air India", "price": "$300"},
+            {"airline": "Singapore Air", "price": "$750"},
+        ]
+        records, source, _ = arbitrate_sources(dom_records, 95.0, net_result, schema)
+        assert source == "dom"
+        assert len(records) == 2
+
+    def test_network_high_count_poor_coverage_does_not_win(self):
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        unrelated_records = [{"id": i, "timestamp": 123456789} for i in range(50)]
+        net_result = extract_from_network_payloads(
+            [json.dumps({"results": unrelated_records})], schema
+        )
+        dom_records = [
+            {"airline": "Qatar Airways", "price": "$800"},
+            {"airline": "Air France", "price": "$950"},
+        ]
+        records, source, _ = arbitrate_sources(dom_records, 85.0, net_result, schema)
+        assert source == "dom"
+        assert len(records) == 2
+
+    def test_mixed_safe_results_secret_metadata_extracts_safe_records(self):
+        payload = json.dumps({
+            "session_id": "sess_deadbeef",
+            "auth_token": "bearer_jwt_token_here",
+            "client_secret": "my-secret-key-12345",
+            "results": [
+                {"carrier": "Lufthansa", "fare": 400},
+                {"carrier": "KLM", "fare": 450},
+            ]
+        })
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        result = extract_from_network_payloads([payload], schema)
+        assert result is not None
+        assert result.record_count == 2
+        assert result.records[0].get("airline") == "Lufthansa"
+        assert result.records[0].get("price") == 400
+        for r in result.records:
+            for k in r:
+                assert "session_id" not in k
+                assert "auth_token" not in k
+                assert "client_secret" not in k
+
+    def test_provenance_nested_suffix(self):
+        payload = json.dumps({
+            "results": [
+                {"carrier": "Delta", "price": {"total": "$500"}},
+                {"carrier": "United", "price": {"total": "$600"}},
+            ]
+        })
+        schema = [
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        result = extract_from_network_payloads([payload], schema)
+        assert result is not None
+        assert "price" in result.field_map
+        assert result.field_map["price"].mapped_from == "$.results[*].price.total"
+
+    def test_invalid_airport_code_rejected_and_warnings(self):
+        from app.utils.quality import post_extract_validate_records
+        schema = [
+            SchemaField(name="origin_airport_code", field_type=FieldType.STRING, required=True),
+            SchemaField(name="destination_airport_code", field_type=FieldType.STRING, required=False),
+        ]
+        
+        # 1. Required field invalid -> Discards record
+        records1 = [
+            {"origin_airport_code": "Guatemala City aerial view", "destination_airport_code": "JFK"}
+        ]
+        warnings = []
+        res1 = post_extract_validate_records(records1, schema, warnings=warnings)
+        assert len(res1) == 0
+        assert "Airport-code fields failed semantic validation" in warnings
+
+        # 2. Optional field invalid -> Sets to None
+        records2 = [
+            {"origin_airport_code": "MIA", "destination_airport_code": "New York City"}
+        ]
+        warnings = []
+        res2 = post_extract_validate_records(records2, schema, warnings=warnings)
+        assert len(res2) == 1
+        assert res2[0]["destination_airport_code"] is None
+        assert "Airport-code fields failed semantic validation" in warnings
+
+    @pytest.mark.asyncio
+    async def test_memory_downgraded_and_arbitration(self, monkeypatch):
+        from app.extraction_orchestrator import orchestrate_extraction
+        
+        url = "https://example.com/search/id/opaque_session_token_123"
+        html = "<html><body>Some content</body></html>"
+        schema = [
+            SchemaField(name="origin_airport_code", field_type=FieldType.STRING, required=True),
+            SchemaField(name="destination_airport_code", field_type=FieldType.STRING, required=True),
+        ]
+        
+        # Mock selector memory to return empty selectors
+        from app.selector_memory import get_selector_memory
+        memory = get_selector_memory()
+        monkeypatch.setattr(memory, "get_selectors", lambda u: {"item_container": "div", "fields": {"origin_airport_code": "", "destination_airport_code": ""}})
+        
+        # Mock apply_selectors to return bad data that will be rejected by semantic validator, dropping average score to 0.0 < 0.8
+        def mock_apply_selectors(html, selectors, schema_fields, **kwargs):
+            return [{"origin_airport_code": "Guatemala City aerial view", "destination_airport_code": "JFK", "record_score": 0.7}]
+            
+        monkeypatch.setattr("app.extraction_orchestrator.apply_selectors", mock_apply_selectors)
+        
+        warnings = []
+        _ = await orchestrate_extraction(
+            url=url,
+            html=html,
+            schema_fields=schema,
+            min_record_score=0.35,
+            warnings=warnings,
+        )
+        # Verify warnings has the memory downgrade warning
+        assert "Memory extraction returned low-confidence records on session-bound URL" in warnings
+
+
