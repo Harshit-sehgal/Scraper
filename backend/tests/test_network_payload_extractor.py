@@ -306,3 +306,67 @@ class TestSourceArbitration:
         for fm in result.field_map.values():
             assert "token" not in fm.mapped_from.lower()
             assert "cookie" not in fm.mapped_from.lower()
+
+    def test_root_array_payload_extraction(self):
+        root_array_payload = json.dumps([
+            {"carrier": "British Airways", "fare": 310, "depart": "11:00"},
+            {"carrier": "Lufthansa", "fare": 420, "depart": "15:30"},
+        ])
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        result = extract_from_network_payloads([root_array_payload], schema)
+        assert result is not None
+        assert result.record_count == 2
+        assert result.records[0].get("airline") == "British Airways"
+        assert result.records[1].get("price") == 420
+
+    def test_irrelevant_arrays_ignored(self):
+        payload = json.dumps({
+            "status": "success",
+            "metadata": {"user_id": 123},
+            "tags": ["tag1", "tag2", "tag3"],  # Primitive array, ignored
+        })
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+        ]
+        result = extract_from_network_payloads([payload], schema)
+        assert result is None
+
+    def test_secret_heavy_payloads_ignored(self):
+        payload = json.dumps({
+            "session_id": "sess_12345",
+            "auth_token": "bearer_token_abc_xyz_789",
+            "client_secret": "sec_99999",
+            "results": [
+                {"carrier": "IndiGo", "fare": 4500},
+                {"carrier": "Vistara", "fare": 6100},
+            ]
+        })
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        result = extract_from_network_payloads([payload], schema)
+        assert result is None
+
+    def test_provenance_exact_path(self):
+        nested_payload = json.dumps({
+            "data": {
+                "flights": [
+                    {"airlineName": "Qatar", "fareCost": 900},
+                    {"airlineName": "Emirates", "fareCost": 950},
+                ]
+            }
+        })
+        schema = [
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+        ]
+        result = extract_from_network_payloads([nested_payload], schema)
+        assert result is not None
+        assert "airline" in result.field_map
+        assert "price" in result.field_map
+        assert result.field_map["airline"].mapped_from == "$.data.flights[*].airlineName"
+        assert result.field_map["price"].mapped_from == "$.data.flights[*].fareCost"

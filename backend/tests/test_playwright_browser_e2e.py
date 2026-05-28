@@ -43,10 +43,29 @@ SEARCH_HTML = """<!DOCTYPE html>
 </script>
 </body></html>"""
 
+PIPELINE_HTML = """<!DOCTYPE html>
+<html><head><title>Pipeline Search Results</title></head><body>
+<div id="results">Loading...</div>
+<script>
+  fetch('/api/pipeline_results')
+    .then(r => r.json())
+    .then(data => {
+       console.log(data);
+    });
+</script>
+</body></html>"""
+
 API_JSON = json.dumps({
     "results": [
         {"carrier": "Test Airways", "fare": 299, "currency": "USD"},
         {"carrier": "Demo Airlines", "fare": 450, "currency": "USD"},
+    ]
+})
+
+PIPELINE_JSON = json.dumps({
+    "results": [
+        {"carrier": "Pipeline Airways", "fare": 999},
+        {"carrier": "Route Jet", "fare": 1200},
     ]
 })
 
@@ -60,11 +79,21 @@ class _BrowserTestHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html")
             self.end_headers()
             self.wfile.write(SEARCH_HTML.encode())
+        elif parsed.path == "/search/id/pipeline_test_token_xyz":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(PIPELINE_HTML.encode())
         elif parsed.path == "/api/results":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(API_JSON.encode())
+        elif parsed.path == "/api/pipeline_results":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(PIPELINE_JSON.encode())
         else:
             self.send_response(404)
             self.end_headers()
@@ -272,8 +301,8 @@ async def test_playwright_network_capture_feeds_extractor(browser_server):
 
         async def handle_response(response):
             try:
-                ct = response.headers.get("content-type", "")
-                if "application/json" in ct:
+                ct = "".join(v for k, v in response.headers.items() if k.lower() == "content-type").lower()
+                if "application/json" in ct or "results" in response.url.lower():
                     text = await response.text()
                     captured_payloads.append(text)
             except Exception:
@@ -287,6 +316,7 @@ async def test_playwright_network_capture_feeds_extractor(browser_server):
             wait_until="domcontentloaded",
         )
         await page.goto(f"{browser_server}/api/results", wait_until="domcontentloaded")
+        await page.wait_for_timeout(500)
         await browser.close()
 
     # Now verify that the captured response feeds successfully into the network payload extractor
@@ -301,3 +331,43 @@ async def test_playwright_network_capture_feeds_extractor(browser_server):
     assert result.record_count == 2
     assert result.records[0].get("airline") == "Test Airways"
     assert result.records[0].get("price") == 299
+
+
+@pytest.mark.asyncio
+async def test_playwright_pipeline_integration(browser_server, monkeypatch):
+    """True pipeline E2E integration: weak DOM + naturally fetched strong JSON -> chooses network."""
+    from app import url_safety, html_utils
+    monkeypatch.setattr(url_safety, "validate_public_http_url", lambda url: None)
+    monkeypatch.setattr(html_utils, "_validate_url_safe", lambda url: None)
+    from app.config import settings
+    monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "127.0.0.1,localhost")
+
+    from app.scraper import scrape_url_attempt
+
+    schema = [
+        SchemaField(name="airline", field_type=FieldType.STRING),
+        SchemaField(name="price", field_type=FieldType.CURRENCY),
+    ]
+
+    url = f"{browser_server}/search/id/pipeline_test_token_xyz"
+
+    # Run the real scraper attempt (which handles Playwright loading and network capture internally)
+    res = await scrape_url_attempt(
+        url=url,
+        schema_fields=schema,
+        min_record_score=0.1,
+    )
+
+    # Assert records were extracted successfully
+    assert len(res) == 2
+
+    # Verify exact records and metadata (source/provenance/confidence) are present in the final result
+    assert res[0].get("airline") == "Pipeline Airways"
+    assert res[0].get("price") == 999
+
+    assert res[0].get("_extraction_source") == "network_payload"
+    assert res[0].get("_extraction_confidence") is not None
+    prov = res[0].get("_extraction_provenance", {})
+    assert "fields" in prov
+    assert prov["fields"]["airline"] == "$.results[*].carrier"
+    assert prov["fields"]["price"] == "$.results[*].fare"

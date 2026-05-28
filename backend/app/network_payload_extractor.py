@@ -69,7 +69,7 @@ class NetworkExtractionResult:
 
 def find_record_arrays(payload: Any, path: str = "$", max_depth: int = 10) -> list[RecordArrayCandidate]:
     """Recursively find arrays of objects inside a JSON payload.
-    
+
     Depth-limited to max_depth to prevent infinite recursion on
     circular or deeply nested structures.
     """
@@ -105,6 +105,10 @@ def find_record_arrays(payload: Any, path: str = "$", max_depth: int = 10) -> li
             records=records,
             source=source,
         ))
+
+    # Check root-level array first
+    if isinstance(payload, list):
+        _check_array(payload, path, "network_payload")
 
     _recurse(payload, path)
     candidates.sort(key=lambda c: len(c.records), reverse=True)
@@ -240,6 +244,7 @@ def map_json_records_to_schema(
     records: list[dict],
     schema: list[SchemaField],
     source: str = "network_payload",
+    candidate_path: str = "$",
 ) -> tuple[list[dict], dict[str, FieldMapping]]:
     """Map JSON records to the requested schema, building field provenance.
 
@@ -268,9 +273,18 @@ def map_json_records_to_schema(
             if key in record and record[key] is not None:
                 mapped[field.name] = _extract_nested_value(record[key])
                 if field.name not in field_map:
+                    # Construct exact path
+                    if candidate_path.endswith(".node") or candidate_path.endswith("[*].node"):
+                        exact_path = f"{candidate_path}.{key}"
+                    elif candidate_path == "$":
+                        exact_path = f"$[*].{key}"
+                    else:
+                        prefix = "" if candidate_path.startswith("$") else "$."
+                        exact_path = f"{prefix}{candidate_path}[*].{key}"
+
                     field_map[field.name] = FieldMapping(
                         requested_field=field.name,
-                        mapped_from=f"$..{key}",
+                        mapped_from=exact_path,
                         source=source,
                         confidence=round(confidence, 2),
                     )
@@ -303,6 +317,12 @@ def extract_from_network_payloads(
         except Exception:
             continue
 
+        # Filter out secret-heavy payloads (auth metadata, token lists, cookie blocks)
+        raw_str = json.dumps(payload).lower() if not isinstance(payload, str) else payload.lower()
+        secret_keys = ("cookie", "auth_token", "bearer", "csrf", "session_id", "private_key", "client_secret")
+        if sum(1 for sk in secret_keys if sk in raw_str) >= 3:
+            continue
+
         candidates = find_record_arrays(payload)
         for candidate in candidates:
             score = score_record_array(candidate, schema)
@@ -315,6 +335,7 @@ def extract_from_network_payloads(
 
     mapped_records, field_map = map_json_records_to_schema(
         best_candidate.records, schema, source=best_candidate.source,
+        candidate_path=best_candidate.path,
     )
     coverage = len(field_map) / max(len(schema), 1)
 

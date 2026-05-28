@@ -553,6 +553,9 @@ async def scrape_url(
     results = ext_result.records
     for r in results:
         r["_extraction_method"] = ext_result.method
+        r["_extraction_source"] = ext_result.method
+        r["_extraction_confidence"] = r.get("record_score", 0.8)
+        r["_extraction_provenance"] = ext_result.selectors
     
     # Track extraction method in provenance
     provenance_builder.set_extraction_method(ext_result.method)
@@ -776,6 +779,10 @@ async def scrape_url(
 
     # Enrich records with provenance metadata (for explainability)
     results = enrich_records_with_provenance(results, provenance)
+    for r in results:
+        r["_extraction_source"] = ext_result.method
+        r["_extraction_confidence"] = r.get("record_score", 0.8)
+        r["_extraction_provenance"] = ext_result.selectors
 
     # Build provenance summary for telemetry
     llm_calls = get_llm_call_count()
