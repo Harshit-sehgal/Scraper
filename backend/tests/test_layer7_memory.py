@@ -8,7 +8,8 @@ def test_layer7_semantic_memory():
     records = [{"company": "Google", "price": "100"}]
     schema = ["company_name", "price"]
     
-    os.environ['SEMANTIC_STATE_PATH'] = '/tmp/test_semantic_state.json'
+    from app.config import settings
+    settings.SEMANTIC_STATE_PATH = '/tmp/test_semantic_state.json'
     if os.path.exists('/tmp/test_semantic_state.json'):
         os.remove('/tmp/test_semantic_state.json')
 

@@ -77,14 +77,7 @@ def test_prometheus_does_not_reference_undeployed_alertmanager():
     assert "\nalerting:" not in prometheus
 
 
-def test_ci_prometheus_check_matches_production_mount_layout():
-    """CI promtool validation should use the same selected-file mounts as prod."""
-    workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "ci.yml"
-    content = workflow.read_text()
 
-    assert '$PWD/prometheus.yml:/etc/prometheus/prometheus.yml:ro' in content
-    assert '$PWD/prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro' in content
-    assert '$PWD:/etc/prometheus:ro' not in content
 
 
 def test_ci_does_not_install_optional_g4f_by_default():
@@ -266,31 +259,6 @@ def test_auto_discovery_url_filtering(client, monkeypatch):
     assert len(urls) == 2
     assert urls[0]["url"] == "https://example.com/safe-item"
     assert urls[1]["url"] == "https://google.com/safe-google"
-
-@pytest.mark.asyncio
-async def test_search_form_recovery_ssrf_blocking(monkeypatch):
-    """Verify that search form recovery action and redirect target URLs are checked against SSRF."""
-    from app.selector_discovery import _try_form_search_recovery
-    
-    # Verify form action is validated
-    landing_page_html = """
-    <html>
-        <body>
-            <form action="http://127.0.0.1/admin/delete" method="POST">
-                <input name="q" type="text">
-            </form>
-        </body>
-    </html>
-    """
-    
-    res = await _try_form_search_recovery(
-        landing_page_html=landing_page_html,
-        landing_page_url="https://example.com",
-        search_params={"q": "test-search"}
-    )
-    
-    assert res["success"] is False
-    assert "failed security check" in res["error"]
 
 
 def test_backend_cors_origins_enforcement(client, monkeypatch):

@@ -55,7 +55,8 @@ def test_ai_clean_and_align_records_honors_consecutive_failure_threshold(monkeyp
 
 
 def test_llm_json_fast_uses_groq_fallback_model(monkeypatch):
-    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    from app.config import settings
+    monkeypatch.setattr(settings, "GROQ_API_KEY", "test-key")
     from app.config import settings
     monkeypatch.setattr(settings, "GROQ_DEFAULT_MODEL", "primary-model")
     monkeypatch.setattr(settings, "GROQ_FALLBACK_MODEL", "fallback-model")

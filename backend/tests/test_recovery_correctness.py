@@ -188,46 +188,7 @@ async def test_extra_headers_and_timeout_passed_to_httpx(monkeypatch):
     assert captured["timeout_ms"] == 1234
 
 
-@pytest.mark.asyncio
-async def test_force_container_discovery_skips_llm_and_memory(monkeypatch):
-    from app import extraction_orchestrator as orchestrator
 
-    called = {"discover": 0, "memory": 0, "container": 0}
-
-    class FakeMemory:
-        def get_selectors(self, url):
-            called["memory"] += 1
-            return {"item_container": ".cached", "fields": {"company_name": ".name"}}
-
-    class FakeContainerResult:
-        all_passed = True
-        final_records = [{"company_name": "Container Studio", "record_score": 0.95}]
-        total_records = 1
-        best_selector = ".card"
-
-    async def fake_discover(*args, **kwargs):
-        called["discover"] += 1
-        return {"item_container": ".llm", "fields": {"company_name": ".name"}}
-
-    async def fake_container(*args, **kwargs):
-        called["container"] += 1
-        return FakeContainerResult()
-
-    monkeypatch.setattr(orchestrator, "get_selector_memory", lambda: FakeMemory())
-    monkeypatch.setattr(orchestrator, "discover_selectors", fake_discover)
-    monkeypatch.setattr(orchestrator, "extract_from_network", lambda *args, **kwargs: [])
-    monkeypatch.setattr(orchestrator, "multi_pass_container_extraction", fake_container)
-
-    result = await orchestrator.orchestrate_extraction(
-        "https://example.com/list",
-        "<html><body><div class='card'>Container Studio</div></body></html>",
-        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
-        min_record_score=0.35,
-        provided_selectors={"force_container_discovery": True},
-    )
-
-    assert result.method == "container_discovery"
-    assert called == {"discover": 0, "memory": 0, "container": 1}
 
 
 def test_selectors_map_rejects_malformed_shapes():

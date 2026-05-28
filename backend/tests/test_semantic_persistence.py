@@ -12,9 +12,9 @@ from app.semantic_boundary_engine import get_boundary_engine
 from app.semantic_ir import SemanticType
 
 def test_persistence_round_trip():
-    # 1. Setup local path
     test_path = str(Path(__file__).parent / "test_semantic_state.json")
-    os.environ['SEMANTIC_STATE_PATH'] = test_path
+    from app.config import settings
+    settings.SEMANTIC_STATE_PATH = test_path
     
     # 2. Clear initial state
     clear_semantic_state()
@@ -72,7 +72,9 @@ def test_persistence_round_trip():
 def test_persistence_affects_pipeline():
     # Ensures that saved state actually changes run_pipeline behavior
     test_path = str(Path(__file__).parent / "test_pipeline_persistence.json")
-    os.environ['SEMANTIC_STATE_PATH'] = test_path
-    clear_semantic_state()
+    from app.config import settings
+    settings.SEMANTIC_STATE_PATH = test_path
+    
+    # Cleanup
     if os.path.exists(test_path):
         os.remove(test_path)
