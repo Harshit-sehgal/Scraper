@@ -729,7 +729,10 @@ Memory Layer (depends on: all layers)
 
 ### Future Work
 
-- [ ] Production deployment guide  
+- [x] Production deployment guide  
+  See `backend/README_DEPLOYMENT.md` for complete production deployment documentation
+  covering SQLite/PostgreSQL backends, Docker stack, worker queue, monitoring, 
+  and the production staging checklist.
 - [ ] Self-healing automation  
 
 > **Note**: See `PROJECT_STATUS.md` for the current honest assessment of what is verified, partially verified, and not yet verified.

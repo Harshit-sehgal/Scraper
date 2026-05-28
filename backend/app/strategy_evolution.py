@@ -189,10 +189,22 @@ class StrategyEvolutionEngine:
         """Initialize strategy evolution engine."""
         self.domain_states: Dict[str, DomainStrategyState] = {}
         
-        # Evolution parameters
+            # Evolution parameters
         self.min_samples_for_recommendation = 3
         self.exploration_probability = 0.15 # 15% chance to explore
         self.learning_enabled = True
+        
+        # Domain-aware cold-start sets (matched via _match_domain_set)
+        # These do NOT replace learning — they seed the initial strategy choice
+        # so common difficult domains get a sensible default on first contact.
+        self._antiboot_heavy_domains: set[str] = {
+            "yelp.com", "indeed.com", "ebay.com", "walmart.com",
+            "amazon.com", "linkedin.com", "zillow.com",
+        }
+        self._js_heavy_domains: set[str] = {
+            "booking.com", "espn.com", "github.com", "stackoverflow.com",
+            "imdb.com", "coursera.org", "etsy.com",
+        }
     
     def _get_or_create_state(self, domain: str) -> DomainStrategyState:
         """Get or create state for a domain."""
@@ -240,6 +252,21 @@ class StrategyEvolutionEngine:
         state = self._get_or_create_state(domain)
         state.record_attempt(strategy, success, time_ms, quality, failure_reason)
     
+    def _match_domain_set(self, domain: str, domain_set: set[str]) -> bool:
+        """Match a domain against a set, handling www. prefix and subdomains."""
+        clean = domain.lower().removeprefix("www.")
+        # Direct match
+        if clean in domain_set:
+            return True
+        # Subdomain match: e.g., "sub.yelp.com" matches "yelp.com"
+        for d in domain_set:
+            if clean.endswith("." + d):
+                return True
+            # Also check if domain_set entry has www. prefix
+            if d.removeprefix("www.") == clean:
+                return True
+        return False
+
     def recommend_strategy(self, domain: str) -> StrategyRecommendation:
         """Recommend a fetch strategy for a domain."""
         import random
@@ -262,7 +289,28 @@ class StrategyEvolutionEngine:
         total_attempts = sum(s.success_count + s.failure_count for s in state.strategies.values())
         
         if total_attempts < self.min_samples_for_recommendation:
-            # Cold start: use dynamic evidence, not domain-name lists
+            # Cold start: domain-aware strategy selection
+            # Check anti-bot heavy domains first (need stealth)
+            if self._match_domain_set(domain, self._antiboot_heavy_domains):
+                return StrategyRecommendation(
+                    recommended_strategy=FetchStrategy.PLAYWRIGHT_STEALTH,
+                    alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],
+                    reason=f"Cold start: '{domain}' is anti-bot heavy — selecting stealth mode",
+                    confidence=0.7,
+                    estimated_success_rate=0.5,
+                )
+            
+            # Check JS-heavy domains (need lightweight to avoid timeout)
+            if self._match_domain_set(domain, self._js_heavy_domains):
+                return StrategyRecommendation(
+                    recommended_strategy=FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT,
+                    alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],
+                    reason=f"Cold start: '{domain}' is JS-heavy — selecting lightweight mode (domcontentloaded)",
+                    confidence=0.6,
+                    estimated_success_rate=0.4,
+                )
+
+            # Dynamic evidence cold start (anti-bot signals from domain intelligence)
             try:
                 from app.domain_intelligence import get_domain_intelligence
                 intel = get_domain_intelligence().get_intelligence(domain)

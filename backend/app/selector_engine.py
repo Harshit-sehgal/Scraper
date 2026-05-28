@@ -310,14 +310,21 @@ def _field_matches_classification(field_name: str, classification: str) -> bool:
     mapping = {
         "date": ("date", "day"),
         "currency": ("price", "cost", "amount", "fee", "total"),
-        "name": ("name", "title", "operator", "provider", "company"),
+        "name": ("name", "title", "operator", "provider", "company", "airline", "carrier", "flight"),
         "location": ("city", "location", "place", "area"),
         "code": ("code", "identifier", "ref", "sku"),
         "text": (),  # matched via field ordering priority — STRING fields can match text
     }
-    keywords = mapping.get(classification, ())
-    if classification == "code":
+    keywords = mapping.get(classification, ())            if classification == "code":
         keywords = keywords + ("id", "ref")
+    if classification == "name":
+        # Broader matching for entity-name fields: airline text should match
+        # airline/operator fields, not city/location fields
+        exclusion_keywords = ("city", "location", "place", "area", "address")
+        if any(kw in n for kw in exclusion_keywords):
+            # A location-named field should NOT match a name-classified value
+            # (e.g., "airline" text should not go to "departure_city" field)
+            return False
     if not keywords and classification == "text":
         return True
     return any(kw in n for kw in keywords)

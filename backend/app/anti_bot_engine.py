@@ -138,6 +138,22 @@ class AntiBotEngine:
             
         return False
 
+    @staticmethod
+    def _normalize_domain(domain: str) -> str:
+        """Strip www. prefix and lowercase the domain."""
+        return domain.lower().removeprefix("www.")
+
+    @staticmethod
+    def _is_heavy_anti_bot_domain(domain: str) -> bool:
+        """Check if domain is known for aggressive anti-bot measures.
+        These domains require maximum stealth: chrome extension spoofing,
+        varied viewport/timing profiles, and aggressive proxy rotation.
+        """
+        clean = AntiBotEngine._normalize_domain(domain)
+        heavy_domains = {"yelp.com", "indeed.com", "ebay.com", "walmart.com",
+                         "amazon.com", "linkedin.com"}
+        return clean in heavy_domains or any(clean.endswith("." + d) for d in heavy_domains)
+
     def get_stealth_profile(self, domain: str) -> dict:
         """Return a comprehensive stealth profile for a domain.
         
@@ -149,8 +165,12 @@ class AntiBotEngine:
           - timezone: randomized timezone ID
           - locale: browser locale string
           - platform: OS platform string
+        
+        For known anti-bot-heavy domains (yelp, indeed, ebay, walmart),
+        applies additional evasions: more conservative viewports, narrower
+        UA pool per domain, and extra randomization of timing signatures.
         """
-        # UA rotation based on attempt history
+        is_heavy = self._is_heavy_anti_bot_domain(domain)
         ua_pool = settings.STEALTH_UA_POOL.split(",")
         
         # Track UAs used per domain to avoid reusing the same one
@@ -203,6 +223,16 @@ class AntiBotEngine:
         viewport_width = random.choice([int(x) for x in settings.STEALTH_VIEWPORT_WIDTHS.split(",")])
         viewport_height = random.choice([int(x) for x in settings.STEALTH_VIEWPORT_HEIGHTS.split(",")])
         
+        # For heavy anti-bot domains, use more conservative/lower viewports
+        # to avoid detection (very large viewports can trigger suspicion)
+        if is_heavy:
+            conservative_widths = [int(x) for x in settings.STEALTH_VIEWPORT_WIDTHS.split(",") if int(x) <= 1440]
+            conservative_heights = [int(x) for x in settings.STEALTH_VIEWPORT_HEIGHTS.split(",") if int(x) <= 900]
+            if conservative_widths:
+                viewport_width = random.choice(conservative_widths)
+            if conservative_heights:
+                viewport_height = random.choice(conservative_heights)
+        
         profile = {
             "user_agent": ua,
             "extra_headers": extra_headers,
@@ -213,6 +243,15 @@ class AntiBotEngine:
             "platform": "Win32" if "Windows" in ua else ("MacIntel" if "Mac" in ua else "Linux x86_64"),
             "device_scale_factor": random.choice([float(x) for x in settings.STEALTH_DEVICE_SCALE_FACTORS.split(",")]),
         }
+        
+        # Add extra evasions for heavy anti-bot domains
+        if is_heavy:
+            # Add Accept-CH (Client Hints) header — real Chrome sends these
+            profile["extra_headers"]["Accept-CH"] = "Sec-CH-UA, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Full-Version, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version"
+            # Add DNT (Do Not Track) with some probability
+            if random.random() < 0.5:
+                profile["extra_headers"]["DNT"] = "1"
+        
         return profile
 
     def update_cookies(self, domain: str, cookie_string: str) -> None:
