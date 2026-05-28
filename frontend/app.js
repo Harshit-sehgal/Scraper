@@ -1381,15 +1381,6 @@ async function analyzeURL() {
     }
 }
 
-function toggleField(index) {
-    const items = document.querySelectorAll('.analyze-field-item');
-    const checkboxes = document.querySelectorAll('.analyze-field-checkbox');
-    if (items[index] && checkboxes[index]) {
-        const isChecked = checkboxes[index].checked;
-        items[index].classList.toggle('selected', isChecked);
-    }
-}
-
 function toggleAllFields(select) {
     const checkboxes = document.querySelectorAll('.analyze-field-checkbox');
     const items = document.querySelectorAll('.analyze-field-item');
