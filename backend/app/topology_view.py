@@ -4,9 +4,9 @@ Returns immutable snapshots (RegionSnapshots, dicts) instead of live
 FieldConflictRegion objects. No mutation is possible through this interface.
 """
 
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
-from app.core_types import FieldConflictRegion, MAX_COUPLING_TRANSFER
+from app.core_types import FieldConflictRegion
 from app.topology_state_types import (
     RegionSnapshot,
     EdgeFieldSnapshot,

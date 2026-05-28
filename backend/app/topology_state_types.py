@@ -8,9 +8,7 @@ This module owns the immutable read-model types and low-level helpers
 extracted from the larger topology_state module.
 """
 
-from typing import List, Set, Tuple
 from dataclasses import dataclass
-from app.core_types import FieldConflictRegion
 import ast
 
 
