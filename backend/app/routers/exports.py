@@ -77,7 +77,9 @@ def create_exports_router(jobs_store: dict):
                 if job_id in fresh_jobs:
                     jobs_store[job_id] = fresh_jobs[job_id]
             except Exception:
-                pass
+                __import__('logging').getLogger(__name__).debug(
+                    "Failed to refresh job %s from repo for export", job_id
+                )
 
     @router.get("/api/jobs/{job_id}/export/csv")
     async def export_csv(job_id: str):
