@@ -257,3 +257,47 @@ async def test_playwright_url_detected_as_session_bound():
     assert result.get("is_session_bound") is True, (
         f"Expected session-bound, got: {result}"
     )
+
+
+@pytest.mark.asyncio
+async def test_playwright_network_capture_feeds_extractor(browser_server):
+    """E2E proving actual network capture feeds the extractor."""
+    from playwright.async_api import async_playwright
+    from app.network_payload_extractor import extract_from_network_payloads
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        captured_payloads = []
+
+        async def handle_response(response):
+            try:
+                ct = response.headers.get("content-type", "")
+                if "application/json" in ct:
+                    text = await response.text()
+                    captured_payloads.append(text)
+            except Exception:
+                pass
+
+        page.on("response", handle_response)
+
+        # Navigate to page and fetch the API results endpoint
+        await page.goto(
+            f"{browser_server}/search/id/browser_test_token_abc",
+            wait_until="domcontentloaded",
+        )
+        await page.goto(f"{browser_server}/api/results", wait_until="domcontentloaded")
+        await browser.close()
+
+    # Now verify that the captured response feeds successfully into the network payload extractor
+    schema = [
+        SchemaField(name="airline", field_type=FieldType.STRING),
+        SchemaField(name="price", field_type=FieldType.CURRENCY),
+    ]
+    assert len(captured_payloads) > 0, "No network JSON response captured"
+    result = extract_from_network_payloads(captured_payloads, schema)
+
+    assert result is not None
+    assert result.record_count == 2
+    assert result.records[0].get("airline") == "Test Airways"
+    assert result.records[0].get("price") == 299
