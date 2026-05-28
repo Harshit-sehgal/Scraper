@@ -1,8 +1,8 @@
 # DataForge Studio — Web Extraction & Resilient Crawling Platform
 
-DataForge Studio is a FastAPI + Playwright web extraction platform that extracts structured data from many public web pages using automatic selector discovery, fallback extraction, recovery logic, telemetry, and optional LLM-based schema cleaning.
+DataForge Studio is a pre-production web extraction platform with FastAPI, Playwright, job orchestration, telemetry, adaptive extraction, replay tooling, and production-hardening work in progress.
 
-Unlike basic scrapers, DataForge is built to be resilient and adaptive: it dynamically adjusts to page changes, handles failures with automated recovery pipelines, and maintains a highly efficient, single-row SQLite state store. Results depend on website accessibility, anti-bot controls, page structure, and extraction configuration.
+Unlike basic scrapers, DataForge is built to be resilient and adaptive: it dynamically adjusts to page changes, handles failures with automated recovery pipelines, and maintains a highly efficient, SQLite state store. Results depend on website accessibility, anti-bot controls, page structure, and extraction configuration.
 
 ---
 

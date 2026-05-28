@@ -14,6 +14,8 @@
 - SSRF protection: URL validation on discover, job creation, and recovery actions
 - Rate limiting: in-memory sliding window + nginx rate zones
 - Body size limits: 5MB payload cap with chunked transfer enforcement
+- Local dashboard security: Chart.js and Tailwind CSS are vendored locally; external CDNs are blocked by a strict Content-Security-Policy (CSP) in Nginx
+- Standardized environment variables: State file paths consistently configured via `DATAFORGE_STATE_FILE_PATH` with legacy fallbacks in place
 
 ## Partially Verified
 
@@ -32,15 +34,15 @@
 - **Not "any website"**: Extraction results depend on website accessibility, anti-bot controls, page structure, authentication requirements, and extraction configuration.
 - **Not "self-healing"**: The system has adaptive recovery mechanisms (selector memory, fallback strategies, replay tools) but cannot independently fix and permanently recover from all failures without human review.
 - **Silent exception blocks**: Multiple broad `except Exception` blocks exist across the codebase for resilience. These are intentional for operational stability but mean some failures may be logged rather than raised.
-- **CDN dashboard dependencies**: The semantic reliability dashboard loads Chart.js and Tailwind CSS from CDNs. The nginx CSP has been updated to allow these, but vendoring is recommended for full isolation.
+- **Read/export endpoints scope**: Read and export endpoints (e.g. results, topology, crystalline knowledge) are protected by a global API key in production, but any valid key has read access. Stricter role-specific filtering (Owner/Operator/Admin) is recommended for client-facing or multi-tenant deployments.
 - **Dependency reproducibility**: Pinned dependencies from `requirements.lock.txt` are enforced in Docker builds.
 - **Benchmark / Accuracy Framework**: Deterministic benchmark coverage exists for selected fixture scenarios. Live benchmark and hostile-site reliability require separate validation. Recovery logic has deterministic unit coverage and simulated recovery checks; real recovery success must be measured through live or replayed failure benchmarks.
 
 ## Production Blockers
 
-- [ ] Full test suite must pass in CI (not just locally)
-- [ ] Production secrets must not use placeholder values (runtime check added in app startup)
-- [x] `requirements.lock.txt` should be used in Dockerfile for reproducible builds
+- [x] Full test suite passes in CI and local SRE checks
+- [x] Production secrets must not use placeholder values (runtime check added in app startup)
+- [x] `requirements.lock.txt` is used in Dockerfile for reproducible builds
 
 ## Verification Commands
 
