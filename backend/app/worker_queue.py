@@ -873,7 +873,6 @@ def get_worker_queue(
     Returns:
         WorkerQueue (SQLite) or PostgresWorkerQueue depending on backend.
     """
-    import os
 
     # Resolve backend: explicit param > env var (checked first so pytest
     # monkeypatch.setenv works even after pydantic-settings cached its value) > default
