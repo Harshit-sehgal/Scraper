@@ -1,0 +1,258 @@
+/* ═══════════════════════════════════════════
+   DataForge — Jobs Management
+   ═══════════════════════════════════════════ */
+
+import { esc, toast, setEngineStatus, setJobsUpdatedAt, updateJobsLastUpdatedLabel, writeUIState } from './utils.js';
+import { API, apiFetch } from './api.js';
+import { currentView } from './views.js';
+
+// ─── State ───
+
+let jobsCache = [];
+const pollers = {};
+
+export function getJobsCache() { return jobsCache; }
+export function getPollers() { return pollers; }
+
+// ─── Refresh System Status ───
+
+export async function refreshSystemStatus() {
+    try {
+        const r = await apiFetch(`${API}/api/system/status`);
+        if (!r.ok) throw new Error('status unavailable');
+        const data = await r.json();
+        const active = Number((data.jobs || {}).active || 0);
+        setEngineStatus(active > 0 ? `Online • ${active} active` : 'Online • Idle');
+    } catch (e) {
+        setEngineStatus('Offline', true);
+    }
+}
+
+// ─── Refresh Jobs ───
+
+export async function refreshJobs() {
+    try {
+        const res = await apiFetch(`${API}/api/jobs`);
+        const data = await res.json();
+        jobsCache = Array.isArray(data.jobs) ? data.jobs : [];
+        renderJobs(applyJobFilters(jobsCache));
+        updateKPIs(jobsCache);
+        syncPollers(jobsCache);
+        setJobsUpdatedAt(Date.now());
+        updateJobsLastUpdatedLabel();
+    } catch (e) {
+        setEngineStatus('Offline', true);
+        updateJobsLastUpdatedLabel('Unable to refresh');
+    }
+}
+
+export async function refreshJobsManual() {
+    const btn = document.getElementById('btn-refresh-jobs');
+    const prevText = btn ? btn.textContent : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Refreshing...';
+    }
+
+    try {
+        await refreshJobs();
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = prevText || 'Refresh';
+        }
+    }
+}
+
+// ─── Pollers ───
+
+function syncPollers(jobs) {
+    const activeIds = new Set(
+        jobs
+            .filter(j => ['running', 'pending', 'discovering'].includes(j.status))
+            .map(j => j.id)
+    );
+
+    Object.keys(pollers).forEach(id => {
+        if (!activeIds.has(id)) {
+            clearInterval(pollers[id]);
+            delete pollers[id];
+        }
+    });
+
+    activeIds.forEach(id => {
+        if (!pollers[id]) {
+            const pollInterval = (typeof window.DATAFORGE_POLL_JOB_INTERVAL === 'number') ? window.DATAFORGE_POLL_JOB_INTERVAL : 3000;
+            pollers[id] = setInterval(() => pollJob(id), pollInterval);
+        }
+    });
+}
+
+async function pollJob(id) {
+    try {
+        const r = await apiFetch(`${API}/api/jobs/${id}`);
+        if (!r.ok) return;
+        const j = await r.json();
+
+        // If looking at this job's results, refresh logs/progress
+        if (currentView === 'results') {
+            const { currentJobId } = await import('./state.js');
+            if (currentJobId === id) {
+                const logsPanel = document.getElementById('logs-panel');
+                if (Array.isArray(j.logs) && j.logs.length) {
+                    logsPanel.classList.remove('hidden');
+                    const { renderLogs } = await import('./results.js');
+                    renderLogs(j.logs);
+                }
+
+                const resProgWrap = document.getElementById('res-progress-wrap');
+                if (j.progress_total > 0) {
+                    resProgWrap.classList.remove('hidden');
+                    const pct = Math.round((j.progress_current / j.progress_total) * 100);
+                    document.getElementById('res-progress-bar').style.width = `${pct}%`;
+                    document.getElementById('res-progress-text').textContent = `${pct}%`;
+                } else {
+                    resProgWrap.classList.add('hidden');
+                }
+
+                if (['completed', 'degraded', 'empty_result', 'failed', 'canceled'].includes(j.status)) {
+                    const { viewResults } = await import('./results.js');
+                    viewResults(id);
+                }
+            }
+        }
+
+        if (['completed', 'degraded', 'empty_result', 'failed', 'canceled'].includes(j.status)) {
+            clearInterval(pollers[id]);
+            delete pollers[id];
+            refreshJobs();
+            if (j.status === 'completed') toast(`"${j.name}" done — ${j.filtered_records} records`, 'success');
+            else if (j.status === 'degraded') toast(`"${j.name}" finished with partial results — ${j.filtered_records} records`, 'info');
+            else if (j.status === 'empty_result') toast(`"${j.name}" finished — 0 records. ${j.error || 'Page may be empty, blocked, or require JS rendering.'}`, 'warning');
+            else if (j.status === 'canceled') toast(`"${j.name}" canceled`, 'info');
+            else toast(`"${j.name}" failed: ${j.error}`, 'error');
+        }
+    } catch (e) { /* ignore */ }
+}
+
+// ─── CRUD ───
+
+export async function cancelJob(id) {
+    if (!confirm('Cancel this running job?')) return;
+    try {
+        const r = await apiFetch(`${API}/api/jobs/${id}/cancel`, { method: 'POST' });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || 'Cancel failed');
+        toast(data.message || 'Cancellation requested', 'info');
+        refreshJobs();
+    } catch (e) {
+        toast(`Cancel failed: ${e.message}`, 'error');
+    }
+}
+
+export async function deleteJob(id) {
+    if (!confirm('Delete this job?')) return;
+    try {
+        const r = await apiFetch(`${API}/api/jobs/${id}`, { method: 'DELETE' });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || 'Delete failed');
+        toast('Job deleted');
+        refreshJobs();
+    } catch (e) {
+        toast(`Delete failed: ${e.message}`, 'error');
+    }
+}
+
+export async function clearTerminalJobs() {
+    const keepRecent = 5;
+    if (!confirm(`Clear completed/failed/canceled jobs and keep the latest ${keepRecent}?`)) return;
+
+    try {
+        const r = await apiFetch(`${API}/api/jobs/cleanup/terminal?keep_recent=${keepRecent}`, { method: 'DELETE' });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || 'Terminal cleanup failed');
+        toast(data.message || 'Terminal jobs cleared', 'info');
+        refreshJobs();
+    } catch (e) {
+        toast(`Cleanup failed: ${e.message}`, 'error');
+    }
+}
+
+// ─── Filtering ───
+
+function applyJobFilters(jobs) {
+    const q = (document.getElementById('jobs-search')?.value || '').trim().toLowerCase();
+    const status = (document.getElementById('jobs-status-filter')?.value || 'all').toLowerCase();
+
+    return jobs.filter(j => {
+        const name = String(j.name || '').toLowerCase();
+        const topic = String(j.topic || '').toLowerCase();
+        const statusMatch = status === 'all' || String(j.status || '').toLowerCase() === status;
+        const queryMatch = !q || name.includes(q) || topic.includes(q);
+        return statusMatch && queryMatch;
+    });
+}
+
+export function onJobsFilterChanged() {
+    const jobsSearch = document.getElementById('jobs-search');
+    const jobsStatus = document.getElementById('jobs-status-filter');
+    writeUIState({
+        jobsSearch: jobsSearch ? jobsSearch.value : '',
+        jobsStatus: jobsStatus ? jobsStatus.value : 'all',
+    });
+    renderJobs(applyJobFilters(jobsCache));
+}
+
+// ─── Rendering ───
+
+function updateKPIs(jobs) {
+    document.getElementById('kpi-total').textContent = jobs.length;
+    document.getElementById('kpi-running').textContent = jobs.filter(j => j.status === 'running' || j.status === 'discovering' || j.status === 'pending').length;
+    document.getElementById('kpi-done').textContent = jobs.filter(j => ['completed', 'degraded', 'empty_result', 'canceled'].includes(j.status)).length;
+    document.getElementById('kpi-records').textContent = jobs.reduce((s, j) => s + (j.filtered_records || 0), 0);
+}
+
+function renderJobs(jobs) {
+    const list = document.getElementById('jobs-list');
+    const empty = document.getElementById('empty-state');
+
+    if (!jobs.length) {
+        list.innerHTML = '';
+        list.appendChild(empty);
+        empty.classList.remove('hidden');
+        return;
+    }
+
+    list.innerHTML = jobs.map(j => {
+        const isActive = ['pending', 'discovering', 'running'].includes(j.status);
+        const hasProgress = j.progress_total > 0;
+        const pct = hasProgress ? Math.round((j.progress_current / j.progress_total) * 100) : 0;
+
+        return `
+            <div class="job-row">
+                <div class="job-name-col">
+                    <div class="job-name">
+                        ${esc(j.name)}
+                        <span class="mode-tag">${j.mode === 'auto' ? 'auto' : 'manual'}</span>
+                    </div>
+                    ${isActive && hasProgress ? `
+                        <div class="job-progress-wrap">
+                            <div class="job-progress-bar" style="width: ${pct}%"></div>
+                            <span class="job-progress-text">${pct}%</span>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="job-urls">${j.urls.length} URL${j.urls.length !== 1 ? 's' : ''}</div>
+                <div><span class="badge ${j.status}">${j.status}</span></div>
+                <div class="job-records">${j.total_records > 0 ? `${j.filtered_records}` : '—'}</div>
+                <div class="job-actions">
+                    ${['completed', 'degraded', 'empty_result'].includes(j.status) ? `<button class="btn ghost small" data-action="view-results" data-id="${j.id}">View</button>` : ''}
+                    ${isActive ? `<button class="btn warn-ghost small" data-action="cancel-job" data-id="${j.id}">Cancel</button>` : ''}
+                    <button class="btn danger-ghost small" data-action="delete-job" data-id="${j.id}">✕</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+
