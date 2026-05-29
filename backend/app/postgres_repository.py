@@ -42,18 +42,22 @@ _pool_lock = threading.Lock()
 def _get_database_url() -> str:
     """Resolve the Postgres DSN from environment or settings.
 
-    In non-development environments, the DSN MUST be explicitly set via
-    DATAFORGE_DATABASE_URL. The fallback default only applies in development.
+    In non-development environments, the DSN MUST be explicitly configured.
+    The fallback default only applies in development.
+
+    Priority:
+    1. DATAFORGE_DATABASE_URL env var (checked first so runtime / test
+       overrides work even after pydantic-settings has cached its value)
+    2. settings.DATABASE_URL (from .env file or pydantic-settings)
+    3. Development fallback default
     """
-    url = os.getenv("DATAFORGE_DATABASE_URL", "").strip()
-    if url:
-        return url
-    try:
-        from app.config import settings
-        url = getattr(settings, "DATABASE_URL", "")
-    except (ImportError, AttributeError):
-        # Settings might not be initialized yet or DATABASE_URL attribute is absent; fallback to env/development defaults
-        pass
+    # Check raw env var first so pytest testcontainers fixtures that set
+    # the env var after import time are still picked up.
+    env_url = os.environ.get("DATAFORGE_DATABASE_URL", "").strip()
+    if env_url:
+        return env_url
+    from app.config import settings
+    url = getattr(settings, "DATABASE_URL", "") or ""
     if url:
         return url
     # Only allow fallback default in development mode
@@ -582,13 +586,21 @@ class PostgresJobRepository(JobRepository):
             # Upsert recycle bin — do NOT delete first
             for job in recycle_bin.values():
                 row = _job_to_row(job)
-                row["deleted_at"] = datetime.datetime.now().isoformat()
+                now_iso = datetime.datetime.now().isoformat()
+                row["deleted_at"] = now_iso
                 cols = ", ".join(row.keys())
                 ph = ", ".join("%s" for _ in row)
                 _execute(
                     conn,
                     f"INSERT INTO recycle_bin ({cols}) VALUES ({ph}) ON CONFLICT (id) DO NOTHING",
                     list(row.values()),
+                )
+                # Also soft-delete the job from the jobs table so it no
+                # longer appears in load_all() queries (WHERE deleted_at IS NULL).
+                _execute(
+                    conn,
+                    "UPDATE jobs SET deleted_at = %s WHERE id = %s AND deleted_at IS NULL",
+                    (now_iso, job.id),
                 )
 
             # Only remove stale recycle bin entries when explicitly requested

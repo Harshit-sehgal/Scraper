@@ -30,14 +30,22 @@ _CURRENT_QUEUE_SCHEMA_VERSION = 3
 def _ensure_schema():
     """Create queue tables and run schema migrations."""
     with _conn() as conn:
-        # Check if the existing table has the new structure or needs a recreate
-        try:
-            _fetch_one(conn, "SELECT id FROM queue_schema_version LIMIT 1")
-        except Exception:
+        # Check table existence via information_schema instead of try/except,
+        # which would leave the connection in an aborted transaction state.
+        table_exists = _fetch_one(
+            conn,
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = 'public' AND table_name = 'queue_schema_version'",
+        )
+        if table_exists:
+            # Verify the table has the expected structure
             try:
-                _execute(conn, "DROP TABLE IF EXISTS queue_schema_version CASCADE")
+                old_row = _fetch_one(conn, "SELECT id FROM queue_schema_version LIMIT 1")
             except Exception:
-                pass
+                old_row = None
+            if old_row is None:
+                _execute(conn, "DROP TABLE IF EXISTS queue_schema_version CASCADE")
+
 
         _execute(conn, """
             CREATE TABLE IF NOT EXISTS queue_schema_version (
@@ -186,7 +194,7 @@ class PostgresWorkerQueue:
                 self._enqueue_sync,
                 task.id, task.type, json.dumps(task.payload),
                 int(task.priority), task.status,
-                task.scheduled_at, task.attempts,
+                task.attempts,
                 task.max_attempts, task.timeout_seconds,
             )
 
@@ -195,22 +203,29 @@ class PostgresWorkerQueue:
     def _enqueue_sync(
         self,
         task_id: str, task_type: str, payload_json: str,
-        priority: int, status: str, scheduled_at: str,
+        priority: int, status: str,
         attempts: int, max_attempts: int, timeout_seconds: int,
     ) -> None:
-        """Synchronous enqueue — runs in a thread to avoid blocking the event loop."""
+        """Synchronous enqueue — runs in a thread to avoid blocking the event loop.
+
+        Uses ``NOW()`` for both ``created_at`` and ``scheduled_at`` so the stored
+        timestamps are in Postgres server time (UTC), matching the ``NOW()``
+        reference used by the dequeue query.  This avoids timezone mismatches
+        when Python's ``datetime.datetime.now()`` returns a different timezone
+        (e.g. IST) than the Postgres server (UTC).
+        """
         with _conn() as conn:
             _execute(
                 conn,
                 """INSERT INTO queue_tasks
                    (id, type, payload, priority, status, created_at,
                     scheduled_at, attempts, max_attempts, timeout_seconds)
-                   VALUES (%s, %s, %s, %s, %s, NOW(), %s, %s, %s, %s)
+                   VALUES (%s, %s, %s, %s, %s, NOW(), NOW(), %s, %s, %s)
                    ON CONFLICT (id) DO NOTHING""",
                 (
                     task_id, task_type, payload_json,
                     priority, status,
-                    scheduled_at, attempts,
+                    attempts,
                     max_attempts, timeout_seconds,
                 ),
             )

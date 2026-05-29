@@ -26,7 +26,7 @@ def postgres_container():
     from testcontainers.postgres import PostgresContainer
 
     with PostgresContainer("postgres:16-alpine") as pg:
-        database_url = pg.get_connection_url()
+        database_url = pg.get_connection_url().replace('+psycopg2', '')
         os.environ["DATAFORGE_DATABASE_URL"] = database_url
         os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
         reset_repository()
@@ -253,8 +253,8 @@ class TestPostgresJobRepositoryIntegration:
         repo = get_job_repository()
         reset_repository()
 
-        # Insert jobs in various states
-        jobs_map = {
+        # Insert jobs in various states (use list, not set — Job models are not hashable)
+        jobs_map = [
             Job(
                 id="pg-rec-pending",
                 name="Pending Job",
@@ -273,7 +273,7 @@ class TestPostgresJobRepositoryIntegration:
                 urls=["https://example.com"],
                 status=JobStatus.COMPLETED,
             ),
-        }
+        ]
         for job in jobs_map:
             repo.save_single(job)
 
@@ -374,7 +374,7 @@ class TestPostgresSchemaRepairIntegration:
         health = repo.health_check()
 
         assert health["ok"] is True, f"Health check failed: {health}"
-        assert health["schema_version"] == 2, f"Expected schema_version=2 after repair, got {health['schema_version']}"
+        assert health["schema_version"] == 3, f"Expected schema_version=3 after repair, got {health['schema_version']}"
 
         # Verify recycle_bin table now exists
         _close_pool()

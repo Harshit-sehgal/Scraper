@@ -1581,17 +1581,15 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 
 // Safer escaping for JavaScript string contexts (onclick handlers).
 // HTML-escapes AND escapes characters that could break out of JS strings:
-//   ' (single quote), " (double quote), \ (backslash), 
- (newline),  (carriage return)
+//   ' (single quote), " (double quote), \ (backslash), \n (newline), \r (carriage return)
 function jsStr(s) {
     if (typeof s !== 'string') s = String(s || '');
     return s
-        .replace(/\\/g, '\\')
+        .replace(/\\/g, '\\\\')
         .replace(/'/g, "\'")
         .replace(/"/g, '\"')
-        .replace(/
-/g, '\n')
-        .replace(//g, '\r');
+        .replace(/\n/g, '\n')
+        .replace(/\r/g, '\r');
 }
 
 // ─── Cognition State ───

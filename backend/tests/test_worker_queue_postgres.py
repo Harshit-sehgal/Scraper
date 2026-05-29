@@ -23,6 +23,32 @@ def _require_psycopg2():
 
 
 # ───────────────────────────────────────────────────────────────────────
+# Shared module-scoped Postgres container fixture
+# ───────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture(scope="module")
+def module_postgres_container():
+    """Start a single Postgres testcontainer for all postgres-marked tests.
+
+    Sets the DATAFORGE_* env vars so any code path that calls
+    ``_get_database_url()`` picks up the container port instead of the
+    development fallback.
+    """
+    from testcontainers.postgres import PostgresContainer
+
+    with PostgresContainer("postgres:16-alpine") as pg:
+        database_url = pg.get_connection_url().replace('+psycopg2', '')
+        os.environ["DATAFORGE_DATABASE_URL"] = database_url
+        os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
+        os.environ["DATAFORGE_QUEUE_BACKEND"] = "postgres"
+        yield
+        os.environ.pop("DATAFORGE_DATABASE_URL", None)
+        os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+        os.environ.pop("DATAFORGE_QUEUE_BACKEND", None)
+
+
+# ───────────────────────────────────────────────────────────────────────
 # Import & schema tests (no DB connection required)
 # ───────────────────────────────────────────────────────────────────────
 
@@ -71,7 +97,7 @@ class TestPostgresQueueImports:
 class TestPostgresQueueFactory:
     """Factory singleton tests (require Postgres connection)."""
 
-    def test_factory_returns_same_instance(self):
+    def test_factory_returns_same_instance(self, module_postgres_container):
         """get_postgres_worker_queue returns the same instance on repeated calls."""
         _require_psycopg2()
         from app.worker_queue_postgres import (
@@ -87,7 +113,7 @@ class TestPostgresQueueFactory:
         finally:
             reset_postgres_worker_queue()
 
-    def test_reset_creates_new_instance(self):
+    def test_reset_creates_new_instance(self, module_postgres_container):
         """After reset_postgres_worker_queue, a new instance is created."""
         _require_psycopg2()
         from app.worker_queue_postgres import (
@@ -154,7 +180,7 @@ class TestPostgresQueueConstruction:
 class TestWorkerQueueFactoryDispatch:
     """Verify get_worker_queue() correctly dispatches to Postgres backend."""
 
-    def test_factory_dispatch_postgres_env(self, monkeypatch):
+    def test_factory_dispatch_postgres_env(self, module_postgres_container, monkeypatch):
         """get_worker_queue(backend='postgres') returns PostgresWorkerQueue."""
         _require_psycopg2()
         from app.worker_queue import get_worker_queue, reset_worker_queue
@@ -182,7 +208,7 @@ class TestWorkerQueueFactoryDispatch:
             reset_worker_queue()
         monkeypatch.delenv("DATAFORGE_WORKER_QUEUE", raising=False)
 
-    def test_factory_dispatch_postgres_via_param(self, monkeypatch):
+    def test_factory_dispatch_postgres_via_param(self, module_postgres_container, monkeypatch):
         """get_worker_queue(backend='postgres') dispatches correctly."""
         _require_psycopg2()
         from app.worker_queue import get_worker_queue, reset_worker_queue
@@ -195,12 +221,14 @@ class TestWorkerQueueFactoryDispatch:
         finally:
             reset_worker_queue()
 
-    def test_reset_clears_both_backends(self, monkeypatch):
+    def test_reset_clears_both_backends(self, module_postgres_container, monkeypatch):
         """reset_worker_queue() clears both SQLite and Postgres singletons."""
         _require_psycopg2()
         from app.worker_queue import get_worker_queue, reset_worker_queue
 
         reset_worker_queue()
+        # Temporarily clear the env var so get_worker_queue() returns SQLite
+        monkeypatch.delenv("DATAFORGE_QUEUE_BACKEND", raising=False)
         q_sqlite = get_worker_queue()
         q_postgres = get_worker_queue(backend="postgres")
         assert q_sqlite is not q_postgres
@@ -226,27 +254,31 @@ class TestPostgresQueueIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def postgres_container(self):
-        """Start a Postgres testcontainer and configure the connection."""
-        from testcontainers.postgres import PostgresContainer
-
-        with PostgresContainer("postgres:16-alpine") as pg:
-            os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
-            os.environ["DATAFORGE_DATABASE_URL"] = pg.get_connection_url()
-            os.environ["DATAFORGE_QUEUE_BACKEND"] = "postgres"
-            yield
-            os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
-            os.environ.pop("DATAFORGE_DATABASE_URL", None)
-            os.environ.pop("DATAFORGE_QUEUE_BACKEND", None)
+    def ensure_postgres(self, module_postgres_container):
+        """Depend on the module-scoped Postgres container."""
+        pass
 
     @pytest.fixture(autouse=True)
-    def reset_queue(self):
-        """Reset the Postgres queue singleton before each test."""
+    def clean_queue_tables(self):
+        """Truncate queue tables between tests for isolation.
+
+        Since the container is module-scoped, tasks created by one test
+        would persist into the next. This fixture also resets the queue
+        singletons so the next test gets a fresh ``PostgresWorkerQueue``.
+        """
         from app.worker_queue_postgres import reset_postgres_worker_queue
         from app.worker_queue import reset_worker_queue
+        from app.postgres_repository import _conn, _execute
 
         reset_postgres_worker_queue()
         reset_worker_queue()
+        # Use the shared pool to clean both queue tables
+        try:
+            with _conn() as conn:
+                _execute(conn, "DELETE FROM queue_tasks")
+                _execute(conn, "DELETE FROM queue_task_history")
+        except Exception:
+            pass  # Tables may not exist yet on first run
         yield
         reset_postgres_worker_queue()
         reset_worker_queue()
@@ -432,32 +464,40 @@ class TestPostgresQueueIntegration:
         queue.clear_completed_history(older_than_days=1)
 
     def test_recover_stuck_tasks(self):
-        """Tasks stuck in 'running' state are recovered on construction."""
+        """Tasks stuck in 'running' state are recovered via start()."""
         import psycopg2
-        from app.worker_queue_postgres import PostgresWorkerQueue
+        from app.worker_queue_postgres import PostgresWorkerQueue, reset_postgres_worker_queue
 
-        queue = PostgresWorkerQueue()
+        async def run():
+            queue = PostgresWorkerQueue()
 
-        task_id = asyncio.run(queue.enqueue("stuck_test", {}))
-        task = asyncio.run(queue.dequeue(timeout=5.0))
-        assert task is not None
+            task_id = await queue.enqueue("stuck_test", {})
+            task = await queue.dequeue(timeout=5.0)
+            assert task is not None
 
-        # Manually set a task to 'running' to simulate crash
-        dsn = os.environ["DATAFORGE_DATABASE_URL"]
-        conn = psycopg2.connect(dsn)
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE queue_tasks SET status = 'running', started_at = NOW() WHERE id = %s",
-                    (task_id,),
-                )
-            conn.commit()
-        finally:
-            conn.close()
+            # Manually set a task to 'running' to simulate crash
+            dsn = os.environ["DATAFORGE_DATABASE_URL"]
+            conn = psycopg2.connect(dsn)
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE queue_tasks SET status = 'running', started_at = NOW() "
+                        "WHERE id = %s",
+                        (task_id,),
+                    )
+                conn.commit()
+            finally:
+                conn.close()
 
-        # New queue should recover stuck tasks
-        queue2 = PostgresWorkerQueue()
-        status = queue2.get_status()
+            reset_postgres_worker_queue()
+            # New queue should recover stuck tasks when start() is called
+            queue2 = PostgresWorkerQueue()
+            await queue2.start()
+            status = queue2.get_status()
+            await queue2.stop(drain=True)
+            return status
+
+        status = asyncio.run(run())
         assert status["running"] == 0, f"Expected 0 running, got {status}"
         assert status["pending"] >= 1, f"Expected >=1 pending, got {status}"
 
@@ -465,49 +505,55 @@ class TestPostgresQueueIntegration:
         """A registered handler is called when the worker processes a task."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
-        queue = PostgresWorkerQueue(max_concurrency=1, poll_interval=0.1)
+        async def run():
+            queue = PostgresWorkerQueue(max_concurrency=1, poll_interval=0.1)
 
-        results = []
+            results = []
 
-        async def test_handler(task):
-            results.append(task.id)
-            return {"handled": True}
+            async def test_handler(task):
+                results.append(task.id)
+                return {"handled": True}
 
-        queue.register_handler("handler_test", test_handler)
+            queue.register_handler("handler_test", test_handler)
 
-        task_id = asyncio.run(queue.enqueue("handler_test", {}))
-        asyncio.run(queue.start())
+            task_id = await queue.enqueue("handler_test", {})
+            await queue.start()
 
-        import time
-        deadline = time.time() + 10
-        while time.time() < deadline:
-            if task_id in results:
-                break
-            time.sleep(0.1)
+            import time
+            deadline = time.time() + 10
+            while time.time() < deadline:
+                if task_id in results:
+                    break
+                await asyncio.sleep(0.1)
 
-        asyncio.run(queue.stop(drain=True))
+            await queue.stop(drain=True)
+            return task_id, results
 
+        task_id, results = asyncio.run(run())
         assert task_id in results, f"Handler never called for {task_id}"
 
     def test_missing_handler_moves_to_dead_letter(self):
         """A task with no registered handler goes to dead letter."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
-        queue = PostgresWorkerQueue(max_concurrency=1, poll_interval=0.1)
+        async def run():
+            queue = PostgresWorkerQueue(max_concurrency=1, poll_interval=0.1)
 
-        asyncio.run(queue.enqueue("no_handler", {}, max_attempts=1))
-        asyncio.run(queue.start())
+            await queue.enqueue("no_handler", {}, max_attempts=1)
+            await queue.start()
 
-        import time
-        deadline = time.time() + 10
-        while time.time() < deadline:
-            status = queue.get_status()
-            if status["dead_letter"] >= 1:
-                break
-            time.sleep(0.1)
+            import time
+            deadline = time.time() + 10
+            while time.time() < deadline:
+                status = queue.get_status()
+                if status["dead_letter"] >= 1:
+                    break
+                await asyncio.sleep(0.1)
 
-        asyncio.run(queue.stop(drain=True))
+            await queue.stop(drain=True)
+            return queue
 
+        queue = asyncio.run(run())
         status = queue.get_status()
         assert status["dead_letter"] >= 1, (
             f"Expected dead_letter >=1, got {status}"

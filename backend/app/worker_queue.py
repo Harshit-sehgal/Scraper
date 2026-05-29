@@ -20,6 +20,7 @@ import asyncio
 import datetime
 import json
 import logging
+import os
 import sqlite3
 import threading
 import time
@@ -27,6 +28,8 @@ import uuid
 from enum import IntEnum, StrEnum
 from pathlib import Path
 from typing import Callable, Optional, Any
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -872,8 +875,10 @@ def get_worker_queue(
     """
     import os
 
-    # Resolve backend: explicit param > env var > default
-    resolved_backend = backend or os.getenv("DATAFORGE_QUEUE_BACKEND", "sqlite").strip().lower()
+    # Resolve backend: explicit param > env var (checked first so pytest
+    # monkeypatch.setenv works even after pydantic-settings cached its value) > default
+    env_backend = os.environ.get("DATAFORGE_QUEUE_BACKEND", "").strip().lower()
+    resolved_backend = backend or env_backend or settings.QUEUE_BACKEND.strip().lower()
 
     if resolved_backend == "postgres":
         from app.worker_queue_postgres import get_postgres_worker_queue
