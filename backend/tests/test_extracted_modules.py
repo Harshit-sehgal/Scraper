@@ -65,7 +65,6 @@ def test_topology_api():
     r.instability = 0.01
     r.semantic_pressure = 0.0 # Force low energy for pruning test
     r.local_energy = 0.1
-    # print(f"DEBUG TEST: r ID={id(r)} inst={r.instability} energy={r.local_energy}")
     assert api.prune_weak_regions(min_instability=0.02) == 1
 
     assert api.region_count() == 0
