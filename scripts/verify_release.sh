@@ -23,7 +23,7 @@ if [[ "${DATAFORGE_SKIP_PROD_ENV_CHECK:-0}" == "1" ]]; then
     echo "== Production env check skipped by DATAFORGE_SKIP_PROD_ENV_CHECK=1 =="
 else
     echo "== Production env check =="
-    "$PYTHON_BIN" scripts/check_prod_env.py --env-file "${DATAFORGE_ENV_FILE:-.env}"
+    "$PYTHON_BIN" scripts/check_prod_env.py --env-file "${DATAFORGE_ENV_FILE:-.env.production}"
 fi
 
 echo "Selected release verification checks completed."
