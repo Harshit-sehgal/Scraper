@@ -1,6 +1,6 @@
 # Project Status
 
-This file is the current source of truth for project claims. Historical maturity reports were moved to `docs/archive/` and should not be used as current evidence.
+This file is the current source of truth for project claims. Historical maturity reports were moved to `docs/archive/` and should not be used as current evidence. The detailed execution handoff is `docs/HANDOFF.md`.
 
 ## Verified
 

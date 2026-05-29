@@ -10,7 +10,7 @@ This project is not a universal scraper, not a guaranteed anti-bot solution, not
 
 ## Current Status
 
-The current source of truth is [PROJECT_STATUS.md](PROJECT_STATUS.md). The full audit report is [docs/AUDIT_REPORT.md](docs/AUDIT_REPORT.md).
+The current source of truth is [PROJECT_STATUS.md](PROJECT_STATUS.md). The full audit report is [docs/AUDIT_REPORT.md](docs/AUDIT_REPORT.md), and the practical next-step handoff plan is [docs/HANDOFF.md](docs/HANDOFF.md).
 
 Verified locally during this cleanup:
 
@@ -96,6 +96,7 @@ Production startup now runs `scripts/check_prod_env.py` through the server and w
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/API.md](docs/API.md)
+- [docs/HANDOFF.md](docs/HANDOFF.md)
 - [docs/SETUP.md](docs/SETUP.md)
 - [docs/PRODUCTION.md](docs/PRODUCTION.md)
 - [docs/SECURITY.md](docs/SECURITY.md)
