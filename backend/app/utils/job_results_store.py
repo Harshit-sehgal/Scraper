@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def get_results_dir() -> Path:
     """Retrieve the path to the job results storage directory and ensure it exists."""
     from app.state_store import get_state_file_path
-    
+
     state_file = get_state_file_path()
     results_dir = state_file.parent / "results"
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -29,12 +29,12 @@ def get_job_results_path(job_id: str) -> Path:
 def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
     """
     Compress and write the list of record dictionaries to disk in JSONLines format.
-    
+
     Returns the absolute string path to the saved file.
     """
     path = get_job_results_path(job_id)
     logger.info("Offloading %d records to disk for job %s at %s", len(results), job_id, path)
-    
+
     # Write to a temporary file first and then atomically rename it to prevent corruption
     temp_path = path.with_suffix(path.suffix + ".tmp")
     try:
@@ -47,11 +47,10 @@ def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
         if temp_path.exists():
             try:
                 temp_path.unlink()
-            except Exception as inner_e:
-                logging.getLogger(__name__).warning("Suppressed exception: %s", inner_e)
+            except Exception:
                 pass
         raise e
-        
+
     return str(path)
 
 
@@ -72,7 +71,7 @@ def load_job_results_from_disk(job_id: str, file_path: Optional[str] = None) -> 
     if not path.exists():
         logger.warning("Results file not found on disk for job %s at %s", job_id, path)
         return []
-        
+
     results = []
     try:
         with gzip.open(path, "rt", encoding="utf-8") as f:
@@ -83,7 +82,7 @@ def load_job_results_from_disk(job_id: str, file_path: Optional[str] = None) -> 
     except Exception as e:
         logger.exception("Failed to read job results from disk for %s: %s", job_id, e)
         raise e
-        
+
     return results
 
 
@@ -95,10 +94,10 @@ def load_paginated_job_results_from_disk(
 ) -> tuple[list[dict], int]:
     """
     Decompress and load only a paginated chunk of record dictionaries from disk.
-    
+
     Skips lines up to *offset*, loads up to *limit* records, and counts the remaining lines
     to return the exact total count without parsing all records.
-    
+
     Returns:
         tuple of (records_page: list[dict], total_count: int)
     """
@@ -106,10 +105,10 @@ def load_paginated_job_results_from_disk(
         path = Path(file_path)
     else:
         path = get_job_results_path(job_id)
-        
+
     if not path.exists():
         return [], 0
-        
+
     records: list[dict] = []
     total_count = 0
     try:
@@ -124,7 +123,7 @@ def load_paginated_job_results_from_disk(
     except Exception as e:
         logger.exception("Failed to read paginated job results from disk for %s: %s", job_id, e)
         raise e
-        
+
     return records, total_count
 
 
@@ -188,11 +187,11 @@ def load_job_results_from_disk_safe(
 def delete_job_results_from_disk(job_id: str, file_path: Optional[str] = None) -> bool:
     """
     Delete the compressed results file from disk for a given job ID.
-    
+
     If *file_path* is provided, it is used directly (supporting migrated or
     externally stored result paths). Otherwise the path is recomputed from
     the job ID using the standard path convention.
-    
+
     Returns True if the file was deleted, False otherwise.
     """
     path = Path(file_path) if file_path else get_job_results_path(job_id)

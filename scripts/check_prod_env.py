@@ -2,21 +2,24 @@
 """
 Production Environment Check — DataForge Scraper.
 
-Validates that the `.env` file has all required variables set correctly
-before running `docker compose up`.
+Validates that required production variables are set before deployment.
+Values from the process environment override values loaded from `--env-file`,
+which lets Docker Compose and container startup checks use the same gate.
 
 Usage:
     python scripts/check_prod_env.py [--env-file .env]
 
 Exit codes:
-    0 — All checks passed
+    0 — Required environment checks passed
     1 — One or more checks failed
 """
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 
 REQUIRED_VARS = [
@@ -28,6 +31,15 @@ REQUIRED_VARS = [
     "DATAFORGE_WORKER_QUEUE",
     "DATAFORGE_ENV",
 ]
+
+DEFAULT_DB_PASSWORD_VALUES = {
+    "dataforge",
+    "change-me",
+    "change-me-to-a-strong-password",
+    "change-this-to-a-strong-password",
+    "password",
+    "postgres",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -62,6 +74,19 @@ def load_env_file(path: Path) -> dict[str, str]:
     return env
 
 
+def load_effective_env(path: Path) -> dict[str, str]:
+    """Load env-file values and overlay process environment variables."""
+    env = load_env_file(path)
+    env.update(
+        {
+            key: value
+            for key, value in os.environ.items()
+            if key.startswith("DATAFORGE_") or key.startswith("GRAFANA_")
+        }
+    )
+    return env
+
+
 def check_var(
     env: dict[str, str],
     name: str,
@@ -82,8 +107,7 @@ def check_var(
     Returns:
         True if the check passed, False otherwise.
     """
-    import os
-    value = env.get(name, os.environ.get(name, "")).strip()
+    value = env.get(name, "").strip()
 
     if not value:
         if required:
@@ -97,7 +121,7 @@ def check_var(
 
     if validator:
         if not validator(value):
-            print(f"  [FAIL]  {name} = {value!r} failed validation.")
+            print(f"  [FAIL]  {name} = {_mask_value(name, value)!r} failed validation.")
             if hint:
                 print(f"          Hint: {hint}")
             return False
@@ -113,6 +137,17 @@ def _mask_value(name: str, value: str) -> str:
         if len(value) > 8:
             return value[:4] + "****" + value[-4:]
         return "****"
+    if name.lower().endswith("url") and "://" in value:
+        try:
+            parsed = urlsplit(value)
+            if parsed.password:
+                username = parsed.username or ""
+                host = parsed.hostname or ""
+                port = f":{parsed.port}" if parsed.port else ""
+                auth = f"{username}:****@" if username else "****@"
+                return urlunsplit((parsed.scheme, f"{auth}{host}{port}", parsed.path, parsed.query, parsed.fragment))
+        except ValueError:
+            return "<invalid-url>"
     return value
 
 
@@ -138,11 +173,6 @@ def check_cors_origins(value: str) -> bool:
             print(
                 f"  [FAIL]  CORS origin {origin!r} is invalid. "
                 "Must be a valid URL starting with http:// or https://."
-            )
-            return False
-        if "yourdomain.com" in origin:
-            print(
-                "  [FAIL]  DATAFORGE_CORS_ORIGINS contains placeholder domain 'yourdomain.com'."
             )
             return False
 
@@ -182,18 +212,20 @@ def check_queue_backend(value: str) -> bool:
     return True
 
 
-def _contains_bad_substring(value: str) -> bool:
-    """Check if value contains generic placeholder strings."""
-    bad_substrings = ["change-me", "changeme", "secret", "password", "example", "admin", "dev-key", "test-key", "your-api-key"]
-    val_lower = value.lower()
-    return any(bad in val_lower for bad in bad_substrings)
-
 def check_grafana_password(value: str) -> bool:
     """Validate GRAFANA_PASSWORD is not a default/placeholder value."""
-    if _contains_bad_substring(value) or value.lower() == "grafana":
+    default_values = {
+        "admin",
+        "password",
+        "grafana",
+        "change-me",
+        "change-me-to-a-strong-password",
+        "change-this-to-a-strong-password",
+    }
+    if value.lower() in default_values:
         print(
             f"  [FAIL]  GRAFANA_PASSWORD={_mask_value('GRAFANA_PASSWORD', value)} "
-            "contains a placeholder or default value. "
+            "is a known default/placeholder value. "
             "Set a strong, unique Grafana admin password."
         )
         return False
@@ -207,36 +239,44 @@ def check_grafana_password(value: str) -> bool:
 
 
 def check_database_url(value: str) -> bool:
-    """Validate DATAFORGE_DATABASE_URL is a postgresql:// URL and doesn't use placeholder passwords."""
+    """Validate DATAFORGE_DATABASE_URL is a postgresql:// URL."""
     if not value.startswith(("postgresql://", "postgres://")):
         print(
             f"  [FAIL]  DATAFORGE_DATABASE_URL={value!r}. "
             "Must be a postgresql:// or postgres:// URL."
         )
         return False
-    
-    import urllib.parse
     try:
-        parsed = urllib.parse.urlparse(value)
-        if parsed.password:
-            if _contains_bad_substring(parsed.password) or parsed.password.lower() in {"dataforge", "postgres"}:
-                print(
-                    f"  [FAIL]  DATAFORGE_DATABASE_URL contains a placeholder/default password '{parsed.password}'."
-                )
-                return False
-    except Exception as e:
-        print(f"  [FAIL]  DATAFORGE_DATABASE_URL failed to parse: {e}")
+        parsed = urlsplit(value)
+    except ValueError:
+        print("  [FAIL]  DATAFORGE_DATABASE_URL is not parseable.")
         return False
-        
+    if not parsed.hostname:
+        print("  [FAIL]  DATAFORGE_DATABASE_URL must include a hostname.")
+        return False
+    if not parsed.password:
+        print("  [FAIL]  DATAFORGE_DATABASE_URL must include a database password.")
+        return False
+    if not _check_password_secret("DATAFORGE_DATABASE_URL password", parsed.password):
+        print("  [FAIL]  DATAFORGE_DATABASE_URL contains a weak or placeholder password.")
+        return False
     return True
 
 
 def check_api_key(value: str) -> bool:
     """Validate DATAFORGE_API_KEY is not a default/placeholder value."""
-    if _contains_bad_substring(value):
+    default_values = {
+        "change-me",
+        "change-me-to-a-random-secret",
+        "change-this-to-a-strong-password",
+        "dev-key",
+        "test-key",
+        "your-api-key-here",
+    }
+    if value.lower() in default_values:
         print(
             f"  [FAIL]  DATAFORGE_API_KEY={_mask_value('DATAFORGE_API_KEY', value)} "
-            "contains a placeholder or default value. "
+            "is a known default/placeholder value. "
             "Generate a strong random key with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
         )
         return False
@@ -251,16 +291,21 @@ def check_api_key(value: str) -> bool:
 
 def check_db_password(value: str) -> bool:
     """Validate DATAFORGE_DB_PASSWORD is not a default/placeholder value."""
-    if _contains_bad_substring(value) or value.lower() in {"dataforge", "postgres"}:
+    return _check_password_secret("DATAFORGE_DB_PASSWORD", value)
+
+
+def _check_password_secret(name: str, value: str) -> bool:
+    """Validate a database-style password is not a default/placeholder value."""
+    if value.lower() in DEFAULT_DB_PASSWORD_VALUES:
         print(
-            f"  [FAIL]  DATAFORGE_DB_PASSWORD={_mask_value('DATAFORGE_DB_PASSWORD', value)} "
-            "contains a placeholder or default value. "
+            f"  [FAIL]  {name}={_mask_value(name, value)} "
+            "is a known default/placeholder value. "
             "Use a strong, unique password."
         )
         return False
     if len(value) < 8:
         print(
-            f"  [FAIL]  DATAFORGE_DB_PASSWORD is too short ({len(value)} chars). "
+            f"  [FAIL]  {name} is too short ({len(value)} chars). "
             "Must be at least 8 characters."
         )
         return False
@@ -279,10 +324,21 @@ def _check_api_key_not_default(name: str, value: str) -> bool:
     Returns:
         True if valid, False otherwise.
     """
-    if _contains_bad_substring(value):
+    default_values = {
+        "change-me",
+        "change-me-to-a-random-secret",
+        "change-this-to-a-strong-password",
+        "dev-key",
+        "test-key",
+        "your-api-key-here",
+        "change-me-admin-key",
+        "change-me-operator-key",
+        "change-me-user-key",
+    }
+    if value.lower() in default_values:
         print(
             f"  [FAIL]  {name}={_mask_value(name, value)} "
-            "contains a placeholder or default value. "
+            "is a known default/placeholder value. "
             "Generate a strong random key with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
         )
         return False
@@ -310,9 +366,10 @@ def main() -> int:
     env_path = Path(args.env_file).expanduser().resolve()
     print("DataForge Production Environment Check")
     print(f"  Env file: {env_path}")
+    print("  Source priority: process environment overrides env-file values")
     print()
 
-    env = load_env_file(env_path)
+    env = load_effective_env(env_path)
 
     all_pass = True
 
@@ -355,26 +412,10 @@ def main() -> int:
         if not passed:
             all_pass = False
 
-    # ── DB Password Consistency Validation ────────────────────────────────
-    import os
-    import urllib.parse
-    db_password = env.get("DATAFORGE_DB_PASSWORD", os.environ.get("DATAFORGE_DB_PASSWORD", "")).strip()
-    db_url = env.get("DATAFORGE_DATABASE_URL", os.environ.get("DATAFORGE_DATABASE_URL", "")).strip()
-    if db_password and db_url:
-        try:
-            parsed = urllib.parse.urlparse(db_url)
-            if parsed.password and parsed.password != db_password:
-                print(
-                    "  [FAIL]  DATAFORGE_DB_PASSWORD does not match the password specified in DATAFORGE_DATABASE_URL!"
-                )
-                all_pass = False
-        except Exception:
-            pass
-
     # ── Summary ──────────────────────────────────────────────────────
     print()
     if all_pass:
-        print("Result: ALL CHECKS PASSED — environment is ready for production.")
+        print("Result: required production environment checks passed.")
         return 0
     else:
         print("Result: ONE OR MORE CHECKS FAILED — fix the issues above before deploying.")

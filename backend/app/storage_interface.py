@@ -8,25 +8,25 @@ logger = logging.getLogger(__name__)
 
 class JobRepository(ABC):
     """Generic repository interface to support SQLite, Postgres, or other databases.
-    
+
     Provides abstract methods to decouple job state persistence from the underlying DB engine.
     """
-    
+
     @abstractmethod
     def load_jobs(self) -> dict[str, Job]:
         """Load all active jobs from the persistent store."""
         pass
-        
+
     @abstractmethod
     def load_recycle_bin(self) -> dict[str, Job]:
         """Load all deleted/recycled jobs from the persistent store."""
         pass
-        
+
     @abstractmethod
     def load_all(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
         """Load active jobs, recycled jobs, and world state in a single DB read pass."""
         pass
-        
+
     @abstractmethod
     def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
         """Atomically persist the entire state to the persistent store.
@@ -39,7 +39,7 @@ class JobRepository(ABC):
                 accidental data loss in multi-process scenarios.
         """
         pass
-        
+
     @abstractmethod
     def save_single(self, job: Job) -> None:
         """Atomically upsert or save a single job's status, progress, or logs."""
@@ -85,15 +85,15 @@ class JobRepository(ABC):
 
 class SQLiteJobRepository(JobRepository):
     """SQLite-backed implementation of the JobRepository interface.
-    
+
     Delegates to the optimized app.job_store functions.
     """
-    
+
     def load_jobs(self) -> dict[str, Job]:
         from app.job_store import load_state
         jobs, _, _ = load_state()
         return jobs
-        
+
     def load_recycle_bin(self) -> dict[str, Job]:
         from app.job_store import load_state
         _, recycle, _ = load_state()
@@ -102,11 +102,11 @@ class SQLiteJobRepository(JobRepository):
     def load_all(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
         from app.job_store import load_state
         return load_state()
-        
+
     def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
         from app.job_store import save_state
         save_state(jobs, recycle_bin, prune_missing=prune_missing)
-        
+
     def is_cancel_requested(self, job_id: str) -> bool:
         """Check from SQLite whether a job has a pending cancellation request."""
         from app.job_store import _get_connection, _DB_LOCK
@@ -155,8 +155,7 @@ class SQLiteJobRepository(JobRepository):
         if ws_path.exists():
             try:
                 return json.loads(ws_path.read_text())
-            except Exception as e:
-                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+            except Exception:
                 return None
         return None
 
@@ -209,11 +208,11 @@ class SQLiteJobRepository(JobRepository):
                 row_dict = dict(zip(col_names, row))
                 # Delete from recycle_bin
                 conn.execute("DELETE FROM recycle_bin WHERE id = ?", (job_id,))
-                
+
                 # Exclude deleted_at as it is not present in jobs table
                 if "deleted_at" in row_dict:
                     del row_dict["deleted_at"]
-                
+
                 # Insert into jobs
                 columns = ", ".join(row_dict.keys())
                 placeholders = ", ".join("?" for _ in row_dict)
@@ -258,12 +257,12 @@ class SQLiteJobRepository(JobRepository):
                 if older_than:
                     query += " AND completed_at < ?"
                     params.append(older_than)
-                
+
                 cursor = conn.execute(query, params)
                 rows = cursor.fetchall()
                 if not rows:
                     return 0
-                
+
                 col_names = [description[0] for description in cursor.description]
                 import datetime
                 now = datetime.datetime.now().isoformat()
@@ -306,16 +305,16 @@ def get_job_repository() -> JobRepository:
     The repository is cached as a module-level singleton so that
     all callers share the same instance.
     """
-    from app.config import settings
+    import os
 
     global _repository_instance
     if _repository_instance is not None:
         return _repository_instance
 
-    storage_backend = settings.STORAGE_BACKEND.strip().lower()
+    storage_backend = os.getenv("DATAFORGE_STORAGE_BACKEND", "sqlite").strip().lower()
 
     if storage_backend == "postgres":
-        database_url = settings.DATABASE_URL.strip()
+        database_url = os.getenv("DATAFORGE_DATABASE_URL", "").strip()
         if not database_url:
             raise RuntimeError(
                 "DATAFORGE_STORAGE_BACKEND=postgres requires DATAFORGE_DATABASE_URL "
@@ -362,7 +361,6 @@ def reset_repository():
             try:
                 from app.postgres_repository import shutdown_postgres
                 shutdown_postgres()
-            except Exception as e:
-                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+            except Exception:
                 pass
     _repository_instance = None

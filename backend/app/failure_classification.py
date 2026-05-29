@@ -12,8 +12,8 @@ Provides:
     telemetry captures classification outcomes, and the scraper pipeline
     invokes classification on low-quality or empty results.
 
-LAW: Every extraction failure must be classified. Generic failures hide
-actionable signal. Classification enables autonomous recovery.
+Every extraction failure should be classified where practical. Generic failures
+hide actionable signal. Classification enables automated recovery decisions.
 """
 
 from __future__ import annotations
@@ -635,7 +635,7 @@ def update_domain_with_failure(
 def translate_exception_to_friendly_message(error: Exception | str) -> str:
     """Translate low-level connection, timeout, and rendering exceptions into human-friendly operator descriptions."""
     err_text = str(error).lower()
-    
+
     if "timeout" in err_text:
         if "goto" in err_text or "navigation" in err_text:
             return (
@@ -646,30 +646,29 @@ def translate_exception_to_friendly_message(error: Exception | str) -> str:
             "⏳ [Wait Timeout] The page rendered successfully, but dynamic hydration (network idle or DOM quietness) "
             "took longer than expected. Retrying with a higher waiting delay limit."
         )
-    
+
     if "dns" in err_text or "resolve" in err_text:
         return (
             "🌐 [DNS Lookup Failed] Could not resolve the server's IP address. This domain may have expired, "
             "be temporarily down, or there is a local internet lookup restriction."
         )
-        
+
     if "refused" in err_text or "connect" in err_text:
         return (
             "🔌 [Connection Refused] The target server actively rejected the connection or is offline. "
             "We have logged this transient network block and scheduled a delayed retry."
         )
-        
+
     if "anti-bot" in err_text or "captcha" in err_text or "cloudflare" in err_text or "ddos" in err_text:
         return (
             "🛡️ [Anti-Bot Defense Block] An active challenge or firewall (e.g. Cloudflare, Captcha, Access Denied) "
             "was encountered. To protect our node reputation, we bypassed standard fallbacks and triggered proxy rotation."
         )
-        
+
     if "crash" in err_text or "closed" in err_text:
         return (
             "🤖 [Browser Context Reset] The underlying headless browser context crashed or closed unexpectedly. "
             "DataForge has recycled the process container and restarted the scrape cycle cleanly."
         )
-        
-    return f"❌ [Extraction Impediment] A system error occurred: {error}. Classifying root cause and scheduled for dynamic recovery."
 
+    return f"❌ [Extraction Impediment] A system error occurred: {error}. Classifying root cause and scheduled for dynamic recovery."

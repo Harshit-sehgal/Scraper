@@ -3,7 +3,7 @@ Zero-Result Failure Classifier — Explains WHY extraction produced 0 records.
 
 When an extraction pipeline returns zero records, this module classifies the
 root cause across nine failure categories, providing a user-facing explanation
-and operator hints for autonomous recovery.
+and operator hints for automated recovery decisions.
 
 Categories:
   - session_bound_url: Session-specific URL with detectable search form

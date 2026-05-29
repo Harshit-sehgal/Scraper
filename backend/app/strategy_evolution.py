@@ -1,22 +1,22 @@
 """
-Strategy Evolution Engine — Autonomous selection and evolution of fetch strategies.
+Strategy Evolution Engine — adaptive selection of fetch strategies.
 
 Provides:
   - Multiple fetch strategies (Playwright, httpx, JavaScript-based, etc.)
   - Per-domain strategy performance tracking
   - Automatic strategy selection based on domain characteristics
-  - Strategy mutation and evolution for persistent failures
+  - Strategy adjustments for persistent failures
   - Learning from successful/failed attempts
 
-This system evolves extraction strategies autonomously:
+This system adjusts extraction strategies based on observed outcomes:
   - Starts with default strategy (Playwright)
   - Learns which strategies work best for each domain
-  - Automatically switches strategies when performance degrades
+  - Can switch strategies when performance degrades
   - Explores new strategy combinations when stuck
   - Optimizes for speed vs. compatibility trade-offs
 
 LAW: Strategy is not fixed. Domains require different approaches.
-Evolution finds what works best per domain.
+Telemetry helps choose what works best per domain.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 class FetchStrategy(str, Enum):
     """Available fetch strategies."""
-    
+
     PLAYWRIGHT_FULL = "playwright_full"  # Full browser render
     PLAYWRIGHT_LIGHTWEIGHT = "playwright_lightweight"  # Minimal render, no media/fonts
     PLAYWRIGHT_STEALTH = "playwright_stealth" # Extra stealth evasion
@@ -47,7 +47,7 @@ class FetchStrategy(str, Enum):
 @dataclass
 class StrategyPerformance:
     """Performance metrics for a fetch strategy on a domain."""
-    
+
     domain: str
     strategy: FetchStrategy
     success_count: int = 0
@@ -57,29 +57,29 @@ class StrategyPerformance:
     avg_quality: float = 0.0  # Average extraction quality
     consecutive_failures: int = 0  # Current failure streak
     error_patterns: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
-    
+
     @property
     def success_rate(self) -> float:
         """Success rate [0, 1]."""
         total = self.success_count + self.failure_count
         return self.success_count / total if total > 0 else 0.0
-    
+
     @property
     def avg_time_ms(self) -> float:
         """Average time per attempt."""
         total = self.success_count + self.failure_count
         return self.total_time_ms / total if total > 0 else 0.0
-    
+
     @property
     def is_healthy(self) -> bool:
         """Strategy is performing well."""
         return self.success_rate >= 0.8 and self.consecutive_failures == 0
-    
+
     @property
     def is_degraded(self) -> bool:
         """Strategy performance is declining."""
         return self.success_rate < 0.6 or self.consecutive_failures >= 3
-    
+
     def to_dict(self) -> dict:
         d = asdict(self)
         d["error_patterns"] = dict(self.error_patterns)
@@ -89,7 +89,7 @@ class StrategyPerformance:
 @dataclass
 class StrategyRecommendation:
     """Recommendation for which strategy to use."""
-    
+
     recommended_strategy: FetchStrategy
     alternatives: List[FetchStrategy]
     reason: str
@@ -99,7 +99,7 @@ class StrategyRecommendation:
 
 class DomainStrategyState:
     """Tracks strategy performance per domain."""
-    
+
     def __init__(self, domain: str):
         self.domain = domain
         self.strategies: Dict[FetchStrategy, StrategyPerformance] = {}
@@ -107,14 +107,14 @@ class DomainStrategyState:
         self.last_strategy_switch: float = 0.0
         self.strategy_switch_count: int = 0
         self.learned_from_failures: int = 0
-        
+
         # Initialize all strategies
         for strategy in FetchStrategy:
             self.strategies[strategy] = StrategyPerformance(
                 domain=domain,
                 strategy=strategy,
             )
-    
+
     def record_attempt(
         self,
         strategy: FetchStrategy,
@@ -125,7 +125,7 @@ class DomainStrategyState:
     ):
         """Record a fetch attempt result."""
         perf = self.strategies[strategy]
-        
+
         if success:
             perf.success_count += 1
             perf.consecutive_failures = 0
@@ -137,81 +137,69 @@ class DomainStrategyState:
             perf.consecutive_failures += 1
             if failure_reason:
                 perf.error_patterns[failure_reason] += 1
-        
+
         perf.total_time_ms += time_ms
         perf.last_used = time.time()
-    
+
     def get_best_strategy(self) -> FetchStrategy:
         """Get best performing strategy."""
         candidates = [s for s in self.strategies.values() if s.success_count > 0]
-        
+
         if not candidates:
             # Fallback to safest strategy
             return FetchStrategy.PLAYWRIGHT_FULL
-        
+
         # Score strategies: prioritize success rate and quality, then speed
         def score(perf: StrategyPerformance) -> float:
             success_score = perf.success_rate * 60
             quality_score = perf.avg_quality * 30
             # Prefer faster strategies (like HTTPX) if they work
             speed_bonus = 10 if perf.avg_time_ms < 2000 else 0
-            
+
             # Penalize consecutive failures heavily
             stability_penalty = perf.consecutive_failures * 20
-            
+
             return success_score + quality_score + speed_bonus - stability_penalty
-        
+
         best = max(candidates, key=score)
         return best.strategy
-    
+
     def get_worst_strategy(self) -> FetchStrategy:
         """Get worst performing strategy based on success rate."""
         candidates = [s for s in self.strategies.values() if s.success_count > 0]
-        
+
         if not candidates:
             return FetchStrategy.PLAYWRIGHT_FULL
-        
+
         # Lower score = worse strategy; reuse the same scoring as get_best_strategy
         def score(perf: StrategyPerformance) -> float:
             success_score = perf.success_rate * 60
             quality_score = perf.avg_quality * 30
             stability_penalty = perf.consecutive_failures * 20
             return success_score + quality_score - stability_penalty
-        
+
         worst = min(candidates, key=score)
         return worst.strategy
 
 
 class StrategyEvolutionEngine:
-    """Evolves fetch strategies autonomously per domain."""
-    
+    """Adjusts fetch strategies per domain based on observed outcomes."""
+
     def __init__(self):
         """Initialize strategy evolution engine."""
         self.domain_states: Dict[str, DomainStrategyState] = {}
-        
-            # Evolution parameters
+
+        # Evolution parameters
         self.min_samples_for_recommendation = 3
         self.exploration_probability = 0.15 # 15% chance to explore
         self.learning_enabled = True
-        
-        # Domain-aware cold-start sets (matched via _match_domain_set)
-        # These do NOT replace learning — they seed the initial strategy choice
-        # so common difficult domains get a sensible default on first contact.
-        self._antibot_heavy_domains: set[str] = {
-            "yelp.com", "indeed.com", "ebay.com", "walmart.com",
-            "amazon.com", "linkedin.com", "zillow.com",
-        }
-        self._js_heavy_domains: set[str] = {
-            "booking.com", "espn.com", "github.com", "stackoverflow.com",
-            "imdb.com", "coursera.org", "etsy.com",
-        }
-    
+
     def _get_or_create_state(self, domain: str) -> DomainStrategyState:
         """Get or create state for a domain."""
         if domain not in self.domain_states:
             self.domain_states[domain] = DomainStrategyState(domain)
         return self.domain_states[domain]
-    
+
     def record_fetch_attempt(
         self,
         domain: str,
@@ -251,27 +239,12 @@ class StrategyEvolutionEngine:
 
         state = self._get_or_create_state(domain)
         state.record_attempt(strategy, success, time_ms, quality, failure_reason)
-    
-    def _match_domain_set(self, domain: str, domain_set: set[str]) -> bool:
-        """Match a domain against a set, handling www. prefix and subdomains."""
-        clean = domain.lower().removeprefix("www.")
-        # Direct match
-        if clean in domain_set:
-            return True
-        # Subdomain match: e.g., "sub.yelp.com" matches "yelp.com"
-        for d in domain_set:
-            if clean.endswith("." + d):
-                return True
-            # Also check if domain_set entry has www. prefix
-            if d.removeprefix("www.") == clean:
-                return True
-        return False
 
     def recommend_strategy(self, domain: str) -> StrategyRecommendation:
         """Recommend a fetch strategy for a domain."""
         import random
         state = self._get_or_create_state(domain)
-        
+
         # Exploration vs Exploitation
         if random.random() < self.exploration_probability:
             # Randomly pick a strategy we haven't failed too much on
@@ -285,39 +258,18 @@ class StrategyEvolutionEngine:
                     confidence=0.3,
                     estimated_success_rate=0.5,
                 )
-        
-        total_attempts = sum(s.success_count + s.failure_count for s in state.strategies.values())
-        
-        if total_attempts < self.min_samples_for_recommendation:
-            # Cold start: domain-aware strategy selection
-            # Check anti-bot heavy domains first (need stealth)
-            if self._match_domain_set(domain, self._antibot_heavy_domains):
-                return StrategyRecommendation(
-                    recommended_strategy=FetchStrategy.PLAYWRIGHT_STEALTH,
-                    alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],
-                    reason=f"Cold start: '{domain}' is anti-bot heavy — selecting stealth mode",
-                    confidence=0.7,
-                    estimated_success_rate=0.5,
-                )
-            
-            # Check JS-heavy domains (need lightweight to avoid timeout)
-            if self._match_domain_set(domain, self._js_heavy_domains):
-                return StrategyRecommendation(
-                    recommended_strategy=FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT,
-                    alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],
-                    reason=f"Cold start: '{domain}' is JS-heavy — selecting lightweight mode (domcontentloaded)",
-                    confidence=0.6,
-                    estimated_success_rate=0.4,
-                )
 
-            # Dynamic evidence cold start (anti-bot signals from domain intelligence)
+        total_attempts = sum(s.success_count + s.failure_count for s in state.strategies.values())
+
+        if total_attempts < self.min_samples_for_recommendation:
+            # Cold start: use dynamic evidence, not domain-name lists
             try:
                 from app.domain_intelligence import get_domain_intelligence
                 intel = get_domain_intelligence().get_intelligence(domain)
-                
+
                 from app.anti_bot_engine import get_anti_bot_engine
                 anti_bot = get_anti_bot_engine()
-                
+
                 if intel.anti_bot_risk > 0.6 or anti_bot.should_evolve_to_stealth(domain):
                     return StrategyRecommendation(
                         recommended_strategy=FetchStrategy.PLAYWRIGHT_STEALTH,
@@ -326,10 +278,9 @@ class StrategyEvolutionEngine:
                         confidence=0.7,
                         estimated_success_rate=0.5,
                     )
-            except Exception as e:
-                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+            except Exception:
                 pass
-                
+
             return StrategyRecommendation(
                 recommended_strategy=FetchStrategy.PLAYWRIGHT_FULL,
                 alternatives=[FetchStrategy.HYBRID],
@@ -337,7 +288,7 @@ class StrategyEvolutionEngine:
                 confidence=0.4,
                 estimated_success_rate=0.6,
             )
-        
+
         # Check anti-bot feedback even if we have samples
         try:
             from app.anti_bot_engine import get_anti_bot_engine
@@ -349,10 +300,9 @@ class StrategyEvolutionEngine:
                     confidence=0.8,
                     estimated_success_rate=0.6,
                 )
-        except Exception as e:
-            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+        except Exception:
             pass
-        
+
         best_strategy = state.get_best_strategy()
         best_perf = state.strategies[best_strategy]
 
@@ -387,7 +337,7 @@ class StrategyEvolutionEngine:
                 confidence=0.6,
                 estimated_success_rate=0.3,
             )
-            
+
         return StrategyRecommendation(
             recommended_strategy=best_strategy,
             alternatives=[s for s in FetchStrategy if s != best_strategy][:2],
@@ -400,23 +350,23 @@ class StrategyEvolutionEngine:
         """Evolve strategy based on performance history."""
         rec = self.recommend_strategy(domain)
         state = self._get_or_create_state(domain)
-        
+
         if rec.recommended_strategy != state.current_strategy:
             logger.info(
                 "Evolving strategy for %s: %s → %s (%s)",
-                domain, state.current_strategy.value, 
+                domain, state.current_strategy.value,
                 rec.recommended_strategy.value, rec.reason
             )
             state.current_strategy = rec.recommended_strategy
             state.strategy_switch_count += 1
             state.last_strategy_switch = time.time()
-            
+
         return state.current_strategy
 
     def get_domain_strategy_report(self, domain: str) -> dict:
         """Get detailed strategy analysis for a domain."""
         state = self._get_or_create_state(domain)
-        
+
         strategies_report = []
         for strategy, perf in state.strategies.items():
             if perf.success_count + perf.failure_count > 0:
@@ -430,7 +380,7 @@ class StrategyEvolutionEngine:
                     "consecutive_failures": perf.consecutive_failures,
                     "health": "healthy" if perf.is_healthy else ("degraded" if perf.is_degraded else "neutral"),
                 })
-        
+
         # Include all strategies even if untried (for complete reporting)
         all_strategies_report = []
         for strategy in FetchStrategy:
@@ -457,9 +407,9 @@ class StrategyEvolutionEngine:
                     "consecutive_failures": 0,
                     "health": "untried",
                 })
-        
+
         all_strategies_report.sort(key=lambda x: x["success_rate"], reverse=True)
-        
+
         return {
             "domain": domain,
             "current_strategy": state.current_strategy.value,
@@ -467,32 +417,32 @@ class StrategyEvolutionEngine:
             "total_attempts": sum(s.success_count + s.failure_count for s in state.strategies.values()),
             "strategies": all_strategies_report,
         }
-    
+
     def should_switch_strategy(self, domain: str) -> bool:
         """Check if the current strategy should be switched.
-        
+
         Returns True if the current strategy is degraded and a better
         alternative exists.
         """
         state = self._get_or_create_state(domain)
         current_perf = state.strategies.get(state.current_strategy)
-        
+
         if not current_perf:
             return False
-        
+
         # Switch if current strategy is degraded
         if current_perf.is_degraded:
             return True
-        
+
         # Switch if there's a significantly better alternative
         best = state.get_best_strategy()
         if best != state.current_strategy:
             best_perf = state.strategies[best]
             if best_perf.success_rate - current_perf.success_rate > 0.2:
                 return True
-        
+
         return False
-    
+
     def get_all_domains_strategy_report(self) -> dict:
         """Get strategy report for all domains."""
         if not self.domain_states:
@@ -501,10 +451,10 @@ class StrategyEvolutionEngine:
                 "domains": [],
                 "avg_success_rate": 0.0,
             }
-        
+
         domains_report = []
         total_success_rate = 0.0
-        
+
         for domain, state in self.domain_states.items():
             attempts = sum(s.success_count + s.failure_count for s in state.strategies.values())
             if attempts > 0:
@@ -512,7 +462,7 @@ class StrategyEvolutionEngine:
                 success_rate = total_success / attempts
             else:
                 success_rate = 0.0
-            
+
             domains_report.append({
                 "domain": domain,
                 "current_strategy": state.current_strategy.value,
@@ -521,7 +471,7 @@ class StrategyEvolutionEngine:
                 "overall_success_rate": round(success_rate, 3),
             })
             total_success_rate += success_rate
-        
+
         return {
             "total_domains": len(self.domain_states),
             "domains": domains_report,

@@ -24,13 +24,19 @@ _STATE_LOCK_PATH: str | None = None
 def _get_lock_path() -> str:
     global _STATE_LOCK_PATH
     if _STATE_LOCK_PATH is None:
-        cache = settings.SEMANTIC_STATE_PATH or settings.SEMANTIC_STATE_PATH
+        cache = get_canonical_cache_path()
         _STATE_LOCK_PATH = cache + '.lock'
     return _STATE_LOCK_PATH
 
 
 def get_canonical_cache_path() -> str:
-    return settings.SEMANTIC_STATE_PATH or settings.SEMANTIC_STATE_PATH
+    legacy_path = os.environ.get('SEMANTIC_STATE_PATH')
+    if legacy_path:
+        logging.getLogger(__name__).warning(
+            "SEMANTIC_STATE_PATH is deprecated; use DATAFORGE_SEMANTIC_STATE_PATH instead."
+        )
+        return legacy_path
+    return settings.SEMANTIC_STATE_PATH
 
 
 def _acquire_lock():
@@ -91,12 +97,12 @@ def clear_semantic_state(clear_file: bool = True):
         path = get_canonical_cache_path()
         if os.path.exists(path):
             os.remove(path)
-    
+
     # Reset unified world state
     get_world_state().clear()
-    
-    # Ensure bootstrap values are re-applied if needed (the engines' __init__ handles this if they are re-instantiated, 
-    # but since they might be singletons, we should be careful. Actually RoleTransitionDetector re-applies it in __init__ 
+
+    # Ensure bootstrap values are re-applied if needed (the engines' __init__ handles this if they are re-instantiated,
+    # but since they might be singletons, we should be careful. Actually RoleTransitionDetector re-applies it in __init__
     # if it's empty, but if the engine object already exists, we might need to manually re-apply.)
     from app.semantic_boundary_engine import _BOOTSTRAP_TRANSITIONS
     get_world_state().update_seed_transition(_BOOTSTRAP_TRANSITIONS)

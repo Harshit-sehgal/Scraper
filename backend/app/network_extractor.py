@@ -10,8 +10,9 @@ Priority order (highest first):
   5. Inline structured JSON in <script> tags
   6. Application/JSON responses captured during rendering
 
-This module is completely generic — no domain-specific field names or selectors.
-It maps structured JSON keys to schema fields using semantic alignment.
+This module uses domain-agnostic heuristics rather than site-specific field
+names or selectors. It maps structured JSON keys to schema fields using
+semantic alignment.
 """
 
 from __future__ import annotations

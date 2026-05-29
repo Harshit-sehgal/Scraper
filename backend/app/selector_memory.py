@@ -76,7 +76,7 @@ class SelectorMemory:
 
     def _compute_confidence(self, entry: dict) -> SelectorConfidenceScore:
         """Compute confidence score for a selector entry.
-        
+
         Formula:
           raw_confidence = successes / (successes + failures + 1)  # +1 to avoid div by zero
           age_factor = 1.0 if age < 14 days else exponential decay
@@ -88,11 +88,11 @@ class SelectorMemory:
         failures = entry.get("failure_count", 0)
         first_seen = entry.get("first_seen", now)
         last_success = entry.get("last_success", now)
-        
+
         # 1. Raw success rate
         total = successes + failures + 1  # +1 to avoid division by zero
         raw_confidence = successes / total
-        
+
         # 2. Age decay (selectors older than 14 days start decaying)
         age_seconds = now - first_seen
         if age_seconds < SELECTOR_AGE_DECAY_THRESHOLD:
@@ -101,7 +101,7 @@ class SelectorMemory:
             # Exponential decay: each additional day reduces by 5%
             extra_days = (age_seconds - SELECTOR_AGE_DECAY_THRESHOLD) / 86400
             age_factor = max(0.0, 1.0 - (0.05 * extra_days))
-        
+
         # 3. Freshness decay (not used in last 7 days)
         last_used_ago = now - last_success
         if last_used_ago < SELECTOR_FRESHNESS_THRESHOLD:
@@ -110,16 +110,16 @@ class SelectorMemory:
             # Linear decay: each day without use reduces by 10%
             extra_days = (last_used_ago - SELECTOR_FRESHNESS_THRESHOLD) / 86400
             freshness_factor = max(0.0, 1.0 - (0.1 * extra_days))
-        
+
         # 4. Final score
         final_score = raw_confidence * age_factor * freshness_factor
-        
+
         reason = (
             f"raw={raw_confidence:.2f} (success={successes}/{total-1}), "
             f"age={age_factor:.2f} (age={age_seconds/86400:.1f}d), "
             f"freshness={freshness_factor:.2f} (last_used={last_used_ago/86400:.1f}d ago)"
         )
-        
+
         return SelectorConfidenceScore(
             raw_confidence=raw_confidence,
             age_factor=age_factor,
@@ -130,7 +130,7 @@ class SelectorMemory:
 
     def _auto_cleanup(self, force: bool = False) -> dict:
         """Auto-cleanup low-confidence selectors.
-        
+
         Returns:
             dict with cleanup stats (domains_checked, selectors_deleted, etc.)
         """
@@ -138,7 +138,7 @@ class SelectorMemory:
         # Only run cleanup every SELECTOR_CLEANUP_CHECK_INTERVAL seconds
         if not force and (now - self._last_cleanup) < SELECTOR_CLEANUP_CHECK_INTERVAL:
             return {}
-        
+
         threshold: float = getattr(settings, "SELECTOR_CONFIDENCE_THRESHOLD", DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD) or DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD
         stats: Dict[str, Any] = {
             "domains_checked": 0,
@@ -146,13 +146,13 @@ class SelectorMemory:
             "deleted_domains": [],
             "low_confidence_selectors": []
         }
-        
+
         domains_to_delete: List[str] = []
-        
+
         for domain, entry in self._memory.items():
             stats["domains_checked"] = int(stats["domains_checked"]) + 1
             confidence = self._compute_confidence(entry)
-            
+
             if confidence.final_score < threshold:
                 logger.info(
                     "Deleting low-confidence selector for %s (score=%.2f, %s)",
@@ -166,20 +166,20 @@ class SelectorMemory:
                     "reason": confidence.reason
                 })
                 domains_to_delete.append(domain)
-        
+
         # Delete low-confidence entries
         for domain in domains_to_delete:
             del self._memory[domain]
-        
+
         if domains_to_delete:
             self._save()
-        
+
         self._last_cleanup = now
-        
+
         if int(stats["selectors_deleted"]) > 0:
             logger.info("Selector cleanup complete: %d deleted from %d domains",
                        int(stats["selectors_deleted"]), int(stats["domains_checked"]))
-        
+
         return stats
 
     def get_selector_confidence(self, url: str) -> Optional[SelectorConfidenceScore]:
@@ -187,21 +187,21 @@ class SelectorMemory:
         domain = self._extract_domain(url)
         if not domain:
             return None
-        
+
         entry = self._memory.get(domain)
         if not entry:
             return None
-        
+
         return self._compute_confidence(entry)
 
     def get_selectors(self, url: str) -> Optional[dict]:
         """Get remembered selectors for a domain with aging and trust decay.
-        
+
         Also triggers cleanup if it's time.
         """
         # Trigger auto-cleanup if needed (non-blocking)
         self._auto_cleanup()
-        
+
         domain = self._extract_domain(url)
         if not domain:
             return None
@@ -212,7 +212,7 @@ class SelectorMemory:
 
         # 1. Failure Threshold
         if entry.get("failure_count", 0) > settings.SELECTOR_MEMORY_MAX_FAILURES:
-            logger.debug("Selector memory for %s is suspended (failures: %d)", 
+            logger.debug("Selector memory for %s is suspended (failures: %d)",
                          domain, entry["failure_count"])
             return None
 
@@ -254,7 +254,7 @@ class SelectorMemory:
                 "replaced_at": now,
                 "successes": entry["success_count"]
             })
-            
+
             entry["selectors"] = selectors
             entry["failure_count"] = 0  # Reset failures on change
             entry["last_updated"] = now
@@ -282,7 +282,7 @@ class SelectorMemory:
 
     def get_memory_stats(self) -> Dict[str, Any]:
         """Get current selector memory statistics.
-        
+
         Returns:
             dict with memory stats (total domains, avg confidence, etc.)
         """
@@ -296,7 +296,7 @@ class SelectorMemory:
                 "low_confidence": 0,
                 "by_confidence": {}
             }
-        
+
         stats: Dict[str, Any] = {
             "total_domains": len(self._memory),
             "avg_confidence": 0.0,
@@ -306,25 +306,25 @@ class SelectorMemory:
             "low_confidence": 0,  # < 0.5
             "by_confidence": {}
         }
-        
+
         total_score = 0.0
         for domain, entry in self._memory.items():
             confidence = self._compute_confidence(entry)
             total_score += confidence.final_score
-            
+
             score_bucket = f"{confidence.final_score:.2f}"
             bucket = stats["by_confidence"]
             bucket[score_bucket] = bucket.get(score_bucket, 0) + 1
-            
+
             if confidence.final_score >= 0.75:
                 stats["high_confidence"] = int(stats["high_confidence"]) + 1
             elif confidence.final_score >= 0.5:
                 stats["medium_confidence"] = int(stats["medium_confidence"]) + 1
             else:
                 stats["low_confidence"] = int(stats["low_confidence"]) + 1
-        
+
         stats["avg_confidence"] = total_score / len(self._memory) if self._memory else 0.0
-        
+
         return stats
 
     def force_cleanup(self) -> dict:
@@ -336,8 +336,7 @@ class SelectorMemory:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None
-        except Exception as e:
-            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+        except Exception:
             return None
 
 

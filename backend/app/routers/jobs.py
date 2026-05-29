@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+import os
 import threading
 from typing import Callable
 
@@ -32,16 +33,15 @@ def _save_job(job) -> None:
     get_job_repository().save_single(job)
 
 
-def is_worker_queue_enabled() -> bool:
-    """Checks if the background worker queue is active instead of in-memory.
+def _is_worker_mode() -> bool:
+    """Check if worker queue mode is enabled (multi-process deployment).
 
-    In worker queue mode, jobs are dispatched to a database queue rather than
+    In worker mode, the API process and worker process have separate
     in-memory stores. Read endpoints should check the persistent store
     as a fallback to avoid serving stale data.
     """
-    return settings.WORKER_QUEUE
-
-_is_worker_mode = is_worker_queue_enabled
+    wq = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
+    return bool(wq and wq.lower() in ("1", "true", "yes"))
 
 
 def _refresh_job_from_repo(job: Job, jobs_store: dict) -> Job:
@@ -168,7 +168,7 @@ def create_jobs_router(
         return suggestion
 
     @router.get("/api/jobs")
-    async def list_jobs(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))):
+    async def list_jobs():
         # In worker mode, refresh from repo to pick up cross-process updates
         if _is_worker_mode():
             try:
@@ -191,7 +191,7 @@ def create_jobs_router(
             return {"jobs": [job.model_dump() for job in ordered]}
 
     @router.get("/api/jobs/{job_id}")
-    async def get_job(job_id: str, include_results: bool = Query(False), _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))):
+    async def get_job(job_id: str, include_results: bool = Query(False)):
         job = _get_job(job_id)
 
         results_list = []
@@ -206,7 +206,7 @@ def create_jobs_router(
         return dumped
 
     @router.get("/api/jobs/{job_id}/results")
-    async def get_job_results(job_id: str, limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0), _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))):
+    async def get_job_results(job_id: str, limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)):
         """Return a paginated slice of job results."""
         job = _get_job(job_id)
 
@@ -244,7 +244,7 @@ def create_jobs_router(
 
         from app.discovery import infer_source_metadata
         from app.utils.quality import safe_score
-        
+
         updated = False
         for row in results_list:
             source_url = str(row.get("source_url") or "")
@@ -266,6 +266,7 @@ def create_jobs_router(
 
     @router.post("/api/jobs")
     async def create_job(job_data: JobCreate, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+        import os
 
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
         urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
@@ -296,7 +297,8 @@ def create_jobs_router(
         _save_job(job)
 
         # If DATAFORGE_WORKER_QUEUE is set, enqueue the job for async processing
-        if is_worker_queue_enabled():
+        worker_queue_enabled = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
+        if worker_queue_enabled and worker_queue_enabled.lower() in ("1", "true", "yes"):
             try:
                 from app.worker_queue import get_worker_queue, Priority
                 queue = get_worker_queue()
@@ -320,8 +322,7 @@ def create_jobs_router(
                     try:
                         repo = get_job_repository()
                         repo.hard_delete(job.id)
-                    except Exception as db_err:
-                        logging.getLogger(__name__).warning("Suppressed exception: %s", db_err)
+                    except Exception:
                         pass
                     raise HTTPException(
                         status_code=503,
@@ -360,7 +361,9 @@ def create_jobs_router(
             mark_job_canceled(job, "Canceled before execution.")
 
         # Cancel the queued task if worker queue is enabled
-        if is_worker_queue_enabled():
+        import os as _os
+        worker_queue_enabled = _os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
+        if worker_queue_enabled and worker_queue_enabled.lower() in ("1", "true", "yes"):
             try:
                 from app.worker_queue import get_worker_queue
                 queue = get_worker_queue()
@@ -388,7 +391,7 @@ def create_jobs_router(
         job = jobs_store[job_id]
         if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
             raise HTTPException(status_code=409, detail="Job is still running; wait for completion before re-cleaning")
-        
+
         results_list = list(job.results)
         loaded_from_disk = False
         if job.results_on_disk:
@@ -598,7 +601,7 @@ def create_jobs_router(
         }
 
     @router.get("/api/recycle_bin")
-    async def list_recycle_bin(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+    async def list_recycle_bin():
         ordered = sorted(recycle_bin_store.values(), key=lambda j: j.created_at, reverse=True)
         return {"jobs": [job.model_dump() for job in ordered]}
 

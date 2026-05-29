@@ -120,7 +120,6 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
 
     # Enable worker queue
     monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
-    monkeypatch.setattr(settings, "WORKER_QUEUE", True)
 
     # 2. Configure temp state databases
     from app.job_store import reset_job_store_for_tests
@@ -144,6 +143,12 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
 
     # 4. Submit Job via REST API
     target_url = f"{e2e_browser_server}/search/id/e2e_pipeline_token_xyz"
+    from app.crawl_policy import get_crawl_policy
+    crawl_policy = get_crawl_policy()
+    crawl_policy.reset_domain(target_url)
+    monkeypatch.setattr(crawl_policy, "_default_delay", 0.0)
+    monkeypatch.setattr(crawl_policy, "_respect_robots", False)
+
     schema = [
         {"name": "airline", "field_type": "string", "required": False},
         {"name": "price", "field_type": "currency", "required": False},
@@ -199,7 +204,7 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
     # Verify that metadata source is 'network_payload'
     assert records[0]["_extraction_source"] == "network_payload"
     assert records[0]["_extraction_method"] == "network_payload"
-    
+
     provenance = records[0]["_extraction_provenance"]
     assert "fields" in provenance
     assert provenance["fields"]["airline"] == "$.results[*].carrier"

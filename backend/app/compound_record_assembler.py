@@ -6,8 +6,9 @@ A compound record has repeated internal segments (e.g., outbound/return legs in
 a flight, room/rate in a hotel, product/offer in an ecommerce listing) plus
 shared fields (e.g., total price, fare type, rating).
 
-This is completely generic — no domain-specific fields, no hardcoded segment names.
-It works by detecting repeated structural patterns within a container element.
+This uses domain-agnostic structural heuristics rather than hardcoded segment
+names. It works by detecting repeated structural patterns within a container
+element.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ class Segment:
 
 @dataclass
 class CompoundRecord:
-    """A complete compound record with segments and shared fields."""
+    """A compound record with segments and shared fields."""
     segments: list[Segment] = field(default_factory=list)
     shared_fields: dict[str, str] = field(default_factory=dict)
     original_text: str = ""

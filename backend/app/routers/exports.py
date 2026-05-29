@@ -4,9 +4,8 @@ import json
 
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, HTTPException, Response, Depends
+from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
-from app.utils.rbac import UserRole, require_role
 from openpyxl import Workbook
 
 from app.utils.export import safe_export_filename
@@ -68,9 +67,9 @@ def create_exports_router(jobs_store: dict):
 
     def _refresh_job_for_export(job_id: str):
         """Refresh job from repository in worker mode to avoid stale exports."""
-        from app.config import settings
-        worker_queue_enabled = settings.WORKER_QUEUE
-        if worker_queue_enabled:
+        import os
+        wq = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
+        if wq and wq.lower() in ("1", "true", "yes"):
             try:
                 from app.storage_interface import get_job_repository
                 repo = get_job_repository()
@@ -83,7 +82,7 @@ def create_exports_router(jobs_store: dict):
                 )
 
     @router.get("/api/jobs/{job_id}/export/csv")
-    async def export_csv(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))):
+    async def export_csv(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
         _refresh_job_for_export(job_id)
@@ -166,7 +165,7 @@ def create_exports_router(jobs_store: dict):
         )
 
     @router.get("/api/jobs/{job_id}/export/json")
-    async def export_json(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))):
+    async def export_json(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
         _refresh_job_for_export(job_id)
@@ -229,7 +228,7 @@ def create_exports_router(jobs_store: dict):
         )
 
     @router.get("/api/jobs/{job_id}/export/excel")
-    async def export_excel(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER]))):
+    async def export_excel(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
         _refresh_job_for_export(job_id)

@@ -11,7 +11,7 @@ from app.semantic_world_state import get_world_state
 from app.checkpoint_manager import get_checkpoint_manager
 class SemanticOS:
     """The official gateway to the semantic cognitive substrate."""
-    
+
     def __init__(self, ws=None):
         self.ws = ws or get_world_state()
         self.checkpoints = get_checkpoint_manager()
@@ -75,9 +75,9 @@ class SemanticOS:
         """Perform a gossip cycle with a random peer and send heartbeat."""
         from app.gossip_substrate import get_gossip_substrate
         from app.heartbeat_manager import get_heartbeat_manager
-        
+
         get_gossip_substrate().gossip(self.ws.node_id)
-        
+
         # Send heartbeat to the substrate
         get_heartbeat_manager().record_heartbeat(
             node_id=self.ws.node_id,
@@ -103,7 +103,7 @@ class SemanticOS:
 
     # ─── Semantic Steering (Phase 36) ────────────────────────────────────
 
-    def set_cognitive_intent(self, intent_id: str, target_vec: List[float], 
+    def set_cognitive_intent(self, intent_id: str, target_vec: List[float],
                              strength: float = 0.5, target_roles: Optional[List[str]] = None):
         """Inject a high-level goal to bias the semantic field (Phase 36)."""
         with self.ws.transaction(f"set_intent:{intent_id}"):
@@ -121,14 +121,14 @@ class SemanticOS:
 
     # ─── Cognitive Agency (Phase 37) ─────────────────────────────────────
 
-    def register_action(self, action_id: str, target_vec: List[float], 
+    def register_action(self, action_id: str, target_vec: List[float],
                         handler_name: str, threshold: float = 0.3):
         """Map executable logic into the semantic field (Phase 37)."""
         with self.ws.transaction(f"register_action:{action_id}"):
             self.ws.register_action(action_id, target_vec, handler_name, threshold)
 
     def trigger_actions(self) -> int:
-        """Manually trigger autonomous dispatchers."""
+        """Manually trigger registered dispatchers."""
         return self.ws.dispatch_actions()
 
     def report_outcome(self, action_id: str, success: bool, details: Optional[dict] = None):
@@ -174,7 +174,7 @@ class SemanticOS:
     # ─── Cognitive Scheduling (Phase 40) ─────────────────────────────────
 
     def schedule_task(self, task_id: str, priority_level: str, handler: Callable, *args, **kwargs):
-        """Register an autonomous cognitive task (Phase 40)."""
+        """Register an automated cognitive task (Phase 40)."""
         from app.graph_update_scheduler import TaskPriority
         p_map = {
             "critical": TaskPriority.CRITICAL,

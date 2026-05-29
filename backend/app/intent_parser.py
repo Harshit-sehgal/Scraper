@@ -115,22 +115,21 @@ def _detect_entity_hint(query_lower: str) -> str:
 def _extract_semantic_needs(query_lower: str) -> dict:
     """Extract what information the user wants, not what domain.
 
-    Always includes a core set of universal semantic needs (price, date,
-    location, name) because these are almost always relevant regardless
-    of what the user explicitly says. Additional needs are inferred
-    from query keywords.
+    Includes a small core set of common semantic needs (price, date, location,
+    name) because they are often useful across extraction tasks. Additional
+    needs are inferred from query keywords.
     """
     needs = {}
 
-    # Always include universal needs (always relevant for ANY extraction)
-    universal_needs = ["price", "date", "location", "name"]
-    for need in universal_needs:
+    # Include common needs as broad hints, not guaranteed fields.
+    common_needs = ["price", "date", "location", "name"]
+    for need in common_needs:
         needs[need] = SEMANTIC_NEED_KEYWORDS.get(need, [need])[:3]
 
     # Add any additional needs inferred from query keywords
     for need, keywords in SEMANTIC_NEED_KEYWORDS.items():
         if need in needs:
-            continue  # already included as universal
+            continue  # already included as a common hint
         matched_keywords = [kw for kw in keywords if kw in query_lower]
         if matched_keywords:
             needs[need] = matched_keywords
@@ -184,7 +183,7 @@ def keywords_to_tokens(keywords: list[str], min_len: int = 2) -> set[str]:
 
 @lru_cache(maxsize=1)
 def build_semantic_synonym_groups() -> tuple[frozenset[str], ...]:
-    """Build synonym groups from universal SEMANTIC_NEED_KEYWORDS (not domain-specific)."""
+    """Build synonym groups from broad SEMANTIC_NEED_KEYWORDS."""
     groups: list[frozenset[str]] = []
     for keywords in SEMANTIC_NEED_KEYWORDS.values():
         token_set = frozenset(keywords_to_tokens(keywords))
@@ -230,6 +229,5 @@ def role_tokens_are_exclusive(tokens_a: set[str], tokens_b: set[str]) -> bool:
         ):
             return True
     return False
-
 
 

@@ -50,8 +50,7 @@ async def run_job(
         """Check the persistent store for a cross-process cancellation signal."""
         try:
             return get_job_repository().is_cancel_requested(job_id)
-        except Exception as e:
-            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+        except Exception:
             return False
 
     # Optimize persistence: use single-row updates for job-local saves
@@ -107,7 +106,7 @@ async def run_job(
             # In auto mode, reuse max_pages as discovery count and cap to runtime-safe limits.
             discovery_limit = int(job.max_pages or 10)
             discovery_limit = max(1, min(discovery_limit, max_discovery_urls))
-            
+
             discovered = await discover_urls(
                 query=job.topic,
                 domain=job.preferred_domain,
@@ -435,7 +434,7 @@ async def run_job(
                 from app.semantic_world_state import get_world_state
                 with get_world_state().transaction("global_ai_structuring"):
                     all_raw_results = run_pipeline(all_raw_results, [f.name for f in job.schema_fields])
-                
+
                 if ai_structuring_report.get("capped_records", 0) > 0:
                     warnings.append(
                         "AI structuring processed a capped subset of rows; "
@@ -513,9 +512,9 @@ async def run_job(
             for field in job.schema_fields
         )
         if has_contact_fields and ai_source_prediction["sources_attempted"] > 0:
-
+            import os
             if ai_source_prediction["records_ai_structured"] == 0:
-                if (settings.GROQ_API_KEY or "").strip():
+                if (os.getenv("GROQ_API_KEY") or "").strip():
                     warnings.append(
                         "AI source structuring covered 0% rows in this run; provider timeouts/rate limits may reduce phone/email extraction."
                     )
@@ -543,12 +542,12 @@ async def run_job(
         job.total_records = total
         job.filtered_records = filtered_count
         _add_job_log(job, f"Final results: {filtered_count} records kept after filtering ({total} raw)", persist_fn=persist_job_state_fn)
-        
+
         # Add scraped_at timestamp to each record
         scraped_at = datetime.datetime.now().isoformat()
         for record in job.results:
             record["scraped_at"] = scraped_at
-        
+
         # AI Insight Phase
         if job.results:
             if job.cancel_requested or _cancel_requested_from_db():
@@ -582,7 +581,7 @@ async def run_job(
                 job.total_llm_calls += get_llm_call_count()
                 logging.exception("Job %s: AI insight generation failed: %s", job_id, ai_e)
                 _add_job_log(job, "AI insight generation failed", level="error")
-                
+
         # Final cost calculation (Phase 80: Economic Optimization)
         # $0.01 per LLM call + estimated browser cost ($0.02 per URL)
         job.estimated_cost_usd = round((job.total_llm_calls * settings.COST_PER_LLM_CALL) + (job.progress_total * settings.COST_PER_URL_SCRAPE), 4)

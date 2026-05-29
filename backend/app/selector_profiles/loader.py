@@ -57,7 +57,7 @@ USER_AGENT = settings.USER_AGENT
 
 def _load_all_profiles() -> dict[str, dict]:
     """Load all JSON profiles from the profiles/ directory.
-    
+
     Returns a dict mapping domain → profile config.
     """
     global _profile_cache
@@ -95,7 +95,7 @@ def match_profile_for_url(url: str) -> Optional[dict]:
 
 def _match_domain(url: str) -> Optional[dict]:
     """Find a profile that matches the URL's domain.
-    
+
     Uses substring matching so profile domains match www. and bare hostnames.
     """
     from urllib.parse import urlparse
@@ -163,15 +163,15 @@ async def extract_with_profile(
     max_wait: int | None = None,
 ) -> list[dict]:
     """Extract structured data from a URL using a selector profile.
-    
+
     Uses Playwright to render the page, waits for the target container,
     then extracts field values from each matching item using page.evaluate().
-    
+
     Args:
         url: Target URL to scrape.
         profile: Profile dict loaded from JSON config.
         max_wait: Max seconds to wait for the wait_for selector.
-    
+
     Returns:
         List of dicts with keys matching the profile's field definitions.
     """
@@ -296,34 +296,32 @@ async def extract_with_profile(
         if context is not None:
             try:
                 await context.close()
-            except Exception as e:
-                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+            except Exception:
                 pass
         if browser is not None:
             try:
                 await browser.close()
-            except Exception as e:
-                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+            except Exception:
                 pass
 
 
 async def try_profile_extraction(url: str, max_wait: int | None = None) -> Optional[list[dict]]:
     """Try to extract data from a URL using a matching selector profile.
-    
+
     Returns extracted records if a matching profile is found, or None if no
     profile matches (caller should fall back to the generic extraction pipeline).
-    
+
     Args:
         url: Target URL to scrape.
         max_wait: Max seconds to wait for content to render.
-    
+
     Returns:
         List of records if a profile matched and extraction succeeded.
         None if no profile matches the URL domain.
     """
     if max_wait is None:
         max_wait = settings.PROFILE_MAX_WAIT
-        
+
     profile = _match_domain(url)
     if profile is None:
         logger.debug("No selector profile found for URL: %s", url)

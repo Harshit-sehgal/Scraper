@@ -3,13 +3,12 @@ def test_layer7_semantic_memory():
 
     from app.semantic_boundary_engine import get_boundary_engine
     from app.semantic_pipeline import run_pipeline
-    
+
     # Run pipeline to generate some memory
     records = [{"company": "Google", "price": "100"}]
     schema = ["company_name", "price"]
-    
-    from app.config import settings
-    settings.SEMANTIC_STATE_PATH = '/tmp/test_semantic_state.json'
+
+    os.environ['SEMANTIC_STATE_PATH'] = '/tmp/test_semantic_state.json'
     if os.path.exists('/tmp/test_semantic_state.json'):
         os.remove('/tmp/test_semantic_state.json')
 
@@ -26,6 +25,6 @@ def test_layer7_semantic_memory():
 
     # Reset engine and load
     clear_semantic_state(clear_file=False)
-    
+
     load_semantic_state()
     assert be.motif_learner.total_records > 0

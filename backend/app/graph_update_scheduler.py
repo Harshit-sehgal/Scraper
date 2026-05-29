@@ -106,8 +106,7 @@ class GlobalCognitiveScheduler:
                             severity="warning",
                             cause=f"Task [{task.task_id}] failed: {e}",
                         )
-                except Exception as e:
-                    logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+                except Exception:
                     pass
 
             duration = time.time() - t0
@@ -144,7 +143,7 @@ class GraphUpdateScheduler:
             "timestamp": event.timestamp or 0,
         })
         ws.trim_decision_history()
-        
+
         # Phase 71: Uncertainty spike now triggers a field wave from the source
         # instead of a fixed relaxation wave count.
         if event.event_type == SemanticEventType.UNCERTAINTY_SPIKE:
@@ -156,7 +155,7 @@ class GraphUpdateScheduler:
         """Monitor field waves to trigger global manifold relaxation."""
         intensity = event.payload.get("intensity", 0.0)
         self._total_wave_intensity += intensity
-        
+
         # If total field agitation is high, trigger a manifold relaxation pass
         if self._total_wave_intensity > 2.0:
             self.run_global_relaxation()
@@ -167,18 +166,18 @@ class GraphUpdateScheduler:
         from app.semantic_inference_engine import RoleEmbeddingEngine
         ie = RoleEmbeddingEngine()
         ws = get_world_state()
-        
+
         pressure_before = ws.metrics.field_pressure
         ie.relax_manifold()
         pressure_after = ws.metrics.field_pressure
-        
+
         ws.snapshot(label=f"global_relaxation_agitation_{round(self._total_wave_intensity, 2)}")
-        
+
         self.dispatcher.dispatch(SemanticEvent(
             event_type=SemanticEventType.EQUILIBRIUM_REACHED,
             source="global_relaxation",
             payload={
-                "energy": ws.metrics.global_energy, 
+                "energy": ws.metrics.global_energy,
                 "agitation": self._total_wave_intensity,
                 "pressure_drop": pressure_before - pressure_after
             },

@@ -16,7 +16,7 @@ from app.config import settings
 from app.models import FieldType, FilterOperator, FilterRule, SchemaField
 
 # ──────────────────────────────────────────────
-# Geocoding & Distance (100% Free via Nominatim)
+# Geocoding & Distance (Nominatim; no paid API key required)
 # ──────────────────────────────────────────────
 
 _geocoder = Nominatim(user_agent=settings.GEOCODER_USER_AGENT, timeout=settings.GEOCODER_TIMEOUT)

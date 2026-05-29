@@ -228,8 +228,7 @@ def _ensure_schema(db_path: Optional[Path] = None):
                     # Add result column to task_history (used for storing successful task results)
                     try:
                         conn.execute("ALTER TABLE task_history ADD COLUMN result TEXT")
-                    except Exception as e:
-                        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+                    except Exception:
                         pass
                     current = 2
 
@@ -464,8 +463,7 @@ class WorkerQueue:
                         try:
                             from app.metrics_collector import record_worker_failure
                             record_worker_failure(actual_type)
-                        except Exception as e:
-                            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+                        except Exception:
                             pass
                         conn.execute(
                             """INSERT OR REPLACE INTO task_history
@@ -699,8 +697,7 @@ class WorkerQueue:
                             "Task %s cooling down %.1fs for %s",
                             task.id, cooldown, task.type,
                         )
-            except Exception as e:
-                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+            except Exception:
                 pass
             await self.fail(task.id, error_msg, retry=True, retry_after=retry_after, task_type=task.type)
 
@@ -873,10 +870,10 @@ def get_worker_queue(
     Returns:
         WorkerQueue (SQLite) or PostgresWorkerQueue depending on backend.
     """
-    from app.config import settings
+    import os
 
     # Resolve backend: explicit param > env var > default
-    resolved_backend = backend or settings.QUEUE_BACKEND.strip().lower()
+    resolved_backend = backend or os.getenv("DATAFORGE_QUEUE_BACKEND", "sqlite").strip().lower()
 
     if resolved_backend == "postgres":
         from app.worker_queue_postgres import get_postgres_worker_queue

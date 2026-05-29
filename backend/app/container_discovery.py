@@ -1,5 +1,5 @@
 """
-Universal Container Discovery — Finds and scores result containers on any page.
+General Container Discovery — Finds and scores candidate result containers.
 
 This module discovers candidate result containers from the DOM and scores
 them using only generic signals (text density, pattern matches, repeated
@@ -7,7 +7,7 @@ structure, label-value pairs, links, buttons). No domain-specific selectors
 or website-specific logic.
 
 Key capabilities:
-  1. Score any candidate container using universal signals
+  1. Score candidate containers using broad structural signals
   2. Rank containers by likely record quality
   3. Multi-pass fallback: try next container when the best one fails
   4. Classify failures when no container produces useful results
@@ -415,7 +415,7 @@ def _extract_record_from_element(
 ) -> dict:
     """Extract field values from a single container element using pattern matching.
 
-    This is a universal text-based extractor. It looks at the text content
+    This is a general text-based extractor. It looks at the text content
     of the element and assigns values to schema fields based on pattern type.
 
     Uses stateful span tracking to ensure each text span is consumed by only

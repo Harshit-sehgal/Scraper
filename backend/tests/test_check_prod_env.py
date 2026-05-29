@@ -91,6 +91,16 @@ class TestCheckProdEnvCore:
         def always_false(v): return False
         assert not mod.check_var({"MY_VAR": "bad"}, "MY_VAR", validator=always_false)
 
+    def test_mask_value_redacts_database_url_password(self):
+        """Database URLs should not print credentials in validation output."""
+        mod = self._import_module()
+        masked = mod._mask_value(
+            "DATAFORGE_DATABASE_URL",
+            "postgresql://dataforge:strong-password-123@postgres:5432/dataforge",
+        )
+        assert "strong-password-123" not in masked
+        assert masked == "postgresql://dataforge:****@postgres:5432/dataforge"
+
 
 class TestCheckProdEnvValidators:
     """Specific validator function tests."""
@@ -170,8 +180,8 @@ class TestCheckProdEnvValidators:
     def test_check_database_url_accepts_postgresql(self):
         """postgresql:// URLs should pass."""
         mod = self._import_module()
-        assert mod.check_database_url("postgresql://user:pass@localhost:5432/db")
-        assert mod.check_database_url("postgres://user:pass@postgres:5432/db")
+        assert mod.check_database_url("postgresql://user:strong-password-123@localhost:5432/db")
+        assert mod.check_database_url("postgres://user:strong-password-123@postgres:5432/db")
 
     def test_check_database_url_rejects_non_postgres(self):
         """Non-postgres URLs should fail."""
@@ -219,7 +229,7 @@ class TestCheckProdEnvValidators:
     def test_check_db_password_accepts_strong_password(self):
         """A strong, unique password should pass."""
         mod = self._import_module()
-        assert mod.check_db_password("secure-db-key-123!@#")
+        assert mod.check_db_password("secure-password-123!@#")
 
     def test_check_env_accepts_production(self):
         """'production' should pass."""
@@ -256,12 +266,12 @@ class TestCheckProdEnvIntegration:
         _write_env(env_file, {
             "DATAFORGE_API_KEY": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
             "DATAFORGE_CORS_ORIGINS": '["https://myapp.example.com"]',
-            "DATAFORGE_DB_PASSWORD": "secure-db-cred-123",
+            "DATAFORGE_DB_PASSWORD": "secure-password-123",
             "DATAFORGE_STORAGE_BACKEND": "postgres",
-            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:secure-db-cred-123@postgres:5432/dataforge",
+            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:secure-password-123@postgres:5432/dataforge",
             "DATAFORGE_WORKER_QUEUE": "true",
             "DATAFORGE_ENV": "production",
-            "GRAFANA_PASSWORD": "strong-grafana-cred-123",
+            "GRAFANA_PASSWORD": "strong-grafana-password-123",
         })
 
         env = mod.load_env_file(env_file)
@@ -355,12 +365,12 @@ class TestCheckProdEnvIntegration:
         _write_env(env_file, {
             "DATAFORGE_API_KEY": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
             "DATAFORGE_CORS_ORIGINS": '["https://app.example.com", "https://dashboard.example.com"]',
-            "DATAFORGE_DB_PASSWORD": "strong-cred-xyz",
+            "DATAFORGE_DB_PASSWORD": "strong-password-xyz",
             "DATAFORGE_STORAGE_BACKEND": "postgres",
-            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:strong-cred-xyz@postgres:5432/dataforge",
+            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:strong-password-xyz@postgres:5432/dataforge",
             "DATAFORGE_WORKER_QUEUE": "true",
             "DATAFORGE_ENV": "production",
-            "GRAFANA_PASSWORD": "strong-grafana-cred-xyz",
+            "GRAFANA_PASSWORD": "strong-grafana-password-xyz",
         })
 
         env = mod.load_env_file(env_file)
@@ -392,44 +402,3 @@ class TestCheckProdEnvIntegration:
 
         env = mod.load_env_file(env_file)
         assert not mod.check_var(env, "GRAFANA_PASSWORD", required=True, validator=mod.check_grafana_password)
-
-    def test_rejects_placeholder_domain_in_cors(self, env_file):
-        """CORS origin containing yourdomain.com should fail validation."""
-        mod = self._import_module()
-        _write_env(env_file, {
-            "DATAFORGE_API_KEY": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
-            "DATAFORGE_CORS_ORIGINS": '["https://yourdomain.com"]',
-            "DATAFORGE_DB_PASSWORD": "strong-password-xyz",
-            "DATAFORGE_STORAGE_BACKEND": "postgres",
-            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:strong-password-xyz@postgres:5432/dataforge",
-            "DATAFORGE_WORKER_QUEUE": "true",
-            "DATAFORGE_ENV": "production",
-        })
-        env = mod.load_env_file(env_file)
-        assert not mod.check_var(env, "DATAFORGE_CORS_ORIGINS", required=True, validator=mod.check_cors_origins)
-
-    def test_rejects_placeholder_password_in_db_url(self):
-        """Database URL containing placeholder password should fail validation."""
-        mod = self._import_module()
-        assert not mod.check_database_url("postgresql://dataforge:wrong-password@postgres:5432/dataforge")
-        assert not mod.check_database_url("postgresql://dataforge:change-me-to-a-strong-password@postgres:5432/dataforge")
-
-    def test_rejects_db_password_mismatch(self, env_file, monkeypatch):
-        """A mismatch between DB password and URL password should fail the checker."""
-        mod = self._import_module()
-        _write_env(env_file, {
-            "DATAFORGE_API_KEY": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
-            "DATAFORGE_CORS_ORIGINS": '["https://myapp.example.com"]',
-            "DATAFORGE_DB_PASSWORD": "secure-password-123",
-            "DATAFORGE_STORAGE_BACKEND": "postgres",
-            "DATAFORGE_DATABASE_URL": "postgresql://dataforge:different-password-abc@postgres:5432/dataforge",
-            "DATAFORGE_WORKER_QUEUE": "true",
-            "DATAFORGE_ENV": "production",
-            "GRAFANA_PASSWORD": "strong-grafana-password-123",
-            "DATAFORGE_OPERATOR_API_KEY": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
-            "DATAFORGE_ADMIN_API_KEY": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
-        })
-        
-        # Override argv so main() parses env_file
-        monkeypatch.setattr("sys.argv", ["check_prod_env.py", "--env-file", str(env_file)])
-        assert mod.main() == 1

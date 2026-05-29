@@ -36,8 +36,7 @@ def _ensure_schema():
         except Exception:
             try:
                 _execute(conn, "DROP TABLE IF EXISTS queue_schema_version CASCADE")
-            except Exception as e:
-                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+            except Exception:
                 pass
 
         _execute(conn, """
@@ -112,8 +111,7 @@ def _ensure_schema():
                 # Add result column (used for storing successful task results)
                 try:
                     _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN result TEXT")
-                except Exception as e:
-                    logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+                except Exception:
                     pass
                 current = 2
 
@@ -121,8 +119,7 @@ def _ensure_schema():
                 # Add execution_time_ms column for tracking task latencies
                 try:
                     _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN execution_time_ms INTEGER")
-                except Exception as e:
-                    logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+                except Exception:
                     pass
                 current = 3
 

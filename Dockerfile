@@ -36,10 +36,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ─────────────────────────────────────────────────────────────────────────────
 FROM base AS deps
 
-COPY backend/requirements.lock.txt .
+COPY backend/requirements.txt .
 
-# Install production dependencies only using locked/pinned dependencies
-RUN pip install --no-cache-dir -r requirements.lock.txt
+# Install production dependencies only
+RUN pip install --no-cache-dir -r requirements.txt
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2: Development (hot-reload, debug-friendly)
@@ -66,7 +66,7 @@ EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Stage 3: Production (minimal, secure)
+# Stage 3: Production
 # ─────────────────────────────────────────────────────────────────────────────
 FROM deps AS production
 
@@ -80,8 +80,6 @@ RUN mkdir -p /ms-playwright && playwright install chromium 2>&1 | tail -3 && cho
 COPY backend/ backend/
 COPY frontend/ frontend/
 COPY scripts/ scripts/
-COPY scripts/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
 
 # Security: drop root privileges
 RUN chown -R dataforge:dataforge /app
@@ -93,6 +91,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 EXPOSE 8000
 
-# Production: run preflight check via entrypoint, then start uvicorn
-ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
+# Production: run env validation before serving.
+CMD ["/app/scripts/start_server.sh"]

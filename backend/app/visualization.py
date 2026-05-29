@@ -58,7 +58,7 @@ class SystemGovernorDashboard:
     def _apply_mode_settings(self, mode: OperatorMode) -> Dict[str, Any]:
         """Modify runtime settings configurations based on the selected mode profile."""
         from app.config import settings
-        
+
         adjustments = {}
         if mode == OperatorMode.PRODUCTION:
             settings.PLAYWRIGHT_TIMEOUT = 30000
@@ -80,27 +80,27 @@ class SystemGovernorDashboard:
             settings.PLAYWRIGHT_TIMEOUT = 20000
             settings.PAGE_SETTLE_DELAY = 2.0
             adjustments = {"timeout": 20000, "settle": 2.0, "stealth": False}
-            
+
         return adjustments
 
     def generate_system_map(self) -> None:
         """Construct and write a visual Markdown system map showing the cluster dependency nodes."""
         from app.semantic_world_state import get_world_state
         ws = get_world_state()
-        
+
         # 1. Fetch registered federated nodes
         nodes = getattr(ws.federation, "registered_nodes", {})
-        
+
         os.makedirs(os.path.dirname(MAP_PATH), exist_ok=True)
-        
+
         with open(MAP_PATH, "w", encoding="utf-8") as f:
             f.write("# 🗺️ DataForge Visual System & Distributed Topology Map\n\n")
             f.write(f"> **Governance Layer**: Live architectural status. Last refreshed: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}\n\n")
-            
+
             f.write("## 1. Active Operator Profile\n\n")
             f.write(f"- **Current System Profile**: `OPERATOR_MODE = {self.active_mode.value.upper()}`\n")
-            f.write("- **System Invariant Compliance**: `HEALTHY` (100% Invariants verified)\n\n")
-            
+            f.write("- **System Invariant Compliance**: `HEALTHY` for the checks included in this visualization\n\n")
+
             f.write("## 2. Distributed Shard Topology\n\n")
             if not nodes:
                 f.write("*Single-node execution: No remote federated instances registered yet.*\n\n")
@@ -126,16 +126,16 @@ class SystemGovernorDashboard:
             f.write("    InvariantFirewall --> |persist| SemanticWorldState[Semantic World State]\n")
             f.write("    SemanticWorldState --> |merge| Federation[Multi-Shard Federation]\n")
             f.write("```\n\n")
-            
+
             f.write("---\n*End of Dynamic System Map.*\n")
-            
+
         self.last_map_update = time.time()
 
     def get_governance_summary(self) -> Dict[str, Any]:
         """Collate the complete governance, resource, and synchronization metrics."""
         from app.resource_governor import get_resource_governor
         gov = get_resource_governor()
-        
+
         return {
             "active_mode": self.active_mode.value,
             "system_map_path": MAP_PATH,

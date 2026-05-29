@@ -129,13 +129,13 @@ def seed_role_engine(schema_fields: list):
     """Seed the RoleEmbeddingEngine manifold with initial priors and Manifold Transfer."""
     reng = _get_role_engine()
     ws = reng.ws
-    
+
     for f_name in schema_fields:
         if f_name in reng.manifold:
             continue
-            
+
         field_lower = f_name.lower()
-        
+
         # 1. Manifold Transfer: inherit from existing similar stable roles (Phase 23)
         # Search for a stable role with a similar name
         inherited = False
@@ -148,7 +148,7 @@ def seed_role_engine(schema_fields: list):
                     ws.metrics.set_schema_instability(f_name, instability)
                     inherited = True
                     break
-        
+
         if inherited:
             continue
 
@@ -158,16 +158,16 @@ def seed_role_engine(schema_fields: list):
             if any(root in field_lower for root in roots):
                 best_type = stype
                 break
-        
+
         if best_type == SemanticType.TEXT:
             for st in SemanticType:
                 if _name_similarity(field_lower, st.value) > 0.6:
                     best_type = st
                     break
-        
+
         # Initialize manifold vector through controlled method
         ws.set_manifold_vector(f_name, reng._get_type_vector(best_type))
-        
+
         # Initial instability for new roles (Medium) through controlled method
         current_instability = ws.metrics.get_schema_instability(f_name)
         if current_instability == 0.5:
@@ -181,32 +181,32 @@ def warm_start_from_values(records: list, schema_fields: list):
     """Warm-start the Role Manifold with observed values."""
     if not records or not schema_fields:
         return
-    
+
     reng = _get_role_engine()
     ws = reng.ws
     first = records[0]
-    
+
     from app.semantic_mapper import detect_semantic_type
-    
+
     for f_name in schema_fields:
         val = first.get(f_name)
         if not isinstance(val, str) or not val.strip():
             continue
-        
+
         st, _ = detect_semantic_type(val, f_name)
         expected_type = _infer_role_type(f_name)
-        
+
         # Grounding check: only seed if types are near
         is_compatible = (st == expected_type) or \
                         (st == SemanticType.TEXT) or \
                         (expected_type == SemanticType.TEXT) or \
                         (st == SemanticType.CODE and expected_type in [SemanticType.LOCATION, SemanticType.PRICE, SemanticType.CODE, SemanticType.IDENTIFIER])
-        
+
         if is_compatible:
             # Move manifold point toward this observed type through controlled blend
             if f_name not in reng.manifold:
                 ws.set_manifold_vector(f_name, reng._get_type_vector(expected_type))
-            
+
             target_vec = reng._get_type_vector(st)
             ws.blend_manifold_vector(f_name, target_vec, alpha=0.7, beta=0.3)
 
@@ -285,14 +285,14 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
         for i, comm in enumerate(ws.global_communities):
             for role_name in comm:
                 role_comm_map[role_name] = i
-        
+
         # Calculate community "Presence" in this record
         comm_max_scores: dict = {}
         for (cand, role), score in graph.compatibility.items():
             if role in role_comm_map:
                 c_idx = role_comm_map[role]
                 comm_max_scores[c_idx] = max(comm_max_scores.get(c_idx, 0.0), score)
-        
+
         # Apply pull: roles in an "active" community get a boost
         for (cand, role), score in list(graph.compatibility.items()):
             if role in role_comm_map:
@@ -346,7 +346,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
             if bucket_id not in position_buckets:
                 position_buckets[bucket_id] = []
             position_buckets[bucket_id].append((cand_val, token))
-        
+
         for (r1, r2), strength in ws.topological_laws.items():
             if r1 in graph.roles and r2 in graph.roles:
                 # For each bucket, check only nearby buckets (spatial locality)
@@ -357,7 +357,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
                     for nearby_id in nearby_buckets:
                         if nearby_id in position_buckets:
                             nearby_candidates.extend(position_buckets[nearby_id])
-                    
+
                     # Now check pairs within nearby candidates (O(k²) where k << n)
                     for i, (c1, t1) in enumerate(candidates_in_bucket):
                         for c2, t2 in nearby_candidates:
@@ -380,7 +380,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
     for role_a, role_b in ROLE_EXCLUSIVITY:
         if role_a in graph.roles and role_b in graph.roles:
             graph.exclusivity_edges.append((role_a, role_b))
-            
+
     # Dynamic topological exclusions
     role_names = list(graph.roles.keys())
     for i in range(len(role_names)):
@@ -398,7 +398,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
 def _infer_role_type(role_name: str) -> SemanticType:
     """Infer the expected SemanticType for a role name."""
     reng = _get_role_engine()
-    
+
     # 1. Anchor to bootstrap seed
     field_lower = role_name.lower()
     seed_type = SemanticType.TEXT
@@ -410,7 +410,7 @@ def _infer_role_type(role_name: str) -> SemanticType:
     # 2. Check manifold geometry
     best_type = SemanticType.TEXT
     best_compat = 0.55
-    
+
     for t in SemanticType:
         compat = reng.get_compatibility(role_name, t)
         if compat > best_compat:
@@ -430,7 +430,7 @@ def _compute_compatibility(
     reng = _get_role_engine()
     learned_compat = reng.get_compatibility(role_name, token.primary_type, token=token)
 
-    # Ambiguity penalty (universal entropy constraint)
+    # Ambiguity penalty (broad entropy constraint)
     dist = token.type_distribution
     if dist and len(dist) > 1:
         primary_conf = dist.get(token.primary_type, 0.5)
@@ -560,7 +560,7 @@ def allocate_semantic_roles(
     reng = _get_role_engine()
     candidates = [(cand, role, score) for (cand, role), score in graph.compatibility.items()]
     hypotheses = []
-    
+
     for _strategy, key_fn in [
         ('primary', lambda x: -x[2]),
         ('noisy', lambda x: -x[2] + random.random() * 0.05),
@@ -568,9 +568,9 @@ def allocate_semantic_roles(
     ]:
         h = _run_allocation(graph, sorted(candidates, key=key_fn))
         hypotheses.append(h)
-    
+
     hypotheses.sort(key=lambda h: h['coherence'])
-    
+
     if len(hypotheses) >= 2:
         best = hypotheses[-1]
         worst = hypotheses[0]
@@ -578,16 +578,16 @@ def allocate_semantic_roles(
             for role_name in graph.roles:
                 best_val = best['roles'].get(role_name)
                 worst_val = worst['roles'].get(role_name)
-                
+
                 if best_val and worst_val and best_val != worst_val:
                     token = graph.candidates.get(best_val)
                     if token:
                         reng.learn_from_allocation(role_name, token.primary_type, token.raw, success=True, delta=0.05, coherence=best['coherence'])
-                    
+
                     token2 = graph.candidates.get(worst_val)
                     if token2:
                         reng.learn_from_allocation(role_name, token2.primary_type, token2.raw, success=False, delta=0.05, coherence=best['coherence'])
-    
+
     return record, graph
 
 
@@ -596,7 +596,7 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
     g = deepcopy(graph)
     assigned = set()
     filled: set[str] = set()
-    
+
     for cand_key, role_name, score in sorted_assignments:
         if cand_key in assigned or role_name in filled:
             continue
@@ -607,7 +607,7 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
             if other and other in filled and g.roles.get(other) and g.roles[other].filled_by == cand_key:
                 conflicting = True
                 break
-                
+
         if not conflicting:
             reng = _get_role_engine()
             for filled_role in filled:
@@ -615,14 +615,14 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
                     if reng.get_learned_exclusion(role_name, filled_role) > _adaptive_runtime_exclusion_threshold():
                         conflicting = True
                         break
-                            
+
         if conflicting:
             continue
         g.roles[role_name].filled_by = cand_key
         g.roles[role_name].fill_confidence = score
         assigned.add(cand_key)
         filled.add(role_name)
-    
+
     coh = _compute_allocation_coherence(g)
     return {'roles': {r: g.roles[r].filled_by for r in g.roles}, 'coherence': coh}
 
@@ -630,17 +630,17 @@ def explain_assignment(role_name: str, candidate_val: str, graph: AllocationGrap
     """Explain why a role was assigned to a candidate using topological evidence."""
     if role_name not in graph.roles:
         return {"error": f"Role {role_name} not found in graph"}
-    
+
     token = graph.candidates.get(candidate_val)
     if not token:
         return {"error": f"Candidate {candidate_val} not found in graph"}
-    
+
     reng = _get_role_engine()
     ws = reng.ws
-    
+
     # 1. Manifold Evidence
     compat = reng.get_compatibility(role_name, token.primary_type, token=token)
-    
+
     # 2. Community Evidence
     community = None
     comm_pull = 0.0
@@ -654,7 +654,7 @@ def explain_assignment(role_name: str, candidate_val: str, graph: AllocationGrap
                     if peer_role_obj.filled_by:
                         comm_pull = max(comm_pull, peer_role_obj.fill_confidence)
             break
-            
+
     # 3. Schema Evidence
     schema_pattern_match = False
     current_roles = sorted(graph.roles.keys())
@@ -666,7 +666,7 @@ def explain_assignment(role_name: str, candidate_val: str, graph: AllocationGrap
                 break
         if schema_pattern_match:
             break
-        
+
     return {
         "role": role_name,
         "candidate": candidate_val,

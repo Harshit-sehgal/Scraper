@@ -47,7 +47,7 @@ class ScrapeTelemetry:
     fallback_usage: str = "none"           # "none" | "regex" | "httpx"
     llm_calls_count: int = 0               # Total LLM requests during this scrape
     estimated_cost_usd: float = 0.0        # Simplified cost estimate
-    
+
     # Granular Metrics (Grounding abstractions)
     selector_hit_rate: float = 0.0          # Percentage of fields successfully matched
     dom_mutation_rate: float = 0.0         # Rough proxy for dynamic behavior/instability
@@ -59,7 +59,7 @@ class ScrapeTelemetry:
     extraction_method: Optional[str] = None
     motifs_generated: int = 0
     motifs_used: int = 0
-    
+
     error: Optional[str] = None
     timestamp: float = field(default_factory=time.time)
 
@@ -82,8 +82,7 @@ class ScrapeTelemetryCollector:
         try:
             from app.domain_intelligence import get_domain_intelligence
             get_domain_intelligence().update_from_telemetry(telemetry.to_dict())
-        except Exception as e:
-            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+        except Exception:
             pass
 
         # Emit to semantic world state observability if available
@@ -110,8 +109,7 @@ class ScrapeTelemetryCollector:
                 "anti_bot": telemetry.anti_bot_score,
                 "retries": telemetry.retry_count,
             })
-        except Exception as e:
-            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+        except Exception:
             pass
 
         return telemetry
@@ -138,7 +136,7 @@ class ScrapeTelemetryCollector:
             score = t.confidence_map.get("overall_avg", 0.0)
             idx = min(9, int(score * 10))
             bins[idx] += 1
-            
+
         return {f"{i/10:.1f}-{i/10+0.1:.1f}": count for i, count in enumerate(bins)}
 
     def clear(self) -> None:

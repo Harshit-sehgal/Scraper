@@ -1,7 +1,6 @@
 from typing import Any
 import re
 from statistics import mean
-import logging
 from app.models import SchemaField, FieldType
 from app.config import settings
 
@@ -21,7 +20,7 @@ def compute_source_breakdown(results: list[dict]) -> dict:
         url = r.get("_source_url") or r.get("source_url") or ""
         domain = urlparse(url).netloc or "unknown"
         counts[domain] = counts.get(domain, 0) + 1
-    
+
     total = len(results)
     return {
         domain: {"count": count, "percentage": round(count / total, 3) if total > 0 else 0.0}
@@ -31,8 +30,7 @@ def compute_source_breakdown(results: list[dict]) -> dict:
 def safe_score(value: Any) -> float:
     try:
         return float(value)
-    except Exception as e:
-        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+    except Exception:
         return 0.0
 
 def _value_quality(field: SchemaField, value) -> float:
@@ -52,7 +50,7 @@ def _value_quality(field: SchemaField, value) -> float:
 
     # Probabilistic scoring: start with a baseline and add "evidence"
     score = settings.QUALITY_BASE_SCORE # Base for non-empty text
-    
+
     # Text length density (too short is suspicious for non-codes)
     if field.field_type not in (FieldType.CODE, FieldType.RATING, FieldType.NUMBER):
         if len(text) > settings.QUALITY_TEXT_LEN_THRESHOLD_1:
@@ -62,7 +60,7 @@ def _value_quality(field: SchemaField, value) -> float:
 
     # Negative Evidence: identify "swapped" or "noise" text in identifying fields
     field_name_lower = field.name.lower()
-    
+
     # Strict airport/IATA code validation
     if "airport_code" in field_name_lower or "iata" in field_name_lower:
         if not re.match(r"^[A-Z]{3}$", text):
@@ -70,15 +68,15 @@ def _value_quality(field: SchemaField, value) -> float:
 
     is_identity_field = any(k in field_name_lower for k in ["name", "title", "company"])
     is_status_field = any(k in field_name_lower for k in ["availability", "stock", "status", "condition"])
-    
+
     noise_status_phrases = ["in stock", "out of stock", "click here", "read more", "view details", "add to cart", "instock"]
-    
+
     if is_identity_field:
         if any(p in text.lower() for p in noise_status_phrases):
             score -= settings.QUALITY_NOISE_PENALTY # Heavy penalty
         if len(text) < 3:
                 score -= settings.QUALITY_SHORT_IDENTITY_PENALTY
-            
+
     if is_status_field:
         # Status fields should be short. If it's a long sentence, it's likely a swapped title.
         if len(text) > 25:
@@ -87,7 +85,7 @@ def _value_quality(field: SchemaField, value) -> float:
             # If it's not a known status phrase AND it's not a simple number/code
             if field.field_type == FieldType.STRING and len(text) > 10:
                 score -= settings.QUALITY_STATUS_MISMATCH_PENALTY
-            
+
     # Type-specific quality "votes"
     if field.field_type == FieldType.EMAIL:
         if re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", text):
@@ -119,7 +117,7 @@ def _value_quality(field: SchemaField, value) -> float:
 
 def score_record_quality(record: dict, schema_fields: list[SchemaField]) -> float:
     """Ensemble-based quality scoring for an extracted record.
-    
+
     Uses multiple "votes" to determine probabilistic confidence:
     1. Field Presence: Percentage of schema fields populated.
     2. Semantic Value: Sum of per-field quality scores.
@@ -136,25 +134,25 @@ def score_record_quality(record: dict, schema_fields: list[SchemaField]) -> floa
     for field in schema_fields:
         val = record.get(field.name)
         quality = _value_quality(field, val)
-        
+
         if quality > settings.QUALITY_PRESENT_FIELD_THRESHOLD:
             present_fields += 1
-            
+
         if field.required:
             required_count += 1
             if quality < settings.QUALITY_REQUIRED_MISSING_THRESHOLD:
                 required_missing_count += 1
-            
+
         weight = settings.QUALITY_REQUIRED_WEIGHT if field.required else 1.0
         total_quality += quality * weight
 
     # 1. Presence Vote (0.0 to 1.0)
     presence_vote = present_fields / len(schema_fields)
-    
+
     # 2. Quality Vote (0.0 to 1.0)
     max_possible_quality = sum(settings.QUALITY_REQUIRED_WEIGHT if f.required else 1.0 for f in schema_fields)
     quality_vote = total_quality / max_possible_quality
-    
+
     # 3. Structural Cohesion Vote
     # If we have very few fields present but they are high quality, it's still suspicious.
     # Conversely, many low quality fields are also bad.
@@ -169,7 +167,7 @@ def score_record_quality(record: dict, schema_fields: list[SchemaField]) -> floa
     # We use a weighted geometric mean-ish approach to ensure one bad vote impacts heavily
     raw_confidence = (presence_vote * settings.QUALITY_PRESENCE_VOTE_WEIGHT) + (quality_vote * settings.QUALITY_QUALITY_VOTE_WEIGHT)
     final_confidence = raw_confidence * cohesion_vote
-    
+
     return round(clamp01(final_confidence), 3)
 
 def build_quality_report(
@@ -257,12 +255,12 @@ def build_quality_report(
 
 
 def post_extract_validate_records(
-    results: list[dict], 
-    schema_fields: list[SchemaField], 
+    results: list[dict],
+    schema_fields: list[SchemaField],
     warnings: list[str] | None = None
 ) -> list[dict]:
     """Validate extracted records against semantic field rules.
-    
+
     If a required field fails validation, the record is rejected.
     If an optional field fails validation, it is set to None (lowering score).
     """

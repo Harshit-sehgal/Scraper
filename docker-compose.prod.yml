@@ -30,10 +30,6 @@ services:
       - .env
     environment:
       - DATAFORGE_ENV=production
-      - DATAFORGE_API_KEY=${DATAFORGE_API_KEY:?DATAFORGE_API_KEY is required}
-      - DATAFORGE_OPERATOR_API_KEY=${DATAFORGE_OPERATOR_API_KEY:?DATAFORGE_OPERATOR_API_KEY is required}
-      - DATAFORGE_ADMIN_API_KEY=${DATAFORGE_ADMIN_API_KEY:?DATAFORGE_ADMIN_API_KEY is required}
-      - DATAFORGE_DB_PASSWORD=${DATAFORGE_DB_PASSWORD:?DATAFORGE_DB_PASSWORD is required}
       - DATAFORGE_STORAGE_BACKEND=postgres
       - DATAFORGE_DATABASE_URL=postgresql://dataforge:${DATAFORGE_DB_PASSWORD:?DATAFORGE_DB_PASSWORD is required}@postgres:5432/dataforge
       - DATAFORGE_WORKER_QUEUE=true
@@ -80,15 +76,11 @@ services:
       target: production
     image: dataforge:latest
     container_name: dataforge-worker
-    command: ["python", "scripts/run_worker.py"]
+    command: ["/app/scripts/start_worker.sh"]
     env_file:
       - .env
     environment:
       - DATAFORGE_ENV=production
-      - DATAFORGE_API_KEY=${DATAFORGE_API_KEY:?DATAFORGE_API_KEY is required}
-      - DATAFORGE_OPERATOR_API_KEY=${DATAFORGE_OPERATOR_API_KEY:?DATAFORGE_OPERATOR_API_KEY is required}
-      - DATAFORGE_ADMIN_API_KEY=${DATAFORGE_ADMIN_API_KEY:?DATAFORGE_ADMIN_API_KEY is required}
-      - DATAFORGE_DB_PASSWORD=${DATAFORGE_DB_PASSWORD:?DATAFORGE_DB_PASSWORD is required}
       - DATAFORGE_STORAGE_BACKEND=postgres
       - DATAFORGE_DATABASE_URL=postgresql://dataforge:${DATAFORGE_DB_PASSWORD:?DATAFORGE_DB_PASSWORD is required}@postgres:5432/dataforge
       - DATAFORGE_WORKER_QUEUE=true

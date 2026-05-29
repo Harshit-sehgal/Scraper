@@ -93,7 +93,7 @@ CARD_Y_SPACING = 60.0
 
 async def capture_bounding_boxes(page) -> list[dict]:
     """Capture bounding boxes of visible text elements using Playwright JS.
-    
+
     Returns a list of dicts with: text, tag, x, y, width, height, visible.
     Only captures leaf text elements that are in the viewport and visible.
     """
@@ -127,8 +127,7 @@ async def capture_bounding_boxes(page) -> list[dict]:
             return results;
         }""")
         return boxes if isinstance(boxes, list) else []
-    except Exception as e:
-        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+    except Exception:
         return []
 
 
@@ -201,7 +200,7 @@ def extract_from_visible_blocks(
 
 def _group_into_cards(evidence: PageEvidence) -> CardGroupingResult:
     """Group visible text blocks into visual cards.
-    
+
     Uses bounding-box spatial proximity when available, falls back to
     DOM parent-path grouping.
     """
@@ -219,20 +218,20 @@ def _group_by_spatial_proximity(blocks: list[VisibleTextBlock], boxes: list[dict
     """Group text blocks into visual cards using y-position proximity."""
     if not blocks:
         return CardGroupingResult(cards=[], card_count=0, has_repeated_structure=False, cluster_signature="")
-    
+
     text_to_box = {b.get("text", "").strip(): b for b in boxes if "text" in b}
     for block in blocks:
         bt = block.text.strip()
         if bt in text_to_box:
             block.y_position = text_to_box[bt].get("y", block.y_position)
-    
+
     sorted_blocks = sorted(blocks, key=lambda b: b.y_position)
-    
+
     Y_TOLERANCE: float = 30.0
     cards: list[VisualCard] = []
     current: list[VisibleTextBlock] = []
     last_y = -Y_TOLERANCE - 1
-    
+
     for block in sorted_blocks:
         if block.y_position - last_y > Y_TOLERANCE:
             if current and _is_meaningful_card(current):
@@ -242,7 +241,7 @@ def _group_by_spatial_proximity(blocks: list[VisibleTextBlock], boxes: list[dict
         last_y = block.y_position
     if current and _is_meaningful_card(current):
         cards.append(_build_card(current, len(cards)))
-    
+
     has_repeat = _detect_repeated_patterns(cards)
     sig = _build_cluster_signature(cards) if has_repeat else ""
     return CardGroupingResult(cards=cards, card_count=len(cards),

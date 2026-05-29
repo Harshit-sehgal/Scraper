@@ -239,23 +239,14 @@ class Settings(BaseSettings):
     TOPOLOGY_MAX_REGIONS: int = 50
     MOTIF_PRUNE_THRESHOLD: float = 0.2
 
-    # ─── Paths & Databases ──────────────────────────────────────────────────
+    # ─── Paths ─────────────────────────────────────────────────────────────
     SEMANTIC_STATE_PATH: str = "data/semantic_state.json"
     STATE_FILE_PATH: str = ""
     """Override for jobs_state.json path. Empty = use default ./backend/data/jobs_state.json"""
-    GROQ_API_KEY: str = ""
-    DATABASE_URL: str = ""
-    """Postgres connection URL (e.g. postgresql://user:pass@host:port/db)"""
-    STORAGE_BACKEND: str = "sqlite"
-    """Storage backend: 'sqlite' or 'postgres'."""
 
-    # ─── API Security & Execution Mode ──────────────────────────────────────
+    # ─── API Security ──────────────────────────────────────────────────────
     ENV: str = "development"
     """Application runtime environment: development or production."""
-    WORKER_QUEUE: bool = False
-    """Enable worker queue for async background jobs."""
-    SMOKE_TEST_MODE: bool = False
-    """Bypass SSRF checks for staging smoke testing."""
     API_KEY: str = ""
     """If set, all /api/* endpoints require X-API-Key header."""
     OPERATOR_API_KEY: str = ""
@@ -618,10 +609,10 @@ class Settings(BaseSettings):
             "FETCH_TIMEOUT": "REQUEST_TIMEOUT",
             "MIN_RECORD_SCORE": "DEFAULT_MIN_RECORD_SCORE",
         }
-        
+
         if name in aliases:
             return super().__getattribute__(aliases[name])
-        
+
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
 

@@ -173,18 +173,18 @@ class CrawlPolicyEngine:
         state = self._domains.get(domain)
         if not state or state.total_fetches == 0:
             return 1.0
-        
+
         # Linear penalty for consecutive failures
         failure_penalty = (state.consecutive_failures / self._max_retries) * 0.8
-        
+
         # Simple success ratio component
         # Note: we don't track total successes explicitly, but we can infer it
         # for a better metric we might want to track windowed success rate
-        
+
         score = 1.0 - failure_penalty
         if time.time() < state.cooldown_until:
             score *= 0.2 # Severely penalized if in cooldown
-            
+
         return round(max(0.0, score), 2)
 
     def get_all_domain_states(self) -> dict[str, dict]:
@@ -220,16 +220,14 @@ class CrawlPolicyEngine:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None
-        except Exception as e:
-            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+        except Exception:
             return None
 
     @staticmethod
     def _extract_path(url: str) -> str:
         try:
             return urlparse(url).path or "/"
-        except Exception as e:
-            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+        except Exception:
             return "/"
 
     async def _check_robots_txt(self, domain: str) -> None:

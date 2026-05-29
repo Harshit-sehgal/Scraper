@@ -20,10 +20,8 @@ def mock_ai_clean_and_align(monkeypatch):
     monkeypatch.setattr("app.services.job_runner.ai_clean_and_align_records", fake_ai_clean_and_align)
 
 
-def test_system_status_shape(client, monkeypatch):
-    from app.config import settings
-    monkeypatch.setattr(settings, "ADMIN_API_KEY", "test-admin-key")
-    r = client.get("/api/system/status", headers={"X-API-Key": "test-admin-key"})
+def test_system_status_shape(client):
+    r = client.get("/api/system/status")
     assert r.status_code == 200
     data = r.json()
 
@@ -261,9 +259,9 @@ def test_prune_history_stores_keeps_active_and_recent_terminal(monkeypatch):
     )
 
     prune_history_stores(
-        main_mod.jobs_store, 
-        main_mod.recycle_bin_store, 
-        main_mod.CONFIG["max_job_history"], 
+        main_mod.jobs_store,
+        main_mod.recycle_bin_store,
+        main_mod.CONFIG["max_job_history"],
         main_mod.CONFIG["max_recycle_bin_history"]
     )
 
@@ -570,7 +568,7 @@ def test_run_job_updates_progress(monkeypatch):
     )
     main_mod.jobs_store[job.id] = job
 
-    # We can't easily check intermediate progress in a sync test run, 
+    # We can't easily check intermediate progress in a sync test run,
     # but we can check the total and the final current.
     asyncio.run(main_mod._run_job_wrapper(job.id))
 

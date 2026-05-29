@@ -318,10 +318,10 @@ class TestLlmJson:
 
     @pytest.mark.asyncio
     async def test_groq_fails_then_pollinations(self):
-        with (
-            patch("app.config.settings.GROQ_API_KEY", "test-key"),
-            patch("app.llm_bridge._groq_model_candidates",
-                  return_value=["llama-3.3-70b-versatile"]),
+        with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}):
+            with (
+                patch("app.llm_bridge._groq_model_candidates",
+                      return_value=["llama-3.3-70b-versatile"]),
                 patch("app.llm_bridge._call_openai_compatible_json") as mock_call,
                 patch("app.llm_bridge.settings.GROQ_API_ENDPOINT", "http://groq"),
                 patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
@@ -339,7 +339,7 @@ class TestLlmJson:
     @pytest.mark.asyncio
     async def test_all_providers_fail_returns_empty_dict(self):
         with (
-            patch("app.config.settings.GROQ_API_KEY", ""),  # No GROQ key
+            patch.dict(os.environ, {}, clear=True),  # No GROQ key
             patch("app.llm_bridge._call_openai_compatible_json",
                   side_effect=Exception("API error")),
             patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),

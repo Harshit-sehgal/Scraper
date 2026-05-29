@@ -337,8 +337,11 @@ async def test_playwright_network_capture_feeds_extractor(browser_server):
 async def test_playwright_pipeline_integration(browser_server, monkeypatch):
     """True pipeline E2E integration: weak DOM + naturally fetched strong JSON -> chooses network."""
     from app import url_safety, html_utils
+    from app.browser_pool import BrowserPool
     monkeypatch.setattr(url_safety, "validate_public_http_url", lambda url: None)
     monkeypatch.setattr(html_utils, "_validate_url_safe", lambda url: None)
+    pool = BrowserPool()
+    monkeypatch.setattr(html_utils, "get_browser_pool", lambda: pool)
     from app.config import settings
     monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "127.0.0.1,localhost")
 
@@ -350,13 +353,24 @@ async def test_playwright_pipeline_integration(browser_server, monkeypatch):
     ]
 
     url = f"{browser_server}/search/id/pipeline_test_token_xyz"
+    from app.browser_network_capture import clear as clear_network_capture
+    from app.crawl_policy import get_crawl_policy
 
-    # Run the real scraper attempt (which handles Playwright loading and network capture internally)
-    res = await scrape_url_attempt(
-        url=url,
-        schema_fields=schema,
-        min_record_score=0.1,
-    )
+    clear_network_capture(url)
+    crawl_policy = get_crawl_policy()
+    crawl_policy.reset_domain(url)
+    monkeypatch.setattr(crawl_policy, "_default_delay", 0.0)
+    monkeypatch.setattr(crawl_policy, "_respect_robots", False)
+
+    try:
+        # Run the real scraper attempt (which handles Playwright loading and network capture internally)
+        res = await scrape_url_attempt(
+            url=url,
+            schema_fields=schema,
+            min_record_score=0.1,
+        )
+    finally:
+        await pool.close()
 
     # Assert records were extracted successfully
     assert len(res) == 2

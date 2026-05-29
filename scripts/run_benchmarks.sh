@@ -2,7 +2,7 @@
 # Scraper Benchmark CI Runner
 set -e
 
-echo "=== DataForge Scraper: Hostile Benchmarks ==="
+echo "=== DataForge Scraper: Manual Benchmark Runner ==="
 
 # 1. Setup environment
 export PYTHONPATH=backend
@@ -27,4 +27,4 @@ $PYTHON_EXEC -m pytest backend/tests/test_field_validator.py
 $PYTHON_EXEC -m pytest backend/tests/test_extraction_precision.py
 $PYTHON_EXEC -m pytest backend/tests/test_accuracy.py
 
-echo "=== All checks PASSED ==="
+echo "=== Selected benchmark and unit checks completed ==="

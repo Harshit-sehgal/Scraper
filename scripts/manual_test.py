@@ -9,7 +9,7 @@ Usage:
     python scripts/manual_test.py health       # Quick health check
     python scripts/manual_test.py topology     # Show topology state
     python scripts/manual_test.py test-job     # Create and monitor a test job
-    python scripts/manual_test.py all          # Run all checks sequentially
+    python scripts/manual_test.py all          # Run selected checks sequentially
     python scripts/manual_test.py --help       # Show this message
 
 Requires the server to be running (use `scripts/start.sh`).
@@ -532,7 +532,7 @@ Examples:
   python scripts/manual_test.py health     # Quick health check
   python scripts/manual_test.py topology   # Show topology state
   python scripts/manual_test.py test-job   # Create and monitor a test job
-  python scripts/manual_test.py all        # Run all checks
+  python scripts/manual_test.py all        # Run selected checks
         """,
     )
     parser.add_argument(

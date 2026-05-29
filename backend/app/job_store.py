@@ -40,12 +40,12 @@ def _get_connection() -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
-    
+
     # Check if database tables are actually present to handle dynamic dev/test deletions
     has_schema = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'"
     ).fetchone()
-    
+
     if path not in _MIGRATIONS_RUN_FOR or not has_schema:
         _run_migrations(conn)
         _MIGRATIONS_RUN_FOR.add(path)
@@ -447,7 +447,7 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
                     job.error = "Recovered after restart while still in progress."
                     job.completed_at = datetime.datetime.now().isoformat()
                     job.cancel_requested = False
-                    
+
                     row = _job_to_row(job)
                     columns = ", ".join(row.keys())
                     placeholders = ", ".join("?" for _ in row)
@@ -457,7 +457,7 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
                         values,
                     )
                     dirty_recovery = True
-            
+
             if dirty_recovery:
                 conn.commit()
 
@@ -466,8 +466,7 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
                 ws_path = _get_db_path().parent / "world_state.json"
                 if ws_path.exists():
                     world_state_data = json.loads(ws_path.read_text())
-            except Exception as e:
-                logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+            except Exception:
                 pass
 
             return jobs_store, recycle_bin_store, world_state_data

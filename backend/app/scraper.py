@@ -1,5 +1,5 @@
 """
-Scraping Engine — Thin orchestration layer with autonomous failure classification
+Scraping Engine — Thin orchestration layer with failure classification
 and extraction provenance tracking.
 
 Delegates to specialised sub-engines:
@@ -380,10 +380,10 @@ async def scrape_url(
 
     # ── Generic extraction pipeline ────────────────────────────────
     from app.domain_intelligence import get_domain_intelligence
-    
+
     intel = get_domain_intelligence().get_intelligence(url)
     strategy_engine = get_strategy_evolution_engine()
-    
+
     # Phase 80: Autonomous Strategy Selection
     recommended_strategy = strategy_engine.evolve_strategy(intel.domain)
     logger.info("[Scraper] Selected strategy for %s: %s", url, recommended_strategy.value)
@@ -419,13 +419,13 @@ async def scrape_url(
     except Exception as e:
         fetch_ms = (time.time() - start_time) * 1000
         logger.error("Failed to fetch %s: %s", url, e)
-        
+
         # Record failure in strategy engine
         strategy_engine.record_fetch_attempt(
-            intel.domain, recommended_strategy, success=False, 
+            intel.domain, recommended_strategy, success=False,
             time_ms=fetch_ms, failure_reason=type(e).__name__
         )
-        
+
         provenance_builder.add_error(f"Fetch failed: {e}")
         # Classify the failure and update domain intelligence
         classification = classify_failure(
@@ -436,7 +436,7 @@ async def scrape_url(
         update_domain_with_failure(get_domain_intelligence(), url, classification)
         telemetry.record(url=url, error=str(e), fetch_ms=fetch_ms, failure_category=classification.category.value)
 
-        # Phase 85: Capture regression for autonomous benchmark evolution
+        # Capture regression candidates for future benchmark expansion
         get_regression_capture().maybe_capture(
             url=url,
             html=None,
@@ -478,10 +478,39 @@ async def scrape_url(
             from app.session_url_detector import detect_session_params
             session_detect = detect_session_params(url)
             if session_detect.get("is_session_bound"):
-                logger.warning(
-                    "[SessionRecovery] URL %s is session-bound. Form recovery is deprecated.",
+                logger.info(
+                    "[SessionRecovery] URL %s is session-bound — checking for search form",
                     url,
                 )
+                from app.selector_discovery import _detect_search_form, _try_form_search_recovery
+                form_info = _detect_search_form(html)
+                if form_info.get("detected"):
+                    logger.info(
+                        "[SessionRecovery] Search form detected at '%s' — attempting recovery",
+                        form_info.get("action", ""),
+                    )
+                    recovery_result = await _try_form_search_recovery(
+                        landing_page_html=html,
+                        landing_page_url=url,
+                        search_params=search_params,
+                    )
+                    if recovery_result.get("success") and recovery_result.get("fresh_html"):
+                        recovered_html = recovery_result["fresh_html"]
+                        html = recovered_html
+                        logger.info(
+                            "[SessionRecovery] Recovery succeeded — using fresh session page: %s",
+                            recovery_result.get("fresh_url", url),
+                        )
+                    else:
+                        logger.warning(
+                            "[SessionRecovery] Recovery failed for %s: %s",
+                            url, recovery_result.get("error", "unknown"),
+                        )
+                else:
+                    logger.info(
+                        "[SessionRecovery] No search form detected on %s — proceeding with original HTML",
+                        url,
+                    )
         except Exception as recovery_err:
             logger.warning(
                 "[SessionRecovery] Recovery attempt failed for %s: %s",
@@ -497,8 +526,7 @@ async def scrape_url(
                     "page may be stale",
                     url,
                 )
-        except Exception as e:
-            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+        except Exception:
             pass
 
     anti_bot = detect_anti_bot(html)
@@ -515,8 +543,7 @@ async def scrape_url(
     if world_state and hasattr(world_state, 'solidified_motifs'):
         try:
             solidified_motifs_count = len(world_state.solidified_motifs)
-        except Exception as e:
-            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+        except Exception:
             pass
 
     result_warnings: list[str] = []
@@ -529,17 +556,17 @@ async def scrape_url(
         provided_selectors=selectors_map,
         warnings=result_warnings,
     )
-    
+
     # Run post-extraction semantic validation
     from app.utils.quality import post_extract_validate_records
     results = post_extract_validate_records(ext_result.records, schema_fields, warnings=result_warnings)
-    
+
     for r in results:
         r["_extraction_method"] = ext_result.method
         r["_extraction_source"] = ext_result.method
         r["_extraction_confidence"] = r.get("record_score", 0.8)
         r["_extraction_provenance"] = ext_result.selectors
-    
+
     # Track extraction method in provenance
     provenance_builder.set_extraction_method(ext_result.method)
     provenance_builder.set_memory_hit(ext_result.method == "memory")
@@ -550,9 +577,9 @@ async def scrape_url(
     avg_score = 0.0
     if results:
         avg_score = sum(r.get("record_score", 0.0) for r in results) / len(results)
-    
+
     strategy_engine.record_fetch_attempt(
-        intel.domain, recommended_strategy, success=True, 
+        intel.domain, recommended_strategy, success=True,
         time_ms=fetch_ms, quality=avg_score
     )
 
@@ -598,7 +625,7 @@ async def scrape_url(
                 full_url = urljoin(url, href)
                 if intel.domain in urlparse(full_url).netloc:
                     discovered_links.append(full_url)
-        
+
         if discovered_links:
             frontier = get_crawl_frontier()
             added = await frontier.add_discovered_links(discovered_links, url, source_depth=0)
@@ -671,7 +698,7 @@ async def scrape_url(
             )
             provenance_builder.add_error(f"Zero-result: {zero_classification.failure_class} ({zero_classification.recommended_action})")
 
-        # Phase 85: Capture regression for autonomous benchmark evolution
+        # Capture regression candidates for future benchmark expansion
         if classification:
             get_regression_capture().maybe_capture(
                 url=url,
@@ -752,7 +779,7 @@ async def scrape_url(
                 if not _is_empty_value(r.get(f.name)):
                     field_hits += 1
         selector_hit_rate = field_hits / max(1, total_slots)
-        
+
         avg_score = sum(r.get("record_score", 0.0) for r in results) / len(results)
         confidence_map = {"overall_avg": round(avg_score, 3)}
 
@@ -818,7 +845,7 @@ async def scrape_url(
     try:
         decay_predictor = get_selector_decay_predictor()
         decay_predictor.record_observation(intel.domain, selector_hit_rate)
-        
+
         # Log prediction if decay risk is elevated
         prediction = decay_predictor.predict_decay(intel.domain)
         if prediction.risk_level in ("decaying", "critical"):
@@ -829,7 +856,7 @@ async def scrape_url(
             )
     except Exception as e:
         logger.debug("[PredictiveAdaptation] Decay prediction failed: %s", e)
-    
+
     # 2. Domain Evolution Model: Track mutations and anti-bot changes
     try:
         evolution_model = get_domain_evolution_model()
@@ -841,7 +868,7 @@ async def scrape_url(
             evolution_model.record_anti_bot_escalation(intel.domain, anti_bot)
     except Exception as e:
         logger.debug("[PredictiveAdaptation] Evolution modeling failed: %s", e)
-    
+
     # 3. Self-Tuning Extraction: Feed telemetry for parameter adjustment
     try:
         tuning_controller = get_self_tuning_controller()
@@ -871,7 +898,7 @@ async def scrape_url(
         recommended_next_action = ""
         if zero_classification:
             recommended_next_action = zero_classification.recommended_action
-        
+
         attempt_res = ScrapeAttemptResult(
             [],
             html=html,

@@ -1,4 +1,4 @@
-"""Substrate Policy Engine — governs autonomous field actions.
+"""Substrate Policy Engine — governs automated field actions.
 
 LAW 12: Cognitive Agency must be bounded by substrate safety policies.
 No action may be triggered if it violates system thermodynamic stability.
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from app.semantic_world_state import SemanticWorldState
 
 class SubstratePolicy:
-    """Governs when and how autonomous actions and structural changes occur."""
+    """Governs when and how automated actions and structural changes occur."""
 
     def __init__(self, ws: Optional[SemanticWorldState] = None):
         self.ws = ws or get_world_state()

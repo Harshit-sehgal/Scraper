@@ -33,14 +33,14 @@ class BrowserPool:
         self._lock = asyncio.Lock()
         self._last_activity = time.time()
         self._cleanup_task: Optional[asyncio.Task] = None
-        
+
         # Hard recycling states
         self._active_fetches = 0
         self._cumulative_fetches = 0
         self._recycling = False
         self._recycle_event = asyncio.Event()
         self._recycle_event.set()
-        
+
         # Metrics
         self.startup_latency_ms: float = 0.0
         self.active_contexts: int = 0
@@ -52,7 +52,7 @@ class BrowserPool:
     async def get_context(self, domain: str, strategy: Optional[FetchStrategy] = None) -> BrowserContext:
         """Get or create a browser context for a specific domain."""
         await self._recycle_event.wait()
-        
+
         # Check if we should recycle before proceeding
         if self._should_recycle():
             asyncio.create_task(self._check_and_trigger_recycle())
@@ -61,12 +61,12 @@ class BrowserPool:
         async with self._lock:
             self._last_activity = time.time()
             self.total_fetches += 1
-            
+
             if not self._playwright:
                 start = time.time()
                 self._playwright = await async_playwright().start()
                 self.startup_latency_ms = (time.time() - start) * 1000
-            
+
             if not self._browser or not self._browser.is_connected():
                 logger.info("[BrowserPool] Launching new Chromium instance")
                 try:
@@ -77,7 +77,7 @@ class BrowserPool:
                     self.crash_count += 1
                     logger.error("[BrowserPool] Failed to launch browser: %s", e)
                     raise
-                    
+
                 # Ensure background cleanup is running
                 if not self._cleanup_task or self._cleanup_task.done():
                     self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
@@ -101,7 +101,7 @@ class BrowserPool:
             # Create new context with optional proxy configuration
             from app.strategy_evolution import FetchStrategy
             is_stealth = strategy == FetchStrategy.PLAYWRIGHT_STEALTH
-            
+
             # Use AntiBotEngine's stealth profile for enhanced fingerprint randomization
             context_options: Dict[str, Any]
             if is_stealth:
@@ -126,7 +126,7 @@ class BrowserPool:
                     "locale": settings.STEALTH_DEFAULT_LOCALE,
                     "timezone_id": settings.STEALTH_TIMEZONE_POOL.split(",")[0],
                 }
-            
+
             # Add proxy if enabled
             if settings.PROXY_ROTATION_ENABLED:
                 from app.proxy_manager import get_proxy_manager
@@ -136,41 +136,68 @@ class BrowserPool:
                     if proxy_config:
                         context_options["proxy"] = proxy_config
                         logger.debug(f"[BrowserPool] Creating context for {domain} with proxy: {proxy_config['server']}")
-            
+
             context = await self._browser.new_context(**context_options)  # type: ignore[arg-type]
-            
+
             # Register page tracking
             def register_page_tracking(ctx):
                 def on_page(page):
                     self._active_fetches += 1
                     self._cumulative_fetches += 1
                     logger.debug("[BrowserPool] Page created. Active: %d, Cumulative: %d", self._active_fetches, self._cumulative_fetches)
-                    
+
                     def on_close(p):
                         self._active_fetches = max(0, self._active_fetches - 1)
                         logger.debug("[BrowserPool] Page closed. Active: %d", self._active_fetches)
                         asyncio.create_task(self._check_and_trigger_recycle())
-                        
+
                     page.on("close", on_close)
                 ctx.on("page", on_page)
 
             register_page_tracking(context)
-            
+
             # Phase 80: Advanced Stealth Evasion
             if settings.PLAYWRIGHT_STEALTH or is_stealth:
-                try:
-                    from playwright_stealth.stealth import Stealth
-                    await Stealth().apply_stealth_async(context)
-                    logger.debug("[BrowserPool] Applied playwright-stealth to context")
-                except ImportError:
-                    logger.warning("[BrowserPool] playwright-stealth not installed, skipping advanced stealth")
-                except Exception as e:
-                    logger.warning("[BrowserPool] Failed to apply playwright-stealth: %s", e)
-                
+                # Basic stealth
+                _nav_langs = settings.STEALTH_NAVIGATOR_LANGUAGES.split(",")
+                stealth_js = f"""
+                Object.defineProperty(navigator, 'webdriver', {{get: () => undefined}});
+                window.chrome = {{ runtime: {{}} }};
+                Object.defineProperty(navigator, 'plugins', {{get: () => [1, 2, 3, 4, 5]}});
+                Object.defineProperty(navigator, 'languages', {{get: () => {_nav_langs}}});
+                """
+                await context.add_init_script(stealth_js)
+
+                if is_stealth:
+                    # Advanced fingerprint randomization
+                    advanced_stealth = f"""
+                    // WebGL spoofing
+                    const getParameter = WebGLRenderingContext.prototype.getParameter;
+                    WebGLRenderingContext.prototype.getParameter = function(parameter) {{
+                        if (parameter === 37445) return 'Intel Open Source Technology Center';
+                        if (parameter === 37446) return 'Mesa DRI Intel(R) Ivybridge Mobile ';
+                        return getParameter.apply(this, arguments);
+                    }};
+
+                    // Hardware concurrency randomization
+                    Object.defineProperty(navigator, 'hardwareConcurrency', {{get: () => {settings.STEALTH_HARDWARE_CONCURRENCY}}});
+
+                    // Battery status spoofing
+                    if (navigator.getBattery) {{
+                        navigator.getBattery = () => Promise.resolve({{
+                            charging: true,
+                            chargingTime: 0,
+                            dischargingTime: Infinity,
+                            level: 1
+                        }});
+                    }}
+                    """
+                    await context.add_init_script(advanced_stealth)
+
             self._contexts[context_key] = context
             self._context_use_count[context_key] = 1
             self.active_contexts = len(self._contexts)
-            
+
             return context
 
     def _get_random_ua(self) -> str:
@@ -182,7 +209,7 @@ class BrowserPool:
         """Perform a basic health check on the browser instance."""
         if not self._browser or not self._browser.is_connected():
             return False
-        
+
         try:
             # Try to create a dummy page and close it
             ctx = await self._browser.new_context()
@@ -215,21 +242,21 @@ class BrowserPool:
                     logger.debug("[BrowserPool] Failed to close context during close(): %s", e)
             self._contexts.clear()
             self._context_use_count.clear()
-            
+
             if self._browser:
                 try:
                     await self._browser.close()
                 except Exception as e:
                     logger.debug("[BrowserPool] Failed to close browser during close(): %s", e)
                 self._browser = None
-            
+
             if self._playwright:
                 try:
                     await self._playwright.stop()
                 except Exception as e:
                     logger.debug("[BrowserPool] Failed to stop playwright during close(): %s", e)
                 self._playwright = None
-            
+
             self.active_contexts = 0
             self._active_fetches = 0
             self._cumulative_fetches = 0
@@ -258,7 +285,7 @@ class BrowserPool:
 
         self._recycling = True
         self._recycle_event.clear()
-        
+
         while self._active_fetches > 0:
             logger.info("[BrowserPool] Waiting for %d active fetches to drain before recycling...", self._active_fetches)
             await asyncio.sleep(settings.BROWSER_DRAIN_POLL_INTERVAL)
@@ -280,21 +307,21 @@ class BrowserPool:
                 logger.debug("[BrowserPool] Failed to close context during hard recycle: %s", e)
         self._contexts.clear()
         self._context_use_count.clear()
-        
+
         if self._browser:
             try:
                 await self._browser.close()
             except Exception as e:
                 logger.debug("[BrowserPool] Failed to close browser during hard recycle: %s", e)
             self._browser = None
-        
+
         if self._playwright:
             try:
                 await self._playwright.stop()
             except Exception as e:
                 logger.debug("[BrowserPool] Failed to stop playwright during hard recycle: %s", e)
             self._playwright = None
-            
+
         self.active_contexts = 0
         self._active_fetches = 0
         self._cumulative_fetches = 0
@@ -309,7 +336,7 @@ class BrowserPool:
                     logger.info("[BrowserPool] Idle timeout reached, closing browser")
                     await self.close()
                     break
-                
+
                 # Also check health
                 if not await self.check_health():
                     logger.warning("[BrowserPool] Unhealthy browser detected in cleanup, restarting")

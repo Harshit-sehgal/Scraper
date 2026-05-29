@@ -1,12 +1,9 @@
 /**
  * Semantic Reliability Dashboard JS
- * Phase 63: Real-time Topology Visualization & Drift Monitoring
+ * Polling topology visualization and drift monitoring.
  */
 
 // ─── API key management (shared with main dashboard) ───────────────────
-// NOTE: Storing the API key in localStorage is suitable for operator-local private
-// deployments. For enterprise-grade secure hosting, keep keys session-only in memory
-// or use HttpOnly secure cookies behind an auth proxy.
 function getDashboardApiKey() {
     try { return localStorage.getItem("dataforge_api_key") || ""; } catch { return ""; }
 }
@@ -158,7 +155,7 @@ function setupControls() {
         liveBtn.classList.remove('bg-green-500/10', 'text-green-500', 'border-green-500');
         liveBtn.classList.add('bg-gray-800', 'text-gray-500', 'border-gray-700');
         liveBtn.innerText = "REPLAY";
-        
+
         currentReplayIdx = parseInt(e.target.value);
         if (topologyHistory[currentReplayIdx]) {
             const topology = topologyHistory[currentReplayIdx].topology || {};
@@ -196,14 +193,14 @@ async function updateLoop() {
         // Exponential backoff — double interval up to MAX_INTERVAL
         currentInterval = Math.min(UPDATE_INTERVAL * Math.pow(2, failedPolls), MAX_INTERVAL);
         console.warn(`Dashboard poll #${failedPolls} partial failure, backing off to ${currentInterval}ms`);
-        
+
         document.getElementById('status-badge').innerText = "DEGRADED";
         document.getElementById('status-badge').className = "px-3 py-1 bg-yellow-900/30 text-yellow-400 border border-yellow-800 rounded-full text-xs font-bold";
     } else {
         // Reset backoff on success
         failedPolls = 0;
         currentInterval = UPDATE_INTERVAL;
-        document.getElementById('status-badge').innerText = "REAL-TIME STREAMING";
+        document.getElementById('status-badge').innerText = "POLLING VIEW";
         document.getElementById('status-badge').className = "px-3 py-1 bg-green-900/30 text-green-400 border border-green-800 rounded-full text-xs font-bold animate-pulse";
     }
 
@@ -349,7 +346,7 @@ function updateMetrics(m, health, mesoClusters, macroContinents, scraperStats, b
 function renderTopology(regions, communities, edges, mesoClusters, macroContinents) {
     const svg = document.getElementById('field-svg');
     svg.innerHTML = ''; // Clear
-    
+
     _renderTopologyInternal(regions, communities, edges, mesoClusters, macroContinents);
 }
 
@@ -365,7 +362,7 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
         svg.appendChild(text);
         return;
     }
-    
+
     const width = 800;
     const height = 450;
     const colors = ['#00ff41', '#007fff', '#ff003c', '#ffbf00', '#9d00ff', '#00ffd0'];
@@ -403,11 +400,11 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
                 });
             }
             if (continentPoints.length < 3) return;
-            
+
             // Compute convex hull
             const hull = convexHull(continentPoints);
             if (!hull || hull.length < 3) return;
-            
+
             const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
             const points = hull.map(p => `${p.x},${p.y}`).join(' ');
             poly.setAttribute("points", points);
@@ -418,11 +415,11 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
             poly.setAttribute("stroke-dasharray", "4,4");
             poly.setAttribute("stroke-opacity", "0.2");
             poly.setAttribute("class", "macro-continent");
-            
+
             // Add continent label
             const cx = hull.reduce((s, p) => s + p.x, 0) / hull.length;
             const cy = hull.reduce((s, p) => s + p.y, 0) / hull.length;
-            
+
             const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
             label.setAttribute("x", cx);
             label.setAttribute("y", cy - 5);
@@ -431,7 +428,7 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
             label.setAttribute("font-size", "6");
             label.setAttribute("fill-opacity", "0.35");
             label.textContent = `${cont.continent_id} (P:${cont.pressure})`;
-            
+
             svg.appendChild(poly);
             svg.appendChild(label);
         });
@@ -447,10 +444,10 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
                 if (pos) clusterPoints.push(pos);
             });
             if (clusterPoints.length < 3) return;
-            
+
             const hull = convexHull(clusterPoints);
             if (!hull || hull.length < 3) return;
-            
+
             const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
             const points = hull.map(p => `${p.x},${p.y}`).join(' ');
             poly.setAttribute("points", points);
@@ -460,14 +457,14 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
             poly.setAttribute("stroke-width", "0.5");
             poly.setAttribute("stroke-opacity", "0.3");
             poly.setAttribute("class", "meso-cluster");
-            
+
             // Tooltip hover
             poly.onmouseover = () => showMesoClusterDetails(cluster);
-            
+
             // Label
             const cx = hull.reduce((s, p) => s + p.x, 0) / hull.length;
             const cy = hull.reduce((s, p) => s + p.y, 0) / hull.length;
-            
+
             const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
             label.setAttribute("x", cx);
             label.setAttribute("y", cy);
@@ -476,7 +473,7 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
             label.setAttribute("font-size", "7");
             label.setAttribute("fill-opacity", "0.5");
             label.textContent = `${cluster.shared_roles && cluster.shared_roles[0] || 'cluster'} (${cluster.size})`;
-            
+
             svg.appendChild(poly);
             svg.appendChild(label);
         });
@@ -496,7 +493,7 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
                     line.setAttribute("y1", p1.y);
                     line.setAttribute("x2", p2.x);
                     line.setAttribute("y2", p2.y);
-                    
+
                     // Pressure-aware styling
                     const pressure = e.pressure || 0;
                     if (pressure > 0.7) {
@@ -506,7 +503,7 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
                     } else {
                         line.setAttribute("class", "edge-pressure-low");
                     }
-                    
+
                     line.setAttribute("stroke-width", (e.weight || 0.1) * 6);
                     line.setAttribute("stroke-opacity", Math.max(0.1, (e.weight || 0.1)));
                     svg.appendChild(line);
@@ -526,7 +523,7 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
             circle.setAttribute("class", "wave-ripple");
             circle.style.strokeWidth = `${Math.max(1, w.intensity * 3)}px`;
             svg.appendChild(circle);
-            
+
             // Draw connection to source if available
             const sourcePos = regionPositions[w.source];
             if (sourcePos) {
@@ -550,7 +547,7 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
         const opacity = 0.2 + (Number(r.integrity || 0) * 0.8);
         const {x: cx, y: cy} = regionPositions[r.region_id];
         if (cx === undefined) return;
-        
+
         let color = '#555';
         if (communities && communities.length > 0) {
             communities.forEach((c, idx) => {
@@ -569,7 +566,7 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
         circle.setAttribute("stroke", color);
         circle.setAttribute("stroke-width", Number(r.instability || 0) > 0.5 ? "2" : "0.5");
         circle.setAttribute("class", "topology-node");
-        
+
         if (Number(r.instability || 0) > 0.8) {
             const animate = document.createElementNS("http://www.w3.org/2000/svg", "animate");
             animate.setAttribute("attributeName", "r");
@@ -581,7 +578,7 @@ function _renderTopologyInternal(regions, communities, edges, mesoClusters, macr
 
         circle.onmouseover = () => showRegionDetails(r);
         svg.appendChild(circle);
-        
+
         if (Number(r.integrity || 0) > 0.7) {
             const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
             label.setAttribute("x", cx);
@@ -659,7 +656,7 @@ function cross(o, a, b) {
 function updateTelemetry(events) {
     const log = document.getElementById('telemetry-log');
     if (!events) return;
-    
+
     // Capture new wave events for animation
     const now = Date.now();
     events.forEach(e => {
@@ -679,14 +676,14 @@ function updateTelemetry(events) {
     activeWaves = activeWaves.filter(w => w.expire > now);
 
     log.innerHTML = events.map(e => {
-        const color = e.type === 'degradation' ? 'text-red-500' : 
+        const color = e.type === 'degradation' ? 'text-red-500' :
                       e.type === 'transaction' ? 'text-blue-400' :
-                      e.type === 'wave_absorption' ? 'text-green-400' : 
+                      e.type === 'wave_absorption' ? 'text-green-400' :
                       e.type === 'scrape' ? 'text-cyan-400' : 'text-gray-500';
-        const icon = e.type === 'degradation' ? '⚠' : 
+        const icon = e.type === 'degradation' ? '⚠' :
                      e.type === 'wave_absorption' ? '⌇' :
                      e.type === 'scrape' ? '⚓' : '◈';
-        
+
         let detailsStr = '';
         if (e.type === 'scrape') {
             const d = e.details || {};
@@ -710,7 +707,7 @@ function updateCharts(m, communities, driftLogs) {
     energyChart.data.labels.push("");
     energyChart.data.datasets[0].data.push(m.global_energy);
     energyChart.data.datasets[1].data.push(m.global_entropy);
-    
+
     if (energyChart.data.labels.length > 50) {
         energyChart.data.labels.shift();
         energyChart.data.datasets[0].data.shift();
@@ -728,7 +725,7 @@ function updateCharts(m, communities, driftLogs) {
         }
     });
     const meanDrift = driftCount > 0 ? totalDrift / driftCount : 0;
-    
+
     driftChart.data.labels.push("");
     driftChart.data.datasets[0].data.push(meanDrift);
     if (driftChart.data.labels.length > 50) {

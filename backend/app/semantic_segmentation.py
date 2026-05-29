@@ -335,7 +335,7 @@ def _clean_value(raw: str, ctype: object) -> str:
     """Clean a candidate value based on type (accepts str or SemanticType)."""
     # Normalize to string for comparison if needed, but prefer enum
     ctype_str = sem_type_str(ctype)
-    
+
     if ctype_str == "price":
         cleaned = raw.strip()
         cleaned = re.sub(r"(?i)^(price|cost|fare|amount)\s*[:\-]\s*", "", cleaned).strip()
@@ -492,7 +492,7 @@ def _classify_fallback(text: str) -> SemanticType:
     # Must match the ENTIRE string (not just start) to avoid split issues
     if re.fullmatch(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*", stripped) and len(stripped) > 1:
         return SemanticType.ORGANIZATION
-    
+
     # Product-like: brand naming pattern (iPhone, iPad, macOS, eBay)
     # Starts lowercase, has AT LEAST one internal uppercase
     if re.fullmatch(r"[a-z][A-Za-z0-9]{2,}", stripped) and re.search(r"[A-Z]", stripped[1:]):
@@ -946,7 +946,7 @@ DOMINANCE_HIERARCHY = {
 
 def resolve_overlaps(tokens: List[SemanticToken]) -> List[SemanticToken]:
     """Resolve span overlaps and value containment.
-    
+
     Suppresses dominated tokens:
     1. Lower in DOMINANCE_HIERARCHY
     2. Physically contained (Span.contains)
@@ -954,7 +954,7 @@ def resolve_overlaps(tokens: List[SemanticToken]) -> List[SemanticToken]:
     """
     if not tokens:
         return tokens
-        
+
     # Sort by dominance then size
     sorted_tokens = sorted(
         tokens,
@@ -964,23 +964,23 @@ def resolve_overlaps(tokens: List[SemanticToken]) -> List[SemanticToken]:
             -len(t.raw)
         )
     )
-    
+
     suppressed: Set[int] = set()
     for i in range(len(sorted_tokens)):
         if i in suppressed:
             continue
         ti = sorted_tokens[i]
-        
+
         for j in range(i + 1, len(sorted_tokens)):
             if j in suppressed:
                 continue
             tj = sorted_tokens[j]
-            
+
             # Case 1: Physical Span overlap
             if ti.span.overlaps_with(tj.span):
                 suppressed.add(j)
                 continue
-                
+
             # Case 2: Semantic Value Containment (Lexical Overlap)
             # If tj.raw is a STRICT substring of ti.raw, it's likely a fragment
             if len(tj.raw) > 2 and len(tj.raw) < len(ti.raw) and tj.raw.lower() in ti.raw.lower():
@@ -1004,7 +1004,7 @@ def is_likely_noise_field(name: str, value: str) -> Tuple[bool, float, List[str]
     Field-type-aware: for name/text fields, plain text is expected.
     For typed fields (price, date, rating), absence of type signals is suspicious.
 
-    Replaces hardcoded phrase-list checks with universal analysis.
+    Replaces hardcoded phrase-list checks with broader semantic analysis.
     """
     evidence: List[str] = []
 

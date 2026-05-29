@@ -72,13 +72,13 @@ async def get_legacy_domain_health():
     from app.crawl_policy import get_crawl_policy
     policy = get_crawl_policy()
     states = policy.get_all_domain_states()
-    
+
     health = {}
     for domain in states:
         if domain.startswith("_"):
             continue
         health[domain] = policy.get_domain_health_score(domain)
-        
+
     return health
 
 
@@ -264,7 +264,7 @@ async def get_regression_detail(entry_id: str):
 
 
 @router.post("/regressions/{entry_id}/generate-test")
-async def generate_regression_replay_test(entry_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+async def generate_regression_replay_test(entry_id: str):
     """Generate a pytest replay test for a captured regression."""
     capture = get_regression_capture()
     test_code = capture.generate_replay_test(entry_id)
@@ -277,7 +277,7 @@ async def generate_regression_replay_test(entry_id: str, _role: UserRole = Depen
 
 
 @router.post("/regressions/generate-all-tests")
-async def generate_all_replay_tests(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+async def generate_all_replay_tests():
     """Generate replay tests for all captured regressions that lack one."""
     capture = get_regression_capture()
     all_tests = capture.generate_all_replay_tests()
@@ -335,15 +335,15 @@ async def get_extraction_economics(window: int = Query(200, ge=10, le=1000)):
 @router.get("/health/domains")
 async def get_all_domains_health():
     """Get health status for all monitored domains.
-    
+
     Returns a sorted list of domains with health scores and alerts.
     Useful for dashboards and automated alerting systems.
     """
     from app.domain_health_alerts import get_domain_health_monitor
-    
+
     monitor = get_domain_health_monitor()
     domains_health = monitor.get_all_domains_health()
-    
+
     return {
         "total_domains_monitored": len(domains_health),
         "domains": domains_health,
@@ -360,7 +360,7 @@ async def get_all_domains_health():
 @router.get("/health/domain/{domain}")
 async def get_domain_health(domain: str):
     """Get detailed health status for a specific domain.
-    
+
     Returns comprehensive health metrics including:
     - Health level (healthy/degrading/unhealthy/critical/blacklisted)
     - Health score (0.0 to 1.0)
@@ -371,44 +371,44 @@ async def get_domain_health(domain: str):
     - Recent failure category
     """
     from app.domain_health_alerts import get_domain_health_monitor
-    
+
     monitor = get_domain_health_monitor()
-    
+
     # Create a fake URL to extract domain
     url = f"https://{domain}/"
     health = monitor.get_domain_health(url)
-    
+
     if health is None:
         raise HTTPException(
             status_code=404,
             detail=f"No health data for domain: {domain}"
         )
-    
+
     return health
 
 
 @router.get("/health/summary")
 async def get_system_health_summary():
     """Get system-wide health summary.
-    
+
     Provides a quick overview of system health across all domains.
     Useful for dashboards and status pages.
     """
     from app.domain_health_alerts import get_domain_health_monitor
-    
+
     monitor = get_domain_health_monitor()
     domains_health = monitor.get_all_domains_health()
-    
+
     if not domains_health:
         return {
             "status": "no_data",
             "domains_monitored": 0,
             "overall_health_score": 0.0,
         }
-    
+
     # Calculate overall health score
     overall_score = sum(d["health_score"] for d in domains_health) / len(domains_health)
-    
+
     # Determine overall status
     if overall_score >= 0.8:
         overall_status = "healthy"
@@ -418,7 +418,7 @@ async def get_system_health_summary():
         overall_status = "unhealthy"
     else:
         overall_status = "critical"
-    
+
     return {
         "status": overall_status,
         "overall_health_score": round(overall_score, 3),
@@ -434,7 +434,7 @@ async def get_system_health_summary():
 @router.get("/selectors/stats")
 async def get_selector_memory_stats():
     """Get selector memory pool statistics.
-    
+
     Returns aggregate statistics about cached selectors:
     - Total domains with cached selectors
     - Average confidence across all selectors
@@ -443,7 +443,7 @@ async def get_selector_memory_stats():
     """
     selector_memory = get_selector_memory()
     stats = selector_memory.get_memory_stats()
-    
+
     return {
         "total_domains": stats["total_domains"],
         "total_selectors": stats["total_selectors"],
@@ -458,7 +458,7 @@ async def get_selector_memory_stats():
 @router.get("/selectors/domain/{domain}")
 async def get_domain_selector_confidence(domain: str):
     """Get selector confidence for a specific domain.
-    
+
     Returns detailed confidence metrics:
     - Raw confidence (success rate)
     - Age factor (degradation over time)
@@ -467,17 +467,17 @@ async def get_domain_selector_confidence(domain: str):
     - Reason (detailed explanation)
     """
     selector_memory = get_selector_memory()
-    
+
     # Create a fake URL to extract domain
     url = f"https://{domain}/"
     confidence = selector_memory.get_selector_confidence(url)
-    
+
     if confidence is None:
         raise HTTPException(
             status_code=404,
             detail=f"No cached selectors for domain: {domain}"
         )
-    
+
     return {
         "domain": domain,
         "raw_confidence": round(confidence.raw_confidence, 3),
@@ -491,21 +491,21 @@ async def get_domain_selector_confidence(domain: str):
 @router.post("/selectors/cleanup")
 async def trigger_selector_cleanup(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Manually trigger selector memory cleanup.
-    
+
     Forces deletion of all selectors below the confidence threshold,
     regardless of the normal cleanup interval.
-    
+
     Returns cleanup statistics.
     """
     selector_memory = get_selector_memory()
     stats = selector_memory.force_cleanup()
-    
+
     if not stats:
         return {
             "message": "Cleanup not performed (too soon after last cleanup)",
             "next_cleanup_available_in_seconds": 86400,
         }
-    
+
     return {
         "domains_checked": stats["domains_checked"],
         "selectors_deleted": stats["selectors_deleted"],
@@ -517,12 +517,12 @@ async def trigger_selector_cleanup(_role: UserRole = Depends(require_role([UserR
 @router.get("/selectors/low-confidence")
 async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)):
     """Get all selectors scoring below the specified threshold.
-    
+
     Useful for identifying domains at risk of extraction failure.
     """
     selector_memory = get_selector_memory()
     low_confidence = []
-    
+
     for domain, entry in selector_memory._memory.items():
         confidence = selector_memory._compute_confidence(entry)
         if confidence.final_score < threshold:
@@ -536,10 +536,10 @@ async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)
                 "failure_count": entry.get("failure_count", 0),
                 "reason": confidence.reason,
             })
-    
+
     # Sort by score (worst first)
     low_confidence.sort(key=lambda x: x["score"])
-    
+
     return {
         "threshold": threshold,
         "count": len(low_confidence),
@@ -547,7 +547,101 @@ async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)
     }
 
 
+# ─── ML Selector Optimization Endpoints ──────────────────────────────────
 
+
+@router.post("/ml/optimize/domain/{domain}")
+async def optimize_domain_selectors(
+    domain: str,
+    selectors: Optional[dict] = None,
+    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
+):
+    """Optimize selectors for a domain using ML predictions.
+
+    Analyzes CSS selector patterns and predicts quality.
+    Returns recommendations for improving selectors.
+
+    Parameters:
+        - domain: Domain name
+        - selectors: Optional dict of {field: css_selector} to analyze
+
+    If no selectors provided, uses cached selectors from memory.
+    Requires operator or admin role — triggers ML computation.
+    """
+    from app.selector_ml_optimizer import get_selector_optimizer
+
+    optimizer = get_selector_optimizer()
+
+    # Get selectors to optimize
+    if selectors is None:
+        selector_memory = get_selector_memory()
+        url = f"https://{domain}/"
+        cached = selector_memory.get_selectors(url)
+
+        if not cached:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No selectors found for domain: {domain}"
+            )
+
+        selectors = cached
+
+    # Run optimization
+    report = optimizer.optimize_selectors(domain, selectors)
+
+    return {
+        "domain": domain,
+        "timestamp": report["timestamp"],
+        "original_count": report["original_count"],
+        "avg_quality": round(report["summary"]["total_quality"], 3),
+        "recommendations": {
+            "keep": report["summary"]["keep"],
+            "improve": report["summary"]["improve"],
+            "replace": report["summary"]["replace"],
+        },
+        "optimizations": report["optimizations"],
+    }
+
+
+@router.get("/ml/optimize/domain/{domain}/history")
+async def get_optimization_history(domain: str, limit: int = Query(10, ge=1, le=100)):
+    """Get historical optimization reports for a domain.
+
+    Shows how selector quality has evolved over time.
+    """
+    from app.selector_ml_optimizer import get_selector_optimizer
+
+    optimizer = get_selector_optimizer()
+    history = optimizer.get_optimization_history(domain, limit)
+
+    return {
+        "domain": domain,
+        "count": len(history),
+        "history": history,
+    }
+
+
+@router.post("/ml/learn")
+async def record_selector_learning(domain: str, selector: str, quality: float = Query(0.0, ge=0, le=1), _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+    """Record actual selector performance for ML model improvement.
+
+    This feedback helps the ML model learn which selectors work best.
+
+    Parameters:
+        - domain: Domain name
+        - selector: CSS selector that was used
+        - quality: Actual quality score achieved [0, 1]
+    """
+    from app.selector_ml_optimizer import get_selector_optimizer
+
+    optimizer = get_selector_optimizer()
+    optimizer.learn_from_results(domain, selector, quality)
+
+    return {
+        "status": "learned",
+        "domain": domain,
+        "quality": quality,
+    }
 
 
 # ─── Strategy Evolution Endpoints ────────────────────────────────────────
@@ -556,14 +650,14 @@ async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)
 @router.get("/strategy/recommend/{domain}")
 async def recommend_fetch_strategy(domain: str):
     """Get recommended fetch strategy for a domain.
-    
+
     Returns the best strategy based on historical performance.
     """
     from app.strategy_evolution import get_strategy_evolution_engine
-    
+
     engine = get_strategy_evolution_engine()
     recommendation = engine.recommend_strategy(domain)
-    
+
     return {
         "domain": domain,
         "recommended_strategy": recommendation.recommended_strategy.value,
@@ -585,7 +679,7 @@ async def record_strategy_attempt(
     _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
 ):
     """Record a strategy attempt for learning.
-    
+
     Parameters:
         - domain: Domain being fetched
         - strategy: Fetch strategy used (e.g., "playwright_full", "httpx_basic")
@@ -595,9 +689,9 @@ async def record_strategy_attempt(
         - failure_reason: Optional failure category
     """
     from app.strategy_evolution import get_strategy_evolution_engine, FetchStrategy
-    
+
     engine = get_strategy_evolution_engine()
-    
+
     try:
         strategy_enum = FetchStrategy(strategy)
     except ValueError:
@@ -605,9 +699,9 @@ async def record_strategy_attempt(
             status_code=400,
             detail=f"Unknown strategy: {strategy}"
         )
-    
+
     engine.record_fetch_attempt(domain, strategy_enum, success, time_ms, quality, failure_reason)
-    
+
     return {
         "status": "recorded",
         "domain": domain,
@@ -619,43 +713,43 @@ async def record_strategy_attempt(
 @router.get("/strategy/domain/{domain}")
 async def get_domain_strategy_analysis(domain: str):
     """Get detailed strategy analysis for a domain.
-    
+
     Shows performance of all strategies and evolution history.
     """
     from app.strategy_evolution import get_strategy_evolution_engine
-    
+
     engine = get_strategy_evolution_engine()
     report = engine.get_domain_strategy_report(domain)
-    
+
     return report
 
 
 @router.get("/strategy/report")
 async def get_all_strategies_report():
     """Get strategy performance report for all domains.
-    
+
     High-level overview of which strategies work best across the system.
     """
     from app.strategy_evolution import get_strategy_evolution_engine
-    
+
     engine = get_strategy_evolution_engine()
     report = engine.get_all_domains_strategy_report()
-    
+
     return report
 
 
 @router.post("/strategy/evolve/{domain}")
 async def evolve_domain_strategy(domain: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Manually trigger strategy evolution for a domain.
-    
+
     Useful when current strategy is degraded.
     Returns the new strategy recommended.
     """
     from app.strategy_evolution import get_strategy_evolution_engine
-    
+
     engine = get_strategy_evolution_engine()
     new_strategy = engine.evolve_strategy(domain)
-    
+
     state = engine.domain_states.get(domain)
     if state:
         current_perf = state.strategies[new_strategy]
@@ -665,7 +759,7 @@ async def evolve_domain_strategy(domain: str, _role: UserRole = Depends(require_
             "success_rate": round(current_perf.success_rate, 3),
             "switches": state.strategy_switch_count,
         }
-    
+
     return {
         "domain": domain,
         "new_strategy": new_strategy.value,

@@ -354,10 +354,10 @@ def _generate_container_selector(element) -> str:
 
 def detect_value_patterns(html: str) -> ValuePatterns:
     """
-    Detect what types of values the page contains using universal patterns.
+    Detect what types of values the page contains using broad patterns.
 
     This is domain-agnostic - it just looks for patterns like currency symbols,
-    date formats, weights, times, etc., regardless of whether it's a flight, 
+    date formats, weights, times, etc., regardless of whether it's a flight,
     product, or directory page.
     """
     soup = BeautifulSoup(html, "html.parser")
@@ -414,5 +414,4 @@ def detect_value_patterns(html: str) -> ValuePatterns:
         setattr(patterns, attr_name, unique[:10])
 
     return patterns
-
 

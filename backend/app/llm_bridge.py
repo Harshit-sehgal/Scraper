@@ -6,7 +6,7 @@ All tool-calls must be traceable and governed by the Substrate Policy Engine.
 
 import json
 import logging
-
+import os
 import re
 import asyncio
 import httpx
@@ -86,7 +86,7 @@ async def _call_openai_compatible_json(
         max_attempts = settings.LLM_MAX_ATTEMPTS
     if backoff_seconds is None:
         backoff_seconds = settings.LLM_BACKOFF_SECONDS
-    
+
     last_error: Exception | None = None
     for attempt in range(1, max(1, max_attempts) + 1):
         try:
@@ -97,10 +97,7 @@ async def _call_openai_compatible_json(
                 content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
                 return _extract_json_payload(content)
         except Exception as error:
-            if isinstance(error, httpx.HTTPError):
-                logging.error("HTTP error during LLM call: %s", error)
-            else:
-                logging.exception(error)
+            logging.exception(error)
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
@@ -145,10 +142,7 @@ async def _call_openai_compatible_text(
                 data = response.json()
                 return ((data.get("choices") or [{}])[0].get("message", {}).get("content", "") or "").strip()
         except Exception as error:
-            if isinstance(error, httpx.HTTPError):
-                logging.error("HTTP error during LLM text call: %s", error)
-            else:
-                logging.exception(error)
+            logging.exception(error)
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
@@ -193,14 +187,13 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
     try:
         from app.metrics_collector import record_llm_call
         record_llm_call()
-    except Exception as e:
-        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+    except Exception:
         pass
     if temperature is None:
         temperature = settings.LLM_TEMPERATURE
     if timeout is None:
         timeout = settings.LLM_TIMEOUT
-    groq_key = (settings.GROQ_API_KEY or "").strip()
+    groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
             try:
@@ -273,14 +266,13 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
     try:
         from app.metrics_collector import record_llm_call
         record_llm_call()
-    except Exception as e:
-        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+    except Exception:
         pass
     if temperature is None:
         temperature = settings.LLM_FAST_TEMPERATURE
     if timeout is None:
         timeout = settings.LLM_FAST_TIMEOUT
-    groq_key = (settings.GROQ_API_KEY or "").strip()
+    groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
             try:
@@ -330,14 +322,13 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
     try:
         from app.metrics_collector import record_llm_call
         record_llm_call()
-    except Exception as e:
-        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+    except Exception:
         pass
     if temperature is None:
         temperature = settings.LLM_TEXT_TEMPERATURE
     if timeout is None:
         timeout = settings.LLM_TIMEOUT
-    groq_key = (settings.GROQ_API_KEY or "").strip()
+    groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if groq_key:
         for idx, model in enumerate(_groq_model_candidates()):
             try:
@@ -410,7 +401,7 @@ class SubstratePluginManager:
         self._handlers: Dict[str, Callable] = {}
         # Sandbox state (placeholders for now)
         self._execution_history: List[dict] = []
-        
+
         # ─── Self-Optimization Tools (Phase 44) ───
         self._register_native_tools()
 
@@ -427,7 +418,7 @@ class SubstratePluginManager:
         role_b = kwargs.get("role_b")
         if not role_a or not role_b:
             return "Fail: Missing roles"
-        
+
         with self.ws.transaction(f"refactor:merge:{role_a}"):
             # Linear blend vectors
             v1 = self.ws.role_manifold.get(role_a)
@@ -449,7 +440,7 @@ class SubstratePluginManager:
         manifold = self.ws.role_manifold
         if len(manifold) < 10:
             return "Skip: Manifold too sparse for compression"
-            
+
         # Calculate variance per dimension
         dim = self.ws.manifold_dimension
         variances = []
@@ -462,11 +453,11 @@ class SubstratePluginManager:
             mean = sum(vals) / n
             var = sum((x - mean)**2 for x in vals) / n
             variances.append(var)
-            
+
         # Identify lowest variance dimension
         min_var = min(variances)
         min_idx = variances.index(min_var)
-        
+
         if min_var < 0.01 and dim > 8:
             # PRUNE DIMENSION (Geometric Refactoring)
             # In a real system, we'd rebuild the manifold.
@@ -475,7 +466,7 @@ class SubstratePluginManager:
                 f"REFACTOR: Compressed manifold from {dim} to {dim-1} (Pruned Dim {min_idx} with var {min_var:.4f})"
             )
             return f"Success: Pruned low-variance dimension {min_idx}"
-            
+
         return "Success: Manifold density optimal"
 
     def register_handler(self, name: str, handler: Callable):
@@ -488,10 +479,10 @@ class SubstratePluginManager:
         handler = self._handlers.get(handler_name)
         if not handler:
             raise ValueError(f"Unknown handler: {handler_name}")
-            
+
         # ─── Execution Boundary ───
         logging.getLogger(__name__).info(f"TOOL CALL: Executing [{handler_name}] with {kwargs}")
-        
+
         try:
             # Check for budget/policy if ws is available
             if self.ws:
@@ -499,17 +490,17 @@ class SubstratePluginManager:
                 policy = get_policy_engine(ws=self.ws)
                 if not policy.can_dispatch_action(handler_name, self.ws.get_system_pressure()):
                     raise PermissionError(f"Action [{handler_name}] blocked by substrate policy")
-            
+
             # Actual execution
             result = handler(**kwargs)
-            
+
             self._execution_history.append({
                 "handler": handler_name,
                 "status": "success",
                 "result_type": str(type(result))
             })
             return result
-            
+
         except Exception as e:
             self._execution_history.append({
                 "handler": handler_name,

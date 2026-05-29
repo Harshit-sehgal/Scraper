@@ -3,12 +3,8 @@ from app.models import Job, JobStatus
 from app.storage_interface import SQLiteJobRepository
 
 @pytest.fixture(autouse=True)
-def clean_job_store(tmp_path, monkeypatch):
+def clean_job_store():
     from app.job_store import reset_job_store_for_tests, _get_connection, _DB_LOCK
-    from app.config import settings
-    db_file = tmp_path / "test_atomic_jobs.db"
-    monkeypatch.setenv("DATAFORGE_STATE_FILE", str(db_file))
-    monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_file))
     reset_job_store_for_tests()
     with _DB_LOCK:
         conn = _get_connection()
@@ -21,7 +17,7 @@ def clean_job_store(tmp_path, monkeypatch):
 
 def test_sqlite_repository_atomic_move_and_restore():
     repo = SQLiteJobRepository()
-    
+
     # 1. Create a job
     job = Job(
         name="atomic-test-job",
@@ -30,32 +26,32 @@ def test_sqlite_repository_atomic_move_and_restore():
         schema_fields=[{"name": "field", "field_type": "string"}]
     )
     repo.save_single(job)
-    
+
     # Verify present in active jobs
     jobs = repo.load_jobs()
     assert job.id in jobs
     assert len(repo.load_recycle_bin()) == 0
-    
+
     # 2. Move to recycle bin
     moved = repo.move_to_recycle_bin(job.id)
     assert moved is True
-    
+
     # Verify no longer active, now in recycle bin
     assert job.id not in repo.load_jobs()
     recycle = repo.load_recycle_bin()
     assert job.id in recycle
-    
+
     # 3. Restore
     restored = repo.restore_from_recycle_bin(job.id)
     assert restored is True
-    
+
     # Verify active again, gone from recycle bin
     assert job.id in repo.load_jobs()
     assert len(repo.load_recycle_bin()) == 0
 
 def test_sqlite_repository_atomic_hard_delete():
     repo = SQLiteJobRepository()
-    
+
     job = Job(
         name="delete-test-job",
         mode="manual",
@@ -63,11 +59,11 @@ def test_sqlite_repository_atomic_hard_delete():
         schema_fields=[]
     )
     repo.save_single(job)
-    
+
     # Move to recycle bin
     repo.move_to_recycle_bin(job.id)
     assert job.id in repo.load_recycle_bin()
-    
+
     # Hard delete
     deleted = repo.hard_delete(job.id)
     assert deleted is True
@@ -76,7 +72,7 @@ def test_sqlite_repository_atomic_hard_delete():
 
 def test_sqlite_repository_clear_terminal_jobs():
     repo = SQLiteJobRepository()
-    
+
     # Active job
     job_active = Job(
         name="active-job",
@@ -86,7 +82,7 @@ def test_sqlite_repository_clear_terminal_jobs():
     )
     job_active.status = JobStatus.RUNNING
     repo.save_single(job_active)
-    
+
     # Terminal job
     job_terminal = Job(
         name="terminal-job",
@@ -96,14 +92,14 @@ def test_sqlite_repository_clear_terminal_jobs():
     )
     job_terminal.status = JobStatus.COMPLETED
     repo.save_single(job_terminal)
-    
+
     # Clear terminal jobs
     cleared = repo.clear_terminal_jobs()
     assert cleared == 1
-    
+
     # Verify active job is untouched
     assert job_active.id in repo.load_jobs()
-    
+
     # Verify terminal job was moved to recycle bin
     assert job_terminal.id not in repo.load_jobs()
     assert job_terminal.id in repo.load_recycle_bin()

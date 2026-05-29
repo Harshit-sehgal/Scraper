@@ -1,8 +1,8 @@
 """
-Domain Behavior Intelligence — Evolutionary learning of site-specific patterns.
+Domain Behavior Intelligence — learning of site-specific patterns.
 
-LAW: Domains have unique physical signatures (hydration, scrolling, anti-bot).
-The system must learn these signatures to adapt its strategy autonomously.
+Domains have different behavioral signatures such as hydration, scrolling, and
+anti-bot signals. The system records these signals to adjust strategy choices.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class DomainIntelligence:
     """Aggregated behavioral metrics for a single domain."""
-    
+
     def __init__(self, domain: str, data: Optional[dict] = None):
         self.domain = domain
         self.hydration_delay_ms = data.get("hydration_delay_ms", 0.0) if data else 0.0
@@ -93,21 +93,21 @@ class DomainIntelligenceRegistry:
 
         intel = self.get_intelligence(url)
         alpha = settings.DOMAIN_INTELLIGENCE_SMOOTHING_ALPHA
-        
+
         # 1. Update basic counts
         intel.total_fetches += 1
         if not telemetry.get("error"):
             intel.success_count += 1
-            
+
         # 2. Hydration Delay (Moving Average)
         delay = telemetry.get("js_render_delay_ms", 0.0)
         if delay > 0:
             intel.hydration_delay_ms = (intel.hydration_delay_ms * (1 - alpha)) + (delay * alpha)
-            
+
         # 3. Anti-Bot Risk (Moving Average)
         risk = telemetry.get("anti_bot_score", 0.0)
         intel.anti_bot_risk = (intel.anti_bot_risk * (1 - alpha)) + (risk * alpha)
-        
+
         # 4. Strategy Analysis
         strategy = telemetry.get("fallback_usage", "none")
         if not telemetry.get("error") and strategy != "none":
@@ -115,7 +115,7 @@ class DomainIntelligenceRegistry:
             # For now, we just track the most recent successful non-discovery strategy
             if strategy in ["profile", "memory", "regex", "httpx"]:
                 intel.preferred_strategy = strategy
-        
+
         # 5. Selector Decay Rate
         if telemetry.get("fallback_triggered"):
              decay_signal = 1.0
@@ -126,10 +126,10 @@ class DomainIntelligenceRegistry:
         # 6. Infinite Scroll (Observation)
         # If we got 0 records without scroll but >0 with scroll, or similar indicators.
         # For now, we rely on the telemetry's records_extracted vs records_final or similar signals.
-        # Let's assume for now that if records_extracted > 0 and fallback_usage was none/memory, 
-        # and we did scroll attempts, we tag it. 
+        # Let's assume for now that if records_extracted > 0 and fallback_usage was none/memory,
+        # and we did scroll attempts, we tag it.
         # (Actually, let's keep it simple: if it's a known feed domain, we'll mark it manually or via discovery result)
-        
+
         intel.last_updated = time.time()
         self._save()
 
@@ -138,8 +138,7 @@ class DomainIntelligenceRegistry:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
-        except Exception as e:
-            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+        except Exception:
             return "unknown"
 
 

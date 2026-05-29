@@ -1,16 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
-# verify_all.sh — Local CI-equivalent verification
+# verify_all.sh — Local selected verification
 # =============================================================================
-# Run all checks that GitHub Actions would run: pyflakes, mypy, pytest,
-# frontend JS validation, shell syntax, and release readiness checks.
-#
-# Usage:
-#   ./scripts/verify_all.sh
-#
-# Exit codes:
-#   0 — All checks passed
-#   1 — One or more checks failed
+# Run selected checks used by GitHub Actions: pyflakes, mypy, pytest,
+# frontend JS validation, and git diff check.
 # =============================================================================
 set -euo pipefail
 
@@ -29,61 +22,51 @@ pass_check() { echo -e "  ${GREEN}PASS${NC} — $1"; PASS=$((PASS + 1)); }
 fail_check() { echo -e "  ${RED}FAIL${NC} — $1"; FAIL=$((FAIL + 1)); }
 
 echo "============================================"
-echo " verify_all.sh — Local CI-equivalent checks"
+echo " verify_all.sh — Local selected checks"
 echo "============================================"
 echo ""
 
-# ─── 1. Python Compilation ─────────────────────────────────────
-echo "[1/7] Python compilation"
-if python3 -m compileall -q "$BACKEND_DIR/app" "$BACKEND_DIR/tests" 2>&1; then
-    pass_check "compileall — 0 errors"
-else
-    fail_check "compileall — syntax errors"
-fi
-
-# ─── 2. pyflakes ───────────────────────────────────────────────
-echo "[2/7] pyflakes"
+# ─── pyflakes ──────────────────────────────────────────────────
+echo "[1/6] pyflakes"
 if python3 -m pyflakes "$BACKEND_DIR/app" "$BACKEND_DIR/tests" 2>&1; then
     pass_check "pyflakes — 0 issues"
 else
     fail_check "pyflakes — issues found"
 fi
 
-# ─── 3. Architecture Validator ─────────────────────────────────
-echo "[3/7] Architecture validator"
-if cd "$PROJECT_DIR" && PYTHONPATH=backend python3 architecture_validator.py 2>&1; then
-    pass_check "architecture validator — passed"
+# ─── mypy ──────────────────────────────────────────────────────
+echo "[2/6] mypy"
+if python3 -m mypy "$BACKEND_DIR/app" --ignore-missing-imports 2>&1 | tail -1 | grep -q "Success"; then
+    pass_check "mypy — 0 errors"
 else
-    fail_check "architecture validator — failed"
+    fail_check "mypy — errors found"
+    python3 -m mypy "$BACKEND_DIR/app" --ignore-missing-imports 2>&1 | grep "error:" | head -5
 fi
-cd "$SCRIPT_DIR" 2>/dev/null || true
 
-# ─── 4. pytest (targeted) ──────────────────────────────────────
-echo "[4/7] pytest (targeted — production hardening + security + metrics)"
+# ─── pytest ────────────────────────────────────────────────────
+echo "[3/6] pytest"
 PYTEST_TMP=$(mktemp)
 set +e
-PYTHONPATH="$BACKEND_DIR" python3 -m pytest \
-    "$BACKEND_DIR/tests/test_production_hardening.py" \
-    "$BACKEND_DIR/tests/test_url_safety.py" \
-    "$BACKEND_DIR/tests/test_metrics.py" \
+PYTHONPATH="$BACKEND_DIR" python3 -m pytest "$BACKEND_DIR/tests" \
     -q -o "addopts=" \
+    --ignore="$BACKEND_DIR/tests/test_profile_alignment_e2e.py" \
     > "$PYTEST_TMP" 2>&1
 PYTEST_EXIT=$?
 set -e
-tail -5 "$PYTEST_TMP"
+tail -3 "$PYTEST_TMP"
 if [ $PYTEST_EXIT -eq 0 ]; then
-    pass_check "pytest (targeted) — all passed"
+    pass_check "pytest"
 else
-    fail_check "pytest (targeted) — failures"
+    fail_check "pytest — failures"
     grep -E "FAILED|ERROR" "$PYTEST_TMP" | head -10
 fi
 rm -f "$PYTEST_TMP"
 
-# ─── 5. frontend JS ────────────────────────────────────────────
-echo "[5/7] frontend JS validation"
+# ─── frontend JS ───────────────────────────────────────────────
+echo "[4/6] frontend JS validation"
 JS_OK=true
 for jsfile in "$PROJECT_DIR/frontend/app.js" "$PROJECT_DIR/frontend/dashboard/dashboard.js"; do
-    if [ -f "$jsfile" ] && ! node -c "$jsfile" 2>/dev/null; then
+    if ! node -c "$jsfile" 2>/dev/null; then
         JS_OK=false
     fi
 done
@@ -93,11 +76,11 @@ else
     fail_check "frontend JS — invalid"
 fi
 
-# ─── 6. shell scripts ──────────────────────────────────────────
-echo "[6/7] shell scripts"
+# ─── shell scripts ─────────────────────────────────────────────
+echo "[5/6] shell scripts"
 SH_OK=true
 for shfile in "$PROJECT_DIR/scripts"/*.sh; do
-    if [ -f "$shfile" ] && ! bash -n "$shfile" 2>/dev/null; then
+    if ! bash -n "$shfile" 2>/dev/null; then
         SH_OK=false
     fi
 done
@@ -107,14 +90,13 @@ else
     fail_check "shell scripts — issues"
 fi
 
-# ─── 7. Production env check ───────────────────────────────────
-echo "[7/7] Production environment check"
-if cd "$PROJECT_DIR" && PYTHONPATH=backend python3 scripts/check_prod_env.py --env-file .env.production.example 2>&1; then
-    pass_check "production env — checks passed"
+# ─── git diff ──────────────────────────────────────────────────
+echo "[6/6] git diff --check"
+if git -C "$PROJECT_DIR" diff --check 2>/dev/null; then
+    pass_check "git diff — clean"
 else
-    fail_check "production env — checks failed (expected if using defaults)"
+    fail_check "git diff — whitespace issues"
 fi
-cd "$SCRIPT_DIR" 2>/dev/null || true
 
 # ─── Summary ───────────────────────────────────────────────────
 echo ""

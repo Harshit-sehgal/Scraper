@@ -1,22 +1,216 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main, fix/deep-scan-hardening]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('backend/requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+          pip install pyflakes autoflake
+      - name: Lint with pyflakes
+        run: python -m pyflakes backend/app backend/tests
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-typecheck-${{ hashFiles('backend/requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+          pip install mypy types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
+      - name: Type check with mypy
+        run: python -m mypy backend/app --ignore-missing-imports
+
+  arch-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-arch-${{ hashFiles('backend/requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+      - name: Run Architecture Validation
+        run: python architecture_validator.py
+
+  env-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+      - name: Validate production env checker
+        run: |
+          # Test that check_prod_env.py validates DATAFORGE_ENV=production
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, 'backend')
+          from scripts.check_prod_env import check_env
+
+          assert check_env('production') is True
+          assert check_env('development') is False
+          assert check_env('test') is False
+
+          print('env validation: OK')
+          PY
+
+      - name: Validate shell scripts
+        run: |
+          bash -n scripts/start.sh
+
+      - name: Check for committed runtime artifacts
+        run: |
+          git ls-files | grep -E '\.(db|sqlite|sqlite3)$|\.json\.lock$' && exit 1 || echo "No bad runtime artifacts tracked"
+
+      - name: Validate configuration files (YAML and JSON)
+        run: |
+          find . -name "*.yml" -o -name "*.yaml" | while read f; do
+            python -c "import yaml; yaml.safe_load(open('$f')); print('OK:', '$f')" || exit 1
+          done
+          find . -name "*.json" | while read f; do
+            python -m json.tool "$f" >/dev/null || exit 1
+          done
+
+      - name: Validate nginx config
+        run: |
+          # NOTE: nginx.conf now has 'resolver 127.0.0.11' + 'resolve' flag
+          # on the upstream server directive so nginx -t can pass without
+          # a real dataforge container to resolve.
+          docker run --rm -v "$PWD/nginx.conf:/etc/nginx/nginx.conf:ro" nginx:alpine nginx -t
+
+      - name: Validate prometheus config
+        run: |
+          # Match the production compose file layout exactly.
+          docker run --rm \
+            -v "$PWD/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+            -v "$PWD/prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro" \
+            --entrypoint promtool \
+            prom/prometheus:v2.53.0 \
+            check config /etc/prometheus/prometheus.yml
+
+      - name: Run SRE quick check
+        run: |
+          bash scripts/sre_quick_check.sh
+
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-test-${{ hashFiles('backend/requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
       - name: Install dependencies
         run: |
-          cd backend
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Run Pytest
+          pip install -r backend/requirements-dev.txt
+      - name: Install Playwright Chromium
         run: |
-          cd backend
-          pytest tests/ -k "not integration"
+          python -m playwright install --with-deps chromium
+      - name: Verify test collection
+        working-directory: backend
+        run: |
+          echo "=== Collect-only: verifying test discovery ==="
+          PYTHONPATH=. python -m pytest --collect-only -q -o "addopts=" -k "not postgres and not test_profile_alignment_e2e" 2>&1 || { echo "❌ Test collection FAILED"; exit 1; }
+
+      - name: Test with pytest
+        working-directory: backend
+        run: |
+          echo "=== Running pytest with coverage ==="
+          # Skip Postgres tests (need --run-postgres + Docker) and
+          # live-LLM E2E tests (need RUN_LIVE_LLM_TESTS=1 + Groq API key)
+          PYTHONPATH=. python -m pytest -v -o "addopts=" -k "not postgres and not test_profile_alignment_e2e" --cov=app --cov-fail-under=70 2>&1
+          echo "=== pytest completed ==="
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build production Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          target: production
+          push: false
+          load: true
+          tags: dataforge:ci-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Verify worker script exists in image
+        run: |
+          docker run -i --rm dataforge:ci-test python - <<'PY'
+          import os, sys
+          sys.path.insert(0, '/app/backend')
+          # Verify scripts/ exists in the image
+          scripts_dir = os.path.join('/app', 'scripts')
+          assert os.path.isdir(scripts_dir), f'scripts/ directory not found at {scripts_dir}'
+          worker_path = os.path.join(scripts_dir, 'run_worker.py')
+          assert os.path.isfile(worker_path), f'run_worker.py not found at {worker_path}'
+          print(f'Worker script confirmed: {worker_path}')
+          # Verify key app modules import correctly
+          from app.worker_queue import WorkerQueue, get_worker_queue, Priority
+          print('worker_queue: OK')
+          from app.storage_interface import JobRepository, get_job_repository
+          print('storage_interface: OK')
+          from app.config import settings
+          print(f'config: OK (env={settings.ENV})')
+          PY

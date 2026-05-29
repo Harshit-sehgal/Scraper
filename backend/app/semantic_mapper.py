@@ -93,7 +93,7 @@ _NUMERIC_PATTERN = re.compile(r"^\d+\.?\d*$")
 @lru_cache(maxsize=4096)
 def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType, float]:
     """Detect semantic type of a value using regex patterns and field name hints.
-    
+
     Results are cached with LRU (max 4096 entries) to avoid re-processing
     common values. This significantly improves performance for repetitive data.
     """
@@ -103,7 +103,7 @@ def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType
     # 1. Field-name hinting (higher priority for disambiguation)
     name_lower = (field_name or "").lower()
 
-    # 2. Pattern-based matching (universal physics) - using pre-compiled patterns
+    # 2. Pattern-based matching using pre-compiled patterns
     for stype, compiled_patterns in SEMANTIC_PATTERNS.items():
         for pattern, _ in compiled_patterns:
             if pattern.search(str(value)):
@@ -117,7 +117,7 @@ def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType
             return SemanticType.PRICE, 0.80
         if any(k in name_lower for k in ["date", "time", "start", "end", "schedule"]):
             return SemanticType.DATE, 0.80
-        
+
         # Generic number
         if _NUMERIC_PATTERN.match(str(value).strip()):
             return SemanticType.NUMBER, 0.60
@@ -126,13 +126,13 @@ def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType
     v_str = str(value).strip()
     v_lower = v_str.lower()
     _UI_NOISE = {
-        'view', 'more', 'skip', 'contact', 'home', 'menu', 'search', 
+        'view', 'more', 'skip', 'contact', 'home', 'menu', 'search',
         'filter', 'sort', 'send', 'get', 'touch', 'back', 'next',
         'previous', 'click', 'here', 'read', 'learn', 'all', 'rights',
         'reserved', 'copyright', 'powered', 'by', 'content', 'submit',
         'cancel', 'save', 'delete', 'edit', 'update', 'share'
     }
-    
+
     if v_lower in _UI_NOISE:
         return SemanticType.TEXT, 0.30
 
@@ -150,7 +150,7 @@ def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType
                 return SemanticType.ORGANIZATION, 0.55
             else:
                 return SemanticType.TEXT, 0.50
-        
+
     # Product-like (brand naming: starts lowercase, has internal uppercase, e.g. iPhone)
     if v_str and len(v_str) >= 3 and v_str[0].islower() and any(c.isupper() for c in v_str[1:]):
         return SemanticType.ORGANIZATION, 0.60
@@ -160,9 +160,9 @@ def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType
 
 def is_child_fragment(value: str, seen_values: set) -> bool:
     """Check if a value is a child fragment of an already-seen larger value.
-    
-    Prevents over-segmentation by suppressing tokens that are physically contained 
-    within larger, already processed tokens, especially for composite entities 
+
+    Prevents over-segmentation by suppressing tokens that are physically contained
+    within larger, already processed tokens, especially for composite entities
     like currencies and dates.
     """
     if not value or not seen_values:
@@ -176,16 +176,16 @@ def is_child_fragment(value: str, seen_values: set) -> bool:
             continue
         seen_str = str(seen)
         seen_lower = seen_str.lower().strip()
-        
+
         # Must be a strict substring
         if len(seen_lower) <= len(value_lower) or value_lower not in seen_lower:
             continue
-            
+
         # Strategy 1: Sub-numeric suppression (e.g., "238" inside "£238")
         if value_is_digit:
             # Suppress if it's a boundary fragment (prefix/suffix)
             is_boundary = seen_lower.startswith(value_lower) or seen_lower.endswith(value_lower)
-            
+
             # OR if it's bounded by common separators (middle fragment, e.g. "-05-" in date)
             if not is_boundary:
                 # Check for separators around the value in the parent string
@@ -203,7 +203,7 @@ def is_child_fragment(value: str, seen_values: set) -> bool:
                 # If parent has numbers followed by text (e.g., "45000 miles")
                 if re.search(r"\d+\s*[a-zA-Z]+", seen_str):
                     return True
-        
+
         # Strategy 2: Prefix/Suffix suppression for fragments
         if seen_lower.startswith(value_lower) or seen_lower.endswith(value_lower):
             # Only suppress if it's very short and part of a multi-word or compound value

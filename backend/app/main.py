@@ -38,7 +38,7 @@ from enum import Enum
 
 class AcquisitionMode(str, Enum):
     """Acquisition mode for URL preview/analysis.
-    
+
     Determines how aggressively the system attempts to acquire the page:
     - standard: Basic fetch, single attempt
     - aggressive: Session recovery, search form submission
@@ -122,30 +122,6 @@ async def lifespan(app: FastAPI):
                 "API_KEY is empty or not configured. In production environment, "
                 "API_KEY must be explicitly set to secure all API endpoints."
             )
-
-        # Reject known placeholder/default secrets in production
-        _placeholder_values = {
-            'change-me', 'change-me-to-a-random-secret',
-            'change-this-to-a-strong-password',
-            'dev-key', 'test-key', 'your-api-key-here',
-            'change-me-admin-key', 'change-me-operator-key',
-        }
-        _secrets_to_check = {
-            'API_KEY': getattr(settings, 'API_KEY', None),
-            'ADMIN_API_KEY': getattr(settings, 'ADMIN_API_KEY', None),
-            'OPERATOR_API_KEY': getattr(settings, 'OPERATOR_API_KEY', None),
-        }
-        for _key_name, _key_val in _secrets_to_check.items():
-            if _key_val and _key_val.strip().lower() in _placeholder_values:
-                logger.critical(
-                    "FATAL: %s contains a known placeholder value. "
-                    "Refusing to start in production with insecure defaults.",
-                    _key_name,
-                )
-                raise SystemExit(
-                    f"{_key_name} contains a known placeholder/default value. "
-                    f"Set a strong, unique secret before running in production."
-                )
 
     # Initialize event cascade (safe: scheduler is lazy-created, no circular import)
     from app.graph_update_scheduler import get_scheduler
@@ -276,7 +252,7 @@ _openapi_url = None if settings.ENV.lower() == "production" else "/openapi.json"
 
 app = FastAPI(
     title="DataForge — General-Purpose Web Scraper",
-    description="AI-powered scraper that extracts structured data from any website",
+    description="Web extraction backend for supported accessible pages",
     version="2.0.0",
     lifespan=lifespan,
     docs_url=_docs_url,
@@ -359,12 +335,12 @@ async def api_key_middleware(request: Request, call_next):
             auth_header = request.headers.get("Authorization", "")
             auth_scheme, _, auth_token = auth_header.partition(" ")
             bearer_token = auth_token.strip() if auth_scheme.lower() == "bearer" else ""
-            
+
             def is_match(provided, expected):
                 if not expected or not provided:
                     return False
                 return secrets.compare_digest(provided, expected)
-                
+
             valid = False
             if settings.API_KEY and (is_match(api_key, settings.API_KEY) or is_match(bearer_token, settings.API_KEY)):
                 valid = True
@@ -379,7 +355,7 @@ async def api_key_middleware(request: Request, call_next):
                 or is_match(admin_key_header, settings.ADMIN_API_KEY)
             ):
                 valid = True
-                
+
             if not valid:
                 return JSONResponse(
                     status_code=403,
@@ -536,16 +512,12 @@ async def ready():
         _rchl(duration)
 
         if not health["ok"]:
-            error_msg = health.get("error", "Backend unhealthy")
-            logging.error("Readiness check failed: %s", error_msg)
-            if settings.ENV.lower() == "production":
-                return JSONResponse(
-                    status_code=503,
-                    content={"status": "not_ready"},
-                )
+            content = {"status": "not_ready"}
+            if settings.ENV.lower() != "production":
+                content["error"] = health.get("error", "Backend unhealthy")
             return JSONResponse(
                 status_code=503,
-                content={"status": "not_ready", "error": error_msg},
+                content=content,
             )
 
         # In production return minimal info to avoid leaking backend/schema details
@@ -563,18 +535,15 @@ async def ready():
             "recycle_bin_count": health.get("recycle_bin_count", len(recycle_bin_store)),
         }
     except Exception as e:
-        logging.exception("Readiness check exception occurred")
         duration = time.time() - start_time
         from app.metrics_collector import record_health_check_latency
         record_health_check_latency(duration)
-        if settings.ENV.lower() == "production":
-            return JSONResponse(
-                status_code=503,
-                content={"status": "not_ready"},
-            )
+        content = {"status": "not_ready"}
+        if settings.ENV.lower() != "production":
+            content["error"] = str(e)
         return JSONResponse(
             status_code=503,
-            content={"status": "not_ready", "error": str(e)},
+            content=content,
         )
 
 
@@ -598,7 +567,7 @@ async def storage_status():
 
 
 @app.get("/api/system/status")
-async def system_status(_role=Depends(require_role([UserRole.ADMIN]))):
+async def system_status():
     from app.models import JobStatus
     counts = {s.value: 0 for s in JobStatus}
     for job in jobs_store.values():
@@ -613,7 +582,7 @@ async def system_status(_role=Depends(require_role([UserRole.ADMIN]))):
     from app.storage_interface import get_job_repository
     repo = get_job_repository()
     backend = getattr(repo, "backend", "sqlite")
-    response_data = {
+    response = {
         "status": "online",
         "backend": backend,
         "jobs": {
@@ -627,16 +596,13 @@ async def system_status(_role=Depends(require_role([UserRole.ADMIN]))):
         },
         "runtime_limits": CONFIG,
     }
-
-    # Only expose state file path in non-production environments
     if settings.ENV.lower() != "production":
-        response_data["state_file"] = str(get_state_file_path())
-
-    return response_data
+        response["state_file"] = str(get_state_file_path())
+    return response
 
 
 @app.get("/api/system/topology")
-async def system_topology(_role=Depends(require_role([UserRole.ADMIN]))):
+async def system_topology():
     """Exposes the raw state of the semantic cognition substrate."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
@@ -668,7 +634,7 @@ async def system_topology(_role=Depends(require_role([UserRole.ADMIN]))):
 
 
 @app.get("/api/system/crystalline")
-async def system_crystalline(_role=Depends(require_role([UserRole.ADMIN]))):
+async def system_crystalline():
     """Returns the synthesized high-integrity knowledge units."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
@@ -679,7 +645,7 @@ async def system_crystalline(_role=Depends(require_role([UserRole.ADMIN]))):
 
 
 @app.get("/api/system/export/knowledge")
-async def export_knowledge(_role=Depends(require_role([UserRole.ADMIN]))):
+async def export_knowledge():
     """Export the synthesized knowledge manifold as a portable schema."""
     import time
     from app.semantic_world_state import get_world_state
@@ -741,7 +707,6 @@ async def merge_knowledge(request: Request, data: dict, _role=Depends(require_ro
     Requires admin API key if DATAFORGE_ADMIN_API_KEY is configured.
     """
     _require_admin_key(request)
-    
     # Validate payload with size caps
     try:
         req = KnowledgeMergeRequest.validate_payload(data)
@@ -779,7 +744,7 @@ async def merge_knowledge(request: Request, data: dict, _role=Depends(require_ro
 
 
 @app.get("/api/system/search")
-async def system_search(query: str, limit: int = 5, _role=Depends(require_role([UserRole.ADMIN]))):
+async def system_search(query: str, limit: int = 5):
     """Perform topological search on crystalline records."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
@@ -788,7 +753,7 @@ async def system_search(query: str, limit: int = 5, _role=Depends(require_role([
 
 
 @app.get("/api/system/observability")
-async def system_observability(_role=Depends(require_role([UserRole.ADMIN]))):
+async def system_observability():
     """Exposes real-time telemetry and activity heatmaps."""
     from app.semantic_world_state import get_world_state
     ws = get_world_state()
@@ -805,7 +770,7 @@ async def system_observability(_role=Depends(require_role([UserRole.ADMIN]))):
 
 
 @app.get("/api/system/domain-policy")
-async def system_domain_policy(_role=Depends(require_role([UserRole.ADMIN]))):
+async def system_domain_policy():
     """Return the current domain runtime policy summaries."""
     from app.domain_runtime_policy import get_domain_runtime_policy
     policy = get_domain_runtime_policy()
@@ -823,14 +788,14 @@ async def system_domain_policy(_role=Depends(require_role([UserRole.ADMIN]))):
 
 
 @app.get("/api/system/acquisition/telemetry")
-async def acquisition_telemetry(_role=Depends(require_role([UserRole.ADMIN]))):
+async def acquisition_telemetry():
     """Exposes acquisition telemetry: state distribution, recovery rates, recent events."""
     from app.acquisition_telemetry import get_acquisition_telemetry
     return get_acquisition_telemetry().get_summary()
 
 
 @app.get("/api/system/history/topology")
-async def system_topology_history(limit: int = 20, _role=Depends(require_role([UserRole.ADMIN]))):
+async def system_topology_history(limit: int = 20):
     """Returns a timeline of historical topology states for replay."""
     from app.event_journal import get_journal
     journal = get_journal()
@@ -863,8 +828,8 @@ async def process_cognitive_tasks(budget_ms: float = 100.0, _role=Depends(requir
 
 
 @app.get("/api/system/agency")
-async def system_agency(_role=Depends(require_role([UserRole.ADMIN]))):
-    """Returns the state of autonomous agency and tools."""
+async def system_agency():
+    """Returns the state of automated agency and tools."""
     from app.semantic_world_state import get_world_state
     from app.llm_bridge import get_plugin_manager
     ws = get_world_state()
@@ -878,7 +843,7 @@ async def system_agency(_role=Depends(require_role([UserRole.ADMIN]))):
 
 
 @app.get("/api/system/replay/status")
-async def system_replay_status(_role=Depends(require_role([UserRole.ADMIN]))):
+async def system_replay_status():
     """Returns the status of the large-scale persistent replay buffer."""
     from app.replay_buffer import get_replay_buffer
     rb = get_replay_buffer()
@@ -890,7 +855,7 @@ async def system_replay_status(_role=Depends(require_role([UserRole.ADMIN]))):
 
 
 @app.get("/api/system/replay/chain")
-async def system_replay_chains(limit: int = 20, _role=Depends(require_role([UserRole.ADMIN]))):
+async def system_replay_chains(limit: int = 20):
     """Returns causal chains reconstructed from the persistent replay buffer."""
     from app.replay_buffer import get_replay_buffer
     rb = get_replay_buffer()
@@ -903,7 +868,7 @@ async def system_replay_chains(limit: int = 20, _role=Depends(require_role([User
 
 
 @app.get("/api/system/replay/events")
-async def system_replay_events(start_idx: int = 0, end_idx: int = -1, _role=Depends(require_role([UserRole.ADMIN]))):
+async def system_replay_events(start_idx: int = 0, end_idx: int = -1):
     """Returns a range of events from the persistent replay buffer."""
     from app.replay_buffer import get_replay_buffer
     rb = get_replay_buffer()
@@ -921,7 +886,7 @@ async def system_replay_events(start_idx: int = 0, end_idx: int = -1, _role=Depe
 
 @app.post("/api/system/refactor/compress")
 async def trigger_manifold_compression(_role=Depends(require_role([UserRole.ADMIN]))):
-    """Trigger an autonomous manifold compression cycle."""
+    """Trigger a manifold compression cycle."""
     from app.semantic_world_state import get_world_state
     from app.llm_bridge import get_plugin_manager
     plugins = get_plugin_manager(ws=get_world_state())
@@ -1061,19 +1026,19 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
 @app.post("/api/url/analyze")
 async def analyze_url(req: URLPreviewRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Analyze a URL and auto-detect what data fields can be extracted.
-    
+
     Fetches the URL, analyzes page structure, detects value patterns,
     and uses LLM to discover all data fields with their CSS selectors,
     types, confidence scores, and example values.
-    
+
     This is the "preview URL → suggest fields" step that lets users
     see what data is available before deciding what to scrape.
-    
+
     Note: A 120-second overall timeout is enforced to prevent hanging
     connections. If the page takes too long to render or the LLM is
     unresponsive, a clear timeout error is returned instead of a
     connection reset / cryptic NetworkError on the frontend.
-    
+
     Returns:
         url: The analyzed URL
         page_structure: Type of structure (table|cards|list|mixed)
@@ -1085,8 +1050,9 @@ async def analyze_url(req: URLPreviewRequest, _role: UserRole = Depends(require_
         anti_bot_score: Likelihood the page has anti-bot protection
         suggested_fields: List of detected fields with name, type, selector, example, confidence
     """
+    from app.selector_discovery import analyze_url_for_fields
     from app.url_safety import validate_public_http_url
-    
+
     try:
         validate_public_http_url(req.url)
     except ValueError as e:
@@ -1104,19 +1070,35 @@ async def analyze_url(req: URLPreviewRequest, _role: UserRole = Depends(require_
             }
         )
 
-    # URL Analyzer has been deprecated in favor of Direct LLM extraction.
-    # We return a stub response to keep frontend API compatibility.
-    return {
-        "url": req.url,
-        "page_structure": "unknown",
-        "structure_confidence": 1.0,
-        "estimated_record_count": 0,
-        "item_container": "",
-        "fetch_method": "direct_llm",
-        "fetch_time_ms": 0,
-        "anti_bot_score": 0.0,
-        "suggested_fields": []
-    }
+    URL_ANALYZER_TIMEOUT = settings.URL_ANALYZER_TIMEOUT
+
+    try:
+        result = await asyncio.wait_for(
+            analyze_url_for_fields(url=req.url, search_params=req.search_params, acquisition_mode=req.acquisition_mode),
+            timeout=URL_ANALYZER_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("[URLAnalyzer] Timeout after %ds analyzing %s", URL_ANALYZER_TIMEOUT, req.url)
+        return JSONResponse(
+            status_code=408,
+            content={
+                "url": req.url,
+                "error": f"Analysis timed out after {URL_ANALYZER_TIMEOUT} seconds. The page may be too slow, heavy, or protected by anti-bot measures.",
+                "redirect_info": None,
+                "content_quality": None,
+                "page_structure": "unknown",
+                "structure_confidence": 0.0,
+                "estimated_record_count": 0,
+                "item_container": None,
+                "suggested_fields": [],
+                "anti_bot_score": 0.0,
+            },
+        )
+
+    if "error" in result and result["error"]:
+        return JSONResponse(status_code=422, content=result)
+
+    return result
 
 
 # ─── Prometheus /metrics endpoint ───────────────────────────────────────

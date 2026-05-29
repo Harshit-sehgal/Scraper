@@ -188,7 +188,46 @@ async def test_extra_headers_and_timeout_passed_to_httpx(monkeypatch):
     assert captured["timeout_ms"] == 1234
 
 
+@pytest.mark.asyncio
+async def test_force_container_discovery_skips_llm_and_memory(monkeypatch):
+    from app import extraction_orchestrator as orchestrator
 
+    called = {"discover": 0, "memory": 0, "container": 0}
+
+    class FakeMemory:
+        def get_selectors(self, url):
+            called["memory"] += 1
+            return {"item_container": ".cached", "fields": {"company_name": ".name"}}
+
+    class FakeContainerResult:
+        all_passed = True
+        final_records = [{"company_name": "Container Studio", "record_score": 0.95}]
+        total_records = 1
+        best_selector = ".card"
+
+    async def fake_discover(*args, **kwargs):
+        called["discover"] += 1
+        return {"item_container": ".llm", "fields": {"company_name": ".name"}}
+
+    async def fake_container(*args, **kwargs):
+        called["container"] += 1
+        return FakeContainerResult()
+
+    monkeypatch.setattr(orchestrator, "get_selector_memory", lambda: FakeMemory())
+    monkeypatch.setattr(orchestrator, "discover_selectors", fake_discover)
+    monkeypatch.setattr(orchestrator, "extract_from_network", lambda *args, **kwargs: [])
+    monkeypatch.setattr(orchestrator, "multi_pass_container_extraction", fake_container)
+
+    result = await orchestrator.orchestrate_extraction(
+        "https://example.com/list",
+        "<html><body><div class='card'>Container Studio</div></body></html>",
+        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        min_record_score=0.35,
+        provided_selectors={"force_container_discovery": True},
+    )
+
+    assert result.method == "container_discovery"
+    assert called == {"discover": 0, "memory": 0, "container": 1}
 
 
 def test_selectors_map_rejects_malformed_shapes():
@@ -213,27 +252,27 @@ def test_schema_rejects_runtime_metadata_field_names():
 async def test_crawl_policy_active_counter_never_leaks_on_fetch_failure(monkeypatch):
     from app import scraper
     from app.crawl_policy import get_crawl_policy
-    
+
     # Get active crawl policy and reset it
     policy = get_crawl_policy()
     policy.reset_domain("https://example.com/fail-fetch")
     monkeypatch.setattr(policy, "_respect_robots", False)
-    
+
     # Assert initial state
     assert policy._domains["example.com"].active_fetches == 0
-    
+
     # Simulate fetch throwing an exception
     async def fake_fetch(*args, **kwargs):
         raise RuntimeError("simulated fetch crash")
-        
+
     monkeypatch.setattr(scraper, "fetch_page_content", fake_fetch)
-    
+
     # Call scrape_url (should handle error and return [])
     results = await scraper.scrape_url(
         "https://example.com/fail-fetch",
         [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
     )
-    
+
     assert results == []
     # Assert counter decremented back to 0!
     assert policy._domains["example.com"].active_fetches == 0
@@ -243,12 +282,12 @@ async def test_crawl_policy_active_counter_never_leaks_on_fetch_failure(monkeypa
 async def test_scrape_attempt_result_exposes_html_and_telemetry(monkeypatch):
     from app import scraper
     from app.crawl_policy import get_crawl_policy
-    
+
     # Reset domain crawl pacing to prevent blocks
     policy = get_crawl_policy()
     policy.reset_domain("https://unique-subclass.example.com/")
     monkeypatch.setattr(policy, "_respect_robots", False)
-    
+
     async def fake_fetch(*args, **kwargs):
         return "<html><body><h1>Example</h1></body></html>", 0.0, "playwright_full", 0
 
@@ -256,15 +295,15 @@ async def test_scrape_attempt_result_exposes_html_and_telemetry(monkeypatch):
         from app.extraction_orchestrator import ExtractionResult
 
         return ExtractionResult([], "regex")
-        
+
     monkeypatch.setattr(scraper, "fetch_page_content", fake_fetch)
     monkeypatch.setattr(scraper, "orchestrate_extraction", fake_orchestrate)
-    
+
     results = await scraper.scrape_url(
         "https://unique-subclass.example.com/test-result-subclass",
         [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
     )
-    
+
     # Assert result is indeed a list subclass with extra metadata
     assert isinstance(results, list)
     assert hasattr(results, "html")

@@ -192,14 +192,14 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
 def _extract_contacts_from_node(node) -> tuple[str | None, str | None]:
     """Search a BeautifulSoup node for email and phone numbers, including href attributes."""
     text = node.get_text(separator=" ", strip=True)
-    
+
     # Check hrefs in this node and its descendants
     hrefs = []
     if node.name == "a":
         hrefs.append(node.get("href") or "")
     for a in node.find_all("a"):
         hrefs.append(a.get("href") or "")
-        
+
     for href in hrefs:
         if href.lower().startswith("mailto:"):
             parts = href.split("mailto:", 1)
@@ -283,7 +283,7 @@ def _boost_contacts_with_page_html(
 
 
 async def fetch_page_content(
-    url: str, 
+    url: str,
     preferred_method: FetchStrategy | str = FetchStrategy.PLAYWRIGHT_FULL,
     timeout_ms: int | None = None,
     hydration_wait_ms: int | None = None,
@@ -308,7 +308,7 @@ async def fetch_page_content(
         tuple of (html_content, js_render_delay_ms, method_used, retry_count)
     """
     domain = urlparse(url).netloc.lower() or "default"
-    
+
     # Normalize method to Enum
     if isinstance(preferred_method, str):
         try:
@@ -322,7 +322,7 @@ async def fetch_page_content(
         strategy = FetchStrategy.PLAYWRIGHT_STEALTH
 
     # ── Phase 80: Granular Strategy Execution ──
-    
+
     # 1. HTTPX-based strategies
     if strategy in [FetchStrategy.HTTPX_BASIC, FetchStrategy.HTTPX_WITH_UA, FetchStrategy.HTTPX_SMART, FetchStrategy.HYBRID]:
         try:
@@ -348,7 +348,7 @@ async def fetch_page_content(
     network_payloads = []  # Pre-initialize for safety
     js_render_delay_ms = 0.0
     method_used = strategy.value
-    
+
     try:
         pool = get_browser_pool()
         # Pass strategy to get_context for specialized setup
@@ -370,7 +370,7 @@ async def fetch_page_content(
             abort_types = {"image", "media", "font"}
             if strategy == FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
                 abort_types.update({"stylesheet", "other"})
-                
+
             if route.request.resource_type in abort_types:
                 await route.abort()
             else:
@@ -417,8 +417,7 @@ async def fetch_page_content(
                 for sel in loading_selectors:
                     try:
                         await page.wait_for_selector(sel, state="hidden", timeout=2000)
-                    except Exception as e:
-                        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+                    except Exception:
                         pass
 
             # Adaptive post-network buffer: check DOM stabilization
@@ -462,8 +461,8 @@ async def fetch_page_content(
                      }}""",
                     timeout=settle_timeout * 1000,
                 )
-            except Exception as stabilization_err:
-                logger.debug("Stabilization check evaluate failed: %s", stabilization_err)
+            except Exception:
+                pass
             js_render_delay_ms = (time.time() - stabilization_start) * 1000
             telemetry.record_stabilization(domain, js_render_delay_ms)
 
@@ -498,14 +497,14 @@ async def fetch_page_content(
                     raise ValueError(f"Anti-bot challenge detected during {wait_until}: {e}")
             except ValueError:
                 raise  # Re-raise anti-bot detection so scraper records the proper failure reason
-            except Exception as partial_content_err:
-                logger.debug("Failed to extract partial HTML content for anti-bot validation: %s", partial_content_err)
+            except Exception:
+                pass
 
             logger.warning(
                 "[Scraper] %s slow load for %s: %s. Falling to domcontentloaded",
                 strategy.value, url, e,
             )
-            await page.wait_for_load_state("domcontentloaded", timeout=5000)
+            await page.wait_for_load_state("domcontentloaded")
             # Reduced fallback wait: 2s instead of 5s — JS has already had time to start
             await asyncio.sleep(min(settings.PAGE_FALLBACK_EXTRA_WAIT, 2.0))
 
@@ -543,9 +542,9 @@ async def fetch_page_content(
         if page:
             try:
                 html_content = await page.content()
-            except Exception as content_err:
-                logger.debug("Failed to extract HTML content from failed page context: %s", content_err)
-        
+            except Exception:
+                pass
+
         err_msg = str(e).lower()
         is_antibot = False
         from app.scrape_telemetry import detect_anti_bot
@@ -553,7 +552,7 @@ async def fetch_page_content(
             is_antibot = True
         elif any(marker in err_msg for marker in ["captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"]):
             is_antibot = True
-            
+
         if is_antibot:
             logger.error("[Scraper] Anti-bot challenge detected during %s for %s. Refusing naive HTTP fallback to prevent IP ban.", strategy.value, url)
             raise ValueError(f"Anti-bot challenge detected: {e}")
@@ -569,8 +568,8 @@ async def fetch_page_content(
         if page:
             try:
                 await page.close()
-            except Exception as close_err:
-                logger.debug("Failed to close page cleanly: %s", close_err)
+            except Exception:
+                pass
 
 
 
@@ -582,12 +581,12 @@ async def _fetch_with_httpx(
 ) -> tuple[str, float, str, int]:
     """Internal helper for httpx fetching with retries."""
     method_used = strategy.value
-    
+
     # Use anti-bot stealth headers for smart/stealth strategies
     from app.anti_bot_engine import get_anti_bot_engine
     domain = urlparse(url).netloc.lower() or "default"
     anti_bot = get_anti_bot_engine()
-    
+
     if strategy in [FetchStrategy.HTTPX_SMART, FetchStrategy.HTTPX_WITH_UA]:
         stealth = anti_bot.get_stealth_profile(domain)
         headers = dict(stealth.get("extra_headers", {}))
@@ -597,7 +596,7 @@ async def _fetch_with_httpx(
         if strategy == FetchStrategy.HTTPX_BASIC:
             # Minimal headers for basic fetch
             headers = {"User-Agent": settings.HTTPX_BASIC_USER_AGENT}
-        
+
     if extra_headers:
         headers.update(extra_headers)
     cookie_string = anti_bot.get_cookies(domain)
@@ -615,48 +614,48 @@ async def _fetch_with_httpx(
             try:
                 # Validate the initial URL before fetching
                 _validate_url_safe(url)
-                
+
                 # Phase 80: Smart mode simulates basic session
                 if strategy == FetchStrategy.HTTPX_SMART:
                     initial_host = urlparse(url).scheme + "://" + urlparse(url).netloc
                     _validate_url_safe(initial_host)
                     await client.get(initial_host)
-                
+
                 current_url = url
                 max_redirects = 10
                 redirects_followed = 0
-                
+
                 while True:
                     resp = await client.get(current_url)
                     if resp.is_redirect:
                         redirects_followed += 1
                         if redirects_followed > max_redirects:
                             raise ValueError(f"Too many redirects (max {max_redirects})")
-                        
+
                         redirect_target = resp.headers.get("location", "")
                         if not redirect_target:
                             break
-                        
+
                         from urllib.parse import urljoin
                         redirect_url = urljoin(str(resp.url), redirect_target)
-                        
+
                         # Validate the target redirect URL before fetching it!
                         _validate_url_safe(redirect_url)
                         current_url = redirect_url
                     else:
                         break
-                
+
                 resp.raise_for_status()
 
                 # SSRF: validate the final resolved URL is not private/internal
                 final_url = str(resp.url)
                 _validate_url_safe(final_url)
-                
+
                 # Persist cookies from response for future requests
                 set_cookie = resp.headers.get("set-cookie", "")
                 if set_cookie:
                     anti_bot.update_cookies(domain, set_cookie)
-                
+
                 return resp.text, 0.0, method_used, retry_count
             except (httpx.HTTPError, httpx.TimeoutException) as e:
                 if attempt < settings.MAX_RETRIES - 1:
@@ -678,7 +677,7 @@ def clean_html_for_selectors(html: str, max_chars: int | None = None) -> str:
     """Remove known-noise tags while preserving structure useful for selector discovery."""
     if max_chars is None:
         max_chars = settings.SELECTOR_SNIPPET_MAX_CHARS
-        
+
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup(["script", "style", "noscript", "svg", "iframe", "form"]):
         tag.decompose()
@@ -752,7 +751,7 @@ def _sanitize_field_value(field: SchemaField, value, base_url: str = ""):
             from urllib.parse import urljoin
             text = urljoin(base_url, text)
         return text if text.startswith("http") else None
-    
+
     if _is_noise_name_value(text) and _is_entity_name_field(field.name):
         return None
 

@@ -53,7 +53,7 @@ PYTHONPATH=backend $PYTHON_EXE -c "from app.main import app; print('FastAPI impo
 
 echo "=== 3. Validating Startup Script Syntax ==="
 STEP=3
-bash -n scripts/start.sh 2>&1
+bash -n scripts/start.sh scripts/start_server.sh scripts/start_worker.sh 2>&1
 
 echo "=== 4. Checking Unsafe eval() in Source ==="
 STEP=4
@@ -73,9 +73,7 @@ $PYTHON_EXE architecture_validator.py 2>&1
 echo "=== 6. Running Production Hardening Tests ==="
 STEP=6
 cd backend 2>&1
-# Allow this to fail without aborting the entire check — the full pytest
-# step (7) runs all tests again and reports the final status.
-PYTHONPATH=. $PYTHON_EXE -m pytest tests/test_production_hardening.py -q -o "addopts=" 2>&1 || echo "[WARN] production hardening tests had failures — check pytest step for details"
+PYTHONPATH=. $PYTHON_EXE -m pytest tests/test_production_hardening.py -q -o "addopts=" 2>&1
 
 if [ "${GITHUB_ACTIONS:-false}" = "true" ]; then
     echo "=== Skipping Step 7 in CI (redundant, handled by the 'test' job) ==="
@@ -83,11 +81,7 @@ else
     echo "=== 7. Running Full pytest Suite ==="
     STEP=7
     # Skip Postgres/live-LLM tests (require Docker/RUN_LIVE_LLM_TESTS=1)
-    PYTHONPATH=. $PYTHON_EXE -m pytest -q -o "addopts=" \
-        --ignore=tests/test_profile_alignment_e2e.py \
-        --ignore=tests/test_job_api_e2e.py \
-        --ignore=tests/test_session_bound_e2e.py \
-        --ignore=tests/test_playwright_browser_e2e.py 2>&1
+    PYTHONPATH=. $PYTHON_EXE -m pytest -q -o "addopts=" -k "not postgres and not test_profile_alignment_e2e" 2>&1
 fi
 
-echo "=== SRE Quick Check Complete — ALL CHECKS PASSED ==="
+echo "=== SRE Quick Check Complete — selected checks passed ==="

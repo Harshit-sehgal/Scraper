@@ -618,7 +618,7 @@ def _get_depth(element: Tag) -> int:
 
 
 def _compute_container_score(container: CandidateContainer) -> float:
-    """Compute a universal container quality score.
+    """Compute a general container quality score.
 
     A good result container has:
     - Rich text (descriptive + values)

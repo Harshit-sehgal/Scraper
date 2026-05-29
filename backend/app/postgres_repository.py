@@ -15,7 +15,7 @@ Usage:
 import datetime
 import json
 import logging
-
+import os
 import threading
 from contextlib import contextmanager
 from typing import Iterator, Optional
@@ -40,21 +40,25 @@ _pool_lock = threading.Lock()
 
 
 def _get_database_url() -> str:
-    """Resolve the Postgres DSN from settings or environment.
+    """Resolve the Postgres DSN from environment or settings.
 
-    In non-development environments, the DSN MUST be explicitly configured.
-    The fallback default only applies in development.
+    In non-development environments, the DSN MUST be explicitly set via
+    DATAFORGE_DATABASE_URL. The fallback default only applies in development.
     """
-    from app.config import settings
-    url = getattr(settings, "DATABASE_URL", "") or ""
+    url = os.getenv("DATAFORGE_DATABASE_URL", "").strip()
     if url:
         return url
-    # Check environment override for backwards compatibility
-    url = settings.DATABASE_URL
+    try:
+        from app.config import settings
+        url = getattr(settings, "DATABASE_URL", "")
+    except (ImportError, AttributeError):
+        # Settings might not be initialized yet or DATABASE_URL attribute is absent; fallback to env/development defaults
+        pass
     if url:
         return url
     # Only allow fallback default in development mode
-    if settings.ENV.lower() in ("", "development", "dev"):
+    env = os.getenv("DATAFORGE_ENV", "development").strip().lower()
+    if env == "development":
         return "postgresql://dataforge:dataforge@localhost:5432/dataforge"
     raise RuntimeError(
         "DATAFORGE_DATABASE_URL is required in non-development environments. "
@@ -103,8 +107,7 @@ def _conn() -> Iterator[psycopg2.extensions.connection]:
         try:
             from app.metrics_collector import record_error
             record_error("database")
-        except Exception as e:
-            logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+        except Exception:
             pass
         raise
     finally:
@@ -233,6 +236,7 @@ def _ensure_required_tables(conn):
             _execute(conn, "RELEASE SAVEPOINT alter_jobs_col")
         except Exception:
             _execute(conn, "ROLLBACK TO SAVEPOINT alter_jobs_col")
+            pass
 
     _execute(conn, _build_create_recycle_bin_sql())
 
@@ -243,6 +247,7 @@ def _ensure_required_tables(conn):
             _execute(conn, "RELEASE SAVEPOINT alter_recycle_col")
         except Exception:
             _execute(conn, "ROLLBACK TO SAVEPOINT alter_recycle_col")
+            pass
 
     for idx_sql in [
         "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
@@ -254,6 +259,7 @@ def _ensure_required_tables(conn):
             _execute(conn, "RELEASE SAVEPOINT create_index")
         except Exception:
             _execute(conn, "ROLLBACK TO SAVEPOINT create_index")
+            pass
 
 
 def _ensure_schema():

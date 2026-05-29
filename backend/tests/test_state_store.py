@@ -58,7 +58,6 @@ class TestGetStateFilePath:
     def test_default_path(self):
         """Without env override, returns the default data file path."""
         old = os.environ.pop("DATAFORGE_STATE_FILE", None)
-        old_path = os.environ.pop("DATAFORGE_STATE_FILE_PATH", None)
         try:
             path = get_state_file_path()
             assert isinstance(path, Path)
@@ -67,16 +66,12 @@ class TestGetStateFilePath:
         finally:
             if old is not None:
                 os.environ["DATAFORGE_STATE_FILE"] = old
-            if old_path is not None:
-                os.environ["DATAFORGE_STATE_FILE_PATH"] = old_path
 
     def test_configured_path(self):
         """With env override, returns the configured path."""
         old = os.environ.get("DATAFORGE_STATE_FILE")
-        old_path = os.environ.get("DATAFORGE_STATE_FILE_PATH")
         try:
             os.environ["DATAFORGE_STATE_FILE"] = "/tmp/test_state.json"
-            os.environ.pop("DATAFORGE_STATE_FILE_PATH", None)
             path = get_state_file_path()
             assert str(path) == "/tmp/test_state.json"
         finally:
@@ -84,10 +79,6 @@ class TestGetStateFilePath:
                 os.environ["DATAFORGE_STATE_FILE"] = old
             else:
                 os.environ.pop("DATAFORGE_STATE_FILE", None)
-            if old_path is not None:
-                os.environ["DATAFORGE_STATE_FILE_PATH"] = old_path
-            else:
-                os.environ.pop("DATAFORGE_STATE_FILE_PATH", None)
 
 
 # ─── load_state ─────────────────────────────────────────────────────────
@@ -98,9 +89,7 @@ class TestLoadState:
         """When the state file doesn't exist, returns empty stores."""
         # Use a path that doesn't exist
         old = os.environ.get("DATAFORGE_STATE_FILE")
-        old_path = os.environ.get("DATAFORGE_STATE_FILE_PATH")
         os.environ["DATAFORGE_STATE_FILE"] = "/tmp/nonexistent-state-file.json"
-        os.environ.pop("DATAFORGE_STATE_FILE_PATH", None)
         try:
             jobs, recycle, world_state = load_state()
             assert jobs == {}
@@ -111,10 +100,6 @@ class TestLoadState:
                 os.environ["DATAFORGE_STATE_FILE"] = old
             else:
                 os.environ.pop("DATAFORGE_STATE_FILE", None)
-            if old_path is not None:
-                os.environ["DATAFORGE_STATE_FILE_PATH"] = old_path
-            else:
-                os.environ.pop("DATAFORGE_STATE_FILE_PATH", None)
 
     def test_load_valid_jobs(self):
         """Loads valid jobs from a state file."""

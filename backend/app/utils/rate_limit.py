@@ -1,4 +1,3 @@
-import logging
 """Rate-limit awareness utilities for the scraper's worker queue.
 
 Provides helpers to detect rate-limit-related errors from HTTP responses
@@ -88,8 +87,7 @@ def parse_retry_after(headers: Optional[dict] = None) -> Optional[float]:
         retry_dt = parsedate_to_datetime(raw)
         delta = (retry_dt - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
         return max(0.0, delta)
-    except Exception as e:
-        logging.getLogger(__name__).warning("Suppressed exception: %s", e)
+    except Exception:
         pass
 
     return None
