@@ -728,9 +728,9 @@ Expected output:
 
     return f"""You are a data schema designer. Name each data field found on this webpage.
 
-I extracted these values from ONE data row on this {
-        structure_type.upper()} page (confidence: {
-        structure_confidence:.0%}):
+I extracted these values from ONE data row on this {{
+        structure_type.upper()}} page (confidence: {{
+        structure_confidence:.0%}}):
 
 {value_block}
 
@@ -740,20 +740,8 @@ For EACH value, assign a descriptive snake_case field name.
 Determine its data type from: string, number, currency, email, phone, url, date, time, rating, boolean, percentage, location, code.  # noqa: E501
 
 CRITICAL: NEVER use type names as field names.
-  ✖ BAD: {
-            "name": "string"}  or {
-                "name": "code"}  or {
-                    "name": "time"}  or {
-                        "name": "text"}  or {
-                            "name": "number"}  or {
-                                "name": "date"}  or {
-                                    "name": "currency"}
-  ✔ GOOD: {
-                                        "name": "airline_name"}  or {
-                                            "name": "flight_number"}  or {
-                                                "name": "departure_airport"}  or {
-                                                    "name": "departure_time"}  or {
-                                                        "name": "price"}
+  ✖ BAD: {{"name": "string"}}  or {{"name": "code"}}  or {{"name": "time"}}  or {{"name": "text"}}  or {{"name": "number"}}  or {{"name": "date"}}  or {{"name": "currency"}}
+  ✔ GOOD: {{"name": "airline_name"}}  or {{"name": "flight_number"}}  or {{"name": "departure_airport"}}  or {{"name": "departure_time"}}  or {{"name": "price"}}
 
 Differentiate duplicate types — if two values share the same type, give them distinct context-specific names (e.g. "origin_airport_code" vs "destination_airport_code" instead of "code" and "code").  # noqa: E501
 
@@ -765,20 +753,16 @@ Look at each value carefully and infer its contextual meaning. For example:
 - A date like "30 / 05 / 2026" is a date, name it "departure_date", "travel_date", or "return_date"
 
 Return ONLY JSON — NO markdown, NO commentary:
-{
-                                                            "page_type": "{structure_type}",
+{{"page_type": "{structure_type}",
   "estimated_record_count": 24,
   "fields": [
-    {
-
-                                                                "name": "descriptive_field_name",
+    {{"name": "descriptive_field_name",
       "type": "string",
       "example_value": "actual value from HTML",
       "confidence": 0.95,
-      "description": "What this field represents"
-    }
+      "description": "What this field represents"}}
   ]
-} """
+}} """
 
 
 # ─── Search Form Detection ──────────────────────────────────────────────

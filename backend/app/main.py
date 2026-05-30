@@ -579,7 +579,7 @@ async def ready():
         )
 
 
-@app.get("/api / system / storage / status")
+@app.get("/api/system/storage/status")
 async def storage_status():
     """Detailed storage backend status — uses the active JobRepository."""
     repo = get_job_repository()
@@ -599,7 +599,7 @@ async def storage_status():
     return get_storage_status()
 
 
-@app.get("/api / system / status")
+@app.get("/api/system/status")
 async def system_status():
     from app.models import JobStatus
 
@@ -640,7 +640,7 @@ async def system_status():
     return response
 
 
-@app.get("/api / system / topology")
+@app.get("/api/system/topology")
 async def system_topology():
     """Exposes the raw state of the semantic cognition substrate."""
     from app.semantic_world_state import get_world_state
@@ -675,7 +675,7 @@ async def system_topology():
     }
 
 
-@app.get("/api / system / crystalline")
+@app.get("/api/system/crystalline")
 async def system_crystalline():
     """Returns the synthesized high-integrity knowledge units."""
     from app.semantic_world_state import get_world_state
@@ -687,7 +687,7 @@ async def system_crystalline():
     }
 
 
-@app.get("/api / system / export / knowledge")
+@app.get("/api/system/export/knowledge")
 async def export_knowledge():
     """Export the synthesized knowledge manifold as a portable schema."""
     import time
@@ -745,7 +745,7 @@ def _require_admin_key(request: Request):
         )
 
 
-@app.post("/api / system / merge / knowledge")
+@app.post("/api/system/merge/knowledge")
 async def merge_knowledge(request: Request, data: dict, _role=Depends(require_role([UserRole.ADMIN]))):
     """Merge an external knowledge manifold into the current field.
 
@@ -791,7 +791,7 @@ async def merge_knowledge(request: Request, data: dict, _role=Depends(require_ro
     return {"status": "merged", "roles_merged": merged_roles, "total_manifold": len(ws.role_manifold)}
 
 
-@app.get("/api / system / search")
+@app.get("/api/system/search")
 async def system_search(query: str, limit: int = 5):
     """Perform topological search on crystalline records."""
     from app.semantic_world_state import get_world_state
@@ -801,7 +801,7 @@ async def system_search(query: str, limit: int = 5):
     return {"results": results, "query": query}
 
 
-@app.get("/api / system / observability")
+@app.get("/api/system/observability")
 async def system_observability():
     """Exposes real-time telemetry and activity heatmaps."""
     from app.semantic_world_state import get_world_state
@@ -819,7 +819,7 @@ async def system_observability():
     }
 
 
-@app.get("/api / system / domain-policy")
+@app.get("/api/system/domain-policy")
 async def system_domain_policy():
     """Return the current domain runtime policy summaries."""
     from app.domain_runtime_policy import get_domain_runtime_policy
@@ -838,7 +838,7 @@ async def system_domain_policy():
     return result
 
 
-@app.get("/api / system / acquisition / telemetry")
+@app.get("/api/system/acquisition/telemetry")
 async def acquisition_telemetry():
     """Exposes acquisition telemetry: state distribution, recovery rates, recent events."""
     from app.acquisition_telemetry import get_acquisition_telemetry
@@ -846,7 +846,7 @@ async def acquisition_telemetry():
     return get_acquisition_telemetry().get_summary()
 
 
-@app.get("/api / system / history / topology")
+@app.get("/api/system/history/topology")
 async def system_topology_history(limit: int = 20):
     """Returns a timeline of historical topology states for replay."""
     from app.event_journal import get_journal
@@ -875,7 +875,7 @@ async def system_topology_history(limit: int = 20):
     return {"history": history}
 
 
-@app.post("/api / system / scheduler / step")
+@app.post("/api/system/scheduler/step")
 async def process_cognitive_tasks(budget_ms: float = 100.0, _role=Depends(require_role([UserRole.ADMIN]))):
     """Manually trigger processing of the cognitive task queue."""
     from app.semantic_world_state import get_world_state
@@ -885,7 +885,7 @@ async def process_cognitive_tasks(budget_ms: float = 100.0, _role=Depends(requir
     return {"status": "success", "tasks_completed": completed}
 
 
-@app.get("/api / system / agency")
+@app.get("/api/system/agency")
 async def system_agency():
     """Returns the state of automated agency and tools."""
     from app.semantic_world_state import get_world_state
@@ -901,7 +901,7 @@ async def system_agency():
     }
 
 
-@app.get("/api / system / replay / status")
+@app.get("/api/system/replay/status")
 async def system_replay_status():
     """Returns the status of the large-scale persistent replay buffer."""
     from app.replay_buffer import get_replay_buffer
@@ -914,7 +914,7 @@ async def system_replay_status():
     }
 
 
-@app.get("/api / system / replay / chain")
+@app.get("/api/system/replay/chain")
 async def system_replay_chains(limit: int = 20):
     """Returns causal chains reconstructed from the persistent replay buffer."""
     from app.replay_buffer import get_replay_buffer
@@ -928,7 +928,7 @@ async def system_replay_chains(limit: int = 20):
     }
 
 
-@app.get("/api / system / replay / events")
+@app.get("/api/system/replay/events")
 async def system_replay_events(start_idx: int = 0, end_idx: int = -1):
     """Returns a range of events from the persistent replay buffer."""
     from app.replay_buffer import get_replay_buffer
@@ -946,7 +946,7 @@ async def system_replay_events(start_idx: int = 0, end_idx: int = -1):
     }
 
 
-@app.post("/api / system / refactor / compress")
+@app.post("/api/system/refactor/compress")
 async def trigger_manifold_compression(_role=Depends(require_role([UserRole.ADMIN]))):
     """Trigger a manifold compression cycle."""
     from app.semantic_world_state import get_world_state
@@ -957,7 +957,7 @@ async def trigger_manifold_compression(_role=Depends(require_role([UserRole.ADMI
     return {"result": result}
 
 
-@app.get("/api / system / diagnostics / export")
+@app.get("/api/system/diagnostics/export")
 async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN]))):
     """Generates and exports an authenticated and sanitized system diagnostics ZIP bundle."""
     import io
@@ -1098,13 +1098,13 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
 
     zip_buffer.seek(0)
     headers = {"Content-Disposition": "attachment; filename=dataforge_diagnostics.zip"}
-    return Response(zip_buffer.getvalue(), media_type="application / zip", headers=headers)
+    return Response(zip_buffer.getvalue(), media_type="application/zip", headers=headers)
 
 
 # ─── URL Analyzer Endpoint ──────────────────────────────────────────────
 
 
-@app.post("/api / url / analyze")
+@app.post("/api/url/analyze")
 async def analyze_url(
     req: URLPreviewRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
 ):
@@ -1317,7 +1317,7 @@ async def metrics(request: Request):
     try:
         from prometheus_client import generate_latest, Gauge, Histogram
     except ModuleNotFoundError:
-        return Response(content=_render_basic_metrics_text(), media_type="text / plain")
+        return Response(content=_render_basic_metrics_text(), media_type="text/plain")
     from prometheus_client.core import CollectorRegistry
 
     # Clear registry to avoid duplicate registration errors on hot-reload
@@ -1452,7 +1452,7 @@ async def metrics(request: Request):
     requests_gauge = Gauge("dataforge_requests_total", "Total requests count", registry=registry)
     requests_gauge.set(get_requests_total())
 
-    return Response(content=generate_latest(registry), media_type="text / plain")
+    return Response(content=generate_latest(registry), media_type="text/plain")
 
 
 # ─── Serve Frontend (must be AFTER all API route definitions) ────────────

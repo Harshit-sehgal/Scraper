@@ -20,7 +20,7 @@ from app.browser_pool import get_browser_pool
 from app.trend_analyzer import TrendAnalyzer, EconomicTracker
 from app.regression_capture import get_regression_capture
 
-router = APIRouter(prefix="/api / scraper", tags=["scraper"])
+router = APIRouter(prefix="/api/scraper", tags=["scraper"])
 logger = logging.getLogger(__name__)
 
 
@@ -44,7 +44,7 @@ async def get_recent_telemetry(n: int = 20):
     return get_scrape_telemetry().get_recent(n)
 
 
-@router.get("/memory / stats")
+@router.get("/memory/stats")
 async def get_selector_memory_brief():
     """Return brief statistics on remembered selectors."""
     memory = get_selector_memory()
@@ -66,7 +66,7 @@ async def get_browser_stats():
     return get_browser_pool().get_metrics()
 
 
-@router.get("/health / legacy")
+@router.get("/health/legacy")
 async def get_legacy_domain_health():
     """Return health scores for all tracked domains (legacy crawl policy)."""
     from app.crawl_policy import get_crawl_policy
@@ -275,7 +275,7 @@ async def generate_regression_replay_test(entry_id: str):
     return {"entry_id": entry_id, "test_code": test_code}
 
 
-@router.post("/regressions / generate-all-tests")
+@router.post("/regressions/generate-all-tests")
 async def generate_all_replay_tests():
     """Generate replay tests for all captured regressions that lack one."""
     capture = get_regression_capture()
@@ -331,7 +331,7 @@ async def get_extraction_economics(window: int = Query(200, ge=10, le=1000)):
 # ─── Domain Health Monitoring Endpoints ──────────────────────────────────
 
 
-@router.get("/health / domains")
+@router.get("/health/domains")
 async def get_all_domains_health():
     """Get health status for all monitored domains.
 
@@ -356,7 +356,7 @@ async def get_all_domains_health():
     }
 
 
-@router.get("/health / domain/{domain}")
+@router.get("/health/domain/{domain}")
 async def get_domain_health(domain: str):
     """Get detailed health status for a specific domain.
 
@@ -383,7 +383,7 @@ async def get_domain_health(domain: str):
     return health
 
 
-@router.get("/health / summary")
+@router.get("/health/summary")
 async def get_system_health_summary():
     """Get system-wide health summary.
 
@@ -427,7 +427,7 @@ async def get_system_health_summary():
 # ─── Selector Memory Stats Endpoints ──────────────────────────────────────
 
 
-@router.get("/selectors / stats")
+@router.get("/selectors/stats")
 async def get_selector_memory_stats():
     """Get selector memory pool statistics.
 
@@ -451,7 +451,7 @@ async def get_selector_memory_stats():
     }
 
 
-@router.get("/selectors / domain/{domain}")
+@router.get("/selectors/domain/{domain}")
 async def get_domain_selector_confidence(domain: str):
     """Get selector confidence for a specific domain.
 
@@ -481,7 +481,7 @@ async def get_domain_selector_confidence(domain: str):
     }
 
 
-@router.post("/selectors / cleanup")
+@router.post("/selectors/cleanup")
 async def trigger_selector_cleanup(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Manually trigger selector memory cleanup.
 
@@ -507,7 +507,7 @@ async def trigger_selector_cleanup(_role: UserRole = Depends(require_role([UserR
     }
 
 
-@router.get("/selectors / low-confidence")
+@router.get("/selectors/low-confidence")
 async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)):
     """Get all selectors scoring below the specified threshold.
 
@@ -545,7 +545,7 @@ async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)
 # ─── ML Selector Optimization Endpoints ──────────────────────────────────
 
 
-@router.post("/ml / optimize / domain/{domain}")
+@router.post("/ml/optimize/domain/{domain}")
 async def optimize_domain_selectors(
     domain: str,
     selectors: Optional[dict] = None,
@@ -595,7 +595,7 @@ async def optimize_domain_selectors(
     }
 
 
-@router.get("/ml / optimize / domain/{domain}/history")
+@router.get("/ml/optimize/domain/{domain}/history")
 async def get_optimization_history(domain: str, limit: int = Query(10, ge=1, le=100)):
     """Get historical optimization reports for a domain.
 
@@ -613,7 +613,7 @@ async def get_optimization_history(domain: str, limit: int = Query(10, ge=1, le=
     }
 
 
-@router.post("/ml / learn")
+@router.post("/ml/learn")
 async def record_selector_learning(
     domain: str,
     selector: str,
@@ -644,7 +644,7 @@ async def record_selector_learning(
 # ─── Strategy Evolution Endpoints ────────────────────────────────────────
 
 
-@router.get("/strategy / recommend/{domain}")
+@router.get("/strategy/recommend/{domain}")
 async def recommend_fetch_strategy(domain: str):
     """Get recommended fetch strategy for a domain.
 
@@ -665,7 +665,7 @@ async def recommend_fetch_strategy(domain: str):
     }
 
 
-@router.post("/strategy / record")
+@router.post("/strategy/record")
 async def record_strategy_attempt(
     domain: str,
     strategy: str,
@@ -704,7 +704,7 @@ async def record_strategy_attempt(
     }
 
 
-@router.get("/strategy / domain/{domain}")
+@router.get("/strategy/domain/{domain}")
 async def get_domain_strategy_analysis(domain: str):
     """Get detailed strategy analysis for a domain.
 
@@ -718,7 +718,7 @@ async def get_domain_strategy_analysis(domain: str):
     return report
 
 
-@router.get("/strategy / report")
+@router.get("/strategy/report")
 async def get_all_strategies_report():
     """Get strategy performance report for all domains.
 
@@ -732,7 +732,7 @@ async def get_all_strategies_report():
     return report
 
 
-@router.post("/strategy / evolve/{domain}")
+@router.post("/strategy/evolve/{domain}")
 async def evolve_domain_strategy(
     domain: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
 ):
