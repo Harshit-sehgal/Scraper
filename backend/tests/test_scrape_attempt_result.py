@@ -265,6 +265,7 @@ async def test_scrape_url_attempt_returns_rich_result(monkeypatch):
     monkeypatch.setattr(scraper, "try_profile_extraction", fake_profile)
     monkeypatch.setattr(scraper, "fetch_page_content", fake_fetch)
     monkeypatch.setattr(scraper, "orchestrate_extraction", fake_orchestrate)
+
     class FakeTelemetry:
         def record(self, **kw):
             pass
@@ -280,6 +281,7 @@ async def test_scrape_url_attempt_returns_rich_result(monkeypatch):
     monkeypatch.setattr(scraper, "collect_page_evidence", lambda *a, **kw: None)
     monkeypatch.setattr(scraper, "classify_zero_result", lambda **kw: None)
     monkeypatch.setattr(scraper, "classify_failure", lambda **kw: None)
+
     def fake_process(records, schema_fields, min_record_score, **kw):
         return records
 
@@ -360,6 +362,7 @@ async def test_scrape_url_attempt_zero_result_with_html(monkeypatch):
     monkeypatch.setattr(scraper, "try_profile_extraction", fake_profile)
     monkeypatch.setattr(scraper, "fetch_page_content", fake_fetch)
     monkeypatch.setattr(scraper, "orchestrate_extraction", fake_orchestrate)
+
     class FakeTelemetry:
         def record(self, **kw):
             pass
@@ -386,6 +389,7 @@ async def test_scrape_url_attempt_zero_result_with_html(monkeypatch):
         operator_hint="DOM parsed but empty.",
     ))
     monkeypatch.setattr(scraper, "classify_failure", lambda **kw: None)
+
     def fake_process(records, schema_fields, min_record_score, **kw):
         return records
 

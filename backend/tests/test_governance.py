@@ -7,6 +7,7 @@ LAW: All cognitive cycles must be bounded by governance policies.
 from app.semantic_world_state import SemanticWorldState
 from app.graph_update_scheduler import GlobalCognitiveScheduler
 
+
 def test_governance_guardrail_enforcement():
     """Verify that thermodynamic violations trigger emergency stabilization."""
     ws = SemanticWorldState(node_id="gov_test")
@@ -22,7 +23,7 @@ def test_governance_guardrail_enforcement():
 
     # Check pressure is high enough for the TEST threshold
     pressure = ws.get_system_pressure()
-    assert pressure > 0.4 # Threshold reached after smoothing
+    assert pressure > 0.4  # Threshold reached after smoothing
 
     # Temporarily lower the policy threshold for this test
     from app.policy_engine import get_policy_engine
@@ -48,13 +49,14 @@ def test_governance_guardrail_enforcement():
     finally:
         policy.critical_entropy_threshold = old_threshold
 
+
 def test_community_density_quota():
     """Verify that community density violations are detected."""
     from app.policy_engine import get_policy_engine
     ws = SemanticWorldState(node_id="quota_test")
     ws.clear()
     policy = get_policy_engine(ws=ws)
-    policy.max_community_density = 5 # Set low for test
+    policy.max_community_density = 5  # Set low for test
 
     # 1. Create bloated community
     with ws.transaction("bloat"):
@@ -64,18 +66,18 @@ def test_community_density_quota():
 
         # Link all in one community via high cohesion
         for i in range(len(roles)):
-            for j in range(i+1, len(roles)):
+            for j in range(i + 1, len(roles)):
                 key = tuple(sorted([roles[i], roles[j]]))
                 ws._topology.set_neighborhood_cohesion(key, 0.9)
 
     # 2. Refresh communities
     ws._topology.detect_communities()
-    
+
     # 3. Validate health
     health = policy.validate_substrate_health()
     issues = [i for i in health["issues"] if i["policy"] == "community_density"]
-    
+
     assert len(issues) > 0
     assert issues[0]["severity"] == "moderate"
-    
+
     print("\nCommunity Density: Quota violation correctly detected.")

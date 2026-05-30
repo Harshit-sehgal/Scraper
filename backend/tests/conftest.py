@@ -29,6 +29,7 @@ def pytest_configure(config):
     )
     try:
         from testcontainers.postgres import PostgresContainer
+
         def patched_get_connection_url(self, host=None):
             username = getattr(self, "username", getattr(self, "POSTGRES_USER", "testuser"))
             password = getattr(self, "password", getattr(self, "POSTGRES_PASSWORD", "testpassword"))

@@ -11,6 +11,8 @@ scoring, dedup, and pipeline processing as the generic path — so they're
 fully compatible with the /app/ frontend and job system.
 """
 
+from app.models import SchemaField, FieldType
+from app.scraper import scrape_url
 import asyncio
 import os
 from pathlib import Path
@@ -18,9 +20,6 @@ from pathlib import Path
 os.environ['DATAFORGE_STATE_FILE'] = str(
     Path(__file__).resolve().parent.parent / 'data' / 'jobs_state_test.json'
 )
-
-from app.scraper import scrape_url
-from app.models import SchemaField, FieldType
 
 
 FLIGHT_SCHEMA = [

@@ -11,7 +11,7 @@ from app.telemetry_state import get_telemetry_state
 def test_default_stabilization_threshold():
     telemetry = get_telemetry_state()
     telemetry.clear()
-    
+
     # Defaults to 1500ms for unknown domains
     val = telemetry.get_avg_stabilization("unknown-domain.com")
     assert val == 1500.0
@@ -20,7 +20,7 @@ def test_default_stabilization_threshold():
 def test_adaptive_stabilization_learning():
     telemetry = get_telemetry_state()
     telemetry.clear()
-    
+
     # Record quick renders: 800ms
     for _ in range(5):
         telemetry.record_stabilization("fast-site.com", 800.0)

@@ -12,7 +12,7 @@ async def test():
         SchemaField(name='author', field_type=FieldType.STRING, description='username of submitter', required=False),
         SchemaField(name='link', field_type=FieldType.URL, description='url of the article', required=False),
     ]
-    
+
     print('Scraping Hacker News...')
     results = await scrape_url('https://news.ycombinator.com/', fields)
     print(f'\n=== RESULTS: {len(results)} records ===')

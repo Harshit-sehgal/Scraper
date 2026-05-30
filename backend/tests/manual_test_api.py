@@ -5,6 +5,7 @@ import requests
 
 BASE_URL = "http://127.0.0.1:8000"
 
+
 def wait_for_job(job_id):
     for _ in range(60):
         res = requests.get(f"{BASE_URL}/api/jobs/{job_id}")
@@ -16,6 +17,7 @@ def wait_for_job(job_id):
             return
         time.sleep(2)
     print("Job timed out!")
+
 
 def test_manual():
     print("=== Testing MANUAL Mode ===")
@@ -35,6 +37,7 @@ def test_manual():
     job_id = res.json()["job_id"]
     wait_for_job(job_id)
 
+
 def test_auto():
     print("\n=== Testing AUTO Mode ===")
     res = requests.post(f"{BASE_URL}/api/jobs", json={
@@ -53,6 +56,7 @@ def test_auto():
     print("Auto create status:", res.status_code)
     job_id = res.json()["job_id"]
     wait_for_job(job_id)
+
 
 if __name__ == "__main__":
     test_manual()

@@ -31,14 +31,14 @@ def test_world_state_round_trip_preserves_structure():
     assert ws2.metrics.total_records_processed == 100
     assert abs(ws2.metrics.global_energy - 3.14) < 0.001
     assert ws2.role_compatibility.get(("name", "text"), 0) == 0.8
-    
+
     excl_key = tuple(sorted(["origin", "destination"]))
     assert ws2.learned_exclusions.get(excl_key, 0) == 0.9
-    
+
     motif_key = tuple(sorted(["A", "B"]))
     assert ws2.motif_counts.get(motif_key, 0) == 5
     assert ws2.motif_timestamps.get(motif_key, 0) == 42
-    
+
     cohesion_key = tuple(sorted(["a", "b"]))
     assert ws2.cohesion_merge_success.get(cohesion_key, 0) == 3.0
     assert ws2.cohesion_merge_attempts.get(cohesion_key, 0) == 5.0

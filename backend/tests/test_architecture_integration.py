@@ -92,6 +92,7 @@ def test_field_validator_detects_nan():
     es._global_energy = float('nan')
     assert math.isnan(es.global_energy)
 
+
 def test_observability_is_read_only():
     """observability functions must not mutate state."""
     from app.observability import field_summary

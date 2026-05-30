@@ -44,7 +44,7 @@ def test_operator_mode_adjustments():
 
 def test_system_map_generation():
     dashboard = SystemGovernorDashboard(mode=OperatorMode.PRODUCTION)
-    
+
     # Generate map
     dashboard.generate_system_map()
     assert os.path.exists(MAP_PATH)
@@ -60,7 +60,7 @@ def test_system_map_generation():
 def test_governance_summary():
     dashboard = SystemGovernorDashboard(mode=OperatorMode.PRODUCTION)
     summary = dashboard.get_governance_summary()
-    
+
     assert summary["active_mode"] == "production"
     assert "resources" in summary
     assert "accumulated_tokens" in summary["resources"]

@@ -6,7 +6,7 @@ def test_parse_topology_key_valid_tuple():
     """Verify that a valid tuple string representing two string items parses correctly."""
     result = parse_topology_key("('role_a', 'role_b')")
     assert result == ("role_a", "role_b")
-    
+
     result2 = parse_topology_key('("role_c", "role_d")')
     assert result2 == ("role_c", "role_d")
 

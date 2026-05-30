@@ -281,10 +281,11 @@ class TestTryProfileExtractionFound:
 
 class AsyncPWCtx:
     """Helper: proper async context manager for mocking `async with async_playwright()`.
-    
+
     `__aenter__`/`__aexit__` must be defined on the class (not instance) for
     Python's `async with` protocol to discover them on the type.
     """
+
     def __init__(self, mock_playwright):
         self._pw = mock_playwright
 
@@ -303,8 +304,8 @@ def _make_pw_mocks(mock_playwright):
 
 
 def _make_page_mock(evaluate_return=None, goto_side_effect=None,
-                     wait_for_selector_return=None, wait_for_selector_side_effect=None,
-                     container_count: int = 2):
+                    wait_for_selector_return=None, wait_for_selector_side_effect=None,
+                    container_count: int = 2):
     """Build a mock page with configurable async methods."""
     m = MagicMock()
     m.goto = AsyncMock(side_effect=goto_side_effect) if goto_side_effect else AsyncMock()

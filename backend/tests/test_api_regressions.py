@@ -573,7 +573,7 @@ def test_run_job_updates_progress(monkeypatch):
     asyncio.run(main_mod._run_job_wrapper(job.id))
 
     finished = main_mod.jobs_store[job.id]
-    assert finished.progress_total == 3 # 2 URLs + 1 final
+    assert finished.progress_total == 3  # 2 URLs + 1 final
     assert finished.progress_current == finished.progress_total
 
 
@@ -763,4 +763,3 @@ def test_quality_report_ai_applied():
         warnings=[],
     )
     assert report["ai_source_prediction"]["ai_row_rate"] == 0.5
-

@@ -1,7 +1,6 @@
 """Tests for the audit logger module."""
 
 import json
-import os
 import tempfile
 from pathlib import Path
 
@@ -217,8 +216,8 @@ class TestLogFunctions:
 
 class TestParseFunctions:
     def test_parse_audit_log_line_standard(self):
-        line = '2026-05-30T12:00:00 [AUDIT] {"event_type":"auth","actor":"test","action":"login","resource":"/","outcome":"success","details":{}}'
-        parsed = _parse_audit_log_line(line)
+        line = '2026-05-30T12:00:00 [AUDIT] {"event_type":"auth","actor":"test","action":"login","resource":"/","outcome":"success","details":{}}'  # noqa: E501
+        parsed = _parse_audit_log_line(line)  # noqa: E501
         assert parsed is not None
         assert parsed["event_type"] == "auth"
         assert parsed["actor"] == "test"

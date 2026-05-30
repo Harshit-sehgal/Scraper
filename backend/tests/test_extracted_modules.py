@@ -60,10 +60,10 @@ def test_topology_api():
     assert api.region_count() == 1
     assert api.find_region('TEST', {'origin', 'destination'}) is not None
     assert api.prune_weak_regions(min_instability=0.6) == 0
-    
+
     # Update properties on the live version
     r.instability = 0.01
-    r.semantic_pressure = 0.0 # Force low energy for pruning test
+    r.semantic_pressure = 0.0  # Force low energy for pruning test
     r.local_energy = 0.1
     assert api.prune_weak_regions(min_instability=0.02) == 1
 
@@ -187,6 +187,7 @@ def test_invariant_firewall():
     from app.invariant_firewall import requires_invariants
     ws = get_world_state()
     ws.clear()
+
     @requires_invariants
     def fn(w):
         w.metrics.global_energy = 5.0

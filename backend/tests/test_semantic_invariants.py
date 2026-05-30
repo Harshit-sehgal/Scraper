@@ -148,7 +148,8 @@ def test_topology_evolution_invariant():
     # Record 2: no contradiction → decay (pipeline dynamics may cause minor fluctuations)
     run_pipeline([{"origin": "JFK", "destination": "LAX"}], schema)
     after_decay = ws.learned_exclusions.get(key, 0.0)
-    assert after_decay < after_first + 0.005, f"Exclusion should not significantly increase without reinforcement ({after_decay} > {after_first + 0.005})"
+    assert after_decay < after_first + \
+        0.005, f"Exclusion should not significantly increase without reinforcement ({after_decay} > {after_first + 0.005})"
 
     # Record 3: contradiction again → reinforce
     run_pipeline([{"origin": "LHR", "destination": "LHR"}], schema)
@@ -300,7 +301,7 @@ def test_field_pressure_includes_contradictions():
     ws._energy.set_exclusion_count(50)
     ws._energy.total_records_processed = 100
     # Maintain entropy baseline to isolate contradiction effect
-    ws._energy.set_entropy(0.5) 
+    ws._energy.set_entropy(0.5)
     p_after = ws.metrics.field_pressure
     assert p_after > p_before or abs(p_after - p_before) < 0.001, \
         "Field pressure must increase or stay same with more contradictions"
@@ -350,18 +351,18 @@ def test_topology_causality_invariant():
     from app.semantic_allocation_engine import _adaptive_exclusion_threshold
     ws = get_world_state()
     ws.clear()
-    
+
     # Low pressure state
     ws._energy.set_energy(0.1)
     ws._energy.set_entropy(0.1)
     ws._energy.total_records_processed = 100
     t_low = _adaptive_exclusion_threshold()
-    
+
     # High pressure state
     ws._energy.set_energy(9.0)
     ws._energy.set_entropy(0.9)
     t_high = _adaptive_exclusion_threshold()
-    
+
     assert t_high >= t_low or abs(t_high - t_low) < 0.01, \
         f"Higher field pressure must raise exclusion threshold ({t_high} >= {t_low})"
 
@@ -435,6 +436,3 @@ def test_propagation_conservation_invariant():
     after = len(ws.learned_exclusions)
     assert after >= before, \
         f"Propagation must create or maintain exclusions ({after} >= {before})"
-
-
-

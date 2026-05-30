@@ -8,6 +8,9 @@ Tests verify:
 - Fake dynamic session-bound website: cookie + storage + network JSON
 """
 
+import urllib.parse
+import threading
+import http.server
 import json
 import os
 from app.models import Job, JobStatus, SchemaField, FieldType
@@ -404,10 +407,6 @@ class TestFakeDynamicSessionBoundWebsite:
 # ══════════════════════════════════════════════════════════════════════════
 # True Local Session-Bound E2E — HTTP server + browser state simulation
 # ══════════════════════════════════════════════════════════════════════════
-
-import http.server
-import threading
-import urllib.parse
 
 
 class _SessionBoundHandler(http.server.BaseHTTPRequestHandler):

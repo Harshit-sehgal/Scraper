@@ -19,6 +19,7 @@ async def test_provider(provider):
         print(f"[FAILED] {provider.__name__}: {str(e)[:100]}")
         return False
 
+
 async def main():
     providers = [
         g4f.Provider.PollinationsAI,

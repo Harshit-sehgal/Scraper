@@ -1,10 +1,11 @@
 import pytest
 from app.models import Job, JobStatus
 
+
 @pytest.fixture
 def seed_job_with_results():
     from app.main import jobs_store
-    
+
     job = Job(
         name="test-paginated-job",
         mode="manual",
@@ -17,11 +18,12 @@ def seed_job_with_results():
     ]
     job.status = JobStatus.COMPLETED
     jobs_store[job.id] = job
-    
+
     yield job
-    
+
     if job.id in jobs_store:
         del jobs_store[job.id]
+
 
 def test_get_job_no_results_by_default(client, seed_job_with_results):
     job = seed_job_with_results
@@ -30,6 +32,7 @@ def test_get_job_no_results_by_default(client, seed_job_with_results):
     data = r.json()
     assert data["results"] == []
 
+
 def test_get_job_include_results_parameter(client, seed_job_with_results):
     job = seed_job_with_results
     r = client.get(f"/api/jobs/{job.id}?include_results=true")
@@ -37,6 +40,7 @@ def test_get_job_include_results_parameter(client, seed_job_with_results):
     data = r.json()
     assert len(data["results"]) == 15
     assert data["results"][0]["title"] == "Result 0"
+
 
 def test_get_job_results_pagination(client, seed_job_with_results):
     job = seed_job_with_results
@@ -49,7 +53,7 @@ def test_get_job_results_pagination(client, seed_job_with_results):
     assert data["limit"] == 5
     assert data["offset"] == 0
     assert data["results"][0]["title"] == "Result 0"
-    
+
     # Fetch with offset=5, limit=5
     r2 = client.get(f"/api/jobs/{job.id}/results?limit=5&offset=5")
     assert r2.status_code == 200
@@ -82,6 +86,7 @@ def test_get_job_results_next_offset(client, seed_job_with_results):
     data3 = r3.json()
     assert data3["next_offset"] is None
 
+
 def test_backfill_metadata_endpoint(client, seed_job_with_results):
     job = seed_job_with_results
     r = client.post(f"/api/jobs/{job.id}/backfill-metadata")
@@ -89,7 +94,7 @@ def test_backfill_metadata_endpoint(client, seed_job_with_results):
     data = r.json()
     assert "Metadata backfilled successfully" in data["message"]
     assert data["updated"] is True
-    
+
     # Fetch the job and check updated source metadata
     r_job = client.get(f"/api/jobs/{job.id}?include_results=true")
     data_job = r_job.json()

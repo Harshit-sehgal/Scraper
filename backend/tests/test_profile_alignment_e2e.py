@@ -73,7 +73,8 @@ async def test_profile_extraction_aligns_all_schema_fields():
             # Check if records have populated data or just nulls from API rate-limiting
             populated = [r for r in raw if r.get("airlines_name") and r.get("prices") is not None]
             if not populated:
-                last_error = f"try_profile_extraction returned {len(raw)} record(s) with null fields for {domain} — likely API rate-limiting"
+                last_error = f"try_profile_extraction returned {
+                    len(raw)} record(s) with null fields for {domain} — likely API rate-limiting"
                 continue
 
             # Got populated results — run assertions
@@ -119,7 +120,8 @@ async def test_scrape_url_end_to_end_multiple_records():
             # Check if records have populated data or just nulls from API rate-limiting
             populated = [r for r in results if r.get("airlines_name") and r.get("prices") is not None]
             if not populated:
-                last_error = f"scrape_url returned {len(results)} record(s) with null fields for {domain} — likely API rate-limiting"
+                last_error = f"scrape_url returned {
+                    len(results)} record(s) with null fields for {domain} — likely API rate-limiting"
                 continue
 
             # Got populated results — run assertions

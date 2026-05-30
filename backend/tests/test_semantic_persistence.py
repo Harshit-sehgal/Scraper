@@ -11,6 +11,7 @@ from app.semantic_allocation_engine import _get_role_engine
 from app.semantic_boundary_engine import get_boundary_engine
 from app.semantic_ir import SemanticType
 
+
 def test_persistence_round_trip():
     # 1. Setup local path
     test_path = str(Path(__file__).parent / "test_semantic_state.json")
@@ -45,7 +46,7 @@ def test_persistence_round_trip():
     # 4. Save state
     save_semantic_state()
     import time
-    time.sleep(0.1) # Wait for filesystem sync
+    time.sleep(0.1)  # Wait for filesystem sync
     assert os.path.exists(test_path)
 
     # 5. Clear in-memory state
@@ -68,6 +69,7 @@ def test_persistence_round_trip():
     # 8. Cleanup
     if os.path.exists(test_path):
         os.remove(test_path)
+
 
 def test_persistence_affects_pipeline():
     # Ensures that saved state actually changes run_pipeline behavior

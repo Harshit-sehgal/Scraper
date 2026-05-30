@@ -93,8 +93,10 @@ class TestSaveJobResultsToDisk:
         class FailingWriter:
             def __enter__(self_):
                 return self_
+
             def __exit__(self_, *args):
                 pass
+
             def write(self_, _data):
                 raise OSError("Disk full")
 
@@ -189,7 +191,7 @@ class TestLoadJobResultsFromDiskSafe:
         # Write valid records then append garbage
         path = get_job_results_path("corrupt_gzip")
         path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Create a truncated gzip by writing valid gzip data and then appending raw data
         with gzip.open(path, "wb") as f:
             f.write(b'{"valid": 1}\n')
@@ -206,7 +208,7 @@ class TestLoadJobResultsFromDiskSafe:
     def test_corrupt_json_line_returns_partial_with_warning(self, mock_state_path: Path) -> None:
         path = get_job_results_path("corrupt_json")
         path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         with gzip.open(path, "wt", encoding="utf-8") as f:
             f.write('{"valid": 1}\n')
             f.write('NOT JSON\n')

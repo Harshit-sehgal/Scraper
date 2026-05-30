@@ -5,6 +5,7 @@ Regression tests for Extraction Accuracy Framework.
 import pytest
 from app.benchmark_accuracy import calculate_extraction_accuracy
 
+
 def test_perfect_extraction_accuracy():
     golden = [
         {"name": "British Airways", "price": "£245.50"},
@@ -26,6 +27,7 @@ def test_perfect_extraction_accuracy():
     assert res.field_accuracy["name"] == 1.0
     assert res.field_accuracy["price"] == 1.0
 
+
 def test_partial_extraction_accuracy():
     golden = [
         {"name": "Acme Corp", "city": "London", "phone": "12345"},
@@ -44,20 +46,22 @@ def test_partial_extraction_accuracy():
     # Extracted fields (valid): 4 + 2 = 6
     # True positives: 3 (Acme) + 2 (Globex) = 5
 
-    assert res.recall == 5/6
-    assert res.precision == 5/6
+    assert res.recall == 5 / 6
+    assert res.precision == 5 / 6
     assert res.field_accuracy["phone"] == 0.5
     assert res.field_accuracy["name"] == 1.0
     assert res.completeness == 1.0
-    assert res.schema_conformity == 5/6
+    assert res.schema_conformity == 5 / 6
+
 
 def test_duplicate_detection():
     golden = [{"name": "A"}, {"name": "B"}]
     extracted = [{"name": "A"}, {"name": "A"}, {"name": "B"}]
 
     res = calculate_extraction_accuracy(extracted, golden)
-    assert res.duplicate_rate == pytest.approx(1/3, 0.01)
+    assert res.duplicate_rate == pytest.approx(1 / 3, 0.01)
     assert res.completeness == 1.0
+
 
 def test_extra_records_are_penalized_in_precision():
     golden = [{"name": "A"}]
@@ -68,8 +72,9 @@ def test_extra_records_are_penalized_in_precision():
 
     res = calculate_extraction_accuracy(extracted, golden)
     assert res.recall == 1.0
-    assert res.precision == pytest.approx(1/3)
+    assert res.precision == pytest.approx(1 / 3)
     assert res.f1_score == pytest.approx(0.5)
+
 
 def test_extra_schema_fields_are_penalized():
     golden = [{"name": "A"}]
@@ -79,6 +84,7 @@ def test_extra_schema_fields_are_penalized():
     assert res.recall == 1.0
     assert res.precision == pytest.approx(0.5)
     assert res.schema_conformity == pytest.approx(0.5)
+
 
 def test_hallucination_indicators():
     golden = [{"name": "A"}]

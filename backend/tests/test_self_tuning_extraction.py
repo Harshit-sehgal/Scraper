@@ -31,7 +31,7 @@ class TestSelfTuningController:
         """Test that getting parameters creates defaults."""
         controller = SelfTuningController()
         params = controller.get_parameters("example.com")
-        
+
         assert params.domain == "example.com"
         assert params.fetch_timeout_s > 0
         assert params.delay_between_requests_s > 0
@@ -41,7 +41,7 @@ class TestSelfTuningController:
         """Test default values match config."""
         controller = SelfTuningController()
         params = controller.get_parameters("example.com")
-        
+
         assert params.fetch_timeout_s == settings.PLAYWRIGHT_TIMEOUT / 1000.0
         assert params.delay_between_requests_s == settings.CRAWL_DEFAULT_DELAY_SECONDS
         assert params.max_retries == settings.MAX_RETRIES
@@ -55,7 +55,7 @@ class TestSelfTuningController:
             "anti_bot_score": 0.0,
             "confidence_map": {"overall_avg": 0.9},
         })
-        
+
         assert "example.com" in controller._telemetry
         assert len(controller._telemetry["example.com"]) == 1
 
@@ -68,7 +68,7 @@ class TestSelfTuningController:
                 "anti_bot_score": min(1.0, i * 0.05),
                 "confidence_map": {"overall_avg": max(0.3, 0.9 - i * 0.03)},
             })
-        
+
         assert len(controller._telemetry["example.com"]) == 20
 
     def test_history_capped_at_50(self):
@@ -80,13 +80,13 @@ class TestSelfTuningController:
                 "anti_bot_score": 0.0,
                 "confidence_map": {"overall_avg": 0.9},
             })
-        
+
         assert len(controller._telemetry["example.com"]) == 50
 
     def test_fetch_timeout_adjusts_up(self):
         """Test that timeout increases with slow fetches."""
         controller = SelfTuningController()
-        
+
         # Record slow fetches (5000ms average)
         for i in range(10):
             controller.record_telemetry("slow-domain.com", {
@@ -94,7 +94,7 @@ class TestSelfTuningController:
                 "anti_bot_score": 0.1,
                 "confidence_map": {"overall_avg": 0.7},
             })
-        
+
         params = controller.get_parameters("slow-domain.com")
         # Timeout should be >= 2x avg + 5s = 2*5 + 5 = 15s
         assert params.fetch_timeout_s >= 15.0
@@ -102,7 +102,7 @@ class TestSelfTuningController:
     def test_fetch_timeout_stays_within_bounds(self):
         """Test that timeout stays within configured bounds."""
         controller = SelfTuningController()
-        
+
         # Record extremely fast fetches
         for i in range(10):
             controller.record_telemetry("fast-domain.com", {
@@ -110,7 +110,7 @@ class TestSelfTuningController:
                 "anti_bot_score": 0.0,
                 "confidence_map": {"overall_avg": 0.95},
             })
-        
+
         params = controller.get_parameters("fast-domain.com")
         # Should not go below min_timeout (10.0)
         assert params.fetch_timeout_s >= 10.0
@@ -118,7 +118,7 @@ class TestSelfTuningController:
     def test_delay_increases_with_anti_bot(self):
         """Test that delay increases with anti-bot score."""
         controller = SelfTuningController()
-        
+
         # High anti-bot domain
         for i in range(5):
             controller.record_telemetry("anti-bot-domain.com", {
@@ -126,7 +126,7 @@ class TestSelfTuningController:
                 "anti_bot_score": 0.9,
                 "confidence_map": {"overall_avg": 0.3},
             })
-        
+
         params = controller.get_parameters("anti-bot-domain.com")
         # Delay should be increased beyond base
         assert params.delay_between_requests_s >= settings.CRAWL_DEFAULT_DELAY_SECONDS
@@ -134,7 +134,7 @@ class TestSelfTuningController:
     def test_retries_increase_with_failures(self):
         """Test that retries increase when success rate is low."""
         controller = SelfTuningController()
-        
+
         # Record failures
         controller.record_telemetry("failing-domain.com", {
             "fetch_ms": 1000.0,
@@ -143,10 +143,10 @@ class TestSelfTuningController:
             "anti_bot_score": 0.0,
             "confidence_map": {"overall_avg": 0.0},
         })
-        
+
         params = controller.get_parameters("failing-domain.com")
         initial_retries = params.max_retries
-        
+
         # Record more failures
         for _ in range(4):
             controller.record_telemetry("failing-domain.com", {
@@ -156,7 +156,7 @@ class TestSelfTuningController:
                 "anti_bot_score": 0.0,
                 "confidence_map": {"overall_avg": 0.0},
             })
-        
+
         params2 = controller.get_parameters("failing-domain.com")
         assert params2.max_retries >= initial_retries
 
@@ -164,7 +164,7 @@ class TestSelfTuningController:
         """Test that confidence threshold adjusts with quality."""
         controller = SelfTuningController()
         domain = "quality-domain.com"
-        
+
         # Record high quality extractions
         for i in range(10):
             controller.record_telemetry(domain, {
@@ -172,7 +172,7 @@ class TestSelfTuningController:
                 "anti_bot_score": 0.0,
                 "confidence_map": {"overall_avg": 0.85},
             })
-        
+
         params = controller.get_parameters(domain)
         # Confidence threshold should not decrease with high quality
         assert params.min_confidence_threshold >= 0.35
@@ -191,7 +191,7 @@ class TestSelfTuningController:
             "anti_bot_score": 0.3,
             "confidence_map": {"overall_avg": 0.8},
         })
-        
+
         report = controller.get_tuning_report()
         assert report["total_domains_tuned"] >= 1
         assert "averages" in report
@@ -205,7 +205,7 @@ class TestSelfTuningController:
             "anti_bot_score": 0.0,
             "confidence_map": {"overall_avg": 0.9},
         })
-        
+
         report = controller.get_domain_report("example.com")
         assert report is not None
         assert report["domain"] == "example.com"
