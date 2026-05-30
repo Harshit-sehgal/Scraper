@@ -25,6 +25,15 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
+# Detect local docker-compose or system command
+if [ -f "./bin/docker-compose" ]; then
+    DOCKER_COMPOSE="./bin/docker-compose"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+else
+    DOCKER_COMPOSE="docker compose"
+fi
+
 # Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -99,18 +108,20 @@ fi
 echo ""
 echo "─── Step 1: Production environment validation ────────────────────────"
 
+export DATAFORGE_SKIP_DB_CHECK=true
 if python3 scripts/check_prod_env.py --env-file .env; then
     echo -e "  $PASS  check_prod_env.py passed"
 else
     echo -e "  $FAIL  check_prod_env.py failed — fix .env before deploying"
     ALL_PASS=false
 fi
+unset DATAFORGE_SKIP_DB_CHECK
 
 # ───── Step 2: Validate compose config ────────────────────────────────────
 echo ""
 echo "─── Step 2: Docker Compose config validation ─────────────────────────"
 
-if docker compose -f docker-compose.prod.yml config > /dev/null 2>&1; then
+if "$DOCKER_COMPOSE" -f docker-compose.prod.yml config > /dev/null 2>&1; then
     echo -e "  $PASS  docker-compose.prod.yml is valid"
 else
     echo -e "  $FAIL  docker-compose.prod.yml has errors"
@@ -121,7 +132,7 @@ fi
 echo ""
 echo "─── Step 3: Building production images ───────────────────────────────"
 
-if docker compose -f docker-compose.prod.yml build --no-cache 2>&1 | tail -5; then
+if "$DOCKER_COMPOSE" -f docker-compose.prod.yml build --no-cache 2>&1 | tail -5; then
     echo -e "  $PASS  Production images built successfully"
 else
     echo -e "  $FAIL  Production image build failed"
@@ -136,17 +147,17 @@ echo "─── Step 4: Starting production stack ──────────
 export DATAFORGE_SMOKE_TEST_MODE=true
 export DATAFORGE_ALLOWED_INTERNAL_HOSTS=nginx
 
-docker compose -f docker-compose.prod.yml up -d 2>&1
+"$DOCKER_COMPOSE" -f docker-compose.prod.yml up -d 2>&1
 echo -e "  $INFO  Waiting for services to start (30s)..."
 sleep 30
 
 # Check all containers are running (including monitoring services)
 for svc in dataforge worker postgres nginx prometheus grafana; do
-    if docker compose -f docker-compose.prod.yml ps "$svc" --format json 2>/dev/null | grep -q '"State":"running"'; then
+    if "$DOCKER_COMPOSE" -f docker-compose.prod.yml ps "$svc" --format json 2>/dev/null | grep -q '"State":"running"'; then
         echo -e "  $PASS  $svc is running"
     else
         echo -e "  $FAIL  $svc is not running"
-        docker compose -f docker-compose.prod.yml logs "$svc" --tail=20 2>&1 || true
+        "$DOCKER_COMPOSE" -f docker-compose.prod.yml logs "$svc" --tail=20 2>&1 || true
         ALL_PASS=false
     fi
 done
@@ -213,7 +224,7 @@ echo "─── Step 8: Create a job against local smoke page ──────
 JOB_RESPONSE=$(curl -s -X POST \
     -H "X-API-Key: $DATAFORGE_OPERATOR_API_KEY" \
     -H "Content-Type: application/json" \
-    -d '{"name":"Smoke Test Job","mode":"manual","urls":["http://nginx/smoke/records.html"]}' \
+    -d '{"name":"Smoke Test Job","mode":"manual","urls":["http://nginx/smoke/records.html"],"schema_fields":[{"name":"name","field_type":"string","required":true},{"name":"email","field_type":"email","required":true},{"name":"role","field_type":"string","required":true},{"name":"team","field_type":"string","required":true}]}' \
     http://localhost/api/jobs 2>/dev/null || echo '{"error":"unreachable"}')
 
 JOB_ID=$(echo "$JOB_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('job_id',''))" 2>/dev/null || echo "")
@@ -278,7 +289,7 @@ fi
 echo ""
 echo "─── Step 9: Worker logs (last 20 lines) ──────────────────────────────"
 
-docker compose -f docker-compose.prod.yml logs worker --tail=20 2>&1 || true
+"$DOCKER_COMPOSE" -f docker-compose.prod.yml logs worker --tail=20 2>&1 || true
 
 # ───── Summary ────────────────────────────────────────────────────────────
 echo ""

@@ -57,6 +57,14 @@ Status: implemented but not end-to-end validated in this audit.
 
 ## Advanced Components
 
-Semantic world state, topology, replay, strategy evolution, selector memory, recovery logic, and adaptive extraction modules exist.
+The following components are **EXPERIMENTAL / NOT FULLY VALIDATED**:
 
-Status: implemented but unevenly validated. These components should not be described as fully autonomous or fully self-healing.
+- **Semantic world state** — ⚠️ Implemented but not validated in production-like scenarios.
+- **Topology engine** — ⚠️ Site modeling is implemented; effectiveness on varied sites is unproven.
+- **Replay buffer** — ⚠️ Replay functionality exists but not hardened for production.
+- **Strategy evolution** — ⚠️ Per-domain strategy learning is implemented but untested in real-world conditions.
+- **Selector memory** — ⚠️ Learned pattern storage exists; convergence behavior unknown.
+- **Recovery logic** — ⚠️ Recovery strategies are defined; simulated benchmarks don't prove real-world effectiveness.
+- **Adaptive extraction** — ⚠️ Self-tuning parameters exist; real-world reliability not validated.
+
+**Status**: implemented but unevenly validated. These components should NOT be described as fully autonomous or fully self-healing.

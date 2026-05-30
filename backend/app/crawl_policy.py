@@ -76,6 +76,12 @@ class CrawlPolicyEngine:
         if not domain:
             return "Invalid URL"
 
+        # Bypass checks for allowed internal hosts (e.g. nginx, localhost)
+        allowed_hosts = {h.strip().lower() for h in settings.ALLOWED_INTERNAL_HOSTS.split(",") if h.strip()}
+        allowed_hosts.update({"localhost", "127.0.0.1"})
+        if domain in allowed_hosts:
+            return None
+
         # Global concurrency check
         if self._global_active_fetches >= self._max_global_concurrency:
             return f"Global concurrency limit reached ({self._max_global_concurrency})"

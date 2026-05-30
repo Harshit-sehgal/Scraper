@@ -88,6 +88,7 @@ def tmp_queue_db(tmp_path):
 # ─────────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.postgres
 class TestApiEnqueuesJob:
     """Verify that the API enqueues a job to the worker queue when enabled."""
 
@@ -154,6 +155,7 @@ class TestApiEnqueuesJob:
 # ─────────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.postgres
 class TestWorkerPicksQueuedJob:
     """Verify that the worker dequeue and job execution flow works correctly."""
 
@@ -252,6 +254,7 @@ class TestWorkerPicksQueuedJob:
         assert job_id is None, "DATAFORGE_JOB_ID should not be set for this test"
 
 
+@pytest.mark.postgres
 class TestRealWorkerHandler:
     """Tests using the actual scripts.run_worker.scrape_job_handler."""
 
@@ -399,6 +402,7 @@ class TestRealWorkerHandler:
             asyncio.run(scrape_job_handler(task))
 
 
+@pytest.mark.postgres
 class TestWorkerPreservesRecycleBin:
     """Verify that worker full-state persistence preserves recycle_bin contents."""
 

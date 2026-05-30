@@ -23,11 +23,11 @@ export const API = (() => {
 // ─── API Key Management ───
 
 function getApiKey() {
-    try { return localStorage.getItem('dataforge_api_key') || ''; } catch { return ''; }
+    try { return sessionStorage.getItem('dataforge_api_key') || ''; } catch { return ''; }
 }
 
 function setApiKey(key) {
-    try { localStorage.setItem('dataforge_api_key', key); } catch { /* ignore storage errors */ }
+    try { sessionStorage.setItem('dataforge_api_key', key); } catch { /* ignore storage errors */ }
 }
 
 // ─── Admin Key Management (session-scoped) ─

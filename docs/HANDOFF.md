@@ -60,8 +60,16 @@ Current documented inventory:
 
 Where to read details:
 
-- `docs/AUDIT_REPORT.md`
 - `PROJECT_STATUS.md`
+- [`docs/audit/DELIVERABLE_1_TRUTH_INVENTORY.md`](audit/DELIVERABLE_1_TRUTH_INVENTORY.md) — Inventory of false claims
+- [`docs/audit/DELIVERABLE_2_ARCHITECTURE_MAP.md`](audit/DELIVERABLE_2_ARCHITECTURE_MAP.md) — Architecture reality vs claims
+- [`docs/audit/DELIVERABLE_3_CLAIMS_AUDIT.md`](audit/DELIVERABLE_3_CLAIMS_AUDIT.md) — Detailed claims audit
+- [`docs/audit/DELIVERABLE_4_ERROR_ISSUE_LIST.md`](audit/DELIVERABLE_4_ERROR_ISSUE_LIST.md) — Error and issue list
+- [`docs/audit/DELIVERABLE_5_TEST_TRUTH_REPORT.md`](audit/DELIVERABLE_5_TEST_TRUTH_REPORT.md) — Test truth assessment
+- [`docs/audit/DELIVERABLE_6_BENCHMARK_TRUTH_REPORT.md`](audit/DELIVERABLE_6_BENCHMARK_TRUTH_REPORT.md) — Benchmark truth report
+- [`docs/audit/DELIVERABLE_7_SECURITY_REPORT.md`](audit/DELIVERABLE_7_SECURITY_REPORT.md) — Security assessment
+- [`docs/audit/DELIVERABLE_8_DOCUMENTATION_CLEANUP.md`](audit/DELIVERABLE_8_DOCUMENTATION_CLEANUP.md) — Documentation cleanup plan
+- [`docs/audit/DELIVERABLE_9_CORRECTED_README.md`](audit/DELIVERABLE_9_CORRECTED_README.md) — Corrected README template
 
 ### 2. Documentation Rewritten Around Evidence
 

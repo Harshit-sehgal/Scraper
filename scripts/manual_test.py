@@ -28,7 +28,10 @@ except ImportError:
     print("❌ 'requests' library not found. Install it with:  pip install requests")
     sys.exit(1)
 
-API_BASE = "http://127.0.0.1:8000"
+import os
+
+# Read API base URL from environment variable, with default for development
+API_BASE = os.getenv("DATAFORGE_API_BASE", "http://127.0.0.1:8000")
 
 
 # ─── Utilities ─────────────────────────────────────────────────────────────

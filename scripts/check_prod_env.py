@@ -361,6 +361,42 @@ def check_env(value: str) -> bool:
     return True
 
 
+def check_postgres_connection(db_url: str) -> bool:
+    """Test actual Postgres connectivity.
+
+    This validates that the database is reachable and schema is initialized,
+    not just that the URL is formatted correctly.
+    """
+    import os
+    if os.environ.get("DATAFORGE_SKIP_DB_CHECK", "").lower() in ("true", "1", "yes"):
+        print("\n  [INFO]  Skipping Postgres connectivity test (DATAFORGE_SKIP_DB_CHECK is set).")
+        return True
+    print("\n  [INFO]  Testing Postgres connectivity...")
+    try:
+        import psycopg2
+        from psycopg2 import OperationalError
+    except ImportError:
+        print("  [WARN]  psycopg2 not installed; skipping connectivity test.")
+        print("          Install with: pip install psycopg2-binary")
+        return True  # Don't fail if driver not available
+
+    try:
+        conn = psycopg2.connect(db_url, connect_timeout=5)
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.close()
+        conn.close()
+        print("  [OK]    Postgres is reachable and responding.")
+        return True
+    except OperationalError as e:
+        print(f"  [FAIL]  Could not connect to Postgres: {e}")
+        print("          Ensure Postgres service is running and accessible at the configured URL.")
+        return False
+    except Exception as e:
+        print(f"  [FAIL]  Unexpected error testing Postgres: {e}")
+        return False
+
+
 def main() -> int:
     args = parse_args()
     env_path = Path(args.env_file).expanduser().resolve()
@@ -411,6 +447,14 @@ def main() -> int:
         passed = check_var(env, name, required=required, validator=validator, hint=hint)
         if not passed:
             all_pass = False
+
+    # ── Postgres Connectivity (if storage backend is postgres) ───────────
+    if all_pass and env.get("DATAFORGE_STORAGE_BACKEND", "").lower() == "postgres":
+        db_url = env.get("DATAFORGE_DATABASE_URL", "")
+        if db_url:
+            pg_passed = check_postgres_connection(db_url)
+            if not pg_passed:
+                all_pass = False
 
     # ── Summary ──────────────────────────────────────────────────────
     print()

@@ -2,22 +2,52 @@
 
 ## Current Protections
 
-- API key middleware protects `/api/*` when keys are configured.
-- RBAC supports user, operator, and admin roles.
-- Production env validation rejects common placeholder secrets.
-- Request body size is limited.
-- URL safety code checks public HTTP(S) targets and redirect hops.
-- Production `/ready` responses are minimal.
+### Authentication & Authorization
+- **API key middleware** protects `/api/*` when keys are configured (via `secrets.compare_digest` — timing-safe).
+- **RBAC** supports user, operator, and admin roles with per-route enforcement.
+- Input validation via Pydantic models on all API request bodies.
+
+### Network Security
+- **CORS** is restricted to configured origins (no wildcard).
+- **CSP** is enforced via nginx (currently allows CDN scripts — see limitations).
+- **X-Frame-Options: DENY** (clickjacking protection).
+- **X-Content-Type-Options: nosniff**.
 - Nginx blocks public `/metrics`, `/docs`, `/redoc`, and `/openapi.json`.
+
+### SSRF Protection (Application Level)
+- Blocks localhost/127.0.0.1 and private IP ranges.
+- Blocks cloud metadata endpoints (AWS, GCP, Azure).
+- Validates redirects (max 5 hops).
+
+### Production Validation
+- Production env validation rejects common placeholder secrets.
+- Startup gate (`scripts/check_prod_env.py`) validates env vars, database connectivity.
+- Production `/ready` responses are minimal (no internal state exposure).
 
 ## Important Limitations
 
-- The dashboard stores the user API key in `localStorage`; use it as an internal/private interface.
-- Direct backend `/metrics` is public unless `DATAFORGE_METRICS_TOKEN` is set or a proxy blocks it.
-- SSRF prevention in application code should be backed by production network egress policy.
-- Route-level authorization should be covered by an explicit test matrix.
-- Rate limiting is not proven distributed.
-- The production dashboard currently permits CDN scripts in CSP.
+### Dashboard
+- **API key stored in `localStorage`** — NOT suitable for shared browsers or public kiosks.
+- Dashboard should be used on **private/internal networks only**.
+
+### CSP Policy
+- Current CSP allows `cdn.jsdelivr.net` and `cdn.tailwindcss.com` for scripts.
+- **Fix:** Vendor all external assets locally, then tighten to `script-src 'self'`.
+
+### Rate Limiting
+- **Single-process only** — not distributed across workers.
+- For multi-instance deployments, use nginx or WAF-level rate limiting.
+
+### SSRF
+- **Application-level only** — must be paired with network-layer egress controls (firewall rules, proxy ACLs) in production.
+- DNS rebinding attacks are not protected at application layer.
+
+### Audit Logging
+- ❌ No logging of authentication failures, RBAC violations, or admin actions.
+
+### Session Management
+- ❌ No session tokens — API keys are long-lived and never expire.
+- ❌ No refresh/rotation mechanism for keys.
 
 ## Production Secret Rules
 
@@ -31,15 +61,36 @@ Do not deploy with values containing:
 - `default`
 - `example`
 - `yourdomain.com`
+- `test`
 
-Run:
+Run before starting the production stack:
 
 ```bash
 python3 scripts/check_prod_env.py --env-file .env
 ```
 
-before starting the production stack.
+This fails if any placeholder secrets are detected.
 
 ## Scraper-Specific Risk
 
-Because this system fetches user-supplied URLs, SSRF is a primary risk. Production deployments should block access to localhost, private networks, metadata endpoints, Docker-internal networks, non-HTTP schemes, and redirect chains into private IPs at both application and network layers.
+Because this system fetches user-supplied URLs, **SSRF is a primary risk**. Production deployments should:
+
+1. Block access to localhost, private networks, and metadata endpoints at the **application layer** (already implemented).
+2. Block access at the **network layer** (firewall, egress ACLs, proxy rules).
+3. Block non-HTTP(S) URL schemes.
+4. Limit redirect chain length (implemented: max 5 hops).
+5. Restrict container network access to only required external endpoints.
+
+## Security Maturity Summary
+
+| Component | Rating | Notes |
+|-----------|--------|-------|
+| Authentication | ✅ Good | Timing-safe API key comparison |
+| Authorization | ✅ Good | RBAC with per-route enforcement |
+| Input Validation | ✅ Good | Pydantic models on all endpoints |
+| Network Security | ⚠️ Partial | CSP allows CDN; rate limiting single-process |
+| SSRF Protection | ⚠️ Partial | App-level only; needs network-layer backing |
+| Audit Logging | ❌ Missing | No auth/security event logging |
+| Session Management | ❌ Missing | No token expiry or rotation |
+
+For detailed security assessment, see [audit/DELIVERABLE_7_SECURITY_REPORT.md](audit/DELIVERABLE_7_SECURITY_REPORT.md).

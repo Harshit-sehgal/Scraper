@@ -36,10 +36,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ─────────────────────────────────────────────────────────────────────────────
 FROM base AS deps
 
-COPY backend/requirements.txt .
+COPY backend/requirements.lock.txt .
 
-# Install production dependencies only
-RUN pip install --no-cache-dir -r requirements.txt
+# Install production dependencies only (from lock file for reproducible builds)
+RUN pip install --no-cache-dir -r requirements.lock.txt
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2: Development (hot-reload, debug-friendly)
@@ -74,12 +74,15 @@ FROM deps AS production
 RUN groupadd -r dataforge && useradd -r -g dataforge -d /app -s /usr/sbin/nologin dataforge
 
 # Install Playwright browsers (only chromium, minimal deps)
-RUN mkdir -p /ms-playwright && playwright install chromium 2>&1 | tail -3 && chown -R dataforge:dataforge /ms-playwright
+RUN mkdir -p /ms-playwright && playwright install chromium 2>&1 | tail -3 && playwright install-deps chromium && chown -R dataforge:dataforge /ms-playwright
 
 # Copy application code
 COPY backend/ backend/
 COPY frontend/ frontend/
 COPY scripts/ scripts/
+
+# Ensure data directory exists and is owned by dataforge
+RUN mkdir -p /app/backend/data && chown -R dataforge:dataforge /app/backend/data
 
 # Security: drop root privileges
 RUN chown -R dataforge:dataforge /app

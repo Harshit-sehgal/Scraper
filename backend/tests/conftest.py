@@ -23,6 +23,27 @@ def pytest_configure(config):
         "markers",
         "postgres: tests that require a running Postgres instance (via testcontainers). Skipped by default.",
     )
+    try:
+        from testcontainers.postgres import PostgresContainer
+        def patched_get_connection_url(self, host=None):
+            username = getattr(self, "username", getattr(self, "POSTGRES_USER", "testuser"))
+            password = getattr(self, "password", getattr(self, "POSTGRES_PASSWORD", "testpassword"))
+            dbname = getattr(self, "dbname", getattr(self, "POSTGRES_DB", "testdb"))
+            port = getattr(self, "port", getattr(self, "port_to_expose", 5432))
+            driver = getattr(self, "driver", "") or ""
+            if driver and not driver.startswith("+"):
+                driver = f"+{driver}"
+            return self._create_connection_url(
+                dialect="postgresql{}".format(driver),
+                username=username,
+                password=password,
+                dbname=dbname,
+                host="127.0.0.1",
+                port=port
+            )
+        PostgresContainer.get_connection_url = patched_get_connection_url
+    except Exception:
+        pass
 
 
 def pytest_collection_modifyitems(config, items):
@@ -52,6 +73,12 @@ if str(BACKEND_ROOT) not in sys.path:
 
 # Keep test state isolated from developer runtime state.
 os.environ.setdefault("DATAFORGE_STATE_FILE", str(ROOT / "backend" / "data" / "jobs_state_test.json"))
+
+# Set development environment and disable API key validation for tests
+os.environ["DATAFORGE_ENV"] = "development"
+os.environ["DATAFORGE_API_KEY"] = ""
+os.environ["DATAFORGE_ADMIN_API_KEY"] = ""
+os.environ["DATAFORGE_OPERATOR_API_KEY"] = ""
 
 try:
     from app import main as main_mod  # noqa: E402

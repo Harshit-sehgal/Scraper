@@ -324,7 +324,8 @@ def store_captures(url: str, payloads: list[dict]) -> None:
     for p in payloads:
         try:
             total_new_bytes += len(json.dumps(p, ensure_ascii=False, default=str))
-        except Exception:
+        except Exception as e:
+            logger.debug("[BrowserNetwork] Failed to estimate payload size for %s: %s", url, e)
             total_new_bytes += 1024  # Conservative fallback estimate
 
     # Enforce memory caps
@@ -340,13 +341,15 @@ def store_captures(url: str, payloads: list[dict]) -> None:
     for p in reversed(existing):
         try:
             total_bytes += len(json.dumps(p, ensure_ascii=False, default=str))
-        except Exception:
+        except Exception as e:
+            logger.debug("[BrowserNetwork] Failed to size existing payload for %s: %s", url, e)
             total_bytes += 1024
     while total_bytes > _MAX_BYTES_PER_URL and len(existing) > 1:
         removed = existing.pop(0)
         try:
             total_bytes -= len(json.dumps(removed, ensure_ascii=False, default=str))
-        except Exception:
+        except Exception as e:
+            logger.debug("[BrowserNetwork] Failed to size removed payload for %s: %s", url, e)
             total_bytes -= 1024
 
     _captured_payloads[url] = existing
@@ -391,7 +394,8 @@ def _evict_lru_captures() -> None:
     for u, payloads in _captured_payloads.items():
         try:
             bytes_for_url = sum(len(_json.dumps(p, ensure_ascii=False, default=str)) for p in payloads)
-        except Exception:
+        except Exception as e:
+            logger.debug("[BrowserNetwork] Failed to compute bytes for URL %s: %s", u, e)
             bytes_for_url = len(payloads) * 1024
         url_bytes.append((u, bytes_for_url))
         total_bytes += bytes_for_url
@@ -464,8 +468,9 @@ async def setup_network_capture(page) -> list[dict]:
             # Try to parse JSON body
             try:
                 body = await response.json()
-            except Exception:
-                # Not JSON — skip
+            except Exception as e:
+                # Not JSON — skip with debug log
+                logger.debug("[BrowserNetwork] Response %s is not JSON: %s", _truncate_url(url), e)
                 return
 
             if body is None:
@@ -489,13 +494,15 @@ async def setup_network_capture(page) -> list[dict]:
             for p in captured:
                 try:
                     total_bytes += len(json.dumps(p, ensure_ascii=False, default=str))
-                except Exception:
+                except Exception as e:
+                    logger.debug("[BrowserNetwork] Failed to size captured payload for %s: %s", url, e)
                     total_bytes += 1024
 
             # Estimate new payload size
             try:
                 new_bytes = len(json.dumps(body, ensure_ascii=False, default=str))
-            except Exception:
+            except Exception as e:
+                logger.debug("[BrowserNetwork] Failed to estimate response payload size for %s: %s", url, e)
                 new_bytes = 1024
 
             if total_bytes + new_bytes > _MAX_BYTES_PER_URL:
