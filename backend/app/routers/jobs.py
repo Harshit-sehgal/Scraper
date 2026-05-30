@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import logging
-import os
 import threading
 from typing import Callable
 
@@ -40,8 +39,7 @@ def _is_worker_mode() -> bool:
     in-memory stores. Read endpoints should check the persistent store
     as a fallback to avoid serving stale data.
     """
-    wq = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
-    return bool(wq and wq.lower() in ("1", "true", "yes"))
+    return settings.WORKER_QUEUE
 
 
 def _refresh_job_from_repo(job: Job, jobs_store: dict) -> Job:
@@ -280,8 +278,6 @@ def create_jobs_router(
     async def create_job(
         job_data: JobCreate, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
     ):
-        import os
-
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
         urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
 
@@ -312,8 +308,7 @@ def create_jobs_router(
 
         # If DATAFORGE_WORKER_QUEUE is set, enqueue the job for async
         # processing
-        worker_queue_enabled = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
-        if worker_queue_enabled and worker_queue_enabled.lower() in ("1", "true", "yes"):
+        if settings.WORKER_QUEUE:
             try:
                 from app.worker_queue import get_worker_queue, Priority
 
@@ -385,10 +380,7 @@ def create_jobs_router(
             mark_job_canceled(job, "Canceled before execution.")
 
         # Cancel the queued task if worker queue is enabled
-        import os as _os
-
-        worker_queue_enabled = _os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
-        if worker_queue_enabled and worker_queue_enabled.lower() in ("1", "true", "yes"):
+        if settings.WORKER_QUEUE:
             try:
                 from app.worker_queue import get_worker_queue
 

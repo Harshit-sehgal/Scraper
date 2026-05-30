@@ -61,15 +61,15 @@ def _safe_cell(value):
     return value
 
 
+from app.config import settings
+
+
 def create_exports_router(jobs_store: dict):
     router = APIRouter()
 
     def _refresh_job_for_export(job_id: str):
         """Refresh job from repository in worker mode to avoid stale exports."""
-        import os
-
-        wq = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
-        if wq and wq.lower() in ("1", "true", "yes"):
+        if settings.WORKER_QUEUE:
             try:
                 from app.storage_interface import get_job_repository
 
