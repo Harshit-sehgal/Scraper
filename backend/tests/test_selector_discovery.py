@@ -224,19 +224,12 @@ class TestValuePatternsToFieldTypes:
         types = [r["type"] for r in result]
         assert "date" in types
 
-    def test_code_3letter_or_airport(self):
+    def test_code_3letter(self):
         patterns = ValuePatterns()
         patterns.codes_3letter = ["LHR"]
         result = _value_patterns_to_field_types(patterns)
         types = [r["type"] for r in result]
         assert "code" in types
-
-        # Also test airport_codes works
-        patterns2 = ValuePatterns()
-        patterns2.airport_codes = ["JFK"]
-        result2 = _value_patterns_to_field_types(patterns2)
-        types2 = [r["type"] for r in result2]
-        assert "code" in types2
 
     def test_multiple_patterns(self):
         patterns = ValuePatterns()
@@ -287,13 +280,13 @@ class TestRenameGenericFields:
         result = _rename_generic_fields(fields)
         assert result[0]["name"] == "price"
 
-    def test_renames_3letter_code_to_airport_code(self):
-        """Code field with 3-letter uppercase example should become 'airport_code'."""
+    def test_renames_3letter_code_to_three_letter_code(self):
+        """Code field with 3-letter uppercase example should become 'three_letter_code'."""
         fields = [
             {"name": "code", "type": "code", "example_value": "LHR", "confidence": 0.8},
         ]
         result = _rename_generic_fields(fields)
-        assert result[0]["name"] == "airport_code"
+        assert result[0]["name"] == "three_letter_code"
 
     def test_renames_2letter_code_to_abbreviation(self):
         """Code field with 2-letter uppercase example should become 'code_abbreviation'."""
@@ -360,8 +353,8 @@ class TestInferFieldName:
         assert _infer_field_name("£1,200", "currency") == "price"
 
     def test_3letter_code_example(self):
-        assert _infer_field_name("LHR", "code") == "airport_code"
-        assert _infer_field_name("JFK", "code") == "airport_code"
+        assert _infer_field_name("LHR", "code") == "three_letter_code"
+        assert _infer_field_name("JFK", "code") == "three_letter_code"
 
     def test_2letter_code_example(self):
         assert _infer_field_name("NY", "code") == "code_abbreviation"

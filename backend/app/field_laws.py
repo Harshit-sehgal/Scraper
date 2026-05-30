@@ -36,10 +36,11 @@ FREE_ENERGY_CLAMP = 2.0
 # Moved here from semantic_allocation_engine.py to prevent upward dependency
 # from core_types.py (the foundational type layer) to the allocation engine.
 ROLE_EXCLUSIVITY: List[Tuple[str, str]] = [
-    ("origin", "destination"),
-    ("departure", "arrival"),
+    # Domain-agnostic role pairs (not transportation-specific)
     ("start", "end"),
     ("price", "cost"),
+    ("source", "target"),
+    ("input", "output"),
 ]
 
 # Semantic needs that must not align to the same schema slot

@@ -183,11 +183,6 @@ def _alignment_score(
 
     pk_need = tokens_to_semantic_need(pk_tokens)
     sf_need = tokens_to_semantic_need(sf_tokens)
-    if pk_need == "date" and sf_need == "date":
-        if "departure" in sf_tokens or "depart" in sf_tokens:
-            score += settings.PROFILE_ALIGNMENT_SCORE_DEPARTURE_BIAS
-        elif "arrival" in sf_tokens:
-            score -= settings.PROFILE_ALIGNMENT_SCORE_DEPARTURE_BIAS / 2
 
     profile_type = _profile_field_type_hint(profile_field_cfg)
     score += _schema_type_alignment_bonus(profile_type, schema_field)

@@ -61,7 +61,6 @@ class Settings(BaseSettings):
     PROFILE_ALIGNMENT_SCORE_REVERSE_SUBSTRING: float = 40.0
     PROFILE_ALIGNMENT_SCORE_SYNONYM: float = 50.0
     PROFILE_ALIGNMENT_SCORE_TYPE_BONUS: float = 25.0
-    PROFILE_ALIGNMENT_SCORE_DEPARTURE_BIAS: float = 35.0
     PROFILE_ALIGNMENT_NEGATIVE_PENALTY: float = 500.0
     PROFILE_SELECTOR_TYPE_COMPATIBILITY: dict[str, tuple[str, ...]] = {
         "currency": ("currency", "float", "number"),
