@@ -22,6 +22,7 @@ from app.semantic_boundary_engine import group_adjacent_entities
 
 from app.semantic_persistence import clear_semantic_state
 
+
 def _clean_engine():
     clear_semantic_state(clear_file=False)
 
@@ -120,7 +121,8 @@ def test_job_allocation():
     assert r["company"] == "Google"
     has_digit = any(r.get(f) and any(c.isdigit() for c in str(r.get(f)))
                     for f in ["salary", "experience"])
-    assert has_digit, f"No fields have digits: { {f: r.get(f) for f in ['company', 'salary', 'currency', 'experience']} }"
+    fields_str = {f: r.get(f) for f in ['company', 'salary', 'currency', 'experience']}
+    assert has_digit, f"No fields have digits: {fields_str}"
 
 
 def test_spanish_allocation():
@@ -410,21 +412,22 @@ def test_transition_detector_high_list():
     high = t.get_high_transition_types()
     assert len(high) >= 2  # Should have at least a few high-transition pairs
 
+
 def test_layer5_contradiction_learning():
     _clean_engine()
     from app.semantic_pipeline import run_pipeline
-    
+
     # 1. Provide a record and force a bad allocation that violates universal roots
     # "price" expects a PRICE type, but we force it to accept a TEXT type.
     records = [{"company": "Google", "price": "NotAPrice"}]
     schema = ["company_name", "price"]
-    
+
     reng = _get_role_engine()
     # Force it to think text is great for price
     reng.compatibility_cache[("price", "text")] = 0.9
-    
+
     run_pipeline(records, schema)
-    
+
     # The pipeline should detect the type warning and penalize the compatibility
     compat = reng.compatibility_cache.get(("price", "text"), 0.5)
     # Give it a tiny bit of leeway for float imprecision, or adjust learning delta check

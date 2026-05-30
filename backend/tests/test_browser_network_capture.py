@@ -9,9 +9,10 @@ from app import browser_network_capture
 async def test_live_network_capture_limits():
     # 1. Mock Playwright Page and Response
     page = MagicMock()
-    
+
     # 2. Register mock listener callback
     on_calls = {}
+
     def fake_on(event, callback):
         on_calls[event] = callback
     page.on = fake_on
@@ -30,7 +31,7 @@ async def test_live_network_capture_limits():
         mock_response.status = 200
         mock_response.headers = {"content-type": "application/json"}
         mock_response.json = AsyncMock(return_value={"id": i, "val": "x" * 100})
-        
+
         await _on_response(mock_response)
 
     # 4. Assert count cap is respected (50 payloads max)
@@ -42,9 +43,10 @@ async def test_live_network_capture_limits():
 async def test_live_network_capture_byte_limit():
     # 1. Mock Playwright Page and Response
     page = MagicMock()
-    
+
     # Register mock listener callback
     on_calls = {}
+
     def fake_on(event, callback):
         on_calls[event] = callback
     page.on = fake_on
@@ -60,10 +62,10 @@ async def test_live_network_capture_byte_limit():
     mock_response.request.url = "https://example.com/api/huge"
     mock_response.status = 200
     mock_response.headers = {"content-type": "application/json"}
-    
+
     # Create massive body exceeding 10 MB limit
     mock_response.json = AsyncMock(return_value={"large_data": "y" * (12 * 1024 * 1024)})
-    
+
     await _on_response(mock_response)
 
     # Assert payload was discarded due to exceeding byte cap

@@ -487,7 +487,7 @@ class TestTrendAnalyzerCategorization:
         report = analyzer.analyze(history)
         all_domains = set()
         for lst in [report.improving_domains, report.stable_domains,
-                     report.degrading_domains, report.unseen_domains]:
+                    report.degrading_domains, report.unseen_domains]:
             for d in lst:
                 assert d not in all_domains, f"{d} appears in multiple lists"
                 all_domains.add(d)

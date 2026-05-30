@@ -20,7 +20,7 @@ def test_field_conflict_drives_exclusion_learning():
 
     tokens = [
         SemanticToken(raw="LAX", normalized="lax", primary_type=SemanticType.LOCATION,
-                     span=Span(0, 3), position=0)
+                      span=Span(0, 3), position=0)
     ]
 
     ws.observe_field_perturbation(output, tokens)
@@ -42,11 +42,11 @@ def test_no_field_conflict_does_not_reinforce():
     output = {"origin": "JFK", "destination": "LAX"}
     tokens = [
         SemanticToken(raw="JFK", normalized="jfk", primary_type=SemanticType.LOCATION,
-                     span=Span(0, 3), position=0),
+                      span=Span(0, 3), position=0),
         SemanticToken(raw="LAX", normalized="lax", primary_type=SemanticType.LOCATION,
-                     span=Span(4, 7), position=1)
+                      span=Span(4, 7), position=1)
     ]
-    
+
     # Observe clean record
     ws.observe_field_perturbation(output, tokens)
     # Trigger decay (Law 3)
@@ -105,6 +105,7 @@ def test_contradiction_pressure_triggers_restructuring():
     # Monkey-patch restructure_topology to detect if it was called
     was_restructured = [False]
     original = ws._topology.restructure_topology
+
     def tracked_restructure(*args, **kwargs):
         was_restructured[0] = True
         return original(*args, **kwargs)
@@ -125,11 +126,11 @@ def test_contradiction_pressure_triggers_restructuring():
 
     tokens = [
         SemanticToken(raw="LAX", normalized="lax",
-                     primary_type=SemanticType.LOCATION,
-                     span=Span(0, 3), position=0),
+                      primary_type=SemanticType.LOCATION,
+                      span=Span(0, 3), position=0),
         SemanticToken(raw="100", normalized="100",
-                     primary_type=SemanticType.NUMBER,
-                     span=Span(4, 7), position=1),
+                      primary_type=SemanticType.NUMBER,
+                      span=Span(4, 7), position=1),
     ]
 
     try:
@@ -155,6 +156,7 @@ def test_contradiction_pressure_low_does_not_restructure():
     # Monkey-patch to detect if restructure_topology was called
     was_restructured = [False]
     original = ws._topology.restructure_topology
+
     def tracked_restructure(*args, **kwargs):
         was_restructured[0] = True
         return original(*args, **kwargs)
@@ -169,8 +171,8 @@ def test_contradiction_pressure_low_does_not_restructure():
 
     tokens = [
         SemanticToken(raw="JFK", normalized="jfk",
-                     primary_type=SemanticType.LOCATION,
-                     span=Span(0, 3), position=0),
+                      primary_type=SemanticType.LOCATION,
+                      span=Span(0, 3), position=0),
     ]
 
     try:

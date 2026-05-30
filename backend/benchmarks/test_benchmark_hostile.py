@@ -30,6 +30,7 @@ app = FastAPI()
 
 # ─── Hostile Endpoints ──────────────────────────────────────────────────
 
+
 @app.get("/broken", response_class=HTMLResponse)
 async def broken_html():
     return """
@@ -45,6 +46,7 @@ async def broken_html():
             <span class="price">$25.00
     </body>
     """
+
 
 @app.get("/dynamic", response_class=HTMLResponse)
 async def dynamic_html():
@@ -63,6 +65,7 @@ async def dynamic_html():
     </body></html>
     """
 
+
 @app.get("/anti-bot", response_class=HTMLResponse)
 async def anti_bot():
     return """
@@ -76,6 +79,7 @@ async def anti_bot():
     </script>
     </body></html>
     """
+
 
 @app.get("/lazy", response_class=HTMLResponse)
 async def lazy_load():
@@ -98,6 +102,7 @@ async def lazy_load():
     </script>
     </body></html>
     """
+
 
 @app.get("/infinite", response_class=HTMLResponse)
 async def infinite_scroll():
@@ -127,6 +132,7 @@ async def infinite_scroll():
     </body></html>
     """
 
+
 @app.get("/malformed", response_class=HTMLResponse)
 async def malformed_dom():
     return """
@@ -146,8 +152,10 @@ async def malformed_dom():
 
 # ─── Benchmark Runner ───────────────────────────────────────────────────
 
+
 def start_server():
     uvicorn.run(app, host="127.0.0.1", port=8888, log_level="warning")
+
 
 async def run_benchmarks():
     fields = [
@@ -165,9 +173,9 @@ async def run_benchmarks():
         ("Malformed DOM", f"{base_url}/malformed", 2),
     ]
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print(" DATAFORGE SCRAPER HOSTILE BENCHMARKS")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     telemetry = get_scrape_telemetry()
 
@@ -185,9 +193,9 @@ async def run_benchmarks():
 
             status = "PASSED" if len(results) >= expected else "FAILED"
             if name == "Anti-Bot Detection" and t_data.get("anti_bot_score", 0) > 0.5:
-                 status = "PASSED (Detected)"
+                status = "PASSED (Detected)"
             elif name == "Anti-Bot Detection" and len(results) == 0:
-                 status = "PASSED (Blocked)"
+                status = "PASSED (Blocked)"
 
             print(f"{status:15} | Records: {len(results):2} | Time: {elapsed:5.2f}s")
 
@@ -199,9 +207,9 @@ async def run_benchmarks():
         except Exception as e:
             print(f"ERROR: {e}")
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print(" BENCHMARKS COMPLETE")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
 if __name__ == "__main__":
     # Allow rapid requests to local server
@@ -211,6 +219,6 @@ if __name__ == "__main__":
 
     server_thread = threading.Thread(target=start_server, daemon=True)
     server_thread.start()
-    time.sleep(2) # Give server time to start
+    time.sleep(2)  # Give server time to start
 
     asyncio.run(run_benchmarks())

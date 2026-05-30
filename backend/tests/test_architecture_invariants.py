@@ -83,7 +83,7 @@ def test_no_orphan_methods():
                 content = f.read()
             for method in list(methods):
                 # Check both method-call style .method() and property access .method
-                if f".{method}(" in content or f".{method}," in content or f".{method})" in content or f".{method}[" in content or f".{method} " in content:
+                if f".{method}(" in content or f".{method}," in content or f".{method})" in content or f".{method}[" in content or f".{method} " in content:  # noqa: E501
                     called.add(method)
 
     uncalled = methods - called - {
@@ -97,9 +97,9 @@ def test_no_orphan_methods():
         "update_scale_coupling", "redistribute_instability",
         "observe_field_perturbation",
         "field_regions", "learned_exclusions",
-        "decay_field_regions",                "meso_clusters",
-                "macro_continents", "compute_macro_continents",
-                "trace_causality", "replay_transaction",
+        "decay_field_regions", "meso_clusters",
+        "macro_continents", "compute_macro_continents",
+        "trace_causality", "replay_transaction",
         "evolved_schema", "export_manifold", "import_federated_manifold",
         "export_topology_laws", "import_federated_laws",
         "get_cognitive_health",

@@ -106,7 +106,17 @@ class TestDedupeRecords:
 
     def test_fallback_to_all_fields(self):
         """When no name/company/title fields, use all fields as identity."""
-        schema = [SchemaField(name="code", field_type=FieldType.STRING, description="", required=False), SchemaField(name="price", field_type=FieldType.FLOAT, description="", required=False)]
+        schema = [
+            SchemaField(
+                name="code",
+                field_type=FieldType.STRING,
+                description="",
+                required=False),
+            SchemaField(
+                name="price",
+                field_type=FieldType.FLOAT,
+                description="",
+                required=False)]
         records = [
             {"code": "A1", "price": "10"},
             {"code": "A1", "price": "10"},
@@ -271,7 +281,7 @@ class TestAlignProfileKeysToSchema:
         schema = [
             SchemaField(name="airlines_name", field_type=FieldType.STRING, description="Name of the airline", required=False),
             SchemaField(name="origin_airport", field_type=FieldType.STRING, description="Airport of origin", required=False),
-            SchemaField(name="destination_airport", field_type=FieldType.STRING, description="Airport of destination", required=False),
+            SchemaField(name="destination_airport", field_type=FieldType.STRING, description="Airport of destination", required=False),  # noqa: E501
             SchemaField(name="prices", field_type=FieldType.CURRENCY, description="Price of the flight", required=False),
             SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure", required=False),
             SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival", required=False),
@@ -293,7 +303,11 @@ class TestAlignProfileKeysToSchema:
             SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure", required=False),
             SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival", required=False),
         ]
-        aligned = align_profile_keys_to_schema(records, schema, profile_fields={"return_date": {"type": "text"}, "date": {"type": "text"}})
+        aligned = align_profile_keys_to_schema(
+            records, schema, profile_fields={
+                "return_date": {
+                    "type": "text"}, "date": {
+                    "type": "text"}})
         assert aligned[0]["departure_date"] == "30-05-2026"
         assert aligned[0]["arrival_date"] == "01-06-2026"
 
@@ -319,4 +333,3 @@ class TestAlignProfileKeysToSchema:
         aligned = align_profile_keys_to_schema(records, schema)
         assert aligned[0]["departure_date"] == "30-05-2026"
         assert aligned[0].get("arrival_date") is None
-

@@ -7,6 +7,9 @@ This file is not collected by pytest under the current pytest.ini. Results are
 network-dependent and should be treated as live smoke observations, not proof of
 universal extraction behavior.
 """
+from app.config import settings
+from app.scraper import scrape_url
+from app.models import FieldType, SchemaField
 import asyncio
 import json
 import logging
@@ -25,13 +28,11 @@ logging.getLogger("app.extraction_orchestrator").setLevel(logging.WARNING)
 logging.getLogger("app.html_utils").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-from app.models import FieldType, SchemaField
-from app.scraper import scrape_url
-from app.config import settings
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Site Definitions
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class SiteTest:
@@ -41,6 +42,7 @@ class SiteTest:
     schema: list[SchemaField]
     min_record_score: float = 0.2
     min_expected: int = 0  # 0 = no strict expectation (observational)
+
 
 SITES: list[SiteTest] = [
     SiteTest(
@@ -346,6 +348,7 @@ SITES: list[SiteTest] = [
 # Result Tracking
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class SiteResult:
     name: str
@@ -366,6 +369,7 @@ class SiteResult:
 # ─────────────────────────────────────────────────────────────────────────────
 # Test Runner
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def test_site(site: SiteTest, index: int, total: int) -> SiteResult:
     """Run scrape_url against one site and return structured results."""
@@ -535,9 +539,10 @@ def print_report(results: list[SiteResult]):
 
         fields_str = ", ".join(r.fields_found[:4])
         if len(r.fields_found) > 4:
-            fields_str += f" +{len(r.fields_found)-4}"
+            fields_str += f" +{len(r.fields_found) - 4}"
 
-        print(f"| {i} | {r.name} | {r.category} | {r.records} | {r.extraction_method[:12]} | {r.quality:.2f} | {fields_str[:40]} | {r.fetch_time_ms/1000:.1f} | {notes[:45]} |")
+        print(
+            f"| {i} | {r.name} | {r.category} | {r.records} | {r.extraction_method[:12]} | {r.quality:.2f} | {fields_str[:40]} | {r.fetch_time_ms / 1000:.1f} | {notes[:45]} |")  # noqa: E501
 
     # Detailed per-site results
     print("\n\n## Per-Site Details\n")
@@ -551,7 +556,7 @@ def print_report(results: list[SiteResult]):
         print(f"- **Avg quality:** {r.quality}")
         fields_display = ', '.join(r.fields_found) if r.fields_found else '*none*'
         print(f"- **Fields found:** {fields_display}")
-        print(f"- **Fetch time:** {r.fetch_time_ms/1000:.1f}s")
+        print(f"- **Fetch time:** {r.fetch_time_ms / 1000:.1f}s")
         print(f"- **DOM nodes:** {r.dom_nodes}")
         print(f"- **Anti-bot score:** {r.anti_bot_score}")
 
@@ -676,9 +681,9 @@ def compare_with_previous(results: list[SiteResult], history_dir: str = "smoke_t
     curr_sites = sum(1 for r in results if r.records > 0)
     curr_records = sum(r.records for r in results)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("BENCHMARK TREND vs Previous Run")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Previous: {prev.get('timestamp', 'unknown')} — {prev_sites} sites, {prev_records} records")
     print(f"Current:  {time.strftime('%Y-%m-%d %H:%M:%S')} — {curr_sites} sites, {curr_records} records")
     print(f"  Improved:  +{len(improved)} sites" + (f" ({', '.join(improved[:5])})" if improved else ""))

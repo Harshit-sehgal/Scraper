@@ -4,6 +4,7 @@ from pathlib import Path
 from app import main as main_mod
 from app.models import Job, JobStatus, ScrapeMode
 
+
 @pytest.fixture(autouse=True)
 def mock_dns_resolution(monkeypatch):
     """Mock socket.getaddrinfo to make tests DNS-independent and prevent external lookups,
@@ -147,6 +148,7 @@ def test_clear_terminal_jobs_preserves_result_files(client, tmp_path, monkeypatc
     # Crucially, the result file MUST still exist!
     assert result_file.exists(), "The result file was deleted, but it should have been preserved!"
 
+
 def test_backfill_metadata_only_saves_single_job(client, monkeypatch):
     """Verify that backfill-metadata endpoint only saves the single job updated and doesn't call a global save."""
     saved_jobs = []
@@ -156,6 +158,7 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch):
 
     # Track if persist_state gets called
     persist_called = False
+
     def mock_persist_state(**kwargs):
         nonlocal persist_called
         persist_called = True
@@ -163,7 +166,12 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch):
 
     # Mock infer_source_metadata to return a mock inferred dict
     from app import discovery
-    monkeypatch.setattr(discovery, "infer_source_metadata", lambda url: {"source_type": "inferred_type", "source_trust_score": 0.85})
+    monkeypatch.setattr(
+        discovery,
+        "infer_source_metadata",
+        lambda url: {
+            "source_type": "inferred_type",
+            "source_trust_score": 0.85})
 
     # Seed a job with unknown source_type
     job_id = "test_backfill_job"
@@ -189,6 +197,7 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch):
 
     # Verify that a global save or persist_state was NOT triggered to prevent concurrency risk
     assert not persist_called, "Global persist_state was called, bringing back concurrency risk!"
+
 
 def test_create_job_enqueue_failure_cleanup(client, monkeypatch):
     """Verify that if enqueue fails in production, the job is removed from memory and repository (not left orphaned)."""
@@ -220,6 +229,7 @@ def test_create_job_enqueue_failure_cleanup(client, monkeypatch):
 
     # Verify job is NOT in memory store
     assert len(main_mod.jobs_store) == 0
+
 
 def test_auto_discovery_url_filtering(client, monkeypatch):
     """Verify that auto-discovered URLs are filtered against SSRF protections in both API and Job runner contexts."""
@@ -255,6 +265,7 @@ def test_auto_discovery_url_filtering(client, monkeypatch):
     assert len(urls) == 2
     assert urls[0]["url"] == "https://example.com/safe-item"
     assert urls[1]["url"] == "https://google.com/safe-google"
+
 
 @pytest.mark.asyncio
 async def test_search_form_recovery_ssrf_blocking(monkeypatch):
@@ -380,7 +391,7 @@ def test_body_size_limit_chunked_oversized(client, monkeypatch):
 
     # A generator yielding 6MB in chunks
     async def chunk_generator():
-        chunk = b"a" * (1024 * 1024) # 1MB
+        chunk = b"a" * (1024 * 1024)  # 1MB
         for _ in range(6):
             yield chunk
 

@@ -5,6 +5,13 @@ call counting, and the SubstratePluginManager.
 """
 
 from __future__ import annotations
+from app.llm_bridge import SubstratePluginManager, get_plugin_manager, reset_plugin_manager
+from app.llm_bridge import llm_json, llm_json_fast, llm_text
+from app.llm_bridge import _call_openai_compatible_json, _call_openai_compatible_text
+from app.llm_bridge import get_llm_call_count, reset_llm_call_count
+from app.llm_bridge import _record_llm_degradation
+from app.llm_bridge import _groq_model_candidates
+from app.llm_bridge import _should_retry_http_error
 
 import os
 import pytest
@@ -64,8 +71,6 @@ class TestExtractJsonPayload:
 
 # ─── _should_retry_http_error ──────────────────────────────────────────
 
-from app.llm_bridge import _should_retry_http_error
-
 
 class TestShouldRetryHttpError:
     def test_retryable_http_status(self):
@@ -105,39 +110,35 @@ class TestShouldRetryHttpError:
 
 # ─── _groq_model_candidates ────────────────────────────────────────────
 
-from app.llm_bridge import _groq_model_candidates
-
 
 class TestGroqModelCandidates:
     def test_defaults_when_no_env_vars(self):
         with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "llama-3.3-70b-versatile"), \
-             patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant"):
+                patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant"):
             models = _groq_model_candidates()
             assert models == ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 
     def test_uses_settings(self):
         with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "mixtral-8x7b-32768"), \
-             patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama2-70b-4096"):
+                patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama2-70b-4096"):
             models = _groq_model_candidates()
             assert models == ["mixtral-8x7b-32768", "llama2-70b-4096"]
 
     def test_deduplicates_identical_models(self):
         with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "llama-3.3-70b-versatile"), \
-             patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama-3.3-70b-versatile"):
+                patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama-3.3-70b-versatile"):
             models = _groq_model_candidates()
             assert models == ["llama-3.3-70b-versatile"]  # Deduplicated
 
     def test_uses_defaults_on_none(self):
         with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", ""), \
-             patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", ""):
+                patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", ""):
             models = _groq_model_candidates()
             # Empty strings resolve to defaults due to `or` operator
             assert models == ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 
 
 # ─── _record_llm_degradation ───────────────────────────────────────────
-
-from app.llm_bridge import _record_llm_degradation
 
 
 class TestRecordLlmDegradation:
@@ -155,8 +156,6 @@ class TestRecordLlmDegradation:
 
 
 # ─── Call Counting ─────────────────────────────────────────────────────
-
-from app.llm_bridge import get_llm_call_count, reset_llm_call_count
 
 
 class TestCallCounting:
@@ -177,11 +176,10 @@ class TestCallCounting:
 
 # ─── HTTP-level helpers (_call_openai_compatible_json/_text) ───────────
 
-from app.llm_bridge import _call_openai_compatible_json, _call_openai_compatible_text
-
 
 class _MockAsyncClient:
     """Helper: creates an async client mock whose post() returns awaitable responses."""
+
     def __init__(self, response_sequence=None):
         # response_sequence: list of response objects or callables that return responses
         self.response_sequence = response_sequence or []
@@ -299,8 +297,6 @@ class TestCallOpenaiCompatibleText:
 
 # ─── llm_json / llm_json_fast / llm_text ───────────────────────────────
 
-from app.llm_bridge import llm_json, llm_json_fast, llm_text
-
 
 class TestLlmJson:
     @pytest.mark.asyncio
@@ -409,8 +405,6 @@ class TestLlmText:
 
 # ─── SubstratePluginManager ────────────────────────────────────────────
 
-from app.llm_bridge import SubstratePluginManager, get_plugin_manager, reset_plugin_manager
-
 
 class TestSubstratePluginManager:
     def setup_method(self):
@@ -418,6 +412,7 @@ class TestSubstratePluginManager:
 
     def test_register_handler(self):
         mgr = SubstratePluginManager()
+
         def handler(**kwargs):
             return "ok"
         mgr.register_handler("test_handler", handler)
@@ -425,6 +420,7 @@ class TestSubstratePluginManager:
 
     def test_call_tool_executes_handler(self):
         mgr = SubstratePluginManager()
+
         def handler(**kwargs):
             return f"processed {kwargs.get('x')}"
         mgr.register_handler("echo", handler)
@@ -438,6 +434,7 @@ class TestSubstratePluginManager:
 
     def test_call_tool_records_execution_history(self):
         mgr = SubstratePluginManager()
+
         def handler(**kwargs):
             return "done"
         mgr.register_handler("h1", handler)
@@ -448,6 +445,7 @@ class TestSubstratePluginManager:
 
     def test_call_tool_records_failure_in_history(self):
         mgr = SubstratePluginManager()
+
         def handler(**kwargs):
             raise ValueError("oops")
         mgr.register_handler("failing", handler)
@@ -460,6 +458,7 @@ class TestSubstratePluginManager:
         ws_mock.get_system_pressure.return_value = 0.9
 
         mgr = SubstratePluginManager(ws=ws_mock)
+
         def handler(**kwargs):
             return "should not reach"
         mgr.register_handler("blocked", handler)

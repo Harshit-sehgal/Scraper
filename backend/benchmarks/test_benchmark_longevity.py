@@ -12,6 +12,7 @@ import random
 from app.semantic_world_state import SemanticWorldState
 from app.semantic_ir import SemanticType, SemanticToken, Span
 
+
 def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 0.5):
     ws = SemanticWorldState()
     ws.clear()
@@ -99,6 +100,7 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
     print(f"Causal Journal Size: {len(journal_size)}")
 
     print("\n[OK] Synthetic longevity invariants held for this run.")
+
 
 if __name__ == "__main__":
     # Running 20k sample for validation

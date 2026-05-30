@@ -9,7 +9,7 @@ payload = {
     "urls": [],
     "topic": "interior designers",
     "location": "Chennai",
-    "schema_fields": [{"name":"company_name", "field_type": "string"}, {"name":"contact_phone", "field_type": "phone"}],
+    "schema_fields": [{"name": "company_name", "field_type": "string"}, {"name": "contact_phone", "field_type": "phone"}],
     "max_pages": 15
 }
 r = requests.post(f"{API}/api/jobs", json=payload)

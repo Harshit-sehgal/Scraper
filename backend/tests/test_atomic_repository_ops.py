@@ -2,6 +2,7 @@ import pytest
 from app.models import Job, JobStatus
 from app.storage_interface import SQLiteJobRepository
 
+
 @pytest.fixture(autouse=True)
 def clean_job_store():
     from app.job_store import reset_job_store_for_tests, _get_connection, _DB_LOCK
@@ -14,6 +15,7 @@ def clean_job_store():
             conn.commit()
         finally:
             conn.close()
+
 
 def test_sqlite_repository_atomic_move_and_restore():
     repo = SQLiteJobRepository()
@@ -49,6 +51,7 @@ def test_sqlite_repository_atomic_move_and_restore():
     assert job.id in repo.load_jobs()
     assert len(repo.load_recycle_bin()) == 0
 
+
 def test_sqlite_repository_atomic_hard_delete():
     repo = SQLiteJobRepository()
 
@@ -69,6 +72,7 @@ def test_sqlite_repository_atomic_hard_delete():
     assert deleted is True
     assert job.id not in repo.load_recycle_bin()
     assert job.id not in repo.load_jobs()
+
 
 def test_sqlite_repository_clear_terminal_jobs():
     repo = SQLiteJobRepository()

@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from app.config import settings
 from app.main import lifespan
 
+
 @pytest.mark.asyncio
 async def test_production_security_enforcement_wildcard_cors(monkeypatch):
     monkeypatch.setattr(settings, "ENV", "production")

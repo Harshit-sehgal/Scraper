@@ -4,6 +4,7 @@ from app.main import app
 
 client = TestClient(app)
 
+
 def test_manual_mode():
     print("=== Testing MANUAL Mode ===")
     response = client.post("/api/jobs", json={
@@ -16,11 +17,11 @@ def test_manual_mode():
             {"name": "company_name", "field_type": "string", "description": "name of company", "required": True},
             {"name": "email", "field_type": "email", "description": "email address", "required": False}
         ],
-        "source_policy": "all_sources" # Don't block any domain
+        "source_policy": "all_sources"  # Don't block any domain
     })
     print("Create Job Response:", response.json())
     job_id = response.json()["job_id"]
-    
+
     # Wait for completion
     import time
     for _ in range(30):
@@ -31,6 +32,7 @@ def test_manual_mode():
             print("Results:", json.dumps(res.json().get("results", []), indent=2))
             break
         time.sleep(2)
+
 
 def test_auto_mode():
     print("\n=== Testing AUTO Mode ===")
@@ -44,12 +46,12 @@ def test_auto_mode():
             {"name": "company_name", "field_type": "string", "description": "name of company", "required": True},
             {"name": "email", "field_type": "email", "description": "email address", "required": False}
         ],
-        "max_pages": 1, # Just test 1 page for speed
-        "source_policy": "all_sources" # Don't block any domain
+        "max_pages": 1,  # Just test 1 page for speed
+        "source_policy": "all_sources"  # Don't block any domain
     })
     print("Create Job Response:", response.json())
     job_id = response.json()["job_id"]
-    
+
     import time
     for _ in range(30):
         res = client.get(f"/api/jobs/{job_id}")
@@ -59,6 +61,7 @@ def test_auto_mode():
             print("Results:", json.dumps(res.json().get("results", []), indent=2))
             break
         time.sleep(2)
+
 
 if __name__ == "__main__":
     import json

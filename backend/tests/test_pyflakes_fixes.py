@@ -11,7 +11,7 @@ def test_pyflakes_clean():
     """Run pyflakes programmatically over backend/app and backend/tests and assert no warnings or errors."""
     # Resolve the absolute path to the backend directory dynamically
     backend_dir = Path(__file__).resolve().parents[1]
-    
+
     result = subprocess.run(
         [sys.executable, "-m", "pyflakes", "app", "tests"],
         cwd=str(backend_dir),

@@ -1,7 +1,10 @@
+from app.html_utils import _fetch_with_httpx
+import httpx
 import pytest
 import socket
 from app.url_safety import validate_public_http_url, is_safe_ip
 from app.config import settings
+
 
 def test_is_safe_ip():
     # Public IPs should be safe
@@ -21,6 +24,7 @@ def test_is_safe_ip():
     assert is_safe_ip("169.254.169.254") is False
     assert is_safe_ip("224.0.0.1") is False
     assert is_safe_ip("240.0.0.0") is False
+
 
 def test_validate_public_http_url_basic_safety():
     # Public domains should pass
@@ -42,6 +46,7 @@ def test_validate_public_http_url_basic_safety():
     for host in ("169.254.169.254", "metadata.google.internal", "instance-data"):
         with pytest.raises(ValueError, match="restricted cloud metadata endpoint"):
             validate_public_http_url(f"http://{host}")
+
 
 def test_validate_public_http_url_dns_resolution(monkeypatch):
     monkeypatch.setattr(settings, "ENV", "production")
@@ -77,6 +82,7 @@ def test_validate_public_http_url_dns_resolution(monkeypatch):
     with pytest.raises(ValueError, match="could not be resolved"):
         validate_public_http_url("http://unresolvable-domain.com")
 
+
 def test_validate_public_http_url_allowlist(monkeypatch):
     # Set ALLOWED_INTERNAL_HOSTS config override
     monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "nginx,smoke-host")
@@ -84,6 +90,7 @@ def test_validate_public_http_url_allowlist(monkeypatch):
     # By default, internal hosts should be rejected in production/test unless smoke test mode is active
     monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "false")
     # Mock socket.getaddrinfo to simulate unresolvable hosts for internal network names
+
     def mock_getaddrinfo_fail(host, port, *args, **kwargs):
         raise socket.gaierror(-2, "Name or service not known")
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_fail)
@@ -102,6 +109,7 @@ def test_validate_public_http_url_allowlist(monkeypatch):
     validate_public_http_url("https://smoke-host/index.html")
 
 # ── IPv6 private range tests ────────────────────────────────────────────
+
 
 def test_is_safe_ip_ipv6_ranges():
     """IPv6 private, link-local, loopback, and multicast ranges are rejected."""
@@ -259,8 +267,6 @@ def test_validate_redirect_to_private_ranges(monkeypatch):
 
 # ── HTTPX redirect integration tests ────────────────────────────────────
 
-import httpx
-from app.html_utils import _fetch_with_httpx
 
 @pytest.mark.asyncio
 async def test_fetch_redirect_to_private_ip(monkeypatch):

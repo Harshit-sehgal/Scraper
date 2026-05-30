@@ -81,7 +81,6 @@ def test_rbac_endpoint_guards(client, monkeypatch):
     )
     assert resp.status_code != 403
 
-
     # --- 2. Test operator mode switcher (Requires Admin only) ---
     # Try as Operator (Should fail with 403)
     resp = client.post(

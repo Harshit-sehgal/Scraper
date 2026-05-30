@@ -10,7 +10,7 @@ payload = {
     "mode": "manual",
     "urls": ["https://example.com"],
     "location": "",
-    "schema_fields": [{"name":"title", "field_type": "string"}],
+    "schema_fields": [{"name": "title", "field_type": "string"}],
     "filters": [],
     "max_pages": 1
 }
@@ -51,8 +51,8 @@ payload2 = {
     "urls": [],
     "topic": "interior designers",
     "location": "Chennai",
-    "max_pages": 50, # Let's test with 50 first
-    "schema_fields": [{"name":"company_name", "field_type": "string"}, {"name":"contact_phone", "field_type": "phone"}, {"name":"email", "field_type": "email"}]
+    "max_pages": 50,  # Let's test with 50 first
+    "schema_fields": [{"name": "company_name", "field_type": "string"}, {"name": "contact_phone", "field_type": "phone"}, {"name": "email", "field_type": "email"}]  # noqa: E501
 }
 rcrawler = requests.post(f"{API}/api/jobs", json=payload2)
 job_id2 = rcrawler.json()["job_id"]

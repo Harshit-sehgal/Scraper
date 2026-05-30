@@ -33,7 +33,7 @@ def test_geocode_cache_initialization():
 
 def test_geocode_cache_set_and_get():
     cache = GeocodeCache()
-    
+
     # Try a query not in the cache (should miss)
     result = cache.get("1600 Amphitheatre Pkwy, Mountain View, CA")
     assert result is None
@@ -41,7 +41,7 @@ def test_geocode_cache_set_and_get():
 
     # Store entry in cache
     cache.set("1600 Amphitheatre Pkwy, Mountain View, CA", 37.422, -122.084, "Googleplex")
-    
+
     # Fetch from cache (should hit)
     result = cache.get("1600 Amphitheatre Pkwy, Mountain View, CA")
     assert result is not None
@@ -54,10 +54,10 @@ def test_geocode_cache_set_and_get():
 
 def test_negative_caching():
     cache = GeocodeCache()
-    
+
     # Query negative entry
     cache.set_negative("Invalid Address Here")
-    
+
     # Querying should hit the negative cache and return specific tag
     result = cache.get("Invalid Address Here")
     assert result is not None

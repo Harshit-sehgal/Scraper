@@ -58,7 +58,7 @@ class TestSelectorDecayPredictor:
         """Test decay prediction with a healthy selector."""
         memory = get_selector_memory()
         domain = "healthy.example.com"
-        
+
         # Record a healthy entry directly in memory
         memory._memory[domain] = {
             "selectors": {".item": "div.item"},
@@ -67,11 +67,11 @@ class TestSelectorDecayPredictor:
             "first_seen": time.time() - 86400,  # 1 day ago
             "last_success": time.time() - 3600,  # 1 hour ago
         }
-        
+
         predictor = SelectorDecayPredictor()
         for _ in range(10):
             predictor.record_observation(domain, 0.95)
-        
+
         prediction = predictor.predict_decay(domain)
         assert prediction.decay_risk < 0.3  # Should be stable
         assert prediction.risk_level in ("stable", "watch")
@@ -81,7 +81,7 @@ class TestSelectorDecayPredictor:
         """Test decay prediction with a degrading selector."""
         memory = get_selector_memory()
         domain = "degrading.example.com"
-        
+
         # Record a degrading entry - many failures, old age
         memory._memory[domain] = {
             "selectors": {".old-item": "div.old-item"},
@@ -90,12 +90,12 @@ class TestSelectorDecayPredictor:
             "first_seen": time.time() - (20 * 86400),  # 20 days ago
             "last_success": time.time() - (10 * 86400),  # 10 days ago
         }
-        
+
         predictor = SelectorDecayPredictor()
         # Record declining confidence
         for i in range(10):
             predictor.record_observation(domain, max(0.1, 0.8 - i * 0.07))
-        
+
         prediction = predictor.predict_decay(domain)
         assert prediction.decay_risk > 0.4  # Should be elevated
         assert prediction.risk_level != "stable"
@@ -103,7 +103,7 @@ class TestSelectorDecayPredictor:
     def test_get_domains_at_risk(self, monkeypatch):
         """Test getting domains at risk above threshold."""
         memory = get_selector_memory()
-        
+
         # Add a healthy domain
         memory._memory["healthy.com"] = {
             "selectors": {".item": "div.item"},
@@ -112,7 +112,7 @@ class TestSelectorDecayPredictor:
             "first_seen": time.time() - 86400,
             "last_success": time.time(),
         }
-        
+
         # Add a degrading domain
         memory._memory["degrading.com"] = {
             "selectors": {".old-item": "div.old-item"},
@@ -121,13 +121,13 @@ class TestSelectorDecayPredictor:
             "first_seen": time.time() - (30 * 86400),
             "last_success": time.time() - (20 * 86400),
         }
-        
+
         predictor = SelectorDecayPredictor()
         # Record declining observations for degrading domain
         for i in range(10):
             predictor.record_observation("degrading.com", max(0.1, 0.7 - i * 0.06))
         predictor.record_observation("healthy.com", 0.98)
-        
+
         at_risk = predictor.get_domains_at_risk(threshold=0.5)
         assert len(at_risk) >= 1
         # The degrading domain should be first (highest risk)
@@ -143,10 +143,10 @@ class TestSelectorDecayPredictor:
             "first_seen": time.time() - 86400,
             "last_success": time.time(),
         }
-        
+
         predictor = SelectorDecayPredictor()
         predictor.record_observation("test.com", 0.85)
-        
+
         report = predictor.get_decay_report()
         assert report["total_domains_tracked"] >= 1
         assert "avg_decay_risk" in report
@@ -190,11 +190,11 @@ class TestSelectorDecayPredictorGlobal:
         predictor = SelectorDecayPredictor()
         predictor._confidence_snapshots.clear()
         predictor.record_observation("persistent.com", 0.88)
-        
+
         predictor2 = SelectorDecayPredictor()
         assert "persistent.com" in predictor2._confidence_snapshots
         assert predictor2._confidence_snapshots["persistent.com"][0][1] == 0.88
-        
+
         try:
             os.remove("backend/data/selector_decay_snapshots.json")
         except Exception:

@@ -12,7 +12,7 @@ async def test():
         SchemaField(name='rating', field_type=FieldType.STRING, description='star rating', required=False),
         SchemaField(name='availability', field_type=FieldType.STRING, description='in stock or not', required=False),
     ]
-    
+
     print('Scraping with scrape_url...')
     results = await scrape_url('https://books.toscrape.com/', fields)
     print(f'\n=== RESULTS: {len(results)} records ===')

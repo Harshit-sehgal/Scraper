@@ -49,7 +49,7 @@ def test_full_multi_subsystem_replay():
 
         # Topology
         ws._topology.add(["role_a", "role_b"], "token_x",
-                          instability=0.3, integrity=0.7, domain="test")
+                         instability=0.3, integrity=0.7, domain="test")
 
         # Instability
         ws._instability.set_exclusion(("role_a", "role_b"), 0.65)
@@ -391,7 +391,7 @@ def test_cumulative_replay_multiple_transactions():
         ws._energy.set_energy(4.0)
         ws._energy.increment_records(3)
         ws._topology.add(["phase_role", "other"], "phase_token",
-                          instability=0.2)
+                         instability=0.2)
 
     tx2 = _capture_last_tx(ws)
 
@@ -590,6 +590,7 @@ def test_replay_instability_tuple_key_deserialization():
         if "key" in entry.get("details", {}):
             entry["details"]["key"] = tuple(entry["details"]["key"])
 
+
 def test_long_horizon_replay_parity():
     """Execute 500 random transactions, capture the journal, and verify
     that full replay results in identical metrics and manifold checksum."""
@@ -597,9 +598,9 @@ def test_long_horizon_replay_parity():
 
     ws = get_world_state()
     ws.clear()
-    
+
     roles = ["role_1", "role_2", "role_3", "role_4", "role_5"]
-    
+
     # ── 1. Original Run ──
     for i in range(500):
         with ws.transaction(f"tx_{i}"):
@@ -608,7 +609,7 @@ def test_long_horizon_replay_parity():
             ws._energy.set_energy(ws.metrics.global_energy + (random.random() - 0.5) * 0.1)
             if i % 10 == 0:
                 ws._instability.set_exclusion((random.choice(roles), random.choice(roles)), random.random())
-                
+
     # Capture final state metrics
     original_metrics = {
         "energy": ws.metrics.global_energy,
@@ -617,12 +618,12 @@ def test_long_horizon_replay_parity():
     }
     original_checksum = ws.get_manifold_checksum()
     full_journal = ws.trace_causality(limit=600)
-    
+
     # ── 2. Replay Run ──
     ws.clear()
     for tx in full_journal:
         ws.replay_transaction(tx)
-        
+
     # ── 3. Verification ──
     assert abs(ws.metrics.global_energy - original_metrics["energy"]) < 0.001
     assert abs(ws.metrics.global_entropy - original_metrics["entropy"]) < 0.001

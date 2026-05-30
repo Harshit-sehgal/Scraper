@@ -272,6 +272,7 @@ class TestBestEffortRollback:
         for name, obj in state_attrs.items():
             if hasattr(obj, 'rollback'):
                 originals[name] = obj.rollback
+
                 def make_failing(name_):
                     def failing():
                         raise RuntimeError(f"rollback failed for {name_}")
@@ -368,6 +369,7 @@ class TestBestEffortRollback:
         for name, obj in state_attrs.items():
             if hasattr(obj, 'rollback'):
                 originals[name] = obj.rollback
+
                 def make_tracker(name_):
                     def tracked_rollback():
                         rollback_called[name_] = True

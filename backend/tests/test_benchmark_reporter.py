@@ -100,6 +100,6 @@ def test_dashboard_generation():
     assert os.path.exists(DASHBOARD_PATH)
     with open(DASHBOARD_PATH, "r", encoding="utf-8") as f:
         content = f.read()
-    
+
     assert "dashboard-run" in content
     assert "DataForge Regression Trends" in content

@@ -11,6 +11,7 @@ import time
 import random
 from app.semantic_world_state import SemanticWorldState
 
+
 def benchmark_replay(transaction_count: int = 10000):
     ws = SemanticWorldState()
     ws.clear()
@@ -56,6 +57,7 @@ def benchmark_replay(transaction_count: int = 10000):
     print("  Verification: success for this synthetic run (checksum parity confirmed)")
     print(f"  Replay Efficiency: {duration_replay / duration_gen:.2f}x generation speed")
     return True
+
 
 if __name__ == "__main__":
     benchmark_replay(transaction_count=5000)

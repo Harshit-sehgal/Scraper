@@ -500,7 +500,14 @@ class TestSourceArbitration:
         # Mock selector memory to return empty selectors
         from app.selector_memory import get_selector_memory
         memory = get_selector_memory()
-        monkeypatch.setattr(memory, "get_selectors", lambda u: {"item_container": "div", "fields": {"origin_airport_code": "", "destination_airport_code": ""}})
+        monkeypatch.setattr(
+            memory,
+            "get_selectors",
+            lambda u: {
+                "item_container": "div",
+                "fields": {
+                    "origin_airport_code": "",
+                    "destination_airport_code": ""}})
 
         # Mock apply_selectors to return bad data that will be rejected by semantic validator, dropping average score to 0.0 < 0.8
         def mock_apply_selectors(html, selectors, schema_fields, **kwargs):

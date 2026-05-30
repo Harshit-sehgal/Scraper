@@ -54,8 +54,16 @@ class TestBuildSelectorPrompt:
         analysis = {
             "structure_type": "card",
             "structure_confidence": 0.85,
-            "headers": ["Price", "Name"],
-            "patterns_detected": {"currencies": True, "dates": False, "ratings": False, "codes": False, "phones": False, "emails": False},
+            "headers": [
+                "Price",
+                "Name"],
+            "patterns_detected": {
+                "currencies": True,
+                "dates": False,
+                "ratings": False,
+                "codes": False,
+                "phones": False,
+                "emails": False},
         }
         prompt = build_selector_prompt(snippet, schema, page_analysis=analysis)
         assert "CARD" in prompt
@@ -406,7 +414,7 @@ class TestDiscoverSelectors:
             patch("app.selector_discovery.clean_html_for_selectors", return_value="<div>cleaned</div>"),
             patch("app.selector_discovery.llm_json", new_callable=AsyncMock, return_value="not a dict"),
         ):
-            result = await discover_selectors("<html>...</html>",                [SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)])
+            result = await discover_selectors("<html>...</html>", [SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)])  # noqa: E501
             assert result == {}
 
     @pytest.mark.asyncio
@@ -415,7 +423,7 @@ class TestDiscoverSelectors:
             patch("app.selector_discovery.clean_html_for_selectors", return_value="<div>cleaned</div>"),
             patch("app.selector_discovery.llm_json", new_callable=AsyncMock, side_effect=ValueError("API error")),
         ):
-            result = await discover_selectors("<html>...</html>",                [SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)])
+            result = await discover_selectors("<html>...</html>", [SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)])  # noqa: E501
             assert result == {}
 
     @pytest.mark.asyncio
