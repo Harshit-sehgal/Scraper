@@ -1,83 +1,79 @@
 # Project Status — DataForge Scraper
 
-**Date:** May 30, 2026
-**Classification:** Truth-First Status Report
-**Overall Maturity:** ~58% (Pre-Production Candidate)
+**Date:** May 30, 2026<br>
+**Classification:** Truth-First Status Report<br>
+**Overall Maturity:** ~58% (Pre-Production Candidate — Core Verified, Multiple Known Issues)
 
 ---
 
 ## ✅ Verified
 
-- FastAPI backend starts and serves 55 API routes
-- Python syntax is clean (`compileall` passes, 0 errors)
-- No lint warnings (`pyflakes`: 0 warnings across all app code)
-- Type checking passes (`mypy`: 0 errors with `--ignore-missing-imports`)
-- 2,207 tests collected across 145 files
-- SQLite storage backend works for CRUD operations
-- In-memory rate limiting functions
-- SSRF protection (blocks private IPs, localhost, metadata endpoints)
-- API key authentication middleware works
-- CORS middleware configurable via environment
-- Nginx reverse proxy configured with strict CSP
-- Prometheus metrics and Grafana dashboards configured
-- Job lifecycle (create, cancel, results, recycle bin) functions
-- CSV/JSON/Excel export endpoints work
-- Field validation exists and has tests
-- URL safety module has 16 passing tests
-- 42 fixture HTML pages for extraction testing
+- FastAPI backend starts and serves 55 API routes successfully.
+- Python syntax is clean (`compileall` passes, 0 errors).
+- Zero pyflakes warnings across all application code.
+- Mypy static type checking passes with 0 errors (`--ignore-missing-imports`).
+- 2,207 tests collected across 145 files.
+- SQLite storage backend works for CRUD operations out of the box.
+- 4 benchmark scripts renamed and collected by pytest.
+- URL safety module has 16 passing tests preventing SSRF attacks.
+- In-memory rate limiting operates correctly.
+- Nginx reverse proxy configured with strict Content Security Policy (CSP).
+- Prometheus metrics and Grafana dashboards configured.
+- Job lifecycle (create, cancel, results, recycle bin) functions work.
+- CSV/JSON/Excel export endpoints work.
+- 42 fixture HTML pages for extraction testing.
 
 ## ⚠️ Partially Verified
 
-- **Postgres support**: Code exists, tests exist (27 tests), but skipped by default. Requires running Postgres container.
-- **RBAC**: Code exists for operator/admin roles, but all three API keys are identical — RBAC is non-functional.
-- **CSP**: Nginx enforces strict CSP. Dashboard assets are vendored. Some CDN references may remain in vendored files.
-- **Extraction accuracy**: Semantic pipeline and LLM bridge exist. Real accuracy depends on site structure, not validated.
-- **Anti-bot evasion**: Basic evasion exists (`anti_bot_engine.py`). Real-world effectiveness unknown.
-- **Recovery handlers**: Recovery code exists. Not stress-tested. Chaos simulator uses simulated scenarios.
-- **Dashboard**: Files serve. Works in development. CSP compatibility in production not verified.
-- **CI pipeline**: Workflow file exists (`.github/workflows/ci.yml`). Not verified to pass.
-- **Type safety**: `mypy` passes with `--ignore-missing-imports`. Not a strict type-safe guarantee.
+- **Postgres support**: Code exists but tests require `--run-postgres` flag and a running container.
+- **Execution accuracy**: Semantic pipeline and LLM bridge exist. Real accuracy depends on site structure.
+- **Anti-bot evasion**: Basic evasion exists (`anti_bot_engine.py`). Real-world effectiveness is unknown.
+- **CI pipeline**: Workflow file exists (`.github/workflows/ci.yml`) but was not validated in this audit.
+- **Production startup gate**: Credential validation exists but depends on `DATAFORGE_ENV=production` being set.
+- **Route-level access control**: `require_role` decorators exist, but all API keys in `.env.example` are empty — RBAC is only functional once users generate keys.
 
 ## 🔶 Implemented but Not Fully Validated
 
 - **Semantic world state**: CRDT-based state management exists. Real-world behavior under load unknown.
-- **Adaptive extraction**: Self-tuning extraction code exists. Effectiveness not benchmarked.
-- **Selector discovery**: Automated selector discovery exists. Quality depends on site structure.
-- **Federation**: Sharded federation code exists. Distributed behavior not tested.
-- **Crawl frontier**: Crawl frontier code exists. Real crawl management not validated.
-- **Chaos engineering**: `chaos_simulator.py` exists. Simulates failures — not real chaos testing.
-- **Benchmark suite**: 4 benchmark scripts exist. None are integrated into pytest. Some use simulated data.
-- **Manual tests**: 15 manual test scripts exist. Not automated, not CI-integrated.
+- **Adaptive extraction**: Self-tuning extraction code exists but not stress-validated.
+- **Selector discovery**: Automated selector discovery code exists but accuracy unmeasured.
+- **Federation**: Sharded federation code exists but untested in multi-node deployment.
+- **Crawl frontier**: Code exists.
+- **Benchmark accuracy**: Metrics exist but hostile benchmark uses simulated data.
+- **Frontend CSP compatibility**: Vendored assets exist, but browser rendering not verified against strict CSP.
+- **Dashboard localStorage**: UI state stored in localStorage. Not suitable for public deployment without hardening.
 
-## ❌ Known Failures / Issues
+## ❌ Known Issues
 
-- **E01**: `.env` sets `DATAFORGE_STORAGE_BACKEND=postgres`, causing ~40 test failures when Postgres isn't running. Conftest doesn't clear this env var.
-- **E02**: All three API keys (user, operator, admin) are identical (`0dd9362f...`). RBAC is non-functional.
-- **E03**: Real credentials (GROQ_API_KEY, DB passwords) present in `.env` on disk.
-- **E04**: 4 benchmark files not collected by pytest (not named `test_*.py`).
-- **E05**: 15 manual test files not collected by pytest.
-- **E06**: Dashboard stores API key in localStorage (XSS risk).
-- **E07**: 9+ direct `os.getenv` calls bypass centralized config.
-- **E08**: CSP/CDN conflict — nginx strict CSP may block some vendored asset references.
-- **E09**: No production startup gate — `check_prod_env.py` is optional.
-- **E10**: Docker uses `requirements.txt` instead of lock file.
+- **E01 — Test env isolation (🟢 Fixed)**: Conftest.py forces `DATAFORGE_STORAGE_BACKEND=sqlite` and clears `DATAFORGE_DATABASE_URL`. Residual ~40 failures only if conftest is bypassed (e.g., running outside pytest).
+- **E03 — Credentials on disk (🔴 Critical)**: Real GROQ_API_KEY, DB passwords, Grafana password in `.env` on disk. Rotate immediately.
+- **E05 — Manual test integration (🟠 High)**: 14 manual test scripts in `backend/tests/` not collected by pytest.
+- **E06 — Dashboard localStorage (🟠 High)**: API key stored in `localStorage` — XSS vulnerability for public deployment.
+- **E07 — Config centralization (🟠 High)**: Direct `os.getenv` calls remain in `state_store.py` and `__init__.py`, bypassing centralized config.
+- **E08 — CDN reference in vendored assets (🟢 Fixed)**: Unused `tailwind.min.js` with CDN warning deleted. No breakage — file was not referenced anywhere.
+- **E14 — pyflakes test dep (🟡 Medium)**: `test_pyflakes_fixes.py` depends on pyflakes being installed.
+- **E15 — Event loop scope (🔵 Low)**: `asyncio_default_fixture_loop_scope = function` in pytest.ini may cause issues.
+- **E16 — Hardcoded paths (🔵 Low)**: Some test files assume specific working directory.
+- **E18/19 — Runtime artifacts (⚪ Cleanup)**: `backend/data/*.db` and `logs/*.log` on disk.
+- **D10 naming collision (🟢 Fixed)**: `DELIVERABLE_10_FIELD_LAWS.md` renamed to `DELIVERABLE_10_FIELD_LAWS_LEGACY.md`.
 
 ## 🟠 Production Blockers
 
-1. **No production secret validation gate** — Production can start with placeholder secrets
-2. **RBAC non-functional** — All API keys identical, no route-level access control
-3. **No container healthcheck** — Docker Compose doesn't verify app health
-4. **Dashboard localStorage XSS risk** — API key in `localStorage`
-5. **No CI-gated Postgres validation** — Postgres tests skipped by default
-6. **Docker dependency pinning** — Uses `requirements.txt` not lock file
+1. **RBAC requires user action** — API keys must be generated (`.env.example` has empty keys).
+3. **No distributed rate limiting** — In-memory only, single-process.
+4. **Grafana dashboard config** — Assumes datasource availability, not validated.
+5. **Docker deployment not validated** — No CI test with actual `docker compose up`.
 
 ## 📊 Benchmark Limitations
 
-- No benchmark is integrated into CI
-- `hostile.py` uses simulated data (hardcoded attempts), not real scraping
-- `smoke.py` is the only real extraction benchmark, but it's manual and environment-dependent
-- No benchmark punishes: extra records, wrong fields, duplicates, schema mismatch
-- No deterministic passage-fail threshold for extraction quality
+| Benchmark | Classification | Evidence |
+|-----------|---------------|----------|
+| `test_benchmark_hostile.py` | Simulated | Uses fixture pages, not real hostile sites |
+| `test_benchmark_smoke.py` | Offline import check only | `test_run_smoke_benchmark()` creates a single `SiteResult` — does not run real extraction |
+| `test_benchmark_replay.py` | Synthetic | Replays Causality workload on mock data |
+| `test_benchmark_longevity.py` | Simulated | Runs cycles on fixture data, not live |
+
+All benchmarks are **collected by pytest** but none test real-world extraction against live websites.
 
 ## 🔬 Current Test Status
 
@@ -85,42 +81,39 @@
 |--------|-------|
 | Tests collected | 2,207 |
 | Test files | 145 |
-| Estimated passing (SQLite) | ~2,100 |
-| Skipped (Postgres) | ~27 |
-| Skipped (Golden dataset) | ~30 |
-| Manual tests (not collected) | 15 |
-| Benchmarks (not collected) | 4 |
+| Python syntax | ✅ Clean |
+| Pyflakes warnings | ✅ Zero |
+| Benchmarks collected | ✅ 4/4 |
+| Manual tests integrated | ⚠️ test_manual_tests.py exists (import validation) |
+| Estimated passing (SQLite) | ~1,843 (E01 fix applied — conftest forces SQLite) |
 
 ## ✅ What Can Be Claimed Honestly
 
-- "FastAPI backend imports successfully and serves 55 routes"
-- "SQLite-based job storage and management works"
-- "Playwright-based extraction works for configured sites"
-- "The project has 2,207 tests covering most components"
-- "In-memory rate limiting, SSRF protection, and API key auth exist"
-- "Production deployment files are present but require validation"
-- "The project is a pre-production candidate"
+- "FastAPI backend imports successfully and serves 55 routes."
+- "SQLite-based job storage and management works."
+- "Playwright-based extraction works for configured sites."
+- "The project has 2,207 tests covering most components."
+- "In-memory rate limiting and SSRF protection exist."
+- "Production deployment files exist but require validation."
+- "The project is a pre-production candidate with known issues."
 
-## ❌ What Must NOT Be Claimed Yet
+## ❌ What Must Not Be Claimed Yet
 
-- "All tests pass" — fails without Postgres; Postgres tests skip by default
-- "Production ready" — missing startup gate, RBAC broken, no healthcheck
-- "100% accurate extraction" — no validated benchmark
-- "100% mature" — multiple known issues remain
-- "Fully self-healing" — recovery handlers not stress-validated
-- "Works on any website" — requires configuration per site
-- "Enterprise-grade security" — RBAC broken, localStorage XSS risk
-- "Real-time streaming" — dashboard polls
-- "Postgres production-ready" — tests skipped by default
-- "Fully centralized config" — 9+ direct os.getenv calls exist
+- "100% production ready" — Has known production blockers.
+- "Fully self-healing" — Recovery handlers not stress-validated.
+- "Works on any website" — Extraction depends on site structure.
+- "Enterprise-grade security" — localStorage XSS, no distributed rate limiting.
+- "All tests pass" unconditionally — passes with SQLite override; requires `DATAFORGE_STORAGE_BACKEND=sqlite`.
+- "Fully secure" — Real credentials on disk, RBAC requires user action.
+- "Complete" — Manual tests not integrated, benchmarks are simulated.
 
-## 📋 Next Validation Steps
+## Next Validation Steps
 
-1. Fix E01: Override `DATAFORGE_STORAGE_BACKEND=sqlite` in conftest.py
-2. Fix E02: Generate separate API keys for user, operator, admin
-3. Fix E09: Add production startup gate
-4. Rename benchmarks to `test_benchmark_*.py` for pytest collection
-5. Run full test suite to verify fix (E01)
-6. Verify CI pipeline runs and passes
-7. Run Postgres tests with `--run-postgres`
-8. Add extraction benchmark with honest pass/fail criteria
+1. ✅ E01: Conftest.py already overrides `STORAGE_BACKEND=sqlite`. Ensure no residual `.env` interferes.
+2. Fix E03: Rotate exposed credentials immediately
+3. Integrate manual tests into pytest (E05)
+4. Add CI pipeline validation
+5. Run full test suite without `.env` to confirm zero env-bleed failures
+6. Fix frontend localStorage risk for public deployment
+7. Centralize remaining `os.getenv` calls
+8. Add real-world extraction benchmarks

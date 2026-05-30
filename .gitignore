@@ -24,6 +24,9 @@ server.log
 backend/.coverage
 .commandcode/
 
+# Runtime logs
+logs/
+
 # Runtime databases
 backend/app/data/*.db
 backend/data/*.db

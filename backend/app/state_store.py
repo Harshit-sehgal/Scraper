@@ -38,13 +38,18 @@ def _now_iso() -> str:
 def get_state_file_path() -> Path:
     from app.config import settings
 
-    if settings.STATE_FILE_PATH:
-        return Path(settings.STATE_FILE_PATH).expanduser()
-
+    # Legacy env var checked first so that runtime overrides (e.g. tests)
+    # take effect even when pydantic has already loaded a static default
+    # from .env or the import-time environment.
     legacy_env_path = os.getenv("DATAFORGE_STATE_FILE", "").strip()
     if legacy_env_path:
-        logging.warning("DATAFORGE_STATE_FILE is deprecated; use DATAFORGE_STATE_FILE_PATH instead.")
+        logging.warning(
+            "DATAFORGE_STATE_FILE is deprecated; use DATAFORGE_STATE_FILE_PATH instead."
+        )
         return Path(legacy_env_path).expanduser()
+
+    if settings.STATE_FILE_PATH:
+        return Path(settings.STATE_FILE_PATH).expanduser()
 
     return _DEFAULT_STATE_FILE
 

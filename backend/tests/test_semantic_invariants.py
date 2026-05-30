@@ -68,8 +68,8 @@ def test_adaptive_threshold_bounds():
 def test_contradiction_pipeline_invariant():
     ws = get_world_state()
     ws.clear()
-    schema = ["origin", "destination"]
-    records = [{"origin": "LAX", "destination": "LAX"}]
+    schema = ["source", "target"]
+    records = [{"source": "TOK1", "target": "TOK1"}]
     result = run_pipeline(records, schema)
     assert result, "Pipeline should not drop contradictory records"
     r = result[0]
@@ -78,7 +78,7 @@ def test_contradiction_pipeline_invariant():
     # continuous signal of contested roles.
     assert r.get("_allocation_conflicts"), "Allocation conflicts must be captured"
     assert len(ws.field_regions) > 0, "Field regions must capture pre-allocation tension"
-    assert ws.learned_exclusions.get(("destination", "origin"), 0) > 0, \
+    assert ws.learned_exclusions.get(("source", "target"), 0) > 0, \
         "Learned exclusions must be reinforced from field tension"
 
 
@@ -89,15 +89,15 @@ def test_contradiction_pipeline_invariant():
 def test_no_false_contradiction_invariant():
     ws = get_world_state()
     ws.clear()
-    schema = ["origin", "destination"]
-    records = [{"origin": "JFK", "destination": "LAX"}]
+    schema = ["source", "target"]
+    records = [{"source": "VAL_A", "target": "VAL_B"}]
     result = run_pipeline(records, schema)
     assert result, "Pipeline should process distinct-value records"
     r = result[0]
     # Different input values must produce different output values
-    assert r.get("origin") != r.get("destination"), "Distinct values must not be merged"
-    assert r.get("destination") == "LAX", "Destination must be LAX"
-    assert r.get("origin") == "JFK", "Origin must be JFK"
+    assert r.get("source") != r.get("target"), "Distinct values must not be merged"
+    assert r.get("source") == "VAL_A", "Source must be VAL_A"
+    assert r.get("target") == "VAL_B", "Target must be VAL_B"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -137,22 +137,22 @@ def test_import_order_independence_invariant():
 def test_topology_evolution_invariant():
     ws = get_world_state()
     ws.clear()
-    key = ("destination", "origin")
-    schema = ["origin", "destination"]
+    key = ("source", "target")
+    schema = ["source", "target"]
 
     # Record 1: contradiction → strengthen
-    run_pipeline([{"origin": "LAX", "destination": "LAX"}], schema)
+    run_pipeline([{"source": "TOK1", "target": "TOK1"}], schema)
     after_first = ws.learned_exclusions.get(key, 0.0)
     assert after_first > 0, "Exclusion must be learned from contradiction"
 
     # Record 2: no contradiction → decay (pipeline dynamics may cause minor fluctuations)
-    run_pipeline([{"origin": "JFK", "destination": "LAX"}], schema)
+    run_pipeline([{"source": "TOK2", "target": "TOK3"}], schema)
     after_decay = ws.learned_exclusions.get(key, 0.0)
     assert after_decay < after_first + \
         0.005, f"Exclusion should not significantly increase without reinforcement ({after_decay} > {after_first + 0.005})"
 
     # Record 3: contradiction again → reinforce
-    run_pipeline([{"origin": "LHR", "destination": "LHR"}], schema)
+    run_pipeline([{"source": "TOK4", "target": "TOK4"}], schema)
     after_reinforce = ws.learned_exclusions.get(key, 0.0)
     assert after_reinforce >= after_decay, f"Exclusion should strengthen when reinforced ({after_reinforce} < {after_decay})"
 
@@ -166,11 +166,11 @@ def test_topology_replay_invariant():
     ws.clear()
     before = len(ws.topology_snapshots)
 
-    schema = ["origin", "destination"]
+    schema = ["source", "target"]
     # First record: normal allocation
-    run_pipeline([{"origin": "JFK", "destination": "LAX"}], schema)
+    run_pipeline([{"source": "VAL_A", "target": "VAL_B"}], schema)
     # Second record: triggers contradiction, changes topology
-    run_pipeline([{"origin": "LAX", "destination": "LAX"}], schema)
+    run_pipeline([{"source": "VAL_C", "target": "VAL_C"}], schema)
 
     after = len(ws.topology_snapshots)
     assert after > before, f"Snapshots must accumulate ({after} <= {before})"
@@ -258,9 +258,9 @@ def test_exclusion_bounds_invariant():
     """Learned exclusions produced by the system must stay bounded [0, 1]."""
     ws = get_world_state()
     ws.clear()
-    schema = ["origin", "destination"]
+    schema = ["source", "target"]
     # Process a contradiction which creates learned exclusions
-    run_pipeline([{"origin": "LAX", "destination": "LAX"}], schema)
+    run_pipeline([{"source": "TOK1", "target": "TOK1"}], schema)
     for key, val in ws.learned_exclusions.items():
         assert 0.0 <= val <= 1.0, f"Exclusion {key} = {val} out of bounds"
 
@@ -413,10 +413,10 @@ def test_topology_restructuring_invariant():
     """Repeated contradictions must increase learned exclusions."""
     ws = get_world_state()
     ws.clear()
-    schema = ["origin", "destination"]
+    schema = ["source", "target"]
     before = len(ws.learned_exclusions)
     for _ in range(3):
-        run_pipeline([{"origin": "LAX", "destination": "LAX"}], schema)
+        run_pipeline([{"source": "TOK1", "target": "TOK1"}], schema)
     after = len(ws.learned_exclusions)
     assert after >= before, \
         f"Contradictions must increase or maintain exclusion count ({after} >= {before})"
@@ -430,9 +430,10 @@ def test_propagation_conservation_invariant():
     """Field propagation must spread instability to neighboring roles."""
     ws = get_world_state()
     ws.clear()
-    schema = ["origin", "destination", "departure", "arrival"]
+    # Using two domain-agnostic ROLE_EXCLUSIVITY pairs: (start,end) and (source,target)
+    schema = ["start", "end", "source", "target"]
     before = len(ws.learned_exclusions)
-    run_pipeline([{"origin": "LAX", "destination": "LAX", "depart": "10:00", "arrive": "12:00"}], schema)
+    run_pipeline([{"start": "VAL1", "end": "VAL1", "source": "VAL2", "target": "VAL2"}], schema)
     after = len(ws.learned_exclusions)
     assert after >= before, \
         f"Propagation must create or maintain exclusions ({after} >= {before})"

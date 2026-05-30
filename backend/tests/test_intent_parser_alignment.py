@@ -25,6 +25,6 @@ class TestSemanticAlignmentHelpers:
         assert semantic_needs_are_exclusive("status", "date") is True
         assert semantic_needs_are_exclusive("price", "date") is False
 
-    def test_role_tokens_exclusive_origin_destination(self):
-        assert role_tokens_are_exclusive({"origin"}, {"destination"}) is True
-        assert role_tokens_are_exclusive({"origin"}, {"origin"}) is False
+    def test_role_tokens_exclusive_source_target(self):
+        assert role_tokens_are_exclusive({"source"}, {"target"}) is True
+        assert role_tokens_are_exclusive({"source"}, {"source"}) is False
