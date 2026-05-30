@@ -5,11 +5,11 @@
 
 // ─── API key management (shared with main dashboard) ───────────────────
 function getDashboardApiKey() {
-    try { return localStorage.getItem("dataforge_api_key") || ""; } catch { return ""; }
+    try { return sessionStorage.getItem("dataforge_api_key") || ""; } catch { return ""; }
 }
 
 function setDashboardApiKey(key) {
-    try { localStorage.setItem("dataforge_api_key", key); } catch {}
+    try { sessionStorage.setItem("dataforge_api_key", key); } catch {}
 }
 
 let dashboardApiLast403 = 0;

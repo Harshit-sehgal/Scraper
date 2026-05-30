@@ -117,11 +117,8 @@ async def lifespan(app: FastAPI):
                 "CORS_ORIGINS contains wildcard '*' or is empty. In production environment, "
                 "CORS_ORIGINS must be locked down to trusted domains for safety."
             )
-        if not settings.API_KEY or not settings.API_KEY.strip():
-            raise ValueError(
-                "API_KEY is empty or not configured. In production environment, "
-                "API_KEY must be explicitly set to secure all API endpoints."
-            )
+        from app.utils.prod_security_validator import validate_production_credentials
+        validate_production_credentials(settings)
 
     # Initialize event cascade (safe: scheduler is lazy-created, no circular import)
     from app.graph_update_scheduler import get_scheduler

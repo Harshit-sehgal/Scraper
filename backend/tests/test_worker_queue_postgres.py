@@ -29,23 +29,44 @@ def _require_psycopg2():
 
 @pytest.fixture(scope="module")
 def module_postgres_container():
-    """Start a single Postgres testcontainer for all postgres-marked tests.
+    """Start a single Postgres testcontainer or reuse a running one.
 
     Sets the DATAFORGE_* env vars so any code path that calls
     ``_get_database_url()`` picks up the container port instead of the
     development fallback.
     """
-    from testcontainers.postgres import PostgresContainer
+    import socket
+    use_running = False
+    dsn = os.environ.get("DATAFORGE_DATABASE_URL")
+    if dsn:
+        use_running = True
+    else:
+        try:
+            with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+                use_running = True
+                os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
+                os.environ["DATAFORGE_QUEUE_BACKEND"] = "postgres"
+                os.environ["DATAFORGE_DATABASE_URL"] = "postgresql://testuser:testpassword@127.0.0.1:5432/testdb"
+        except (socket.timeout, ConnectionRefusedError):
+            pass
 
-    with PostgresContainer("postgres:16-alpine") as pg:
-        database_url = pg.get_connection_url().replace('+psycopg2', '')
-        os.environ["DATAFORGE_DATABASE_URL"] = database_url
-        os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
-        os.environ["DATAFORGE_QUEUE_BACKEND"] = "postgres"
+    if use_running:
         yield
-        os.environ.pop("DATAFORGE_DATABASE_URL", None)
-        os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
-        os.environ.pop("DATAFORGE_QUEUE_BACKEND", None)
+        if not dsn:
+            os.environ.pop("DATAFORGE_DATABASE_URL", None)
+            os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+            os.environ.pop("DATAFORGE_QUEUE_BACKEND", None)
+    else:
+        from testcontainers.postgres import PostgresContainer
+        with PostgresContainer("postgres:16-alpine") as pg:
+            database_url = pg.get_connection_url().replace('+psycopg2', '')
+            os.environ["DATAFORGE_DATABASE_URL"] = database_url
+            os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
+            os.environ["DATAFORGE_QUEUE_BACKEND"] = "postgres"
+            yield
+            os.environ.pop("DATAFORGE_DATABASE_URL", None)
+            os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+            os.environ.pop("DATAFORGE_QUEUE_BACKEND", None)
 
 
 # ───────────────────────────────────────────────────────────────────────

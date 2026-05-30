@@ -435,17 +435,38 @@ class TestPostgresIntegration:
 
     @pytest.fixture(autouse=True)
     def postgres_container(self):
-        """Start a Postgres testcontainer and configure the connection."""
-        from testcontainers.postgres import PostgresContainer
+        """Start a Postgres testcontainer or reuse a running one."""
+        import socket
+        use_running = False
+        dsn = os.environ.get("DATAFORGE_DATABASE_URL")
+        if dsn:
+            use_running = True
+        else:
+            try:
+                with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+                    use_running = True
+                    os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
+                    os.environ["DATAFORGE_DATABASE_URL"] = "postgresql://testuser:testpassword@127.0.0.1:5432/testdb"
+                    os.environ["PGPASSWORD"] = "testpassword"
+            except (socket.timeout, ConnectionRefusedError):
+                pass
 
-        with PostgresContainer("postgres:16-alpine") as pg:
-            os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
-            os.environ["DATAFORGE_DATABASE_URL"] = pg.get_connection_url()
-            os.environ["PGPASSWORD"] = pg.password
+        if use_running:
             yield
-            os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
-            os.environ.pop("DATAFORGE_DATABASE_URL", None)
-            os.environ.pop("PGPASSWORD", None)
+            if not dsn:
+                os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+                os.environ.pop("DATAFORGE_DATABASE_URL", None)
+                os.environ.pop("PGPASSWORD", None)
+        else:
+            from testcontainers.postgres import PostgresContainer
+            with PostgresContainer("postgres:16-alpine") as pg:
+                os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
+                os.environ["DATAFORGE_DATABASE_URL"] = pg.get_connection_url().replace("+psycopg2", "")
+                os.environ["PGPASSWORD"] = pg.password
+                yield
+                os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+                os.environ.pop("DATAFORGE_DATABASE_URL", None)
+                os.environ.pop("PGPASSWORD", None)
 
     def _setup_v1_schema(self, conn):
         """Create a minimal v1 schema (jobs table but no recycle_bin)."""
@@ -470,6 +491,8 @@ class TestPostgresIntegration:
         import psycopg2
 
         dsn = os.environ["DATAFORGE_DATABASE_URL"]
+        if dsn.startswith("postgresql+psycopg2://"):
+            dsn = dsn.replace("postgresql+psycopg2://", "postgresql://")
         conn = psycopg2.connect(dsn)
         try:
             self._setup_v1_schema(conn)
@@ -488,7 +511,7 @@ class TestPostgresIntegration:
         # Trigger schema ensure + health check
         health = repo.health_check()
         assert health["ok"] is True, f"Health check failed: {health}"
-        assert health["schema_version"] == 2, f"Expected schema_version=2, got {health['schema_version']}"
+        assert health["schema_version"] == 3, f"Expected schema_version=3, got {health['schema_version']}"
 
         # Verify recycle_bin table exists
         health2 = repo.health_check()
@@ -514,6 +537,8 @@ class TestPostgresIntegration:
         import psycopg2
 
         dsn = os.environ["DATAFORGE_DATABASE_URL"]
+        if dsn.startswith("postgresql+psycopg2://"):
+            dsn = dsn.replace("postgresql+psycopg2://", "postgresql://")
         conn = psycopg2.connect(dsn)
         try:
             self._setup_v1_schema(conn)

@@ -100,6 +100,7 @@ class LocalASGIClient:
 
 # ── E2E Test Flow ──────────────────────────────────────────────────────
 
+@pytest.mark.postgres
 @pytest.mark.asyncio
 async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, monkeypatch):
     """

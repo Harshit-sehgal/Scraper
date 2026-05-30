@@ -103,12 +103,12 @@ async def test_deterministic_benchmark_run():
 
     # 3. Recovery Success Metric Simulation
     # This validates benchmark math only; it does not exercise scraper recovery.
-    attempts = [False, True, True, True]
-    success_retries = 0
-    for attempt in attempts:
-        if attempt:
-            success_retries += 1
-    metrics["recovery_success_rate"] = success_retries / len(attempts)
+    # NOTE: This is a SIMULATED metric. It does NOT test real recovery behavior.
+    # The hardcoded sequence [False, True, True, True] was removed because it
+    # was not representative of actual failure/recovery patterns.
+    # Real recovery testing requires failure injection (see scripts/live_benchmark.py).
+    # For now, we skip the simulated recovery metric entirely.
+    metrics["recovery_success_rate"] = 0.0  # Simulated; not meaningful
 
     # 4. Cancellation Response Time
     # We test how fast the runner checks and respects cancel_requested flags
@@ -130,7 +130,7 @@ async def test_deterministic_benchmark_run():
     print(f"Zero-Result Truthfulness:         {metrics['zero_result_truthfulness']*100:.1f}% (Target: >90%)")
     print(f"False-Positive Records:           {metrics['false_positive_records']*100:.1f}% (Target: <10%)")
     print(f"Average Scrape Time:              {metrics['average_scrape_time_ms']:.2f} ms")
-    print(f"Simulated Recovery Metric:         {metrics['recovery_success_rate']*100:.1f}% (Target: >70%)")
+    print(f"Recovery Metric (SIMULATED):          {metrics['recovery_success_rate']*100:.1f}% — NOT TESTED (see note above)")
     print(f"Cancellation Response Time:       {metrics['cancellation_response_time_ms']:.4f} ms (Target: <1000ms)")
     print("="*50 + "\n")
 
@@ -138,5 +138,7 @@ async def test_deterministic_benchmark_run():
     assert metrics["success_rate"] >= 0.85
     assert metrics["zero_result_truthfulness"] >= 0.9
     assert metrics["false_positive_records"] <= 0.10
-    assert metrics["recovery_success_rate"] >= 0.70
+    # Recovery metric is simulated and not meaningful for validation
+    # Real recovery testing requires failure injection
+    # See scripts/live_benchmark.py for real recovery validation
     assert metrics["cancellation_response_time_ms"] < 1000.0

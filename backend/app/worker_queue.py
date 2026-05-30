@@ -648,8 +648,8 @@ class WorkerQueue:
                 async with self._in_flight_lock:
                     self._in_flight[task.id] = t
 
-                t.add_done_callback(lambda _: asyncio.ensure_future(
-                    self._cleanup_in_flight(task.id)
+                t.add_done_callback(lambda _, tid=task.id: asyncio.ensure_future(
+                    self._cleanup_in_flight(tid)
                 ))
 
             except asyncio.CancelledError:

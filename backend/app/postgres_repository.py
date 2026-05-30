@@ -459,6 +459,7 @@ class PostgresJobRepository(JobRepository):
     Uses psycopg2.pool.ThreadedConnectionPool for thread-safe connection management.
     Schema auto-migration runs on first access.
     """
+    backend = "postgres"
 
     def __init__(self, auto_ensure_schema: bool = True):
         self._auto_ensure_schema = auto_ensure_schema

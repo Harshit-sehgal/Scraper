@@ -88,6 +88,7 @@ class SQLiteJobRepository(JobRepository):
 
     Delegates to the optimized app.job_store functions.
     """
+    backend = "sqlite"
 
     def load_jobs(self) -> dict[str, Job]:
         from app.job_store import load_state

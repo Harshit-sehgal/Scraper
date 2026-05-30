@@ -22,19 +22,39 @@ pytestmark = pytest.mark.postgres
 
 @pytest.fixture(scope="module")
 def postgres_container():
-    """Start a Postgres container and configure the environment."""
-    from testcontainers.postgres import PostgresContainer
+    """Start a Postgres container or reuse a running one."""
+    import socket
+    use_running = False
+    dsn = os.environ.get("DATAFORGE_DATABASE_URL")
+    if dsn:
+        use_running = True
+    else:
+        try:
+            with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+                use_running = True
+                os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
+                os.environ["DATAFORGE_DATABASE_URL"] = "postgresql://testuser:testpassword@127.0.0.1:5432/testdb"
+        except (socket.timeout, ConnectionRefusedError):
+            pass
 
-    with PostgresContainer("postgres:16-alpine") as pg:
-        database_url = pg.get_connection_url().replace('+psycopg2', '')
-        os.environ["DATAFORGE_DATABASE_URL"] = database_url
-        os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
-        reset_repository()
+    reset_repository()
+    if use_running:
         yield
         reset_repository()
-        # Clean up env vars
-        os.environ.pop("DATAFORGE_DATABASE_URL", None)
-        os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+        if not dsn:
+            os.environ.pop("DATAFORGE_DATABASE_URL", None)
+            os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+    else:
+        from testcontainers.postgres import PostgresContainer
+        with PostgresContainer("postgres:16-alpine") as pg:
+            database_url = pg.get_connection_url().replace('+psycopg2', '')
+            os.environ["DATAFORGE_DATABASE_URL"] = database_url
+            os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
+            reset_repository()
+            yield
+            reset_repository()
+            os.environ.pop("DATAFORGE_DATABASE_URL", None)
+            os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
 
 
 @pytest.fixture()
