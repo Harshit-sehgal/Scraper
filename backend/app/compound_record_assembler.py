@@ -2,8 +2,8 @@
 Compound Record Assembler — Detects internal segments inside a result container
 and assembles them into structured compound records.
 
-A compound record has repeated internal segments (e.g., outbound/return legs in
-a flight, room/rate in a hotel, product/offer in an ecommerce listing) plus
+A compound record has repeated internal segments (e.g., outbound / return legs in
+a flight, room / rate in a hotel, product / offer in an ecommerce listing) plus
 shared fields (e.g., total price, fare type, rating).
 
 This uses domain-agnostic structural heuristics rather than hardcoded segment
@@ -18,7 +18,6 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -26,9 +25,11 @@ logger = logging.getLogger(__name__)
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Segment:
     """A single detected internal segment within a result container."""
+
     index: int
     label: str  # e.g., "Departure", "Outbound", "Leg 1", or inferred label
     fields: dict[str, str] = field(default_factory=dict)
@@ -39,6 +40,7 @@ class Segment:
 @dataclass
 class CompoundRecord:
     """A compound record with segments and shared fields."""
+
     segments: list[Segment] = field(default_factory=list)
     shared_fields: dict[str, str] = field(default_factory=dict)
     original_text: str = ""
@@ -46,10 +48,7 @@ class CompoundRecord:
 
     def to_dict(self) -> dict:
         return {
-            "segments": [
-                {"label": s.label, "fields": s.fields, "raw_text": s.raw_text}
-                for s in self.segments
-            ],
+            "segments": [{"label": s.label, "fields": s.fields, "raw_text": s.raw_text} for s in self.segments],
             "shared_fields": self.shared_fields,
         }
 
@@ -73,23 +72,32 @@ class CompoundRecord:
 # ---------------------------------------------------------------------------
 
 SEGMENT_LABELS = [
-    "segment", "part", "section",
-    "from", "to",
-    "item", "entry",
+    "segment",
+    "part",
+    "section",
+    "from",
+    "to",
+    "item",
+    "entry",
 ]
 
 # Labels that act as segment separators
 SEGMENT_SEPARATORS = [
-    "from", "to",
-    "item", "entry",
-    "segment 1", "segment 2",
-    "part 1", "part 2",
+    "from",
+    "to",
+    "item",
+    "entry",
+    "segment 1",
+    "segment 2",
+    "part 1",
+    "part 2",
 ]
 
 
 # ---------------------------------------------------------------------------
 # Segment detection
 # ---------------------------------------------------------------------------
+
 
 def detect_segments(element_text: str) -> list[dict[str, Any]]:
     """Detect internal segments within a single element's text.
@@ -109,7 +117,7 @@ def detect_segments(element_text: str) -> list[dict[str, Any]]:
     # Look for common segment separators in the text
     lines = [line.strip() for line in element_text.split("\n") if line.strip()]
     if not lines:
-        lines = [line.strip() for line in re.split(r'\s{2,}', element_text) if line.strip()]
+        lines = [line.strip() for line in re.split(r"\s{2,}", element_text) if line.strip()]
 
     current_segment: dict[str, Any] | None = None
     segment_idx = 0
@@ -141,7 +149,8 @@ def detect_segments(element_text: str) -> list[dict[str, Any]]:
     if current_segment:
         segments.append(current_segment)
 
-    # Strategy 2: If no label-separated segments found, try repeated field groups
+    # Strategy 2: If no label-separated segments found, try repeated field
+    # groups
     if not segments:
         segments = _detect_repeated_groups(element_text)
 
@@ -157,32 +166,34 @@ def _detect_repeated_groups(text: str) -> list[dict[str, Any]]:
 
     Uses only generic patterns:
     - Repeated section-like structures separated by whitespace or punctuation
-    - Repeated date/label/value patterns
+    - Repeated date / label / value patterns
     - Repeated blocks with similar internal structure
     """
     segments: list[dict[str, Any]] = []
 
     # Strategy 1: repeated blocks with whitespace separation (generic)
-    blocks = re.split(r'\n\s*\n|\s{4,}|(?<=\d)\s{3,}(?=\w)', text)
+    blocks = re.split(r"\n\s*\n|\s{4,}|(?<=\d)\s{3,}(?=\w)", text)
     if len(blocks) >= 2:
         non_empty = [b.strip() for b in blocks if b.strip() and len(b.strip()) > 10]
         if len(non_empty) >= 2:
             for i, block in enumerate(non_empty[:10]):
-                segments.append({
-                    "index": i,
-                    "label": f"Part {i + 1}",
-                    "lines": [block],
-                    "raw_text": block,
-                })
+                segments.append(
+                    {
+                        "index": i,
+                        "label": f"Part {i + 1}",
+                        "lines": [block],
+                        "raw_text": block,
+                    }
+                )
             return segments
 
-    # Strategy 2: repeated date/value clusters (generic for any listing)
-    # Look for repeated patterns of date/time followed by text and values
+    # Strategy 2: repeated date / value clusters (generic for any listing)
+    # Look for repeated patterns of date / time followed by text and values
     date_value_pattern = re.compile(
-        r'(?:(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|'       # date
-        r'(?:\d{1,2}:\d{2}\s*(?:am|pm)?))'               # or time
-        r'[\s\S]{10,100}?'                                 # intervening text
-        r'(?:[\$\€\£\¥\₹]\s*\d+|\d{1,3}(?:,\d{3})*(?:\.\d{2})?)'  # price
+        r"(?:(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|"  # date
+        r"(?:\d{1,2}:\d{2}\s*(?:am|pm)?))"  # or time
+        r"[\s\S]{10,100}?"  # intervening text
+        r"(?:[\$\€\£\¥\₹]\s*\d+|\d{1,3}(?:,\d{3})*(?:\.\d{2})?)"  # price
     )
     matches = list(date_value_pattern.finditer(text))
     if len(matches) >= 2:
@@ -192,12 +203,14 @@ def _detect_repeated_groups(text: str) -> list[dict[str, Any]]:
             end = min(len(text), m.end() + 30)
             context = text[start:end].strip()
             if context:
-                segments.append({
-                    "index": i,
-                    "label": label,
-                    "lines": [context],
-                    "raw_text": context,
-                })
+                segments.append(
+                    {
+                        "index": i,
+                        "label": label,
+                        "lines": [context],
+                        "raw_text": context,
+                    }
+                )
         if len(segments) >= 2:
             return segments
 
@@ -208,6 +221,7 @@ def _detect_repeated_groups(text: str) -> list[dict[str, Any]]:
 # Field extraction from segments
 # ---------------------------------------------------------------------------
 
+
 def _extract_segment_fields(raw_text: str) -> dict[str, str]:
     """Extract typed fields from a segment's text using pattern matching.
 
@@ -217,14 +231,22 @@ def _extract_segment_fields(raw_text: str) -> dict[str, str]:
 
     # Organization (capitalized multi-word names)
     org_match = re.search(
-        r'\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})\b',
+        r"\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})\b",
         raw_text,
     )
-    if org_match and org_match.group(1).lower() not in ("from", "to", "departure", "arrival", "return", "outbound", "inbound"):
+    if org_match and org_match.group(1).lower() not in (
+        "from",
+        "to",
+        "departure",
+        "arrival",
+        "return",
+        "outbound",
+        "inbound",
+    ):
         fields["organization"] = org_match.group(1).strip()
 
     # Time patterns (start and end times)
-    times = re.findall(r'\d{1,2}:\d{2}\s*(?:am|pm)?', raw_text, re.I)
+    times = re.findall(r"\d{1,2}:\d{2}\s*(?:am|pm)?", raw_text, re.I)
     if len(times) >= 2:
         fields["time_start"] = times[0]
         fields["time_end"] = times[1]
@@ -232,7 +254,7 @@ def _extract_segment_fields(raw_text: str) -> dict[str, str]:
         fields["time_start"] = times[0]
 
     # 3-letter codes
-    codes = re.findall(r'\b[A-Z]{3}\b', raw_text)
+    codes = re.findall(r"\b[A-Z]{3}\b", raw_text)
     if len(codes) >= 2:
         fields["code_from"] = codes[0]
         fields["code_to"] = codes[1]
@@ -240,12 +262,12 @@ def _extract_segment_fields(raw_text: str) -> dict[str, str]:
         fields["code"] = codes[0]
 
     # Date
-    date_match = re.search(r'\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}', raw_text)
+    date_match = re.search(r"\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}", raw_text)
     if date_match:
         fields["date"] = date_match.group(0)
 
     # Price / currency
-    price_match = re.search(r'[\$\€\£\¥\₹]\s*\d+[\d,.]*', raw_text)
+    price_match = re.search(r"[\$\€\£\¥\₹]\s*\d+[\d,.]*", raw_text)
     if price_match:
         fields["price"] = price_match.group(0).replace(" ", "")
 
@@ -260,23 +282,24 @@ def _extract_shared_fields(segments: list[dict[str, Any]], full_text: str) -> di
     shared: dict[str, str] = {}
 
     # Total price (look for large currency values)
-    prices = re.findall(r'[\$\€\£\¥\₹]\s*\d+[\d,.]*', full_text)
+    prices = re.findall(r"[\$\€\£\¥\₹]\s*\d+[\d,.]*", full_text)
     if prices:
         # The largest price is likely the total
         def _parse_price(p: str) -> float:
-            nums = re.findall(r'\d+[\d,.]*', p)
+            nums = re.findall(r"\d+[\d,.]*", p)
             return float(nums[0].replace(",", "")) if nums else 0.0
+
         prices_with_values = [(p, _parse_price(p)) for p in prices]
         prices_with_values.sort(key=lambda x: x[1], reverse=True)
         shared["price"] = prices_with_values[0][0]
 
     # Rating
-    rating_match = re.search(r'(?:rating|score|stars?)\s*:?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*\d+)?', full_text, re.I)
+    rating_match = re.search(r"(?:rating|score|stars?)\s*:?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*\d+)?", full_text, re.I)
     if rating_match:
         shared["rating"] = rating_match.group(1)
 
     # Status / availability
-    status_match = re.search(r'\b(available|sold\s*out|in\s*stock|out\s*of\s*stock|pending)\b', full_text, re.I)
+    status_match = re.search(r"\b(available|sold\s * out|in\s * stock|out\s * of\s * stock|pending)\b", full_text, re.I)
     if status_match:
         shared["status"] = status_match.group(1)
 
@@ -286,6 +309,7 @@ def _extract_shared_fields(segments: list[dict[str, Any]], full_text: str) -> di
 # ---------------------------------------------------------------------------
 # Main assembly function
 # ---------------------------------------------------------------------------
+
 
 def assemble_compound_records(
     records: list[dict],
@@ -313,7 +337,8 @@ def assemble_compound_records(
 
     for i, record in enumerate(records):
         # Get the full text for this record
-        # Priority: 1) _element_text set by extractor, 2) full_texts dict, 3) concatenated values
+        # Priority: 1) _element_text set by extractor, 2) full_texts dict, 3)
+        # concatenated values
         text = ""
         if record.get("_element_text"):
             text = record["_element_text"]
@@ -337,7 +362,8 @@ def assemble_compound_records(
 
             for seg in segments:
                 seg_fields = _extract_segment_fields(seg.get("raw_text", ""))
-                # Also copy any record fields that look like they belong to a segment
+                # Also copy any record fields that look like they belong to a
+                # segment
                 for k, v in record.items():
                     if k in ("organization", "name", "price", "date", "code"):
                         if k not in seg_fields:
@@ -355,7 +381,14 @@ def assemble_compound_records(
             # Flatten into schema-compatible dict
             flat = compound.flatten()
             # Preserve metadata from original record
-            for meta_key in ("source_url", "source_type", "source_trust_score", "record_score", "_extraction_method", "_key"):
+            for meta_key in (
+                "source_url",
+                "source_type",
+                "source_trust_score",
+                "record_score",
+                "_extraction_method",
+                "_key",
+            ):
                 if meta_key in record:
                     flat[meta_key] = record[meta_key]
             assembled.append(flat)

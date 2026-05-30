@@ -17,6 +17,7 @@ from app.semantic_world_state.topology import TopologyMixin
 
 logger = logging.getLogger(__name__)
 
+
 class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMixin, TopologyMixin):
     """
     Canonical Semantic World State — now a true orchestrator.
@@ -24,6 +25,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     Meaning emerges from the relational topology of this state.
     No subsystem may maintain isolated semantic truth.
     """
+
     def __init__(self, node_id: Optional[str] = None):
         from app.topology_state import TopologyState
         from app.energy_state import EnergyState
@@ -42,10 +44,9 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
         self._node_id = node_id or str(uuid.uuid4())[:8]
         self._vector_clock = VectorClock(self._node_id)
-        self._lock = NonBlockingRLock() # Reentrant lock for nested transactions
+        self._lock = NonBlockingRLock()  # Reentrant lock for nested transactions
 
-        self._topology = TopologyState(delta_callback=self.record_delta,
-                                      read_callback=self.record_read)
+        self._topology = TopologyState(delta_callback=self.record_delta, read_callback=self.record_read)
         self._energy = EnergyState(delta_callback=self.record_delta)
         self._instability = InstabilityState(delta_callback=self.record_delta)
         self._manifold = ManifoldState(delta_callback=self.record_delta)
@@ -61,15 +62,17 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         from app.crawl_state import get_crawl_state
         from app.telemetry_state import get_telemetry_state
         from app.regression_state import get_regression_state
+
         self.crawl = get_crawl_state()
         self.telemetry = get_telemetry_state()
         self.regression = get_regression_state()
 
         # Phase 83: Multi-Shard Federation Manager
         from app.federation_manager import FederationManager
+
         self.federation = FederationManager(self)
 
-        # Phase 60/63: Drift Tracking References
+        # Phase 60 / 63: Drift Tracking References
         self._manifold._energy_ref = self._energy
         self._manifold._obs_ref = self._observability
 
@@ -81,7 +84,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         self._replaying = False
         self._active_trace_id: Optional[str] = None
         self._current_journal: List[dict] = []
-        self._journal_capacity: int = 1000 # Default (Phase 55)
+        self._journal_capacity: int = 1000  # Default (Phase 55)
         self._evolved_schema: Set[str] = set()
 
         # Idempotent close guard
@@ -95,6 +98,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         # Phase 71: Decentralized Field Waves
         from app.event_dispatcher import get_dispatcher
         from app.semantic_events import SemanticEventType
+
         self._dispatcher = get_dispatcher()
         self._dispatcher.subscribe(SemanticEventType.FIELD_WAVE, self._on_field_wave)
         self._subscribed_to_dispatcher = True
@@ -106,10 +110,11 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         - Subsequent calls return immediately.
         - Unsubscribe failures are logged but never raised.
         """
-        if getattr(self, '_closed', False):
+        if getattr(self, "_closed", False):
             return
         self._closed = True
         from app.semantic_events import SemanticEventType
+
         if self._subscribed_to_dispatcher:
             try:
                 self._dispatcher.unsubscribe(SemanticEventType.FIELD_WAVE, self._on_field_wave)
@@ -126,7 +131,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     @node_id.setter
     def node_id(self, value: str):
         self._node_id = value
-        if hasattr(self, '_vector_clock'):
+        if hasattr(self, "_vector_clock"):
             self._vector_clock.node_id = value
 
     @property
@@ -174,6 +179,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def branch(self, label: str) -> "SemanticWorldState":
         """Create an isolated branch of the current semantic world (Phase 39)."""
         import uuid
+
         child_id = f"{self._node_id}-br-{str(uuid.uuid4())[:4]}"
         child = SemanticWorldState(node_id=child_id)
 
@@ -189,9 +195,8 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         # Initialize child's vector clock as a descendant of parent
         child._vector_clock.update(self._vector_clock.get_clock())
 
-        logger.info(
-            f"SUBSTRATE BRANCHED: [{self.node_id}] -> [{child_id}] (Label: {label})"
-        )
+        logger.info(f"SUBSTRATE BRANCHED: [{
+                self.node_id}] -> [{child_id}] (Label: {label})")
         return child
 
     # ─── Transaction Manager (MVCC & Thread Safety) ──────────────────────
@@ -206,14 +211,25 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             return
 
         from app.failure_injector import get_injector
+
         injector = get_injector()
 
-        states = [self._topology, self._energy, self._instability,
-                  self._manifold, self._motif, self._transition,
-                  self._intent, self._action, self._abstraction, self._observability,
-                  self._history]
+        states = [
+            self._topology,
+            self._energy,
+            self._instability,
+            self._manifold,
+            self._motif,
+            self._transition,
+            self._intent,
+            self._action,
+            self._abstraction,
+            self._observability,
+            self._history,
+        ]
 
         import uuid
+
         tx_ctx: Dict[str, Any] = {
             "label": label,
             "trace_id": trace_id or str(uuid.uuid4())[:8],
@@ -225,7 +241,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         try:
             start_time = time.time()
             for s in states:
-                if hasattr(s, 'begin_transaction'):
+                if hasattr(s, "begin_transaction"):
                     s.begin_transaction()
             yield self
 
@@ -241,21 +257,25 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                 val_start = time.time()
 
                 from app.topology_state import TopologyState, ConflictError
+
                 try:
                     for s in states:
-                        if hasattr(s, 'commit'):
+                        if hasattr(s, "commit"):
                             injector.inject(f"mid_commit:{label}")
                             if isinstance(s, TopologyState):
                                 s.commit(expected_versions=expected_versions)
                             else:
                                 s.commit()
                 except ConflictError as ce:
-                    self.emit_telemetry("transaction_conflict", {
-                        "label": label,
-                        "trace_id": tx_ctx["trace_id"],
-                        "error": str(ce),
-                        "regions_touched": len(expected_versions)
-                    })
+                    self.emit_telemetry(
+                        "transaction_conflict",
+                        {
+                            "label": label,
+                            "trace_id": tx_ctx["trace_id"],
+                            "error": str(ce),
+                            "regions_touched": len(expected_versions),
+                        },
+                    )
                     raise
 
                 val_end = time.time()
@@ -270,20 +290,23 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                     "clock": self._vector_clock.get_clock(),
                     "node_id": self.node_id,
                     "trace_id": tx_ctx["trace_id"],
-                    "entries": list(tx_ctx["journal"])
+                    "entries": list(tx_ctx["journal"]),
                 }
                 self._history.record_transaction(tx, capacity=self._journal_capacity)
 
                 # Emit enhanced telemetry for the transaction itself
-                self.emit_telemetry("transaction", {
-                    "label": label,
-                    "duration": tx["duration"],
-                    "validation_ms": tx["validation_time_ms"],
-                    "entry_count": len(tx["entries"]) if isinstance(tx["entries"], list) else 0,
-                    "regions_touched": len(expected_versions),
-                    "trace_id": tx["trace_id"],
-                    "node_id": self.node_id
-                })
+                self.emit_telemetry(
+                    "transaction",
+                    {
+                        "label": label,
+                        "duration": tx["duration"],
+                        "validation_ms": tx["validation_time_ms"],
+                        "entry_count": len(tx["entries"]) if isinstance(tx["entries"], list) else 0,
+                        "regions_touched": len(expected_versions),
+                        "trace_id": tx["trace_id"],
+                        "node_id": self.node_id,
+                    },
+                )
 
         except Exception as e:
             # Best-effort rollback: if one subsystem fails to rollback,
@@ -291,7 +314,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             # original exception and re-raise it.
             rollback_errors: list[str] = []
             for s in states:
-                if hasattr(s, 'rollback'):
+                if hasattr(s, "rollback"):
                     try:
                         s.rollback()
                     except Exception as rb_err:
@@ -299,16 +322,23 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                         rollback_errors.append(rb_msg)
                         logger.error(
                             "Rollback failed for subsystem %s during transaction [%s]: %s",
-                            type(s).__name__, label, rb_err,
+                            type(s).__name__,
+                            label,
+                            rb_err,
                         )
             if rollback_errors:
                 logger.error(
                     "State transaction [%s] rollback had %d subsystem error(s): %s",
-                    label, len(rollback_errors), "; ".join(rollback_errors),
+                    label,
+                    len(rollback_errors),
+                    "; ".join(rollback_errors),
                 )
             logger.error(
                 "State transaction [%s] failed on node [%s] (Trace: %s), rolled back: %s",
-                label, self.node_id, tx_ctx['trace_id'], e,
+                label,
+                self.node_id,
+                tx_ctx["trace_id"],
+                e,
             )
             raise
         finally:
@@ -370,6 +400,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     def _filter_replay_details(self, method: Any, details: dict) -> dict:
         import inspect
+
         try:
             signature = inspect.signature(method)
         except (TypeError, ValueError):
@@ -379,8 +410,10 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             return details
 
         allowed = {
-            name for name, param in signature.parameters.items()
-            if param.kind in (
+            name
+            for name, param in signature.parameters.items()
+            if param.kind
+            in (
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
                 inspect.Parameter.KEYWORD_ONLY,
             )
@@ -398,17 +431,14 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             "action": action,
             "details": deepcopy(details),
             "timestamp": time.time(),
-            "trace_id": tx["trace_id"] if tx else None
+            "trace_id": tx["trace_id"] if tx else None,
         }
 
         # Push to global EventJournal
         from app.event_journal import get_journal
+
         get_journal().record(
-            source=subsystem,
-            mutation_type=action,
-            before={},
-            after=details,
-            metadata={"trace_id": entry["trace_id"]}
+            source=subsystem, mutation_type=action, before={}, after=details, metadata={"trace_id": entry["trace_id"]}
         )
 
         if tx is not None:
@@ -422,7 +452,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                     "clock": self._vector_clock.get_clock(),
                     "node_id": self.node_id,
                     "entries": [entry],
-                    "trace_id": entry["trace_id"]
+                    "trace_id": entry["trace_id"],
                 }
                 self._history.record_transaction(direct_tx, capacity=self._journal_capacity)
 
@@ -445,7 +475,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
         relation = self._vector_clock.compare(remote_clock)
         if relation in ("ancestor", "equal"):
-            logger.info(f"CONSENSUS: Ignoring remote state from [{remote_node}] (Ancestor/Equal)")
+            logger.info(f"CONSENSUS: Ignoring remote state from [{remote_node}] (Ancestor / Equal)")
             return
 
         alpha = 0.7 if relation == "descendant" else 0.3
@@ -466,18 +496,23 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             logger.info(
                 f"CONSENSUS: Merged state from [{remote_node}]. Relation: {relation}, Alpha: {alpha} (Trace: {active_trace})"
             )
-            self.record_delta("global", "merge_state", {
-                "remote_node": remote_node,
-                "relation": relation,
-                "alpha": alpha,
-                "remote_trace": remote_data.get("last_trace_id")
-            })
+            self.record_delta(
+                "global",
+                "merge_state",
+                {
+                    "remote_node": remote_node,
+                    "relation": relation,
+                    "alpha": alpha,
+                    "remote_trace": remote_data.get("last_trace_id"),
+                },
+            )
 
     # ─── Manifold Federation ─────────────────────────────────────────────
 
     def export_manifold(self) -> dict:
         """Export learned role embeddings with Differential Noise (Phase 30)."""
         import random
+
         manifold = self.role_manifold
 
         for role in manifold:
@@ -492,7 +527,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             "version": "1.1",
             "timestamp": time.time(),
             "origin": id(self),
-            "privacy": "differential_noise_v1"
+            "privacy": "differential_noise_v1",
         }
 
     def import_federated_manifold(self, data: dict):
@@ -512,7 +547,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                         continue
 
                     local_vec = self._manifold.get_manifold_vector(role)
-                    dist = sum((a - b)**2 for a, b in zip(local_vec, remote_vec))**0.5
+                    dist = sum((a - b) ** 2 for a, b in zip(local_vec, remote_vec)) ** 0.5
                     if dist > 1.5:
                         filtered_count += 1
                         continue
@@ -522,20 +557,18 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                     self._manifold.set_manifold_vector(role, remote_vec)
                     self._energy.set_schema_instability(role, 0.3)
 
-            logger.info(
-                f"FEDERATION: Merged {len(remote_manifold) - filtered_count} roles. "
-                f"Firewall filtered {filtered_count} roles."
+            logger.info(f"FEDERATION: Merged {
+                    len(remote_manifold) -
+                    filtered_count} roles. " f"Firewall filtered {filtered_count} roles.")
+            self.record_delta(
+                "global", "manifold_federation", {"remote_roles": len(remote_manifold), "filtered": filtered_count}
             )
-            self.record_delta("global", "manifold_federation", {
-                "remote_roles": len(remote_manifold),
-                "filtered": filtered_count
-            })
 
     def export_topology_laws(self) -> dict:
         return {
             "laws": {f"{k[0]}|{k[1]}": v for k, v in self._topology.topological_laws.items()},
             "version": "1.0",
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
 
     def import_federated_laws(self, data: dict):
@@ -549,13 +582,15 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                     new_val = local_val * 0.7 + remote_val * 0.3
                     self._topology.set_topological_law(pair, new_val)
 
-            logger.info(f"FEDERATION: Merged {len(remote_laws)} topological laws.")
+            logger.info(f"FEDERATION: Merged {
+                    len(remote_laws)} topological laws.")
             self.record_delta("global", "federated_laws", {"remote_laws": len(remote_laws)})
 
     # ─── Cognitive Health Summary ────────────────────────────────────────
 
     def get_cognitive_health(self) -> dict:
         from app.semantic_inference_engine import RoleEmbeddingEngine
+
         reng = RoleEmbeddingEngine()
 
         certainty = reng.get_certainty()
@@ -567,6 +602,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         fragmentation = len(communities) / max(len(active_roles), 1)
 
         from app.semantic_allocation_engine import _infer_role_type
+
         alignment_total = 0.0
         for role in active_roles:
             seed_type = _infer_role_type(role)
@@ -586,10 +622,10 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                 "total": len(roles),
                 "active": len(active_roles),
                 "hypo": len(hypo_roles),
-                "anchored": len(self._manifold.role_anchors)
+                "anchored": len(self._manifold.role_anchors),
             },
             "system_energy": round(self.metrics.global_energy, 3),
-            "stability_debt": round(self.metrics.stability_debt, 3)
+            "stability_debt": round(self.metrics.stability_debt, 3),
         }
 
     # ─── Manifold Delegation Methods ──────────────────────────────────────
@@ -990,6 +1026,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
         from app.policy_engine import get_policy_engine
         from app.llm_bridge import get_plugin_manager
+
         policy = get_policy_engine(ws=self)
         plugins = get_plugin_manager(ws=self)
         pressure = self.get_system_pressure()
@@ -1010,12 +1047,11 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                             threshold = details["threshold"]
                             handler_name = details["handler_name"]
 
-                            dist = sum((a - b)**2 for a, b in zip(role_vec, target_vec))**0.5
+                            dist = sum((a - b) ** 2 for a, b in zip(role_vec, target_vec)) ** 0.5
 
                             if dist < threshold:
-                                logger.info(
-                                    f"AGENCY TRIGGERED: Role [{role}] activated Action [{aid}] (Dist: {dist:.4f})"
-                                )
+                                logger.info(f"AGENCY TRIGGERED: Role [{role}] activated Action [{aid}] (Dist: {
+                                        dist:.4f})")
 
                                 success = True
                                 tool_result = None
@@ -1025,12 +1061,16 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                                     logger.warning(f"Plugin execution failed for {handler_name}: {e}")
                                     success = False
 
-                                self._action.log_execution(aid, success=success, details={
-                                    "role": role,
-                                    "token": region.token,
-                                    "distance": dist,
-                                    "tool_result": str(tool_result)[:100] if tool_result else None
-                                })
+                                self._action.log_execution(
+                                    aid,
+                                    success=success,
+                                    details={
+                                        "role": role,
+                                        "token": region.token,
+                                        "distance": dist,
+                                        "tool_result": str(tool_result)[:100] if tool_result else None,
+                                    },
+                                )
                                 triggered += 1
                                 if success:
                                     self._manifold.blend_manifold_vector(role, target_vec, alpha=0.95, beta=0.05)
@@ -1095,18 +1135,19 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                 merged = False
                 for lid, l_details in local_envelopes.items():
                     l_vec = l_details["manifold_vec"]
-                    dist = sum((a - b)**2 for a, b in zip(l_vec, r_vec))**0.5
+                    dist = sum((a - b) ** 2 for a, b in zip(l_vec, r_vec)) ** 0.5
 
                     if dist < 0.15:
                         new_constituents = set(l_details["constituents"]) | set(r_details["constituents"])
                         new_vec = [(a + b) / 2 for a, b in zip(l_vec, r_vec)]
 
-                        self._abstraction.create_envelope(lid, list(new_constituents), new_vec, level=max(l_details["level"], r_details["level"]))
+                        self._abstraction.create_envelope(
+                            lid, list(new_constituents), new_vec, level=max(l_details["level"], r_details["level"])
+                        )
                         self._manifold.set_manifold_vector(lid, new_vec)
 
-                        logger.info(
-                            f"HIERARCHICAL MERGE: Merged remote concept {rid} into local [{lid}] (Dist: {dist:.4f})"
-                        )
+                        logger.info(f"HIERARCHICAL MERGE: Merged remote concept {rid} into local [{lid}] (Dist: {
+                                dist:.4f})")
                         merged = True
                         break
 
@@ -1122,6 +1163,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     def execute_tql(self, query: str) -> dict:
         from app.topological_query import get_tql_engine
+
         return get_tql_engine(ws=self).execute_tql(query)
 
     def get_crystalline_attractors(self, token_vals=None) -> list:
@@ -1144,16 +1186,18 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         self.evolve_field()
 
     def snapshot(self, label: str = ""):
-        self._history.add_snapshot({
-            "label": label,
-            "time": self.metrics.total_records_processed,
-            "energy": self.metrics.global_energy,
-            "uncertainty": self.metrics.average_uncertainty,
-            "field_pressure": self.metrics.field_pressure,
-            "exclusions": len(self.learned_exclusions),
-            "compatibilities": len(self.role_compatibility),
-            "motifs": len(self.motif_counts),
-        })
+        self._history.add_snapshot(
+            {
+                "label": label,
+                "time": self.metrics.total_records_processed,
+                "energy": self.metrics.global_energy,
+                "uncertainty": self.metrics.average_uncertainty,
+                "field_pressure": self.metrics.field_pressure,
+                "exclusions": len(self.learned_exclusions),
+                "compatibilities": len(self.role_compatibility),
+                "motifs": len(self.motif_counts),
+            }
+        )
         self._history.trim_snapshots(max_size=500, keep=250)
 
     def replay(self) -> list:
@@ -1181,8 +1225,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         self._scheduler.clear()
         self.last_update_time = time.time()
 
-    def schedule_cognitive_task(self, task_id: str, priority: Any,
-                                 handler: Callable, *args, **kwargs):
+    def schedule_cognitive_task(self, task_id: str, priority: Any, handler: Callable, *args, **kwargs):
         self._scheduler.schedule(task_id, priority, handler, *args, **kwargs)
 
     def process_cognitive_queue(self, budget_ms: float = 100.0) -> int:
@@ -1200,13 +1243,18 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             diff["global_entropy"] = (self.metrics.global_entropy, other.metrics.global_entropy)
         added_roles = set(other.role_compatibility) - set(self.role_compatibility)
         if added_roles:
-            diff["added_role_compatibilities"] = {str(k): v for k, v in other.role_compatibility.items() if k in added_roles}
+            diff["added_role_compatibilities"] = {
+                str(k): v for k, v in other.role_compatibility.items() if k in added_roles
+            }
         changed_roles = {
-            k for k in set(self.role_compatibility) & set(other.role_compatibility)
+            k
+            for k in set(self.role_compatibility) & set(other.role_compatibility)
             if abs(self.role_compatibility[k] - other.role_compatibility[k]) > 0.01
         }
         if changed_roles:
-            diff["changed_role_compatibilities"] = {str(k): (self.role_compatibility[k], other.role_compatibility[k]) for k in changed_roles}
+            diff["changed_role_compatibilities"] = {
+                str(k): (self.role_compatibility[k], other.role_compatibility[k]) for k in changed_roles
+            }
         added_motifs = set(other.motif_counts) - set(self.motif_counts)
         if added_motifs:
             diff["added_motifs"] = [str(m) for m in added_motifs]
@@ -1232,7 +1280,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             total_dist = 0.0
             for r in common_roles:
                 v1, v2 = local_m[r], other_m[r]
-                dist = sum((a - b)**2 for a, b in zip(v1, v2))**0.5
+                dist = sum((a - b) ** 2 for a, b in zip(v1, v2)) ** 0.5
                 total_dist += dist
             divergence["manifold_drift"] = total_dist / n_common if n_common > 0 else 0.0
 
@@ -1251,6 +1299,4 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             self.merge_hierarchical_knowledge(branch._abstraction.to_dict())
             self._vector_clock.update(branch._vector_clock.get_clock())
 
-            logger.info(
-                f"SUBSTRATE MERGED: [{branch.node_id}] -> [{self.node_id}] (Alpha: {alpha})"
-            )
+            logger.info(f"SUBSTRATE MERGED: [{branch.node_id}] -> [{self.node_id}] (Alpha: {alpha})")

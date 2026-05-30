@@ -24,22 +24,31 @@ logger = logging.getLogger(__name__)
 # Primary detection patterns for common anti-bot platforms
 CHALLENGE_PATTERNS = {
     "cloudflare": [
-        "cf-browser-verification", "cf-challenge", "cf-turnstile",
-        "challenge-platform", "checking your browser", "attention required"
+        "cf-browser-verification",
+        "cf-challenge",
+        "cf-turnstile",
+        "challenge-platform",
+        "checking your browser",
+        "attention required",
     ],
     "akamai": ["akamai-ghost", "ak_bmsc", "bm_sz", "_abck"],
     "datadome": ["dd-captcha", "datadome", "dd="],
     "perimeterx": ["perimeterx", "px-captcha", "_px"],
     "incapsula": ["incapsula", "visid_incap", "incap_ses", "imperva"],
     "generic_block": [
-        "access denied", "blocked", "sorry, you have been blocked",
-        "please verify", "security check", "suspicious activity",
-        "captcha", "human verify", "bot detection", "robot"
+        "access denied",
+        "blocked",
+        "sorry, you have been blocked",
+        "please verify",
+        "security check",
+        "suspicious activity",
+        "captcha",
+        "human verify",
+        "bot detection",
+        "robot",
     ],
-    "js_required": [
-        "enable javascript", "javascript is required", "browser is not supported"
-    ],
-    "rate_limit": ["too many requests", "429", "rate limit"]
+    "js_required": ["enable javascript", "javascript is required", "browser is not supported"],
+    "rate_limit": ["too many requests", "429", "rate limit"],
 }
 
 # Probability weights for detection signals
@@ -73,13 +82,15 @@ class AntiBotEngine:
         self._proxy_manager: Optional[object] = None
         self._cookies: Dict[str, str] = {}  # domain -> cookie_string
         self._last_cookie_update: Dict[str, float] = {}
-        self._ua_history: Dict[str, List[str]] = {}  # domain -> user agents used
+        # domain -> user agents used
+        self._ua_history: Dict[str, List[str]] = {}
 
     @property
     def proxy_manager(self):
         """Lazy-load proxy manager."""
         if self._proxy_manager is None:
             from app.proxy_manager import get_proxy_manager
+
             self._proxy_manager = get_proxy_manager()
         return self._proxy_manager
 
@@ -164,7 +175,8 @@ class AntiBotEngine:
         if domain not in self._ua_history:
             self._ua_history[domain] = []
         self._ua_history[domain].append(ua)
-        self._ua_history[domain] = self._ua_history[domain][-settings.ANTIBOT_UA_HISTORY_SIZE:]  # Keep last 5
+        # Keep last 5
+        self._ua_history[domain] = self._ua_history[domain][-settings.ANTIBOT_UA_HISTORY_SIZE:]
 
         # Randomize additional headers to mimic real browsers
         is_chromium = "Chrome" in ua and "Firefox" not in ua
@@ -177,7 +189,7 @@ class AntiBotEngine:
         else:
             sec_ch_ua_platform = '"Linux"'
         extra_headers = {
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept": "text / html,application / xhtml+xml,application / xml;q=0.9,image / avif,image / webp,*/*;q=0.8",
             "Accept-Language": settings.STEALTH_ACCEPT_LANGUAGE,
             "Accept-Encoding": "gzip, deflate, br",
             "Sec-Fetch-Dest": "document",
@@ -191,7 +203,9 @@ class AntiBotEngine:
         }
         if not is_chromium:
             # Firefox-style headers
-            extra_headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+            extra_headers["Accept"] = (
+                "text / html,application / xhtml+xml,application / xml;q=0.9,image / avif,image / webp,*/*;q=0.8"
+            )
             extra_headers["Sec-Fetch-Dest"] = "document"
             extra_headers["Sec-Fetch-Mode"] = "navigate"
             extra_headers["Sec-Fetch-Site"] = "none"
@@ -246,7 +260,8 @@ class AntiBotEngine:
             policy = {"action": "retry_slow", "delay": settings.ANTIBOT_HARD_BLOCK_DELAY, "rotate_proxy": True}
 
         elif last_score > 0.5:
-            # Medium challenge: probably just need more wait time/js execution
+            # Medium challenge: probably just need more wait time / js
+            # execution
             policy = {"action": "retry_wait", "delay": settings.ANTIBOT_MEDIUM_CHALLENGE_DELAY}
 
         else:
@@ -287,6 +302,7 @@ class AntiBotEngine:
 
 # Global Singleton
 _engine: AntiBotEngine | None = None
+
 
 def get_anti_bot_engine() -> AntiBotEngine:
     global _engine

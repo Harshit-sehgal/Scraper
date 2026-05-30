@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 # ─── Redirect Detection ────────────────────────────────────────────────
 
+
 def _detect_redirect(original_url: str, final_url: str) -> dict:
     """Detect and classify URL redirects by comparing original vs final URL.
 
@@ -28,9 +29,9 @@ def _detect_redirect(original_url: str, final_url: str) -> dict:
 
     Classification logic:
     - Same URL (or trailing-slash difference only) → no redirect
-    - Different domain/scheme → cross-domain (not flagged as redirect)
+    - Different domain / scheme → cross-domain (not flagged as redirect)
     - Final URL is homepage (/) and original had a deep path → homepage redirect
-    - Path shortened significantly (deep → shallow) → session/expired token redirect
+    - Path shortened significantly (deep → shallow) → session / expired token redirect
     - Path changed → generic path_changed redirect
 
     Args:
@@ -64,12 +65,14 @@ def _detect_redirect(original_url: str, final_url: str) -> dict:
     parsed_orig = urlparse(original_url)
     parsed_final = urlparse(final_url)
 
-    # Different domain/scheme — cross-domain navigation, not a site redirect
+    # Different domain / scheme — cross-domain navigation, not a site redirect
     if parsed_orig.netloc != parsed_final.netloc:
         return {
             "redirected": False,
             "redirect_type": "none",
-            "message": f"Different domain: {parsed_orig.netloc} → {parsed_final.netloc}",
+            "message": f"Different domain: {
+                parsed_orig.netloc} → {
+                parsed_final.netloc}",
             "original_url": original_url,
             "final_url": final_url,
         }
@@ -82,7 +85,8 @@ def _detect_redirect(original_url: str, final_url: str) -> dict:
 
     # Redirect to homepage (final is "/" or empty)
     if not final_path or final_path == "/":
-        # Deep path (3+ segments) redirected to homepage → likely expired session/token
+        # Deep path (3+ segments) redirected to homepage → likely expired
+        # session / token
         if len(orig_segments) >= 3:
             return {
                 "redirected": True,
@@ -106,7 +110,7 @@ def _detect_redirect(original_url: str, final_url: str) -> dict:
 
     # Path changed
     if orig_path != final_path:
-        # Deep path → shallow path: likely expired session/token
+        # Deep path → shallow path: likely expired session / token
         if len(orig_segments) >= 3 and len(final_segments) <= 2:
             return {
                 "redirected": True,
@@ -181,11 +185,12 @@ def build_redirect_info(
 
 # ─── Content Quality Assessment ────────────────────────────────────────
 
+
 def _assess_content_quality(html: str, profile) -> dict:
     """Assess whether the fetched page contains meaningful data containers.
 
     Detects landing pages (hero banners, search forms, welcome text),
-    empty/poor pages (no repeating data containers), and pages with real
+    empty / poor pages (no repeating data containers), and pages with real
     extractable data.
 
     Works with ANY StructureProfile — no domain-specific assumptions.
@@ -210,10 +215,16 @@ def _assess_content_quality(html: str, profile) -> dict:
     # ── Landing Page Detection ──────────────────────────────────────
     landing_signals: list[str] = []
 
-    # Hero/banner sections (generic selectors, no hardcoded domain)
+    # Hero / banner sections (generic selectors, no hardcoded domain)
     hero_selectors = [
-        ".hero", ".banner", ".jumbotron", ".landing", ".cover",
-        "[class*='hero']", "[class*='banner']", "[class*='landing']",
+        ".hero",
+        ".banner",
+        ".jumbotron",
+        ".landing",
+        ".cover",
+        "[class*='hero']",
+        "[class*='banner']",
+        "[class*='landing']",
         "[class*='jumbotron']",
     ]
     for sel in hero_selectors:
@@ -224,7 +235,7 @@ def _assess_content_quality(html: str, profile) -> dict:
         except Exception:
             continue
 
-    # Search forms (generic — any form with text/search input)
+    # Search forms (generic — any form with text / search input)
     forms = soup.find_all("form")
     search_form_found = False
     for form in forms:
@@ -239,11 +250,17 @@ def _assess_content_quality(html: str, profile) -> dict:
     if search_form_found:
         landing_signals.append("search_form")
 
-    # Welcome/landing page text patterns (generic, domain-agnostic)
+    # Welcome / landing page text patterns (generic, domain-agnostic)
     body_text = soup.get_text().lower()[:2000]
     welcome_patterns = [
-        "welcome", "find your", "search for", "get started",
-        "start your", "explore", "discover", "find the best",
+        "welcome",
+        "find your",
+        "search for",
+        "get started",
+        "start your",
+        "explore",
+        "discover",
+        "find the best",
         "looking for",
     ]
     for pattern in welcome_patterns:
@@ -253,16 +270,13 @@ def _assess_content_quality(html: str, profile) -> dict:
 
     # ── Data Container Detection ────────────────────────────────────
     data_container_count = 0
-    has_profile_selector = profile is not None and hasattr(profile, 'container_selector')
+    has_profile_selector = profile is not None and hasattr(profile, "container_selector")
     container_selector = profile.container_selector if has_profile_selector else None
 
     if container_selector and container_selector != "body":
         try:
             containers = soup.select(container_selector)
-            data_container_count = sum(
-                1 for c in containers
-                if len(c.get_text(strip=True)) > 20
-            )
+            data_container_count = sum(1 for c in containers if len(c.get_text(strip=True)) > 20)
         except Exception:
             pass
 
@@ -271,11 +285,12 @@ def _assess_content_quality(html: str, profile) -> dict:
     # element patterns across the full DOM (no hardcoded selectors).
     if data_container_count < 3:
         from collections import Counter as _Counter
+
         tag_class_counts: _Counter = _Counter()
         for tag in soup.find_all(True):
-            if tag.name in ('script', 'style', 'noscript', 'svg', 'form', 'nav', 'footer', 'header'):
+            if tag.name in ("script", "style", "noscript", "svg", "form", "nav", "footer", "header"):
                 continue
-            classes = ' '.join(tag.get('class', []) or [])
+            classes = " ".join(tag.get("class", []) or [])
             if classes:
                 key = f"{tag.name}.{'.'.join(classes.split()[:2])}"
                 tag_class_counts[key] += 1
@@ -286,39 +301,29 @@ def _assess_content_quality(html: str, profile) -> dict:
                 continue
             try:
                 # Build a rough CSS selector from the pattern
-                css_sel = pattern.replace('.', '.')
+                css_sel = pattern.replace(".", ".")
                 matching = soup.select(css_sel)
-                content_count = sum(
-                    1 for m in matching
-                    if len(m.get_text(strip=True)) > 20
-                )
+                content_count = sum(1 for m in matching if len(m.get_text(strip=True)) > 20)
                 if content_count > data_container_count:
                     data_container_count = content_count
             except Exception:
                 continue
 
         # Also scan for repeating direct children of common containers
-        for container_tag in ['div', 'li', 'article', 'section', 'tr']:
+        for container_tag in ["div", "li", "article", "section", "tr"]:
             parents = soup.find_all(container_tag, limit=10)
             for parent in parents:
                 children = parent.find_all(recursive=False)
                 if len(children) >= 3:
                     # Check if children share the same structure
-                    child_classes = [
-                        ' '.join(c.get('class', []) or []) for c in children
-                    ]
+                    child_classes = [" ".join(c.get("class", []) or []) for c in children]
                     unique_classes = len(set(child_classes))
                     if unique_classes <= 2:
                         # Likely repeating items
-                        data_container_count = max(
-                            data_container_count, len(children)
-                        )
+                        data_container_count = max(data_container_count, len(children))
 
     # ── Classification ──────────────────────────────────────────────
-    is_landing_page = (
-        len(landing_signals) >= 2
-        or (len(landing_signals) >= 1 and data_container_count < 3)
-    )
+    is_landing_page = len(landing_signals) >= 2 or (len(landing_signals) >= 1 and data_container_count < 3)
 
     if is_landing_page:
         return {
@@ -373,7 +378,7 @@ def _extract_container_text_values(html: str, container_selector: str) -> list[s
     seen = set()
 
     for tag in container.find_all(True):
-        if tag.name in ('script', 'style', 'noscript', 'svg', 'form', 'nav', 'footer', 'header'):
+        if tag.name in ("script", "style", "noscript", "svg", "form", "nav", "footer", "header"):
             continue
 
         text = tag.get_text(strip=True)
@@ -399,8 +404,8 @@ def _extract_container_text_values(html: str, container_selector: str) -> list[s
         values.append(text)
 
     # Add alt texts from images
-    for img in container.find_all('img'):
-        alt = img.get('alt', '').strip()
+    for img in container.find_all("img"):
+        alt = img.get("alt", "").strip()
         if alt and len(alt) > 2 and alt.lower() not in seen:
             seen.add(alt.lower())
             values.append(alt)
@@ -409,6 +414,7 @@ def _extract_container_text_values(html: str, container_selector: str) -> list[s
 
 
 # ─── Value Classification ────────────────────────────────────────────
+
 
 def _classify_value(value: str) -> str:
     """Classify a single text value using VALUE_PATTERNS.
@@ -429,7 +435,7 @@ def _classify_value(value: str) -> str:
     # This prevents "£450" from being classified as "number" because
     # the number regex matches the "450" substring.
     # Also date before phone because phone patterns can match date strings
-    # like "30-05-2026" (digits + dashes).
+    # like "30 - 05 - 2026" (digits + dashes).
     type_priority = [
         ("email", ["email"]),
         ("currency", ["currency"]),
@@ -508,109 +514,160 @@ def _value_patterns_to_field_types(patterns) -> list[dict]:
     """
     suggestions = []
     if patterns.currencies:
-        suggestions.append({
-            "type": "currency", "confidence": 0.9,
-            "example": patterns.currencies[0],
-            "description": "Monetary values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "currency",
+                "confidence": 0.9,
+                "example": patterns.currencies[0],
+                "description": "Monetary values detected on page",
+            }
+        )
     if patterns.dates:
-        suggestions.append({
-            "type": "date", "confidence": 0.9,
-            "example": patterns.dates[0],
-            "description": "Date values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "date",
+                "confidence": 0.9,
+                "example": patterns.dates[0],
+                "description": "Date values detected on page",
+            }
+        )
     if patterns.times:
-        suggestions.append({
-            "type": "time", "confidence": 0.75,
-            "example": patterns.times[0],
-            "description": "Time values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "time",
+                "confidence": 0.75,
+                "example": patterns.times[0],
+                "description": "Time values detected on page",
+            }
+        )
     if patterns.ratings:
-        suggestions.append({
-            "type": "rating", "confidence": 0.85,
-            "example": patterns.ratings[0],
-            "description": "Rating or score values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "rating",
+                "confidence": 0.85,
+                "example": patterns.ratings[0],
+                "description": "Rating or score values detected on page",
+            }
+        )
     if patterns.emails:
-        suggestions.append({
-            "type": "email", "confidence": 0.95,
-            "example": patterns.emails[0],
-            "description": "Email addresses detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "email",
+                "confidence": 0.95,
+                "example": patterns.emails[0],
+                "description": "Email addresses detected on page",
+            }
+        )
     if patterns.phones:
-        suggestions.append({
-            "type": "phone", "confidence": 0.9,
-            "example": patterns.phones[0],
-            "description": "Phone numbers detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "phone",
+                "confidence": 0.9,
+                "example": patterns.phones[0],
+                "description": "Phone numbers detected on page",
+            }
+        )
     codes_3letter = getattr(patterns, "codes_3letter", []) or []
     airport_codes = getattr(patterns, "airport_codes", []) or []
     if codes_3letter or airport_codes:
-        suggestions.append({
-            "type": "code", "confidence": 0.75,
-            "example": (airport_codes or codes_3letter)[0],
-            "description": "Short codes (3-letter) detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "code",
+                "confidence": 0.75,
+                "example": (airport_codes or codes_3letter)[0],
+                "description": "Short codes (3-letter) detected on page",
+            }
+        )
     if patterns.durations:
-        suggestions.append({
-            "type": "string", "confidence": 0.8,
-            "example": patterns.durations[0],
-            "description": "Duration values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "string",
+                "confidence": 0.8,
+                "example": patterns.durations[0],
+                "description": "Duration values detected on page",
+            }
+        )
     if patterns.urls:
-        suggestions.append({
-            "type": "url", "confidence": 0.85,
-            "example": patterns.urls[0],
-            "description": "URL/website values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "url",
+                "confidence": 0.85,
+                "example": patterns.urls[0],
+                "description": "URL / website values detected on page",
+            }
+        )
     if patterns.weights:
-        suggestions.append({
-            "type": "string", "confidence": 0.8,
-            "example": patterns.weights[0],
-            "description": "Weight values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "string",
+                "confidence": 0.8,
+                "example": patterns.weights[0],
+                "description": "Weight values detected on page",
+            }
+        )
     if patterns.percentages:
-        suggestions.append({
-            "type": "percentage", "confidence": 0.8,
-            "example": patterns.percentages[0],
-            "description": "Percentage values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "percentage",
+                "confidence": 0.8,
+                "example": patterns.percentages[0],
+                "description": "Percentage values detected on page",
+            }
+        )
     if patterns.booleans:
-        suggestions.append({
-            "type": "boolean", "confidence": 0.85,
-            "example": patterns.booleans[0],
-            "description": "Boolean/status values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "boolean",
+                "confidence": 0.85,
+                "example": patterns.booleans[0],
+                "description": "Boolean / status values detected on page",
+            }
+        )
     if patterns.dimensions:
-        suggestions.append({
-            "type": "string", "confidence": 0.75,
-            "example": patterns.dimensions[0],
-            "description": "Dimension/size values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "string",
+                "confidence": 0.75,
+                "example": patterns.dimensions[0],
+                "description": "Dimension / size values detected on page",
+            }
+        )
     if patterns.quantities:
-        suggestions.append({
-            "type": "string", "confidence": 0.75,
-            "example": patterns.quantities[0],
-            "description": "Quantity/pack size values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "string",
+                "confidence": 0.75,
+                "example": patterns.quantities[0],
+                "description": "Quantity / pack size values detected on page",
+            }
+        )
     if patterns.product_codes:
-        suggestions.append({
-            "type": "code", "confidence": 0.8,
-            "example": patterns.product_codes[0],
-            "description": "Product/SKU codes detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "code",
+                "confidence": 0.8,
+                "example": patterns.product_codes[0],
+                "description": "Product / SKU codes detected on page",
+            }
+        )
     if patterns.units:
-        suggestions.append({
-            "type": "string", "confidence": 0.75,
-            "example": patterns.units[0],
-            "description": "Unit type indicators detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "string",
+                "confidence": 0.75,
+                "example": patterns.units[0],
+                "description": "Unit type indicators detected on page",
+            }
+        )
     if patterns.address_fragments:
-        suggestions.append({
-            "type": "location", "confidence": 0.8,
-            "example": patterns.address_fragments[0],
-            "description": "Address/location values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "location",
+                "confidence": 0.8,
+                "example": patterns.address_fragments[0],
+                "description": "Address / location values detected on page",
+            }
+        )
     return suggestions
 
 
@@ -633,7 +690,7 @@ def build_url_analysis_prompt(values: list[str], page_analysis: dict) -> str:
     rows = []
     for i, val in enumerate(values, 1):
         vtype = _classify_value(val)
-        rows.append(f"  #{i:<3} \"{val}\"  type: {vtype}")
+        rows.append(f'  #{i:<3} "{val}"  type: {vtype}')
 
     value_block = "\n".join(rows)
 
@@ -643,9 +700,9 @@ Input values from a product listing page:
   #1   "Ergonomic Office Chair"           type: string
   #2   "FURN-4032"                        type: code
   #3   "$299.99"                          type: currency
-  #4   "4.5/5"                            type: rating
+  #4   "4.5 / 5"                            type: rating
   #5   "Free shipping"                    type: string
-  #6   "2-3 business days"                type: string
+  #6   "2 - 3 business days"                type: string
   #7   "In Stock"                         type: boolean
   #8   "SteelFrame Co."                   type: string
   #9   "Leather, Aluminum"                type: string
@@ -654,15 +711,15 @@ Input values from a product listing page:
 
 Expected output:
 {"page_type": "cards", "estimated_record_count": 36, "fields": [
-  {"name": "product_name", "type": "string", "example_value": "Ergonomic Office Chair", "confidence": 0.95, "description": "Product name"},
-  {"name": "sku", "type": "code", "example_value": "FURN-4032", "confidence": 0.95, "description": "Product SKU or item code"},
+  {"name": "product_name", "type": "string", "example_value": "Ergonomic Office Chair", "confidence": 0.95, "description": "Product name"},  # noqa: E501
+  {"name": "sku", "type": "code", "example_value": "FURN-4032", "confidence": 0.95, "description": "Product SKU or item code"},  # noqa: E501
   {"name": "price", "type": "currency", "example_value": "$299.99", "confidence": 0.95, "description": "Product price"},
-  {"name": "rating", "type": "rating", "example_value": "4.5/5", "confidence": 0.90, "description": "Customer rating"},
-  {"name": "delivery_info", "type": "string", "example_value": "Free shipping", "confidence": 0.80, "description": "Shipping or delivery information"},
-  {"name": "delivery_time", "type": "string", "example_value": "2-3 business days", "confidence": 0.80, "description": "Estimated delivery time"},
-  {"name": "availability", "type": "boolean", "example_value": "In Stock", "confidence": 0.90, "description": "Stock availability status"},
-  {"name": "brand", "type": "string", "example_value": "SteelFrame Co.", "confidence": 0.95, "description": "Brand or manufacturer"},
-  {"name": "materials", "type": "string", "example_value": "Leather, Aluminum", "confidence": 0.85, "description": "Product materials or features"},
+  {"name": "rating", "type": "rating", "example_value": "4.5 / 5", "confidence": 0.90, "description": "Customer rating"},  # noqa: E501
+  {"name": "delivery_info", "type": "string", "example_value": "Free shipping", "confidence": 0.80, "description": "Shipping or delivery information"},  # noqa: E501
+  {"name": "delivery_time", "type": "string", "example_value": "2 - 3 business days", "confidence": 0.80, "description": "Estimated delivery time"},  # noqa: E501
+  {"name": "availability", "type": "boolean", "example_value": "In Stock", "confidence": 0.90, "description": "Stock availability status"},  # noqa: E501
+  {"name": "brand", "type": "string", "example_value": "SteelFrame Co.", "confidence": 0.95, "description": "Brand or manufacturer"},  # noqa: E501
+  {"name": "materials", "type": "string", "example_value": "Leather, Aluminum", "confidence": 0.85, "description": "Product materials or features"},  # noqa: E501
   {"name": "weight_lbs", "type": "number", "example_value": "450", "confidence": 0.75, "description": "Product weight"},
   {"name": "color", "type": "string", "example_value": "Black, White", "confidence": 0.90, "description": "Available colors"}
 ]}
@@ -671,51 +728,67 @@ Expected output:
 
     return f"""You are a data schema designer. Name each data field found on this webpage.
 
-I extracted these values from ONE data row on this {structure_type.upper()} page (confidence: {structure_confidence:.0%}):
+I extracted these values from ONE data row on this {
+        structure_type.upper()} page (confidence: {
+        structure_confidence:.0%}):
 
 {value_block}
 
 {few_shot}
 
 For EACH value, assign a descriptive snake_case field name.
-Determine its data type from: string, number, currency, email, phone, url, date, time, rating, boolean, percentage, location, code.
+Determine its data type from: string, number, currency, email, phone, url, date, time, rating, boolean, percentage, location, code.  # noqa: E501
 
 CRITICAL: NEVER use type names as field names.
-  ✖ BAD: {{"name": "string"}} or {{"name": "code"}} or {{"name": "time"}} or {{"name": "text"}} or {{"name": "number"}} or {{"name": "date"}} or {{"name": "currency"}}
-  ✔ GOOD: {{"name": "airline_name"}} or {{"name": "flight_number"}} or {{"name": "departure_airport"}} or {{"name": "departure_time"}} or {{"name": "price"}}
+  ✖ BAD: {
+            "name": "string"}  or {
+                "name": "code"}  or {
+                    "name": "time"}  or {
+                        "name": "text"}  or {
+                            "name": "number"}  or {
+                                "name": "date"}  or {
+                                    "name": "currency"}
+  ✔ GOOD: {
+                                        "name": "airline_name"}  or {
+                                            "name": "flight_number"}  or {
+                                                "name": "departure_airport"}  or {
+                                                    "name": "departure_time"}  or {
+                                                        "name": "price"}
 
-Differentiate duplicate types — if two values share the same type, give them distinct context-specific names (e.g. "origin_airport_code" vs "destination_airport_code" instead of "code" and "code").
+Differentiate duplicate types — if two values share the same type, give them distinct context-specific names (e.g. "origin_airport_code" vs "destination_airport_code" instead of "code" and "code").  # noqa: E501
 
 Look at each value carefully and infer its contextual meaning. For example:
-- A 3-letter uppercase word like "LHR" or "JFK" is likely an airport code, name it "origin_airport_code" or "destination_airport_code"
+- A 3-letter uppercase word like "LHR" or "JFK" is likely an airport code, name it "origin_airport_code" or "destination_airport_code"  # noqa: E501
 - A city name like "London" or "New York" is a location, name it "origin_city" or "destination_city"
 - A monetary value like "$450" or "£450" is a price, name it "price", "total_price", or "fee"
 - A short time like "08:30" or "14:00" is a time, name it "departure_time" or "arrival_time"
-- A date like "30/05/2026" is a date, name it "departure_date", "travel_date", or "return_date"
+- A date like "30 / 05 / 2026" is a date, name it "departure_date", "travel_date", or "return_date"
 
 Return ONLY JSON — NO markdown, NO commentary:
-{{
-  "page_type": "{structure_type}",
+{
+                                                            "page_type": "{structure_type}",
   "estimated_record_count": 24,
   "fields": [
-    {{
-      "name": "descriptive_field_name",
+    {
+
+                                                                "name": "descriptive_field_name",
       "type": "string",
       "example_value": "actual value from HTML",
       "confidence": 0.95,
       "description": "What this field represents"
-    }}
+    }
   ]
-}}"""
+} """
 
 
 # ─── Search Form Detection ──────────────────────────────────────────────
 
+
 def _detect_search_form(html: str) -> dict:
     """Detect search forms on a page and extract their field structure.
 
-    Scans the page HTML for forms that look like search/query forms
-    (text inputs with location, date, or search-related names/placeholders),
+    Scans the page HTML for forms that look like search / query forms
+    (text inputs with location, date, or search-related names / placeholders),
     and returns a structured description of the form fields, action URL,
     and method. Fully generic — works with any site, no hardcoded values.
 
@@ -729,20 +802,29 @@ def _detect_search_form(html: str) -> dict:
         - method: str — GET or POST
         - fields: list of dicts with {id, name, type, placeholder, required_indicator}
         - search_fields: list of field dicts identified as search-relevant
-        (city/date/airport related names and placeholders)
+        (city / date / airport related names and placeholders)
     """
     soup = BeautifulSoup(html, "html.parser")
     forms = soup.find_all("form")
 
-    # Keywords that suggest a field is a search/query parameter
+    # Keywords that suggest a field is a search / query parameter
     SEARCH_FIELD_NAMES: set[str] = {
-        "from", "to", "source", "target",
-        "location", "place", "city",
+        "from",
+        "to",
+        "source",
+        "target",
+        "location",
+        "place",
+        "city",
         "date",
-        "query", "search", "q", "keyword",
+        "query",
+        "search",
+        "q",
+        "keyword",
     }
     SEARCH_PLACEHOLDER_PATTERNS: list[str] = [
-        r"from|to", r"location|place",
+        r"from|to",
+        r"location|place",
         r"date|when",
         r"search|find",
         r"keyword|query",
@@ -843,9 +925,11 @@ def _detect_search_form(html: str) -> dict:
 
 # ─── Search Form POST Recovery ─────────────────────────────────────────
 
+
 def _build_absolute_url(base_url: str, action: str) -> str:
     """Build an absolute URL from a base URL and potentially relative action."""
     from urllib.parse import urljoin, urlparse
+
     if action.startswith("http://") or action.startswith("https://"):
         return action
     if action.startswith("/"):
@@ -917,9 +1001,9 @@ def _map_search_params_to_fields(
                 if kw_norm == field_name or kw_norm == field_id:
                     score = 10  # Exact match
                 elif kw_norm in field_name or kw_norm in field_id:
-                    score = 5   # Substring match on name/id
+                    score = 5  # Substring match on name / id
                 elif kw_norm in placeholder:
-                    score = 3   # Placeholder match
+                    score = 3  # Placeholder match
 
                 if score > best_score:
                     best_score = score
@@ -951,10 +1035,10 @@ async def _try_form_search_recovery(
     hardcoded domains or field names.
 
     Args:
-        landing_page_html: HTML of the landing/homepage (after redirect)
+        landing_page_html: HTML of the landing / homepage (after redirect)
         landing_page_url: URL of the landing page (for resolving relative actions)
         search_params: Dict of search parameters
-            (e.g. {"origin": "NYC", "destination": "LHR", "departure_date": "05/15/2026"})
+            (e.g. {"origin": "NYC", "destination": "LHR", "departure_date": "05 / 15 / 2026"})
 
     Returns:
         dict with:
@@ -988,7 +1072,8 @@ async def _try_form_search_recovery(
     mapped_params = _map_search_params_to_fields(search_params, form_fields)
 
     if not mapped_params:
-        # Could not map any params — return the form structure so the user can see what's needed
+        # Could not map any params — return the form structure so the user can
+        # see what's needed
         return {
             "success": False,
             "fresh_url": landing_page_url,
@@ -1021,7 +1106,8 @@ async def _try_form_search_recovery(
 
     logger.info(
         "[SearchRecovery] POSTing to %s with params: %s",
-        absolute_action, mapped_params,
+        absolute_action,
+        mapped_params,
     )
 
     # Step 3: Submit the form
@@ -1047,6 +1133,7 @@ async def _try_form_search_recovery(
                     break
 
                 from urllib.parse import urljoin
+
                 redirect_url = urljoin(str(resp.url), redirect_target)
 
                 # SSRF: Validate each redirect hop target URL
@@ -1067,12 +1154,14 @@ async def _try_form_search_recovery(
                     "fresh_html": fresh_html,
                     "form_detected": True,
                     "form_info": form_info,
-                    "error": f"Search form submission returned HTTP {resp.status_code}",
+                    "error": f"Search form submission returned HTTP {
+                        resp.status_code}",
                 }
 
             logger.info(
                 "[SearchRecovery] Form submitted successfully → %s (status %d)",
-                fresh_url, resp.status_code,
+                fresh_url,
+                resp.status_code,
             )
 
             return {
@@ -1108,10 +1197,28 @@ async def _try_form_search_recovery(
 
 _GENERIC_NAMES: set[str] = {
     # Pure type names that should never be field identifiers
-    "string", "text", "number", "integer", "float", "boolean", "bool",
-    "code", "date", "time", "currency", "email", "phone", "url",
-    "website", "rating", "location", "address", "percentage",
-    "list", "object", "field",
+    "string",
+    "text",
+    "number",
+    "integer",
+    "float",
+    "boolean",
+    "bool",
+    "code",
+    "date",
+    "time",
+    "currency",
+    "email",
+    "phone",
+    "url",
+    "website",
+    "rating",
+    "location",
+    "address",
+    "percentage",
+    "list",
+    "object",
+    "field",
 }
 
 
@@ -1171,7 +1278,7 @@ _FIELD_NAME_HINTS: list[tuple[str, str, str]] = [
     ("email", "", "email"),
     # Phone
     ("phone", "", "phone_number"),
-    # Location/city names (capitalized proper nouns like "London")
+    # Location / city names (capitalized proper nouns like "London")
     ("location", r"[A-Z][a-z]+", "city_name"),
     # URLs
     ("url", "", "website_url"),

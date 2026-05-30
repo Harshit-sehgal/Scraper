@@ -3,12 +3,12 @@ Page Evidence Collector — Gathers all useful evidence from a rendered page.
 
 Before any extraction, this module collects raw evidence from the page:
   1. Visible text blocks with positional context
-  2. Repeated sibling/card structures (candidate containers)
+  2. Repeated sibling / card structures (candidate containers)
   3. Tables, rows, and list structures
   4. Links and buttons
   5. Pattern matches (price, date, currency, email, phone, etc.)
   6. Form fields
-  7. Network/XHR JSON responses (when available)
+  7. Network / XHR JSON responses (when available)
   8. Hydration data from <script> tags (Next.js, JSON-LD, window.__INITIAL_STATE__)
   9. Page metadata (title, URL, canonical URL, description)
 
@@ -35,9 +35,11 @@ logger = logging.getLogger(__name__)
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class VisibleTextBlock:
     """A single visible text node with positional and container context."""
+
     text: str
     tag: str
     parent_path: str
@@ -48,7 +50,8 @@ class VisibleTextBlock:
     height: float = 0.0
     container_id: str = ""
     nearby_text: list[str] = field(default_factory=list)
-    pattern_type: str = ""  # "price", "date", "email", "phone", "currency", "url", "time", "location", "organization", "name", "code", etc.
+    # "price", "date", "email", "phone", "currency", "url", "time", "location", "organization", "name", "code", etc.
+    pattern_type: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -57,6 +60,7 @@ class VisibleTextBlock:
 @dataclass
 class CandidateContainer:
     """A candidate result container discovered from DOM structure."""
+
     selector: str
     tag: str
     text_density: float = 0.0
@@ -89,6 +93,7 @@ class CandidateContainer:
 @dataclass
 class PageEvidence:
     """All evidence collected from a single page."""
+
     url: str
     title: str = ""
     canonical_url: str = ""
@@ -103,7 +108,8 @@ class PageEvidence:
     patterns: dict[str, list[str]] = field(default_factory=dict)
     network_json: list[dict] = field(default_factory=list)
     hydration_data: dict[str, Any] = field(default_factory=dict)
-    page_structure: str = ""  # "listing", "table", "cards", "list", "search_results", "detail", "single_item", "unknown"
+    # "listing", "table", "cards", "list", "search_results", "detail", "single_item", "unknown"
+    page_structure: str = ""
     estimated_record_count: int = 0
     html_length: int = 0
     visible_text_length: int = 0
@@ -121,18 +127,19 @@ class PageEvidence:
 # ---------------------------------------------------------------------------
 
 PATTERN_DEFINITIONS: list[tuple[str, re.Pattern]] = [
-    ("currency", re.compile(r'[\$\€\£\¥\₹]\s*\d+[\d,.]*')),
-    ("price", re.compile(r'(?:price|total|amount|cost|fare)\s*:?\s*[\$\€\£\¥\₹]?\s*\d+[\d,.]*', re.I)),
-    ("date_iso", re.compile(r'\d{4}-\d{2}-\d{2}')),
-    ("date_slash", re.compile(r'\d{1,2}/\d{1,2}/\d{2,4}')),
-    ("date_text", re.compile(r'(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}', re.I)),
-    ("time", re.compile(r'\d{1,2}:\d{2}\s*(?:am|pm)?', re.I)),
-    ("email", re.compile(r'[\w.+-]+@[\w-]+\.[\w.-]+')),
-    ("phone", re.compile(r'\+?\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}')),
-    ("percentage", re.compile(r'\d+[\.,]?\d*%')),
+    ("currency", re.compile(r"[\$\€\£\¥\₹]\s*\d+[\d,.]*")),
+    ("price", re.compile(r"(?:price|total|amount|cost|fare)\s*:?\s*[\$\€\£\¥\₹]?\s*\d+[\d,.]*", re.I)),
+    ("date_iso", re.compile(r"\d{4}-\d{2}-\d{2}")),
+    ("date_slash", re.compile(r"\d{1,2}/\d{1,2}/\d{2,4}")),
+    ("date_text", re.compile(r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}", re.I)),
+    ("time", re.compile(r"\d{1,2}:\d{2}\s*(?:am|pm)?", re.I)),
+    ("email", re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")),
+    ("phone", re.compile(r"\+?\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}")),
+    ("percentage", re.compile(r"\d+[\.,]?\d*%")),
     ("url", re.compile(r'https?://[^\s<>"\'\]\)]+')),
-    ("rating", re.compile(r'(?:rating|score|stars?)\s*:?\s*\d+(?:\.\d+)?(?:\s*\/\s*\d+)?', re.I)),
-    ("location_code", re.compile(r'\b[A-Z]{3}\b')),  # 3-letter codes like MIA, JFK
+    ("rating", re.compile(r"(?:rating|score|stars?)\s*:?\s*\d+(?:\.\d+)?(?:\s*\/\s*\d+)?", re.I)),
+    # 3-letter codes like MIA, JFK
+    ("location_code", re.compile(r"\b[A-Z]{3}\b")),
 ]
 
 # Repeated structure detection
@@ -142,6 +149,7 @@ STRUCTURAL_SEPARATORS = ["hr", "br", "---", "___", "···"]
 # ---------------------------------------------------------------------------
 # Evidence collection
 # ---------------------------------------------------------------------------
+
 
 def collect_page_evidence(
     html: str,
@@ -154,7 +162,7 @@ def collect_page_evidence(
     Args:
         html: Raw HTML of the page (post-render).
         url: The page URL.
-        network_json: Optional network/XHR JSON responses captured during rendering.
+        network_json: Optional network / XHR JSON responses captured during rendering.
 
     Returns:
         PageEvidence with all collected evidence.
@@ -171,10 +179,10 @@ def collect_page_evidence(
     if title_tag:
         evidence.title = title_tag.get_text(strip=True)
     canonical = soup.find("link", rel="canonical")
-    if canonical and hasattr(canonical, 'get'):
+    if canonical and hasattr(canonical, "get"):
         evidence.canonical_url = str(canonical.get("href", ""))
     meta_desc = soup.find("meta", attrs={"name": "description"})
-    if meta_desc and hasattr(meta_desc, 'get'):
+    if meta_desc and hasattr(meta_desc, "get"):
         evidence.meta_description = str(meta_desc.get("content", ""))
 
     # ── DOM node count ───────────────────────────────────────────────
@@ -344,12 +352,14 @@ def _collect_tables(soup: BeautifulSoup) -> list[dict]:
             if cells:
                 rows.append(cells)
         if len(rows) >= 2:  # At least a header + one data row
-            tables.append({
-                "row_count": len(rows),
-                "col_count": max(len(r) for r in rows),
-                "rows": rows[:20],
-                "headers": rows[0] if rows else [],
-            })
+            tables.append(
+                {
+                    "row_count": len(rows),
+                    "col_count": max(len(r) for r in rows),
+                    "rows": rows[:20],
+                    "headers": rows[0] if rows else [],
+                }
+            )
     return tables
 
 
@@ -358,7 +368,7 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
     hydration: dict[str, Any] = {}
 
     # JSON-LD structured data
-    jsonld_scripts = soup.find_all("script", type="application/ld+json")
+    jsonld_scripts = soup.find_all("script", type="application / ld+json")
     jsonld_data = []
     for script in jsonld_scripts:
         try:
@@ -371,7 +381,7 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
 
     # Next.js __NEXT_DATA__
     next_data = soup.find("script", id="__NEXT_DATA__")
-    if next_data and hasattr(next_data, 'string') and next_data.string:
+    if next_data and hasattr(next_data, "string") and next_data.string:
         try:
             data = json.loads(str(next_data.string))
             # Extract props and state
@@ -391,17 +401,18 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
         text = script.string.strip()
         for var_name in ["__INITIAL_STATE__", "__PRELOADED_STATE__", "window.__INITIAL_STATE__"]:
             if var_name in text:
-                # Try to extract JSON after assignment (depth-aware brace matching)
-                match = re.search(rf'{re.escape(var_name)}\s*=\s*(\{{)', text)
+                # Try to extract JSON after assignment (depth-aware brace
+                # matching)
+                match = re.search(rf"{re.escape(var_name)}\s*=\s*(\{{)", text)
                 if match:
                     # Count braces to extract the full JSON object
                     start = match.start(1)
                     brace_count = 0
                     end = start
                     for i in range(start, len(text)):
-                        if text[i] == '{':
+                        if text[i] == "{":
                             brace_count += 1
-                        elif text[i] == '}':
+                        elif text[i] == "}":
                             brace_count -= 1
                             if brace_count == 0:
                                 end = i + 1
@@ -413,13 +424,13 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
                         except (json.JSONDecodeError, TypeError):
                             pass
 
-    # Apollo/Relay state
+    # Apollo / Relay state
     for script in soup.find_all("script"):
         if not script.string:
             continue
         text = script.string.strip()
         if "apolloState" in text or "ROOT_QUERY" in text:
-            match = re.search(r'window\.__APOLLO_STATE__\s*=\s*(\{.+?\});', text, re.DOTALL)
+            match = re.search(r"window\.__APOLLO_STATE__\s*=\s*(\{.+?\});", text, re.DOTALL)
             if match:
                 try:
                     data = json.loads(match.group(1))
@@ -546,17 +557,20 @@ def _score_container(element: Tag, selector: str, siblings: list[Tag]) -> Candid
     children = [c for c in element.children if isinstance(c, Tag)]
 
     # Detect features
-    has_price = bool(re.search(r'[\$\€\£\¥\₹]\s*\d+', text))
-    has_date = bool(re.search(r'\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}', text))
-    has_time = bool(re.search(r'\d{1,2}:\d{2}\s*(?:am|pm)?', text, re.I))
-    has_currency = bool(re.search(r'[\$\€\£\¥\₹]', text))
-    has_location = bool(re.search(r'\b[A-Z]{3}\b', text) and len(text) > 20)  # 3-letter codes with enough context
-    has_organization = bool(re.search(r'(?:inc\.?|llc|ltd\.?|corp\.?|co\.?|hospital|university|school)\b', text, re.I))
-    has_contact = bool(re.search(r'[\w.+-]+@[\w-]+\.[\w.-]+|\+?\d{7,}', text))
+    has_price = bool(re.search(r"[\$\€\£\¥\₹]\s*\d+", text))
+    has_date = bool(re.search(r"\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}", text))
+    has_time = bool(re.search(r"\d{1,2}:\d{2}\s*(?:am|pm)?", text, re.I))
+    has_currency = bool(re.search(r"[\$\€\£\¥\₹]", text))
+    # 3-letter codes with enough context
+    has_location = bool(re.search(r"\b[A-Z]{3}\b", text) and len(text) > 20)
+    has_organization = bool(re.search(r"(?:inc\.?|llc|ltd\.?|corp\.?|co\.?|hospital|university|school)\b", text, re.I))
+    has_contact = bool(re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+|\+?\d{7,}", text))
     has_link = bool(element.find("a"))
     has_button = bool(element.find(["button", "input[type=submit]"]))
     has_image = bool(element.find("img"))
-    has_label_value = bool(re.search(r'(?:price|name|date|time|location|phone|email|address)\s*:|\|\s*(?:price|name|date)', text, re.I))
+    has_label_value = bool(
+        re.search(r"(?:price|name|date|time|location|phone|email|address)\s*:|\|\s*(?:price|name|date)", text, re.I)
+    )
 
     # Text density (chars per descendant)
     text_density = text_len / max(1, len(descendants))
@@ -625,7 +639,7 @@ def _compute_container_score(container: CandidateContainer) -> float:
     - Pattern matches (price, date, etc.)
     - Repeated structure
     - Labels and values
-    - Links/buttons for interaction
+    - Links / buttons for interaction
     - Not too deep in the DOM
     """
     score = 0.0
@@ -644,11 +658,17 @@ def _compute_container_score(container: CandidateContainer) -> float:
         score += 0.05
 
     # Pattern presence
-    pattern_count = sum([
-        container.has_price, container.has_date, container.has_time,
-        container.has_currency, container.has_location, container.has_organization,
-        container.has_contact,
-    ])
+    pattern_count = sum(
+        [
+            container.has_price,
+            container.has_date,
+            container.has_time,
+            container.has_currency,
+            container.has_location,
+            container.has_organization,
+            container.has_contact,
+        ]
+    )
     score += min(pattern_count * 0.08, 0.30)
 
     # Label-value pairs
@@ -682,8 +702,13 @@ def _compute_container_score(container: CandidateContainer) -> float:
     if 2 <= container.child_count <= 15:
         score += 0.05
 
-    # Penalty for being a pure price/button container (no descriptive text)
-    if (container.has_price or container.has_button) and not container.has_organization and not container.has_date and not container.has_location:
+    # Penalty for being a pure price / button container (no descriptive text)
+    if (
+        (container.has_price or container.has_button)
+        and not container.has_organization
+        and not container.has_date
+        and not container.has_location
+    ):
         if combined_len < 80:
             score *= 0.5  # Significant penalty for narrow containers
 

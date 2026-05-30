@@ -1,9 +1,9 @@
 """
-Benchmark Reporter — continuous operational intelligence for tracking precision/recall regressions.
+Benchmark Reporter — continuous operational intelligence for tracking precision / recall regressions.
 
 Provides:
   - SQLite persistence for historical benchmark runs.
-  - Automated precision/recall regression trend calculations.
+  - Automated precision / recall regression trend calculations.
   - Automatic alerts for regressions crossing critical thresholds (> 5%).
   - Markdown-based auto-updating regression dashboard logs.
 """
@@ -28,6 +28,7 @@ DASHBOARD_PATH = str(_BACKEND_ROOT / "data" / "benchmarks" / "regression_dashboa
 @dataclass
 class BenchmarkRun:
     """Represents a single benchmark run snapshot."""
+
     run_id: str
     timestamp: float
     precision: float
@@ -74,7 +75,7 @@ class BenchmarkReporter:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO benchmark_runs VALUES (?, ?, ?, ?, ?, ?)",
-                (run.run_id, run.timestamp, run.precision, run.recall, run.fallback_rate, run.latency_ms)
+                (run.run_id, run.timestamp, run.precision, run.recall, run.fallback_rate, run.latency_ms),
             )
             for selector in run.failed_selectors:
                 conn.execute("INSERT INTO run_failures VALUES (?, ?)", (run.run_id, selector))
@@ -89,7 +90,7 @@ class BenchmarkReporter:
         return comparison
 
     def compare_against_history(self, current_precision: float, current_recall: float) -> Dict[str, Any]:
-        """Compare current precision/recall against historical averages."""
+        """Compare current precision / recall against historical averages."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT AVG(precision), AVG(recall) FROM benchmark_runs")
@@ -101,7 +102,7 @@ class BenchmarkReporter:
                 "status": "stable",
                 "precision_drift": 0.0,
                 "recall_drift": 0.0,
-                "message": "First recorded benchmark run."
+                "message": "First recorded benchmark run.",
             }
 
         precision_drift = current_precision - avg_precision
@@ -122,7 +123,7 @@ class BenchmarkReporter:
             "status": status,
             "precision_drift": round(precision_drift, 4),
             "recall_drift": round(recall_drift, 4),
-            "message": message
+            "message": message,
         }
 
     def get_history(self, limit: int = 10) -> List[BenchmarkRun]:
@@ -133,7 +134,7 @@ class BenchmarkReporter:
             cursor.execute(
                 "SELECT run_id, timestamp, precision, recall, fallback_rate, latency_ms "
                 "FROM benchmark_runs ORDER BY timestamp DESC LIMIT ?",
-                (limit,)
+                (limit,),
             )
             for row in cursor.fetchall():
                 run_id = row[0]
@@ -141,34 +142,36 @@ class BenchmarkReporter:
                 fail_cursor.execute("SELECT selector FROM run_failures WHERE run_id = ?", (run_id,))
                 failures = [r[0] for r in fail_cursor.fetchall()]
 
-                runs.append(BenchmarkRun(
-                    run_id=row[0],
-                    timestamp=row[1],
-                    precision=row[2],
-                    recall=row[3],
-                    fallback_rate=row[4],
-                    latency_ms=row[5],
-                    failed_selectors=failures
-                ))
+                runs.append(
+                    BenchmarkRun(
+                        run_id=row[0],
+                        timestamp=row[1],
+                        precision=row[2],
+                        recall=row[3],
+                        fallback_rate=row[4],
+                        latency_ms=row[5],
+                        failed_selectors=failures,
+                    )
+                )
         return runs
 
     def generate_dashboard(self) -> None:
-        """Generate/overwrite the auto-updating markdown dashboard file."""
+        """Generate / overwrite the auto-updating markdown dashboard file."""
         history = self.get_history(limit=5)
         if not history:
             return
 
         os.makedirs(os.path.dirname(DASHBOARD_PATH), exist_ok=True)
-        
+
         with open(DASHBOARD_PATH, "w", encoding="utf-8") as f:
             f.write("# 📊 DataForge Regression Trends & Benchmarks Dashboard\n\n")
             f.write("> **Continuous Operational Intelligence**: Auto-updating regression trends tracker.\n\n")
             f.write("## 1. Recent Execution Runs\n\n")
             f.write("| Run ID | Date & Time | Precision | Recall | Fallback Rate | Avg Latency | Failed Selectors |\n")
             f.write("| :--- | :--- | :---: | :---: | :---: | :---: | :--- |\n")
-            
+
             for run in history:
-                date_str = time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(run.timestamp))
+                date_str = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(run.timestamp))
                 failed_str = ", ".join(run.failed_selectors) if run.failed_selectors else "None"
                 f.write(
                     f"| `{run.run_id}` | {date_str} | **{run.precision:.2%}** | **{run.recall:.2%}** | "
@@ -178,9 +181,19 @@ class BenchmarkReporter:
             # Add simple visual progress indicators
             f.write("\n## 2. Dynamic Performance Indicators\n\n")
             latest = history[0]
-            f.write(f"- **Latest Extraction Success (Precision)**: `{'█' * int(latest.precision * 20)}{'░' * (20 - int(latest.precision * 20))}` ({latest.precision:.2%})\n")
-            f.write(f"- **Latest Capture Rate (Recall)**: `{'█' * int(latest.recall * 20)}{'░' * (20 - int(latest.recall * 20))}` ({latest.recall:.2%})\n")
+            f.write(f"- **Latest Extraction Success (Precision)**: `{'█' *
+                                                                     int(latest.precision *
+                                                                         20)}{'░' *
+                                                                              (20 -
+                                                                               int(latest.precision *
+                                                                                   20))}` ({latest.precision:.2%})\n")
+            f.write(f"- **Latest Capture Rate (Recall)**: `{'█' *
+                                                            int(latest.recall *
+                                                                20)}{'░' *
+                                                                     (20 -
+                                                                      int(latest.recall *
+                                                                          20))}` ({latest.recall:.2%})\n")
             f.write(f"- **Latest Fallback Rate**: `{latest.fallback_rate:.2%}`\n")
             f.write(f"- **Latest Average Scrape Latency**: `{latest.latency_ms:.0f}ms`\n\n")
-            
-            f.write("---\n*End of Auto-Generated Dashboard Log.*\n")
+
+            f.write("---\n * End of Auto-Generated Dashboard Log.*\n")

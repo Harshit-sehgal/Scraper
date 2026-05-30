@@ -31,7 +31,8 @@ from app.semantic_ir import SemanticToken, SemanticType
 
 # Mapping from CandidateIR type strings to SemanticType enum values.
 # This ensures clean conversion between the segmentation layer (str-based)
-# and the semantic IR layer (enum-based) without fragile hasattr/isinstance checks.
+# and the semantic IR layer (enum-based) without fragile hasattr /
+# isinstance checks.
 _TYPE_STR_TO_SEMANTIC = {
     "price": SemanticType.PRICE,
     "date": SemanticType.DATE,
@@ -59,7 +60,7 @@ def to_semantic_type(value: object) -> SemanticType:
     """Unified conversion: accepts str, SemanticType, or anything with .value."""
     if isinstance(value, SemanticType):
         return value
-    if hasattr(value, 'value'):
+    if hasattr(value, "value"):
         try:
             return SemanticType(value.value)
         except (ValueError, TypeError):
@@ -71,7 +72,7 @@ def sem_type_str(value: object) -> str:
     """Unified string representation of a type (str or SemanticType or .value)."""
     if isinstance(value, SemanticType):
         return value.value
-    if hasattr(value, 'value'):
+    if hasattr(value, "value"):
         return str(value.value)
     return str(value)
 
@@ -80,6 +81,7 @@ def sem_type_str(value: object) -> str:
 # CANDIDATE IR
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class CandidateIR:
     """Intermediate Representation for a single extracted candidate.
@@ -87,6 +89,7 @@ class CandidateIR:
     This is the core data structure. ALL later stages operate on IR objects,
     NOT raw strings. This prevents direct regex-to-schema coupling.
     """
+
     raw: str
     cleaned: str
     span_start: int
@@ -121,6 +124,7 @@ class CandidateIR:
     def as_token(self, source_field: str = "") -> "SemanticToken":
         """Convert this candidate to a SemanticToken for the IR layer."""
         from app.semantic_ir import Span, SemanticToken
+
         return SemanticToken(
             raw=self.raw,
             normalized=self.cleaned,
@@ -139,6 +143,7 @@ class CandidateIR:
 @dataclass
 class RelationshipIR:
     """Represents a scored relationship between two candidates."""
+
     source_idx: int
     target_idx: int
     relationship_type: str  # "adjacent", "same_group", "parent_child", "repeated_pattern"
@@ -149,6 +154,7 @@ class RelationshipIR:
 @dataclass
 class StructuralMemory:
     """Remembers repeated structural patterns across records."""
+
     pattern_signature: Tuple[str, ...]  # e.g., ("code", "date", "price")
     occurrence_count: int
     row_indices: List[int] = field(default_factory=list)
@@ -158,6 +164,7 @@ class StructuralMemory:
 @dataclass
 class SegmentedIR:
     """Complete IR for a single segmented record."""
+
     original: str
     candidates: List[CandidateIR]
     relationships: List[RelationshipIR] = field(default_factory=list)
@@ -190,10 +197,10 @@ DETECTION_PATTERNS = {
         r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2},?\s+\d{2,4}",
     ],
     "duration": [
-        r"\d+h\s*\d*m",
+        r"\d+h\s*\d * m",
         r"\d+h$",
         r"\d+:\d{2}",
-        r"\d+\s*hours?",
+        r"\d+\s * hours?",
     ],
     "code": [
         r"\b[A-Z]{2,5}\b",
@@ -225,28 +232,128 @@ DETECTION_PATTERNS = {
 }
 
 COMMON_ENGLISH_WORDS: Set[str] = {
-    "THE", "AND", "FOR", "ARE", "NOT", "YOU", "ALL", "CAN", "HAS", "WAS",
-    "BUT", "ITS", "OUT", "NEW", "NOW", "HOW", "GET", "HAD", "SHE", "HER",
-    "HIM", "HIS", "OUR", "YOUR", "THEM", "WHO", "WHY", "ANY", "MAN", "OLD",
-    "SAY", "WAY", "USE", "PUT", "TRY", "ASK", "LET", "BIG", "LOT",
-    "DAY", "MAY", "SEE", "DID", "GOT", "SAW", "TWO", "ONE", "KEY",
-    "SUM", "TIP", "SON", "CUP", "DOG", "CAR", "BUS",
-    "AGE", "ACT", "ADD", "BIT", "BOX", "BOY",
-    "FIT", "FUN", "GAS", "GOD", "HAT", "HIT", "HOT",
-    "JOB", "JOY", "LAW", "LEG", "LIE", "LOG", "MAP",
-    "NET", "OIL", "PAY", "PET", "PIN", "POP", "POT",
-    "RAW", "RED", "ROW", "RUN", "SAD", "SEA", "SET",
-    "SKY", "SUN", "TAG", "TEA", "TEN", "TIE",
-    "TIN", "TON", "TOP", "TOY", "VAN", "WAR",
-    "WAX", "WET",
+    "THE",
+    "AND",
+    "FOR",
+    "ARE",
+    "NOT",
+    "YOU",
+    "ALL",
+    "CAN",
+    "HAS",
+    "WAS",
+    "BUT",
+    "ITS",
+    "OUT",
+    "NEW",
+    "NOW",
+    "HOW",
+    "GET",
+    "HAD",
+    "SHE",
+    "HER",
+    "HIM",
+    "HIS",
+    "OUR",
+    "YOUR",
+    "THEM",
+    "WHO",
+    "WHY",
+    "ANY",
+    "MAN",
+    "OLD",
+    "SAY",
+    "WAY",
+    "USE",
+    "PUT",
+    "TRY",
+    "ASK",
+    "LET",
+    "BIG",
+    "LOT",
+    "DAY",
+    "MAY",
+    "SEE",
+    "DID",
+    "GOT",
+    "SAW",
+    "TWO",
+    "ONE",
+    "KEY",
+    "SUM",
+    "TIP",
+    "SON",
+    "CUP",
+    "DOG",
+    "CAR",
+    "BUS",
+    "AGE",
+    "ACT",
+    "ADD",
+    "BIT",
+    "BOX",
+    "BOY",
+    "FIT",
+    "FUN",
+    "GAS",
+    "GOD",
+    "HAT",
+    "HIT",
+    "HOT",
+    "JOB",
+    "JOY",
+    "LAW",
+    "LEG",
+    "LIE",
+    "LOG",
+    "MAP",
+    "NET",
+    "OIL",
+    "PAY",
+    "PET",
+    "PIN",
+    "POP",
+    "POT",
+    "RAW",
+    "RED",
+    "ROW",
+    "RUN",
+    "SAD",
+    "SEA",
+    "SET",
+    "SKY",
+    "SUN",
+    "TAG",
+    "TEA",
+    "TEN",
+    "TIE",
+    "TIN",
+    "TON",
+    "TOP",
+    "TOY",
+    "VAN",
+    "WAR",
+    "WAX",
+    "WET",
     # Months (ambiguous with codes)
-    "JAN", "FEB", "MAR", "APR", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+    "JAN",
+    "FEB",
+    "MAR",
+    "APR",
+    "JUN",
+    "JUL",
+    "AUG",
+    "SEP",
+    "OCT",
+    "NOV",
+    "DEC",
 }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PASS 1: AGGRESSIVE EXTRACTION (maximize recall)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def _extract_by_pattern(text: str) -> List[CandidateIR]:
     """Pass 1: Extract all pattern-matching candidates aggressively."""
@@ -255,7 +362,8 @@ def _extract_by_pattern(text: str) -> List[CandidateIR]:
 
     for ctype, patterns in DETECTION_PATTERNS.items():
         for pattern in patterns:
-            # Code patterns need case-sensitive matching (only ALL-CAPS = codes)
+            # Code patterns need case-sensitive matching (only ALL-CAPS =
+            # codes)
             flags = re.IGNORECASE if ctype != "code" else 0
             for match in re.finditer(pattern, text, flags):
                 start, end = match.start(), match.end()
@@ -310,7 +418,7 @@ def _classify_with_ambiguity(raw: str, primary_type: SemanticType) -> Dict[Seman
             distribution = {SemanticType.NUMBER: 0.9, SemanticType.CODE: 0.1}
         elif re.match(r"^[A-Z]{3}$", raw):
             distribution = {SemanticType.CODE: 0.7, SemanticType.TEXT: 0.3}
-        elif re.match(r"^[A-Z0-9]{4,5}$", raw):
+        elif re.match(r"^[A-Z0 - 9]{4,5}$", raw):
             distribution = {SemanticType.CODE: 0.8, SemanticType.TEXT: 0.2}
 
     elif primary_type == SemanticType.NUMBER:
@@ -347,19 +455,20 @@ def _clean_value(raw: str, ctype: object) -> str:
 # PASS 2: SPLIT-BASED EXTRACTION (catch non-pattern values)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def _extract_by_split(text: str, existing_spans: Set[Tuple[int, int]]) -> List[CandidateIR]:
     """Pass 2: Extract values by splitting on separators."""
     candidates: List[CandidateIR] = []
     position = 0
 
-    segments = re.split(r'\s*[|\t]\s*', text)
+    segments = re.split(r"\s*[|\t]\s*", text)
     for seg in segments:
         seg = seg.strip()
         if not seg or len(seg) < 2:
             position += 1
             continue
 
-        sub_segments = re.split(r'\s{2,}', seg)
+        sub_segments = re.split(r"\s{2,}", seg)
         for sub in sub_segments:
             sub = sub.strip()
             if not sub or len(sub) < 2:
@@ -374,20 +483,22 @@ def _extract_by_split(text: str, existing_spans: Set[Tuple[int, int]]) -> List[C
             existing_spans.add(span)
 
             ctype = _classify_fallback(sub)
-            candidates.append(CandidateIR(
-                raw=sub,
-                cleaned=sub.strip(),
-                span_start=char_start,
-                span_end=char_start + len(sub),
-                position=char_start,
-                primary_type=ctype,
-                primary_confidence=0.5,
-                type_distribution={ctype: 0.5, SemanticType.TEXT: 0.5},
-                evidence=["split_extraction"],
-                extraction_pass=2,
-                extraction_method="split",
-                signals=["pass2_split"],
-            ))
+            candidates.append(
+                CandidateIR(
+                    raw=sub,
+                    cleaned=sub.strip(),
+                    span_start=char_start,
+                    span_end=char_start + len(sub),
+                    position=char_start,
+                    primary_type=ctype,
+                    primary_confidence=0.5,
+                    type_distribution={ctype: 0.5, SemanticType.TEXT: 0.5},
+                    evidence=["split_extraction"],
+                    extraction_pass=2,
+                    extraction_method="split",
+                    signals=["pass2_split"],
+                )
+            )
             position = char_start + len(sub)
 
     return candidates
@@ -397,11 +508,12 @@ def _extract_by_split(text: str, existing_spans: Set[Tuple[int, int]]) -> List[C
 # PASS 3: WHITESPACE EXTRACTION (last resort)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def _extract_by_whitespace(text: str, existing_spans: Set[Tuple[int, int]]) -> List[CandidateIR]:
     """Pass 3: Extract by whitespace splitting as last resort."""
     candidates: List[CandidateIR] = []
 
-    parts = re.split(r'\s{2,}', text)
+    parts = re.split(r"\s{2,}", text)
     if len(parts) < 2:
         parts = text.split()
 
@@ -419,20 +531,22 @@ def _extract_by_whitespace(text: str, existing_spans: Set[Tuple[int, int]]) -> L
         existing_spans.add(span)
 
         ctype = _classify_fallback(part)
-        candidates.append(CandidateIR(
-            raw=part,
-            cleaned=part.strip(),
-            span_start=char_start,
-            span_end=char_start + len(part),
-            position=char_start,
-            primary_type=ctype,
-            primary_confidence=0.3,
-            type_distribution={ctype: 0.3, SemanticType.TEXT: 0.7},
-            evidence=["whitespace_fallback"],
-            extraction_pass=3,
-            extraction_method="whitespace",
-            signals=["pass3_whitespace"],
-        ))
+        candidates.append(
+            CandidateIR(
+                raw=part,
+                cleaned=part.strip(),
+                span_start=char_start,
+                span_end=char_start + len(part),
+                position=char_start,
+                primary_type=ctype,
+                primary_confidence=0.3,
+                type_distribution={ctype: 0.3, SemanticType.TEXT: 0.7},
+                evidence=["whitespace_fallback"],
+                extraction_pass=3,
+                extraction_method="whitespace",
+                signals=["pass3_whitespace"],
+            )
+        )
 
     return candidates
 
@@ -465,10 +579,11 @@ def _classify_fallback(text: str) -> SemanticType:
     if re.fullmatch(r"\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{2,4}", lower):
         return SemanticType.DATE
 
-    # Code-like (only if ENTIRE string is uppercase or alphanumeric with letters)
+    # Code-like (only if ENTIRE string is uppercase or alphanumeric with
+    # letters)
     if re.fullmatch(r"[A-Z]{2,5}", stripped):
         return SemanticType.CODE
-    if re.fullmatch(r"[A-Z][A-Z0-9]{2,7}", stripped):
+    if re.fullmatch(r"[A-Z][A-Z0 - 9]{2,7}", stripped):
         return SemanticType.CODE
 
     # Number-like (entire string is a number)
@@ -480,7 +595,7 @@ def _classify_fallback(text: str) -> SemanticType:
         return SemanticType.RATING
 
     # Duration-like
-    if re.fullmatch(r"\d+h\s*\d*m|\d+h|\d+:\d{2}|(?:\d+\s*hours?)", lower):
+    if re.fullmatch(r"\d+h\s*\d * m|\d+h|\d+:\d{2}|(?:\d+\s * hours?)", lower):
         return SemanticType.DURATION
 
     # Number with suffix: "5+", "25L", "10K"
@@ -495,7 +610,7 @@ def _classify_fallback(text: str) -> SemanticType:
 
     # Product-like: brand naming pattern (iPhone, iPad, macOS, eBay)
     # Starts lowercase, has AT LEAST one internal uppercase
-    if re.fullmatch(r"[a-z][A-Za-z0-9]{2,}", stripped) and re.search(r"[A-Z]", stripped[1:]):
+    if re.fullmatch(r"[a-z][A-Za-z0 - 9]{2,}", stripped) and re.search(r"[A-Z]", stripped[1:]):
         return SemanticType.ORGANIZATION
 
     return SemanticType.TEXT
@@ -504,6 +619,7 @@ def _classify_fallback(text: str) -> SemanticType:
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN EXTRACTION PIPELINE (multi-pass)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def extract_candidate_values(text: str) -> List[CandidateIR]:
     """Multi-pass extraction: maximize recall, then deduplicate.
@@ -559,6 +675,7 @@ def _uncovered_ratio(text: str, spans: Set[Tuple[int, int]]) -> float:
 # RELATIONSHIP SCORING
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def score_relationships(candidates: List[CandidateIR]) -> List[RelationshipIR]:
     """Score relationships between candidate values.
 
@@ -579,22 +696,26 @@ def score_relationships(candidates: List[CandidateIR]) -> List[RelationshipIR]:
             # Adjacent (no gap or small gap)
             if gap <= 2:
                 rel_type, confidence, evidence = _infer_relationship_type(ci, cj)
-                relationships.append(RelationshipIR(
-                    source_idx=i,
-                    target_idx=j,
-                    relationship_type=rel_type,
-                    confidence=confidence,
-                    evidence=evidence,
-                ))
+                relationships.append(
+                    RelationshipIR(
+                        source_idx=i,
+                        target_idx=j,
+                        relationship_type=rel_type,
+                        confidence=confidence,
+                        evidence=evidence,
+                    )
+                )
             # Near (small gap)
             elif gap <= 10:
-                relationships.append(RelationshipIR(
-                    source_idx=i,
-                    target_idx=j,
-                    relationship_type="nearby",
-                    confidence=0.4,
-                    evidence=[f"gap={gap}chars"],
-                ))
+                relationships.append(
+                    RelationshipIR(
+                        source_idx=i,
+                        target_idx=j,
+                        relationship_type="nearby",
+                        confidence=0.4,
+                        evidence=[f"gap={gap}chars"],
+                    )
+                )
 
     return relationships
 
@@ -632,6 +753,7 @@ def _infer_relationship_type(a: CandidateIR, b: CandidateIR) -> Tuple[str, float
 # STRUCTURAL MEMORY
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class StructuralMemoryTracker:
     """Tracks repeated structural patterns across records.
 
@@ -653,8 +775,9 @@ class StructuralMemoryTracker:
         # Build type signature
         signature = tuple(c.primary_type for c in candidates)
 
-        # Phase 47: Type Integrity - Ensure pattern signatures are string-based tuples
-        sig_list = [t.value if hasattr(t, 'value') else str(t) for t in signature]
+        # Phase 47: Type Integrity - Ensure pattern signatures are string-based
+        # tuples
+        sig_list = [t.value if hasattr(t, "value") else str(t) for t in signature]
         sig_key = tuple(sig_list)
 
         # Update memory
@@ -682,10 +805,7 @@ class StructuralMemoryTracker:
             return 0.3, ["novel_pattern"]
 
 
-def _max_pattern_similarity(
-    signature: Tuple[str, ...],
-    known: List[Tuple[str, ...]]
-) -> float:
+def _max_pattern_similarity(signature: Tuple[str, ...], known: List[Tuple[str, ...]]) -> float:
     """Compute max Jaccard similarity between a signature and known patterns."""
     if not known:
         return 0.0
@@ -706,11 +826,12 @@ def _max_pattern_similarity(
 # SEMANTIC DENSITY ANALYSIS (replaces heuristic phrase lists)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def compute_semantic_density(text: str) -> float:
     """Compute how semantically 'dense' a text is.
 
     High-density text contains many meaningful candidates (prices, dates, codes).
-    Low-density text is mostly prose/navigation/descriptive.
+    Low-density text is mostly prose / navigation / descriptive.
 
     This replaces hardcoded phrase lists for noise detection.
     """
@@ -735,7 +856,7 @@ def compute_semantic_density(text: str) -> float:
 
 
 def is_likely_noise(text: str) -> Tuple[bool, float, List[str]]:
-    """Determine if text is likely noise/navigation using semantic analysis.
+    """Determine if text is likely noise / navigation using semantic analysis.
 
     Uses semantic density, not phrase lists.
     """
@@ -744,13 +865,25 @@ def is_likely_noise(text: str) -> Tuple[bool, float, List[str]]:
         return False, 0.2, ["too_short_for_noise_classification"]
 
     # Universal structural navigation check (NOT domain-specific)
-    key = re.sub(r"[^a-z0-9\s]+", " ", text.lower()).strip()
+    key = re.sub(r"[^a-z0 - 9\s]+", " ", text.lower()).strip()
     nav_markers = [
-        "about us", "contact us", "privacy", "terms of",
-        "copyright", "all rights reserved", "powered by",
-        "faq", "help support", "login", "sign up", "register",
-        "click here", "read more", "learn more",
-        "home menu", "search filter",
+        "about us",
+        "contact us",
+        "privacy",
+        "terms of",
+        "copyright",
+        "all rights reserved",
+        "powered by",
+        "faq",
+        "help support",
+        "login",
+        "sign up",
+        "register",
+        "click here",
+        "read more",
+        "learn more",
+        "home menu",
+        "search filter",
     ]
     if any(m in key for m in nav_markers):
         return True, 0.9, ["navigation_structure_detected"]
@@ -784,6 +917,7 @@ def is_likely_noise(text: str) -> Tuple[bool, float, List[str]]:
 # COMPOSITE VALUE DETECTION
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def is_composite_value(text: str) -> bool:
     """Detect if text contains multiple distinct semantic values.
 
@@ -804,7 +938,8 @@ def is_composite_value(text: str) -> bool:
     types = set(c.primary_type for c in meaningful)
 
     # Require 2+ DIFFERENT types (e.g., organization + price + code)
-    # Same-type candidates (e.g., two ORGs in "British Airways") are NOT composite.
+    # Same-type candidates (e.g., two ORGs in "British Airways") are NOT
+    # composite.
     return len(types) >= 2
 
 
@@ -812,14 +947,18 @@ def is_composite_value(text: str) -> bool:
 # RECORD-LEVEL SEGMENTATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def segment_single_text(text: str) -> SegmentedIR:
     """Segment a single text into full IR with candidates, relationships, and scoring."""
     candidates = extract_candidate_values(text)
     relationships = score_relationships(candidates)
 
     # Structural pattern
-    pattern = tuple(c.primary_type.value if hasattr(c.primary_type, 'value') else str(c.primary_type)
-                   for c in candidates if c.primary_type != SemanticType.TEXT)
+    pattern = tuple(
+        c.primary_type.value if hasattr(c.primary_type, "value") else str(c.primary_type)
+        for c in candidates
+        if c.primary_type != SemanticType.TEXT
+    )
 
     # Noise detection via semantic density
     is_noise, noise_conf, noise_evidence = is_likely_noise(text)
@@ -862,6 +1001,7 @@ def _compute_cohesion(candidates: List[CandidateIR], relationships: List[Relatio
 # RECORD EXPANSION (composite → multiple candidates)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def expand_composite_records(
     records: List[dict],
     memory: Optional[StructuralMemoryTracker] = None,
@@ -902,7 +1042,10 @@ def expand_composite_records(
             for i, cand in enumerate(meaningful):
                 # Encode topological information in the key: type, index, and span
                 # Format: {key}_seg_{type}_{i}_{start}_{end}
-                new_key = f"{key}_seg_{cand.primary_type.value}_{i}_{cand.span_start}_{cand.span_end}"
+                new_key = f"{key}_seg_{
+                    cand.primary_type.value}_{i}_{
+                    cand.span_start}_{
+                    cand.span_end}"
                 new_record[new_key] = cand.cleaned
 
         # Update structural memory
@@ -957,12 +1100,7 @@ def resolve_overlaps(tokens: List[SemanticToken]) -> List[SemanticToken]:
 
     # Sort by dominance then size
     sorted_tokens = sorted(
-        tokens,
-        key=lambda t: (
-            -DOMINANCE_HIERARCHY.get(t.primary_type, 0),
-            -(t.span.end - t.span.start),
-            -len(t.raw)
-        )
+        tokens, key=lambda t: (-DOMINANCE_HIERARCHY.get(t.primary_type, 0), -(t.span.end - t.span.start), -len(t.raw))
     )
 
     suppressed: Set[int] = set()
@@ -988,9 +1126,11 @@ def resolve_overlaps(tokens: List[SemanticToken]) -> List[SemanticToken]:
                 # - If child is a NUMBER, always suppress
                 # - If child is same type as parent, always suppress
                 # - If parent is high-dominance (EMAIL, PHONE), always suppress child
-                if tj.primary_type == SemanticType.NUMBER or \
-                   tj.primary_type == ti.primary_type or \
-                   DOMINANCE_HIERARCHY.get(ti.primary_type, 0) >= 80:
+                if (
+                    tj.primary_type == SemanticType.NUMBER
+                    or tj.primary_type == ti.primary_type
+                    or DOMINANCE_HIERARCHY.get(ti.primary_type, 0) >= 80
+                ):
                     suppressed.add(j)
                     continue
 
@@ -1001,7 +1141,7 @@ def resolve_overlaps(tokens: List[SemanticToken]) -> List[SemanticToken]:
 def is_likely_noise_field(name: str, value: str) -> Tuple[bool, float, List[str]]:
     """Check if a field value is likely noise, using semantic analysis.
 
-    Field-type-aware: for name/text fields, plain text is expected.
+    Field-type-aware: for name / text fields, plain text is expected.
     For typed fields (price, date, rating), absence of type signals is suspicious.
 
     Replaces hardcoded phrase-list checks with broader semantic analysis.
@@ -1011,7 +1151,7 @@ def is_likely_noise_field(name: str, value: str) -> Tuple[bool, float, List[str]
     if not value:
         return True, 1.0, ["empty_value"]
 
-    key = re.sub(r"[^a-z0-9]+", " ", value.lower().strip()).strip()
+    key = re.sub(r"[^a-z0 - 9]+", " ", value.lower().strip()).strip()
     if not key or len(key) < 2:
         return False, 0.3, ["too_short_to_classify"]
 
@@ -1020,17 +1160,36 @@ def is_likely_noise_field(name: str, value: str) -> Tuple[bool, float, List[str]
     is_text_field = any(t in name_lower for t in ["name", "company", "title", "description", "address"])
     is_typed_field = any(t in name_lower for t in ["price", "date", "rating", "phone", "email", "url"])
 
-    # For text/name fields: plain text is expected, check only obvious noise
+    # For text / name fields: plain text is expected, check only obvious noise
     if is_text_field:
         # Universal structural navigation patterns (NOT domain-specific)
-        nav_key = re.sub(r"[^a-z0-9\s]+", "", key)
+        nav_key = re.sub(r"[^a-z0 - 9\s]+", "", key)
         nav_markers = [
-            "about us", "contact us", "privacy", "terms of",
-            "copyright", "all rights reserved", "powered by",
-            "faq", "help", "support", "login", "sign up", "register",
-            "facebook", "twitter", "instagram",
-            "click here", "read more", "learn more", "view more",
-            "home", "menu", "search", "filter", "sort by",
+            "about us",
+            "contact us",
+            "privacy",
+            "terms of",
+            "copyright",
+            "all rights reserved",
+            "powered by",
+            "faq",
+            "help",
+            "support",
+            "login",
+            "sign up",
+            "register",
+            "facebook",
+            "twitter",
+            "instagram",
+            "click here",
+            "read more",
+            "learn more",
+            "view more",
+            "home",
+            "menu",
+            "search",
+            "filter",
+            "sort by",
         ]
         if any(m in nav_key for m in nav_markers):
             return True, 0.9, ["navigation_structure_detected"]
@@ -1039,7 +1198,8 @@ def is_likely_noise_field(name: str, value: str) -> Tuple[bool, float, List[str]
         # Name fields shouldn't contain structured data (prices, dates, etc.)
         typed_candidates = [c for c in segments.candidates if c.primary_type not in ("text", "number")]
         if typed_candidates:
-            evidence.append(f"name_field_has_typed_content:{typed_candidates[0].primary_type}")
+            evidence.append(f"name_field_has_typed_content:{
+                typed_candidates[0].primary_type}")
             return False, 0.4, evidence
         # Plain text is fine for name fields
         return False, 0.9, ["plain_text_name_field"]

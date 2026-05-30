@@ -27,7 +27,7 @@ def get_current_role(request: Request) -> UserRole:
     # 1. Read headers
     api_key_header = request.headers.get("X-API-Key", "")
     auth_header = request.headers.get("Authorization", "")
-    
+
     provided_token = ""
     if auth_header.startswith("Bearer "):
         provided_token = auth_header[7:]
@@ -39,15 +39,19 @@ def get_current_role(request: Request) -> UserRole:
         return secrets.compare_digest(provided, expected)
 
     # 2. Match Admin Role
-    # Check X-Admin-Key (legacy operator router compatibility) or X-API-Key or Bearer token
+    # Check X-Admin-Key (legacy operator router compatibility) or X-API-Key or
+    # Bearer token
     admin_key_header = request.headers.get("X-Admin-Key", "")
-    if is_match(api_key_header, settings.ADMIN_API_KEY) or \
-       is_match(provided_token, settings.ADMIN_API_KEY) or \
-       is_match(admin_key_header, settings.ADMIN_API_KEY):
+    if (
+        is_match(api_key_header, settings.ADMIN_API_KEY)
+        or is_match(provided_token, settings.ADMIN_API_KEY)
+        or is_match(admin_key_header, settings.ADMIN_API_KEY)
+    ):
         return UserRole.ADMIN
 
     # 3. Match Operator Role
-    # operator_api_key defaults to a dedicated operator config if declared, fallback to general API_KEY
+    # operator_api_key defaults to a dedicated operator config if declared,
+    # fallback to general API_KEY
     operator_key = getattr(settings, "OPERATOR_API_KEY", "")
     if is_match(api_key_header, operator_key) or is_match(provided_token, operator_key):
         return UserRole.OPERATOR
@@ -60,10 +64,9 @@ def get_current_role(request: Request) -> UserRole:
     if settings.ENV.lower() == "development" and not settings.API_KEY and not settings.ADMIN_API_KEY:
         return UserRole.ADMIN
 
-    # 6. Fallback/Unauthenticated
+    # 6. Fallback / Unauthenticated
     raise HTTPException(
-        status_code=403,
-        detail="Invalid or missing API credentials. Provide X-API-Key or Authorization Bearer token."
+        status_code=403, detail="Invalid or missing API credentials. Provide X-API-Key or Authorization Bearer token."
     )
 
 
@@ -71,12 +74,14 @@ def require_role(allowed_roles: list[UserRole]):
     """
     FastAPI route guard dependency to enforce role permission boundaries.
     """
+
     async def dependency(request: Request):
         role = get_current_role(request)
         if role not in allowed_roles:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Permission denied. Required roles: {[r.value for r in allowed_roles]}. Your role: {role.value}."
-            )
+            raise HTTPException(status_code=403, detail=f"Permission denied. Required roles: {
+                    [
+                        r.value for r in allowed_roles]}. Your role: {
+                    role.value}.")
         return role
+
     return dependency

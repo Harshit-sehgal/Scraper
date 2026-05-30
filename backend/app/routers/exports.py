@@ -10,7 +10,6 @@ from openpyxl import Workbook
 
 from app.utils.export import safe_export_filename
 
-
 _PAGINATION_CHUNK_SIZE = 500
 
 
@@ -48,7 +47,7 @@ _DANGEROUS_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 
 def _safe_cell(value):
-    """Escape spreadsheet formula-injection prefixes so exported CSV/Excel files
+    """Escape spreadsheet formula-injection prefixes so exported CSV / Excel files
     do not execute malicious formulas when opened in Excel, Sheets, or LibreOffice.
 
     If *value* is a string that starts with a dangerous prefix (``=``, ``+``, ``-``,
@@ -68,20 +67,20 @@ def create_exports_router(jobs_store: dict):
     def _refresh_job_for_export(job_id: str):
         """Refresh job from repository in worker mode to avoid stale exports."""
         import os
+
         wq = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
         if wq and wq.lower() in ("1", "true", "yes"):
             try:
                 from app.storage_interface import get_job_repository
+
                 repo = get_job_repository()
                 fresh_jobs = repo.load_jobs()
                 if job_id in fresh_jobs:
                     jobs_store[job_id] = fresh_jobs[job_id]
             except Exception:
-                __import__('logging').getLogger(__name__).debug(
-                    "Failed to refresh job %s from repo for export", job_id
-                )
+                __import__("logging").getLogger(__name__).debug("Failed to refresh job %s from repo for export", job_id)
 
-    @router.get("/api/jobs/{job_id}/export/csv")
+    @router.get("/api / jobs/{job_id}/export / csv")
     async def export_csv(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -95,7 +94,9 @@ def create_exports_router(jobs_store: dict):
 
             # Load the first page to determine headers and total count
             first_page, total = load_paginated_job_results_from_disk(
-                job.id, limit=_PAGINATION_CHUNK_SIZE, offset=0,
+                job.id,
+                limit=_PAGINATION_CHUNK_SIZE,
+                offset=0,
                 file_path=job.results_file_path,
             )
             if not first_page:
@@ -125,7 +126,9 @@ def create_exports_router(jobs_store: dict):
                 offset = _PAGINATION_CHUNK_SIZE
                 while offset < total:
                     page, _ = load_paginated_job_results_from_disk(
-                        job.id, limit=_PAGINATION_CHUNK_SIZE, offset=offset,
+                        job.id,
+                        limit=_PAGINATION_CHUNK_SIZE,
+                        offset=offset,
                         file_path=job.results_file_path,
                     )
                     if not page:
@@ -139,8 +142,11 @@ def create_exports_router(jobs_store: dict):
 
             return StreamingResponse(
                 _stream_csv_from_disk(),
-                media_type="text/csv",
-                headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "csv")}"'},
+                media_type="text / csv",
+                headers={"Content-Disposition": f'attachment; filename="{
+                        safe_export_filename(
+                            job.name,
+                            "csv")}"'},
             )
 
         # In-memory results (small dataset)
@@ -160,11 +166,14 @@ def create_exports_router(jobs_store: dict):
         output.seek(0)
         return Response(
             content=output.getvalue(),
-            media_type="text/csv",
-            headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "csv")}"'}
+            media_type="text / csv",
+            headers={"Content-Disposition": f'attachment; filename="{
+                    safe_export_filename(
+                        job.name,
+                        "csv")}"'},
         )
 
-    @router.get("/api/jobs/{job_id}/export/json")
+    @router.get("/api / jobs/{job_id}/export / json")
     async def export_json(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -177,7 +186,9 @@ def create_exports_router(jobs_store: dict):
             )
 
             first_page, total = load_paginated_job_results_from_disk(
-                job.id, limit=_PAGINATION_CHUNK_SIZE, offset=0,
+                job.id,
+                limit=_PAGINATION_CHUNK_SIZE,
+                offset=0,
                 file_path=job.results_file_path,
             )
             if not first_page:
@@ -196,7 +207,9 @@ def create_exports_router(jobs_store: dict):
                 idx = len(first_page)
                 while offset < total:
                     page, _ = load_paginated_job_results_from_disk(
-                        job.id, limit=_PAGINATION_CHUNK_SIZE, offset=offset,
+                        job.id,
+                        limit=_PAGINATION_CHUNK_SIZE,
+                        offset=offset,
                         file_path=job.results_file_path,
                     )
                     if not page:
@@ -211,8 +224,11 @@ def create_exports_router(jobs_store: dict):
 
             return StreamingResponse(
                 _stream_json_from_disk(),
-                media_type="application/json",
-                headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "json")}"'},
+                media_type="application / json",
+                headers={"Content-Disposition": f'attachment; filename="{
+                        safe_export_filename(
+                            job.name,
+                            "json")}"'},
             )
 
         # In-memory results
@@ -223,11 +239,14 @@ def create_exports_router(jobs_store: dict):
         json_content = json.dumps(cleaned, indent=2)
         return Response(
             content=json_content,
-            media_type="application/json",
-            headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "json")}"'}
+            media_type="application / json",
+            headers={"Content-Disposition": f'attachment; filename="{
+                    safe_export_filename(
+                        job.name,
+                        "json")}"'},
         )
 
-    @router.get("/api/jobs/{job_id}/export/excel")
+    @router.get("/api / jobs/{job_id}/export / excel")
     async def export_excel(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -237,8 +256,10 @@ def create_exports_router(jobs_store: dict):
         results_list = list(job.results)
         if job.results_on_disk:
             from app.utils.job_results_store import load_job_results_from_disk_safe
+
             results_list, warning = load_job_results_from_disk_safe(
-                job.id, job.results_file_path,
+                job.id,
+                job.results_file_path,
             )
             # Log corruption warning but still export partial data
             if warning:
@@ -280,8 +301,11 @@ def create_exports_router(jobs_store: dict):
 
         return Response(
             content=output.getvalue(),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "xlsx")}"'}
+            media_type="application / vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{
+                    safe_export_filename(
+                        job.name,
+                        "xlsx")}"'},
         )
 
     return router

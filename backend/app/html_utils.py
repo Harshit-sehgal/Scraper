@@ -21,30 +21,49 @@ from app.browser_network_capture import (
     store_captures,
 )
 
-
 # ─── SSRF / private-network IP validation ──────────────────────────────
 from app.url_safety import validate_public_http_url as _validate_url_safe
-
 
 logger = logging.getLogger(__name__)
 
 
-EMPTY_TOKENS = {"-", "n/a", "na", "null", "none", "", "not available", "empty", "0", "false", "undefined"}
+EMPTY_TOKENS = {"-", "n / a", "na", "null", "none", "", "not available", "empty", "0", "false", "undefined"}
 PLACEHOLDER_PHRASES = {"no data", "not specified", "coming soon", "tbd", "unknown"}
 LIKELY_LOCATION_WORDS = {"city", "country", "state"}
 NAME_FIELD_NOISE_PREFIXES = {
-    "privacy policy", "terms of", "cookie", "copyright", "all rights",
-    "contact us", "about us", "home", "search", "menu", "login", "sign up",
-    "subscribe", "newsletter", "follow us", "read more", "learn more",
-    "view details", "quick links", "useful links", "selling tools",
-    "starting from", "years of experience",
+    "privacy policy",
+    "terms of",
+    "cookie",
+    "copyright",
+    "all rights",
+    "contact us",
+    "about us",
+    "home",
+    "search",
+    "menu",
+    "login",
+    "sign up",
+    "subscribe",
+    "newsletter",
+    "follow us",
+    "read more",
+    "learn more",
+    "view details",
+    "quick links",
+    "useful links",
+    "selling tools",
+    "starting from",
+    "years of experience",
 }
+
 
 def _compact_text(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
 
+
 def _normalized_text_key(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", (text or "").strip().lower()).strip()
+    return re.sub(r"[^a-z0 - 9]+", " ", (text or "").strip().lower()).strip()
+
 
 def _is_placeholder_value(text: str) -> bool:
     key = _normalized_text_key(text)
@@ -55,7 +74,7 @@ def _is_placeholder_value(text: str) -> bool:
     if len(key) < settings.SELECTOR_MIN_TEXT_LEN:
         # If extremely short but contains alphanumeric characters (e.g. "LON", "PAR", "238", "1"), it is valid.
         # Only treat as placeholder if it is purely symbols (e.g. "--", "...")
-        if not re.search(r"[a-zA-Z0-9]", key):
+        if not re.search(r"[a-zA-Z0 - 9]", key):
             return True
         return False
     if key.endswith(" page") and key.split()[0] in EMPTY_TOKENS:
@@ -66,9 +85,11 @@ def _is_placeholder_value(text: str) -> bool:
         return True
     return False
 
+
 def _is_entity_name_field(field_name: str) -> bool:
     name = (field_name or "").lower()
     return any(token in name for token in ["company", "name", "title", "entity"])
+
 
 def _is_noise_name_value(text: str) -> bool:
     val = _compact_text(text).lower()
@@ -86,10 +107,12 @@ def _is_noise_name_value(text: str) -> bool:
         return True
     return False
 
+
 def _is_likely_noise_entity(text: str) -> bool:
     """Check if text is noise using semantic density analysis."""
     is_noise, _conf, _evidence = is_likely_noise_field("name", text)
     return is_noise
+
 
 def _is_empty_value(value) -> bool:
     if value is None:
@@ -108,6 +131,7 @@ def _is_empty_value(value) -> bool:
         text = _compact_text(value)
         return text == "" or _is_placeholder_value(text)
     return False
+
 
 def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool:
     """Determine if a record is noise using semantic density and structural analysis."""
@@ -133,13 +157,14 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
         if not seg.structural_pattern and seg.overall_cohesion < settings.NOISE_COHESION_THRESHOLD:
             return True
 
-    # Privacy/legal/navigation: these are structurally distinct
+    # Privacy / legal / navigation: these are structurally distinct
     nav_indicators = ["privacy policy", "terms of", "cookie", "about us"]
     if any(v in combined for v in nav_indicators):
         return True
 
     # Social media links: structural noise on listing pages
-    # Only flag if multiple platforms appear (single mention is likely legitimate)
+    # Only flag if multiple platforms appear (single mention is likely
+    # legitimate)
     social = ["facebook", "instagram", "twitter", "linkedin", "youtube"]
     if sum(v in combined for v in social) >= settings.NOISE_SOCIAL_PLATFORM_THRESHOLD:
         return True
@@ -154,11 +179,13 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
             is_noise, _conf, _evidence = is_likely_noise_field(name_field, name_text)
             if is_noise:
                 email_present = any(
-                    record.get(f.name) for f in schema_fields
+                    record.get(f.name)
+                    for f in schema_fields
                     if f.field_type == FieldType.EMAIL and not _is_empty_value(record.get(f.name))
                 )
                 phone_present = any(
-                    record.get(f.name) for f in schema_fields
+                    record.get(f.name)
+                    for f in schema_fields
                     if f.field_type == FieldType.PHONE and not _is_empty_value(record.get(f.name))
                 )
                 url_field = next((f.name for f in schema_fields if f.field_type == FieldType.URL), "")
@@ -168,26 +195,32 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
                     return True
 
         address_field = next(
-            (f.name for f in schema_fields
-             if f.field_type == FieldType.LOCATION or any(x in f.name.lower() for x in ["address", "location"])),
-            ""
+            (
+                f.name
+                for f in schema_fields
+                if f.field_type == FieldType.LOCATION or any(x in f.name.lower() for x in ["address", "location"])
+            ),
+            "",
         )
         address_text = _compact_text(str(record.get(address_field) or "")) if address_field else ""
         if address_text and name_text and address_text.startswith(name_text[:40]):
             email_present = any(
-                    record.get(f.name) for f in schema_fields
-                    if f.field_type == FieldType.EMAIL and not _is_empty_value(record.get(f.name))
-                )
+                record.get(f.name)
+                for f in schema_fields
+                if f.field_type == FieldType.EMAIL and not _is_empty_value(record.get(f.name))
+            )
             phone_present = any(
-                    record.get(f.name) for f in schema_fields
-                    if f.field_type == FieldType.PHONE and not _is_empty_value(record.get(f.name))
-                )
+                record.get(f.name)
+                for f in schema_fields
+                if f.field_type == FieldType.PHONE and not _is_empty_value(record.get(f.name))
+            )
             url_field = next((f.name for f in schema_fields if f.field_type == FieldType.URL), "")
             website_present = bool(record.get(url_field)) if url_field else False
             if not (email_present or phone_present or website_present):
                 return True
 
     return False
+
 
 def _extract_contacts_from_node(node) -> tuple[str | None, str | None]:
     """Search a BeautifulSoup node for email and phone numbers, including href attributes."""
@@ -215,6 +248,7 @@ def _extract_contacts_from_node(node) -> tuple[str | None, str | None]:
                     text += f" {phone}"
 
     return _valid_email(text), _valid_phone(text)
+
 
 def _enrich_record_contacts(
     record: dict,
@@ -298,7 +332,7 @@ async def fetch_page_content(
         url: The URL to fetch.
         preferred_method: The preferred fetch strategy.
         timeout_ms: Override the Playwright navigation timeout (ms).
-        hydration_wait_ms: Override the hydration wait/delay after load (ms).
+        hydration_wait_ms: Override the hydration wait / delay after load (ms).
         skip_networkidle: If True, use domcontentloaded instead of networkidle.
         scroll_attempts: Override the number of scroll attempts.
         anti_bot_stealth: If True, enable extra stealth measures.
@@ -324,7 +358,12 @@ async def fetch_page_content(
     # ── Phase 80: Granular Strategy Execution ──
 
     # 1. HTTPX-based strategies
-    if strategy in [FetchStrategy.HTTPX_BASIC, FetchStrategy.HTTPX_WITH_UA, FetchStrategy.HTTPX_SMART, FetchStrategy.HYBRID]:
+    if strategy in [
+        FetchStrategy.HTTPX_BASIC,
+        FetchStrategy.HTTPX_WITH_UA,
+        FetchStrategy.HTTPX_SMART,
+        FetchStrategy.HYBRID,
+    ]:
         try:
             html, delay, method, retries = await _fetch_with_httpx(
                 url,
@@ -335,6 +374,7 @@ async def fetch_page_content(
             if html:
                 # Basic anti-bot check on httpx result
                 from app.scrape_telemetry import detect_anti_bot
+
                 if detect_anti_bot(html) < 0.7:
                     return html, delay, method, retries
                 logger.info("[Scraper] HTTPX result looks like a block, falling through")
@@ -378,10 +418,11 @@ async def fetch_page_content(
 
         await page.route("**/*", _route_filter)
 
-        # Set up network response interception for API/XHR JSON capture
+        # Set up network response interception for API / XHR JSON capture
         network_payloads = await setup_network_capture(page)
 
-        # Phase 1: Try networkidle with quick timeout for faster failure detection
+        # Phase 1: Try networkidle with quick timeout for faster failure
+        # detection
         try:
             if skip_networkidle:
                 wait_until = "domcontentloaded"
@@ -389,21 +430,25 @@ async def fetch_page_content(
                 wait_until = "networkidle"
             else:
                 wait_until = "domcontentloaded"
-            # Use recovery timeout if provided, otherwise use a short initial timeout (15s) for networkidle
+            # Use recovery timeout if provided, otherwise use a short initial
+            # timeout (15s) for networkidle
             if timeout_ms is not None:
                 initial_timeout = timeout_ms
             else:
                 initial_timeout = min(settings.PLAYWRIGHT_TIMEOUT, 15000)
-            await page.goto(url, wait_until=wait_until, timeout=initial_timeout)  # type: ignore[arg-type]
+            # type: ignore[arg-type]
+            await page.goto(url, wait_until=wait_until, timeout=initial_timeout)
 
-            # SSRF: validate the final page URL is not private/internal after Playwright navigation
+            # SSRF: validate the final page URL is not private / internal after
+            # Playwright navigation
             try:
                 final_url = page.url
                 _validate_url_safe(final_url)
             except ValueError:
                 logger.warning(
                     "[SSRF] Playwright navigated to blocked target %s from %s — aborting",
-                    page.url, url,
+                    page.url,
+                    url,
                 )
                 await page.close()
                 raise
@@ -422,14 +467,18 @@ async def fetch_page_content(
 
             # Adaptive post-network buffer: check DOM stabilization
             from app.telemetry_state import get_telemetry_state
+
             telemetry = get_telemetry_state()
             avg_stabilization = telemetry.get_avg_stabilization(domain)
             stabilization_start = time.time()
-            # Use recovery hydration wait if provided, otherwise domain intelligence or default
+            # Use recovery hydration wait if provided, otherwise domain
+            # intelligence or default
             if hydration_wait_ms is not None:
                 settle_timeout = hydration_wait_ms / 1000.0
             else:
-                settle_timeout = intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
+                settle_timeout = (
+                    intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
+                )
             settle_timeout = max(settle_timeout, 3.0)
 
             min_wait_ms = 2500
@@ -469,7 +518,9 @@ async def fetch_page_content(
             # Scroll handling — use recovery scroll_attempts if provided
             if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
                 _scroll_attempts = 0
-                max_scrolls = scroll_attempts if scroll_attempts is not None else getattr(settings, 'MAX_SCROLL_ATTEMPTS', 3)
+                max_scrolls = (
+                    scroll_attempts if scroll_attempts is not None else getattr(settings, "MAX_SCROLL_ATTEMPTS", 3)
+                )
                 last_height = await page.evaluate("document.body.scrollHeight")
                 while _scroll_attempts < max_scrolls:
                     await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -489,10 +540,12 @@ async def fetch_page_content(
             try:
                 partial_html = await page.content()
                 from app.scrape_telemetry import detect_anti_bot
+
                 if detect_anti_bot(partial_html) > 0.5:
                     logger.warning(
                         "[Scraper] Anti-bot detected during initial %s for %s — aborting early",
-                        wait_until, url,
+                        wait_until,
+                        url,
                     )
                     raise ValueError(f"Anti-bot challenge detected during {wait_until}: {e}")
             except ValueError:
@@ -502,10 +555,13 @@ async def fetch_page_content(
 
             logger.warning(
                 "[Scraper] %s slow load for %s: %s. Falling to domcontentloaded",
-                strategy.value, url, e,
+                strategy.value,
+                url,
+                e,
             )
             await page.wait_for_load_state("domcontentloaded")
-            # Reduced fallback wait: 2s instead of 5s — JS has already had time to start
+            # Reduced fallback wait: 2s instead of 5s — JS has already had time
+            # to start
             await asyncio.sleep(min(settings.PAGE_FALLBACK_EXTRA_WAIT, 2.0))
 
         browser_state = await collect_browser_state(page)
@@ -522,6 +578,7 @@ async def fetch_page_content(
             cookie_header = build_cookie_header(raw_cookies)
             if cookie_header:
                 from app.anti_bot_engine import get_anti_bot_engine
+
                 get_anti_bot_engine().update_cookies(domain, cookie_header)
         except Exception as cookie_err:
             logger.debug("[BrowserState] Cookie persistence skipped for %s: %s", url, cookie_err)
@@ -533,7 +590,8 @@ async def fetch_page_content(
             store_captures(url, network_payloads)
             logger.info(
                 "[BrowserNetwork] Captured %d network payloads from %s",
-                len(network_payloads), url,
+                len(network_payloads),
+                url,
             )
 
         return html, js_render_delay_ms, method_used, 0
@@ -548,13 +606,21 @@ async def fetch_page_content(
         err_msg = str(e).lower()
         is_antibot = False
         from app.scrape_telemetry import detect_anti_bot
+
         if html_content and detect_anti_bot(html_content) > 0.5:
             is_antibot = True
-        elif any(marker in err_msg for marker in ["captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"]):
+        elif any(
+            marker in err_msg
+            for marker in ["captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"]
+        ):
             is_antibot = True
 
         if is_antibot:
-            logger.error("[Scraper] Anti-bot challenge detected during %s for %s. Refusing naive HTTP fallback to prevent IP ban.", strategy.value, url)
+            logger.error(
+                "[Scraper] Anti-bot challenge detected during %s for %s. Refusing naive HTTP fallback to prevent IP ban.",
+                strategy.value,
+                url,
+            )
             raise ValueError(f"Anti-bot challenge detected: {e}")
 
         logger.error("[Scraper] %s failed for %s: %s. Final fallback to httpx_basic", strategy.value, url, e)
@@ -572,7 +638,6 @@ async def fetch_page_content(
                 pass
 
 
-
 async def _fetch_with_httpx(
     url: str,
     strategy: FetchStrategy = FetchStrategy.HTTPX_BASIC,
@@ -582,8 +647,9 @@ async def _fetch_with_httpx(
     """Internal helper for httpx fetching with retries."""
     method_used = strategy.value
 
-    # Use anti-bot stealth headers for smart/stealth strategies
+    # Use anti-bot stealth headers for smart / stealth strategies
     from app.anti_bot_engine import get_anti_bot_engine
+
     domain = urlparse(url).netloc.lower() or "default"
     anti_bot = get_anti_bot_engine()
 
@@ -637,6 +703,7 @@ async def _fetch_with_httpx(
                             break
 
                         from urllib.parse import urljoin
+
                         redirect_url = urljoin(str(resp.url), redirect_target)
 
                         # Validate the target redirect URL before fetching it!
@@ -647,7 +714,8 @@ async def _fetch_with_httpx(
 
                 resp.raise_for_status()
 
-                # SSRF: validate the final resolved URL is not private/internal
+                # SSRF: validate the final resolved URL is not private /
+                # internal
                 final_url = str(resp.url)
                 _validate_url_safe(final_url)
 
@@ -662,16 +730,25 @@ async def _fetch_with_httpx(
                     wait = settings.HTTP_BACKOFF_FACTOR * (attempt + 1)
                     logger.warning(
                         "[Scraper] %s attempt %d/%d failed for %s: %s. Retrying in %.1fs",
-                        strategy.value, attempt + 1, settings.MAX_RETRIES, url, e, wait,
+                        strategy.value,
+                        attempt + 1,
+                        settings.MAX_RETRIES,
+                        url,
+                        e,
+                        wait,
                     )
                     await asyncio.sleep(wait)
                 else:
                     logger.error(
                         "[Scraper_diagnostics] %s failed after %d attempts for %s: %s",
-                        strategy.value, settings.MAX_RETRIES, url, e,
+                        strategy.value,
+                        settings.MAX_RETRIES,
+                        url,
+                        e,
                     )
                     raise
     return "", 0.0, method_used, 0
+
 
 def clean_html_for_selectors(html: str, max_chars: int | None = None) -> str:
     """Remove known-noise tags while preserving structure useful for selector discovery."""
@@ -689,6 +766,7 @@ def clean_html_for_selectors(html: str, max_chars: int | None = None) -> str:
     cleaned = soup.prettify()
     return cleaned[:max_chars]
 
+
 def _valid_email(text: str) -> str | None:
     match = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", text)
     if not match:
@@ -705,6 +783,7 @@ def _valid_email(text: str) -> str | None:
         return None
     return email
 
+
 def _valid_phone(text: str) -> str | None:
     candidates = re.findall(r"(?:\+?\d[\d\s()\-]{6,}\d)", text)
     cleaned = []
@@ -712,12 +791,16 @@ def _valid_phone(text: str) -> str | None:
     for c in candidates:
         c_norm = _compact_text(c).strip("- ,")
         digits = re.sub(r"\D", "", c_norm)
-        if len(digits) < settings.CONTACT_VALID_PHONE_MIN_DIGITS or len(digits) > settings.CONTACT_VALID_PHONE_MAX_DIGITS:
+        if (
+            len(digits) < settings.CONTACT_VALID_PHONE_MIN_DIGITS
+            or len(digits) > settings.CONTACT_VALID_PHONE_MAX_DIGITS
+        ):
             continue
         if c_norm not in seen:
             seen.add(c_norm)
             cleaned.append(c_norm)
     return cleaned[0] if cleaned else None
+
 
 def _sanitize_field_value(field: SchemaField, value, base_url: str = ""):
     """Apply type-specific sanitization to extracted values."""
@@ -749,6 +832,7 @@ def _sanitize_field_value(field: SchemaField, value, base_url: str = ""):
     if field.field_type == FieldType.URL:
         if not text.startswith("http"):
             from urllib.parse import urljoin
+
             text = urljoin(base_url, text)
         return text if text.startswith("http") else None
 

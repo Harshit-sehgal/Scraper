@@ -10,9 +10,9 @@ Provides:
 
 This system learns what makes selectors effective for each domain:
   - Selector specificity and stability
-  - Class/ID naming patterns
+  - Class / ID naming patterns
   - HTML structure characteristics
-  - Historical success/failure rates
+  - Historical success / failure rates
   - Domain-specific patterns
 
 LAW: Selectors are not created equal. ML learns which features predict quality.
@@ -35,8 +35,8 @@ class SelectorFeatures:
     """Extracted features from a CSS selector."""
 
     selector: str
-    specificity_score: float  # 0-1: how specific
-    stability_score: float  # 0-1: likely to change
+    specificity_score: float  # 0 - 1: how specific
+    stability_score: float  # 0 - 1: likely to change
     class_count: int  # Number of classes
     id_count: int  # Number of IDs
     tag_count: int  # Number of tag selectors
@@ -57,8 +57,8 @@ class SelectorPrediction:
     """ML model prediction for selector quality."""
 
     selector: str
-    predicted_quality: float  # 0-1: predicted success rate
-    confidence: float  # 0-1: confidence in prediction
+    predicted_quality: float  # 0 - 1: predicted success rate
+    confidence: float  # 0 - 1: confidence in prediction
     feature_importance: Dict[str, float]  # Which features matter most
     recommendation: str  # "keep", "improve", "replace"
     suggested_mutations: List[str]  # Alternative selectors to try
@@ -83,8 +83,9 @@ class SelectorFeatureExtractor:
         id_count = selector.count("#")
 
         # Robust tag counting using regex
-        # Matches alphanumeric tags starting with a letter, either at start or after a combinator/space
-        tag_matches = re.findall(r'(?:^|[\s>+~])([a-zA-Z][a-zA-Z0-9-]*)', selector)
+        # Matches alphanumeric tags starting with a letter, either at start or
+        # after a combinator / space
+        tag_matches = re.findall(r"(?:^|[\s>+~])([a-zA-Z][a-zA-Z0 - 9-]*)", selector)
         tag_count = len(tag_matches)
 
         pseudo_count = selector.count(":")
@@ -92,7 +93,7 @@ class SelectorFeatureExtractor:
 
         # Calculate specificity (rough approximation)
         # ID: 100, class: 10, tag: 1
-        # Normalize to 0-1. 100+ is very specific.
+        # Normalize to 0 - 1. 100+ is very specific.
         specificity = (id_count * 100 + class_count * 10 + tag_count) / 150.0
         specificity = min(1.0, specificity)
 
@@ -111,7 +112,7 @@ class SelectorFeatureExtractor:
         if class_count > 3:
             stability -= 0.2  # Too many classes suggests fragility
         if descendant_depth_val := (selector.count(" ") + selector.count(">")):
-            stability -= (descendant_depth_val * 0.1)
+            stability -= descendant_depth_val * 0.1
 
         stability = max(0.0, min(1.0, stability))
 
@@ -137,10 +138,7 @@ class SelectorFeatureExtractor:
     @staticmethod
     def extract_batch(selectors: List[str]) -> List[SelectorFeatures]:
         """Extract features for multiple selectors."""
-        return [
-            SelectorFeatureExtractor.extract_features(sel)
-            for sel in selectors
-        ]
+        return [SelectorFeatureExtractor.extract_features(sel) for sel in selectors]
 
 
 class SelectorQualityPredictor:
@@ -151,7 +149,7 @@ class SelectorQualityPredictor:
 
     def __init__(self):
         """Initialize predictor with learned weights."""
-        # Feature weights learned from successful/failed selectors
+        # Feature weights learned from successful / failed selectors
         # These are baseline weights; they improve with more training data
         self.feature_weights = {
             "specificity_score": 0.8,  # More specific = better
@@ -194,9 +192,12 @@ class SelectorQualityPredictor:
             if isinstance(raw, bool):
                 value: float = 1.0 if raw else 0.0
             elif feature_name in ["class_count", "pseudo_class_count", "tag_count", "id_count", "attribute_count"]:
-                value = min(1.0, float(raw) / 5.0)  # Normalize counts to [0, 1]
+                # Normalize counts to [0, 1]
+                value = min(1.0, float(raw) / 5.0)
             elif feature_name == "descendant_depth":
-                value = float(raw) / 5.0  # Normalize depth. Weight is negative, so higher depth reduces score.
+                # Normalize depth. Weight is negative, so higher depth reduces
+                # score.
+                value = float(raw) / 5.0
             else:
                 value = float(raw)
 
@@ -317,7 +318,8 @@ class SelectorQualityPredictor:
 
                 # Simple gradient update
                 adjustment = learning_rate * error * val
-                weight: float = self.feature_weights[feature_name]  # type: ignore[assignment]
+                # type: ignore[assignment]
+                weight: float = self.feature_weights[feature_name]
                 self.feature_weights[feature_name] = weight + adjustment
 
         logger.info("Updated selector quality predictor with %d feedback samples", len(feedback))
@@ -358,7 +360,7 @@ class SelectorOptimizationEngine:
                 "keep": 0,
                 "improve": 0,
                 "replace": 0,
-            }
+            },
         }
 
         for field_name, selector in selectors.items():
@@ -412,10 +414,7 @@ class SelectorOptimizationEngine:
         # Update model weights based on actual results
         self.predictor.update_weights([(features, actual_quality)])
 
-        logger.info(
-            "Learned from selector %s (actual=%.2f)",
-            selector, actual_quality
-        )
+        logger.info("Learned from selector %s (actual=%.2f)", selector, actual_quality)
 
 
 # Global singleton

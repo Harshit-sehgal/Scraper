@@ -23,6 +23,10 @@ def pytest_configure(config):
         "markers",
         "postgres: tests that require a running Postgres instance (via testcontainers). Skipped by default.",
     )
+    config.addinivalue_line(
+        "markers",
+        "golden_dataset: tests that hit real websites for extraction validation. Skipped by default (use --run-golden-dataset).",
+    )
     try:
         from testcontainers.postgres import PostgresContainer
         def patched_get_connection_url(self, host=None):
@@ -79,6 +83,9 @@ os.environ["DATAFORGE_ENV"] = "development"
 os.environ["DATAFORGE_API_KEY"] = ""
 os.environ["DATAFORGE_ADMIN_API_KEY"] = ""
 os.environ["DATAFORGE_OPERATOR_API_KEY"] = ""
+# Force SQLite for tests to avoid Postgres env bleed from .env
+os.environ["DATAFORGE_STORAGE_BACKEND"] = "sqlite"
+os.environ.pop("DATAFORGE_DATABASE_URL", None)
 
 try:
     from app import main as main_mod  # noqa: E402

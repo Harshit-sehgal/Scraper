@@ -13,7 +13,7 @@ Supports:
 Usage:
     from app.rate_limiter import RateLimiterMiddleware
 
-    rate_limiter = RateLimiterMiddleware(global_limit="100/minute")
+    rate_limiter = RateLimiterMiddleware(global_limit="100 / minute")
     app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limiter.middleware)
 """
 
@@ -38,21 +38,28 @@ class RateLimitExceeded(Exception):
 # stricter limits than general read-only API routes.
 _ROUTE_LIMITS: dict[str, tuple[int, float]] = {
     # Format: prefix -> (max_requests, window_seconds)
-    "/api/url/analyze": (10, 60.0),             # 10 per minute — expensive browser + LLM
-    "/api/discover": (15, 60.0),                # 15 per minute — network calls
-    "/api/schema/suggest": (15, 60.0),          # 15 per minute — LLM calls
-    "/api/scraper/diagnostics": (5, 60.0),       # 5 per minute — expensive diagnostic
-    "/api/scraper/ml": (20, 60.0),              # 20 per minute — ML computation
-    "/api/scraper/strategy": (20, 60.0),         # 20 per minute — strategy mutations
-    "/api/jobs": (60, 60.0),                     # 60 per minute — job creation/mutation
-    "/api/recycle_bin": (30, 60.0),             # 30 per minute — recycle bin mutations
+    # 10 per minute — expensive browser + LLM
+    "/api / url / analyze": (10, 60.0),
+    # 15 per minute — network calls
+    "/api / discover": (15, 60.0),
+    "/api / schema / suggest": (15, 60.0),  # 15 per minute — LLM calls
+    # 5 per minute — expensive diagnostic
+    "/api / scraper / diagnostics": (5, 60.0),
+    # 20 per minute — ML computation
+    "/api / scraper / ml": (20, 60.0),
+    # 20 per minute — strategy mutations
+    "/api / scraper / strategy": (20, 60.0),
+    # 60 per minute — job creation / mutation
+    "/api / jobs": (60, 60.0),
+    # 30 per minute — recycle bin mutations
+    "/api / recycle_bin": (30, 60.0),
 }
 
 
 def _parse_rate_limit(limit_str: str) -> tuple[int, float]:
-    """Parse a rate limit string like '100/minute' into (max_requests, window_seconds).
+    """Parse a rate limit string like '100 / minute' into (max_requests, window_seconds).
 
-    Supported formats: N/second, N/minute, N/hour.
+    Supported formats: N / second, N / minute, N / hour.
     Returns (max_requests, window_seconds), or (0, 0) if invalid.
     """
     if not limit_str or not isinstance(limit_str, str):
@@ -146,7 +153,7 @@ class RateLimiterMiddleware:
     plus optional stricter limits for specific route patterns.
 
     Safe IP extraction:
-    - Only trusts X-Forwarded-For when the connection comes from localhost/127.0.0.1
+    - Only trusts X-Forwarded-For when the connection comes from localhost / 127.0.0.1
       (i.e., through nginx on the same machine or Docker network).
     - In all other cases, falls back to the direct remote address.
     """
@@ -166,7 +173,9 @@ class RateLimiterMiddleware:
         if self._global_max > 0:
             logger.info(
                 "Rate limiter: %d requests per %.0fs (global), cleanup every %ds",
-                self._global_max, self._global_window, self._cleanup_interval,
+                self._global_max,
+                self._global_window,
+                self._cleanup_interval,
             )
         else:
             logger.info("Rate limiter: disabled")
@@ -187,8 +196,12 @@ class RateLimiterMiddleware:
 
         # Only trust X-Forwarded-For when the immediate peer is internal
         is_trusted_proxy = client_host in (
-            "127.0.0.1", "::1", "localhost",
-            "172.16.0.0", "172.17.0.0", "172.18.0.0",
+            "127.0.0.1",
+            "::1",
+            "localhost",
+            "172.16.0.0",
+            "172.17.0.0",
+            "172.18.0.0",
             "10.0.0.0",
         ) or client_host.startswith(("172.16.", "172.17.", "172.18.", "10.", "192.168."))
 
@@ -233,10 +246,7 @@ class RateLimiterMiddleware:
             return
         self._last_cleanup = now
         before = len(self._counters)
-        self._counters = {
-            k: v for k, v in self._counters.items()
-            if not v.is_expired()
-        }
+        self._counters = {k: v for k, v in self._counters.items() if not v.is_expired()}
         after = len(self._counters)
         if before > after:
             logger.debug("Rate limiter: pruned %d expired counter(s)", before - after)
@@ -279,7 +289,11 @@ class RateLimiterMiddleware:
         if not counter.allow():
             logger.warning(
                 "Rate limit exceeded for %s on %s (%d/%d per %.0fs)",
-                client_ip, path, counter.remaining(), max_req, window_sec,
+                client_ip,
+                path,
+                counter.remaining(),
+                max_req,
+                window_sec,
             )
             return JSONResponse(
                 status_code=429,
@@ -311,10 +325,7 @@ class RateLimiterMiddleware:
             "limit_per_window": self._global_max,
             "window_seconds": self._global_window,
             "active_keys": len(self._counters),
-            "route_limits": {
-                k: {"max_requests": v[0], "window_seconds": v[1]}
-                for k, v in _ROUTE_LIMITS.items()
-            },
+            "route_limits": {k: {"max_requests": v[0], "window_seconds": v[1]} for k, v in _ROUTE_LIMITS.items()},
         }
 
     def reset(self):

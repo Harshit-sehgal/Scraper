@@ -32,12 +32,15 @@ from app.semantic_ir import (
 # Imported lazily to avoid circular deps
 _role_engine = None
 
+
 def _get_role_engine():
     global _role_engine
     if _role_engine is None:
         from app.semantic_inference_engine import RoleEmbeddingEngine
+
         _role_engine = RoleEmbeddingEngine()
     return _role_engine
+
 
 def reset_role_engine():
     """Reset the global role engine (for testing)."""
@@ -56,6 +59,7 @@ class _SemanticMetricsProtocol(Protocol):
     Replaces unchecked 'Any' with an explicit protocol so mypy can validate
     attribute access without needing type: ignore comments.
     """
+
     _smoothed_structural: float
     _smoothed_runtime: float
     semantic_temperature: float
@@ -65,6 +69,7 @@ class _SemanticMetricsProtocol(Protocol):
 def _adaptive_exclusion_threshold() -> float:
     """Exclusion threshold with hysteresis + temperature modulation."""
     from app.semantic_world_state import get_world_state
+
     ws = get_world_state()
     metrics: _SemanticMetricsProtocol = ws.metrics  # type: ignore[has-type]
     base: float = float(metrics._smoothed_structural)
@@ -78,6 +83,7 @@ def _adaptive_exclusion_threshold() -> float:
 def _adaptive_runtime_exclusion_threshold() -> float:
     """Exclusion threshold with hysteresis + temperature + convergence."""
     from app.semantic_world_state import get_world_state
+
     ws = get_world_state()
     metrics: _SemanticMetricsProtocol = ws.metrics  # type: ignore[has-type]
     base: float = float(metrics._smoothed_runtime)
@@ -91,16 +97,15 @@ def _adaptive_runtime_exclusion_threshold() -> float:
 # Bootstrap seeds for role-type compatibility.
 # These are TEMPORARY priors — learning overrides them over time.
 _UNIVERSAL_ROOTS = [
-    (['pric', 'cost', 'salar', 'preci', 'prix', 'wert'], SemanticType.PRICE),
-    (['date', 'time', 'schedule', 'fecha', 'zeit', 'horar'], SemanticType.DATE),
+    (["pric", "cost", "salar", "preci", "prix", "wert"], SemanticType.PRICE),
+    (["date", "time", "schedule", "fecha", "zeit", "horar"], SemanticType.DATE),
     # Short codes / identifiers (product codes, SKUs, etc.)
-    (['code', 'currenc', 'ident', 'id', 'codig', 'sku'], SemanticType.CODE),
-    (['loc', 'city', 'addr', 'place', 'dest', 'orig', 'ubica', 'stadt'], SemanticType.LOCATION),
-
-    (['nam', 'comp', 'firm', 'brand', 'make', 'model', 'builder', 'nombr', 'title'], SemanticType.ORGANIZATION),
-    (['rat', 'scor', 'review', 'calif', 'bewert'], SemanticType.RATING),
-    (['count', 'number', 'year', 'mileage', 'age', 'experien', 'num', 'jahr'], SemanticType.NUMBER),
-    (['avail', 'stock', 'status', 'state'], SemanticType.TEXT),
+    (["code", "currenc", "ident", "id", "codig", "sku"], SemanticType.CODE),
+    (["loc", "city", "addr", "place", "dest", "orig", "ubica", "stadt"], SemanticType.LOCATION),
+    (["nam", "comp", "firm", "brand", "make", "model", "builder", "nombr", "title"], SemanticType.ORGANIZATION),
+    (["rat", "scor", "review", "calif", "bewert"], SemanticType.RATING),
+    (["count", "number", "year", "mileage", "age", "experien", "num", "jahr"], SemanticType.NUMBER),
+    (["avail", "stock", "status", "state"], SemanticType.TEXT),
 ]
 
 
@@ -117,10 +122,10 @@ def _name_similarity(a: str, b: str) -> float:
     dp = [[0] * (n + 1) for _ in range(m + 1)]
     for i in range(1, m + 1):
         for j in range(1, n + 1):
-            if a[i-1] == b[j-1]:
-                dp[i][j] = dp[i-1][j-1] + 1
+            if a[i - 1] == b[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
             else:
-                dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
     lcs = dp[m][n]
     return lcs / max(m, n)
 
@@ -197,13 +202,20 @@ def warm_start_from_values(records: list, schema_fields: list):
         expected_type = _infer_role_type(f_name)
 
         # Grounding check: only seed if types are near
-        is_compatible = (st == expected_type) or \
-                        (st == SemanticType.TEXT) or \
-                        (expected_type == SemanticType.TEXT) or \
-                        (st == SemanticType.CODE and expected_type in [SemanticType.LOCATION, SemanticType.PRICE, SemanticType.CODE, SemanticType.IDENTIFIER])
+        is_compatible = (
+            (st == expected_type)
+            or (st == SemanticType.TEXT)
+            or (expected_type == SemanticType.TEXT)
+            or (
+                st == SemanticType.CODE
+                and expected_type
+                in [SemanticType.LOCATION, SemanticType.PRICE, SemanticType.CODE, SemanticType.IDENTIFIER]
+            )
+        )
 
         if is_compatible:
-            # Move manifold point toward this observed type through controlled blend
+            # Move manifold point toward this observed type through controlled
+            # blend
             if f_name not in reng.manifold:
                 ws.set_manifold_vector(f_name, reng._get_type_vector(expected_type))
 
@@ -211,10 +223,13 @@ def warm_start_from_values(records: list, schema_fields: list):
             ws.blend_manifold_vector(f_name, target_vec, alpha=0.7, beta=0.3)
 
 
-def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abstraction_gradient: float = 0.0) -> AllocationGraph:
+def build_allocation_graph(
+    record: SemanticRecord, schema_roles: List[str], abstraction_gradient: float = 0.0
+) -> AllocationGraph:
     """Build an allocation graph from a record and desired schema roles with Hierarchical Synthesis (Phase 38)."""
     graph = AllocationGraph()
     from app.semantic_world_state import get_world_state
+
     ws = get_world_state()
 
     # Expand schema roles to include constituents if gradient allows
@@ -244,7 +259,8 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
         graph.roles[role_name] = SemanticRole(
             role_name=role_name,
             field_type=expected_type,
-            required=(role_name in schema_roles), # Only top-level roles are required
+            # Only top-level roles are required
+            required=(role_name in schema_roles),
         )
 
     # Topology-driven exclusion edges from field regions
@@ -276,7 +292,7 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
                     key = (cand_key, role)
                     if key in graph.compatibility:
                         # Unstable basins reduce proposal confidence
-                        graph.compatibility[key] *= (1.0 - instability * 0.3)
+                        graph.compatibility[key] *= 1.0 - instability * 0.3
 
     # Topological Inference (Phase 18): Community Pull
     # Roles that are part of a macro-scale community pull each other.
@@ -304,7 +320,8 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
                     graph.compatibility[(cand, role)] = min(1.0, score + (1.0 - score) * 0.1 * pull)
 
     # Schema Gravity Pull (Phase 19): Macro-Scale Structural memory
-    # If the set of schema roles matches a learned stable pattern, boost compatibility.
+    # If the set of schema roles matches a learned stable pattern, boost
+    # compatibility.
     if ws.schema_patterns:
         current_roles = sorted(graph.roles.keys())
         # Check role-pair subsets against stored 2-tuple patterns
@@ -324,18 +341,20 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
     token_vals = list(graph.candidates.keys())
     attractors = ws.get_crystalline_attractors(token_vals)
     for attractor in attractors:
-        # Every field in the attractor exerts a pull on matching candidate tokens
+        # Every field in the attractor exerts a pull on matching candidate
+        # tokens
         for role_name, attr_val in attractor.items():
             if role_name in graph.roles:
                 for cand_val, token in graph.candidates.items():
                     if cand_val == attr_val:
-                        # Direct match found in crystalline unit; boost compatibility
+                        # Direct match found in crystalline unit; boost
+                        # compatibility
                         key = (cand_val, role_name)
                         current = graph.compatibility.get(key, 0.5)
                         # Strong pull: synthesized knowledge is high-integrity
                         graph.compatibility[key] = min(1.0, current + (1.0 - current) * 0.5)
 
-     # Topological Law Bias (Phase 24): Proximity Laws
+    # Topological Law Bias (Phase 24): Proximity Laws
     # If roles A and B have a proximity law and are close, boost.
     if ws.topological_laws:
         # Build spatial index: bucket candidates by position (O(n) preprocessing)
@@ -358,19 +377,21 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
                         if nearby_id in position_buckets:
                             nearby_candidates.extend(position_buckets[nearby_id])
 
-                    # Now check pairs within nearby candidates (O(k²) where k << n)
+                    # Now check pairs within nearby candidates (O(k²) where k
+                    # << n)
                     for i, (c1, t1) in enumerate(candidates_in_bucket):
                         for c2, t2 in nearby_candidates:
                             if c1 == c2:
                                 continue
                             dist = abs(t1.position - t2.position)
-                            if dist < 50: # Physically close
+                            if dist < 50:  # Physically close
                                 # Boost compatibility for both
                                 for role in [r1, r2]:
                                     for cand in [c1, c2]:
                                         key = (cand, role)
                                         if key in graph.compatibility:
-                                            # Boost proportional to law strength and physical proximity
+                                            # Boost proportional to law
+                                            # strength and physical proximity
                                             proximity_factor = (50 - dist) / 50.0
                                             boost = 0.1 * strength * proximity_factor
                                             graph.compatibility[key] = min(1.0, graph.compatibility[key] + boost)
@@ -423,9 +444,7 @@ def _infer_role_type(role_name: str) -> SemanticType:
     return best_type
 
 
-def _compute_compatibility(
-    token: SemanticToken, role_name: str, role: SemanticRole
-) -> float:
+def _compute_compatibility(token: SemanticToken, role_name: str, role: SemanticRole) -> float:
     """Geometric compatibility: emergent from Role Manifold similarity."""
     reng = _get_role_engine()
     learned_compat = reng.get_compatibility(role_name, token.primary_type, token=token)
@@ -451,6 +470,7 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
     )
 
     from app.semantic_world_state import get_world_state
+
     ws = get_world_state()
     topo_view = ws.get_topology_view()
     field_owned_roles: Set[str] = set()
@@ -462,9 +482,7 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
     for score, cand_key, role_name in assignments:
         if role_name in field_owned_roles:
             conflicts_with_field = any(
-                region.token == cand_key
-                for region in topo_view.all_regions()
-                if role_name in region.competing_roles
+                region.token == cand_key for region in topo_view.all_regions() if role_name in region.competing_roles
             )
             if conflicts_with_field:
                 already_assigned_to_peer = False
@@ -474,7 +492,9 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
                         already_assigned_to_peer = True
                         break
                 if already_assigned_to_peer:
-                    field_conflicts.append({"role": role_name, "candidate": cand_key, "reason": "exclusivity:self", "score": score})
+                    field_conflicts.append(
+                        {"role": role_name, "candidate": cand_key, "reason": "exclusivity:self", "score": score}
+                    )
                     continue
 
         if cand_key in assigned_candidates or role_name in filled_roles:
@@ -493,7 +513,9 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
                 break
 
         if conflicting:
-            field_conflicts.append({"role": role_name, "candidate": cand_key, "reason": conflict_reason, "score": score})
+            field_conflicts.append(
+                {"role": role_name, "candidate": cand_key, "reason": conflict_reason, "score": score}
+            )
             continue
 
         graph.roles[role_name].filled_by = cand_key
@@ -562,31 +584,45 @@ def allocate_semantic_roles(
     hypotheses = []
 
     for _strategy, key_fn in [
-        ('primary', lambda x: -x[2]),
-        ('noisy', lambda x: -x[2] + random.random() * 0.05),
-        ('random', lambda x: random.random()),
+        ("primary", lambda x: -x[2]),
+        ("noisy", lambda x: -x[2] + random.random() * 0.05),
+        ("random", lambda x: random.random()),
     ]:
         h = _run_allocation(graph, sorted(candidates, key=key_fn))
         hypotheses.append(h)
 
-    hypotheses.sort(key=lambda h: h['coherence'])
+    hypotheses.sort(key=lambda h: h["coherence"])
 
     if len(hypotheses) >= 2:
         best = hypotheses[-1]
         worst = hypotheses[0]
-        if (best['coherence'] - worst['coherence']) > 0.15:
+        if (best["coherence"] - worst["coherence"]) > 0.15:
             for role_name in graph.roles:
-                best_val = best['roles'].get(role_name)
-                worst_val = worst['roles'].get(role_name)
+                best_val = best["roles"].get(role_name)
+                worst_val = worst["roles"].get(role_name)
 
                 if best_val and worst_val and best_val != worst_val:
                     token = graph.candidates.get(best_val)
                     if token:
-                        reng.learn_from_allocation(role_name, token.primary_type, token.raw, success=True, delta=0.05, coherence=best['coherence'])
+                        reng.learn_from_allocation(
+                            role_name,
+                            token.primary_type,
+                            token.raw,
+                            success=True,
+                            delta=0.05,
+                            coherence=best["coherence"],
+                        )
 
                     token2 = graph.candidates.get(worst_val)
                     if token2:
-                        reng.learn_from_allocation(role_name, token2.primary_type, token2.raw, success=False, delta=0.05, coherence=best['coherence'])
+                        reng.learn_from_allocation(
+                            role_name,
+                            token2.primary_type,
+                            token2.raw,
+                            success=False,
+                            delta=0.05,
+                            coherence=best["coherence"],
+                        )
 
     return record, graph
 
@@ -624,7 +660,8 @@ def _run_allocation(graph: AllocationGraph, sorted_assignments: list) -> dict:
         filled.add(role_name)
 
     coh = _compute_allocation_coherence(g)
-    return {'roles': {r: g.roles[r].filled_by for r in g.roles}, 'coherence': coh}
+    return {"roles": {r: g.roles[r].filled_by for r in g.roles}, "coherence": coh}
+
 
 def explain_assignment(role_name: str, candidate_val: str, graph: AllocationGraph) -> dict:
     """Explain why a role was assigned to a candidate using topological evidence."""
@@ -676,5 +713,5 @@ def explain_assignment(role_name: str, candidate_val: str, graph: AllocationGrap
             "community_context": community,
             "learned_schema_match": schema_pattern_match,
         },
-        "coherence_contribution": round(graph.coherence_score, 3)
+        "coherence_contribution": round(graph.coherence_score, 3),
     }

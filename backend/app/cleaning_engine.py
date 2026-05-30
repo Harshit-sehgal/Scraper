@@ -46,10 +46,12 @@ async def ai_clean_and_align_records(
         return [], {"applied": False, "reason": "no_records", "ai_chunks": 0, "fallback_chunks": 0}
 
     # Limit to top quality records for AI processing to save tokens
-    target_records = sorted(records, key=lambda x: x.get("record_score", 0.0), reverse=True)[:settings.AI_CLEAN_TARGET_RECORDS]
+    target_records = sorted(records, key=lambda x: x.get("record_score", 0.0), reverse=True)[
+        : settings.AI_CLEAN_TARGET_RECORDS
+    ]
 
     chunk_size = settings.AI_STRUCTURING_CHUNK_SIZE
-    chunks = [target_records[i:i + chunk_size] for i in range(0, len(target_records), chunk_size)]
+    chunks = [target_records[i: i + chunk_size] for i in range(0, len(target_records), chunk_size)]
 
     final_records = []
     unprocessed_records = []
@@ -82,7 +84,7 @@ Rules:
         try:
             messages = [
                 {"role": "system", "content": "You are an expert data cleaning agent. Return only JSON."},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": prompt},
             ]
 
             raw_response = None
@@ -94,11 +96,11 @@ Rules:
                     raw_response = res_fast
             except Exception as e:
                 logger.warning(
-                    "Fast-path semantic inference failed for chunk %d/%d: %s",
-                    chunks_processed, len(chunks), e
+                    "Fast-path semantic inference failed for chunk %d/%d: %s", chunks_processed, len(chunks), e
                 )
                 try:
                     from app.semantic_world_state import get_world_state
+
                     ws = get_world_state()
                     ws.record_degradation(
                         subsystem="llm_fastpath",
@@ -156,5 +158,5 @@ Rules:
         "records_returned": len(final_records),
         "ai_chunks": chunks_processed,
         "fallback_chunks": fallback_chunks,
-        "model_fallback_mode": any_standard_call
+        "model_fallback_mode": any_standard_call,
     }

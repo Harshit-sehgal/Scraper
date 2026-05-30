@@ -42,11 +42,12 @@ class ManifoldState:
         self.learning_count: int = 0
         self.total_co_occurrences: int = 0
 
-        # Phase 60/63: Linked States
+        # Phase 60 / 63: Linked States
         self._energy_ref: Any = None
         self._obs_ref: Any = None
 
         # ─── Transaction Staging ──────────────────────────────────────
+
     @property
     def _staging(self) -> Optional[dict]:
         tx = active_transaction.get()
@@ -149,13 +150,17 @@ class ManifoldState:
         if self._obs_ref and role in manifold:
             old_v = manifold[role]
             import math
-            displacement = math.sqrt(sum((a - b)**2 for a, b in zip(old_v, vector)))
+
+            displacement = math.sqrt(sum((a - b) ** 2 for a, b in zip(old_v, vector)))
             if displacement > 1e-4:
                 self._obs_ref.log_drift(role, displacement)
 
         manifold[role] = list(vector)
         self._set_struct("role_manifold", manifold)
-        self._record("set_manifold_vector", {"role": role, "vector": vector, "displacement": displacement if 'displacement' in locals() else 0.0})
+        self._record(
+            "set_manifold_vector",
+            {"role": role, "vector": vector, "displacement": displacement if "displacement" in locals() else 0.0},
+        )
 
     def apply_force_to_manifold(self, role: str, deltas: list, clamp: bool = True):
         """Apply a delta array to a role's manifold vector with drift tracking (Phase 63)."""
@@ -180,13 +185,16 @@ class ManifoldState:
         # Phase 63: Log drift
         if self._obs_ref:
             import math
-            displacement = math.sqrt(sum((a - b)**2 for a, b in zip(old_v, vec)))
+
+            displacement = math.sqrt(sum((a - b) ** 2 for a, b in zip(old_v, vec)))
             if displacement > 1e-4:
                 self._obs_ref.log_drift(role, displacement)
 
         manifold[role] = vec
         self._set_struct("role_manifold", manifold)
-        self._record("apply_force_to_manifold", {"role": role, "deltas": deltas, "clamp": clamp, "displacement": displacement})
+        self._record(
+            "apply_force_to_manifold", {"role": role, "deltas": deltas, "clamp": clamp, "displacement": displacement}
+        )
 
     def compute_similarity(self, role_a: str, role_b: str) -> float:
         """Geometric similarity between two roles in the manifold."""
@@ -222,13 +230,17 @@ class ManifoldState:
         # Phase 63: Log drift
         if self._obs_ref:
             import math
-            displacement = math.sqrt(sum((a - b)**2 for a, b in zip(existing, new_v)))
+
+            displacement = math.sqrt(sum((a - b) ** 2 for a, b in zip(existing, new_v)))
             if displacement > 1e-4:
                 self._obs_ref.log_drift(role, displacement)
 
         manifold[role] = new_v
         self._set_struct("role_manifold", manifold)
-        self._record("blend_manifold_vector", {"role": role, "other_vector": other_vector, "alpha": alpha, "beta": beta, "displacement": displacement})
+        self._record(
+            "blend_manifold_vector",
+            {"role": role, "other_vector": other_vector, "alpha": alpha, "beta": beta, "displacement": displacement},
+        )
 
     def has_manifold_role(self, role: str) -> bool:
         return role in self._get_struct("role_manifold")
@@ -354,6 +366,7 @@ class ManifoldState:
     def get_manifold_checksum(self) -> str:
         """Compute a geometric checksum of the entire manifold (Phase 31)."""
         import hashlib
+
         manifold = self._get_struct("role_manifold")
         roles = sorted(manifold.keys())
         hasher = hashlib.sha256()
@@ -401,7 +414,8 @@ class ManifoldState:
 
     # ─── Controlled Setters for Counters ──────────────────────────────────
     # These route through _set_struct for transaction staging compliance,
-    # preventing external code from bypassing staging via direct attribute writes.
+    # preventing external code from bypassing staging via direct attribute
+    # writes.
 
     def set_learning_count(self, value: int):
         self._set_struct("learning_count", max(0, value))
@@ -437,7 +451,7 @@ class ManifoldState:
             return 0.0
         n_vec = len(vec)
         avg = sum(vec) / n_vec
-        var = sum((x - avg)**2 for x in vec) / n_vec
+        var = sum((x - avg) ** 2 for x in vec) / n_vec
         # Scale variance to [0,1] stability. High variance = lower stability.
         return max(0.0, min(1.0, 1.0 - var * 4.0))
 
@@ -508,7 +522,7 @@ class ManifoldState:
             self.dimension = 16
 
     def merge(self, other_data: dict, alpha: float = 0.5):
-        """Merge remote manifold state into local (Phase 32/60)."""
+        """Merge remote manifold state into local (Phase 32 / 60)."""
         remote_manifold = other_data.get("role_manifold", {})
 
         # Phase 60: Semantic Conflict Arbitration
@@ -521,7 +535,11 @@ class ManifoldState:
 
             if self.has_manifold_role(role):
                 # Arbitration heuristic: more stable nodes have higher weight
-                l_inst = self.__dict__.get('_energy_ref', {}).get_schema_instability(role) if hasattr(self, '_energy_ref') else 0.5
+                l_inst = (
+                    self.__dict__.get("_energy_ref", {}).get_schema_instability(role)
+                    if hasattr(self, "_energy_ref")
+                    else 0.5
+                )
                 r_inst = remote_inst.get(role, 0.5)
 
                 # reliability = 1 - instability
@@ -537,7 +555,8 @@ class ManifoldState:
             else:
                 self.set_manifold_vector(role, r_vec)
 
-        # Merge co-occurrences (Max — avoids double-counting overlapping observations)
+        # Merge co-occurrences (Max — avoids double-counting overlapping
+        # observations)
         remote_co = other_data.get("role_co_occurrence", {})
         co_occ = self._get_struct("role_co_occurrence")
         for key_str, r_val in remote_co.items():

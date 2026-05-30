@@ -1,5 +1,5 @@
 """
-Auto-Discovery Engine: Given a topic/query, automatically finds the best
+Auto-Discovery Engine: Given a topic / query, automatically finds the best
 web pages to scrape by searching the web and ranking results.
 Uses free search via DuckDuckGo.
 """
@@ -22,8 +22,8 @@ NOISY_URL_PARTS = (
     "/terms",
     "/tag/",
     "/wp-admin",
-    "facebook.com/sharer",
-    "linkedin.com/share",
+    "facebook.com / sharer",
+    "linkedin.com / share",
 )
 
 LISTING_HINTS = (
@@ -60,26 +60,25 @@ def get_ddgs_class():
     """Resolve the preferred DuckDuckGo search client lazily."""
     try:
         from ddgs import DDGS  # type: ignore
+
         return DDGS
     except ImportError:
         try:
             from duckduckgo_search import DDGS  # type: ignore
+
             return DDGS
         except ImportError as exc:
             raise DiscoveryDependencyError(
-                "Discovery requires ddgs or duckduckgo_search. "
-                "Install backend requirements first."
+                "Discovery requires ddgs or duckduckgo_search. " "Install backend requirements first."
             ) from exc
 
 
-# Domains that repeatedly fail to resolve/connect can be excluded from discovery.
+# Domains that repeatedly fail to resolve / connect can be excluded from
+# discovery.
 def _get_blocked_domains() -> set[str]:
     from app.config import settings
-    return {
-        token.strip().lower()
-        for token in (settings.BLOCKED_DISCOVERY_DOMAINS or "").split(",")
-        if token.strip()
-    }
+
+    return {token.strip().lower() for token in (settings.BLOCKED_DISCOVERY_DOMAINS or "").split(",") if token.strip()}
 
 
 BLOCKED_DISCOVERY_ROOT_DOMAINS = _get_blocked_domains()
@@ -186,7 +185,9 @@ def _build_search_query(
         parts.append(f"in {location.strip()}")
 
     if origin_location and max_distance_km is not None and max_distance_km > 0:
-        parts.append(f"within {int(max_distance_km)} km of {origin_location.strip()}")
+        parts.append(f"within {
+            int(max_distance_km)} km of {
+            origin_location.strip()}")
 
     if domain:
         parts.append(f"site:{domain.strip()}")
@@ -328,14 +329,15 @@ async def discover_urls(
                 source_type=metadata["source_type"],
             )
             score += metadata["source_trust_score"] * 0.1
-            
+
             # Semantic Steering (Phase 20)
             # Discovery adapts to the current state of the semantic field.
             from app.semantic_world_state import get_world_state
+
             ws = get_world_state()
             field_pressure = ws.metrics.field_pressure
             global_entropy = ws.metrics.global_entropy
-            
+
             # Causal Steering:
             # 1. High entropy (disorder) rewards domain novelty (Exploration)
             if global_entropy > 0.7:
@@ -343,12 +345,13 @@ async def discover_urls(
                 domain = _extract_domain(url)
                 if domain not in [r[2].get("source_domain") for r in ranked[:5]]:
                     score += 0.2
-            
-            # 2. High pressure (stress) rewards high-trust markers (Stabilization)
+
+            # 2. High pressure (stress) rewards high-trust markers
+            # (Stabilization)
             if field_pressure > 0.6:
                 if metadata["source_type"] == "official":
                     score += 0.15
-            
+
             if score <= 0:
                 continue
             ranked.append((score, r, metadata, canonical))
@@ -370,17 +373,26 @@ async def discover_urls(
             source_type = metadata["source_type"]
             trust = metadata["source_trust_score"]
 
-            results.append({
-                "url": url,
-                "canonical_url": canonical,
-                "title": r.get("title", "Found Object"),
-                "reason": (reason + "...") if reason else "Likely relevant search result",
-                "source_domain": domain_name,
-                "source_type": source_type,
-                "source_trust_score": trust,
-                "relevance_score": score,
-                "expected_records": 10 if source_type == "directory" or any(h in (r.get("title", "").lower() + " " + r.get("body", "").lower()) for h in LISTING_HINTS) else 1,
-            })
+            results.append(
+                {
+                    "url": url,
+                    "canonical_url": canonical,
+                    "title": r.get("title", "Found Object"),
+                    "reason": (reason + "...") if reason else "Likely relevant search result",
+                    "source_domain": domain_name,
+                    "source_type": source_type,
+                    "source_trust_score": trust,
+                    "relevance_score": score,
+                    "expected_records": (
+                        10
+                        if source_type == "directory"
+                        or any(
+                            h in (r.get("title", "").lower() + " " + r.get("body", "").lower()) for h in LISTING_HINTS
+                        )
+                        else 1
+                    ),
+                }
+            )
 
             if len(results) >= num_results:
                 break

@@ -30,6 +30,7 @@ class GovernanceSnapshot:
     accept this snapshot, breaking the causal chain between governance
     decisions and live state access during field evolution.
     """
+
     # Role manifold data
     role_names: tuple
     role_certainties: dict
@@ -59,11 +60,13 @@ class GovernanceSnapshot:
     # Topology centrality for importance calculation
     topology_centrality: dict
 
+
 class ObservabilityState:
     """Sole owner of the semantic field's telemetry and activity heatmaps."""
 
     def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
         from app.config import settings
+
         self._delta_callback = delta_callback
         # Telemetry Stream: recent cognitive events (Ring buffer)
         self._telemetry_stream: deque = deque(maxlen=settings.TELEMETRY_STREAM_MAXLEN)
@@ -113,20 +116,14 @@ class ObservabilityState:
     def _get_struct(self, key: str):
         if self._staging is not None:
             return self._staging[key]
-        attr_map = {
-            "activity_heatmap": "_activity_heatmap",
-            "drift_log": "_drift_log"
-        }
+        attr_map = {"activity_heatmap": "_activity_heatmap", "drift_log": "_drift_log"}
         return getattr(self, attr_map[key])
 
     def _set_struct(self, key: str, val):
         if self._staging is not None:
             self._staging[key] = val
         else:
-            attr_map = {
-                "activity_heatmap": "_activity_heatmap",
-                "drift_log": "_drift_log"
-            }
+            attr_map = {"activity_heatmap": "_activity_heatmap", "drift_log": "_drift_log"}
             setattr(self, attr_map[key], val)
 
     # ─── Controlled Mutations ────────────────────────────────────────────
@@ -150,10 +147,15 @@ class ObservabilityState:
 
         self._record("emit_telemetry", {"type": event_type, "details": details, "trace_id": trace_id})
 
-    def record_degradation(self, subsystem: str, severity: str, cause: str,
-                             trace_id: Optional[str] = None,
-                             topology_state: Optional[str] = None,
-                             semantic_entropy: Optional[float] = None):
+    def record_degradation(
+        self,
+        subsystem: str,
+        severity: str,
+        cause: str,
+        trace_id: Optional[str] = None,
+        topology_state: Optional[str] = None,
+        semantic_entropy: Optional[float] = None,
+    ):
         """Record a structured degradation event with causality tracking.
 
         This ensures silent fallback paths are visible in telemetry,
@@ -226,7 +228,7 @@ class ObservabilityState:
             "total_divergence": total_divergence,
             "max_causal_skew": max_delta,
             "drift_risk": "high" if max_delta > 50 else "moderate" if max_delta > 10 else "low",
-            "action_recommendation": "branch" if max_delta > 100 else "merge"
+            "action_recommendation": "branch" if max_delta > 100 else "merge",
         }
 
     # ─── Read-Only Accessors ─────────────────────────────────────────────
@@ -245,7 +247,7 @@ class ObservabilityState:
 
     def get_causal_telemetry(self) -> List[dict]:
         """Return formatted transaction lineages for visualization."""
-        journal = self._telemetry_stream # Using telemetry stream for now
+        journal = self._telemetry_stream  # Using telemetry stream for now
         # Filtering for transaction-related events
         return [t for t in journal if t["type"] in ["transaction", "merge_branch", "federation", "wave_absorption"]]
 
@@ -257,11 +259,7 @@ class ObservabilityState:
         oscillations = []
         energies = [s.get("energy", 0.0) for s in snapshots[-window:]]
         if self._is_cyclic(energies):
-            oscillations.append({
-                "type": "global_energy",
-                "confidence": 0.8,
-                "period": self._estimate_period(energies)
-            })
+            oscillations.append({"type": "global_energy", "confidence": 0.8, "period": self._estimate_period(energies)})
 
         return oscillations
 
@@ -286,6 +284,7 @@ class ObservabilityState:
         probs = [s / total for s in stabilities]
 
         import math
+
         entropy = -sum(p * math.log2(p) for p in probs if p > 0)
 
         # Scale by log of number of roles to get [0, 1] range
@@ -308,8 +307,8 @@ class ObservabilityState:
             "memory_usage": self.get_memory_profile(snapshot),
             "is_locked": self.detect_metastable_locks(
                 [s.get("energy", 0.0) for s in snapshot.topology_snapshots],
-                [s.get("entropy", 0.0) for s in snapshot.topology_snapshots]
-            )
+                [s.get("entropy", 0.0) for s in snapshot.topology_snapshots],
+            ),
         }
         return report
 
@@ -345,13 +344,14 @@ class ObservabilityState:
             "force_decay": snapshot.global_energy > 8.0,
             "attractor_scaling": 0.5 if runaways else 1.0,
             "lock_escape_required": self.detect_metastable_locks(
-                [s.get("energy", 0.0) for s in snapshots],
-                [s.get("entropy", 0.0) for s in snapshots]
-            )
+                [s.get("energy", 0.0) for s in snapshots], [s.get("entropy", 0.0) for s in snapshots]
+            ),
         }
         return policy
 
-    def detect_runaway_attractors(self, manifold_history: Dict[str, List[float]], threshold: float = 0.95) -> List[dict]:
+    def detect_runaway_attractors(
+        self, manifold_history: Dict[str, List[float]], threshold: float = 0.95
+    ) -> List[dict]:
         """Identify roles that have become 'too stable' or dominant (Phase 48).
 
         Runaway attractors can freeze the field and prevent new learning.
@@ -363,7 +363,7 @@ class ObservabilityState:
             recent = history[-20:]
             # If variance is near-zero and position is at an extreme
             avg_pos = sum(recent) / len(recent)
-            variance = sum((x - avg_pos)**2 for x in recent) / len(recent)
+            variance = sum((x - avg_pos) ** 2 for x in recent) / len(recent)
             if variance < 1e-6 and abs(avg_pos) > threshold:
                 runaways.append({"role": role, "stability": avg_pos, "risk": "field_freezing"})
         return runaways
@@ -415,8 +415,8 @@ class ObservabilityState:
                 "event_counts": {},
                 "compressed_count": len(to_compress),
                 "energy_stats": {},
-                "entropy_stats": {}
-            }
+                "entropy_stats": {},
+            },
         }
         energies = []
         entropies = []
@@ -430,11 +430,15 @@ class ObservabilityState:
 
         if energies:
             summary["details"]["energy_stats"] = {
-                "min": min(energies), "max": max(energies), "avg": sum(energies)/len(energies)
+                "min": min(energies),
+                "max": max(energies),
+                "avg": sum(energies) / len(energies),
             }
         if entropies:
             summary["details"]["entropy_stats"] = {
-                "min": min(entropies), "max": max(entropies), "avg": sum(entropies)/len(entropies)
+                "min": min(entropies),
+                "max": max(entropies),
+                "avg": sum(entropies) / len(entropies),
             }
 
         new_stream = [summary] + to_keep
@@ -456,8 +460,7 @@ class ObservabilityState:
         # Check for sign-flip frequency
         flips = 0
         for i in range(1, len(centered)):
-            if (centered[i-1] > 0 and centered[i] < 0) or \
-               (centered[i-1] < 0 and centered[i] > 0):
+            if (centered[i - 1] > 0 and centered[i] < 0) or (centered[i - 1] < 0 and centered[i] > 0):
                 flips += 1
 
         # High number of flips relative to window size indicates oscillation
@@ -469,7 +472,7 @@ class ObservabilityState:
         # Implementation: count distance between peaks
         peaks = []
         for i in range(1, len(values) - 1):
-            if values[i] > values[i-1] and values[i] > values[i+1]:
+            if values[i] > values[i - 1] and values[i] > values[i + 1]:
                 peaks.append(i)
         if len(peaks) < 2:
             return 0
@@ -529,9 +532,7 @@ class ObservabilityState:
             "telemetry": telemetry_size,
             "total_records": snapshot.total_records_processed,
         }
-        profile["total_estimated_bytes"] = sum(
-            value for key, value in profile.items() if key != "total_records"
-        )
+        profile["total_estimated_bytes"] = sum(value for key, value in profile.items() if key != "total_records")
         return profile
 
     def get_semantic_health_index(self, snapshot: GovernanceSnapshot) -> dict:
@@ -555,7 +556,8 @@ class ObservabilityState:
                 all_drifts.append(role_drifts[-1])
         if all_drifts:
             mean_drift = sum(all_drifts) / len(all_drifts)
-        stability_score = max(0.0, 1.0 - mean_drift * 5.0)  # Penalty for high velocity
+        # Penalty for high velocity
+        stability_score = max(0.0, 1.0 - mean_drift * 5.0)
 
         # 2. Tension (Energetic stress) — from snapshot
         pressure = snapshot.system_pressure
@@ -566,8 +568,11 @@ class ObservabilityState:
         tx_history = [t for t in tx_list if t.get("type") == "transaction"]
         success_rate = 1.0
         if tx_history:
-            degrads = [t for t in tx_list if t.get("type") == "degradation"
-                       and t.get("details", {}).get("severity") == "critical"]
+            degrads = [
+                t
+                for t in tx_list
+                if t.get("type") == "degradation" and t.get("details", {}).get("severity") == "critical"
+            ]
             success_rate = max(0.0, 1.0 - (len(degrads) / (len(tx_history) + 1)))
 
         # 4. Diversity & Monoculture Risk (Phase 65)
@@ -583,7 +588,13 @@ class ObservabilityState:
         monoculture_risk = max(0.0, (hhi - 0.1) / 0.9)
         diversity_score = diversity * (1.0 - monoculture_risk * 0.5)
 
-        health_score = (stability_score * 0.25) + (diversity_score * 0.25) + (tension_score * 0.2) + (success_rate * 0.2) + (max(0, 1.0 - monoculture_risk) * 0.1)
+        health_score = (
+            (stability_score * 0.25)
+            + (diversity_score * 0.25)
+            + (tension_score * 0.2)
+            + (success_rate * 0.2)
+            + (max(0, 1.0 - monoculture_risk) * 0.1)
+        )
 
         return {
             "score": round(health_score, 3),
@@ -593,9 +604,9 @@ class ObservabilityState:
                 "tension": round(tension_score, 3),
                 "reliability": round(success_rate, 3),
                 "monoculture_risk": round(monoculture_risk, 3),
-                "mean_drift": round(mean_drift, 5)
+                "mean_drift": round(mean_drift, 5),
             },
-            "status": "optimal" if health_score > 0.8 else "degraded" if health_score > 0.4 else "critical"
+            "status": "optimal" if health_score > 0.8 else "degraded" if health_score > 0.4 else "critical",
         }
 
     def calculate_semantic_importance(self, region, centrality: dict) -> float:
@@ -617,7 +628,7 @@ class ObservabilityState:
         return (c * 0.4) + (stability * 0.3) + (persistence * 0.3)
 
     def apply_resource_shedding(self, ws: SemanticWorldState, snapshot: GovernanceSnapshot, max_bytes: int = 10000000):
-        """Prune non-essential state if memory footprint exceeds threshold (Phase 47/50).
+        """Prune non-essential state if memory footprint exceeds threshold (Phase 47 / 50).
 
         Enhanced with Value-Aware Pruning to preserve semantic continuity.
         Uses snapshot for memory estimation, then mutates live state for pruning.
@@ -626,8 +637,11 @@ class ObservabilityState:
         if profile["total_estimated_bytes"] < max_bytes:
             return False
 
-        logging.warning("RESOURCE SHEDDING TRIGGERED: Substrate memory [%d] exceeds threshold [%d]",
-                        profile["total_estimated_bytes"], max_bytes)
+        logging.warning(
+            "RESOURCE SHEDDING TRIGGERED: Substrate memory [%d] exceeds threshold [%d]",
+            profile["total_estimated_bytes"],
+            max_bytes,
+        )
 
         # 1. Prune Telemetry (tail-heavy)
         old_telemetry = len(self._telemetry_stream)
@@ -643,7 +657,7 @@ class ObservabilityState:
         if len(regs) > 50:
             # Rank by importance using snapshot centrality
             scored_regs = [(self.calculate_semantic_importance(r, snapshot.topology_centrality), r) for r in regs]
-            scored_regs.sort(key=lambda x: x[0], reverse=True) # highest importance first
+            scored_regs.sort(key=lambda x: x[0], reverse=True)  # highest importance first
 
             # Keep top 50
             kept_regs = [r for score, r in scored_regs[:50]]
@@ -652,13 +666,19 @@ class ObservabilityState:
         # 4. Prune Weak Motifs
         ws._motif.prune_weak(threshold=0.2)  # type: ignore
 
-        self.emit_telemetry("resource_shedding", {
-            "old_bytes": profile["total_estimated_bytes"],
-            "telemetry_pruned": old_telemetry - len(self._telemetry_stream),
-            "regions_count": len(ws._topology._get_regions())  # type: ignore
-        })
+        self.emit_telemetry(
+            "resource_shedding",
+            {
+                "old_bytes": profile["total_estimated_bytes"],
+                "telemetry_pruned": old_telemetry - len(self._telemetry_stream),
+                "regions_count": len(ws._topology._get_regions()),  # type: ignore
+            },
+        )
         return True
+
+
 # ─── Legacy Observability Utilities ──────────────────────────────────
+
 
 def field_summary(ws: SemanticWorldState) -> dict:
     """Return a summary of the field's current energetic state."""
@@ -666,8 +686,9 @@ def field_summary(ws: SemanticWorldState) -> dict:
         "energy": ws.metrics.global_energy,  # type: ignore
         "entropy": ws.metrics.global_entropy,  # type: ignore
         "temperature": ws.metrics.semantic_temperature,  # type: ignore
-        "integrity": ws.metrics.integrity_score  # type: ignore
+        "integrity": ws.metrics.integrity_score,  # type: ignore
     }
+
 
 def topology_report(ws: SemanticWorldState) -> dict:
     """Return a detailed report of the manifold's topology."""
@@ -675,5 +696,5 @@ def topology_report(ws: SemanticWorldState) -> dict:
         "pressure": ws.get_system_pressure(),
         "region_count": ws.get_topology_view().region_count(),
         "role_count": len(ws.role_manifold),
-        "community_count": len(ws.global_communities)
+        "community_count": len(ws.global_communities),
     }

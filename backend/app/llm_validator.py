@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 # ─── Schema Validation Helpers ──────────────────────────────────────────
 
+
 def validate_llm_json(
     raw: Any,
     expected_type: type = dict,
@@ -48,10 +49,7 @@ def validate_llm_json(
         return False, "Response is None"
 
     if not isinstance(raw, expected_type):
-        return False, (
-            f"Expected type {expected_type.__name__}, "
-            f"got {type(raw).__name__}: {str(raw)[:200]}"
-        )
+        return False, (f"Expected type {expected_type.__name__}, " f"got {type(raw).__name__}: {str(raw)[:200]}")
 
     if expected_type is dict and isinstance(raw, dict):
         if required_keys:
@@ -68,7 +66,7 @@ def validate_llm_json(
             for key, expected in key_types.items():
                 if key in raw and raw[key] is not None:
                     if not isinstance(raw[key], expected):
-                        expected_name = getattr(expected, '__name__', str(expected))
+                        expected_name = getattr(expected, "__name__", str(expected))
                         return False, (
                             f"Key '{key}' expected type {expected_name}, "
                             f"got {type(raw[key]).__name__}: {str(raw[key])[:100]}"
@@ -78,10 +76,11 @@ def validate_llm_json(
         if list_item_type and raw:
             for i, item in enumerate(raw):
                 if not isinstance(item, list_item_type):
-                    return False, (
-                        f"List item {i} expected type {list_item_type.__name__}, "
-                        f"got {type(item).__name__}: {str(item)[:100]}"
-                    )
+                    return False, (f"List item {i} expected type {
+                        list_item_type.__name__}, " f"got {
+                        type(item).__name__}: {
+                        str(item)[
+                            :100]}")
 
     return True, None
 
@@ -120,6 +119,7 @@ def validate_llm_record_list(
 
 # ─── Retry Wrappers ─────────────────────────────────────────────────────
 
+
 def llm_call_with_validation(
     call_fn: Callable[[], Any],
     validator: Callable[[Any], tuple[bool, str | None]],
@@ -153,12 +153,16 @@ def llm_call_with_validation(
                     return result
                 logger.warning(
                     "LLM output validation failed (attempt %d/%d): %s",
-                    attempt + 1, effective_retries + 1, error,
+                    attempt + 1,
+                    effective_retries + 1,
+                    error,
                 )
         except Exception as e:
             logger.warning(
                 "LLM call failed (attempt %d/%d): %s",
-                attempt + 1, effective_retries + 1, e,
+                attempt + 1,
+                effective_retries + 1,
+                e,
             )
 
         if attempt < effective_retries:
@@ -200,12 +204,16 @@ async def llm_call_with_validation_async(
                     return result
                 logger.warning(
                     "LLM output validation failed (attempt %d/%d): %s",
-                    attempt + 1, effective_retries + 1, error,
+                    attempt + 1,
+                    effective_retries + 1,
+                    error,
                 )
         except Exception as e:
             logger.warning(
                 "LLM call failed (attempt %d/%d): %s",
-                attempt + 1, effective_retries + 1, e,
+                attempt + 1,
+                effective_retries + 1,
+                e,
             )
 
     logger.error("LLM output validation failed after %d attempts", effective_retries + 1)
@@ -213,6 +221,7 @@ async def llm_call_with_validation_async(
 
 
 # ─── Specific Validators ────────────────────────────────────────────────
+
 
 def validate_selector_response(raw: Any) -> tuple[bool, str | None]:
     """Validate an LLM selector generation response."""
@@ -226,15 +235,19 @@ def validate_selector_response(raw: Any) -> tuple[bool, str | None]:
         return False, "Missing required key 'item_container'"
 
     if not isinstance(d["item_container"], str):
-        return False, f"'item_container' must be a string, got {type(d['item_container']).__name__}"
+        return False, f"'item_container' must be a string, got {
+            type(
+                d['item_container']).__name__}"
 
     if "fields" in d and d["fields"] is not None:
         fields = d["fields"]
         if not isinstance(fields, dict):
-            return False, f"'fields' must be a dict, got {type(fields).__name__}"
+            return False, f"'fields' must be a dict, got {
+                type(fields).__name__}"
         for field_name, selector in fields.items():
             if not isinstance(selector, str):
-                return False, f"Field '{field_name}' selector must be a string, got {type(selector).__name__}"
+                return False, f"Field '{field_name}' selector must be a string, got {
+                    type(selector).__name__}"
 
     return True, None
 

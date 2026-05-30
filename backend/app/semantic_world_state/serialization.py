@@ -2,6 +2,7 @@
 import time
 from app.invariant_firewall import requires_invariants
 
+
 class SerializationMixin:
     def to_dict(self) -> dict:
         """Serialize state to a JSON-compatible dictionary."""
@@ -43,6 +44,7 @@ class SerializationMixin:
 
         if "clock" in data:
             from app.vector_clock import VectorClock
+
             self._vector_clock = VectorClock.from_dict(self.node_id, data["clock"])
 
         # Load EnergyState (supports nested and flat)
@@ -50,11 +52,20 @@ class SerializationMixin:
         if metrics_data is not None:
             self._energy.from_dict(metrics_data)
         else:
-            metric_keys = {"global_energy", "global_entropy", "exclusion_count",
-                          "total_records_processed", "cumulative_density",
-                          "cumulative_uncertainty", "dataset_coherence",
-                          "_convergence", "_temperature", "_integrity",
-                          "stability_debt", "schema_instability"}
+            metric_keys = {
+                "global_energy",
+                "global_entropy",
+                "exclusion_count",
+                "total_records_processed",
+                "cumulative_density",
+                "cumulative_uncertainty",
+                "dataset_coherence",
+                "_convergence",
+                "_temperature",
+                "_integrity",
+                "stability_debt",
+                "schema_instability",
+            }
             flat_metrics = {k: v for k, v in data.items() if k in metric_keys}
             if flat_metrics:
                 self._energy.from_dict(flat_metrics)

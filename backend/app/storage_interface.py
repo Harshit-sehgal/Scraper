@@ -6,6 +6,7 @@ from app.models import Job
 
 logger = logging.getLogger(__name__)
 
+
 class JobRepository(ABC):
     """Generic repository interface to support SQLite, Postgres, or other databases.
 
@@ -19,7 +20,7 @@ class JobRepository(ABC):
 
     @abstractmethod
     def load_recycle_bin(self) -> dict[str, Job]:
-        """Load all deleted/recycled jobs from the persistent store."""
+        """Load all deleted / recycled jobs from the persistent store."""
         pass
 
     @abstractmethod
@@ -88,29 +89,35 @@ class SQLiteJobRepository(JobRepository):
 
     Delegates to the optimized app.job_store functions.
     """
+
     backend = "sqlite"
 
     def load_jobs(self) -> dict[str, Job]:
         from app.job_store import load_state
+
         jobs, _, _ = load_state()
         return jobs
 
     def load_recycle_bin(self) -> dict[str, Job]:
         from app.job_store import load_state
+
         _, recycle, _ = load_state()
         return recycle
 
     def load_all(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
         from app.job_store import load_state
+
         return load_state()
 
     def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
         from app.job_store import save_state
+
         save_state(jobs, recycle_bin, prune_missing=prune_missing)
 
     def is_cancel_requested(self, job_id: str) -> bool:
         """Check from SQLite whether a job has a pending cancellation request."""
         from app.job_store import _get_connection, _DB_LOCK
+
         with _DB_LOCK:
             conn = _get_connection()
             try:
@@ -126,6 +133,7 @@ class SQLiteJobRepository(JobRepository):
 
     def save_single(self, job: Job) -> None:
         from app.job_store import persist_state_single
+
         persist_state_single(job)
 
     def save_world_state(self, payload: dict) -> None:
@@ -134,8 +142,10 @@ class SQLiteJobRepository(JobRepository):
         import tempfile
         import os
         from app.job_store import _get_db_path
+
         ws_path = _get_db_path().parent / "world_state.json"
-        # Write to a temp file first, then atomic rename to prevent partial writes.
+        # Write to a temp file first, then atomic rename to prevent partial
+        # writes.
         tmp_dir = ws_path.parent
         tmp_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
@@ -152,6 +162,7 @@ class SQLiteJobRepository(JobRepository):
         """Load semantic world state from the SQLite world_state.json file."""
         import json
         from app.job_store import _get_db_path
+
         ws_path = _get_db_path().parent / "world_state.json"
         if ws_path.exists():
             try:
@@ -163,6 +174,7 @@ class SQLiteJobRepository(JobRepository):
     def move_to_recycle_bin(self, job_id: str) -> bool:
         """Move a job to the recycle bin atomically in SQLite."""
         from app.job_store import _get_connection, _DB_LOCK
+
         with _DB_LOCK:
             conn = _get_connection()
             try:
@@ -178,6 +190,7 @@ class SQLiteJobRepository(JobRepository):
                 conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
                 # Set deleted_at timestamp
                 import datetime
+
                 row_dict["deleted_at"] = datetime.datetime.now().isoformat()
                 # Insert into recycle_bin
                 columns = ", ".join(row_dict.keys())
@@ -197,6 +210,7 @@ class SQLiteJobRepository(JobRepository):
     def restore_from_recycle_bin(self, job_id: str) -> bool:
         """Restore a job from the recycle bin back to active jobs atomically in SQLite."""
         from app.job_store import _get_connection, _DB_LOCK
+
         with _DB_LOCK:
             conn = _get_connection()
             try:
@@ -232,6 +246,7 @@ class SQLiteJobRepository(JobRepository):
     def hard_delete(self, job_id: str) -> bool:
         """Permanently delete a job atomically in SQLite."""
         from app.job_store import _get_connection, _DB_LOCK
+
         with _DB_LOCK:
             conn = _get_connection()
             try:
@@ -249,6 +264,7 @@ class SQLiteJobRepository(JobRepository):
     def clear_terminal_jobs(self, older_than: Optional[str] = None) -> int:
         """Remove terminal-status jobs atomically in SQLite and move them to recycle_bin."""
         from app.job_store import _get_connection, _DB_LOCK
+
         terminal_statuses = ("completed", "failed", "canceled", "degraded", "empty_result")
         with _DB_LOCK:
             conn = _get_connection()
@@ -266,6 +282,7 @@ class SQLiteJobRepository(JobRepository):
 
                 col_names = [description[0] for description in cursor.description]
                 import datetime
+
                 now = datetime.datetime.now().isoformat()
                 for r in rows:
                     row_dict = dict(zip(col_names, r))
@@ -322,10 +339,11 @@ def get_job_repository() -> JobRepository:
         if not database_url:
             raise RuntimeError(
                 "DATAFORGE_STORAGE_BACKEND=postgres requires DATAFORGE_DATABASE_URL "
-                "to be set. Example: postgresql://user:pass@host:5432/dataforge"
+                "to be set. Example: postgresql://user:pass@host:5432 / dataforge"
             )
         try:
             from app.postgres_repository import PostgresJobRepository, verify_postgres_connectivity
+
             connectivity = verify_postgres_connectivity()
             if not connectivity.get("ok"):
                 raise RuntimeError(
@@ -341,8 +359,7 @@ def get_job_repository() -> JobRepository:
             raise
         except Exception as e:
             raise RuntimeError(
-                f"Failed to create PostgresJobRepository: {e}. "
-                "Install psycopg2-binary: pip install psycopg2-binary"
+                f"Failed to create PostgresJobRepository: {e}. " "Install psycopg2-binary: pip install psycopg2-binary"
             ) from e
 
     repo_sqlite: JobRepository = SQLiteJobRepository()
@@ -361,9 +378,13 @@ def reset_repository():
     """
     global _repository_instance
     if _repository_instance is not None:
-        if hasattr(_repository_instance, "__class__") and "PostgresJobRepository" in type(_repository_instance).__name__:
+        if (
+            hasattr(_repository_instance, "__class__")
+            and "PostgresJobRepository" in type(_repository_instance).__name__
+        ):
             try:
                 from app.postgres_repository import shutdown_postgres
+
                 shutdown_postgres()
             except Exception:
                 pass

@@ -19,8 +19,8 @@ async def run_sync_in_thread(
     Run a blocking function in a daemon thread and await its result.
 
     Some restricted runtimes can fail to wake the event loop from
-    asyncio.to_thread/run_in_executor even after the worker returns. Polling a
-    completion event avoids that hang while still moving blocking I/O off the
+    asyncio.to_thread / run_in_executor even after the worker returns. Polling a
+    completion event avoids that hang while still moving blocking I / O off the
     request loop.
     """
     done = threading.Event()

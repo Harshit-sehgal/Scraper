@@ -45,7 +45,7 @@ class DomainIntelligence:
             "success_count": self.success_count,
             "total_fetches": self.total_fetches,
             "failure_history": dict(self.failure_history),
-            "last_updated": self.last_updated
+            "last_updated": self.last_updated,
         }
 
 
@@ -112,21 +112,22 @@ class DomainIntelligenceRegistry:
         strategy = telemetry.get("fallback_usage", "none")
         if not telemetry.get("error") and strategy != "none":
             # If successful, consider this a candidate for preferred strategy
-            # For now, we just track the most recent successful non-discovery strategy
+            # For now, we just track the most recent successful non-discovery
+            # strategy
             if strategy in ["profile", "memory", "regex", "httpx"]:
                 intel.preferred_strategy = strategy
 
         # 5. Selector Decay Rate
         if telemetry.get("fallback_triggered"):
-             decay_signal = 1.0
+            decay_signal = 1.0
         else:
-             decay_signal = 0.0
+            decay_signal = 0.0
         intel.selector_decay_rate = (intel.selector_decay_rate * (1 - alpha)) + (decay_signal * alpha)
 
         # 6. Infinite Scroll (Observation)
         # If we got 0 records without scroll but >0 with scroll, or similar indicators.
         # For now, we rely on the telemetry's records_extracted vs records_final or similar signals.
-        # Let's assume for now that if records_extracted > 0 and fallback_usage was none/memory,
+        # Let's assume for now that if records_extracted > 0 and fallback_usage was none / memory,
         # and we did scroll attempts, we tag it.
         # (Actually, let's keep it simple: if it's a known feed domain, we'll mark it manually or via discovery result)
 
@@ -144,6 +145,7 @@ class DomainIntelligenceRegistry:
 
 # Global Singleton
 _registry: DomainIntelligenceRegistry | None = None
+
 
 def get_domain_intelligence() -> DomainIntelligenceRegistry:
     global _registry

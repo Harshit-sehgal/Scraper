@@ -26,6 +26,7 @@ _MIGRATIONS_RUN_FOR: set[Path] = set()
 
 def _get_db_path() -> Path:
     from app.config import settings
+
     if settings.STATE_FILE_PATH:
         base = Path(settings.STATE_FILE_PATH).expanduser()
     else:
@@ -41,10 +42,9 @@ def _get_connection() -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
 
-    # Check if database tables are actually present to handle dynamic dev/test deletions
-    has_schema = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'"
-    ).fetchone()
+    # Check if database tables are actually present to handle dynamic dev /
+    # test deletions
+    has_schema = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone()
 
     if path not in _MIGRATIONS_RUN_FOR or not has_schema:
         _run_migrations(conn)
@@ -62,6 +62,7 @@ def _maybe_migrate_from_json(conn: sqlite3.Connection) -> None:
         return  # Already have data, skip migration
     try:
         import json as _json
+
         data = _json.loads(json_path.read_text())
         for raw in data.get("jobs", []):
             job = _row_to_job(_job_from_raw(raw))
@@ -78,8 +79,11 @@ def _maybe_migrate_from_json(conn: sqlite3.Connection) -> None:
                 ph = ", ".join("?" for _ in row_data)
                 conn.execute(f"INSERT OR IGNORE INTO recycle_bin ({cols}) VALUES ({ph})", list(row_data.values()))
         conn.commit()
-        logger.info("Migrated %d jobs + %d recycle-bin entries from JSON to SQLite",
-                     len(data.get("jobs", [])), len(data.get("recycle_bin", [])))
+        logger.info(
+            "Migrated %d jobs + %d recycle-bin entries from JSON to SQLite",
+            len(data.get("jobs", [])),
+            len(data.get("recycle_bin", [])),
+        )
     except Exception as e:
         logger.warning("JSON-to-SQLite migration skipped: %s", e)
 
@@ -87,7 +91,18 @@ def _maybe_migrate_from_json(conn: sqlite3.Connection) -> None:
 def _job_from_raw(raw: dict) -> dict:
     """Convert a raw JSON job dict to the format expected by _row_to_job."""
     out = dict(raw)
-    for field in ["urls", "schema_fields", "filters", "results", "logs", "warnings", "quality_report", "discovered_urls", "selectors_map", "search_params"]:
+    for field in [
+        "urls",
+        "schema_fields",
+        "filters",
+        "results",
+        "logs",
+        "warnings",
+        "quality_report",
+        "discovered_urls",
+        "selectors_map",
+        "search_params",
+    ]:
         if field in out and not isinstance(out[field], str):
             out[field] = json.dumps(out[field])
     return out
@@ -98,26 +113,32 @@ def _job_to_row(job: Job) -> dict:
     return {
         "id": job.id,
         "name": job.name,
-        "status": job.status.value if hasattr(job.status, 'value') else str(job.status),
-        "mode": job.mode.value if hasattr(job.mode, 'value') else str(job.mode),
+        "status": job.status.value if hasattr(job.status, "value") else str(job.status),
+        "mode": job.mode.value if hasattr(job.mode, "value") else str(job.mode),
         "topic": job.topic or "",
         "intent": job.intent or "",
         "urls": json.dumps(job.urls or []),
-        "schema_fields": json.dumps([f.model_dump() if hasattr(f, 'model_dump') else f for f in (job.schema_fields or [])]),
-        "filters": json.dumps([f.model_dump() if hasattr(f, 'model_dump') else f for f in (job.filters or [])]) if hasattr(job, 'filters') else "[]",
+        "schema_fields": json.dumps(
+            [f.model_dump() if hasattr(f, "model_dump") else f for f in (job.schema_fields or [])]
+        ),
+        "filters": (
+            json.dumps([f.model_dump() if hasattr(f, "model_dump") else f for f in (job.filters or [])])
+            if hasattr(job, "filters")
+            else "[]"
+        ),
         "results": json.dumps(job.results or []),
-        "logs": json.dumps([log.model_dump() if hasattr(log, 'model_dump') else log for log in (job.logs or [])]),
+        "logs": json.dumps([log.model_dump() if hasattr(log, "model_dump") else log for log in (job.logs or [])]),
         "total_records": job.total_records or 0,
         "filtered_records": job.filtered_records or 0,
         "total_llm_calls": job.total_llm_calls or 0,
         "error": job.error if job.error is not None else "",
         "warnings": json.dumps(job.warnings or []),
-        "quality_report": json.dumps(job.quality_report if hasattr(job, 'quality_report') else {}),
+        "quality_report": json.dumps(job.quality_report if hasattr(job, "quality_report") else {}),
         "analysis": job.analysis if job.analysis is not None else "",
-        "discovered_urls": json.dumps(job.discovered_urls if hasattr(job, 'discovered_urls') else []),
-        "selectors_map": json.dumps(job.selectors_map if hasattr(job, 'selectors_map') else {}),
+        "discovered_urls": json.dumps(job.discovered_urls if hasattr(job, "discovered_urls") else []),
+        "selectors_map": json.dumps(job.selectors_map if hasattr(job, "selectors_map") else {}),
         "search_params": json.dumps(job.search_params if job.search_params is not None else {}),
-        "max_pages": job.max_pages if hasattr(job, 'max_pages') else 0,
+        "max_pages": job.max_pages if hasattr(job, "max_pages") else 0,
         "progress_current": job.progress_current or 0,
         "progress_total": job.progress_total or 0,
         "estimated_cost_usd": job.estimated_cost_usd or 0,
@@ -133,7 +154,7 @@ def _job_to_row(job: Job) -> dict:
         "search_params_json": json.dumps(job.search_params if job.search_params is not None else {}),
         "location": job.location or "",
         "preferred_domain": job.preferred_domain or "",
-        "source_policy": job.source_policy.value if hasattr(job.source_policy, 'value') else str(job.source_policy),
+        "source_policy": job.source_policy.value if hasattr(job.source_policy, "value") else str(job.source_policy),
         "max_per_domain": job.max_per_domain or 4,
         "origin_location": job.origin_location or "",
         "max_distance_km": job.max_distance_km,
@@ -155,50 +176,52 @@ def _row_to_job(row: dict) -> Job | None:
         except Exception:
             sp = SourcePolicy.ALL_SOURCES
 
-        return Job.model_validate({
-            "id": row["id"],
-            "name": row["name"],
-            "status": row["status"],
-            "mode": row.get("mode", "manual"),
-            "topic": row.get("topic", ""),
-            "intent": row.get("intent", ""),
-            "urls": json.loads(row.get("urls", "[]")),
-            "schema_fields": json.loads(row.get("schema_fields", "[]")),
-            "filters": json.loads(row.get("filters", "[]")),
-            "results": json.loads(row.get("results", "[]")),
-            "logs": json.loads(row.get("logs", "[]")),
-            "total_records": row.get("total_records", 0),
-            "filtered_records": row.get("filtered_records", 0),
-            "total_llm_calls": row.get("total_llm_calls", 0),
-            "error": row.get("error") or None,
-            "quality_report": json.loads(row.get("quality_report", "{}")),
-            "analysis": row.get("analysis") or None,
-            "discovered_urls": json.loads(row.get("discovered_urls", "[]")),
-            "selectors_map": json.loads(row.get("selectors_map", "{}")),
-            "search_params": json.loads(row.get("search_params", "{}")) or None,
-            "max_pages": row.get("max_pages", 0),
-            "progress_current": row.get("progress_current", 0),
-            "progress_total": row.get("progress_total", 0),
-            "estimated_cost_usd": row.get("estimated_cost_usd", 0),
-            "cancel_requested": bool(row.get("cancel_requested", 0)),
-            "created_at": row.get("created_at", ""),
-            "completed_at": row.get("completed_at") or None,
-            "min_record_score": row.get("min_record_score", 0.35),
-            "location": row.get("location", ""),
-            "preferred_domain": row.get("preferred_domain", ""),
-            "source_policy": sp,
-            "max_per_domain": row.get("max_per_domain", 4),
-            "origin_location": row.get("origin_location", ""),
-            "max_distance_km": row.get("max_distance_km"),
-            "pagination": bool(row.get("pagination", 0)),
-            "deduplicate": bool(row.get("deduplicate", 1)),
-            "deduplicate_field": row.get("deduplicate_field", ""),
-            "started_at": row.get("started_at") if row.get("started_at") else None,
-            "results_on_disk": bool(row.get("results_on_disk", 0)),
-            "results_file_path": row.get("results_file_path") if row.get("results_file_path") else None,
-            "warnings": json.loads(row.get("warnings", "[]")),
-            "acquisition_mode": row.get("acquisition_mode", "standard"),
-        })
+        return Job.model_validate(
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "status": row["status"],
+                "mode": row.get("mode", "manual"),
+                "topic": row.get("topic", ""),
+                "intent": row.get("intent", ""),
+                "urls": json.loads(row.get("urls", "[]")),
+                "schema_fields": json.loads(row.get("schema_fields", "[]")),
+                "filters": json.loads(row.get("filters", "[]")),
+                "results": json.loads(row.get("results", "[]")),
+                "logs": json.loads(row.get("logs", "[]")),
+                "total_records": row.get("total_records", 0),
+                "filtered_records": row.get("filtered_records", 0),
+                "total_llm_calls": row.get("total_llm_calls", 0),
+                "error": row.get("error") or None,
+                "quality_report": json.loads(row.get("quality_report", "{}")),
+                "analysis": row.get("analysis") or None,
+                "discovered_urls": json.loads(row.get("discovered_urls", "[]")),
+                "selectors_map": json.loads(row.get("selectors_map", "{}")),
+                "search_params": json.loads(row.get("search_params", "{}")) or None,
+                "max_pages": row.get("max_pages", 0),
+                "progress_current": row.get("progress_current", 0),
+                "progress_total": row.get("progress_total", 0),
+                "estimated_cost_usd": row.get("estimated_cost_usd", 0),
+                "cancel_requested": bool(row.get("cancel_requested", 0)),
+                "created_at": row.get("created_at", ""),
+                "completed_at": row.get("completed_at") or None,
+                "min_record_score": row.get("min_record_score", 0.35),
+                "location": row.get("location", ""),
+                "preferred_domain": row.get("preferred_domain", ""),
+                "source_policy": sp,
+                "max_per_domain": row.get("max_per_domain", 4),
+                "origin_location": row.get("origin_location", ""),
+                "max_distance_km": row.get("max_distance_km"),
+                "pagination": bool(row.get("pagination", 0)),
+                "deduplicate": bool(row.get("deduplicate", 1)),
+                "deduplicate_field": row.get("deduplicate_field", ""),
+                "started_at": row.get("started_at") if row.get("started_at") else None,
+                "results_on_disk": bool(row.get("results_on_disk", 0)),
+                "results_file_path": row.get("results_file_path") if row.get("results_file_path") else None,
+                "warnings": json.loads(row.get("warnings", "[]")),
+                "acquisition_mode": row.get("acquisition_mode", "standard"),
+            }
+        )
     except Exception as e:
         logger.warning("Failed to deserialize job row: %s", e)
         return None
@@ -318,7 +341,8 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                 # 1. Identify existing columns of the old recycle_bin table
                 cursor = conn.execute("PRAGMA table_info(recycle_bin)")
                 existing_cols = [r["name"] for r in cursor.fetchall()]
-                # 2. Fetch all existing records and convert each sqlite3.Row to a dict immediately
+                # 2. Fetch all existing records and convert each sqlite3.Row to
+                # a dict immediately
                 existing = [dict(row) for row in conn.execute("SELECT * FROM recycle_bin").fetchall()]
             except Exception:
                 existing_cols = []
@@ -385,14 +409,12 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                     placeholders = ", ".join("?" for _ in overlapping_cols)
                     for r in existing:
                         vals = [r.get(col) for col in overlapping_cols]
-                        conn.execute(
-                            f"INSERT OR IGNORE INTO recycle_bin ({cols_str}) VALUES ({placeholders})",
-                            vals
-                        )
+                        conn.execute(f"INSERT OR IGNORE INTO recycle_bin ({cols_str}) VALUES ({placeholders})", vals)
             current = 2
 
         if current < 3:
-            # Dynamically add any missing columns in both tables to prevent data-loss or crashes in existing databases
+            # Dynamically add any missing columns in both tables to prevent
+            # data-loss or crashes in existing databases
             for table_name in ["jobs", "recycle_bin"]:
                 cursor = conn.execute(f"PRAGMA table_info({table_name})")
                 v3_cols: set[str] = {r["name"] for r in cursor.fetchall()}
@@ -571,7 +593,9 @@ def get_storage_health() -> dict:
         schema_row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
         schema_version = schema_row[0] if schema_row and schema_row[0] is not None else 0
         jobs_ok = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone() is not None
-        recycle_ok = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='recycle_bin'").fetchone() is not None
+        recycle_ok = (
+            conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='recycle_bin'").fetchone() is not None
+        )
         conn.close()
 
         if schema_version == 0:

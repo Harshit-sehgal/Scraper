@@ -11,13 +11,14 @@ logger = logging.getLogger(__name__)
 
 class EnergyAPI:
     """Controlled interface for energy mutations.
-    
+
     Delegates all state mutations to EnergyState.
     NEVER accesses ws.metrics directly.
     """
 
     def __init__(self, ws):
         from app.energy_state import EnergyState
+
         if isinstance(ws, EnergyState):
             self._energy = ws
         else:

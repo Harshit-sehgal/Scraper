@@ -17,20 +17,29 @@ from app.topology_state_types import (
 
 class TopologyView:
     """Read-only view of the topology graph.
-    
-    Returns immutable snapshots (dicts/RegionSnapshots) instead of live
+
+    Returns immutable snapshots (dicts / RegionSnapshots) instead of live
     FieldConflictRegion objects. No mutation is possible through this interface.
     """
 
-    def __init__(self, regions: List[FieldConflictRegion],
-                 global_communities, schema_patterns, topological_laws,
-                 neighborhood_cohesion, global_centrality,
-                 impossible_neighborhoods, restructuring_queue,
-                 cohesion_merge_success, cohesion_merge_attempts,
-                 cohesion_split_success, cohesion_split_attempts,
-                 meso_clusters=None,
-                 macro_continents=None,
-                 read_callback: Optional[Callable[[str, int], None]] = None):
+    def __init__(
+        self,
+        regions: List[FieldConflictRegion],
+        global_communities,
+        schema_patterns,
+        topological_laws,
+        neighborhood_cohesion,
+        global_centrality,
+        impossible_neighborhoods,
+        restructuring_queue,
+        cohesion_merge_success,
+        cohesion_merge_attempts,
+        cohesion_split_success,
+        cohesion_split_attempts,
+        meso_clusters=None,
+        macro_continents=None,
+        read_callback: Optional[Callable[[str, int], None]] = None,
+    ):
         self._regions = list(regions)
         self._communities = [set(c) for c in global_communities]
         self._schema_patterns = dict(schema_patterns)
@@ -51,7 +60,8 @@ class TopologyView:
         if self._read_callback:
             self._read_callback(r.region_id, r.version)
         # Thermodynamic free energy = internal energy - temperature * entropy
-        # For field regions: local_energy (potential) - local_temperature * instability (disorder)
+        # For field regions: local_energy (potential) - local_temperature *
+        # instability (disorder)
         free_energy = r.local_energy - r.local_temperature * r.instability
         return RegionSnapshot(
             region_id=r.region_id,
@@ -68,12 +78,12 @@ class TopologyView:
             local_temperature=r.local_temperature,
             free_energy=free_energy,
             source_record=r.source_record,
-            domain=getattr(r, 'domain', ''),
+            domain=getattr(r, "domain", ""),
             version=r.version,
         )
 
     def _snapshot_dict(self, r: FieldConflictRegion) -> dict:
-        """Return a region as a plain dict — for use in serialization/formatting."""
+        """Return a region as a plain dict — for use in serialization / formatting."""
         return {
             "region_id": r.region_id,
             "token": r.token,
@@ -101,16 +111,18 @@ class TopologyView:
         edges = []
         for edge in self.get_edge_fields():
             if edge.route_strength > 0.05:
-                edges.append({
-                    "source": edge.source,
-                    "target": edge.target,
-                    "weight": edge.route_strength,
-                    "affinity": edge.affinity,
-                    "repulsion": edge.repulsion,
-                    "uncertainty": edge.uncertainty,
-                    "pressure": edge.pressure,
-                    "semantics": edge.semantics,
-                })
+                edges.append(
+                    {
+                        "source": edge.source,
+                        "target": edge.target,
+                        "weight": edge.route_strength,
+                        "affinity": edge.affinity,
+                        "repulsion": edge.repulsion,
+                        "uncertainty": edge.uncertainty,
+                        "pressure": edge.pressure,
+                        "semantics": edge.semantics,
+                    }
+                )
         return edges
 
     def get_edge_fields(self) -> List[EdgeFieldSnapshot]:
@@ -135,7 +147,8 @@ class TopologyView:
         for source, target in sorted(pairs):
             pair = tuple(sorted((source, target)))  # type: ignore[assignment]
             cohesion = _clamp01(self._cohesion.get(pair, 0.0))  # type: ignore[arg-type]
-            law = _clamp_signed(self._laws.get(pair, 0.0))  # type: ignore[arg-type]
+            # type: ignore[arg-type]
+            law = _clamp_signed(self._laws.get(pair, 0.0))
             impossible = pair in impossible_pairs
             instabilities = region_instability.get(pair, [])  # type: ignore[arg-type]
             uncertainty = _clamp01(sum(instabilities) / len(instabilities)) if instabilities else 0.0
@@ -155,23 +168,25 @@ class TopologyView:
             else:
                 semantics = "latent"
 
-            edges.append(EdgeFieldSnapshot(
-                source=source,
-                target=target,
-                affinity=round(affinity, 3),
-                repulsion=round(repulsion, 3),
-                uncertainty=round(uncertainty, 3),
-                route_strength=round(route_strength, 3),
-                pressure=round(pressure, 3),
-                law=round(law, 3),
-                cohesion=round(cohesion, 3),
-                impossible=impossible,
-                semantics=semantics,
-            ))
+            edges.append(
+                EdgeFieldSnapshot(
+                    source=source,
+                    target=target,
+                    affinity=round(affinity, 3),
+                    repulsion=round(repulsion, 3),
+                    uncertainty=round(uncertainty, 3),
+                    route_strength=round(route_strength, 3),
+                    pressure=round(pressure, 3),
+                    law=round(law, 3),
+                    cohesion=round(cohesion, 3),
+                    impossible=impossible,
+                    semantics=semantics,
+                )
+            )
         return edges
 
     def all_region_dicts(self) -> List[dict]:
-        """Return all regions as plain dicts (for serialization/display)."""
+        """Return all regions as plain dicts (for serialization / display)."""
         return [self._snapshot_dict(r) for r in self._regions]
 
     def region_count(self) -> int:

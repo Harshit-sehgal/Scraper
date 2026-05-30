@@ -8,8 +8,8 @@ Provides:
   - Recommendation engine for preventive actions
 
 Health Scoring:
-  - Success Rate (0-1): percentage of successful scrapes
-  - Consistency (0-1): variance in failures (high variance = unpredictable)
+  - Success Rate (0 - 1): percentage of successful scrapes
+  - Consistency (0 - 1): variance in failures (high variance = unpredictable)
   - Recency Bias: Recent failures weighted more than old ones
   - Degradation Trend: Slope of failure rate (positive = worsening)
 
@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 class DomainHealthLevel(str, Enum):
     """Domain health alert levels."""
+
     HEALTHY = "healthy"  # score >= 0.8
     DEGRADING = "degrading"  # 0.7 <= score < 0.8, negative trend
     UNHEALTHY = "unhealthy"  # 0.5 <= score < 0.7
@@ -170,11 +171,13 @@ class DomainHealthMonitor:
             metrics.last_failure_category = failure_category
 
         # Record in time series
-        metrics.recent_attempts.append({
-            "timestamp": now,
-            "success": success,
-            "category": failure_category,
-        })
+        metrics.recent_attempts.append(
+            {
+                "timestamp": now,
+                "success": success,
+                "category": failure_category,
+            }
+        )
 
         # Update hourly stats
         hour_key = int(now) // 3600
@@ -219,12 +222,16 @@ class DomainHealthMonitor:
 
         logger.info(
             "Domain health alert for %s: %s (score=%.2f, trend=%.2f)",
-            domain, level.value, score, metrics.get_degradation_trend()
+            domain,
+            level.value,
+            score,
+            metrics.get_degradation_trend(),
         )
 
         # Call alert callback if registered
         if self.alert_callback:
             import asyncio
+
             try:
                 asyncio.create_task(self.alert_callback(alert))
             except Exception as e:
@@ -252,11 +259,7 @@ class DomainHealthMonitor:
             recency_factor = 1.0
 
         # Weighted average
-        health_score = (
-            success_rate * 0.5 +
-            consistency * 0.3 +
-            recency_factor * 0.2
-        )
+        health_score = success_rate * 0.5 + consistency * 0.3 + recency_factor * 0.2
 
         return health_score
 
@@ -268,7 +271,7 @@ class DomainHealthMonitor:
         if success_rate < 0.1:  # >90% failure rate
             return DomainHealthLevel.BLACKLISTED
 
-        # Unhealthy/Critical: very low score with recent failures
+        # Unhealthy / Critical: very low score with recent failures
         if score < 0.5:
             recent_failures = sum(1 for a in list(metrics.recent_attempts)[-10:] if not a["success"])
             if recent_failures >= 7:  # 7+ failures in last 10 attempts
@@ -356,8 +359,7 @@ class DomainHealthMonitor:
             health = {
                 "domain": domain,
                 "health_level": self._determine_health_level(
-                    self._calculate_health_score(self._domains[domain]),
-                    self._domains[domain]
+                    self._calculate_health_score(self._domains[domain]), self._domains[domain]
                 ).value,
                 "health_score": self._calculate_health_score(self._domains[domain]),
             }

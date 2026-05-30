@@ -5,9 +5,10 @@ from pathlib import Path
 from typing import List, Optional
 from app.semantic_world_state import get_world_state
 
+
 class CheckpointManager:
     """Manages persistent, versioned snapshots of the entire world state."""
-    
+
     def __init__(self, base_dir: str = "checkpoints"):
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
@@ -16,11 +17,11 @@ class CheckpointManager:
         """Save a new versioned checkpoint of the current world state."""
         ws = get_world_state()
         state_dict = ws.to_dict()
-        
+
         timestamp = int(time.time())
         filename = f"checkpoint_{label}_{timestamp}.json"
         filepath = self.base_dir / filename
-        
+
         try:
             with open(filepath, "w") as f:
                 json.dump(state_dict, f, indent=2)
@@ -45,11 +46,7 @@ class CheckpointManager:
         """List all available checkpoints."""
         checkpoints = []
         for f in self.base_dir.glob("checkpoint_*.json"):
-            checkpoints.append({
-                "filename": f.name,
-                "path": str(f),
-                "mtime": f.stat().st_mtime
-            })
+            checkpoints.append({"filename": f.name, "path": str(f), "mtime": f.stat().st_mtime})
         return sorted(checkpoints, key=lambda x: x["mtime"], reverse=True)
 
     def get_latest_checkpoint(self) -> Optional[str]:
@@ -57,7 +54,9 @@ class CheckpointManager:
         list_cp = self.list_checkpoints()
         return list_cp[0]["path"] if list_cp else None
 
+
 _manager: Optional[CheckpointManager] = None
+
 
 def get_checkpoint_manager() -> CheckpointManager:
     global _manager

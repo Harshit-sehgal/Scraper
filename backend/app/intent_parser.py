@@ -1,4 +1,3 @@
-
 """
 Layer 1: Intent Parser
 ======================
@@ -18,6 +17,7 @@ from app.models import FieldType
 @dataclass
 class IntentSchema:
     """Represents what the user wants, not what domain they're in."""
+
     raw_query: str
     entity_hint: str = ""  # weak metadata only, NOT core logic
     semantic_needs: dict = field(default_factory=dict)  # {need: [synonyms]}
@@ -28,11 +28,36 @@ class IntentSchema:
 # Universal semantic need mappings (not domain-specific)
 SEMANTIC_NEED_KEYWORDS = {
     "name": ["name", "title", "entity", "business", "company", "item", "product", "job", "property"],
-    "price": ["price", "cost", "amount", "rate", "fee", "rent", "sale", "budget", "cheap", "expensive", "under", "above"],
+    "price": [
+        "price",
+        "cost",
+        "amount",
+        "rate",
+        "fee",
+        "rent",
+        "sale",
+        "budget",
+        "cheap",
+        "expensive",
+        "under",
+        "above",
+    ],
     "date": ["date", "when", "schedule", "timing", "time"],
     "duration": ["duration", "hours", "time", "takes"],
     "rating": ["rating", "stars", "review", "score", "feedback", "rank", "out of"],
-    "location": ["location", "address", "place", "area", "city", "near", "around", "from", "to", "destination", "origin"],
+    "location": [
+        "location",
+        "address",
+        "place",
+        "area",
+        "city",
+        "near",
+        "around",
+        "from",
+        "to",
+        "destination",
+        "origin",
+    ],
     "phone": ["phone", "contact", "call", "mobile", "tel"],
     "email": ["email", "mail", "contact"],
     "description": ["description", "about", "details", "info", "specs", "features", "amenities"],
@@ -89,7 +114,7 @@ def parse_user_intent(query: str) -> IntentSchema:
         entity_hint=entity_hint,
         semantic_needs=semantic_needs,
         required_needs=required_needs,
-        optional_needs=optional_needs
+        optional_needs=optional_needs,
     )
 
 
@@ -153,7 +178,7 @@ def _determine_required_needs(semantic_needs: dict, query_lower: str) -> list:
                         required.append(need)
                     break
 
-    # If nothing explicitly marked, assume first 2-3 needs are required
+    # If nothing explicitly marked, assume first 2 - 3 needs are required
     if not required and len(semantic_needs) > 0:
         required = list(semantic_needs.keys())[:3]
 
@@ -212,6 +237,7 @@ def semantic_needs_are_exclusive(need_a: str | None, need_b: str | None) -> bool
     if not need_a or not need_b or need_a == need_b:
         return False
     from app.field_laws import SEMANTIC_NEED_EXCLUSIVITY
+
     for a, b in SEMANTIC_NEED_EXCLUSIVITY:
         if (need_a == a and need_b == b) or (need_a == b and need_b == a):
             return True
@@ -221,13 +247,10 @@ def semantic_needs_are_exclusive(need_a: str | None, need_b: str | None) -> bool
 def role_tokens_are_exclusive(tokens_a: set[str], tokens_b: set[str]) -> bool:
     """True when token sets match opposite sides of ROLE_EXCLUSIVITY."""
     from app.field_laws import ROLE_EXCLUSIVITY
+
     for left, right in ROLE_EXCLUSIVITY:
         left_tokens = keywords_to_tokens([left], min_len=2) | {left}
         right_tokens = keywords_to_tokens([right], min_len=2) | {right}
-        if (tokens_a & left_tokens and tokens_b & right_tokens) or (
-            tokens_a & right_tokens and tokens_b & left_tokens
-        ):
+        if (tokens_a & left_tokens and tokens_b & right_tokens) or (tokens_a & right_tokens and tokens_b & left_tokens):
             return True
     return False
-
-

@@ -14,8 +14,8 @@ from typing import Dict, Any, List, Optional, Callable
 
 from app.config import settings
 
-
 # ─── Legacy LLM Utility Support ──────────────────────────────────────
+
 
 def _extract_json_payload(text: str | None):
     raw = (text or "").strip()
@@ -70,7 +70,6 @@ def _should_retry_http_error(error: Exception) -> bool:
     return any(token in text for token in ["429", "timed out", "connection", "temporary"])
 
 
-
 async def _call_openai_compatible_json(
     endpoint: str,
     payload: dict,
@@ -102,7 +101,11 @@ async def _call_openai_compatible_json(
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
             # Respect retry-after header for 429 rate limits
-            if isinstance(error, httpx.HTTPStatusError) and error.response is not None and error.response.status_code == 429:
+            if (
+                isinstance(error, httpx.HTTPStatusError)
+                and error.response is not None
+                and error.response.status_code == 429
+            ):
                 retry_after = error.response.headers.get("retry-after")
                 if retry_after:
                     try:
@@ -147,7 +150,11 @@ async def _call_openai_compatible_text(
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
             # Respect retry-after header for 429 rate limits
-            if isinstance(error, httpx.HTTPStatusError) and error.response is not None and error.response.status_code == 429:
+            if (
+                isinstance(error, httpx.HTTPStatusError)
+                and error.response is not None
+                and error.response.status_code == 429
+            ):
                 retry_after = error.response.headers.get("retry-after")
                 if retry_after:
                     try:
@@ -163,8 +170,8 @@ async def _call_openai_compatible_text(
 
 
 def _groq_model_candidates() -> list[str]:
-    primary = (settings.GROQ_DEFAULT_MODEL or "llama-3.3-70b-versatile").strip()
-    fallback = (settings.GROQ_FALLBACK_MODEL or "llama-3.1-8b-instant").strip()
+    primary = (settings.GROQ_DEFAULT_MODEL or "llama-3.3 - 70b-versatile").strip()
+    fallback = (settings.GROQ_FALLBACK_MODEL or "llama-3.1 - 8b-instant").strip()
     models: list[str] = []
     for model in [primary, fallback]:
         if model and model not in models:
@@ -176,6 +183,7 @@ def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning
     """Helper to record LLM failures in the semantic world state if available."""
     try:
         from app.semantic_world_state import get_world_state
+
         ws = get_world_state()
         ws.record_degradation(subsystem=subsystem, severity=severity, cause=cause)
     except Exception as e:
@@ -186,6 +194,7 @@ def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning
 async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     try:
         from app.metrics_collector import record_llm_call
+
         record_llm_call()
     except Exception:
         pass
@@ -232,6 +241,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
         _record_llm_degradation(subsystem="pollinations", cause=f"JSON call failed: {e}")
 
     try:
+
         def _run_g4f_json():
             try:
                 from g4f.client import Client  # type: ignore
@@ -265,6 +275,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
     """Fast-path JSON call for throughput-sensitive cleaning tasks."""
     try:
         from app.metrics_collector import record_llm_call
+
         record_llm_call()
     except Exception:
         pass
@@ -321,6 +332,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
 async def llm_text(messages: list[dict], temperature: float | None = None, timeout: int | None = None) -> str:
     try:
         from app.metrics_collector import record_llm_call
+
         record_llm_call()
     except Exception:
         pass
@@ -365,6 +377,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
         logging.error("Pollinations text call failed: %s", e)
 
     try:
+
         def _run_g4f_text():
             try:
                 from g4f.client import Client  # type: ignore[import-untyped]
@@ -390,7 +403,9 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
         logging.error("g4f text fallback failed: %s", e)
         return ""
 
+
 # ─── Plugin Architecture (Phase 43) ──────────────────────────────────
+
 
 class SubstratePluginManager:
     """Manages the registration and execution of external action handlers."""
@@ -451,7 +466,7 @@ class SubstratePluginManager:
                 continue
             n = len(vals)
             mean = sum(vals) / n
-            var = sum((x - mean)**2 for x in vals) / n
+            var = sum((x - mean) ** 2 for x in vals) / n
             variances.append(var)
 
         # Identify lowest variance dimension
@@ -462,9 +477,10 @@ class SubstratePluginManager:
             # PRUNE DIMENSION (Geometric Refactoring)
             # In a real system, we'd rebuild the manifold.
             # Here we emit telemetry and log success.
-            logging.getLogger(__name__).info(
-                f"REFACTOR: Compressed manifold from {dim} to {dim-1} (Pruned Dim {min_idx} with var {min_var:.4f})"
-            )
+            logging.getLogger(__name__).info(f"REFACTOR: Compressed manifold from {dim} to {
+                dim -
+                1} (Pruned Dim {min_idx} with var {
+                min_var:.4f})")
             return f"Success: Pruned low-variance dimension {min_idx}"
 
         return "Success: Manifold density optimal"
@@ -484,9 +500,10 @@ class SubstratePluginManager:
         logging.getLogger(__name__).info(f"TOOL CALL: Executing [{handler_name}] with {kwargs}")
 
         try:
-            # Check for budget/policy if ws is available
+            # Check for budget / policy if ws is available
             if self.ws:
                 from app.policy_engine import get_policy_engine
+
                 policy = get_policy_engine(ws=self.ws)
                 if not policy.can_dispatch_action(handler_name, self.ws.get_system_pressure()):
                     raise PermissionError(f"Action [{handler_name}] blocked by substrate policy")
@@ -494,44 +511,44 @@ class SubstratePluginManager:
             # Actual execution
             result = handler(**kwargs)
 
-            self._execution_history.append({
-                "handler": handler_name,
-                "status": "success",
-                "result_type": str(type(result))
-            })
+            self._execution_history.append(
+                {"handler": handler_name, "status": "success", "result_type": str(type(result))}
+            )
             return result
 
         except Exception as e:
-            self._execution_history.append({
-                "handler": handler_name,
-                "status": "error",
-                "error": str(e)
-            })
+            self._execution_history.append({"handler": handler_name, "status": "error", "error": str(e)})
             logging.getLogger(__name__).error(f"TOOL FAIL: [{handler_name}] - {e}")
             raise
 
     def get_available_tools(self) -> List[str]:
         return list(self._handlers.keys())
 
+
 _manager: Optional[SubstratePluginManager] = None
 _call_count = 0
 
+
 def get_llm_call_count() -> int:
     return _call_count
+
 
 def reset_llm_call_count():
     global _call_count
     _call_count = 0
 
+
 def _record_call():
     global _call_count
     _call_count = _call_count + 1
+
 
 def get_plugin_manager(ws: Any = None) -> SubstratePluginManager:
     global _manager
     if _manager is None:
         _manager = SubstratePluginManager(ws=ws)
     return _manager
+
 
 def reset_plugin_manager():
     """Reset the global plugin manager (for testing)."""

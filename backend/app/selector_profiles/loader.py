@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 # Path to the profiles directory
 _PROFILES_DIR = Path(__file__).resolve().parent / "profiles"
 
-# Cache loaded profiles to avoid repeated disk I/O
+# Cache loaded profiles to avoid repeated disk I / O
 _profile_cache: dict[str, dict] | None = None
 
 USER_AGENT = settings.USER_AGENT
@@ -99,6 +99,7 @@ def _match_domain(url: str) -> Optional[dict]:
     Uses substring matching so profile domains match www. and bare hostnames.
     """
     from urllib.parse import urlparse
+
     parsed = urlparse(url)
     hostname = parsed.hostname or ""
 
@@ -110,7 +111,7 @@ def _match_domain(url: str) -> Optional[dict]:
 
 
 def reload_profiles():
-    """Force reload profiles from disk. Call when profiles are added/updated at runtime."""
+    """Force reload profiles from disk. Call when profiles are added / updated at runtime."""
     global _profile_cache
     _profile_cache = None
     _load_all_profiles()
@@ -188,7 +189,9 @@ async def extract_with_profile(
 
     logger.info(
         "[ProfileExtractor] Fetching %s with profile (container=%s, %d fields)",
-        url, container_sel, len(field_defs),
+        url,
+        container_sel,
+        len(field_defs),
     )
 
     browser = None
@@ -202,7 +205,7 @@ async def extract_with_profile(
             )
             page = await context.new_page()
 
-            # Block images/media/fonts for speed
+            # Block images / media / fonts for speed
             async def _route_filter(route):
                 if route.request.resource_type in {"image", "media", "font"}:
                     await route.abort()
@@ -224,7 +227,8 @@ async def extract_with_profile(
                 except Exception:
                     logger.warning(
                         "[ProfileExtractor] Selector '%s' not found within %ds",
-                        wait_for_sel, max_wait,
+                        wait_for_sel,
+                        max_wait,
                     )
                     return []
 
@@ -282,9 +286,7 @@ async def extract_with_profile(
             for record in records:
                 for field_name, field_cfg in field_defs.items():
                     if field_name in record:
-                        record[field_name] = _postprocess_field(
-                            record[field_name], field_cfg
-                        )
+                        record[field_name] = _postprocess_field(record[field_name], field_cfg)
 
             logger.info("[ProfileExtractor] Extracted %d records", len(records))
             return records
@@ -297,12 +299,12 @@ async def extract_with_profile(
             try:
                 await context.close()
             except Exception:
-                pass
+                logger.debug("[ProfileExtractor] Failed to close browser context gracefully")
         if browser is not None:
             try:
                 await browser.close()
             except Exception:
-                pass
+                logger.debug("[ProfileExtractor] Failed to close browser gracefully")
 
 
 async def try_profile_extraction(url: str, max_wait: int | None = None) -> Optional[list[dict]]:

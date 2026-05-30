@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def collect_garbage(ws: SemanticWorldState):
     """Run full garbage collection cycle on the semantic field.
-    
+
     Delegates all operations to SemanticWorldState GC gateway APIs.
     Returns dict with counts of collected items.
     """

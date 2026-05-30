@@ -20,7 +20,7 @@ from app.browser_pool import get_browser_pool
 from app.trend_analyzer import TrendAnalyzer, EconomicTracker
 from app.regression_capture import get_regression_capture
 
-router = APIRouter(prefix="/api/scraper", tags=["scraper"])
+router = APIRouter(prefix="/api / scraper", tags=["scraper"])
 logger = logging.getLogger(__name__)
 
 
@@ -44,7 +44,7 @@ async def get_recent_telemetry(n: int = 20):
     return get_scrape_telemetry().get_recent(n)
 
 
-@router.get("/memory/stats")
+@router.get("/memory / stats")
 async def get_selector_memory_brief():
     """Return brief statistics on remembered selectors."""
     memory = get_selector_memory()
@@ -55,8 +55,8 @@ async def get_selector_memory_brief():
         "top_domains": sorted(
             [{"domain": d, "success": e.get("success_count", 0)} for d, e in memory._memory.items()],
             key=lambda x: x["success"],
-            reverse=True
-        )[:10]
+            reverse=True,
+        )[:10],
     }
 
 
@@ -66,10 +66,11 @@ async def get_browser_stats():
     return get_browser_pool().get_metrics()
 
 
-@router.get("/health/legacy")
+@router.get("/health / legacy")
 async def get_legacy_domain_health():
     """Return health scores for all tracked domains (legacy crawl policy)."""
     from app.crawl_policy import get_crawl_policy
+
     policy = get_crawl_policy()
     states = policy.get_all_domain_states()
 
@@ -91,12 +92,12 @@ async def get_scraper_stats():
     return {
         "confidence_histogram": telemetry.get_confidence_histogram(),
         "recent_latency_avg": (
-            sum(float(t.get("fetch_ms", 0) or 0) for t in recent_latency) / len(recent_latency)
-            if recent_latency else 0
+            sum(float(t.get("fetch_ms", 0) or 0) for t in recent_latency) / len(recent_latency) if recent_latency else 0
         ),
         "recent_success_rate": (
             sum(1 for t in recent_success if not t.get("fallback_triggered", False)) / len(recent_success)
-            if recent_success else 1.0
+            if recent_success
+            else 1.0
         ),
     }
 
@@ -117,7 +118,7 @@ async def get_scraper_diagnostics(
 ):
     """Run a deep diagnostic scrape for a URL.
 
-    Requires operator or admin role — triggers browser/network work.
+    Requires operator or admin role — triggers browser / network work.
     """
     report = await run_diagnostics(url, fields, min_record_score=min_score)
     return report.to_dict()
@@ -134,7 +135,7 @@ async def get_extraction_trends(window: int = Query(100, ge=10, le=500)):
     and actionable alerts.
 
     Args:
-        window: Number of recent telemetry events to analyze (10-500).
+        window: Number of recent telemetry events to analyze (10 - 500).
 
     Returns:
         A TrendReport with domain-level trends, global metrics, and alerts.
@@ -181,10 +182,8 @@ async def get_domain_trend(
 
     # Filter to only this domain's events
     from app.trend_analyzer import TrendAnalyzer as TA
-    domain_events = [
-        e for e in telemetry_history
-        if TA.extract_domain(e.get("url", "")) == domain.lower()
-    ]
+
+    domain_events = [e for e in telemetry_history if TA.extract_domain(e.get("url", "")) == domain.lower()]
 
     if not domain_events:
         raise HTTPException(
@@ -223,11 +222,11 @@ async def get_regression_archive(limit: int = Query(20, ge=1, le=100)):
     """Return the regression capture archive — statistics and recent captures.
 
     The regression capture system automatically archives extraction failures
-    as named fixtures in fixtures/pages/, building an organic benchmark suite
+    as named fixtures in fixtures / pages/, building an organic benchmark suite
     from real operational failures.
 
     Args:
-        limit: Maximum number of recent captures to return (1-100).
+        limit: Maximum number of recent captures to return (1 - 100).
 
     Returns:
         Archive statistics and the most recent capture entries.
@@ -276,7 +275,7 @@ async def generate_regression_replay_test(entry_id: str):
     return {"entry_id": entry_id, "test_code": test_code}
 
 
-@router.post("/regressions/generate-all-tests")
+@router.post("/regressions / generate-all-tests")
 async def generate_all_replay_tests():
     """Generate replay tests for all captured regressions that lack one."""
     capture = get_regression_capture()
@@ -332,7 +331,7 @@ async def get_extraction_economics(window: int = Query(200, ge=10, le=1000)):
 # ─── Domain Health Monitoring Endpoints ──────────────────────────────────
 
 
-@router.get("/health/domains")
+@router.get("/health / domains")
 async def get_all_domains_health():
     """Get health status for all monitored domains.
 
@@ -353,16 +352,16 @@ async def get_all_domains_health():
             "unhealthy": sum(1 for d in domains_health if d["health_level"] == "unhealthy"),
             "critical": sum(1 for d in domains_health if d["health_level"] == "critical"),
             "blacklisted": sum(1 for d in domains_health if d["health_level"] == "blacklisted"),
-        }
+        },
     }
 
 
-@router.get("/health/domain/{domain}")
+@router.get("/health / domain/{domain}")
 async def get_domain_health(domain: str):
     """Get detailed health status for a specific domain.
 
     Returns comprehensive health metrics including:
-    - Health level (healthy/degrading/unhealthy/critical/blacklisted)
+    - Health level (healthy / degrading / unhealthy / critical / blacklisted)
     - Health score (0.0 to 1.0)
     - Success rate
     - Consistency score (how uniform failures are)
@@ -379,15 +378,12 @@ async def get_domain_health(domain: str):
     health = monitor.get_domain_health(url)
 
     if health is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No health data for domain: {domain}"
-        )
+        raise HTTPException(status_code=404, detail=f"No health data for domain: {domain}")
 
     return health
 
 
-@router.get("/health/summary")
+@router.get("/health / summary")
 async def get_system_health_summary():
     """Get system-wide health summary.
 
@@ -431,7 +427,7 @@ async def get_system_health_summary():
 # ─── Selector Memory Stats Endpoints ──────────────────────────────────────
 
 
-@router.get("/selectors/stats")
+@router.get("/selectors / stats")
 async def get_selector_memory_stats():
     """Get selector memory pool statistics.
 
@@ -439,7 +435,7 @@ async def get_selector_memory_stats():
     - Total domains with cached selectors
     - Average confidence across all selectors
     - Distribution by confidence level
-    - High/medium/low confidence counts
+    - High / medium / low confidence counts
     """
     selector_memory = get_selector_memory()
     stats = selector_memory.get_memory_stats()
@@ -449,13 +445,13 @@ async def get_selector_memory_stats():
         "total_selectors": stats["total_selectors"],
         "avg_confidence": round(stats["avg_confidence"], 3),
         "high_confidence": stats["high_confidence"],  # >= 0.75
-        "medium_confidence": stats["medium_confidence"],  # 0.5-0.74
+        "medium_confidence": stats["medium_confidence"],  # 0.5 - 0.74
         "low_confidence": stats["low_confidence"],  # < 0.5
         "confidence_distribution": stats["by_confidence"],
     }
 
 
-@router.get("/selectors/domain/{domain}")
+@router.get("/selectors / domain/{domain}")
 async def get_domain_selector_confidence(domain: str):
     """Get selector confidence for a specific domain.
 
@@ -473,10 +469,7 @@ async def get_domain_selector_confidence(domain: str):
     confidence = selector_memory.get_selector_confidence(url)
 
     if confidence is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No cached selectors for domain: {domain}"
-        )
+        raise HTTPException(status_code=404, detail=f"No cached selectors for domain: {domain}")
 
     return {
         "domain": domain,
@@ -488,7 +481,7 @@ async def get_domain_selector_confidence(domain: str):
     }
 
 
-@router.post("/selectors/cleanup")
+@router.post("/selectors / cleanup")
 async def trigger_selector_cleanup(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Manually trigger selector memory cleanup.
 
@@ -514,7 +507,7 @@ async def trigger_selector_cleanup(_role: UserRole = Depends(require_role([UserR
     }
 
 
-@router.get("/selectors/low-confidence")
+@router.get("/selectors / low-confidence")
 async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)):
     """Get all selectors scoring below the specified threshold.
 
@@ -526,16 +519,18 @@ async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)
     for domain, entry in selector_memory._memory.items():
         confidence = selector_memory._compute_confidence(entry)
         if confidence.final_score < threshold:
-            low_confidence.append({
-                "domain": domain,
-                "score": round(confidence.final_score, 3),
-                "raw_confidence": round(confidence.raw_confidence, 3),
-                "age_factor": round(confidence.age_factor, 3),
-                "freshness_factor": round(confidence.freshness_factor, 3),
-                "success_count": entry.get("success_count", 0),
-                "failure_count": entry.get("failure_count", 0),
-                "reason": confidence.reason,
-            })
+            low_confidence.append(
+                {
+                    "domain": domain,
+                    "score": round(confidence.final_score, 3),
+                    "raw_confidence": round(confidence.raw_confidence, 3),
+                    "age_factor": round(confidence.age_factor, 3),
+                    "freshness_factor": round(confidence.freshness_factor, 3),
+                    "success_count": entry.get("success_count", 0),
+                    "failure_count": entry.get("failure_count", 0),
+                    "reason": confidence.reason,
+                }
+            )
 
     # Sort by score (worst first)
     low_confidence.sort(key=lambda x: x["score"])
@@ -550,7 +545,7 @@ async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)
 # ─── ML Selector Optimization Endpoints ──────────────────────────────────
 
 
-@router.post("/ml/optimize/domain/{domain}")
+@router.post("/ml / optimize / domain/{domain}")
 async def optimize_domain_selectors(
     domain: str,
     selectors: Optional[dict] = None,
@@ -579,10 +574,7 @@ async def optimize_domain_selectors(
         cached = selector_memory.get_selectors(url)
 
         if not cached:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No selectors found for domain: {domain}"
-            )
+            raise HTTPException(status_code=404, detail=f"No selectors found for domain: {domain}")
 
         selectors = cached
 
@@ -603,7 +595,7 @@ async def optimize_domain_selectors(
     }
 
 
-@router.get("/ml/optimize/domain/{domain}/history")
+@router.get("/ml / optimize / domain/{domain}/history")
 async def get_optimization_history(domain: str, limit: int = Query(10, ge=1, le=100)):
     """Get historical optimization reports for a domain.
 
@@ -621,8 +613,13 @@ async def get_optimization_history(domain: str, limit: int = Query(10, ge=1, le=
     }
 
 
-@router.post("/ml/learn")
-async def record_selector_learning(domain: str, selector: str, quality: float = Query(0.0, ge=0, le=1), _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+@router.post("/ml / learn")
+async def record_selector_learning(
+    domain: str,
+    selector: str,
+    quality: float = Query(0.0, ge=0, le=1),
+    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
+):
     """Record actual selector performance for ML model improvement.
 
     This feedback helps the ML model learn which selectors work best.
@@ -647,7 +644,7 @@ async def record_selector_learning(domain: str, selector: str, quality: float = 
 # ─── Strategy Evolution Endpoints ────────────────────────────────────────
 
 
-@router.get("/strategy/recommend/{domain}")
+@router.get("/strategy / recommend/{domain}")
 async def recommend_fetch_strategy(domain: str):
     """Get recommended fetch strategy for a domain.
 
@@ -668,7 +665,7 @@ async def recommend_fetch_strategy(domain: str):
     }
 
 
-@router.post("/strategy/record")
+@router.post("/strategy / record")
 async def record_strategy_attempt(
     domain: str,
     strategy: str,
@@ -695,10 +692,7 @@ async def record_strategy_attempt(
     try:
         strategy_enum = FetchStrategy(strategy)
     except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown strategy: {strategy}"
-        )
+        raise HTTPException(status_code=400, detail=f"Unknown strategy: {strategy}")
 
     engine.record_fetch_attempt(domain, strategy_enum, success, time_ms, quality, failure_reason)
 
@@ -710,7 +704,7 @@ async def record_strategy_attempt(
     }
 
 
-@router.get("/strategy/domain/{domain}")
+@router.get("/strategy / domain/{domain}")
 async def get_domain_strategy_analysis(domain: str):
     """Get detailed strategy analysis for a domain.
 
@@ -724,7 +718,7 @@ async def get_domain_strategy_analysis(domain: str):
     return report
 
 
-@router.get("/strategy/report")
+@router.get("/strategy / report")
 async def get_all_strategies_report():
     """Get strategy performance report for all domains.
 
@@ -738,8 +732,10 @@ async def get_all_strategies_report():
     return report
 
 
-@router.post("/strategy/evolve/{domain}")
-async def evolve_domain_strategy(domain: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+@router.post("/strategy / evolve/{domain}")
+async def evolve_domain_strategy(
+    domain: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
+):
     """Manually trigger strategy evolution for a domain.
 
     Useful when current strategy is degraded.

@@ -4,7 +4,7 @@ Resource Governor — operational economics and bounded resource budgets.
 Provides:
   - Memory bounds tracking for browser pools, closing stale contexts when threshold is exceeded.
   - Frontier queue-shedding for low-priority targets when capacity is saturated.
-  - Automatic historical log and telemetry compaction/pruning.
+  - Automatic historical log and telemetry compaction / pruning.
   - Token consumption budgets with adaptive throttling triggers.
 """
 
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ResourceBudgets:
     """Configurable resource caps to guarantee system longevity under high load."""
+
     max_browser_memory_mb: float = 1024.0
     max_retry_depth: int = field(default_factory=lambda: settings.MAX_RECOVERY_ATTEMPTS)
     max_queue_size: int = 1000
@@ -46,8 +47,9 @@ class ResourceGovernor:
     async def check_browser_memory(self) -> Dict[str, Any]:
         """Inspect and prune the browser pool context pool if memory limits are exceeded."""
         from app.browser_pool import get_browser_pool
+
         pool = get_browser_pool()
-        
+
         # Simple simulated RSS page memory tracking
         num_contexts = len(pool._contexts)
         estimated_memory_mb = num_contexts * 150.0  # Assumes ~150MB per running context
@@ -56,9 +58,10 @@ class ResourceGovernor:
         if estimated_memory_mb > self.budgets.max_browser_memory_mb:
             logger.warning(
                 "[Governor] Browser memory limit exceeded: %.2fMB > %.2fMB. Pruning stale contexts.",
-                estimated_memory_mb, self.budgets.max_browser_memory_mb
+                estimated_memory_mb,
+                self.budgets.max_browser_memory_mb,
             )
-            # Prune/close half of active contexts
+            # Prune / close half of active contexts
             to_prune = num_contexts // 2
             keys = list(pool._contexts.keys())
             for i in range(min(to_prune, len(keys))):
@@ -70,7 +73,7 @@ class ResourceGovernor:
                     except Exception as e:
                         logger.debug("Failed to close context during prune: %s", e)
                     pruned += 1
-            
+
             self.metrics["browser_prunes"] += pruned
             estimated_memory_mb = len(pool._contexts) * 150.0
 
@@ -85,11 +88,12 @@ class ResourceGovernor:
         if len(queue) > self.budgets.max_queue_size:
             logger.warning(
                 "[Governor] Crawl frontier queue size exceeded: %d > %d. Trimming excess seeds.",
-                len(queue), self.budgets.max_queue_size
+                len(queue),
+                self.budgets.max_queue_size,
             )
             excess = len(queue) - self.budgets.max_queue_size
             # Retain only the highest-priority seeds (assumes queue is sorted)
-            trimmed = queue[:self.budgets.max_queue_size]
+            trimmed = queue[: self.budgets.max_queue_size]
             self.metrics["queue_sheds"] += excess
             return trimmed
         return queue
@@ -97,8 +101,9 @@ class ResourceGovernor:
     def prune_telemetry(self) -> int:
         """Compact telemetry records to prevent memory inflation."""
         from app.scrape_telemetry import get_scrape_telemetry
+
         telemetry = get_scrape_telemetry()
-        
+
         recent = telemetry.get_recent(10000)
         num_records = len(recent)
         pruned = 0
@@ -106,7 +111,8 @@ class ResourceGovernor:
         if num_records > self.budgets.max_telemetry_records:
             logger.info(
                 "[Governor] Telemetry count exceeded: %d > %d. Pruning historical logs.",
-                num_records, self.budgets.max_telemetry_records
+                num_records,
+                self.budgets.max_telemetry_records,
             )
             # Retain only the limit bounds
             telemetry.clear()
@@ -129,9 +135,10 @@ class ResourceGovernor:
             self.metrics["throttled_cycles"] += 1
             logger.warning(
                 "[Governor] LLM token dollar budget exhausted: $%.4f > $%.2f. Triggering throttle.",
-                self.token_spend, self.budgets.max_token_spend
+                self.token_spend,
+                self.budgets.max_token_spend,
             )
-            return False  # Throttle/block further calls
+            return False  # Throttle / block further calls
         return True
 
     def get_governance_report(self) -> Dict[str, Any]:

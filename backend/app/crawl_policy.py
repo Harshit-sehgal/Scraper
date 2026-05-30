@@ -33,9 +33,11 @@ logger = logging.getLogger(__name__)
 
 # ─── Domain State ───────────────────────────────────────────────────────
 
+
 @dataclass
 class DomainState:
     """Tracks operational state for a single domain."""
+
     domain: str
     active_fetches: int = 0
     consecutive_failures: int = 0
@@ -84,24 +86,28 @@ class CrawlPolicyEngine:
 
         # Global concurrency check
         if self._global_active_fetches >= self._max_global_concurrency:
-            return f"Global concurrency limit reached ({self._max_global_concurrency})"
+            return f"Global concurrency limit reached ({
+                self._max_global_concurrency})"
 
         state = self._get_state(domain)
 
         # Cooldown check
         if time.time() < state.cooldown_until:
             remaining = int(state.cooldown_until - time.time())
-            logger.info("Domain %s in cooldown for %ds (%d consecutive failures)",
-                        domain, remaining, state.consecutive_failures)
+            logger.info(
+                "Domain %s in cooldown for %ds (%d consecutive failures)", domain, remaining, state.consecutive_failures
+            )
             return f"Domain {domain} in cooldown ({remaining}s remaining)"
 
         # Page budget check
         if state.total_fetches >= self._max_pages_per_domain:
-            return f"Domain {domain} reached page budget ({self._max_pages_per_domain})"
+            return f"Domain {domain} reached page budget ({
+                self._max_pages_per_domain})"
 
         # Concurrency budget check
         if state.active_fetches >= self._max_concurrency:
-            return f"Domain {domain} at max concurrency ({self._max_concurrency})"
+            return f"Domain {domain} at max concurrency ({
+                self._max_concurrency})"
 
         # Delay check
         elapsed = time.time() - state.last_fetch_time
@@ -129,9 +135,11 @@ class CrawlPolicyEngine:
 
             # Re-check under lock — another task may have taken the slot
             if state.active_fetches >= self._max_concurrency:
-                return f"Domain {domain} at max concurrency ({self._max_concurrency})"
+                return f"Domain {domain} at max concurrency ({
+                    self._max_concurrency})"
             if self._global_active_fetches >= self._max_global_concurrency:
-                return f"Global concurrency limit reached ({self._max_global_concurrency})"
+                return f"Global concurrency limit reached ({
+                    self._max_global_concurrency})"
 
             state.active_fetches += 1
             self._global_active_fetches += 1
@@ -157,7 +165,9 @@ class CrawlPolicyEngine:
                 state.cooldown_until = time.time() + self._cooldown_seconds
                 logger.warning(
                     "Domain %s: %d consecutive failures, cooling down for %ds",
-                    domain, state.consecutive_failures, self._cooldown_seconds,
+                    domain,
+                    state.consecutive_failures,
+                    self._cooldown_seconds,
                 )
 
     def get_domain_state(self, domain: str) -> Optional[dict]:
@@ -175,7 +185,7 @@ class CrawlPolicyEngine:
         }
 
     def get_domain_health_score(self, domain: str) -> float:
-        """Calculate a health score [0, 1] for a domain based on recent successes/failures."""
+        """Calculate a health score [0, 1] for a domain based on recent successes / failures."""
         state = self._domains.get(domain)
         if not state or state.total_fetches == 0:
             return 1.0
@@ -189,22 +199,18 @@ class CrawlPolicyEngine:
 
         score = 1.0 - failure_penalty
         if time.time() < state.cooldown_until:
-            score *= 0.2 # Severely penalized if in cooldown
+            score *= 0.2  # Severely penalized if in cooldown
 
         return round(max(0.0, score), 2)
 
     def get_all_domain_states(self) -> dict[str, dict]:
         """Get states for all tracked domains."""
-        states = {
-            d: s
-            for d in sorted(self._domains.keys())
-            if (s := self.get_domain_state(d))
-        }
+        states = {d: s for d in sorted(self._domains.keys()) if (s := self.get_domain_state(d))}
         # Add global summary
         states["_global"] = {
             "active_fetches": self._global_active_fetches,
             "max_concurrency": self._max_global_concurrency,
-            "tracked_domains": len(self._domains)
+            "tracked_domains": len(self._domains),
         }
         return states
 
@@ -243,6 +249,7 @@ class CrawlPolicyEngine:
 
         try:
             import httpx
+
             url = f"https://{domain}/robots.txt"
             async with httpx.AsyncClient(
                 timeout=settings.ROBOTS_TIMEOUT,
@@ -285,8 +292,12 @@ class CrawlPolicyEngine:
                 state.crawl_delay = crawl_delay
 
                 if disallowed_paths:
-                    logger.debug("robots.txt for %s: %d disallowed paths, delay=%.1fs",
-                                 domain, len(disallowed_paths), crawl_delay)
+                    logger.debug(
+                        "robots.txt for %s: %d disallowed paths, delay=%.1fs",
+                        domain,
+                        len(disallowed_paths),
+                        crawl_delay,
+                    )
 
         except Exception as e:
             logger.debug("Failed to fetch robots.txt for %s: %s", domain, e)

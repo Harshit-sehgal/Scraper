@@ -64,9 +64,7 @@ def _refresh_job_from_repo(job: Job, jobs_store: dict) -> Job:
             jobs_store[job.id] = fresh
             return fresh
     except Exception:
-        logging.getLogger(__name__).debug(
-            "Failed to refresh job %s from repo, using in-memory copy", job.id
-        )
+        logging.getLogger(__name__).debug("Failed to refresh job %s from repo, using in-memory copy", job.id)
     return job
 
 
@@ -97,7 +95,8 @@ def create_jobs_router(
             if job_id not in jobs_store:
                 raise HTTPException(status_code=404, detail="Job not found")
             job = jobs_store[job_id]
-            # In worker mode, refresh from repo to pick up cross-process updates
+            # In worker mode, refresh from repo to pick up cross-process
+            # updates
             if _is_worker_mode():
                 try:
                     repo = get_job_repository()
@@ -107,9 +106,7 @@ def create_jobs_router(
                         jobs_store[job_id] = fresh
                         return fresh
                 except Exception:
-                    logging.getLogger(__name__).debug(
-                        "Failed to refresh job %s from repo", job_id
-                    )
+                    logging.getLogger(__name__).debug("Failed to refresh job %s from repo", job_id)
             return job
 
     def _pop_job(job_id: str) -> Job:
@@ -132,8 +129,10 @@ def create_jobs_router(
                 raise HTTPException(status_code=404, detail="Job not in recycle bin")
             return recycle_bin_store.pop(job_id)
 
-    @router.post("/api/discover")
-    async def discover(req: DiscoveryRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+    @router.post("/api / discover")
+    async def discover(
+        req: DiscoveryRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
+    ):
         """Auto-discover best URLs to scrape for a topic."""
         try:
             results = await discover_urls(
@@ -150,6 +149,7 @@ def create_jobs_router(
         except DiscoveryDependencyError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         from app.url_safety import validate_public_http_url
+
         safe_results = []
         for r in results:
             url = r.get("url")
@@ -161,13 +161,15 @@ def create_jobs_router(
                     pass
         return {"urls": safe_results}
 
-    @router.post("/api/schema/suggest")
-    async def suggest_schema(req: SchemaSuggestionRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+    @router.post("/api / schema / suggest")
+    async def suggest_schema(
+        req: SchemaSuggestionRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
+    ):
         """Infer topic + schema fields from plain-language user intent."""
         suggestion = await suggest_schema_from_intent(req.intent, max_fields=req.max_fields)
         return suggestion
 
-    @router.get("/api/jobs")
+    @router.get("/api / jobs")
     async def list_jobs():
         # In worker mode, refresh from repo to pick up cross-process updates
         if _is_worker_mode():
@@ -176,7 +178,8 @@ def create_jobs_router(
                 fresh_jobs = repo.load_jobs()
                 with _store_lock:
                     # Merge fresh data into in-memory store, preserving any jobs
-                    # that the worker doesn't track (e.g., newly created via API)
+                    # that the worker doesn't track (e.g., newly created via
+                    # API)
                     for jid, fresh in fresh_jobs.items():
                         jobs_store[jid] = fresh
                     # Remove jobs that were hard-deleted by the worker
@@ -190,7 +193,7 @@ def create_jobs_router(
             ordered = sorted(jobs_store.values(), key=lambda j: j.created_at, reverse=True)
             return {"jobs": [job.model_dump() for job in ordered]}
 
-    @router.get("/api/jobs/{job_id}")
+    @router.get("/api / jobs/{job_id}")
     async def get_job(job_id: str, include_results: bool = Query(False)):
         job = _get_job(job_id)
 
@@ -199,26 +202,31 @@ def create_jobs_router(
             results_list = list(job.results)
             if job.results_on_disk:
                 from app.utils.job_results_store import load_job_results_from_disk
+
                 results_list = load_job_results_from_disk(job.id, job.results_file_path)
 
         dumped = job.model_dump()
         dumped["results"] = results_list
         return dumped
 
-    @router.get("/api/jobs/{job_id}/results")
+    @router.get("/api / jobs/{job_id}/results")
     async def get_job_results(job_id: str, limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)):
         """Return a paginated slice of job results."""
         job = _get_job(job_id)
 
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
+
             page, total = load_paginated_job_results_from_disk(
-                job.id, limit=limit, offset=offset, file_path=job.results_file_path,
+                job.id,
+                limit=limit,
+                offset=offset,
+                file_path=job.results_file_path,
             )
         else:
             results_list = list(job.results)
             total = len(results_list)
-            page = results_list[offset:offset + limit]
+            page = results_list[offset : offset + limit]
 
         next_offset = offset + limit if (offset + limit) < total else None
 
@@ -232,14 +240,17 @@ def create_jobs_router(
             "returned": len(page),
         }
 
-    @router.post("/api/jobs/{job_id}/backfill-metadata")
-    async def backfill_job_metadata(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+    @router.post("/api / jobs/{job_id}/backfill-metadata")
+    async def backfill_job_metadata(
+        job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
+    ):
         """Explicitly backfill source metadata for manual-mode job results."""
         job = _get_job(job_id)
 
         results_list = list(job.results)
         if job.results_on_disk:
             from app.utils.job_results_store import load_job_results_from_disk
+
             results_list = load_job_results_from_disk(job.id, job.results_file_path)
 
         from app.discovery import infer_source_metadata
@@ -259,13 +270,16 @@ def create_jobs_router(
             job.results = results_list
             if job.results_on_disk:
                 from app.utils.job_results_store import save_job_results_to_disk
+
                 save_job_results_to_disk(job.id, results_list)
             _save_job(job)
 
         return {"message": "Metadata backfilled successfully", "updated": updated}
 
-    @router.post("/api/jobs")
-    async def create_job(job_data: JobCreate, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+    @router.post("/api / jobs")
+    async def create_job(
+        job_data: JobCreate, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
+    ):
         import os
 
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
@@ -296,11 +310,13 @@ def create_jobs_router(
         jobs_store[job.id] = job
         _save_job(job)
 
-        # If DATAFORGE_WORKER_QUEUE is set, enqueue the job for async processing
+        # If DATAFORGE_WORKER_QUEUE is set, enqueue the job for async
+        # processing
         worker_queue_enabled = os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
         if worker_queue_enabled and worker_queue_enabled.lower() in ("1", "true", "yes"):
             try:
                 from app.worker_queue import get_worker_queue, Priority
+
                 queue = get_worker_queue()
                 task_id = await queue.enqueue(
                     task_type="scrape_job",
@@ -308,14 +324,13 @@ def create_jobs_router(
                     priority=Priority.NORMAL,
                     task_id=job.id,
                 )
-                logging.getLogger(__name__).info(
-                    "Job %s enqueued to worker queue (task=%s)", job.id, task_id
-                )
+                logging.getLogger(__name__).info("Job %s enqueued to worker queue (task=%s)", job.id, task_id)
             except Exception as e:
                 if settings.ENV.lower() == "production":
                     logging.getLogger(__name__).error(
                         "Failed to enqueue job %s to worker queue in production: %s",
-                        job.id, e,
+                        job.id,
+                        e,
                     )
                     if job.id in jobs_store:
                         del jobs_store[job.id]
@@ -323,7 +338,9 @@ def create_jobs_router(
                         repo = get_job_repository()
                         repo.hard_delete(job.id)
                     except Exception:
-                        pass
+                        logging.getLogger(__name__).warning(
+                            "Failed to hard-delete job %s after enqueue failure", job.id
+                        )
                     raise HTTPException(
                         status_code=503,
                         detail=(
@@ -334,7 +351,8 @@ def create_jobs_router(
                     )
                 logging.getLogger(__name__).warning(
                     "Failed to enqueue job %s to worker queue, falling back to inline: %s",
-                    job.id, e,
+                    job.id,
+                    e,
                 )
                 schedule_task_fn(run_job_coro_fn(job.id))
         else:
@@ -342,13 +360,19 @@ def create_jobs_router(
 
         return {"job_id": job.id, "status": job.status.value}
 
-    @router.post("/api/jobs/{job_id}/cancel")
+    @router.post("/api / jobs/{job_id}/cancel")
     async def cancel_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
 
         job = jobs_store[job_id]
-        if job.status in {JobStatus.COMPLETED, JobStatus.DEGRADED, JobStatus.EMPTY_RESULT, JobStatus.FAILED, JobStatus.CANCELED}:
+        if job.status in {
+            JobStatus.COMPLETED,
+            JobStatus.DEGRADED,
+            JobStatus.EMPTY_RESULT,
+            JobStatus.FAILED,
+            JobStatus.CANCELED,
+        }:
             return {
                 "job_id": job.id,
                 "status": job.status.value,
@@ -362,15 +386,19 @@ def create_jobs_router(
 
         # Cancel the queued task if worker queue is enabled
         import os as _os
+
         worker_queue_enabled = _os.getenv("DATAFORGE_WORKER_QUEUE", "").strip()
         if worker_queue_enabled and worker_queue_enabled.lower() in ("1", "true", "yes"):
             try:
                 from app.worker_queue import get_worker_queue
+
                 queue = get_worker_queue()
                 await queue.cancel(job_id)
             except Exception as e:
                 logging.getLogger(__name__).warning(
-                    "Failed to cancel queued task for job %s: %s", job_id, e,
+                    "Failed to cancel queued task for job %s: %s",
+                    job_id,
+                    e,
                 )
 
         _save_job(job)
@@ -382,7 +410,7 @@ def create_jobs_router(
             "message": "Cancellation requested",
         }
 
-    @router.post("/api/jobs/{job_id}/reclean")
+    @router.post("/api / jobs/{job_id}/reclean")
     async def reclean_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         """Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs."""
         if job_id not in jobs_store:
@@ -396,6 +424,7 @@ def create_jobs_router(
         loaded_from_disk = False
         if job.results_on_disk:
             from app.utils.job_results_store import load_job_results_from_disk
+
             results_list = load_job_results_from_disk(job.id, job.results_file_path)
             loaded_from_disk = True
 
@@ -435,9 +464,8 @@ def create_jobs_router(
             )
         except asyncio.TimeoutError:
             cleaned_rows = working_rows
-            reclean_warnings.append(
-                f"AI re-clean timed out after {config['ai_structuring_timeout_seconds']}s; used deterministic post-processing."
-            )
+            reclean_warnings.append(f"AI re-clean timed out after {
+                    config['ai_structuring_timeout_seconds']}s; used deterministic post-processing.")
         except Exception as e:
             logging.exception(e)
             cleaned_rows = working_rows
@@ -458,7 +486,8 @@ def create_jobs_router(
             )
             filtered_count = len(filtered_results)
 
-        # Backfill manual-mode source metadata so users don't only see "unknown".
+        # Backfill manual-mode source metadata so users don't only see
+        # "unknown".
         for row in filtered_results:
             source_url = str(row.get("source_url") or "")
             source_type = str(row.get("source_type") or "unknown").strip().lower()
@@ -478,9 +507,11 @@ def create_jobs_router(
         for row in job.results:
             row["scraped_at"] = scraped_at
 
-        # Save back to disk if results remain above the configured in-memory threshold.
+        # Save back to disk if results remain above the configured in-memory
+        # threshold.
         if len(job.results) > settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD:
             from app.utils.job_results_store import save_job_results_to_disk
+
             file_path = save_job_results_to_disk(job.id, job.results)
             job.results_on_disk = True
             job.results_file_path = file_path
@@ -488,6 +519,7 @@ def create_jobs_router(
         else:
             if loaded_from_disk:
                 from app.utils.job_results_store import delete_job_results_from_disk
+
                 delete_job_results_from_disk(job.id, job.results_file_path)
                 job.results_on_disk = False
                 job.results_file_path = None
@@ -547,29 +579,30 @@ def create_jobs_router(
             "warnings": reclean_warnings,
         }
 
-    @router.delete("/api/jobs/{job_id}")
+    @router.delete("/api / jobs/{job_id}")
     async def delete_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
         job = jobs_store[job_id]
         if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
-            raise HTTPException(
-                status_code=409,
-                detail="Cannot delete/recycle an active job. Cancel the job first."
-            )
+            raise HTTPException(status_code=409, detail="Cannot delete / recycle an active job. Cancel the job first.")
         repo = get_job_repository()
         repo.move_to_recycle_bin(job_id)
         recycle_bin_store[job_id] = jobs_store.pop(job_id)
         return {"message": "Job moved to recycle bin"}
 
-    @router.delete("/api/jobs/cleanup/terminal")
-    async def clear_terminal_jobs(keep_recent: int = Query(5, ge=0, le=5000), _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
-        terminal_statuses = {JobStatus.COMPLETED, JobStatus.DEGRADED, JobStatus.EMPTY_RESULT, JobStatus.FAILED, JobStatus.CANCELED}
-        terminal = [
-            (jid, job)
-            for jid, job in jobs_store.items()
-            if job.status in terminal_statuses
-        ]
+    @router.delete("/api / jobs / cleanup / terminal")
+    async def clear_terminal_jobs(
+        keep_recent: int = Query(5, ge=0, le=5000), _role: UserRole = Depends(require_role([UserRole.ADMIN]))
+    ):
+        terminal_statuses = {
+            JobStatus.COMPLETED,
+            JobStatus.DEGRADED,
+            JobStatus.EMPTY_RESULT,
+            JobStatus.FAILED,
+            JobStatus.CANCELED,
+        }
+        terminal = [(jid, job) for jid, job in jobs_store.items() if job.status in terminal_statuses]
 
         if not terminal:
             return {
@@ -600,12 +633,12 @@ def create_jobs_router(
             "remaining": len(jobs_store),
         }
 
-    @router.get("/api/recycle_bin")
+    @router.get("/api / recycle_bin")
     async def list_recycle_bin():
         ordered = sorted(recycle_bin_store.values(), key=lambda j: j.created_at, reverse=True)
         return {"jobs": [job.model_dump() for job in ordered]}
 
-    @router.post("/api/recycle_bin/{job_id}/restore")
+    @router.post("/api / recycle_bin/{job_id}/restore")
     async def restore_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
@@ -614,11 +647,12 @@ def create_jobs_router(
         jobs_store[job_id] = recycle_bin_store.pop(job_id)
         return {"message": "Job restored"}
 
-    @router.delete("/api/recycle_bin/{job_id}")
+    @router.delete("/api / recycle_bin/{job_id}")
     async def hard_delete_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
         from app.utils.job_results_store import delete_job_results_from_disk
+
         job = recycle_bin_store.get(job_id)
         file_path = job.results_file_path if job else None
         delete_job_results_from_disk(job_id, file_path)
@@ -627,10 +661,11 @@ def create_jobs_router(
         del recycle_bin_store[job_id]
         return {"message": "Job permanently deleted"}
 
-    @router.delete("/api/recycle_bin")
+    @router.delete("/api / recycle_bin")
     async def clear_recycle_bin(_role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         count = len(recycle_bin_store)
         from app.utils.job_results_store import delete_job_results_from_disk
+
         for jid in list(recycle_bin_store.keys()):
             job = recycle_bin_store.get(jid)
             file_path = job.results_file_path if job else None

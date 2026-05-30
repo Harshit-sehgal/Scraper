@@ -29,7 +29,8 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 # Confidence scoring thresholds
-DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD = 0.5  # Minimum confidence to keep selector
+# Minimum confidence to keep selector
+DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD = 0.5
 SELECTOR_CLEANUP_CHECK_INTERVAL = 86400  # Run cleanup every 24 hours
 SELECTOR_AGE_DECAY_THRESHOLD = 14 * 86400  # Start decaying after 14 days
 SELECTOR_FRESHNESS_THRESHOLD = 7 * 86400  # Penalize if not used in 7 days
@@ -38,6 +39,7 @@ SELECTOR_FRESHNESS_THRESHOLD = 7 * 86400  # Penalize if not used in 7 days
 @dataclass
 class SelectorConfidenceScore:
     """Confidence metrics for a selector."""
+
     raw_confidence: float  # success/(success+failure)
     age_factor: float  # Decay based on age
     freshness_factor: float  # Decay based on lack of recent use
@@ -115,9 +117,9 @@ class SelectorMemory:
         final_score = raw_confidence * age_factor * freshness_factor
 
         reason = (
-            f"raw={raw_confidence:.2f} (success={successes}/{total-1}), "
-            f"age={age_factor:.2f} (age={age_seconds/86400:.1f}d), "
-            f"freshness={freshness_factor:.2f} (last_used={last_used_ago/86400:.1f}d ago)"
+            f"raw={raw_confidence:.2f} (success={successes}/{total - 1}), "
+            f"age={age_factor:.2f} (age={age_seconds / 86400:.1f}d), "
+            f"freshness={freshness_factor:.2f} (last_used={last_used_ago / 86400:.1f}d ago)"
         )
 
         return SelectorConfidenceScore(
@@ -125,7 +127,7 @@ class SelectorMemory:
             age_factor=age_factor,
             freshness_factor=freshness_factor,
             final_score=final_score,
-            reason=reason
+            reason=reason,
         )
 
     def _auto_cleanup(self, force: bool = False) -> dict:
@@ -139,12 +141,15 @@ class SelectorMemory:
         if not force and (now - self._last_cleanup) < SELECTOR_CLEANUP_CHECK_INTERVAL:
             return {}
 
-        threshold: float = getattr(settings, "SELECTOR_CONFIDENCE_THRESHOLD", DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD) or DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD
+        threshold: float = (
+            getattr(settings, "SELECTOR_CONFIDENCE_THRESHOLD", DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD)
+            or DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD
+        )
         stats: Dict[str, Any] = {
             "domains_checked": 0,
             "selectors_deleted": 0,
             "deleted_domains": [],
-            "low_confidence_selectors": []
+            "low_confidence_selectors": [],
         }
 
         domains_to_delete: List[str] = []
@@ -156,15 +161,15 @@ class SelectorMemory:
             if confidence.final_score < threshold:
                 logger.info(
                     "Deleting low-confidence selector for %s (score=%.2f, %s)",
-                    domain, confidence.final_score, confidence.reason
+                    domain,
+                    confidence.final_score,
+                    confidence.reason,
                 )
                 stats["selectors_deleted"] = int(stats["selectors_deleted"]) + 1
                 stats["deleted_domains"].append(domain)
-                stats["low_confidence_selectors"].append({
-                    "domain": domain,
-                    "score": confidence.final_score,
-                    "reason": confidence.reason
-                })
+                stats["low_confidence_selectors"].append(
+                    {"domain": domain, "score": confidence.final_score, "reason": confidence.reason}
+                )
                 domains_to_delete.append(domain)
 
         # Delete low-confidence entries
@@ -177,8 +182,11 @@ class SelectorMemory:
         self._last_cleanup = now
 
         if int(stats["selectors_deleted"]) > 0:
-            logger.info("Selector cleanup complete: %d deleted from %d domains",
-                       int(stats["selectors_deleted"]), int(stats["domains_checked"]))
+            logger.info(
+                "Selector cleanup complete: %d deleted from %d domains",
+                int(stats["selectors_deleted"]),
+                int(stats["domains_checked"]),
+            )
 
         return stats
 
@@ -212,8 +220,7 @@ class SelectorMemory:
 
         # 1. Failure Threshold
         if entry.get("failure_count", 0) > settings.SELECTOR_MEMORY_MAX_FAILURES:
-            logger.debug("Selector memory for %s is suspended (failures: %d)",
-                         domain, entry["failure_count"])
+            logger.debug("Selector memory for %s is suspended (failures: %d)", domain, entry["failure_count"])
             return None
 
         # 2. Aging (Time-based decay)
@@ -223,7 +230,8 @@ class SelectorMemory:
         age_days = (time.time() - last_success) / 86400
         if age_days > 30:
             logger.info("Selector memory for %s is aged (%.1f days). Re-discovery recommended.", domain, age_days)
-            # We still return it, but could trigger a "soft re-discovery" in orchestrator
+            # We still return it, but could trigger a "soft re-discovery" in
+            # orchestrator
 
         return entry.get("selectors")
 
@@ -234,14 +242,17 @@ class SelectorMemory:
             return
 
         now = time.time()
-        entry = self._memory.get(domain, {
-            "selectors": selectors,
-            "success_count": 0,
-            "failure_count": 0,
-            "first_seen": now,
-            "last_success": now,
-            "lineage": [] # Track previous successful selector hashes
-        })
+        entry = self._memory.get(
+            domain,
+            {
+                "selectors": selectors,
+                "success_count": 0,
+                "failure_count": 0,
+                "first_seen": now,
+                "last_success": now,
+                "lineage": [],  # Track previous successful selector hashes
+            },
+        )
 
         # Update if selectors changed or it's a new entry
         if entry["selectors"] != selectors:
@@ -249,11 +260,7 @@ class SelectorMemory:
             old_hash = str(hash(json.dumps(entry["selectors"], sort_keys=True)))
             if "lineage" not in entry:
                 entry["lineage"] = []
-            entry["lineage"].append({
-                "hash": old_hash,
-                "replaced_at": now,
-                "successes": entry["success_count"]
-            })
+            entry["lineage"].append({"hash": old_hash, "replaced_at": now, "successes": entry["success_count"]})
 
             entry["selectors"] = selectors
             entry["failure_count"] = 0  # Reset failures on change
@@ -294,7 +301,7 @@ class SelectorMemory:
                 "high_confidence": 0,
                 "medium_confidence": 0,
                 "low_confidence": 0,
-                "by_confidence": {}
+                "by_confidence": {},
             }
 
         stats: Dict[str, Any] = {
@@ -304,7 +311,7 @@ class SelectorMemory:
             "high_confidence": 0,  # >= 0.75
             "medium_confidence": 0,  # 0.5 - 0.74
             "low_confidence": 0,  # < 0.5
-            "by_confidence": {}
+            "by_confidence": {},
         }
 
         total_score = 0.0
@@ -342,6 +349,7 @@ class SelectorMemory:
 
 # Global singleton
 _memory: SelectorMemory | None = None
+
 
 def get_selector_memory() -> SelectorMemory:
     global _memory

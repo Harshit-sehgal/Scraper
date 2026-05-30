@@ -18,11 +18,7 @@ def parse_topology_key(raw: str) -> tuple[str, str]:
     except (SyntaxError, ValueError, TypeError):
         raise ValueError(f"Invalid topology key format: {raw!r}")
 
-    if (
-        not isinstance(value, tuple)
-        or len(value) != 2
-        or not all(isinstance(item, str) for item in value)
-    ):
+    if not isinstance(value, tuple) or len(value) != 2 or not all(isinstance(item, str) for item in value):
         raise ValueError(f"Invalid topology key structure: {raw!r}")
 
     return value
@@ -42,13 +38,15 @@ def _clamp_signed(value: float) -> float:
 
 # ─── RegionSnapshot: Immutable Read-Only View ──────────────────────────────
 
+
 @dataclass(frozen=True)
 class RegionSnapshot:
     """Frozen, immutable representation of a field region for read-only access.
-    
+
     This is the ONLY way external code should read region data.
     FieldConflictRegion dataclass instances are mutable — never expose them directly.
     """
+
     region_id: str
     token: str
     competing_roles: tuple
@@ -59,12 +57,13 @@ class RegionSnapshot:
     persistence: float
     semantic_pressure: float
     stability_momentum: float
-    free_energy: float  # thermodynamic potential = local_energy - local_temperature * instability
+    # thermodynamic potential = local_energy - local_temperature * instability
+    free_energy: float
     local_convergence: float
     local_temperature: float
     source_record: str
     domain: str
-    version: int # For validation
+    version: int  # For validation
 
 
 @dataclass(frozen=True)
@@ -72,9 +71,10 @@ class EdgeFieldSnapshot:
     """Unified read model for role-pair topology forces.
 
     This is derived from topology-owned structures only. It does not create a
-    second edge authority; it makes existing cohesion/law/region pressure
+    second edge authority; it makes existing cohesion / law / region pressure
     observable through one bounded field representation.
     """
+
     source: str
     target: str
     affinity: float
@@ -98,8 +98,9 @@ class MesoClusterSnapshot:
 
     Meso clusters are the intermediate scale between micro (regions)
     and macro (continents). They form naturally from shared roles
-    and exert top-down stabilization/perturbation on their regions.
+    and exert top-down stabilization / perturbation on their regions.
     """
+
     cluster_id: str
     size: int
     region_ids: tuple
@@ -111,7 +112,7 @@ class MesoClusterSnapshot:
     avg_pressure: float
     # Active entity properties
     entropy: float  # internal disorder
-    drift: float    # how much the cluster's center is moving
+    drift: float  # how much the cluster's center is moving
     stability: float  # inverse of avg instability, smoothed
     boundary_strength: float  # 0=porous, 1=tightly bounded
     interaction_policy: str  # "cooperative", "competitive", "neutral", "isolated"
@@ -134,6 +135,7 @@ class MacroContinentSnapshot:
     - guidance_strength: How strongly the continent influences its clusters
     - diversity_pressure: Mechanism to prevent single-attractor dominance
     """
+
     continent_id: str
     size: int  # total regions across all constituent clusters
     meso_cluster_ids: tuple

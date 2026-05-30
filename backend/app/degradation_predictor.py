@@ -31,9 +31,11 @@ logger = logging.getLogger(__name__)
 # Data Models
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class Prediction:
     """A single prediction about an upcoming failure."""
+
     domain: str
     risk_level: str  # 'low' | 'medium' | 'high' | 'critical'
     confidence: float  # 0.0 to 1.0
@@ -45,7 +47,7 @@ class Prediction:
     """How many hours until the predicted failure is expected to occur."""
 
     health_score_current: float = 100.0
-    health_score_trend: str = 'stable'
+    health_score_trend: str = "stable"
     """Direction of health score change: 'improving' | 'stable' | 'declining'."""
 
     evidence: list[str] = field(default_factory=list)
@@ -87,6 +89,7 @@ class Prediction:
 @dataclass
 class PredictionReport:
     """Complete degradation prediction report for the system."""
+
     generated_at: float = field(default_factory=time.time)
     predictions: list[Prediction] = field(default_factory=list)
 
@@ -98,10 +101,10 @@ class PredictionReport:
     critical_risk_count: int = 0
 
     # Systemic risk
-    systemic_risk_level: str = 'low'
+    systemic_risk_level: str = "low"
     """Overall system risk: 'low' | 'medium' | 'high' | 'critical'."""
     cascade_risk_count: int = 0
-    most_common_failure_type: str = 'none'
+    most_common_failure_type: str = "none"
     average_confidence: float = 0.0
 
     # Top risks
@@ -131,6 +134,7 @@ class PredictionReport:
 # Degradation Pattern Detectors
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class DegradationPredictor:
     """Predicts what's about to fail by analyzing telemetry trends.
 
@@ -149,8 +153,7 @@ class DegradationPredictor:
     def __init__(self, history_window: int = 200):
         self._history_window = history_window
 
-    def predict(self, telemetry_history: list[dict],
-                domain_trends: dict | None = None) -> PredictionReport:
+    def predict(self, telemetry_history: list[dict], domain_trends: dict | None = None) -> PredictionReport:
         """Run full degradation prediction on telemetry data.
 
         Args:
@@ -187,11 +190,11 @@ class DegradationPredictor:
 
         # Count by risk level
         for p in all_predictions:
-            if p.risk_level == 'critical':
+            if p.risk_level == "critical":
                 result.critical_risk_count += 1
-            elif p.risk_level == 'high':
+            elif p.risk_level == "high":
                 result.high_risk_count += 1
-            elif p.risk_level == 'medium':
+            elif p.risk_level == "medium":
                 result.medium_risk_count += 1
             else:
                 result.low_risk_count += 1
@@ -201,27 +204,23 @@ class DegradationPredictor:
 
         # Most common failure type
         if failure_type_counts:
-            result.most_common_failure_type = max(
-                failure_type_counts, key=lambda k: failure_type_counts[k]
-            )
+            result.most_common_failure_type = max(failure_type_counts, key=lambda k: failure_type_counts[k])
 
         # Average confidence
         if all_predictions:
-            result.average_confidence = sum(
-                p.confidence for p in all_predictions
-            ) / len(all_predictions)
+            result.average_confidence = sum(p.confidence for p in all_predictions) / len(all_predictions)
 
         # Systemic risk level
         result.systemic_risk_level = self._compute_systemic_risk(result)
 
         # Top risks sorted by severity
-        severity_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
+        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
         sorted_predictions = sorted(
             all_predictions,
             key=lambda p: (
                 severity_order.get(p.risk_level, 99),
                 -p.confidence,
-            )
+            ),
         )
         result.top_risks = [p.to_dict() for p in sorted_predictions[:10]]
 
@@ -245,8 +244,8 @@ class DegradationPredictor:
         if trend.selector_decay_accelerating:
             pred = self._build_prediction(
                 domain=domain,
-                risk_level='high' if trend.health_score < 50 else 'medium',
-                failure_type='selector_decay',
+                risk_level="high" if trend.health_score < 50 else "medium",
+                failure_type="selector_decay",
                 confidence=self._estimate_confidence(trend, base=0.75),
                 health_score_current=trend.health_score,
                 health_score_trend=trend.quality_trend,
@@ -262,16 +261,16 @@ class DegradationPredictor:
                 ],
                 trend=trend,
             )
-            if pred.risk_level in ('high', 'critical'):
+            if pred.risk_level in ("high", "critical"):
                 pred.estimated_time_to_failure_hours = self._estimate_selector_decay_timer(trend)
             predictions.append(pred)
 
         # 3. Check for anti-bot intensification
-        if trend.anti_bot_trend == 'degrading':
+        if trend.anti_bot_trend == "degrading":
             pred = self._build_prediction(
                 domain=domain,
-                risk_level='medium' if trend.health_score > 50 else 'high',
-                failure_type='anti_bot_block',
+                risk_level="medium" if trend.health_score > 50 else "high",
+                failure_type="anti_bot_block",
                 confidence=self._estimate_confidence(trend, base=0.7),
                 health_score_current=trend.health_score,
                 health_score_trend=trend.anti_bot_trend,
@@ -291,11 +290,11 @@ class DegradationPredictor:
             predictions.append(pred)
 
         # 4. Check for latency creep (timeout death spiral)
-        if trend.fetch_latency_trend == 'degrading' and trend.avg_fetch_ms > 15000:
+        if trend.fetch_latency_trend == "degrading" and trend.avg_fetch_ms > 15000:
             pred = self._build_prediction(
                 domain=domain,
-                risk_level='medium',
-                failure_type='timeout_death_spiral',
+                risk_level="medium",
+                failure_type="timeout_death_spiral",
                 confidence=self._estimate_confidence(trend, base=0.65),
                 health_score_current=trend.health_score,
                 health_score_trend=trend.fetch_latency_trend,
@@ -316,8 +315,8 @@ class DegradationPredictor:
         if trend.avg_quality_score < 0.15 and trend.sample_count >= 5:
             pred = self._build_prediction(
                 domain=domain,
-                risk_level='high' if trend.health_score < 40 else 'medium',
-                failure_type='zero_result_drift',
+                risk_level="high" if trend.health_score < 40 else "medium",
+                failure_type="zero_result_drift",
                 confidence=self._estimate_confidence(trend, base=0.7),
                 health_score_current=trend.health_score,
                 health_score_trend=trend.quality_trend,
@@ -338,15 +337,16 @@ class DegradationPredictor:
 
         # 6. High failure rate with poor health
         if trend.failure_rate > 0.5 and trend.health_score < 40:
-            # Check cascade risk: if this is a major domain, failures could cascade
+            # Check cascade risk: if this is a major domain, failures could
+            # cascade
             cascade = trend.sample_count >= 20
             pred = self._build_prediction(
                 domain=domain,
-                risk_level='critical' if trend.failure_rate > 0.8 else 'high',
-                failure_type='sustained_failure_rate',
+                risk_level="critical" if trend.failure_rate > 0.8 else "high",
+                failure_type="sustained_failure_rate",
                 confidence=self._estimate_confidence(trend, base=0.85),
                 health_score_current=trend.health_score,
-                health_score_trend='declining',
+                health_score_trend="declining",
                 evidence=[
                     f"Sustained failure rate: {trend.failure_rate:.0%}",
                     f"Health score: {trend.health_score:.0f}/100",
@@ -363,12 +363,8 @@ class DegradationPredictor:
                 cascade_risk_domains=[domain] if cascade else [],
             )
             if cascade:
-                pred.evidence.append(
-                    "High-volume domain — failure could cascade to dependent systems"
-                )
-                pred.recommended_actions.append(
-                    "Reduce concurrency for all domains sharing this proxy pool"
-                )
+                pred.evidence.append("High-volume domain — failure could cascade to dependent systems")
+                pred.recommended_actions.append("Reduce concurrency for all domains sharing this proxy pool")
             predictions.append(pred)
 
         return predictions
@@ -379,18 +375,18 @@ class DegradationPredictor:
             return None  # Healthy enough
 
         if trend.health_score < self.CRITICAL_HEALTH_THRESHOLD:
-            risk_level = 'critical'
+            risk_level = "critical"
         elif trend.health_score < self.HIGH_HEALTH_THRESHOLD:
-            risk_level = 'high'
+            risk_level = "high"
         else:
-            risk_level = 'medium'
+            risk_level = "medium"
 
         evidence = [
             f"Health score: {trend.health_score:.0f}/100",
             f"Failure rate: {trend.failure_rate:.0%}",
             f"Sample count: {trend.sample_count}",
         ]
-        if trend.quality_trend == 'degrading':
+        if trend.quality_trend == "degrading":
             evidence.append("Quality metrics are declining")
 
         rec_actions = [
@@ -399,13 +395,13 @@ class DegradationPredictor:
         ]
         if trend.selector_decay_accelerating:
             rec_actions.append("Force selector rediscovery")
-        if trend.anti_bot_trend == 'degrading':
+        if trend.anti_bot_trend == "degrading":
             rec_actions.append("Rotate proxies and reduce frequency")
 
         return self._build_prediction(
             domain=domain,
             risk_level=risk_level,
-            failure_type='general_degradation',
+            failure_type="general_degradation",
             confidence=self._estimate_confidence(trend, base=0.6),
             health_score_current=trend.health_score,
             health_score_trend=self._determine_health_trend(trend),
@@ -459,7 +455,7 @@ class DegradationPredictor:
             return None
 
         # Use recent quality trend to estimate decay rate
-        if trend.quality_trend == 'degrading':
+        if trend.quality_trend == "degrading":
             # Assume linear decay: estimate time until quality < 0.1
             quality_gap = max(0, trend.avg_quality_score - 0.1)
             if quality_gap <= 0:
@@ -478,36 +474,36 @@ class DegradationPredictor:
     def _determine_health_trend(self, trend: "DomainTrend") -> str:
         """Determine if health is improving, stable, or declining."""
         declining_signals = 0
-        if trend.quality_trend == 'degrading':
+        if trend.quality_trend == "degrading":
             declining_signals += 1
-        if trend.fetch_latency_trend == 'degrading':
+        if trend.fetch_latency_trend == "degrading":
             declining_signals += 1
-        if trend.anti_bot_trend == 'degrading':
+        if trend.anti_bot_trend == "degrading":
             declining_signals += 1
         if trend.selector_decay_accelerating:
             declining_signals += 1
 
         improving_signals = 0
-        if trend.quality_trend == 'improving':
+        if trend.quality_trend == "improving":
             improving_signals += 1
-        if trend.fetch_latency_trend == 'improving':
+        if trend.fetch_latency_trend == "improving":
             improving_signals += 1
 
         if declining_signals >= 2:
-            return 'declining'
+            return "declining"
         elif improving_signals >= 2:
-            return 'improving'
-        return 'stable'
+            return "improving"
+        return "stable"
 
     def _compute_systemic_risk(self, report: PredictionReport) -> str:
         """Compute overall systemic risk level."""
         if report.critical_risk_count >= 3 or report.high_risk_count >= 5:
-            return 'critical'
+            return "critical"
         elif report.critical_risk_count >= 1 or report.high_risk_count >= 3:
-            return 'high'
+            return "high"
         elif report.high_risk_count >= 1 or report.medium_risk_count >= 5:
-            return 'medium'
-        return 'low'
+            return "medium"
+        return "low"
 
 
 # ═══════════════════════════════════════════════════════════════════════

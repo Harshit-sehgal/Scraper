@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     )
 
     ALLOWED_INTERNAL_HOSTS: str = ""
-    """Comma-separated list of allowed internal hostnames (for testing/smoke)."""
+    """Comma-separated list of allowed internal hostnames (for testing / smoke)."""
 
     # ─── Browser / Playwright ──────────────────────────────────────────────
     PLAYWRIGHT_TIMEOUT: int = 45000
@@ -96,10 +96,10 @@ class Settings(BaseSettings):
     GEOCODER_TIMEOUT: int = 10
     """Timeout for reverse geocoding lookups."""
     USER_AGENT: str = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "Mozilla / 5.0 (Windows NT 10.0; Win64; x64) AppleWebKit / 537.36 "
+        "(KHTML, like Gecko) Chrome / 122.0.0.0 Safari / 537.36"
     )
-    GEOCODER_USER_AGENT: str = "DataForge-Scraper/2.0 (geocoder)"
+    GEOCODER_USER_AGENT: str = "DataForge-Scraper / 2.0 (geocoder)"
     """User-agent for geocoding services."""
     MAX_RETRIES: int = 2
     """Number of retries for HTTP requests (httpx)."""
@@ -108,7 +108,7 @@ class Settings(BaseSettings):
 
     # ─── Extraction & AI Structuring ───────────────────────────────────────
     MAX_RECORDS_PER_SOURCE: int = 25
-    """Max records kept from a single URL after scoring/dedup."""
+    """Max records kept from a single URL after scoring / dedup."""
     DEFAULT_MIN_RECORD_SCORE: float = 0.35
     """Default minimum quality score for a record to be accepted."""
     RECORD_ACCEPTANCE_FACTOR: float = 0.8
@@ -171,7 +171,7 @@ class Settings(BaseSettings):
 
     # ─── LLM Provider Timeouts ─────────────────────────────────────────────
     LLM_TIMEOUT: int = 45
-    """Default timeout for LLM JSON/text calls (seconds)."""
+    """Default timeout for LLM JSON / text calls (seconds)."""
     LLM_FAST_TIMEOUT: int = 12
     """Fast-path timeout for throughput-sensitive LLM calls."""
     LLM_SELECTOR_TIMEOUT: int = 30
@@ -201,7 +201,7 @@ class Settings(BaseSettings):
     MAX_DISCOVERY_URLS: int = 20
     """Max URLs discovered per auto-discovery."""
     MAX_JOB_HISTORY: int = 300
-    """Max completed/canceled jobs retained before pruning."""
+    """Max completed / canceled jobs retained before pruning."""
     MAX_RECYCLE_BIN_HISTORY: int = 300
     """Max deleted jobs retained before pruning."""
 
@@ -240,9 +240,9 @@ class Settings(BaseSettings):
     MOTIF_PRUNE_THRESHOLD: float = 0.2
 
     # ─── Paths ─────────────────────────────────────────────────────────────
-    SEMANTIC_STATE_PATH: str = "data/semantic_state.json"
+    SEMANTIC_STATE_PATH: str = "data / semantic_state.json"
     STATE_FILE_PATH: str = ""
-    """Override for jobs_state.json path. Empty = use default ./backend/data/jobs_state.json"""
+    """Override for jobs_state.json path. Empty = use default ./backend / data / jobs_state.json"""
 
     # ─── API Security ──────────────────────────────────────────────────────
     ENV: str = "development"
@@ -252,7 +252,7 @@ class Settings(BaseSettings):
     OPERATOR_API_KEY: str = ""
     """If set, operator routes (creating and running jobs, manual scraper invocation) require this key."""
     ADMIN_API_KEY: str = ""
-    """If set, powerful admin routes (/api/system/merge, /api/system/scheduler, etc.) require this key."""
+    """If set, powerful admin routes (/api / system / merge, /api / system / scheduler, etc.) require this key."""
     METRICS_TOKEN: str = ""
     """If set, /metrics endpoint requires Authorization: Bearer <token> or X-API-Key header."""
     ALERT_WEBHOOK_URL: Optional[str] = None
@@ -263,11 +263,11 @@ class Settings(BaseSettings):
     """Enable request duration and operation latency histograms in /metrics output."""
     METRICS_HISTOGRAM_BUCKETS: str = "0.01,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0,30.0,60.0,120.0"
     """Comma-separated bucket boundaries for duration histograms (seconds)."""
-    RATE_LIMIT_GLOBAL: str = "600/minute"
+    RATE_LIMIT_GLOBAL: str = "600 / minute"
     """Global rate limit for /api/* endpoints (slowapi format). Empty = disabled."""
-    RATE_LIMIT_JOB_CREATE: str = "10/minute"
-    """Stricter rate limit for job creation (POST /api/jobs)."""
-    RATE_LIMIT_DISCOVER: str = "20/minute"
+    RATE_LIMIT_JOB_CREATE: str = "10 / minute"
+    """Stricter rate limit for job creation (POST /api / jobs)."""
+    RATE_LIMIT_DISCOVER: str = "20 / minute"
     """Rate limit for discovery endpoint."""
 
     # ─── Crawl Policy (operational governance) ─────────────────────────────
@@ -299,9 +299,9 @@ class Settings(BaseSettings):
     """Emit per-URL scrape telemetry events."""
 
     # ─── LLM Provider Settings ───────────────────────────────────────────────
-    GROQ_API_ENDPOINT: str = "https://api.groq.com/openai/v1/chat/completions"
+    GROQ_API_ENDPOINT: str = "https://api.groq.com / openai / v1 / chat / completions"
     """Groq API endpoint for LLM calls."""
-    POLLINATIONS_API_ENDPOINT: str = "https://text.pollinations.ai/openai"
+    POLLINATIONS_API_ENDPOINT: str = "https://text.pollinations.ai / openai"
     """Pollinations AI endpoint for LLM calls."""
 
     # ─── Proxy & Anti-Bot Evasion ──────────────────────────────────────────
@@ -368,7 +368,7 @@ class Settings(BaseSettings):
     ZERO_RESULT_ANTIBOT_THRESHOLD: float = 0.8
     """Anti-bot score above this classifies zero-result as anti-bot block."""
     ZERO_RESULT_EMPTY_HTML_LEN: int = 100
-    """HTML shorter than this is classified as a blank/empty page."""
+    """HTML shorter than this is classified as a blank / empty page."""
     ZERO_RESULT_JS_SHELL_HTML_LEN: int = 1000
     """HTML longer than this without containers suggests JS shell."""
     ZERO_RESULT_AUTH_PATTERNS: list[str] = ["login", "sign in", "password"]
@@ -467,9 +467,14 @@ class Settings(BaseSettings):
     """Max ms for hydration delay."""
 
     # ─── Discovery & Source Trust ──────────────────────────────────────────
-    DISCOVERY_SOCIAL_DOMAINS: str = "facebook.com,twitter.com,x.com,instagram.com,linkedin.com,reddit.com,pinterest.com,tiktok.com,youtube.com"
+    DISCOVERY_SOCIAL_DOMAINS: str = (
+        "facebook.com,twitter.com,x.com,instagram.com,linkedin.com,reddit.com,pinterest.com,tiktok.com,youtube.com"
+    )
     """Comma-separated social root domains for source classification."""
-    DISCOVERY_DIRECTORY_DOMAINS: str = "yelp.com,yellowpages.com,justdial.com,sulekha.com,indiamart.com,tripadvisor.com,glassdoor.com,angieslist.com,homeadvisor.com,houzz.com"
+    DISCOVERY_DIRECTORY_DOMAINS: str = (
+        "yelp.com,yellowpages.com,justdial.com,sulekha.com,indiamart.com,"
+        "tripadvisor.com,glassdoor.com,angieslist.com,homeadvisor.com,houzz.com"
+    )
     """Comma-separated directory domains for source classification."""
     DISCOVERY_SEARCH_DOMAINS: str = "google.com,bing.com,yahoo.com,duckduckgo.com,baidu.com"
     """Comma-separated search engine domains for source classification."""
@@ -484,11 +489,16 @@ class Settings(BaseSettings):
 
     # ─── Browser Stealth Pool ─────────────────────────────────────────────
     STEALTH_UA_POOL: str = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36,"
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36,"
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0,"
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0,"
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "Mozilla / 5.0 (Windows NT 10.0; Win64; x64) AppleWebKit / 537.36 "
+        "(KHTML, like Gecko) Chrome / 122.0.0.0 Safari / 537.36,"
+        "Mozilla / 5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit / 537.36 "
+        "(KHTML, like Gecko) Chrome / 122.0.0.0 Safari / 537.36,"
+        "Mozilla / 5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko / 20100101 "
+        "Firefox / 123.0,"
+        "Mozilla / 5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko / 20100101 "
+        "Firefox / 123.0,"
+        "Mozilla / 5.0 (X11; Linux x86_64) AppleWebKit / 537.36 (KHTML, like Gecko) "
+        "Chrome / 122.0.0.0 Safari / 537.36"
     )
     """Comma-separated pool of stealth user-agent strings shared across browser_pool and anti_bot_engine."""
     STEALTH_VIEWPORT_WIDTHS: str = "1280,1366,1440,1536,1600,1920"
@@ -499,7 +509,10 @@ class Settings(BaseSettings):
     """Comma-separated device scale factors for stealth randomization."""
     STEALTH_NAVIGATOR_LANGUAGES: str = "en-US,en"
     """Comma-separated navigator.languages for stealth JS injection."""
-    STEALTH_TIMEZONE_POOL: str = "America/New_York,America/Chicago,America/Los_Angeles,Europe/London,Europe/Berlin,Asia/Singapore,Asia/Tokyo,Australia/Sydney"
+    STEALTH_TIMEZONE_POOL: str = (
+        "America / New_York,America / Chicago,America / Los_Angeles,"
+        "Europe / London,Europe / Berlin,Asia / Singapore,Asia / Tokyo,Australia / Sydney"
+    )
     """Comma-separated timezone IDs for stealth randomization."""
     STEALTH_HARDWARE_CONCURRENCY: int = 4
     """navigator.hardwareConcurrency value for stealth JS injection."""
@@ -509,9 +522,9 @@ class Settings(BaseSettings):
     """Default locale for browser contexts."""
 
     # ─── LLM Provider Models ──────────────────────────────────────────────
-    GROQ_DEFAULT_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_DEFAULT_MODEL: str = "llama-3.3 - 70b-versatile"
     """Default model for Groq LLM calls."""
-    GROQ_FALLBACK_MODEL: str = "llama-3.1-8b-instant"
+    GROQ_FALLBACK_MODEL: str = "llama-3.1 - 8b-instant"
     """Fallback model when default Groq model fails."""
     G4F_JSON_MODEL: str = "gpt-4o-mini"
     """Model for g4f JSON fallback calls."""
@@ -525,7 +538,13 @@ class Settings(BaseSettings):
     """Timeout in seconds for search form POST recovery."""
 
     # ─── Location / Locale ────────────────────────────────────────────────
-    LOCATION_WORDS: str = "chennai,bangalore,delhi,mumbai,kolkata,hyderabad,pune,ahmedabad,jaipur,lucknow,london,new york,los angeles,chicago,houston,phoenix,paris,berlin,tokyo,singapore,sydney,toronto,melbourne,dubai,amsterdam,beijing,seoul,bangkok,madrid,rome,dublin,sao paulo,mexico city,buenos aires,cairo,nairobi,lagos,jakarta,manila"
+    LOCATION_WORDS: str = (
+        "chennai,bangalore,delhi,mumbai,kolkata,hyderabad,pune,ahmedabad,"
+        "jaipur,lucknow,london,new york,los angeles,chicago,houston,phoenix,"
+        "paris,berlin,tokyo,singapore,sydney,toronto,melbourne,dubai,amsterdam,"
+        "beijing,seoul,bangkok,madrid,rome,dublin,sao paulo,mexico city,"
+        "buenos aires,cairo,nairobi,lagos,jakarta,manila"
+    )
     """Comma-separated location words for geographic field detection."""
 
     # ─── Scraper Recovery ──────────────────────────────────────────────────
@@ -579,24 +598,24 @@ class Settings(BaseSettings):
     """Seconds between domain health alert notifications for the same domain."""
 
     # ─── Domain Intelligence Persistence ───────────────────────────────────
-    DOMAIN_INTELLIGENCE_PATH: str = "data/domain_intelligence.json"
+    DOMAIN_INTELLIGENCE_PATH: str = "data / domain_intelligence.json"
     """Path for domain intelligence persistence file."""
-    SELECTOR_MEMORY_PATH: str = "data/selector_memory.json"
+    SELECTOR_MEMORY_PATH: str = "data / selector_memory.json"
     """Path for selector memory persistence file."""
-    SELECTOR_DECAY_SNAPSHOT_PATH: str = "data/selector_decay_snapshots.json"
+    SELECTOR_DECAY_SNAPSHOT_PATH: str = "data / selector_decay_snapshots.json"
     """Path for selector decay snapshots."""
-    REGRESSION_REGISTRY_PATH: str = "data/regression_registry.json"
+    REGRESSION_REGISTRY_PATH: str = "data / regression_registry.json"
     """Path for regression capture registry."""
     SELECTOR_PROFILES_DIR: str = "profiles"
     """Directory for selector profile definitions."""
     FRONTEND_DIR: str = ""
     """Override for frontend static files directory. Empty = auto-detect."""
-    HTTPX_BASIC_USER_AGENT: str = "python-httpx/0.27.0"
+    HTTPX_BASIC_USER_AGENT: str = "python-httpx / 0.27.0"
     """User-Agent for basic HTTPX requests (non-stealth)."""
 
     # ─── Federation / Sharding ──────────────────────────────────────────────
     NODE_ID: str = "node-1"
-    """Unique identifier for this node/worker context."""
+    """Unique identifier for this node / worker context."""
     SHARD_ID: str = "shard-1"
     """Unique identifier for the sharded workload context."""
 

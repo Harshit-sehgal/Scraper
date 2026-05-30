@@ -20,9 +20,12 @@ class RegressionStateAdapter:
         # Maps domain -> failure count per category
         self._counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
-    def record_failure(self, domain: str, failure_type: str, severity: str = "medium", context: Optional[dict] = None) -> None:
-        """Record and log a new classified regression/failure event."""
+    def record_failure(
+        self, domain: str, failure_type: str, severity: str = "medium", context: Optional[dict] = None
+    ) -> None:
+        """Record and log a new classified regression / failure event."""
         import time
+
         record = {
             "failure_type": failure_type,
             "severity": severity,
@@ -31,14 +34,13 @@ class RegressionStateAdapter:
         }
         self._history[domain].append(record)
         self._counts[domain][failure_type] += 1
-        
+
         # Keep history bounded (last 100 failures per domain)
         if len(self._history[domain]) > 100:
             self._history[domain].pop(0)
 
         logger.debug(
-            "[RegressionState] Archived failure for domain %s: %s (severity: %s)",
-            domain, failure_type, severity
+            "[RegressionState] Archived failure for domain %s: %s (severity: %s)", domain, failure_type, severity
         )
 
     def get_failure_history(self, domain: str) -> list[dict[str, Any]]:
@@ -52,11 +54,9 @@ class RegressionStateAdapter:
     def get_regression_rate(self, domain: str, window_seconds: float = 3600.0) -> float:
         """Calculate the regression rate (failures per hour) within a sliding time window."""
         import time
+
         now = time.time()
-        recent_failures = [
-            f for f in self._history.get(domain, [])
-            if now - f["timestamp"] < window_seconds
-        ]
+        recent_failures = [f for f in self._history.get(domain, []) if now - f["timestamp"] < window_seconds]
         return len(recent_failures)
 
     def clear(self) -> None:
@@ -66,6 +66,7 @@ class RegressionStateAdapter:
 
 
 _regression_state: Optional[RegressionStateAdapter] = None
+
 
 def get_regression_state() -> RegressionStateAdapter:
     global _regression_state

@@ -70,9 +70,7 @@ class BrowserPool:
             if not self._browser or not self._browser.is_connected():
                 logger.info("[BrowserPool] Launching new Chromium instance")
                 try:
-                    self._browser = await self._playwright.chromium.launch(
-                        headless=settings.PLAYWRIGHT_HEADLESS
-                    )
+                    self._browser = await self._playwright.chromium.launch(headless=settings.PLAYWRIGHT_HEADLESS)
                 except Exception as e:
                     self.crash_count += 1
                     logger.error("[BrowserPool] Failed to launch browser: %s", e)
@@ -83,8 +81,10 @@ class BrowserPool:
                     self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
 
             # Check for existing context
-            # We key by (domain, strategy) to allow different strategies for same domain
-            context_key = f"{domain}:{strategy.value if strategy else 'default'}"
+            # We key by (domain, strategy) to allow different strategies for
+            # same domain
+            context_key = f"{domain}:{
+                strategy.value if strategy else 'default'}"
             context = self._contexts.get(context_key)
             if context:
                 use_count = self._context_use_count.get(context_key, 0)
@@ -100,12 +100,15 @@ class BrowserPool:
 
             # Create new context with optional proxy configuration
             from app.strategy_evolution import FetchStrategy
+
             is_stealth = strategy == FetchStrategy.PLAYWRIGHT_STEALTH
 
-            # Use AntiBotEngine's stealth profile for enhanced fingerprint randomization
+            # Use AntiBotEngine's stealth profile for enhanced fingerprint
+            # randomization
             context_options: Dict[str, Any]
             if is_stealth:
                 from app.anti_bot_engine import get_anti_bot_engine
+
                 stealth_profile = get_anti_bot_engine().get_stealth_profile(domain)
                 context_options = {
                     "user_agent": stealth_profile["user_agent"],
@@ -130,21 +133,28 @@ class BrowserPool:
             # Add proxy if enabled
             if settings.PROXY_ROTATION_ENABLED:
                 from app.proxy_manager import get_proxy_manager
+
                 proxy_mgr = get_proxy_manager()
                 if proxy_mgr.enabled:
                     proxy_config = proxy_mgr.get_proxy_for_playwright()
                     if proxy_config:
                         context_options["proxy"] = proxy_config
-                        logger.debug(f"[BrowserPool] Creating context for {domain} with proxy: {proxy_config['server']}")
+                        logger.debug(f"[BrowserPool] Creating context for {domain} with proxy: {
+                            proxy_config['server']}")
 
-            context = await self._browser.new_context(**context_options)  # type: ignore[arg-type]
+            # type: ignore[arg-type]
+            context = await self._browser.new_context(**context_options)
 
             # Register page tracking
             def register_page_tracking(ctx):
                 def on_page(page):
                     self._active_fetches += 1
                     self._cumulative_fetches += 1
-                    logger.debug("[BrowserPool] Page created. Active: %d, Cumulative: %d", self._active_fetches, self._cumulative_fetches)
+                    logger.debug(
+                        "[BrowserPool] Page created. Active: %d, Cumulative: %d",
+                        self._active_fetches,
+                        self._cumulative_fetches,
+                    )
 
                     def on_close(p):
                         self._active_fetches = max(0, self._active_fetches - 1)
@@ -152,6 +162,7 @@ class BrowserPool:
                         asyncio.create_task(self._check_and_trigger_recycle())
 
                     page.on("close", on_close)
+
                 ctx.on("page", on_page)
 
             register_page_tracking(context)
@@ -170,6 +181,7 @@ class BrowserPool:
 
                 if is_stealth:
                     # Advanced fingerprint randomization
+                    hw_concurrency = settings.STEALTH_HARDWARE_CONCURRENCY
                     advanced_stealth = f"""
                     // WebGL spoofing
                     const getParameter = WebGLRenderingContext.prototype.getParameter;
@@ -180,7 +192,9 @@ class BrowserPool:
                     }};
 
                     // Hardware concurrency randomization
-                    Object.defineProperty(navigator, 'hardwareConcurrency', {{get: () => {settings.STEALTH_HARDWARE_CONCURRENCY}}});
+                    Object.defineProperty(navigator, 'hardwareConcurrency', {{
+                        get: () => {hw_concurrency}
+                    }});
 
                     // Battery status spoofing
                     if (navigator.getBattery) {{
@@ -203,6 +217,7 @@ class BrowserPool:
     def _get_random_ua(self) -> str:
         """Return a randomized browser user agent."""
         import random
+
         return random.choice(settings.STEALTH_UA_POOL.split(","))
 
     async def check_health(self) -> bool:
@@ -229,7 +244,7 @@ class BrowserPool:
             "context_reuse_rate": round(self.context_reuse_rate, 3),
             "total_fetches": self.total_fetches,
             "crash_count": self.crash_count,
-            "connected": self._browser.is_connected() if self._browser else False
+            "connected": self._browser.is_connected() if self._browser else False,
         }
 
     async def close(self) -> None:
@@ -263,6 +278,7 @@ class BrowserPool:
 
     def _get_rss_memory(self) -> int:
         import resource
+
         try:
             return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
         except Exception as e:
@@ -271,11 +287,15 @@ class BrowserPool:
 
     def _should_recycle(self) -> bool:
         if self._cumulative_fetches >= settings.BROWSER_MAX_CUMULATIVE_FETCHES:
-            logger.info("[BrowserPool] Cumulative fetches (%d) reached limit. Recycling required.", self._cumulative_fetches)
+            logger.info(
+                "[BrowserPool] Cumulative fetches (%d) reached limit. Recycling required.", self._cumulative_fetches
+            )
             return True
         rss = self._get_rss_memory()
         if rss > settings.BROWSER_MAX_RSS_MEMORY_MB * 1024 * 1024:
-            logger.info("[BrowserPool] Process RSS memory (%.2f MB) exceeded limit. Recycling required.", rss / (1024*1024))
+            logger.info(
+                "[BrowserPool] Process RSS memory (%.2f MB) exceeded limit. Recycling required.", rss / (1024 * 1024)
+            )
             return True
         return False
 
@@ -287,7 +307,9 @@ class BrowserPool:
         self._recycle_event.clear()
 
         while self._active_fetches > 0:
-            logger.info("[BrowserPool] Waiting for %d active fetches to drain before recycling...", self._active_fetches)
+            logger.info(
+                "[BrowserPool] Waiting for %d active fetches to drain before recycling...", self._active_fetches
+            )
             await asyncio.sleep(settings.BROWSER_DRAIN_POLL_INTERVAL)
 
         logger.info("[BrowserPool] Active fetches drained to 0. Performing hard browser process recycle.")
@@ -346,6 +368,7 @@ class BrowserPool:
 
 # Global Singleton
 _pool: BrowserPool | None = None
+
 
 def get_browser_pool() -> BrowserPool:
     global _pool

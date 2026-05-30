@@ -24,6 +24,7 @@ MAP_PATH = str(_BACKEND_ROOT / "data" / "governance" / "architecture_map.md")
 
 class OperatorMode(str, Enum):
     """Adaptive operational profiles for the scraper substrate."""
+
     PRODUCTION = "production"
     """Optimized for high-yield throughput and stable data capture."""
 
@@ -86,6 +87,7 @@ class SystemGovernorDashboard:
     def generate_system_map(self) -> None:
         """Construct and write a visual Markdown system map showing the cluster dependency nodes."""
         from app.semantic_world_state import get_world_state
+
         ws = get_world_state()
 
         # 1. Fetch registered federated nodes
@@ -95,7 +97,10 @@ class SystemGovernorDashboard:
 
         with open(MAP_PATH, "w", encoding="utf-8") as f:
             f.write("# 🗺️ DataForge Visual System & Distributed Topology Map\n\n")
-            f.write(f"> **Governance Layer**: Live architectural status. Last refreshed: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}\n\n")
+            f.write(f"> **Governance Layer**: Live architectural status. Last refreshed: {
+                    time.strftime(
+                        '%Y-%m-%d %H:%M:%S UTC',
+                        time.gmtime())}\n\n")
 
             f.write("## 1. Active Operator Profile\n\n")
             f.write(f"- **Current System Profile**: `OPERATOR_MODE = {self.active_mode.value.upper()}`\n")
@@ -111,7 +116,11 @@ class SystemGovernorDashboard:
                 local_node = ws.federation.node_id
                 f.write(f'    Local["Local Node: {local_node}"]\n')
                 for node_id, info in nodes.items():
-                    f.write(f'    Node_{node_id.replace("-", "_")}["Remote Node: {node_id} (Shard {info["shard_id"]})"]\n')
+                    f.write(f'    Node_{
+                            node_id.replace(
+                                "-",
+                                "_")}["Remote Node: {node_id} (Shard {
+                            info["shard_id"]})"]\n')
                     f.write(f'    Local <--> |sync| Node_{node_id.replace("-", "_")}\n')
                 f.write("```\n\n")
 
@@ -127,13 +136,14 @@ class SystemGovernorDashboard:
             f.write("    SemanticWorldState --> |merge| Federation[Multi-Shard Federation]\n")
             f.write("```\n\n")
 
-            f.write("---\n*End of Dynamic System Map.*\n")
+            f.write("---\n * End of Dynamic System Map.*\n")
 
         self.last_map_update = time.time()
 
     def get_governance_summary(self) -> Dict[str, Any]:
         """Collate the complete governance, resource, and synchronization metrics."""
         from app.resource_governor import get_resource_governor
+
         gov = get_resource_governor()
 
         return {

@@ -8,6 +8,7 @@ This prevents direct regex-to-schema coupling and enables
 probabilistic reasoning at every level.
 
 Core principle: Everything is a relationship, nothing is an island."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -35,12 +36,13 @@ class SemanticType(Enum):
 
 
 class RecordType(Enum):
-    ENTITY = "entity"           # Real data record (flight, hotel, product, etc.)
-    FILTER = "filter"           # Filter/pagination control
-    NAVIGATION = "navigation"   # Navigation element
-    METADATA = "metadata"       # Page metadata
-    CONTROL = "control"          # UI control (button, form)
-    SUMMARY = "summary"         # Aggregate/summary row
+    # Real data record (flight, hotel, product, etc.)
+    ENTITY = "entity"
+    FILTER = "filter"  # Filter / pagination control
+    NAVIGATION = "navigation"  # Navigation element
+    METADATA = "metadata"  # Page metadata
+    CONTROL = "control"  # UI control (button, form)
+    SUMMARY = "summary"  # Aggregate / summary row
     ADVERTISEMENT = "advertisement"
     UI_COMPONENT = "ui_component"
     UNKNOWN = "unknown"
@@ -48,16 +50,17 @@ class RecordType(Enum):
 
 class RegionType(Enum):
     """Universal region types - NOT domain-specific."""
-    ENTITY_NAME = "entity_name"         # Primary entity name/identifier
-    PRICE_REGION = "price_region"       # Price-related tokens
-    DATE_REGION = "date_region"         # Date/time-related tokens
-    LOCATION_REGION = "location_region" # Location identifiers (codes, names)
-    QUANTIFIER = "quantifier"           # Numeric modifiers (count, quantity)
-    DESCRIPTOR = "descriptor"           # Descriptive/adjective text
+
+    ENTITY_NAME = "entity_name"  # Primary entity name / identifier
+    PRICE_REGION = "price_region"  # Price-related tokens
+    DATE_REGION = "date_region"  # Date / time-related tokens
+    LOCATION_REGION = "location_region"  # Location identifiers (codes, names)
+    QUANTIFIER = "quantifier"  # Numeric modifiers (count, quantity)
+    DESCRIPTOR = "descriptor"  # Descriptive / adjective text
     IDENTIFIER_REGION = "identifier_region"  # Codes, SKUs, IDs
-    RATING_REGION = "rating_region"     # Rating/score tokens
-    CONTACT_REGION = "contact_region"   # Phone/email/contact
-    DURATION_REGION = "duration_region" # Time duration
+    RATING_REGION = "rating_region"  # Rating / score tokens
+    CONTACT_REGION = "contact_region"  # Phone / email / contact
+    DURATION_REGION = "duration_region"  # Time duration
     MIXED = "mixed"
     UNKNOWN = "unknown"
 
@@ -65,6 +68,7 @@ class RegionType(Enum):
 @dataclass
 class Span:
     """Character span in source text."""
+
     start: int
     end: int
 
@@ -92,6 +96,7 @@ class SemanticToken:
     All extraction, classification, and mapping operates on these.
     Regex only PROPOSES tokens; meaning is inferred from context.
     """
+
     raw: str
     normalized: str
     span: Span
@@ -129,9 +134,11 @@ class SemanticToken:
 @dataclass
 class RelationshipEdge:
     """A scored relationship between two tokens."""
+
     source_idx: int
     target_idx: int
-    relationship_type: str  # "adjacent", "paired_codes", "date_range", "price_modifier", "same_group"
+    # "adjacent", "paired_codes", "date_range", "price_modifier", "same_group"
+    relationship_type: str
     confidence: float
     evidence: List[str] = field(default_factory=list)
     signals: List[str] = field(default_factory=list)
@@ -140,6 +147,7 @@ class RelationshipEdge:
 @dataclass
 class SemanticGroup:
     """A group of tokens that form a coherent semantic unit."""
+
     tokens: List[SemanticToken]
     cohesion_score: float = 0.0
     primary_type: Optional[SemanticType] = None
@@ -151,6 +159,7 @@ class SemanticGroup:
 @dataclass
 class SemanticRecord:
     """Complete semantic representation of one extracted record."""
+
     tokens: List[SemanticToken]
     groups: list[SemanticRegion] = field(default_factory=list)
     relationships: List[RelationshipEdge] = field(default_factory=list)
@@ -192,6 +201,7 @@ class SemanticRegion:
     Groups related tokens into a meaningful unit.
     Meaning exists primarily at region level, not token level.
     """
+
     region_id: int
     region_type: RegionType
     tokens: List[SemanticToken]
@@ -219,6 +229,7 @@ class SemanticRegion:
 @dataclass
 class AffinityEdge:
     """Soft cohesion between tokens (e.g. proximity-based contextual affinity)."""
+
     source_id: int
     target_id: int
     strength: float = 0.5
@@ -232,6 +243,7 @@ class OwnershipEdge:
 
     Example: price (owned_entity) belongs_to flight (owner_region)
     """
+
     owner_region_id: int
     owned_region_id: int
     ownership_type: str  # "belongs_to", "describes", "modifies", "quantifies", "identifies"
@@ -241,23 +253,31 @@ class OwnershipEdge:
 
 @dataclass
 class ExclusionEdge:
-    """A scored exclusion relationship between two nodes/regions.
+    """A scored exclusion relationship between two nodes / regions.
     Exclusion edges propagate conflict pressure through the topology.
-    Unified with RelationshipEdge via confidence/strength duality.
+    Unified with RelationshipEdge via confidence / strength duality.
     """
+
     source_id: int
     target_id: int
     strength: float = 1.0
     confidence: float = 1.0
     evidence: List[str] = field(default_factory=list)
 
-    def __init__(self, source_id: int, target_id: int, strength: float = 1.0,
-                 confidence: Optional[float] = None, evidence: Optional[List[str]] = None):
+    def __init__(
+        self,
+        source_id: int,
+        target_id: int,
+        strength: float = 1.0,
+        confidence: Optional[float] = None,
+        evidence: Optional[List[str]] = None,
+    ):
         self.source_id = source_id
         self.target_id = target_id
         self.strength = strength
         self.confidence = confidence if confidence is not None else strength
         self.evidence = evidence or []
+
 
 @dataclass
 class SemanticGraph:
@@ -266,6 +286,7 @@ class SemanticGraph:
     The graph ITSELF is the reasoning substrate.
     Meaning emerges from graph structure, not individual heuristics.
     """
+
     regions: List[SemanticRegion]
     tokens: List[SemanticToken] = field(default_factory=list)
     relationships: List[RelationshipEdge] = field(default_factory=list)
@@ -276,8 +297,8 @@ class SemanticGraph:
     # Global properties & Equilibrium metrics
     coherence_score: float = 0.0
     semantic_energy: float = 5.0
-    uncertainty_field: Dict[int, float] = field(default_factory=dict) # node_id -> uncertainty
-    
+    uncertainty_field: Dict[int, float] = field(default_factory=dict)  # node_id -> uncertainty
+
     # Sub-graphs
     sub_graphs: List["SemanticGraph"] = field(default_factory=list)
 
@@ -307,10 +328,12 @@ class SemanticRole:
     Roles compete globally - each candidate can fill at most one role,
     and each role can be filled by at most one candidate.
     """
-    role_name: str           # "price", "date", "name", "location", "code"
-    field_type: SemanticType # Expected type for this role
+
+    role_name: str  # "price", "date", "name", "location", "code"
+    field_type: SemanticType  # Expected type for this role
     required: bool = False
-    exclusivity: float = 1.0  # How exclusive this role is (1.0 = strictly one candidate)
+    # How exclusive this role is (1.0 = strictly one candidate)
+    exclusivity: float = 1.0
     filled_by: Optional[str] = None  # candidate key
     fill_confidence: float = 0.0
 
@@ -322,6 +345,7 @@ class AllocationGraph:
     Candidates compete for roles. The optimal assignment maximizes
     global coherence while satisfying exclusivity constraints.
     """
+
     candidates: Dict[str, SemanticToken] = field(default_factory=dict)  # key → token
     roles: Dict[str, SemanticRole] = field(default_factory=dict)  # role_name → role
     compatibility: Dict[Tuple[str, str], float] = field(default_factory=dict)  # (candidate, role) → score
@@ -335,6 +359,7 @@ class AllocationGraph:
 @dataclass
 class DatasetIR:
     """Complete IR for a dataset (multiple records from one page)."""
+
     records: List[SemanticRecord]
     structure_type: str = ""  # "table", "cards", "list", "mixed"
     structural_memory: Dict[Tuple[str, ...], int] = field(default_factory=dict)  # pattern -> count
@@ -346,16 +371,21 @@ class DatasetIR:
         self.structural_memory[sig] = self.structural_memory.get(sig, 0) + 1
 
 
-def create_token(raw: str, span_start: int, span_end: int, position: int,
-                 primary_type: SemanticType = SemanticType.TEXT,
-                 confidence: float = 0.85,
-                 extraction_method: str = "pattern",
-                 source_field: str = "") -> SemanticToken:
+def create_token(
+    raw: str,
+    span_start: int,
+    span_end: int,
+    position: int,
+    primary_type: SemanticType = SemanticType.TEXT,
+    confidence: float = 0.85,
+    extraction_method: str = "pattern",
+    source_field: str = "",
+) -> SemanticToken:
     """Factory for creating SemanticToken with sensible defaults.
 
     Also populates the 16-dimensional embedding from the primary_type.
     """
-    source = primary_type.value[:10].lower() if hasattr(primary_type, 'value') else ''
+    source = primary_type.value[:10].lower() if hasattr(primary_type, "value") else ""
     tok = SemanticToken(
         raw=raw,
         normalized=raw.strip(),
@@ -371,17 +401,17 @@ def create_token(raw: str, span_start: int, span_end: int, position: int,
     return tok
 
 
-def populate_type_vector(token: SemanticToken, primary_type: SemanticType,
-                          graph: Optional[SemanticGraph] = None):
+def populate_type_vector(token: SemanticToken, primary_type: SemanticType, graph: Optional[SemanticGraph] = None):
     """Populate the 16-dimensional embedding from graph context."""
     if graph:
         from app.semantic_inference_engine import RelationshipEmbeddingSpace
+
         emb_space = RelationshipEmbeddingSpace()
         for i, t in enumerate(graph.tokens):
             if t is token or t.raw == token.raw:
                 token.embedding = emb_space.compute_embedding(i, graph)
                 return
-    
+
     # No graph available: use uniform defaults (entropy anchored)
     token.embedding = [0.5] * 16
 

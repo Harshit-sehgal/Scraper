@@ -1,7 +1,7 @@
 """Acquisition telemetry — tracks URL acquisition outcomes and recovery metrics.
 
 Collects per-URL acquisition events (direct, session_expired, recovered, etc.)
-and exposes aggregate statistics for the /api/system/telemetry endpoint.
+and exposes aggregate statistics for the /api / system / telemetry endpoint.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ class AcquisitionEvent:
     """A single URL acquisition outcome."""
 
     url: str = ""
-    state: str = ""                       # AcquisitionState value
+    state: str = ""  # AcquisitionState value
     original_url: str = ""
     final_url: str = ""
     canonical_url: str = ""
@@ -86,8 +86,12 @@ class AcquisitionTelemetryCollector:
         self._state_counts[event.state] += 1
         if session_bound:
             self._session_bound_count += 1
-        if state in (AcquisitionState.RECOVERED, AcquisitionState.RECOVERY_FAILED,
-                     AcquisitionState.AWAITING_SEARCH_PARAMS, AcquisitionState.NO_SEARCH_FORM):
+        if state in (
+            AcquisitionState.RECOVERED,
+            AcquisitionState.RECOVERY_FAILED,
+            AcquisitionState.AWAITING_SEARCH_PARAMS,
+            AcquisitionState.NO_SEARCH_FORM,
+        ):
             self._recovery_attempts += 1
             if state == AcquisitionState.RECOVERED:
                 self._recovery_successes += 1
@@ -102,11 +106,7 @@ class AcquisitionTelemetryCollector:
     def get_summary(self) -> dict:
         """Get aggregate acquisition statistics."""
         total = sum(self._state_counts.values())
-        recovery_rate = (
-            self._recovery_successes / self._recovery_attempts
-            if self._recovery_attempts > 0
-            else 0.0
-        )
+        recovery_rate = self._recovery_successes / self._recovery_attempts if self._recovery_attempts > 0 else 0.0
         return {
             "total_acquisitions": total,
             "state_distribution": dict(self._state_counts),

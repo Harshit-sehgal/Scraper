@@ -30,7 +30,7 @@ class AcquisitionState(str, Enum):
     # URL redirected to homepage — likely a shallow redirect
     HOMEPAGE_REDIRECT = "homepage_redirect"
 
-    # URL redirected to a shallow path — session/token likely expired
+    # URL redirected to a shallow path — session / token likely expired
     SESSION_EXPIRED = "session_expired"
 
     # Session was expired but recovered via search form submission
@@ -45,7 +45,7 @@ class AcquisitionState(str, Enum):
     # Session expired, form detected, but no search params provided
     AWAITING_SEARCH_PARAMS = "awaiting_search_params"
 
-    # Page returned 200 but content appears empty/unhelpful
+    # Page returned 200 but content appears empty / unhelpful
     EMPTY_RESPONSE = "empty_response"
 
     # Blocked by anti-bot measures
@@ -81,7 +81,8 @@ class AcquisitionLineage(BaseModel):
     # Human-readable explanation of what happened
     message: str = ""
 
-    # How the page was fetched (playwright_full, httpx_basic, search_form_post, etc.)
+    # How the page was fetched (playwright_full, httpx_basic,
+    # search_form_post, etc.)
     fetch_method: str = ""
 
     # If recovery was attempted, what method was used
@@ -119,18 +120,50 @@ class AcquisitionLineage(BaseModel):
 
         messages = {
             AcquisitionState.DIRECT: "Page loaded successfully.",
-            AcquisitionState.DOMAIN_COOLDOWN: "The domain is in cooldown due to recent failures. The URL was skipped to respect rate limits and avoid anti-bot escalation.",
-            AcquisitionState.REDIRECTED: "The URL was redirected from the original to a new location. Data was extracted from the final page.",
-            AcquisitionState.HOMEPAGE_REDIRECT: "The URL redirected to the homepage. The original page may have moved or the session may have expired.",
-            AcquisitionState.SESSION_EXPIRED: "The session for this URL has expired. The page redirected to a homepage or landing page instead of showing results.",
-            AcquisitionState.RECOVERED: "The expired session was recovered by re-submitting the search form. Fresh results are now available.",
-            AcquisitionState.RECOVERY_FAILED: "The session expired and automatic recovery failed. Try providing search parameters to re-fetch the data.",
-            AcquisitionState.NO_SEARCH_FORM: "The session expired and no search form was found on the landing page to recover it. The URL may need to be refreshed manually.",
-            AcquisitionState.AWAITING_SEARCH_PARAMS: "The session expired but a search form was found. Provide search parameters (e.g., origin, destination, dates) to recover the data.",
-            AcquisitionState.EMPTY_RESPONSE: "The page returned a successful response but contained no usable data. It may be a login wall, cookie consent page, or require JavaScript rendering.",
-            AcquisitionState.ANTI_BOT_BLOCKED: "The page appears to be blocking automated access. Try again later or use a different approach.",
+            AcquisitionState.DOMAIN_COOLDOWN: (
+                "The domain is in cooldown due to recent failures. The URL was skipped to "
+                "respect rate limits and avoid anti-bot escalation."
+            ),
+            AcquisitionState.REDIRECTED: (
+                "The URL was redirected from the original to a new location. Data was "
+                "extracted from the final page."
+            ),
+            AcquisitionState.HOMEPAGE_REDIRECT: (
+                "The URL redirected to the homepage. The original page may have moved or the "
+                "session may have expired."
+            ),
+            AcquisitionState.SESSION_EXPIRED: (
+                "The session for this URL has expired. The page redirected to a homepage or "
+                "landing page instead of showing results."
+            ),
+            AcquisitionState.RECOVERED: (
+                "The expired session was recovered by re-submitting the search form. Fresh "
+                "results are now available."
+            ),
+            AcquisitionState.RECOVERY_FAILED: (
+                "The session expired and automatic recovery failed. Try providing search "
+                "parameters to re-fetch the data."
+            ),
+            AcquisitionState.NO_SEARCH_FORM: (
+                "The session expired and no search form was found on the landing page to "
+                "recover it. The URL may need to be refreshed manually."
+            ),
+            AcquisitionState.AWAITING_SEARCH_PARAMS: (
+                "The session expired but a search form was found. Provide search parameters "
+                "(e.g., origin, destination, dates) to recover the data."
+            ),
+            AcquisitionState.EMPTY_RESPONSE: (
+                "The page returned a successful response but contained no usable data. It may "
+                "be a login wall, cookie consent page, or require JavaScript rendering."
+            ),
+            AcquisitionState.ANTI_BOT_BLOCKED: (
+                "The page appears to be blocking automated access. Try again later or use a "
+                "different approach."
+            ),
             AcquisitionState.PATH_CHANGED: "The URL path changed. Data was extracted from the new page.",
-            AcquisitionState.CROSS_DOMAIN: "The URL redirected to a different domain. The original site may have changed.",
+            AcquisitionState.CROSS_DOMAIN: (
+                "The URL redirected to a different domain. The original site may have changed."
+            ),
         }
         return messages.get(self.state, "URL acquisition completed.")
 
@@ -217,8 +250,11 @@ class AcquisitionLineage(BaseModel):
                     original_url=original_url,
                     final_url=final_url,
                     state=state,
-                    message=message if "recovered" in message.lower()
-                    else "Search session was recovered via form submission → fresh results page",
+                    message=(
+                        message
+                        if "recovered" in message.lower()
+                        else "Search session was recovered via form submission → fresh results page"
+                    ),
                     fetch_method=fetch_method,
                     recovery_method="search_form_post",
                     recovered_url=recovered_url,

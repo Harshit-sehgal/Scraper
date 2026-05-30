@@ -19,13 +19,16 @@ from app.utils.quality import build_quality_report, compute_source_breakdown, sa
 from app.llm_bridge import get_llm_call_count, reset_llm_call_count
 from app.storage_interface import get_job_repository
 
+
 def _add_job_log(job, message: str, level: str = "info", persist_fn=None, persist_single_fn=None):
     from app.models import LogEntry
+
     job.logs.append(LogEntry(message=message, level=level))
     if persist_single_fn:
         persist_single_fn()
     elif persist_fn:
         persist_fn()
+
 
 async def run_job(
     job_id: str,
@@ -57,7 +60,8 @@ async def run_job(
     # when available, while preserving persist_state_fn for full-store saves.
     persist_job_state_fn = persist_state_single_fn or persist_state_fn
 
-    _add_job_log(job, f"Initializing job: {job.name}", persist_fn=persist_job_state_fn)
+    _add_job_log(job, f"Initializing job: {
+            job.name}", persist_fn=persist_job_state_fn)
 
     all_raw_results: list[dict] = []
     urls_with_records = 0
@@ -98,12 +102,13 @@ async def run_job(
         if job.mode == ScrapeMode.AUTO:
             reset_llm_call_count()
             job.status = JobStatus.DISCOVERING
-            job.progress_total = int(job.max_pages or 10) + 2 # Discovery + URLs + Final
+            job.progress_total = int(job.max_pages or 10) + 2  # Discovery + URLs + Final
             job.progress_current = 1
             _add_job_log(job, f"Starting auto-discovery for topic: {job.topic}", persist_fn=persist_job_state_fn)
             logging.info("Job %s: Auto-discovering URLs for: %s", job_id, job.topic)
 
-            # In auto mode, reuse max_pages as discovery count and cap to runtime-safe limits.
+            # In auto mode, reuse max_pages as discovery count and cap to
+            # runtime-safe limits.
             discovery_limit = int(job.max_pages or 10)
             discovery_limit = max(1, min(discovery_limit, max_discovery_urls))
 
@@ -120,6 +125,7 @@ async def run_job(
             )
             job.total_llm_calls += get_llm_call_count()
             from app.url_safety import validate_public_http_url
+
             safe_discovered = []
             safe_urls = []
             for d in discovered:
@@ -160,14 +166,14 @@ async def run_job(
             logging.info("Job %s: Discovered %d URLs", job_id, len(job.urls))
 
             if job.cancel_requested or _cancel_requested_from_db():
-                        job.cancel_requested = True
-                        mark_job_canceled(job)
-                        _add_job_log(job, "Job canceled after discovery", level="warning", persist_fn=persist_job_state_fn)
-                        if persist_state_single_critical_fn:
-                            persist_state_single_critical_fn()
-                        else:
-                            persist_state_fn()
-                        return
+                job.cancel_requested = True
+                mark_job_canceled(job)
+                _add_job_log(job, "Job canceled after discovery", level="warning", persist_fn=persist_job_state_fn)
+                if persist_state_single_critical_fn:
+                    persist_state_single_critical_fn()
+                else:
+                    persist_state_fn()
+                return
 
         job.status = JobStatus.RUNNING
         if job.mode == ScrapeMode.MANUAL:
@@ -182,7 +188,13 @@ async def run_job(
 
         async def _safe_log(message: str, level: str = "info"):
             async with job_lock:
-                _add_job_log(job, message, level=level, persist_fn=persist_job_state_fn, persist_single_fn=persist_state_single_fn)
+                _add_job_log(
+                    job,
+                    message,
+                    level=level,
+                    persist_fn=persist_job_state_fn,
+                    persist_single_fn=persist_state_single_fn,
+                )
 
         completed_count = 0
 
@@ -210,6 +222,7 @@ async def run_job(
             # ── DomainRuntimePolicy check ─────────────────────────────────
             from app.domain_runtime_policy import get_domain_runtime_policy
             from app.acquisition_state import AcquisitionLineage, AcquisitionState
+
             policy = get_domain_runtime_policy()
 
             if not policy.can_fetch(url):
@@ -218,9 +231,7 @@ async def run_job(
                     f"Skipping ({idx}/{len(job.urls)}): {url} — domain in cooldown ({rec_action})",
                     level="warning",
                 )
-                await _safe_warning(
-                    f"URL skipped due to domain cooldown ({idx}/{len(job.urls)}): {url}"
-                )
+                await _safe_warning(f"URL skipped due to domain cooldown ({idx}/{len(job.urls)}): {url}")
                 cooldown_remaining = policy.remaining_cooldown(url)
                 domain_key = urlparse(url).netloc.lower()
                 lineage = AcquisitionLineage(
@@ -231,7 +242,8 @@ async def run_job(
                     recovery_method="domain_runtime_policy",
                     anti_bot_score=0.0,
                     data_evidence_score=0.0,
-                    user_message=f"Domain '{domain_key}' in cooldown for {cooldown_remaining:.0f}s — {rec_action}",
+                    user_message=f"Domain '{domain_key}' in cooldown for {
+                        cooldown_remaining:.0f}s — {rec_action}",
                     recommended_next_action=rec_action,
                 )
                 url_meta = {
@@ -250,20 +262,24 @@ async def run_job(
             domain_sem = domain_semaphores[domain]
 
             # Global capacity is reserved first, then domain-level capacity,
-            # to avoid holding a scarce domain slot while waiting for global capacity.
+            # to avoid holding a scarce domain slot while waiting for global
+            # capacity.
             async with semaphore:
                 async with domain_sem:
                     await _safe_log(f"Scraping ({idx}/{len(job.urls)}): {url}")
 
                     from app.semantic_world_state import get_world_state
+
                     ws = get_world_state()
                     try:
                         reset_llm_call_count()
                         results, recovery_stats = await asyncio.wait_for(
                             scrape_url_with_recovery(
-                                url, job.schema_fields,
+                                url,
+                                job.schema_fields,
                                 min_record_score=job.min_record_score,
-                                user_intent=job.intent, world_state=ws,
+                                user_intent=job.intent,
+                                world_state=ws,
                                 max_recovery_attempts=settings.MAX_RECOVERY_ATTEMPTS,
                                 selectors_map=job.selectors_map,
                                 search_params=job.search_params,
@@ -271,7 +287,8 @@ async def run_job(
                             timeout=per_url_scrape_timeout_seconds * settings.RECOVERY_TIMEOUT_MULTIPLIER,
                         )
 
-                        # Log network diagnostics and warnings to job Activity Logs
+                        # Log network diagnostics and warnings to job Activity
+                        # Logs
                         if "network_diagnostics" in recovery_stats:
                             for diag in recovery_stats["network_diagnostics"]:
                                 await _safe_log(f"[NetworkDiagnostics] {diag}", level="info")
@@ -291,7 +308,7 @@ async def run_job(
                             job.total_llm_calls += get_llm_call_count()
 
                         with ws.transaction(f"integrate_scrape:{url}"):
-                            pass  # Future: integrate semantic/motif/world-state updates here
+                            pass  # Future: integrate semantic / motif / world-state updates here
 
                         if recovery_stats.get("recovery_attempts", 0) > 0:
                             actions = ", ".join(recovery_stats.get("recovery_actions_taken", []))
@@ -305,7 +322,9 @@ async def run_job(
                             record["source_url"] = url
                             inferred = infer_source_metadata(url=url)
                             record["source_type"] = str(inferred.get("source_type") or "unknown")
-                            record["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
+                            record["source_trust_score"] = round(
+                                safe_score(inferred.get("source_trust_score") or 0.4), 3
+                            )
 
                         # Attach acquisition lineage to each record so it's
                         # exposed in job results via the API
@@ -343,17 +362,15 @@ async def run_job(
                         await _mark_completed()
                         return idx, [], False, {}
 
-        scrape_tasks = [
-            asyncio.create_task(_scrape_single_url(idx, url))
-            for idx, url in enumerate(job.urls, start=1)
-        ]
+        scrape_tasks = [asyncio.create_task(_scrape_single_url(idx, url)) for idx, url in enumerate(job.urls, start=1)]
 
         # Active cancellation watcher — polls cancel_requested while tasks run
         # so in-flight scrapes are interrupted promptly instead of waiting
         # for all tasks to finish before checking the cancel flag.
         # Also polls the DB for cross-process cancellation signals.
         # NOTE: check all(done) BEFORE cancel_requested to avoid a tight race
-        # where all tasks finish and cancel is flagged in the same polling cycle.
+        # where all tasks finish and cancel is flagged in the same polling
+        # cycle.
         while True:
             if all(task.done() for task in scrape_tasks):
                 break
@@ -406,7 +423,11 @@ async def run_job(
         if run_global_ai_structuring and all_raw_results:
             ext_methods = set(a.get("_extraction_method", "") for a in all_raw_results if isinstance(a, dict))
             if ext_methods and "" not in ext_methods and "regex" not in ext_methods:
-                _add_job_log(job, "Skipping AI structuring — records extracted via structured method (not regex)", persist_fn=persist_job_state_fn)
+                _add_job_log(
+                    job,
+                    "Skipping AI structuring — records extracted via structured method (not regex)",
+                    persist_fn=persist_job_state_fn,
+                )
                 run_global_ai_structuring = False
 
         if job.cancel_requested or _cancel_requested_from_db():
@@ -417,7 +438,8 @@ async def run_job(
             return
 
         if run_global_ai_structuring:
-            _add_job_log(job, f"Running global AI structuring on {len(all_raw_results)} records...", persist_fn=persist_job_state_fn)
+            _add_job_log(job, f"Running global AI structuring on {
+                    len(all_raw_results)} records...", persist_fn=persist_job_state_fn)
             logging.info("Job %s: AI structuring %d scraped rows...", job_id, len(all_raw_results))
             try:
                 reset_llm_call_count()
@@ -430,8 +452,10 @@ async def run_job(
                     timeout=ai_structuring_timeout_seconds,
                 )
                 job.total_llm_calls += get_llm_call_count()
-                # Integration Phase: ensure AI-cleaned records are integrated into the world state
+                # Integration Phase: ensure AI-cleaned records are integrated
+                # into the world state
                 from app.semantic_world_state import get_world_state
+
                 with get_world_state().transaction("global_ai_structuring"):
                     all_raw_results = run_pipeline(all_raw_results, [f.name for f in job.schema_fields])
 
@@ -442,7 +466,7 @@ async def run_job(
                     )
                 if ai_structuring_report.get("model_fallback_mode"):
                     warnings.append(
-                        "AI structuring switched to deterministic fallback after repeated model timeouts/errors."
+                        "AI structuring switched to deterministic fallback after repeated model timeouts / errors."
                     )
                 _add_job_log(job, "AI structuring complete")
             except asyncio.TimeoutError:
@@ -507,20 +531,18 @@ async def run_job(
 
         source_breakdown = compute_source_breakdown(filtered_results)
 
-        has_contact_fields = any(
-            field.field_type in {FieldType.EMAIL, FieldType.PHONE}
-            for field in job.schema_fields
-        )
+        has_contact_fields = any(field.field_type in {FieldType.EMAIL, FieldType.PHONE} for field in job.schema_fields)
         if has_contact_fields and ai_source_prediction["sources_attempted"] > 0:
             import os
+
             if ai_source_prediction["records_ai_structured"] == 0:
                 if (os.getenv("GROQ_API_KEY") or "").strip():
                     warnings.append(
-                        "AI source structuring covered 0% rows in this run; provider timeouts/rate limits may reduce phone/email extraction."
+                        "AI source structuring covered 0% rows in this run; provider timeouts / rate limits may reduce phone / email extraction."  # noqa: E501
                     )
                 else:
                     warnings.append(
-                        "AI source structuring covered 0% rows in this run; set GROQ_API_KEY to improve phone/email extraction reliability."
+                        "AI source structuring covered 0% rows in this run; set GROQ_API_KEY to improve phone / email extraction reliability."  # noqa: E501
                     )
 
         job.quality_report = build_quality_report(
@@ -535,13 +557,19 @@ async def run_job(
             ai_source_prediction=ai_source_prediction,
             ai_structuring_report=ai_structuring_report,
             warnings=warnings,
-            acquisition_lineages=[m.get("acquisition_lineage", {}) for _, _, _, m in scraped if m.get("acquisition_lineage")],
+            acquisition_lineages=[
+                m.get("acquisition_lineage", {}) for _, _, _, m in scraped if m.get("acquisition_lineage")
+            ],
         )
 
         job.results = normalize_job_results(filtered_results, job.schema_fields)
         job.total_records = total
         job.filtered_records = filtered_count
-        _add_job_log(job, f"Final results: {filtered_count} records kept after filtering ({total} raw)", persist_fn=persist_job_state_fn)
+        _add_job_log(
+            job,
+            f"Final results: {filtered_count} records kept after filtering ({total} raw)",
+            persist_fn=persist_job_state_fn,
+        )
 
         # Add scraped_at timestamp to each record
         scraped_at = datetime.datetime.now().isoformat()
@@ -557,10 +585,13 @@ async def run_job(
                 return
 
             job.status = JobStatus.RUNNING
-            _add_job_log(job, f"Generating AI insights for {len(job.results)} records...", persist_fn=persist_job_state_fn)
+            _add_job_log(
+                job, f"Generating AI insights for {len(job.results)} records...", persist_fn=persist_job_state_fn
+            )
             logging.info("Job %s: Generating AI insights over %d records...", job_id, len(job.results))
             try:
                 from app.scraper import generate_data_insight
+
                 reset_llm_call_count()
                 analysis_text = await asyncio.wait_for(
                     generate_data_insight(job.results),
@@ -574,7 +605,8 @@ async def run_job(
                 _add_job_log(job, "AI insight generation timed out", level="warning")
                 logging.warning(
                     "Job %s: AI insight timed out after %ds; continuing without insight.",
-                    job_id, insight_timeout_seconds
+                    job_id,
+                    insight_timeout_seconds,
                 )
                 job.analysis = "Insight generation timed out."
             except Exception as ai_e:
@@ -584,17 +616,21 @@ async def run_job(
 
         # Final cost calculation (Phase 80: Economic Optimization)
         # $0.01 per LLM call + estimated browser cost ($0.02 per URL)
-        job.estimated_cost_usd = round((job.total_llm_calls * settings.COST_PER_LLM_CALL) + (job.progress_total * settings.COST_PER_URL_SCRAPE), 4)
+        job.estimated_cost_usd = round(
+            (job.total_llm_calls * settings.COST_PER_LLM_CALL) + (job.progress_total * settings.COST_PER_URL_SCRAPE), 4
+        )
 
         # Bound memory footprint if results > 1000
         if len(job.results) > settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD:
             try:
                 from app.utils.job_results_store import save_job_results_to_disk
+
                 file_path = save_job_results_to_disk(job.id, job.results)
                 job.results_on_disk = True
                 job.results_file_path = file_path
                 job.results = []
-                _add_job_log(job, f"Job results bounded and offloaded to disk due to size (>{settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD} records).")
+                _add_job_log(job, f"Job results bounded and offloaded to disk due to size (>{
+                        settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD} records).")
             except Exception as e:
                 logging.exception("Job %s: Failed to offload results to disk: %s", job_id, e)
                 _add_job_log(job, f"Failed to offload results to disk: {e}", level="warning")
@@ -608,13 +644,13 @@ async def run_job(
                 persist_state_single_critical_fn()
         elif len(all_raw_results) == 0:
             job.status = JobStatus.EMPTY_RESULT
-            job.error = "The job completed but no records were extracted. This may be due to a session-bound URL, empty response, anti-bot block, JavaScript-rendered results, or missing search-form replay."
+            job.error = "The job completed but no records were extracted. This may be due to a session-bound URL, empty response, anti-bot block, JavaScript-rendered results, or missing search-form replay."  # noqa: E501
             _add_job_log(job, job.error, level="warning", persist_fn=persist_job_state_fn)
             if persist_state_single_critical_fn:
                 persist_state_single_critical_fn()
         elif urls_with_records > 0 and urls_with_records < total_urls:
             job.status = JobStatus.DEGRADED
-            msg = f"{urls_with_records} of {total_urls} URLs produced results. Some pages may have anti-bot protection, expired sessions, or require JavaScript rendering."
+            msg = f"{urls_with_records} of {total_urls} URLs produced results. Some pages may have anti-bot protection, expired sessions, or require JavaScript rendering."  # noqa: E501
             job.error = msg
             _add_job_log(job, msg, level="warning", persist_fn=persist_job_state_fn)
             if persist_state_single_critical_fn:
@@ -625,7 +661,8 @@ async def run_job(
         job.completed_at = datetime.datetime.now().isoformat()
         job.progress_current = job.progress_total
         save_semantic_state()
-        # Contextual completion log message — use critical persistence for terminal state
+        # Contextual completion log message — use critical persistence for
+        # terminal state
         if job.status == JobStatus.COMPLETED:
             _add_job_log(job, "Job completed successfully", persist_fn=persist_job_state_fn)
             if persist_state_single_critical_fn:
@@ -639,7 +676,9 @@ async def run_job(
             if persist_state_single_critical_fn:
                 persist_state_single_critical_fn()
 
-        logging.info("Job %s: Completed (%s): %d total, %d after filtering", job_id, job.status.value, total, filtered_count)
+        logging.info(
+            "Job %s: Completed (%s): %d total, %d after filtering", job_id, job.status.value, total, filtered_count
+        )
 
     except Exception as e:
         logging.exception(e)

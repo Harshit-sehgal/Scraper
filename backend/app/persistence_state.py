@@ -3,7 +3,7 @@
 Extracted from SemanticWorldState to separate persistence concerns from
 runtime field dynamics.
 
-ALL mutations go through the owning state objects. No direct ws.* dict/list
+ALL mutations go through the owning state objects. No direct ws.* dict / list
 mutations are performed here.
 """
 
@@ -23,7 +23,7 @@ def world_state_from_dict(ws: SemanticWorldState, data: dict):
     """Restore the world state from a serialized dict.
 
     Delegates to SemanticWorldState.from_dict() which correctly dispatches
-    to each owned state object's from_dict/load_from_dict method.
+    to each owned state object's from_dict / load_from_dict method.
     """
     ws.from_dict(data)
 

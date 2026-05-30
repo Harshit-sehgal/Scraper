@@ -7,12 +7,14 @@ All changes go through this state object, which supports transactions.
 from typing import Callable, Dict, List, Optional
 from app.transaction_context import active_transaction
 
+
 class IntentState:
     """Sole owner of the semantic field's cognitive intents and goal attractors."""
 
     def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
         self._delta_callback = delta_callback
-        # Active Intents: intent_id -> details {target_vec, strength, target_roles}
+        # Active Intents: intent_id -> details {target_vec, strength,
+        # target_roles}
         self._active_intents: Dict[str, dict] = {}
 
     @property
@@ -36,9 +38,7 @@ class IntentState:
 
     def begin_transaction(self):
         """Snapshot current state for staging."""
-        self._staging = {
-            "active_intents": {k: dict(v) for k, v in self._active_intents.items()}
-        }
+        self._staging = {"active_intents": {k: dict(v) for k, v in self._active_intents.items()}}
 
     def commit(self):
         """Apply staged changes."""
@@ -52,32 +52,38 @@ class IntentState:
     def _get_struct(self, key: str):
         if self._staging is not None:
             return self._staging[key]
-        attr_map = {
-            "active_intents": "_active_intents"
-        }
+        attr_map = {"active_intents": "_active_intents"}
         return getattr(self, attr_map[key])
 
     def _set_struct(self, key: str, val):
         if self._staging is not None:
             self._staging[key] = val
         else:
-            attr_map = {
-                "active_intents": "_active_intents"
-            }
+            attr_map = {"active_intents": "_active_intents"}
             setattr(self, attr_map[key], val)
 
     # ─── Controlled Mutations ────────────────────────────────────────────
 
-    def set_intent(self, intent_id: str, target_vec: List[float], strength: float = 0.5, target_roles: Optional[List[str]] = None):
+    def set_intent(
+        self, intent_id: str, target_vec: List[float], strength: float = 0.5, target_roles: Optional[List[str]] = None
+    ):
         """Define a new cognitive intent (Phase 36)."""
         intents = self._get_struct("active_intents")
         intents[intent_id] = {
             "target_vec": list(target_vec),
             "strength": max(0.0, min(1.0, strength)),
-            "target_roles": list(target_roles) if target_roles else []
+            "target_roles": list(target_roles) if target_roles else [],
         }
         self._set_struct("active_intents", intents)
-        self._record("set_intent", {"intent_id": intent_id, "target_vec": list(target_vec), "strength": strength, "target_roles": list(target_roles) if target_roles else []})
+        self._record(
+            "set_intent",
+            {
+                "intent_id": intent_id,
+                "target_vec": list(target_vec),
+                "strength": strength,
+                "target_roles": list(target_roles) if target_roles else [],
+            },
+        )
 
     def remove_intent(self, intent_id: str):
         intents = self._get_struct("active_intents")
@@ -99,9 +105,7 @@ class IntentState:
     # ─── Serialization ───────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
-        return {
-            "active_intents": self.active_intents
-        }
+        return {"active_intents": self.active_intents}
 
     def from_dict(self, data: dict):
         self.clear()

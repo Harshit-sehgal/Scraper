@@ -12,6 +12,7 @@ from app.semantic_world_state import get_world_state
 if TYPE_CHECKING:
     from app.semantic_world_state import SemanticWorldState
 
+
 class InstabilityAPI:
     """Hardened interface for controlled exclusion and tension mutations."""
 
@@ -49,7 +50,7 @@ class ImmunityLayer:
 
     def __init__(self, ws: Optional[SemanticWorldState] = None):
         self.ws = ws or get_world_state()
-        # Quarantine Registry: domain/source -> trust_score
+        # Quarantine Registry: domain / source -> trust_score
         self._quarantined_sources: Dict[str, float] = {}
 
     # ─── Query Operations ────────────────────────────────────────────────
@@ -62,29 +63,34 @@ class ImmunityLayer:
     def validate_perturbation(self, source: str, token: str, roles: List[str]) -> bool:
         """Evaluate if a data source is safe to perturb the field (Phase 42)."""
         trust = self._quarantined_sources.get(source, 1.0)
-        
+
         # 1. Source Trust
         if trust < 0.2:
             logging.getLogger(__name__).warning(f"IMMUNITY: Blocked perturbation from untrusted source [{source}]")
             return False
-            
+
         # 2. Regional Integrity
         # If any target roles are "Crystalline", check system energy
         for role in roles:
             level = self.ws.get_role_level(role)
             if level > 0 or self.ws.is_role_anchored(role):
                 if self.ws.metrics.global_energy > 7.0:
-                    # System is too hot to allow mutation of high-level concepts
-                    logging.getLogger(__name__).info(f"IMMUNITY: Shielded high-integrity role [{role}] from mutation (Energy too high)")
+                    # System is too hot to allow mutation of high-level
+                    # concepts
+                    logging.getLogger(__name__).info(
+                        f"IMMUNITY: Shielded high-integrity role [{role}] from mutation (Energy too high)"
+                    )
                     return False
-                    
+
         # 3. Adversarial Pressure Detection (Phase 42)
         # Check if this source is repeatedly causing high energy spikes
         if self.ws.metrics.global_energy > 5.0 and trust < 0.6:
-            logging.getLogger(__name__).warning(f"IMMUNITY: Quarantining source [{source}] for contributing to field fever.")
+            logging.getLogger(__name__).warning(
+                f"IMMUNITY: Quarantining source [{source}] for contributing to field fever."
+            )
             self.quarantine_source(source, penalty=0.2)
             return False
-            
+
         return True
 
     def quarantine_source(self, source: str, penalty: float = 0.5):
@@ -92,13 +98,16 @@ class ImmunityLayer:
         current = self._quarantined_sources.get(source, 1.0)
         self._quarantined_sources[source] = max(0.0, current - penalty)
 
+
 _immune_system: Optional[ImmunityLayer] = None
+
 
 def get_immune_system(ws: Optional[SemanticWorldState] = None) -> ImmunityLayer:
     global _immune_system
     if _immune_system is None:
         _immune_system = ImmunityLayer(ws=ws)
     return _immune_system
+
 
 def reset_immune_system():
     """Reset the global immune system (for testing)."""

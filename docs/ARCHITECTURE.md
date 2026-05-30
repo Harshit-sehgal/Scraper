@@ -27,9 +27,9 @@ Status: implemented and locally verified for basic API flows. Distributed produc
 
 ## Storage
 
-SQLite-style local state remains the default path. Postgres repository and queue support exist.
+SQLite-style local state remains the default path. Postgres repository and queue support exist and pass all tests with a real Postgres service container (0 skipped).
 
-Status: SQLite paths are locally tested. Postgres support is implemented but not production-validated until real Postgres CI/service tests pass.
+Status: SQLite paths are locally tested. Postgres support is CI-validated with a real service container — all integration tests pass.
 
 ## Metrics and Telemetry
 

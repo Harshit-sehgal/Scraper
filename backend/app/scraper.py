@@ -25,7 +25,9 @@ from app.config import settings
 from app.cleaning_engine import ai_clean_and_align_records
 from app.insight_engine import generate_data_insight, suggest_schema_from_intent, suggest_schema_from_intent_sync
 from app.html_utils import (
-    _is_empty_value, fetch_page_content, _boost_contacts_with_page_html,
+    _is_empty_value,
+    fetch_page_content,
+    _boost_contacts_with_page_html,
 )
 from app.models import SchemaField
 from app.data_utils import (
@@ -34,16 +36,20 @@ from app.data_utils import (
 )
 from app.selector_profiles.loader import try_profile_extraction, match_profile_for_url
 from app.scrape_telemetry import (
-    get_scrape_telemetry, detect_anti_bot, estimate_dom_nodes,
+    get_scrape_telemetry,
+    detect_anti_bot,
+    estimate_dom_nodes,
 )
 from app.crawl_policy import get_crawl_policy
 from app.extraction_orchestrator import orchestrate_extraction
 from app.strategy_evolution import get_strategy_evolution_engine, FetchStrategy
 from app.failure_classification import (
-    classify_failure, update_domain_with_failure,
+    classify_failure,
+    update_domain_with_failure,
 )
 from app.extraction_provenance import (
-    ProvenanceBuilder, enrich_records_with_provenance,
+    ProvenanceBuilder,
+    enrich_records_with_provenance,
 )
 from app.regression_capture import get_regression_capture
 from app.motif_feedback import MotifFeedbackEngine
@@ -57,12 +63,14 @@ from app.compound_record_assembler import assemble_compound_records
 
 logger = logging.getLogger(__name__)
 
+
 class ScrapeAttemptResult(list):
     """Subclass of list that holds rich metadata about a scrape attempt.
 
     Behaves as a plain list of records for backward compatibility while
     carrying context about how the page was fetched, extracted, and classified.
     """
+
     def __init__(
         self,
         records: list[dict],
@@ -105,9 +113,7 @@ class ScrapeAttemptResult(list):
             "data_evidence_score": self.data_evidence_score,
             "recommended_next_action": self.recommended_next_action,
             "zero_result_classification": (
-                self.zero_result_classification.to_dict()
-                if self.zero_result_classification
-                else None
+                self.zero_result_classification.to_dict() if self.zero_result_classification else None
             ),
             "warnings": self.warnings,
         }
@@ -116,7 +122,8 @@ class ScrapeAttemptResult(list):
 if TYPE_CHECKING:
     from app.recovery_strategies import AttemptContext
 
-# Re-export for backwards compatibility (used by routers/jobs.py and services/job_runner.py)
+# Re-export for backwards compatibility (used by routers / jobs.py and
+# services / job_runner.py)
 
 __all__ = [
     "scrape_url",
@@ -154,9 +161,7 @@ def _build_acquisition_lineage_from_result(
         "records": len(result),
         "html_length": len(result.html) if result.html else 0,
         "zero_result_classification": (
-            result.zero_result_classification.to_dict()
-            if result.zero_result_classification
-            else None
+            result.zero_result_classification.to_dict() if result.zero_result_classification else None
         ),
     }
 
@@ -181,11 +186,13 @@ async def scrape_url_attempt(
     a ScrapeAttemptResult (a ``list`` subclass).
     """
     from app.recovery_strategies import AttemptContext as AttemptContextType
+
     if attempt_ctx is not None and not isinstance(attempt_ctx, AttemptContextType):
         attempt_ctx = None
 
     raw = await scrape_url(
-        url, schema_fields,
+        url,
+        schema_fields,
         min_record_score=min_record_score,
         user_intent=user_intent,
         world_state=world_state,
@@ -239,7 +246,9 @@ async def scrape_url_attempt(
     result.network_diagnostics = getattr(raw, "network_diagnostics", [])
     # Build acquisition lineage from the enriched result
     result.acquisition_lineage = _build_acquisition_lineage_from_result(
-        url=url, result=result, state=state,
+        url=url,
+        result=result,
+        state=state,
     )
 
     return result
@@ -265,6 +274,7 @@ async def scrape_url(
     ``scrape_url_attempt()`` instead.
     """
     from app.recovery_strategies import AttemptContext
+
     if attempt_ctx is not None and not isinstance(attempt_ctx, AttemptContext):
         attempt_ctx = None  # Safety: only accept proper AttemptContext
     if min_record_score is None:
@@ -277,6 +287,7 @@ async def scrape_url(
     logger.info("Fetching: %s", url)
     telemetry = get_scrape_telemetry()
     from app.llm_bridge import reset_llm_call_count, get_llm_call_count
+
     reset_llm_call_count()
     start_time = time.time()
 
@@ -308,7 +319,8 @@ async def scrape_url(
         selectors_map = dict(selectors_map)
         if "fields" in selectors_map and isinstance(selectors_map["fields"], dict):
             selectors_map["fields"] = dict(selectors_map["fields"])
-    # Transfer recovery flags to the cloned selectors_map so orchestrator can consume them.
+    # Transfer recovery flags to the cloned selectors_map so orchestrator can
+    # consume them.
     if attempt_ctx:
         if selectors_map is None:
             selectors_map = {}
@@ -336,7 +348,8 @@ async def scrape_url(
     if profile_results is not None:
         logger.info(
             "Profile-based extraction returned %d records for %s",
-            len(profile_results), url,
+            len(profile_results),
+            url,
         )
         if profile_results:
             profile_keys = {k.lower() for r in profile_results for k in r if not k.startswith("_")}
@@ -346,7 +359,8 @@ async def scrape_url(
             if schema_match < 0.6 or profile_match < 0.5:
                 logger.info(
                     "Profile field names don't match schema (s=%.0f%% p=%.0f%%) — falling through to generic pipeline",
-                    schema_match * 100, profile_match * 100,
+                    schema_match * 100,
+                    profile_match * 100,
                 )
             else:
                 profile_field_defs = (matched_profile or {}).get("fields") if matched_profile else None
@@ -399,7 +413,7 @@ async def scrape_url(
     try:
         fetch_start = time.time()
         fetch_strategy = recommended_strategy
-        if attempt_ctx and getattr(attempt_ctx, 'fetch_strategy', None):
+        if attempt_ctx and getattr(attempt_ctx, "fetch_strategy", None):
             try:
                 fetch_strategy = FetchStrategy(attempt_ctx.fetch_strategy)
             except ValueError:
@@ -422,8 +436,7 @@ async def scrape_url(
 
         # Record failure in strategy engine
         strategy_engine.record_fetch_attempt(
-            intel.domain, recommended_strategy, success=False,
-            time_ms=fetch_ms, failure_reason=type(e).__name__
+            intel.domain, recommended_strategy, success=False, time_ms=fetch_ms, failure_reason=type(e).__name__
         )
 
         provenance_builder.add_error(f"Fetch failed: {e}")
@@ -432,7 +445,8 @@ async def scrape_url(
             error_message=str(e),
             fetch_method=fetch_method,
         )
-        provenance_builder.add_error(f"Classified: {classification.category.value}")
+        provenance_builder.add_error(f"Classified: {
+            classification.category.value}")
         update_domain_with_failure(get_domain_intelligence(), url, classification)
         telemetry.record(url=url, error=str(e), fetch_ms=fetch_ms, failure_category=classification.category.value)
 
@@ -450,6 +464,7 @@ async def scrape_url(
         recommended_next_action = ""
         if classification:
             from app.recovery_strategies import RecoveryAction
+
             try:
                 recommended_next_action = RecoveryAction(classification.recovery_strategy).value
             except (ValueError, AttributeError):
@@ -471,11 +486,12 @@ async def scrape_url(
     # ── Session-Bound Search Form Recovery ───────────────────────────
     # If the URL is session-bound (detected from param analysis) AND
     # search_params are provided, attempt to replay the search form
-    # to get a fresh results page instead of a stale/expired landing page.
+    # to get a fresh results page instead of a stale / expired landing page.
     recovered_html = None
     if search_params:
         try:
             from app.session_url_detector import detect_session_params
+
             session_detect = detect_session_params(url)
             if session_detect.get("is_session_bound"):
                 logger.info(
@@ -483,6 +499,7 @@ async def scrape_url(
                     url,
                 )
                 from app.selector_discovery import _detect_search_form, _try_form_search_recovery
+
                 form_info = _detect_search_form(html)
                 if form_info.get("detected"):
                     logger.info(
@@ -504,7 +521,8 @@ async def scrape_url(
                     else:
                         logger.warning(
                             "[SessionRecovery] Recovery failed for %s: %s",
-                            url, recovery_result.get("error", "unknown"),
+                            url,
+                            recovery_result.get("error", "unknown"),
                         )
                 else:
                     logger.info(
@@ -514,16 +532,17 @@ async def scrape_url(
         except Exception as recovery_err:
             logger.warning(
                 "[SessionRecovery] Recovery attempt failed for %s: %s",
-                url, recovery_err,
+                url,
+                recovery_err,
             )
     elif not search_params:
         try:
             from app.session_url_detector import detect_session_params
+
             session_detect = detect_session_params(url)
             if session_detect.get("is_session_bound"):
                 logger.warning(
-                    "[SessionRecovery] URL %s is session-bound but no search_params provided — "
-                    "page may be stale",
+                    "[SessionRecovery] URL %s is session-bound but no search_params provided — " "page may be stale",
                     url,
                 )
         except Exception:
@@ -537,10 +556,10 @@ async def scrape_url(
     page_text = soup_for_density.get_text()
     token_density = len(page_text) / max(1, dom_nodes)
 
-    # ── Step 2-4: Extraction Cascade ──────────────────────────────
+    # ── Step 2 - 4: Extraction Cascade ──────────────────────────────
     # Capture solidified_motifs count before extraction for telemetry
     solidified_motifs_count = 0
-    if world_state and hasattr(world_state, 'solidified_motifs'):
+    if world_state and hasattr(world_state, "solidified_motifs"):
         try:
             solidified_motifs_count = len(world_state.solidified_motifs)
         except Exception:
@@ -549,7 +568,10 @@ async def scrape_url(
     result_warnings: list[str] = []
 
     ext_result = await orchestrate_extraction(
-        url, html, schema_fields, min_record_score,
+        url,
+        html,
+        schema_fields,
+        min_record_score,
         provenance_builder=provenance_builder,
         world_state=world_state,
         user_intent=user_intent,
@@ -559,6 +581,7 @@ async def scrape_url(
 
     # Run post-extraction semantic validation
     from app.utils.quality import post_extract_validate_records
+
     results = post_extract_validate_records(ext_result.records, schema_fields, warnings=result_warnings)
 
     for r in results:
@@ -579,8 +602,7 @@ async def scrape_url(
         avg_score = sum(r.get("record_score", 0.0) for r in results) / len(results)
 
     strategy_engine.record_fetch_attempt(
-        intel.domain, recommended_strategy, success=True,
-        time_ms=fetch_ms, quality=avg_score
+        intel.domain, recommended_strategy, success=True, time_ms=fetch_ms, quality=avg_score
     )
 
     # ── Autonomous Adaptation: Close Motif Feedback Loop ──────────
@@ -589,24 +611,29 @@ async def scrape_url(
     new_motifs = []
     if results and world_state:
         feedback_engine = MotifFeedbackEngine()
-        new_motifs = feedback_engine.extract_motifs_from_results(results, schema_fields, min_cooccurrence=settings.MOTIF_MIN_COOCCURRENCE)
+        new_motifs = feedback_engine.extract_motifs_from_results(
+            results, schema_fields, min_cooccurrence=settings.MOTIF_MIN_COOCCURRENCE
+        )
         if new_motifs:
-            # Merge new motifs with existing solidified motifs (dedup, keep latest)
+            # Merge new motifs with existing solidified motifs (dedup, keep
+            # latest)
             existing = {tuple(sorted(m)) for m in world_state.solidified_motifs}
             for m in new_motifs:
                 m_sorted = tuple(sorted(m))
                 if m_sorted not in existing:
                     existing.add(m_sorted)
                     # Append to world_state's internal motif list
-                    # Use the history state's setter to update solidified_motifs
+                    # Use the history state's setter to update
+                    # solidified_motifs
                     current = list(world_state.solidified_motifs)
                     current.append(list(m_sorted))
                     # Write back through history state's internal setter
-                    if hasattr(world_state, '_history'):
+                    if hasattr(world_state, "_history"):
                         world_state._history._set_val("solidified_motifs", current)
             logger.info(
                 "[Scraper] Closed motif feedback loop: %d new motifs from %d results",
-                len(new_motifs), len(results),
+                len(new_motifs),
+                len(results),
             )
     elif results and not world_state:
         logger.debug("[Scraper] No world_state available, skipping motif feedback")
@@ -630,8 +657,9 @@ async def scrape_url(
             frontier = get_crawl_frontier()
             added = await frontier.add_discovered_links(discovered_links, url, source_depth=0)
             if added > 0:
-                logger.debug("[Scraper] Added %d/%d discovered links to frontier from %s",
-                            added, len(discovered_links), url)
+                logger.debug(
+                    "[Scraper] Added %d/%d discovered links to frontier from %s", added, len(discovered_links), url
+                )
     except Exception as e:
         logger.debug("[Scraper] Link discovery skipped for %s: %s", url, e)
 
@@ -641,20 +669,23 @@ async def scrape_url(
     if not results:
         # Check for session-bound URL signals
         from app.session_url_detector import detect_session_params
+
         session_detection = detect_session_params(url) if url else None
         from app.empty_response_detector import detect_empty_response
+
         empty_check = detect_empty_response(html) if html else None
 
         # Collect page evidence for zero-result classification
         evidence = collect_page_evidence(html, url=url)
-        # page_text was computed above; use it to strengthen zero-result classification
+        # page_text was computed above; use it to strengthen zero-result
+        # classification
         visible_text = page_text
 
         # Classify the zero-result using the dedicated classifier
         zero_classification = classify_zero_result(
             acquisition_lineage={"state": fetch_method},
             session_detection=session_detection,
-            empty_check=empty_check.to_dict() if empty_check is not None and hasattr(empty_check, 'to_dict') else None,
+            empty_check=empty_check.to_dict() if empty_check is not None and hasattr(empty_check, "to_dict") else None,
             anti_bot_score=anti_bot,
             final_url=url,
             html=html,
@@ -665,7 +696,8 @@ async def scrape_url(
             schema_fields=[f.name for f in schema_fields],
         )
 
-        # Classification may have been set in except block above, only classify if not
+        # Classification may have been set in except block above, only classify
+        # if not
         if not classification:
             classification = classify_failure(
                 telemetry={
@@ -684,7 +716,8 @@ async def scrape_url(
                 fetch_method=fetch_method,
             )
             if classification:
-                provenance_builder.add_error(f"No records: {classification.recovery_strategy}")
+                provenance_builder.add_error(f"No records: {
+                    classification.recovery_strategy}")
                 update_domain_with_failure(get_domain_intelligence(), url, classification)
 
         # Log zero-result classification for diagnostics
@@ -696,7 +729,9 @@ async def scrape_url(
                 zero_classification.user_message,
                 zero_classification.confidence,
             )
-            provenance_builder.add_error(f"Zero-result: {zero_classification.failure_class} ({zero_classification.recommended_action})")
+            provenance_builder.add_error(f"Zero-result: {
+                zero_classification.failure_class} ({
+                zero_classification.recommended_action})")
 
         # Capture regression candidates for future benchmark expansion
         if classification:
@@ -717,10 +752,7 @@ async def scrape_url(
             )
     else:
         # Capture when quality is low (partial extraction)
-        if any(
-            r.get("record_score", 1.0) < min_record_score * 0.5
-            for r in results
-        ):
+        if any(r.get("record_score", 1.0) < min_record_score * 0.5 for r in results):
             get_regression_capture().maybe_capture(
                 url=url,
                 html=html,
@@ -745,16 +777,19 @@ async def scrape_url(
 
     # Global page-level contact boosting
     contact_counts = sum(
-        1 for r in results
-        if not _is_empty_value(r.get("email")) or not _is_empty_value(r.get("phone"))
+        1 for r in results if not _is_empty_value(r.get("email")) or not _is_empty_value(r.get("phone"))
     )
-    if len(results) > settings.CONTACT_BOOST_MIN_RECORDS and contact_counts / len(results) < settings.CONTACT_BOOST_THRESHOLD:
+    if (
+        len(results) > settings.CONTACT_BOOST_MIN_RECORDS
+        and contact_counts / len(results) < settings.CONTACT_BOOST_THRESHOLD
+    ):
         results = _boost_contacts_with_page_html(results, html, schema_fields)
 
     records_before_scoring = len(results)
 
     if results:
         from app.selector_engine import build_selector_field_metadata
+
         selector_meta = build_selector_field_metadata(
             (ext_result.selectors or {}).get("fields", {}),
             schema_fields,
@@ -803,9 +838,12 @@ async def scrape_url(
     regression_severity = None
     if classification:
         from app.regression_capture import RegressionEntry
+
         # Build a temporary entry to classify severity
         temp_entry = RegressionEntry(
-            id="", url=url, domain=intel.domain,
+            id="",
+            url=url,
+            domain=intel.domain,
             failure_category=classification.category.value,
             failure_confidence=classification.confidence,
             captured_at=start_time,
@@ -851,7 +889,9 @@ async def scrape_url(
         if prediction.risk_level in ("decaying", "critical"):
             logger.info(
                 "[PredictiveAdaptation] %s decay risk=%.2f level=%s days_until_failure=%.1f",
-                intel.domain, prediction.decay_risk, prediction.risk_level,
+                intel.domain,
+                prediction.decay_risk,
+                prediction.risk_level,
                 prediction.days_until_failure,
             )
     except Exception as e:
@@ -872,18 +912,22 @@ async def scrape_url(
     # 3. Self-Tuning Extraction: Feed telemetry for parameter adjustment
     try:
         tuning_controller = get_self_tuning_controller()
-        tuning_controller.record_telemetry(intel.domain, {
-            "fetch_ms": fetch_ms,
-            "error": classification.category.value if classification else None,
-            "failure_category": classification.category.value if classification else None,
-            "anti_bot_score": anti_bot,
-            "confidence_map": confidence_map,
-        })
+        tuning_controller.record_telemetry(
+            intel.domain,
+            {
+                "fetch_ms": fetch_ms,
+                "error": classification.category.value if classification else None,
+                "failure_category": classification.category.value if classification else None,
+                "anti_bot_score": anti_bot,
+                "confidence_map": confidence_map,
+            },
+        )
     except Exception as e:
         logger.debug("[PredictiveAdaptation] Self-tuning failed: %s", e)
 
     # Cleanup: Release browser network capture buffer for this URL
     from app.browser_network_capture import clear as clear_network_captures
+
     clear_network_captures(url)
 
     # ── Return with zero-result diagnostic logging ─────────────────
@@ -893,7 +937,8 @@ async def scrape_url(
     if not results and zero_result_failure_class:
         logger.info(
             "[Scraper] Zero records for %s — failure_class=%s (not returning marker record)",
-            url, zero_result_failure_class,
+            url,
+            zero_result_failure_class,
         )
         recommended_next_action = ""
         if zero_classification:
@@ -905,7 +950,7 @@ async def scrape_url(
             final_url=url,
             fetch_method=fetch_method,
             telemetry=telemetry,
-            extraction_method=ext_result.method if 'ext_result' in locals() else None,
+            extraction_method=ext_result.method if "ext_result" in locals() else None,
             zero_result_classification=zero_classification,
             anti_bot_score=anti_bot,
             recommended_next_action=recommended_next_action,
@@ -921,7 +966,7 @@ async def scrape_url(
         final_url=url,
         fetch_method=fetch_method,
         telemetry=telemetry,
-        extraction_method=ext_result.method if 'ext_result' in locals() else None,
+        extraction_method=ext_result.method if "ext_result" in locals() else None,
         zero_result_classification=zero_classification,
         anti_bot_score=anti_bot,
         data_evidence_score=data_evidence_score,

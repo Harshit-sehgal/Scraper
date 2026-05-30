@@ -66,7 +66,7 @@ async def scrape_url_with_recovery(
     search_params: dict[str, str] | None = None,
 ) -> tuple[list[dict], dict]:
     """Scrape a URL with intelligent failure recovery.
-    
+
     Args:
         url: The URL to scrape
         schema_fields: Fields to extract
@@ -76,7 +76,7 @@ async def scrape_url_with_recovery(
         max_recovery_attempts: Maximum recovery attempts before giving up
         selectors_map: Pre-discovered CSS selectors map from URL analysis
         search_params: Optional search parameters for session-bound URL recovery
-        
+
     Returns:
         Tuple of (results, recovery_stats) where:
             - results: Extracted records (empty list if all attempts failed)
@@ -119,6 +119,7 @@ async def scrape_url_with_recovery(
         try:
             # Chaos failure injection check
             from app.chaos_simulator import get_chaos_simulator, FailureMode
+
             chaos = get_chaos_simulator()
 
             if chaos.is_failure_active(FailureMode.NETWORK_TIMEOUT):
@@ -152,6 +153,7 @@ async def scrape_url_with_recovery(
 
             # Check telemetry for fetch-level errors
             from app.scrape_telemetry import get_scrape_telemetry
+
             telemetry = get_scrape_telemetry()
             last_event = telemetry.get_last_for_url(url)
 
@@ -194,13 +196,21 @@ async def scrape_url_with_recovery(
                 data_evidence_score=result.data_evidence_score,
                 user_message=user_message,
                 recommended_next_action=recommend or _recommended_action_for_state(state),
-                recovery_method=", ".join(recovery_stats["recovery_actions_taken"]) if recovery_stats["recovery_actions_taken"] else None,
+                recovery_method=(
+                    ", ".join(recovery_stats["recovery_actions_taken"])
+                    if recovery_stats["recovery_actions_taken"]
+                    else None
+                ),
             )
             recovery_stats["acquisition_lineage"] = lineage.to_dict()
 
             logger.info(
                 "Scrape succeeded on attempt %d for %s (got %d records, state=%s, anti_bot=%.2f)",
-                attempt, url, len(results), state.value if hasattr(state, 'value') else str(state), anti_bot_score,
+                attempt,
+                url,
+                len(results),
+                state.value if hasattr(state, "value") else str(state),
+                anti_bot_score,
             )
             return results, recovery_stats
 
@@ -210,13 +220,15 @@ async def scrape_url_with_recovery(
 
             # Get telemetry if available for richer classification
             from app.scrape_telemetry import get_scrape_telemetry
+
             last_event = get_scrape_telemetry().get_last_for_url(url)
             event_dict = last_event.to_dict() if last_event else {}
 
-            # Use scrape result HTML for evidence-based classification if available
+            # Use scrape result HTML for evidence-based classification if
+            # available
             result_html = None
-            if 'result' in locals():
-                result_html = getattr(result, 'html', None)
+            if "result" in locals():
+                result_html = getattr(result, "html", None)
 
             classification = classify_failure(
                 error_message=error_msg,
@@ -235,25 +247,29 @@ async def scrape_url_with_recovery(
 
             domain_info = get_domain_intelligence().get_intelligence(url).to_dict()
             plan = strategist.generate_recovery_plan(classification, attempt, domain_info=domain_info)
-            logger.info("Generated recovery plan for %s: %s (attempt %d)",
-                       url, plan.primary_action.value, attempt)
+            logger.info("Generated recovery plan for %s: %s (attempt %d)", url, plan.primary_action.value, attempt)
 
             if attempt > plan.max_retry_attempts:
                 logger.warning(
                     "Max retry attempts (%d) reached for %s, giving up",
-                    plan.max_retry_attempts, url,
+                    plan.max_retry_attempts,
+                    url,
                 )
                 break
 
             recovery_stats["recovery_attempts"] += 1
             recovery_stats["recovery_actions_taken"].append(plan.primary_action.value)
 
-            success = await executor.execute(plan, context={
-                "url": url,
-                "attempt": attempt,
-                "world_state": world_state,
-                "min_record_score": min_record_score or settings.DEFAULT_MIN_RECORD_SCORE,
-            }, attempt_ctx=attempt_ctx)
+            success = await executor.execute(
+                plan,
+                context={
+                    "url": url,
+                    "attempt": attempt,
+                    "world_state": world_state,
+                    "min_record_score": min_record_score or settings.DEFAULT_MIN_RECORD_SCORE,
+                },
+                attempt_ctx=attempt_ctx,
+            )
 
             if not success:
                 logger.warning("Recovery action %s failed for %s", plan.primary_action.value, url)
@@ -276,6 +292,7 @@ async def scrape_url_with_recovery(
     state = _acquisition_state_for_failure(failure_category)
 
     from app.scrape_telemetry import get_scrape_telemetry
+
     last_event = get_scrape_telemetry().get_last_for_url(url)
     event_dict = last_event.to_dict() if last_event else {}
 
@@ -294,6 +311,5 @@ async def scrape_url_with_recovery(
     lineage.user_message = lineage.get_user_message()
     recovery_stats["acquisition_lineage"] = lineage.to_dict()
 
-    logger.error("All %d scrape attempts failed for %s. Last error: %s",
-                max_recovery_attempts, url, last_error)
+    logger.error("All %d scrape attempts failed for %s. Last error: %s", max_recovery_attempts, url, last_error)
     return [], recovery_stats

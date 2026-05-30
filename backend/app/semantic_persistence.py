@@ -1,4 +1,3 @@
-
 """
 Semantic Persistence Hub
 =========================
@@ -17,7 +16,6 @@ import fcntl
 from app.semantic_world_state import get_world_state
 from app.config import settings
 
-
 _STATE_LOCK_PATH: str | None = None
 
 
@@ -25,12 +23,12 @@ def _get_lock_path() -> str:
     global _STATE_LOCK_PATH
     if _STATE_LOCK_PATH is None:
         cache = get_canonical_cache_path()
-        _STATE_LOCK_PATH = cache + '.lock'
+        _STATE_LOCK_PATH = cache + ".lock"
     return _STATE_LOCK_PATH
 
 
 def get_canonical_cache_path() -> str:
-    legacy_path = os.environ.get('SEMANTIC_STATE_PATH')
+    legacy_path = os.environ.get("SEMANTIC_STATE_PATH")
     if legacy_path:
         logging.getLogger(__name__).warning(
             "SEMANTIC_STATE_PATH is deprecated; use DATAFORGE_SEMANTIC_STATE_PATH instead."
@@ -63,7 +61,7 @@ def load_semantic_state():
 
     lock_fd = _acquire_lock()
     try:
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             full_state = json.load(f)
         ws = get_world_state()
         ws.from_dict(full_state)
@@ -81,8 +79,8 @@ def save_semantic_state():
         ws = get_world_state()
         full_state = ws.to_dict()
         full_state["version"] = "3.0"
-        os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
-        with open(path, 'w') as f:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w") as f:
             json.dump(full_state, f, indent=2)
         logging.getLogger(__name__).info("Saved unified semantic state to %s", path)
     except Exception as e:
@@ -103,6 +101,8 @@ def clear_semantic_state(clear_file: bool = True):
 
     # Ensure bootstrap values are re-applied if needed (the engines' __init__ handles this if they are re-instantiated,
     # but since they might be singletons, we should be careful. Actually RoleTransitionDetector re-applies it in __init__
-    # if it's empty, but if the engine object already exists, we might need to manually re-apply.)
+    # if it's empty, but if the engine object already exists, we might need to
+    # manually re-apply.)
     from app.semantic_boundary_engine import _BOOTSTRAP_TRANSITIONS
+
     get_world_state().update_seed_transition(_BOOTSTRAP_TRANSITIONS)

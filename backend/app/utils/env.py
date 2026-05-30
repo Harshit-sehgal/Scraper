@@ -1,6 +1,7 @@
 import logging
 import os
 
+
 def env_int(name: str, default: int, minimum: int | None = None, maximum: int | None = None) -> int:
     raw = (os.getenv(name) or "").strip()
     if not raw:

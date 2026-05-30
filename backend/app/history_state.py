@@ -17,7 +17,7 @@ from app.transaction_context import active_transaction
 
 
 class HistoryState:
-    """Sole owner of the semantic field's diagnostic/history structures."""
+    """Sole owner of the semantic field's diagnostic / history structures."""
 
     def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
         self._delta_callback = delta_callback
@@ -318,8 +318,9 @@ class HistoryState:
         if len(tj) > capacity:
             tj = tj[-(capacity // 2):]
         self._set_val("transaction_journal", tj)
-        # Phase 57/58: DO NOT call self._record here!
-        # Causal journaling already captures this; recording the recording causes infinite recursion.
+        # Phase 57 / 58: DO NOT call self._record here!
+        # Causal journaling already captures this; recording the recording
+        # causes infinite recursion.
 
     def get_transaction_journal(self) -> list:
         return list(self._get_val("transaction_journal"))

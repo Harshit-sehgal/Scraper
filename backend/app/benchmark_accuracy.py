@@ -32,9 +32,7 @@ class AccuracyMetrics:
 
 
 def calculate_extraction_accuracy(
-    extracted: List[Dict[str, Any]],
-    expected: List[Dict[str, Any]],
-    domain: str = "unknown"
+    extracted: List[Dict[str, Any]], expected: List[Dict[str, Any]], domain: str = "unknown"
 ) -> AccuracyMetrics:
     """Calculate deep accuracy metrics for a set of extracted records."""
     if not expected:
@@ -53,7 +51,8 @@ def calculate_extraction_accuracy(
     field_totals = {k: 0 for r in expected for k in r.keys()}
 
     # Count extracted comparable fields. Metadata such as record_score should not
-    # dilute precision, but extra extracted data fields and extra records should.
+    # dilute precision, but extra extracted data fields and extra records
+    # should.
     total_extracted_fields = sum(len(_data_fields(r)) for r in extracted)
 
     # Local copies to track matched records
@@ -97,16 +96,9 @@ def calculate_extraction_accuracy(
     metrics.completeness = min(1.0, len(extracted) / max(1, len(expected)))
     expected_schema = {k for r in expected for k in r.keys()}
     extracted_schema_fields = sum(len(_data_fields(r)) for r in extracted)
-    conforming_schema_fields = sum(
-        1
-        for r in extracted
-        for k in _data_fields(r).keys()
-        if k in expected_schema
-    )
+    conforming_schema_fields = sum(1 for r in extracted for k in _data_fields(r).keys() if k in expected_schema)
     metrics.schema_conformity = (
-        conforming_schema_fields / extracted_schema_fields
-        if extracted_schema_fields > 0
-        else 0.0
+        conforming_schema_fields / extracted_schema_fields if extracted_schema_fields > 0 else 0.0
     )
 
     # Per-field accuracy
@@ -119,11 +111,14 @@ def calculate_extraction_accuracy(
     metrics.duplicate_rate = 1.0 - (unique_count / len(extracted)) if extracted else 0.0
 
     # 5. Hallucination Detection (Indicators)
-    # Very basic: look for common placeholder strings or "I don't know" phrases from LLM
+    # Very basic: look for common placeholder strings or "I don't know"
+    # phrases from LLM
     hallucinations = 0
     for r in extracted:
         for v in r.values():
-            if isinstance(v, str) and any(p in v.lower() for p in ["i'm sorry", "cannot determine", "not found in html", "unknown"]):
+            if isinstance(v, str) and any(
+                p in v.lower() for p in ["i'm sorry", "cannot determine", "not found in html", "unknown"]
+            ):
                 hallucinations += 1
     metrics.hallucination_rate = hallucinations / total_extracted_fields if total_extracted_fields > 0 else 0.0
 
@@ -147,6 +142,7 @@ def _values_match(v1: Any, v2: Any) -> bool:
 
     # Currency-aware matching: strip symbols and commas
     import re
+
     def _strip_currency(s: str) -> str:
         return re.sub(r"[^\d.]", "", s)
 

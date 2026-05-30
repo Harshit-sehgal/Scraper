@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 # Data Models
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class RegressionEntry:
     """A single captured regression case."""
@@ -64,7 +65,7 @@ class RegressionEntry:
     """Snapshot of telemetry at time of failure."""
 
     fixture_filename: str = ""
-    """Name of the fixture file in fixtures/pages/."""
+    """Name of the fixture file in fixtures / pages/."""
 
     replay_test_generated: bool = False
     """Whether a replay test has been generated for this case."""
@@ -89,6 +90,7 @@ class RegressionRegistry:
 # Regression Capture Engine
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class RegressionCapture:
     """Automatically captures extraction failures as benchmark fixtures.
 
@@ -99,11 +101,11 @@ class RegressionCapture:
 
     Each capture:
       1. Hashes the HTML content to produce a unique fixture ID
-      2. Saves the HTML to fixtures/pages/{id}.html
+      2. Saves the HTML to fixtures / pages/{id}.html
       3. Registers metadata in the regression registry
       4. Optionally generates a pytest replay test
 
-    The registry is persisted to backend/data/regression_registry.json.
+    The registry is persisted to backend / data / regression_registry.json.
     """
 
     def __init__(
@@ -200,19 +202,19 @@ class RegressionCapture:
         self._registry.entries.append(entry)
         self._registry.total_captured += 1
         self._registry.last_capture_at = time.time()
-        self._registry.domain_coverage[domain] = (
-            self._registry.domain_coverage.get(domain, 0) + 1
-        )
+        self._registry.domain_coverage[domain] = self._registry.domain_coverage.get(domain, 0) + 1
         cat = failure_category or "unknown"
-        self._registry.category_coverage[cat] = (
-            self._registry.category_coverage.get(cat, 0) + 1
-        )
+        self._registry.category_coverage[cat] = self._registry.category_coverage.get(cat, 0) + 1
 
         self._save_registry()
 
         logger.info(
             "Regression captured: %s | domain=%s category=%s confidence=%.2f size=%d",
-            content_id, domain, failure_category, failure_confidence, entry.html_size,
+            content_id,
+            domain,
+            failure_category,
+            failure_confidence,
+            entry.html_size,
         )
 
         return entry
@@ -238,9 +240,7 @@ class RegressionCapture:
 
         test_code = self._build_replay_test(entry)
         entry.replay_test_generated = True
-        self._registry.total_with_replay_tests = sum(
-            1 for e in self._registry.entries if e.replay_test_generated
-        )
+        self._registry.total_with_replay_tests = sum(1 for e in self._registry.entries if e.replay_test_generated)
         self._save_registry()
 
         return test_code
@@ -259,9 +259,7 @@ class RegressionCapture:
                     entry.replay_test_generated = True
                     all_tests.append(test_code)
 
-        self._registry.total_with_replay_tests = sum(
-            1 for e in self._registry.entries if e.replay_test_generated
-        )
+        self._registry.total_with_replay_tests = sum(1 for e in self._registry.entries if e.replay_test_generated)
         self._save_registry()
 
         return "\n\n# ===== TEST SEPARATOR =====\n\n".join(all_tests)
@@ -277,15 +275,27 @@ class RegressionCapture:
           - info: All other categories — captured for awareness
         """
         high_severity_categories = {
-            "anti_bot_block", "captcha", "ip_banned", "browser_crash",
+            "anti_bot_block",
+            "captcha",
+            "ip_banned",
+            "browser_crash",
         }
         med_severity_categories = {
-            "selector_decay", "hydration_failure", "lazy_load_timeout",
-            "empty_page", "no_records_extracted", "malformed_dom",
+            "selector_decay",
+            "hydration_failure",
+            "lazy_load_timeout",
+            "empty_page",
+            "no_records_extracted",
+            "malformed_dom",
         }
         low_severity_categories = {
-            "low_quality_extraction", "partial_extraction", "selector_mismatch",
-            "connection_timeout", "http_error", "rate_limited", "dns_resolution_failure",
+            "low_quality_extraction",
+            "partial_extraction",
+            "selector_mismatch",
+            "connection_timeout",
+            "http_error",
+            "rate_limited",
+            "dns_resolution_failure",
         }
 
         cat = entry.failure_category or "unknown"
@@ -337,10 +347,7 @@ class RegressionCapture:
 
         # Also clean up registry entries for removed fixtures
         removed_names = {f.name for f in to_remove}
-        self._registry.entries = [
-            e for e in self._registry.entries
-            if e.fixture_filename not in removed_names
-        ]
+        self._registry.entries = [e for e in self._registry.entries if e.fixture_filename not in removed_names]
 
         # Actually delete files
         pruned = 0
@@ -477,9 +484,7 @@ class RegressionCapture:
         safe_name = f"test_replay_{entry.id}"
         category = entry.failure_category or "unknown"
 
-        schema_args = ", ".join(
-            repr(f) for f in entry.schema_fields[:5]
-        ) if entry.schema_fields else '"company_name"'
+        schema_args = ", ".join(repr(f) for f in entry.schema_fields[:5]) if entry.schema_fields else '"company_name"'
 
         test_code = f"""
 def {safe_name}(hostile_base_url):
@@ -503,6 +508,7 @@ def {safe_name}(hostile_base_url):
     def _extract_domain(url: str) -> str:
         """Extract domain from a URL."""
         from urllib.parse import urlparse
+
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"

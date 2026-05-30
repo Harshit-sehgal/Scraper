@@ -28,7 +28,7 @@ class EmptyResponseCheck:
     """Classification: blank, cookie_wall, js_shell, redirect_meta, captcha, login_wall, minimal"""
 
     confidence: float = 0.0
-    """0.0-1.0 confidence that this is an empty/unhelpful response."""
+    """0.0 - 1.0 confidence that this is an empty / unhelpful response."""
 
     message: str = ""
     """Human-readable explanation."""
@@ -49,17 +49,17 @@ class EmptyResponseCheck:
 
 # Patterns that indicate a page has real data content
 DATA_SIGNAL_PATTERNS: list[re.Pattern] = [
-    re.compile(r"\$\d+[\d,.]*"),           # Currency: $450, $1,234.56
-    re.compile(r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}"),  # Dates: 05/15/2026
-    re.compile(r"\d{4}-\d{2}-\d{2}"),      # ISO dates: 2026-05-15
-    re.compile(r"\d+\.\d{1,2}%"),          # Percentages: 85.5%
-    re.compile(r"\b\d{1,3}(,\d{3})*\b"),   # Large numbers: 1,234,567
-    re.compile(r"@[a-zA-Z0-9._-]+\.[a-z]{2,}"),  # Emails
+    re.compile(r"\$\d+[\d,.]*"),  # Currency: $450, $1,234.56
+    re.compile(r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}"),  # Dates: 05 / 15 / 2026
+    re.compile(r"\d{4}-\d{2}-\d{2}"),  # ISO dates: 2026 - 05 - 15
+    re.compile(r"\d+\.\d{1,2}%"),  # Percentages: 85.5%
+    re.compile(r"\b\d{1,3}(,\d{3})*\b"),  # Large numbers: 1,234,567
+    re.compile(r"@[a-zA-Z0 - 9._-]+\.[a-z]{2,}"),  # Emails
     re.compile(r"\+\d{1,3}[\s-]?\d{3,}"),  # Phone numbers
-    re.compile(r"https?://[^\s<\"]+"),      # URLs
+    re.compile(r"https?://[^\s<\"]+"),  # URLs
 ]
 
-# Patterns that indicate an empty/unhelpful page — checked against RAW HTML
+# Patterns that indicate an empty / unhelpful page — checked against RAW HTML
 EMPTY_PAGE_SIGNALS: dict[str, list[re.Pattern]] = {
     "cookie_wall": [
         re.compile(r"cookie\s*(consent|banner|notice|policy|preferences)", re.I),
@@ -67,9 +67,9 @@ EMPTY_PAGE_SIGNALS: dict[str, list[re.Pattern]] = {
         re.compile(r"we\s+use\s+cookies", re.I),
     ],
     "login_wall": [
-        re.compile(r"sign\s*in\s+to\s+(continue|view|access)", re.I),
-        re.compile(r"log\s*in\s+to\s+(continue|view|access)", re.I),
-        re.compile(r"please\s+(log|sign)\s*in", re.I),
+        re.compile(r"sign\s * in\s+to\s+(continue|view|access)", re.I),
+        re.compile(r"log\s * in\s+to\s+(continue|view|access)", re.I),
+        re.compile(r"please\s+(log|sign)\s * in", re.I),
         re.compile(r"create\s+(an?\s+)?account\s+to\s+continue", re.I),
     ],
     "captcha": [
@@ -186,12 +186,16 @@ def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseChe
         elif best_type == "redirect_meta":
             suggestions.append("Page uses meta-refresh redirect — follow the redirect target URL")
         elif best_type == "minimal":
-            suggestions.append("Page has very little content — URL may be incorrect or page may need different parameters")
+            suggestions.append(
+                "Page has very little content — URL may be incorrect or page may need different parameters"
+            )
 
         return EmptyResponseCheck(
             is_empty=is_empty,
             empty_type=best_type,
-            confidence=round(best_conf, 2),
+            confidence=round(
+                best_conf,
+                2),
             message=f"Page appears to be a {best_type} with {text_length} chars of visible text and {data_signals} data signals",
             text_length=text_length,
             data_signals=data_signals,

@@ -23,13 +23,13 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-
 logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════════════
 # Data Models
 # ═══════════════════════════════════════════════════════════════════════
+
 
 @dataclass
 class DomainTrend:
@@ -66,7 +66,7 @@ class DomainTrend:
     """Whether the selector decay rate is increasing (bad sign)."""
 
     health_score: float = 100.0
-    """0-100 composite health score. Lower = worse."""
+    """0 - 100 composite health score. Lower = worse."""
 
     sample_count: int = 0
     """Number of telemetry events contributing to this trend."""
@@ -100,6 +100,7 @@ class TrendReport:
 # ═══════════════════════════════════════════════════════════════════════
 # Trend Analyzer
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TrendAnalyzer:
     """Analyzes accumulated scrape telemetry to detect meaningful patterns.
@@ -165,71 +166,64 @@ class TrendAnalyzer:
 
         # Global aggregates
         n_domains = max(len(global_latencies), 1)
-        report.global_failure_rate = (
-            global_failure_count / max(report.total_scrapes, 1)
-        )
-        report.global_avg_latency_ms = (
-            sum(global_latencies) / n_domains if global_latencies else 0.0
-        )
-        report.global_avg_cost_usd = (
-            sum(global_costs) / n_domains if global_costs else 0.0
-        )
+        report.global_failure_rate = global_failure_count / max(report.total_scrapes, 1)
+        report.global_avg_latency_ms = sum(global_latencies) / n_domains if global_latencies else 0.0
+        report.global_avg_cost_usd = sum(global_costs) / n_domains if global_costs else 0.0
         report.total_cost_estimated = sum(global_costs)
 
         # Generate alerts for degrading domains
         for domain in report.degrading_domains:
             trend = report.domain_trends[domain]
-            report.alerts.append({
-                "severity": "high",
-                "domain": domain,
-                "message": (
-                    f"Domain {domain} health score is {trend.health_score:.0f}/100 "
-                    f"(failure rate: {trend.failure_rate:.0%}, "
-                    f"quality trend: {trend.quality_trend})"
-                ),
-                "health_score": trend.health_score,
-                "failure_rate": trend.failure_rate,
-            })
+            report.alerts.append(
+                {
+                    "severity": "high",
+                    "domain": domain,
+                    "message": (
+                        f"Domain {domain} health score is {trend.health_score:.0f}/100 "
+                        f"(failure rate: {trend.failure_rate:.0%}, "
+                        f"quality trend: {trend.quality_trend})"
+                    ),
+                    "health_score": trend.health_score,
+                    "failure_rate": trend.failure_rate,
+                }
+            )
 
         # Alerts for accelerating selector decay
         for domain, trend in report.domain_trends.items():
             if trend.selector_decay_accelerating and trend.sample_count >= 3:
-                report.alerts.append({
-                    "severity": "medium",
-                    "domain": domain,
-                    "message": (
-                        f"Selector decay accelerating on {domain} — "
-                        f"consider forced rediscovery"
-                    ),
-                    "health_score": trend.health_score,
-                })
+                report.alerts.append(
+                    {
+                        "severity": "medium",
+                        "domain": domain,
+                        "message": (f"Selector decay accelerating on {domain} — " f"consider forced rediscovery"),
+                        "health_score": trend.health_score,
+                    }
+                )
 
         # Alerts for anti-bot intensification
         for domain, trend in report.domain_trends.items():
             if trend.anti_bot_trend == "degrading" and trend.sample_count >= 3:
-                report.alerts.append({
-                    "severity": "medium",
-                    "domain": domain,
-                    "message": (
-                        f"Anti-bot pressure increasing on {domain} — "
-                        f"may need proxy rotation or reduced frequency"
-                    ),
-                    "health_score": trend.health_score,
-                })
+                report.alerts.append(
+                    {
+                        "severity": "medium",
+                        "domain": domain,
+                        "message": (
+                            f"Anti-bot pressure increasing on {domain} — "
+                            f"may need proxy rotation or reduced frequency"
+                        ),
+                        "health_score": trend.health_score,
+                    }
+                )
 
         # Sort alerts by severity (high first), then by health score ascending
         severity_order = {"high": 0, "medium": 1, "low": 2}
-        report.alerts.sort(
-            key=lambda a: (severity_order.get(a["severity"], 99), a.get("health_score", 100))
-        )
+        report.alerts.sort(key=lambda a: (severity_order.get(a["severity"], 99), a.get("health_score", 100)))
 
         return report
 
     # ── Internal Analysis ─────────────────────────────────────────────
 
-    def analyze_domain(
-        self, domain: str, events: list[dict]
-    ) -> DomainTrend:
+    def analyze_domain(self, domain: str, events: list[dict]) -> DomainTrend:
         """Analyze telemetry events for a single domain.
 
         This is a public method — callable directly for per-domain
@@ -249,10 +243,7 @@ class TrendAnalyzer:
 
         for event in events:
             # Failure detection
-            is_failure = (
-                event.get("error") is not None
-                or event.get("records_final", 0) == 0
-            )
+            is_failure = event.get("error") is not None or event.get("records_final", 0) == 0
             if is_failure:
                 failures += 1
 
@@ -310,13 +301,8 @@ class TrendAnalyzer:
             trend.avg_cost_usd = sum(costs) / len(costs)
 
         # Top failure categories
-        sorted_categories = sorted(
-            failure_categories.items(), key=lambda x: -x[1]
-        )[:5]
-        trend.top_failure_categories = [
-            {"category": cat, "count": count}
-            for cat, count in sorted_categories
-        ]
+        sorted_categories = sorted(failure_categories.items(), key=lambda x: -x[1])[:5]
+        trend.top_failure_categories = [{"category": cat, "count": count} for cat, count in sorted_categories]
 
         # Selector decay acceleration
         if len(selector_decay_signals) >= 4:
@@ -325,16 +311,14 @@ class TrendAnalyzer:
             early_decay_rate = sum(selector_decay_signals[:half]) / max(half, 1)
             trend.selector_decay_accelerating = recent_decay_rate > early_decay_rate * 1.5
 
-        # Composite health score (0-100)
+        # Composite health score (0 - 100)
         trend.health_score = self._compute_health_score(trend)
 
         return trend
 
     # ── Helpers ───────────────────────────────────────────────────────
 
-    def _detect_trend(
-        self, values: list[float], higher_is_worse: bool
-    ) -> str:
+    def _detect_trend(self, values: list[float], higher_is_worse: bool) -> str:
         """Detect whether a sequence of values is improving, stable, or degrading.
 
         Compares the mean of the first third to the mean of the last third.
@@ -367,7 +351,7 @@ class TrendAnalyzer:
             return "improving" if delta > 0 else "degrading"
 
     def _compute_health_score(self, trend: DomainTrend) -> float:
-        """Compute a 0-100 health score from trend metrics.
+        """Compute a 0 - 100 health score from trend metrics.
 
         Factors:
           - Failure rate (heaviest penalty)
@@ -417,6 +401,7 @@ class TrendAnalyzer:
     @staticmethod
     def extract_domain(url: str) -> str:
         from urllib.parse import urlparse
+
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
@@ -427,6 +412,7 @@ class TrendAnalyzer:
 # ═══════════════════════════════════════════════════════════════════════
 # Economic Tracker
 # ═══════════════════════════════════════════════════════════════════════
+
 
 @dataclass
 class DomainCostSummary:
@@ -499,24 +485,17 @@ class EconomicTracker:
         report.total_records = total_records
 
         if report.total_scrapes > 0:
-            report.avg_cost_per_scrape = round(
-                total_cost / report.total_scrapes, 4
-            )
+            report.avg_cost_per_scrape = round(total_cost / report.total_scrapes, 4)
 
         if total_records > 0:
             report.avg_cost_per_record = round(total_cost / total_records, 4)
-            report.efficiency_rating = self._rate_efficiency(
-                report.avg_cost_per_record
-            )
+            report.efficiency_rating = self._rate_efficiency(report.avg_cost_per_record)
 
         report.cost_by_category = dict(category_costs)
 
         # Sort domains by cost
         sorted_domains = sorted(
-            [
-                {"domain": d, "total_cost": s.total_cost_usd}
-                for d, s in report.cost_by_domain.items()
-            ],
+            [{"domain": d, "total_cost": s.total_cost_usd} for d, s in report.cost_by_domain.items()],
             key=lambda x: -(x["total_cost"]),  # type: ignore
         )
         report.most_expensive_domains = sorted_domains[:5]
@@ -524,9 +503,7 @@ class EconomicTracker:
 
         return report
 
-    def _analyze_domain_costs(
-        self, domain: str, events: list[dict]
-    ) -> DomainCostSummary:
+    def _analyze_domain_costs(self, domain: str, events: list[dict]) -> DomainCostSummary:
         """Analyze costs for a single domain."""
         summary = DomainCostSummary(domain=domain)
         summary.total_scrapes = len(events)
@@ -562,20 +539,14 @@ class EconomicTracker:
 
         summary.total_cost_usd = round(total_cost, 4)
         summary.total_records = total_records
-        summary.avg_cost_per_scrape = round(
-            total_cost / max(len(events), 1), 4
-        )
-        summary.avg_cost_per_record = round(
-            total_cost / max(total_records, 1), 6
-        )
+        summary.avg_cost_per_scrape = round(total_cost / max(len(events), 1), 4)
+        summary.avg_cost_per_record = round(total_cost / max(total_records, 1), 6)
         summary.cost_breakdown = {
             "llm": round(total_llm_cost, 4),
             "browser": round(total_browser_cost, 4),
             "network": round(total_network_cost, 4),
         }
-        summary.efficiency_rating = self._rate_efficiency(
-            summary.avg_cost_per_record
-        )
+        summary.efficiency_rating = self._rate_efficiency(summary.avg_cost_per_record)
 
         return summary
 

@@ -5,7 +5,7 @@ Storage safety features:
 - Automatic backup before overwrite
 - Integrity validation on load with fallback to backup
 - Background thread serialization (non-blocking saves)
-- Reasonable retry for transient I/O errors
+- Reasonable retry for transient I / O errors
 """
 
 import datetime
@@ -37,14 +37,13 @@ def _now_iso() -> str:
 
 def get_state_file_path() -> Path:
     from app.config import settings
+
     if settings.STATE_FILE_PATH:
         return Path(settings.STATE_FILE_PATH).expanduser()
 
     legacy_env_path = os.getenv("DATAFORGE_STATE_FILE", "").strip()
     if legacy_env_path:
-        logging.warning(
-            "DATAFORGE_STATE_FILE is deprecated; use DATAFORGE_STATE_FILE_PATH instead."
-        )
+        logging.warning("DATAFORGE_STATE_FILE is deprecated; use DATAFORGE_STATE_FILE_PATH instead.")
         return Path(legacy_env_path).expanduser()
 
     return _DEFAULT_STATE_FILE
@@ -70,7 +69,7 @@ def _try_load_from(path: Path) -> Optional[dict]:
             return payload
         logging.error("State file %s failed structural validation", path)
     except Exception as e:
-        logging.error("Failed to read/parse state file %s: %s", path, e)
+        logging.error("Failed to read / parse state file %s: %s", path, e)
     return None
 
 
@@ -119,7 +118,8 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
             job.completed_at = _now_iso()
             job.cancel_requested = False
 
-    # Phase 68: Semantic field state — restore from persisted world_state if present
+    # Phase 68: Semantic field state — restore from persisted world_state if
+    # present
     world_state_data: Optional[dict] = payload.get("world_state")
 
     return jobs_store, recycle_bin_store, world_state_data
@@ -154,12 +154,17 @@ def _write_state_to_disk(path: Path, payload: dict) -> None:
             if attempt < _SAVE_RETRIES:
                 logging.warning(
                     "State save attempt %d/%d failed for %s: %s",
-                    attempt, _SAVE_RETRIES, path, e,
+                    attempt,
+                    _SAVE_RETRIES,
+                    path,
+                    e,
                 )
             else:
                 logging.exception(
                     "Failed to persist state after %d attempts to %s: %s",
-                    _SAVE_RETRIES, path, e,
+                    _SAVE_RETRIES,
+                    path,
+                    e,
                 )
 
 
@@ -171,6 +176,7 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
     world_state_data = None
     try:
         from app.semantic_world_state import get_world_state
+
         ws = get_world_state()
         world_state_data = ws.to_dict()
     except Exception as e:

@@ -12,13 +12,14 @@ from app.semantic_world_state import get_world_state
 if TYPE_CHECKING:
     from app.semantic_world_state import SemanticWorldState
 
+
 class SubstratePolicy:
     """Governs when and how automated actions and structural changes occur."""
 
     def __init__(self, ws: Optional[SemanticWorldState] = None):
         self.ws = ws or get_world_state()
         # Phase 68: Operational Guardrails
-        self.max_community_density = 15 # Max roles per cluster
+        self.max_community_density = 15  # Max roles per cluster
         self.critical_entropy_threshold = 0.8
         self.min_attractor_plasticity = 0.1
 
@@ -31,37 +32,40 @@ class SubstratePolicy:
         communities = ws.global_communities
         for i, c in enumerate(communities):
             if len(c) > self.max_community_density:
-                issues.append({
-                    "policy": "community_density",
-                    "id": f"C-{i}",
-                    "severity": "moderate",
-                    "details": f"Density {len(c)} exceeds quota {self.max_community_density}"
-                })
+                issues.append(
+                    {
+                        "policy": "community_density",
+                        "id": f"C-{i}",
+                        "severity": "moderate",
+                        "details": f"Density {len(c)} exceeds quota {self.max_community_density}",
+                    }
+                )
 
         # 2. Thermodynamic Guardrails
         pressure = ws.get_system_pressure()
         if pressure > self.critical_entropy_threshold:
-            issues.append({
-                "policy": "thermodynamic_guardrail",
-                "severity": "critical",
-                "details": f"Field pressure {pressure:.3f} exceeds stability threshold"
-            })
+            issues.append(
+                {
+                    "policy": "thermodynamic_guardrail",
+                    "severity": "critical",
+                    "details": f"Field pressure {pressure:.3f} exceeds stability threshold",
+                }
+            )
 
         # 3. Attractor Plasticity — capture snapshot for governance reads
         snapshot = ws.capture_governance_snapshot()
         health = ws._observability.get_semantic_health_index(snapshot)
         diversity = health["metrics"]["diversity"]
         if diversity < self.min_attractor_plasticity:
-            issues.append({
-                "policy": "plasticity_law",
-                "severity": "high",
-                "details": f"Attractor diversity {diversity:.3f} below plasticity floor"
-            })
+            issues.append(
+                {
+                    "policy": "plasticity_law",
+                    "severity": "high",
+                    "details": f"Attractor diversity {diversity:.3f} below plasticity floor",
+                }
+            )
 
-        return {
-            "valid": len([i for i in issues if i["severity"] == "critical"]) == 0,
-            "issues": issues
-        }
+        return {"valid": len([i for i in issues if i["severity"] == "critical"]) == 0, "issues": issues}
 
     def enforce_guardrails(self):
         """Automatically trigger stabilization if guardrails are violated (Phase 68)."""
@@ -72,10 +76,10 @@ class SubstratePolicy:
             # Phase 68: Refresh metrics immediately to reflect stabilization
             self.ws._energy.update_from_regions(self.ws._topology._regions)
 
-            self.ws.emit_telemetry("governance_enforcement", {
-                "action": "emergency_stabilization",
-                "reason": "critical_thermodynamic_violation"
-            })
+            self.ws.emit_telemetry(
+                "governance_enforcement",
+                {"action": "emergency_stabilization", "reason": "critical_thermodynamic_violation"},
+            )
 
     def can_dispatch_action(self, action_id: str, pressure: float) -> bool:
         """Check if an action is allowed under current field pressure."""
@@ -93,13 +97,16 @@ class SubstratePolicy:
         # Policy 2: Convergence
         # Critical actions require minimum system certainty
         from app.semantic_inference_engine import RoleEmbeddingEngine
+
         certainty = RoleEmbeddingEngine().get_certainty()
         if certainty < 0.1:
             return False
 
         return True
 
+
 _policy_instances: WeakKeyDictionary | None = None
+
 
 def get_policy_engine(ws: Optional[SemanticWorldState] = None) -> SubstratePolicy:
     target_ws = ws or get_world_state()

@@ -30,7 +30,7 @@ _CURRENT_QUEUE_SCHEMA_VERSION = 3
 def _ensure_schema():
     """Create queue tables and run schema migrations."""
     with _conn() as conn:
-        # Check table existence via information_schema instead of try/except,
+        # Check table existence via information_schema instead of try / except,
         # which would leave the connection in an aborted transaction state.
         table_exists = _fetch_one(
             conn,
@@ -46,19 +46,23 @@ def _ensure_schema():
             if old_row is None:
                 _execute(conn, "DROP TABLE IF EXISTS queue_schema_version CASCADE")
 
-
-        _execute(conn, """
+        _execute(
+            conn,
+            """
             CREATE TABLE IF NOT EXISTS queue_schema_version (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 version INTEGER NOT NULL
             )
-        """)
+        """,
+        )
         row = _fetch_one(conn, "SELECT version FROM queue_schema_version WHERE id = 1")
         current = row["version"] if row and row.get("version") is not None else 0
 
         if current < _CURRENT_QUEUE_SCHEMA_VERSION:
             if current < 1:
-                _execute(conn, """
+                _execute(
+                    conn,
+                    """
                     CREATE TABLE IF NOT EXISTS queue_tasks (
                         id TEXT PRIMARY KEY,
                         type TEXT NOT NULL,
@@ -74,19 +78,28 @@ def _ensure_schema():
                         scheduled_at TIMESTAMP NOT NULL DEFAULT NOW(),
                         timeout_seconds INTEGER NOT NULL DEFAULT 300
                     )
-                """)
+                """,
+                )
 
-                _execute(conn, """
+                _execute(
+                    conn,
+                    """
                     CREATE INDEX IF NOT EXISTS idx_queue_tasks_status_priority
                         ON queue_tasks(status, priority)
-                """)
+                """,
+                )
 
-                _execute(conn, """
+                _execute(
+                    conn,
+                    """
                     CREATE INDEX IF NOT EXISTS idx_queue_tasks_scheduled
                         ON queue_tasks(scheduled_at)
-                """)
+                """,
+                )
 
-                _execute(conn, """
+                _execute(
+                    conn,
+                    """
                     CREATE TABLE IF NOT EXISTS queue_task_history (
                         id TEXT PRIMARY KEY,
                         type TEXT NOT NULL,
@@ -102,17 +115,24 @@ def _ensure_schema():
                         timeout_seconds INTEGER NOT NULL DEFAULT 300,
                         finished_at TIMESTAMP NOT NULL DEFAULT NOW()
                     )
-                """)
+                """,
+                )
 
-                _execute(conn, """
+                _execute(
+                    conn,
+                    """
                     CREATE INDEX IF NOT EXISTS idx_queue_task_history_type
                         ON queue_task_history(type)
-                """)
+                """,
+                )
 
-                _execute(conn, """
+                _execute(
+                    conn,
+                    """
                     CREATE INDEX IF NOT EXISTS idx_queue_task_history_finished
                         ON queue_task_history(finished_at DESC)
-                """)
+                """,
+                )
                 current = 1
 
             if current < 2:
@@ -133,7 +153,7 @@ def _ensure_schema():
 
             _execute(
                 conn,
-                "INSERT INTO queue_schema_version (id, version) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version",
+                "INSERT INTO queue_schema_version (id, version) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version",  # noqa: E501
                 (current,),
             )
             logger.info("Postgres queue schema migrated to version %d", current)
@@ -192,19 +212,28 @@ class PostgresWorkerQueue:
         async with self._in_flight_lock:
             await asyncio.to_thread(
                 self._enqueue_sync,
-                task.id, task.type, json.dumps(task.payload),
-                int(task.priority), task.status,
+                task.id,
+                task.type,
+                json.dumps(task.payload),
+                int(task.priority),
+                task.status,
                 task.attempts,
-                task.max_attempts, task.timeout_seconds,
+                task.max_attempts,
+                task.timeout_seconds,
             )
 
         return task.id
 
     def _enqueue_sync(
         self,
-        task_id: str, task_type: str, payload_json: str,
-        priority: int, status: str,
-        attempts: int, max_attempts: int, timeout_seconds: int,
+        task_id: str,
+        task_type: str,
+        payload_json: str,
+        priority: int,
+        status: str,
+        attempts: int,
+        max_attempts: int,
+        timeout_seconds: int,
     ) -> None:
         """Synchronous enqueue — runs in a thread to avoid blocking the event loop.
 
@@ -223,10 +252,14 @@ class PostgresWorkerQueue:
                    VALUES (%s, %s, %s, %s, %s, NOW(), NOW(), %s, %s, %s)
                    ON CONFLICT (id) DO NOTHING""",
                 (
-                    task_id, task_type, payload_json,
-                    priority, status,
+                    task_id,
+                    task_type,
+                    payload_json,
+                    priority,
+                    status,
                     attempts,
-                    max_attempts, timeout_seconds,
+                    max_attempts,
+                    timeout_seconds,
                 ),
             )
 
@@ -274,17 +307,20 @@ class PostgresWorkerQueue:
                 if row is None:
                     return None
 
-                # Normalize Postgres datetime objects to strings for QueueTask compatibility
+                # Normalize Postgres datetime objects to strings for QueueTask
+                # compatibility
                 _ts_fields = ("created_at", "started_at", "completed_at", "scheduled_at", "finished_at")
                 for _f in _ts_fields:
                     v = row.get(_f)
                     if isinstance(v, (datetime.datetime, datetime.date)):
-                        row[_f] = v.strftime('%Y-%m-%d %H:%M:%S')
+                        row[_f] = v.strftime("%Y-%m-%d %H:%M:%S")
 
-                task = QueueTask.from_dict({
-                    **row,
-                    "payload": json.loads(row["payload"]),
-                })
+                task = QueueTask.from_dict(
+                    {
+                        **row,
+                        "payload": json.loads(row["payload"]),
+                    }
+                )
                 return task
         except Exception as e:
             logger.error("Postgres dequeue error: %s", e, exc_info=True)
@@ -294,7 +330,8 @@ class PostgresWorkerQueue:
         """Mark a task as completed successfully."""
         async with self._in_flight_lock:
             await asyncio.to_thread(
-                self._complete_sync, task_id,
+                self._complete_sync,
+                task_id,
                 json.dumps(result) if result else None,
             )
 
@@ -312,10 +349,14 @@ class PostgresWorkerQueue:
                        VALUES (%s, %s, %s, %s, 'completed', %s,
                                %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
                     (
-                        row["id"], row["type"], row["payload"],
-                        row["priority"], row["created_at"],
+                        row["id"],
+                        row["type"],
+                        row["payload"],
+                        row["priority"],
+                        row["created_at"],
                         row.get("started_at"),
-                        row["attempts"], row["max_attempts"],
+                        row["attempts"],
+                        row["max_attempts"],
                         None,
                         result_json,
                         row.get("timeout_seconds", 300),
@@ -332,7 +373,10 @@ class PostgresWorkerQueue:
         """Mark a task as failed. Retries if attempts remain."""
         async with self._in_flight_lock:
             await asyncio.to_thread(
-                self._fail_sync, task_id, error, retry,
+                self._fail_sync,
+                task_id,
+                error,
+                retry,
             )
 
     def _fail_sync(self, task_id: str, error: str, retry: bool = True) -> None:
@@ -359,7 +403,11 @@ class PostgresWorkerQueue:
                     )
                     logger.info(
                         "Task %s failed (attempt %d/%d). Retrying in %ds: %s",
-                        task_id, attempts, max_attempts, backoff, error,
+                        task_id,
+                        attempts,
+                        max_attempts,
+                        backoff,
+                        error,
                     )
                 else:
                     # Move to dead letter (archive to history)
@@ -372,10 +420,14 @@ class PostgresWorkerQueue:
                            VALUES (%s, %s, %s, %s, 'dead_letter', %s,
                                    %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
                         (
-                            row["id"], row["type"], row["payload"],
-                            row["priority"], row["created_at"],
+                            row["id"],
+                            row["type"],
+                            row["payload"],
+                            row["priority"],
+                            row["created_at"],
                             row.get("started_at"),
-                            row["attempts"], row["max_attempts"],
+                            row["attempts"],
+                            row["max_attempts"],
                             error,
                             None,
                             row.get("timeout_seconds", 300),
@@ -384,7 +436,9 @@ class PostgresWorkerQueue:
                     _execute(conn, "DELETE FROM queue_tasks WHERE id = %s", (task_id,))
                     logger.warning(
                         "Task %s moved to dead letter after %d attempts: %s",
-                        task_id, attempts, error,
+                        task_id,
+                        attempts,
+                        error,
                     )
 
     async def cancel(self, task_id: str) -> bool:
@@ -397,13 +451,15 @@ class PostgresWorkerQueue:
                 flight_task = self._in_flight[task_id]
                 flight_task.cancel()
                 result = await asyncio.to_thread(
-                    self._cancel_in_flight_sync, task_id,
+                    self._cancel_in_flight_sync,
+                    task_id,
                 )
                 return result
 
             # Check pending tasks
             result = await asyncio.to_thread(
-                self._cancel_pending_sync, task_id,
+                self._cancel_pending_sync,
+                task_id,
             )
             return result
 
@@ -411,7 +467,9 @@ class PostgresWorkerQueue:
         """Synchronous cancel for in-flight tasks — runs in a thread."""
         with _conn() as conn:
             row = _fetch_one(
-                conn, "SELECT * FROM queue_tasks WHERE id = %s", (task_id,),
+                conn,
+                "SELECT * FROM queue_tasks WHERE id = %s",
+                (task_id,),
             )
             if row:
                 _execute(
@@ -423,10 +481,14 @@ class PostgresWorkerQueue:
                        VALUES (%s, %s, %s, %s, 'cancelled', %s,
                                %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
                     (
-                        row["id"], row["type"], row["payload"],
-                        row["priority"], row["created_at"],
+                        row["id"],
+                        row["type"],
+                        row["payload"],
+                        row["priority"],
+                        row["created_at"],
                         row.get("started_at"),
-                        row["attempts"], row["max_attempts"],
+                        row["attempts"],
+                        row["max_attempts"],
                         "Cancelled by user (in-flight)",
                         None,
                         row.get("timeout_seconds", 300),
@@ -454,10 +516,14 @@ class PostgresWorkerQueue:
                    VALUES (%s, %s, %s, %s, 'cancelled', %s,
                            %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
                 (
-                    row["id"], row["type"], row["payload"],
-                    row["priority"], row["created_at"],
+                    row["id"],
+                    row["type"],
+                    row["payload"],
+                    row["priority"],
+                    row["created_at"],
                     row.get("started_at"),
-                    row["attempts"], row["max_attempts"],
+                    row["attempts"],
+                    row["max_attempts"],
                     "Cancelled by user",
                     None,
                     row.get("timeout_seconds", 300),
@@ -477,7 +543,8 @@ class PostgresWorkerQueue:
         self._worker_task = asyncio.create_task(self._worker_loop())
         logger.info(
             "Postgres worker queue started: max_concurrency=%d, poll_interval=%.1fs",
-            self._max_concurrency, self._poll_interval,
+            self._max_concurrency,
+            self._poll_interval,
         )
 
     def _recover_stuck_tasks(self):
@@ -487,9 +554,7 @@ class PostgresWorkerQueue:
         """
         try:
             with _conn() as conn:
-                stuck = _fetch_one(
-                    conn, "SELECT COUNT(*) AS cnt FROM queue_tasks WHERE status = 'running'"
-                )
+                stuck = _fetch_one(conn, "SELECT COUNT(*) AS cnt FROM queue_tasks WHERE status = 'running'")
                 count = stuck["cnt"] if stuck else 0
                 if count:
                     _execute(
@@ -536,9 +601,7 @@ class PostgresWorkerQueue:
                 async with self._in_flight_lock:
                     self._in_flight[task.id] = t
 
-                t.add_done_callback(lambda _, tid=task.id: asyncio.ensure_future(
-                    self._cleanup_in_flight(tid)
-                ))
+                t.add_done_callback(lambda _, tid=task.id: asyncio.ensure_future(self._cleanup_in_flight(tid)))
 
             except asyncio.CancelledError:
                 break
@@ -595,12 +658,16 @@ class PostgresWorkerQueue:
         try:
             with _conn() as conn:
                 row = _fetch_one(
-                    conn, "SELECT * FROM queue_tasks WHERE id = %s", (task_id,),
+                    conn,
+                    "SELECT * FROM queue_tasks WHERE id = %s",
+                    (task_id,),
                 )
                 if row:
                     return row
                 row = _fetch_one(
-                    conn, "SELECT * FROM queue_task_history WHERE id = %s", (task_id,),
+                    conn,
+                    "SELECT * FROM queue_task_history WHERE id = %s",
+                    (task_id,),
                 )
                 if row:
                     return row
@@ -621,12 +688,8 @@ class PostgresWorkerQueue:
         """
         try:
             with _conn() as conn:
-                pending = _fetch_one(
-                    conn, "SELECT COUNT(*) AS cnt FROM queue_tasks WHERE status = 'pending'"
-                )
-                running = _fetch_one(
-                    conn, "SELECT COUNT(*) AS cnt FROM queue_tasks WHERE status = 'running'"
-                )
+                pending = _fetch_one(conn, "SELECT COUNT(*) AS cnt FROM queue_tasks WHERE status = 'pending'")
+                running = _fetch_one(conn, "SELECT COUNT(*) AS cnt FROM queue_tasks WHERE status = 'running'")
                 dead_letter = _fetch_one(
                     conn,
                     "SELECT COUNT(*) AS cnt FROM queue_task_history WHERE status = 'dead_letter'",
@@ -705,9 +768,13 @@ class PostgresWorkerQueue:
                        VALUES (%s, %s, %s, %s, 'pending', %s,
                                NOW(), 0, %s, %s)""",
                     (
-                        row["id"], row["type"], row["payload"],
-                        row["priority"], row["created_at"],
-                        row["max_attempts"], timeout,
+                        row["id"],
+                        row["type"],
+                        row["payload"],
+                        row["priority"],
+                        row["created_at"],
+                        row["max_attempts"],
+                        timeout,
                     ),
                 )
                 _execute(
