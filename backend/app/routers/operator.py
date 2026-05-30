@@ -29,7 +29,7 @@ from app.trend_analyzer import TrendAnalyzer
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api / operator", tags=["operator"])
+router = APIRouter(prefix="/api/operator", tags=["operator"])
 
 
 class ModeBody(BaseModel):

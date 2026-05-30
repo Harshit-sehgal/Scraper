@@ -129,7 +129,7 @@ def create_jobs_router(
                 raise HTTPException(status_code=404, detail="Job not in recycle bin")
             return recycle_bin_store.pop(job_id)
 
-    @router.post("/api / discover")
+    @router.post("/api/discover")
     async def discover(
         req: DiscoveryRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
     ):
@@ -161,7 +161,7 @@ def create_jobs_router(
                     pass
         return {"urls": safe_results}
 
-    @router.post("/api / schema / suggest")
+    @router.post("/api/schema/suggest")
     async def suggest_schema(
         req: SchemaSuggestionRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
     ):
@@ -169,7 +169,7 @@ def create_jobs_router(
         suggestion = await suggest_schema_from_intent(req.intent, max_fields=req.max_fields)
         return suggestion
 
-    @router.get("/api / jobs")
+    @router.get("/api/jobs")
     async def list_jobs():
         # In worker mode, refresh from repo to pick up cross-process updates
         if _is_worker_mode():
@@ -193,7 +193,7 @@ def create_jobs_router(
             ordered = sorted(jobs_store.values(), key=lambda j: j.created_at, reverse=True)
             return {"jobs": [job.model_dump() for job in ordered]}
 
-    @router.get("/api / jobs/{job_id}")
+    @router.get("/api/jobs/{job_id}")
     async def get_job(job_id: str, include_results: bool = Query(False)):
         job = _get_job(job_id)
 
@@ -209,7 +209,7 @@ def create_jobs_router(
         dumped["results"] = results_list
         return dumped
 
-    @router.get("/api / jobs/{job_id}/results")
+    @router.get("/api/jobs/{job_id}/results")
     async def get_job_results(job_id: str, limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)):
         """Return a paginated slice of job results."""
         job = _get_job(job_id)
@@ -240,7 +240,7 @@ def create_jobs_router(
             "returned": len(page),
         }
 
-    @router.post("/api / jobs/{job_id}/backfill-metadata")
+    @router.post("/api/jobs/{job_id}/backfill-metadata")
     async def backfill_job_metadata(
         job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
     ):
@@ -276,7 +276,7 @@ def create_jobs_router(
 
         return {"message": "Metadata backfilled successfully", "updated": updated}
 
-    @router.post("/api / jobs")
+    @router.post("/api/jobs")
     async def create_job(
         job_data: JobCreate, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
     ):
@@ -360,7 +360,7 @@ def create_jobs_router(
 
         return {"job_id": job.id, "status": job.status.value}
 
-    @router.post("/api / jobs/{job_id}/cancel")
+    @router.post("/api/jobs/{job_id}/cancel")
     async def cancel_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -410,7 +410,7 @@ def create_jobs_router(
             "message": "Cancellation requested",
         }
 
-    @router.post("/api / jobs/{job_id}/reclean")
+    @router.post("/api/jobs/{job_id}/reclean")
     async def reclean_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         """Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs."""
         if job_id not in jobs_store:
@@ -579,7 +579,7 @@ def create_jobs_router(
             "warnings": reclean_warnings,
         }
 
-    @router.delete("/api / jobs/{job_id}")
+    @router.delete("/api/jobs/{job_id}")
     async def delete_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -591,7 +591,7 @@ def create_jobs_router(
         recycle_bin_store[job_id] = jobs_store.pop(job_id)
         return {"message": "Job moved to recycle bin"}
 
-    @router.delete("/api / jobs / cleanup / terminal")
+    @router.delete("/api/jobs/cleanup/terminal")
     async def clear_terminal_jobs(
         keep_recent: int = Query(5, ge=0, le=5000), _role: UserRole = Depends(require_role([UserRole.ADMIN]))
     ):
@@ -633,12 +633,12 @@ def create_jobs_router(
             "remaining": len(jobs_store),
         }
 
-    @router.get("/api / recycle_bin")
+    @router.get("/api/recycle_bin")
     async def list_recycle_bin():
         ordered = sorted(recycle_bin_store.values(), key=lambda j: j.created_at, reverse=True)
         return {"jobs": [job.model_dump() for job in ordered]}
 
-    @router.post("/api / recycle_bin/{job_id}/restore")
+    @router.post("/api/recycle_bin/{job_id}/restore")
     async def restore_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
@@ -647,7 +647,7 @@ def create_jobs_router(
         jobs_store[job_id] = recycle_bin_store.pop(job_id)
         return {"message": "Job restored"}
 
-    @router.delete("/api / recycle_bin/{job_id}")
+    @router.delete("/api/recycle_bin/{job_id}")
     async def hard_delete_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         if job_id not in recycle_bin_store:
             raise HTTPException(status_code=404, detail="Job not in recycle bin")
@@ -661,7 +661,7 @@ def create_jobs_router(
         del recycle_bin_store[job_id]
         return {"message": "Job permanently deleted"}
 
-    @router.delete("/api / recycle_bin")
+    @router.delete("/api/recycle_bin")
     async def clear_recycle_bin(_role: UserRole = Depends(require_role([UserRole.ADMIN]))):
         count = len(recycle_bin_store)
         from app.utils.job_results_store import delete_job_results_from_disk

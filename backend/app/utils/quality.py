@@ -105,7 +105,7 @@ def _value_quality(field: SchemaField, value) -> float:
 
     # Type-specific quality "votes"
     if field.field_type == FieldType.EMAIL:
-        if re.match(r"^[a-zA-Z0 - 9_.+-]+@[a-zA-Z0 - 9-]+\.[a-zA-Z0 - 9-.]+$", text):
+        if re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", text):
             score += 0.5
     elif field.field_type == FieldType.PHONE:
         digits = re.sub(r"\D", "", text)

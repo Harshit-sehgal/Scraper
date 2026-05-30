@@ -80,7 +80,7 @@ def create_exports_router(jobs_store: dict):
             except Exception:
                 __import__("logging").getLogger(__name__).debug("Failed to refresh job %s from repo for export", job_id)
 
-    @router.get("/api / jobs/{job_id}/export / csv")
+    @router.get("/api/jobs/{job_id}/export/csv")
     async def export_csv(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -142,7 +142,7 @@ def create_exports_router(jobs_store: dict):
 
             return StreamingResponse(
                 _stream_csv_from_disk(),
-                media_type="text / csv",
+                media_type="text/csv",
                 headers={"Content-Disposition": f'attachment; filename="{
                         safe_export_filename(
                             job.name,
@@ -166,14 +166,14 @@ def create_exports_router(jobs_store: dict):
         output.seek(0)
         return Response(
             content=output.getvalue(),
-            media_type="text / csv",
+            media_type="text/csv",
             headers={"Content-Disposition": f'attachment; filename="{
                     safe_export_filename(
                         job.name,
                         "csv")}"'},
         )
 
-    @router.get("/api / jobs/{job_id}/export / json")
+    @router.get("/api/jobs/{job_id}/export/json")
     async def export_json(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -224,7 +224,7 @@ def create_exports_router(jobs_store: dict):
 
             return StreamingResponse(
                 _stream_json_from_disk(),
-                media_type="application / json",
+                media_type="application/json",
                 headers={"Content-Disposition": f'attachment; filename="{
                         safe_export_filename(
                             job.name,
@@ -239,14 +239,14 @@ def create_exports_router(jobs_store: dict):
         json_content = json.dumps(cleaned, indent=2)
         return Response(
             content=json_content,
-            media_type="application / json",
+            media_type="application/json",
             headers={"Content-Disposition": f'attachment; filename="{
                     safe_export_filename(
                         job.name,
                         "json")}"'},
         )
 
-    @router.get("/api / jobs/{job_id}/export / excel")
+    @router.get("/api/jobs/{job_id}/export/excel")
     async def export_excel(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -301,7 +301,7 @@ def create_exports_router(jobs_store: dict):
 
         return Response(
             content=output.getvalue(),
-            media_type="application / vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f'attachment; filename="{
                     safe_export_filename(
                         job.name,
