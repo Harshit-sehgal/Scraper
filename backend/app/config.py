@@ -11,6 +11,7 @@ To override, set the corresponding env var (e.g. PLAYWRIGHT_TIMEOUT=45000).
 
 from __future__ import annotations
 
+import os
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -412,6 +413,16 @@ class Settings(BaseSettings):
     """Max characters for context window around fuzzy match."""
     SELECTOR_MIN_SEGMENT_LEN: int = 3
     """Min characters for extracted context segment."""
+
+    @property
+    def GROQ_API_KEY(self) -> str:
+        """Groq API key for LLM calls. Read from GROQ_API_KEY env var dynamically."""
+        return (os.environ.get("GROQ_API_KEY") or "").strip()
+
+    @property
+    def WORKER_QUEUE(self) -> bool:
+        """Whether worker queue mode is enabled. Read from DATAFORGE_WORKER_QUEUE env var dynamically."""
+        return (os.environ.get("DATAFORGE_WORKER_QUEUE") or "").strip().lower() in ("1", "true", "yes")
 
     # ─── Queue Backend ─────────────────────────────────────────────────────
     QUEUE_BACKEND: str = "sqlite"
