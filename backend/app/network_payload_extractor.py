@@ -1,7 +1,7 @@
 """Network payload extraction — find structured records in captured JSON responses.
 
 Finds record arrays inside arbitrary JSON payloads, scores them against
-the requested schema, maps fields using synonym/key matching, and returns
+the requested schema, maps fields using synonym / key matching, and returns
 structured extraction results with provenance metadata.
 
 No domain-specific logic — works for flights, hotels, groceries, ecommerce, etc.
@@ -40,6 +40,7 @@ _FIELD_SYNONYMS: dict[str, list[str]] = {
 @dataclass
 class RecordArrayCandidate:
     """A candidate array of records found inside a JSON payload."""
+
     path: str  # e.g., "results" or "data.items"
     records: list[dict]
     source: str  # "network_payload" or "hydration_data"
@@ -50,6 +51,7 @@ class RecordArrayCandidate:
 @dataclass
 class FieldMapping:
     """How a requested field maps to a JSON key."""
+
     requested_field: str
     mapped_from: str
     source: str = "network_payload"
@@ -59,6 +61,7 @@ class FieldMapping:
 @dataclass
 class NetworkExtractionResult:
     """Result of extracting records from network payloads."""
+
     records: list[dict]
     source: str
     score: float
@@ -100,11 +103,13 @@ def find_record_arrays(payload: Any, path: str = "$", max_depth: int = 10) -> li
             records = [r["node"] for r in records]
             arr_path = f"{arr_path}[*].node"
 
-        candidates.append(RecordArrayCandidate(
-            path=arr_path,
-            records=records,
-            source=source,
-        ))
+        candidates.append(
+            RecordArrayCandidate(
+                path=arr_path,
+                records=records,
+                source=source,
+            )
+        )
 
     # Check root-level array first
     if isinstance(payload, list):
@@ -143,7 +148,7 @@ def _extract_nested_value_with_suffix(val: Any) -> tuple[Any, str]:
 
 
 def _sanitize_payload(obj: Any, _depth: int = 0, _max_depth: int = 50) -> Any:
-    """Recursively remove sensitive keys/branches from a JSON structure.
+    """Recursively remove sensitive keys / branches from a JSON structure.
 
     Depth-limited to ``_max_depth`` to prevent stack overflow on
     pathological or circular-reference payloads.
@@ -152,7 +157,19 @@ def _sanitize_payload(obj: Any, _depth: int = 0, _max_depth: int = 50) -> Any:
         return obj
     if isinstance(obj, dict):
         sanitized = {}
-        sensitive_patterns = ("cookie", "token", "session", "secret", "password", "jwt", "auth", "bearer", "csrf", "private_key", "client_secret")
+        sensitive_patterns = (
+            "cookie",
+            "token",
+            "session",
+            "secret",
+            "password",
+            "jwt",
+            "auth",
+            "bearer",
+            "csrf",
+            "private_key",
+            "client_secret",
+        )
         for k, v in obj.items():
             k_lower = k.lower()
             if any(pattern in k_lower for pattern in sensitive_patterns):
@@ -166,7 +183,19 @@ def _sanitize_payload(obj: Any, _depth: int = 0, _max_depth: int = 50) -> Any:
 
 def _is_candidate_secret_heavy(candidate: RecordArrayCandidate) -> bool:
     """Check if the candidate array itself is secret-heavy (contains sensitive info in path or records)."""
-    sensitive_patterns = ("cookie", "token", "session", "secret", "password", "jwt", "auth", "bearer", "csrf", "private_key", "client_secret")
+    sensitive_patterns = (
+        "cookie",
+        "token",
+        "session",
+        "secret",
+        "password",
+        "jwt",
+        "auth",
+        "bearer",
+        "csrf",
+        "private_key",
+        "client_secret",
+    )
     path_lower = candidate.path.lower()
     if any(pat in path_lower for pat in sensitive_patterns):
         return True
@@ -199,7 +228,7 @@ def _value_matches_type(value: Any, field_type: FieldType) -> bool:
     if field_type == FieldType.NUMBER or field_type == FieldType.INTEGER or field_type == FieldType.FLOAT:
         return bool(re.match(r"^-?\d+(\.\d+)?$", s))
     if field_type == FieldType.EMAIL:
-        return bool(re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", s))
+        return bool(re.search(r"[a-zA-Z0 - 9_.+-]+@[a-zA-Z0 - 9-]+\.[a-zA-Z0 - 9-.]+", s))
     if field_type == FieldType.URL:
         return s.startswith(("http://", "https://"))
     if field_type == FieldType.DATE:
@@ -216,7 +245,7 @@ def _key_matches_field(key: str, field: SchemaField) -> float:
     key_lower = key.lower().replace("_", " ").replace("-", " ")
     field_lower = field.name.lower().replace("_", " ")
 
-    # Avoid matching sensitive keys that could contain secrets/credentials
+    # Avoid matching sensitive keys that could contain secrets / credentials
     sensitive_patterns = ("cookie", "token", "session", "secret", "password", "jwt", "auth", "bearer", "csrf")
     if any(pattern in key_lower for pattern in sensitive_patterns):
         return 0.0
@@ -381,7 +410,8 @@ def extract_from_network_payloads(
             if _is_candidate_secret_heavy(candidate):
                 continue
 
-            # Recursively sanitize candidate records to remove sensitive keys/branches
+            # Recursively sanitize candidate records to remove sensitive keys /
+            # branches
             candidate.records = _sanitize_payload(candidate.records)
 
             score = score_record_array(candidate, schema)
@@ -393,7 +423,9 @@ def extract_from_network_payloads(
         return None
 
     mapped_records, field_map = map_json_records_to_schema(
-        best_candidate.records, schema, source=best_candidate.source,
+        best_candidate.records,
+        schema,
+        source=best_candidate.source,
         candidate_path=best_candidate.path,
     )
     coverage = len(field_map) / max(len(schema), 1)
@@ -422,8 +454,7 @@ def arbitrate_sources(
         return dom_records, "dom", {}
 
     dom_cov = sum(
-        1 for r in dom_records[:20] for f in schema
-        if r.get(f.name) is not None and str(r.get(f.name, "")).strip()
+        1 for r in dom_records[:20] for f in schema if r.get(f.name) is not None and str(r.get(f.name, "")).strip()
     ) / max(len(dom_records[:20]) * len(schema), 1)
 
     net_cov = network_result.field_coverage

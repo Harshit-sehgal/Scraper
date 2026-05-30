@@ -9,6 +9,8 @@ import logging
 from typing import Callable, List, Dict, Optional
 from app.semantic_world_state import get_world_state
 from app.checkpoint_manager import get_checkpoint_manager
+
+
 class SemanticOS:
     """The official gateway to the semantic cognitive substrate."""
 
@@ -20,6 +22,7 @@ class SemanticOS:
         """Standard entry point for new semantic data. Automatically handles schema expansion."""
         effective_schema = self.get_effective_schema(schema)
         from app.semantic_pipeline import run_pipeline
+
         return run_pipeline(records, effective_schema)
 
     def get_effective_schema(self, base_schema: List[str]) -> List[str]:
@@ -69,6 +72,7 @@ class SemanticOS:
     def register_with_network(self):
         """Register this OS node with the virtual gossip network."""
         from app.gossip_substrate import get_gossip_substrate
+
         get_gossip_substrate().register_node(self.ws.node_id, self.ws)
 
     def perform_gossip(self):
@@ -83,12 +87,13 @@ class SemanticOS:
             node_id=self.ws.node_id,
             clock=self.ws.get_vector_clock(),
             checksum=self.ws.get_manifold_checksum(),
-            energy=self.ws.metrics.global_energy
+            energy=self.ws.metrics.global_energy,
         )
 
     def get_network_health(self) -> dict:
         """Return the global health of the distributed network (Phase 33)."""
         from app.heartbeat_manager import get_heartbeat_manager
+
         return get_heartbeat_manager().get_global_health()
 
     # ─── Knowledge Federation (Phase 29) ─────────────────────────────────
@@ -103,8 +108,9 @@ class SemanticOS:
 
     # ─── Semantic Steering (Phase 36) ────────────────────────────────────
 
-    def set_cognitive_intent(self, intent_id: str, target_vec: List[float],
-                             strength: float = 0.5, target_roles: Optional[List[str]] = None):
+    def set_cognitive_intent(
+        self, intent_id: str, target_vec: List[float], strength: float = 0.5, target_roles: Optional[List[str]] = None
+    ):
         """Inject a high-level goal to bias the semantic field (Phase 36)."""
         with self.ws.transaction(f"set_intent:{intent_id}"):
             self.ws.set_intent(intent_id, target_vec, strength, target_roles)
@@ -121,8 +127,7 @@ class SemanticOS:
 
     # ─── Cognitive Agency (Phase 37) ─────────────────────────────────────
 
-    def register_action(self, action_id: str, target_vec: List[float],
-                        handler_name: str, threshold: float = 0.3):
+    def register_action(self, action_id: str, target_vec: List[float], handler_name: str, threshold: float = 0.3):
         """Map executable logic into the semantic field (Phase 37)."""
         with self.ws.transaction(f"register_action:{action_id}"):
             self.ws.register_action(action_id, target_vec, handler_name, threshold)
@@ -140,7 +145,8 @@ class SemanticOS:
                 action = self.ws.get_action(action_id)
                 if action:
                     target_vec = action["target_vec"]
-                    # Reward successful interpretation by pulling role toward action anchor
+                    # Reward successful interpretation by pulling role toward
+                    # action anchor
                     self.ws.blend_manifold_vector(role, target_vec, alpha=0.9, beta=0.1)
                     logging.getLogger(__name__).info(
                         f"FEEDBACK REINFORCED: Role [{role}] rewarded by Action [{action_id}]"
@@ -176,11 +182,12 @@ class SemanticOS:
     def schedule_task(self, task_id: str, priority_level: str, handler: Callable, *args, **kwargs):
         """Register an automated cognitive task (Phase 40)."""
         from app.graph_update_scheduler import TaskPriority
+
         p_map = {
             "critical": TaskPriority.CRITICAL,
             "urgent": TaskPriority.URGENT,
             "normal": TaskPriority.NORMAL,
-            "background": TaskPriority.BACKGROUND
+            "background": TaskPriority.BACKGROUND,
         }
         priority = p_map.get(priority_level.lower(), TaskPriority.NORMAL)
         self.ws.schedule_cognitive_task(task_id, priority, handler, *args, **kwargs)
@@ -208,9 +215,14 @@ class SemanticOS:
         with self.ws.transaction("manual_telemetry"):
             self.ws.emit_telemetry(event_type, details)
 
-    def record_degradation(self, subsystem: str, severity: str, cause: str,
-                           topology_state: Optional[str] = None,
-                           semantic_entropy: Optional[float] = None):
+    def record_degradation(
+        self,
+        subsystem: str,
+        severity: str,
+        cause: str,
+        topology_state: Optional[str] = None,
+        semantic_entropy: Optional[float] = None,
+    ):
         """Record a structured degradation event with causality tracking."""
         self.ws.record_degradation(
             subsystem=subsystem,
@@ -220,13 +232,16 @@ class SemanticOS:
             semantic_entropy=semantic_entropy,
         )
 
+
 _os_instance: Optional[SemanticOS] = None
+
 
 def get_semantic_os() -> SemanticOS:
     global _os_instance
     if _os_instance is None:
         _os_instance = SemanticOS()
     return _os_instance
+
 
 def reset_semantic_os():
     """Reset the global Semantic OS instance (for testing)."""

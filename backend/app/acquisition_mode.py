@@ -27,7 +27,8 @@ class AcquisitionMode(str, Enum):
     # Aggressive mode: session recovery, search form submission
     AGGRESSIVE = "aggressive"
 
-    # Deep scan mode: all recovery strategies, multiple retries, fallback rendering
+    # Deep scan mode: all recovery strategies, multiple retries, fallback
+    # rendering
     DEEP_SCAN = "deep_scan"
 
 
@@ -133,7 +134,7 @@ def should_escalate(
     - Anti-bot blocked → escalate to try stealth
 
     A plain empty_response boolean only triggers escalation from STANDARD,
-    since AGGRESSIVE/DEEP_SCAN already have empty-response detection enabled.
+    since AGGRESSIVE / DEEP_SCAN already have empty-response detection enabled.
     """
     if current_mode == AcquisitionMode.DEEP_SCAN:
         return False  # Already at max

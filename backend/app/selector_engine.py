@@ -5,34 +5,41 @@ from bs4 import BeautifulSoup
 from app.models import SchemaField, FieldType
 from app.html_utils import (
     _compact_text,
-    _extract_contacts_from_node, _sanitize_field_value,
-    _enrich_record_contacts, _apply_page_level_contact_fallback
+    _extract_contacts_from_node,
+    _sanitize_field_value,
+    _enrich_record_contacts,
+    _apply_page_level_contact_fallback,
 )
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+
 def _detect_table_headers(html: str) -> list[dict]:
-    """Detect table/grid headers from HTML to understand column semantics."""
+    """Detect table / grid headers from HTML to understand column semantics."""
     soup = BeautifulSoup(html, "html.parser")
     headers_info = []
 
     for th in soup.find_all(["th", "thead"]):
         text = _compact_text(th.get_text())
         if text:
-            headers_info.append({
-                "text": text,
-                "class": " ".join(th.get("class", [])),
-                "id": th.get("id", ""),
-            })
+            headers_info.append(
+                {
+                    "text": text,
+                    "class": " ".join(th.get("class", [])),
+                    "id": th.get("id", ""),
+                }
+            )
 
     for header in soup.find_all(["h1", "h2", "h3", "h4"])[:5]:
         text = _compact_text(header.get_text())
         if text and len(text) < settings.SELECTOR_HEADING_FALLBACK_LEN:
-            headers_info.append({
-                "text": text,
-                "is_heading": True,
-            })
+            headers_info.append(
+                {
+                    "text": text,
+                    "is_heading": True,
+                }
+            )
 
     return headers_info
 
@@ -71,9 +78,44 @@ def _collect_child_text_nodes(node) -> list[str]:
     """
     texts: list[str] = []
     for el in node.find_all(True):
-        if el.name in ("script", "style", "noscript", "svg", "meta", "link", "select", "option", "input", "button", "textarea", "nav", "header", "footer"):
+        if el.name in (
+            "script",
+            "style",
+            "noscript",
+            "svg",
+            "meta",
+            "link",
+            "select",
+            "option",
+            "input",
+            "button",
+            "textarea",
+            "nav",
+            "header",
+            "footer",
+        ):
             continue
-        children = [c for c in el.find_all(True, recursive=False) if c.name not in ("script", "style", "noscript", "svg", "meta", "link", "select", "option", "input", "button", "textarea", "nav", "header", "footer")]
+        children = [
+            c
+            for c in el.find_all(True, recursive=False)
+            if c.name
+            not in (
+                "script",
+                "style",
+                "noscript",
+                "svg",
+                "meta",
+                "link",
+                "select",
+                "option",
+                "input",
+                "button",
+                "textarea",
+                "nav",
+                "header",
+                "footer",
+            )
+        ]
         if not children:
             t = el.get_text(separator=" ", strip=True)
             if t:
@@ -124,7 +166,13 @@ def _infer_field_type_from_name(field_name: str) -> FieldType | None:
     return None
 
 
-def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans: list[tuple[int, int]] | None = None, used_child_indices: set | None = None) -> str | None:
+def _extract_field_by_pattern(
+    node,
+    sel_entry,
+    field_name: str = "",
+    used_spans: list[tuple[int, int]] | None = None,
+    used_child_indices: set | None = None,
+) -> str | None:
     """Fallback: extract field value from a container node when CSS selector is missing.
 
     Args:
@@ -135,6 +183,7 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
         used_child_indices: Set of child text node indices already consumed
     """
     import re as re_mod
+
     if used_spans is None:
         used_spans = []
     if used_child_indices is None:
@@ -165,25 +214,28 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
     if ftype is not None:
         patterns: list[str] = []
         if ftype == FieldType.CURRENCY:
-            patterns = [r'(?:[$£€¥₹]|USD\s*|EUR\s*)\s*\d[\d,.]*']
+            patterns = [r"(?:[$£€¥₹]|USD\s*|EUR\s*)\s*\d[\d,.]*"]
         elif ftype == FieldType.EMAIL:
-            patterns = [r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+']
+            patterns = [r"[a-zA-Z0 - 9_.+-]+@[a-zA-Z0 - 9-]+\.[a-zA-Z0 - 9-.]+"]
         elif ftype == FieldType.PHONE:
-            patterns = [r'[\d\s\-()+]{7,20}']
+            patterns = [r"[\d\s\-()+]{7,20}"]
         elif ftype == FieldType.URL:
-            patterns = [r'https?://[^\s]+']
+            patterns = [r"https?://[^\s]+"]
         elif ftype == FieldType.DATE:
             patterns = [
-                r'\d{1,2}[-/]\d{1,2}[-/]\d{2,4}',
-                r'\d{4}-\d{2}-\d{2}',
-                r'\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}',
-                r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}',
-                r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}\s*[-–]\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}',
+                r"\d{1,2}[-/]\d{1,2}[-/]\d{2,4}",
+                r"\d{4}-\d{2}-\d{2}",
+                r"\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}",
+                r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}",
+                r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}\s*[-–]\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}",  # noqa: E501
             ]
         elif ftype == FieldType.NUMBER:
-            patterns = [r'-?\d+(?:\.\d+)?']
+            patterns = [r"-?\d+(?:\.\d+)?"]
         elif ftype == FieldType.RATING:
-            patterns = [r'(?:\d+(?:\.\d+)?)\s*(?:[/|]?\s*\d+)?\s*(?:stars?|rating)?', r'\b(?:one|two|three|four|five)\b']
+            patterns = [
+                r"(?:\d+(?:\.\d+)?)\s*(?:[/|]?\s*\d+)?\s*(?:stars?|rating)?",
+                r"\b(?:one|two|three|four|five)\b",
+            ]
 
         if patterns:
             n_lower = field_name.lower()
@@ -196,7 +248,7 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
             if not all_matches:
                 ancestor = node.parent
                 for _ in range(3):
-                    if not ancestor or not hasattr(ancestor, 'get_text'):
+                    if not ancestor or not hasattr(ancestor, "get_text"):
                         break
                     anc_text = ancestor.get_text(separator=" ", strip=True)
                     if anc_text and anc_text != full_text:
@@ -206,7 +258,7 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
                                     all_matches.append(match)
                     if all_matches:
                         break
-                    ancestor = ancestor.parent if hasattr(ancestor, 'parent') else None
+                    ancestor = ancestor.parent if hasattr(ancestor, "parent") else None
             if all_matches:
                 chosen = all_matches[-1] if use_last else all_matches[0]
                 used_spans.append((chosen.start(), chosen.end()))
@@ -280,26 +332,27 @@ def _extract_field_by_pattern(node, sel_entry, field_name: str = "", used_spans:
 def _classify_text_value(text: str) -> str:
     """Classify a text value into a semantic category."""
     import re as _re
+
     t = text.strip()
     if not t:
         return "empty"
     lower = t.lower()
-    if _re.match(r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$', t):
+    if _re.match(r"^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$", t):
         return "date"
-    if _re.match(r'^\d{4}-\d{2}-\d{2}$', t):
+    if _re.match(r"^\d{4}-\d{2}-\d{2}$", t):
         return "date"
-    if _re.search(r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}', t):
+    if _re.search(r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}", t):
         return "date"
-    if _re.match(r'^[\$£€¥₹]\s*\d[\d,.]*$', t):
+    if _re.match(r"^[\$£€¥₹]\s*\d[\d,.]*$", t):
         return "currency"
-    if _re.match(r'^[A-Z]{3,4}$', t):
+    if _re.match(r"^[A-Z]{3,4}$", t):
         return "code"
-    if _re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){2,}$', t):
+    if _re.match(r"^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){2,}$", t):
         return "location"
     label_patterns = ("starting from", "call now", "learn more", "select", "age")
     if any(w in lower for w in label_patterns):
         return "label"
-    if _re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$', t) and len(t) > 1:
+    if _re.match(r"^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$", t) and len(t) > 1:
         return "name"
     return "text"
 
@@ -356,9 +409,9 @@ def _read_node_value(target, field_type: FieldType | None = None, field_name: st
             if text_val.endswith("...") or text_val.endswith("…"):
                 use_title = True
             elif (
-                (field_type in (None, FieldType.STRING) or any(k in field_name.lower() for k in ["title", "name", "company", "product"]))
-                and len(title_clean) > len(text_val)
-            ):
+                field_type in (None, FieldType.STRING)
+                or any(k in field_name.lower() for k in ["title", "name", "company", "product"])
+            ) and len(title_clean) > len(text_val):
                 # Prefer title attribute if it's longer
                 use_title = True
     if use_title and title_val:
@@ -387,15 +440,25 @@ def extract_raw_from_selectors(
         record: dict = {}
         used_spans: list[tuple[int, int]] = []
         used_child_indices: set = set()
-        # Sort fields: typed fields with regex patterns first, then LOCATION/CODE, then STRING/None last.
-        # This prevents STRING fields from greedily consuming children that typed fields should match.
+        # Sort fields: typed fields with regex patterns first, then LOCATION / CODE, then STRING / None last.
+        # This prevents STRING fields from greedily consuming children that
+        # typed fields should match.
         _TYPED_ORDER: dict = {}
-        for ftype in (FieldType.CURRENCY, FieldType.EMAIL, FieldType.PHONE, FieldType.URL, FieldType.DATE, FieldType.NUMBER, FieldType.RATING):
+        for ftype in (
+            FieldType.CURRENCY,
+            FieldType.EMAIL,
+            FieldType.PHONE,
+            FieldType.URL,
+            FieldType.DATE,
+            FieldType.NUMBER,
+            FieldType.RATING,
+        ):
             _TYPED_ORDER[ftype] = 0
         _TYPED_ORDER[FieldType.LOCATION] = 1
         _TYPED_ORDER[FieldType.CODE] = 1
         _TYPED_ORDER[FieldType.STRING] = 2
         _TYPED_ORDER[None] = 2
+
         def _field_sort_key(item):
             key, sel_entry = item
             ftype = None
@@ -407,6 +470,7 @@ def extract_raw_from_selectors(
             if ftype is None:
                 ftype = _infer_field_type_from_name(key)
             return _TYPED_ORDER.get(ftype, 2)
+
         sorted_fields = sorted(field_sels.items(), key=_field_sort_key)
         for key, sel_entry in sorted_fields:
             sel = _selector_css(sel_entry)
@@ -428,6 +492,7 @@ def extract_raw_from_selectors(
                 val = _extract_field_by_pattern(node, sel_entry, key, used_spans, used_child_indices)
             if isinstance(sel_entry, dict) and sel_entry.get("type") == "currency" and val:
                 from app.selector_profiles.loader import _postprocess_field
+
                 val = _postprocess_field(val, sel_entry)
             record[key] = val
         if any(v not in (None, "") for v in record.values()):
@@ -479,24 +544,28 @@ def apply_selectors(
             record[field.name] = _sanitize_field_value(field, val, base_url=base_url)
             if return_field_quality:
                 from app.utils.quality import _value_quality
+
                 field_quality_map[field.name].append(_value_quality(field, record[field.name]))
 
         if node is not None:
             record = _enrich_record_contacts(
-                record, schema_fields, node,
-                page_email=page_email, page_phone=page_phone,
+                record,
+                schema_fields,
+                node,
+                page_email=page_email,
+                page_phone=page_phone,
                 allow_page_fallback=False,
             )
 
         from app.utils.quality import score_record_quality
+
         record["record_score"] = score_record_quality(record, schema_fields)
         if record["record_score"] > 0:
             results.append(record)
 
     if return_field_quality:
         avg_field_quality = {
-            name: (sum(scores) / len(scores)) if scores else 0.0
-            for name, scores in field_quality_map.items()
+            name: (sum(scores) / len(scores)) if scores else 0.0 for name, scores in field_quality_map.items()
         }
         return results, avg_field_quality
 
@@ -519,9 +588,9 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
     page_email, page_phone = _extract_contacts_from_node(soup)
 
     # Priority 1: Common data container classes
-    containers = list(soup.find_all(["article", "li", "tr", "div"], class_=re.compile(
-        r"item|card|listing|row|result|entry", re.I
-    )))
+    containers = list(
+        soup.find_all(["article", "li", "tr", "div"], class_=re.compile(r"item|card|listing|row|result|entry", re.I))
+    )
 
     # Priority 2: Headings and their parents
     if not containers:
@@ -539,19 +608,24 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
     results = []
     seen_texts = set()
 
-    # Use the first schema field as the primary entity field (user-defined ordering)
+    # Use the first schema field as the primary entity field (user-defined
+    # ordering)
     desc_field = schema_fields[0].name if schema_fields else "text"
 
-    for container in containers[:settings.REGEX_MAX_CONTAINERS]:
+    for container in containers[: settings.REGEX_MAX_CONTAINERS]:
         text = _compact_text(container.get_text(separator=" ", strip=True))
         if len(text) < settings.SELECTOR_MIN_TEXT_LEN or text in seen_texts:
             continue
-        # Skip containers that look like noise: ads, newsletters, signup forms, sidebars
+        # Skip containers that look like noise: ads, newsletters, signup forms,
+        # sidebars
         classes = " ".join(container.get("class", []))
         id_attr = container.get("id", "")
         noise_text = text.lower()
-        if re.search(r"subscribe|newsletter|sign.?up|advertisement|ad[-_]?banner|sidebar|sponsored|cookie",
-                      f"{classes} {id_attr} {noise_text}", re.I):
+        if re.search(
+            r"subscribe|newsletter|sign.?up|advertisement|ad[-_]?banner|sidebar|sponsored|cookie",
+            f"{classes} {id_attr} {noise_text}",
+            re.I,
+        ):
             continue
         seen_texts.add(text)
 
@@ -578,7 +652,9 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.CURRENCY:
-                price_node = container.find(True, class_=re.compile(r"price|amount|cost|amt|fare|mrp|discount|total|sale|offer", re.I))
+                price_node = container.find(
+                    True, class_=re.compile(r"price|amount|cost|amt|fare|mrp|discount|total|sale|offer", re.I)
+                )
                 if price_node:
                     val = price_node.get_text()
                 else:
@@ -600,7 +676,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 if rating_node:
                     val = rating_node.get_text()
                 else:
-                    match = re.search(r"(\d+\.?\d*/\d+|\d+\.?\d*\s*stars?|★+)", text, re.I)
+                    match = re.search(r"(\d+\.?\d*/\d+|\d+\.?\d*\s * stars?|★+)", text, re.I)
                     val = match.group(1) if match else None
                 val = _sanitize_field_value(field, val)
 
@@ -614,16 +690,20 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.CODE:
-                code_node = container.find(True, class_=re.compile(r"sku|product-code|barcode|isbn|model-number|part", re.I))
+                code_node = container.find(
+                    True, class_=re.compile(r"sku|product-code|barcode|isbn|model-number|part", re.I)
+                )
                 if code_node:
                     val = code_node.get_text()
                 else:
-                    match = re.search(r"(SKU[-:\s]*[A-Za-z0-9-]+|\b[0-9]{12,13}\b)", text, re.I)
+                    match = re.search(r"(SKU[-:\s]*[A-Za-z0 - 9-]+|\b[0 - 9]{12,13}\b)", text, re.I)
                     val = match.group(1) if match else None
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.LOCATION:
-                loc_node = container.find(True, class_=re.compile(r"origin|destination|city|location|airport|from|to|station", re.I))
+                loc_node = container.find(
+                    True, class_=re.compile(r"origin|destination|city|location|airport|from|to|station", re.I)
+                )
                 if loc_node:
                     val = loc_node.get_text()
                 else:
@@ -644,7 +724,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 # STRING, DATE, or unknown — extract the most prominent text
                 if field.name == desc_field:
                     # Primary entity: get the most specific identifying text
-                    # Strategy 1: Look for heading/link elements
+                    # Strategy 1: Look for heading / link elements
                     heading = container.find(["h1", "h2", "h3", "h4", "strong"])
                     if not heading:
                         link = container.find("a")
@@ -659,13 +739,15 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                         if img and img.get("alt", "").strip() and len(img["alt"].strip()) > 2:
                             heading = img
 
-                    # Strategy 3: Look for elements with identifying class patterns
+                    # Strategy 3: Look for elements with identifying class
+                    # patterns
                     if not heading:
                         named_el = container.find(class_=re.compile(r"name|title|brand|company|org", re.I))
                         if named_el:
                             heading = named_el
 
-                    # Strategy 4: First element with short, meaningful text (not a full sentence)
+                    # Strategy 4: First element with short, meaningful text
+                    # (not a full sentence)
                     if not heading:
                         for child in container.find_all(["span", "div", "p", "b", "i"], recursive=True, limit=10):
                             child_text = child.get_text(strip=True)
@@ -674,8 +756,15 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                                     heading = child
                                     break
 
-                    candidate = heading.get("alt") if heading and heading.name == "img" else \
-                        (heading.get_text(" ", strip=True) if heading else text[:settings.SELECTOR_HEADING_FALLBACK_LEN])
+                    candidate = (
+                        heading.get("alt")
+                        if heading and heading.name == "img"
+                        else (
+                            heading.get_text(" ", strip=True)
+                            if heading
+                            else text[: settings.SELECTOR_HEADING_FALLBACK_LEN]
+                        )
+                    )
                     val = _sanitize_field_value(field, candidate)
                 else:
                     # Secondary fields: use container text or None
@@ -684,15 +773,18 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
             record[field.name] = val
 
         record = _enrich_record_contacts(
-            record, schema_fields, container,
-            page_email=page_email, page_phone=page_phone,
+            record,
+            schema_fields,
+            container,
+            page_email=page_email,
+            page_phone=page_phone,
             allow_page_fallback=True,
         )
 
         from app.utils.quality import score_record_quality
+
         record["record_score"] = score_record_quality(record, schema_fields)
         if record["record_score"] > 0:
             results.append(record)
 
     return _apply_page_level_contact_fallback(results, schema_fields, page_email, page_phone)
-

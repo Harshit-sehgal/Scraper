@@ -33,7 +33,8 @@ class _CheckpointIndex:
     __slots__ = ("entries",)
 
     def __init__(self):
-        # entries: list of (global_idx, segment_path, segment_offset, snapshot_dict)
+        # entries: list of (global_idx, segment_path, segment_offset,
+        # snapshot_dict)
         self.entries: List[Tuple[int, str, int, dict]] = []
 
     def add(self, global_idx: int, segment_path: str, offset: int, snapshot: dict):
@@ -52,10 +53,7 @@ class _CheckpointIndex:
         self.entries.clear()
 
     def to_dict_list(self) -> List[dict]:
-        return [
-            {"idx": idx, "segment": seg, "offset": off}
-            for idx, seg, off, _ in self.entries
-        ]
+        return [{"idx": idx, "segment": seg, "offset": off} for idx, seg, off, _ in self.entries]
 
 
 class ReplayBuffer:
@@ -131,8 +129,13 @@ class ReplayBuffer:
 
             # Trigger checkpoint if structural event or interval hit
             is_structural = entry["type"] in {
-                "restructure_topology", "merge_state", "add", "remove",
-                "promote_hypo", "crystallize", "phase_transition",
+                "restructure_topology",
+                "merge_state",
+                "add",
+                "remove",
+                "promote_hypo",
+                "crystallize",
+                "phase_transition",
             }
             if is_structural or (self._current_segment_count % _CHECKPOINT_INTERVAL == 0):
                 segment_offset = self._get_file_offset(filepath)
@@ -174,9 +177,7 @@ class ReplayBuffer:
             self._segments.remove(oldest)
             # Prune checkpoints in evicted segments
             evicted_seg = oldest
-            self._checkpoints.entries = [
-                cp for cp in self._checkpoints.entries if cp[1] != evicted_seg
-            ]
+            self._checkpoints.entries = [cp for cp in self._checkpoints.entries if cp[1] != evicted_seg]
 
     def _get_file_offset(self, filepath: Path) -> int:
         """Get the current byte offset at end of file."""
@@ -265,7 +266,8 @@ class ReplayBuffer:
         if cp_idx > target_idx:
             return None
 
-        # Clone the checkpoint snapshot as starting state, unpacking delta encoding
+        # Clone the checkpoint snapshot as starting state, unpacking delta
+        # encoding
         checkpoint_delta = snapshot.get("delta", {})
         state = {}
         for k, change in checkpoint_delta.items():
@@ -311,11 +313,13 @@ class ReplayBuffer:
             for seg_name in sorted(self._segments):
                 seg_path = self._base_dir / seg_name
                 size_bytes = seg_path.stat().st_size if seg_path.exists() else 0
-                result.append({
-                    "segment": seg_name,
-                    "size_bytes": size_bytes,
-                    "size_mb": round(size_bytes / (1024 * 1024), 2),
-                })
+                result.append(
+                    {
+                        "segment": seg_name,
+                        "size_bytes": size_bytes,
+                        "size_mb": round(size_bytes / (1024 * 1024), 2),
+                    }
+                )
         return result
 
     def status(self) -> dict:
@@ -384,17 +388,20 @@ class ReplayBuffer:
                     total_lines += 1
                     # Rebuild checkpoints using same heuristic as append()
                     is_structural = entry.get("type") in {
-                        "restructure_topology", "merge_state", "add", "remove",
-                        "promote_hypo", "crystallize", "phase_transition",
+                        "restructure_topology",
+                        "merge_state",
+                        "add",
+                        "remove",
+                        "promote_hypo",
+                        "crystallize",
+                        "phase_transition",
                     }
                     if is_structural or (total_lines > 0 and total_lines % _CHECKPOINT_INTERVAL == 0):
                         self._checkpoints.add(idx, seg_path.name, pos, entry)
                         self._total_checkpoints += 1
 
             # Update current segment to the latest
-            self._current_segment_idx = int(
-                seg_path.stem.split("_")[1]
-            ) if "_" in seg_path.stem else 0
+            self._current_segment_idx = int(seg_path.stem.split("_")[1]) if "_" in seg_path.stem else 0
             self._current_segment_count = total_lines
 
         if self._segments:
@@ -495,13 +502,17 @@ class ReplayBuffer:
                 "end_idx": max(idxs),
                 "event_count": len(events),
                 "types": unique_types,
-                "events": [{
-                    "idx": e.get("idx"),
-                    "type": e.get("type"),
-                    "timestamp": e.get("timestamp"),
-                    "metadata": e.get("metadata", {}),
-                    "delta": e.get("delta", {}),
-                } for e in sorted(events, key=lambda x: x.get("idx", 0))][-20:],  # Limit events per chain
+                "events": [
+                    {
+                        "idx": e.get("idx"),
+                        "type": e.get("type"),
+                        "timestamp": e.get("timestamp"),
+                        "metadata": e.get("metadata", {}),
+                        "delta": e.get("delta", {}),
+                        # Limit events per chain
+                    }
+                    for e in sorted(events, key=lambda x: x.get("idx", 0))
+                ][-20:],
                 "summary": " → ".join(t.split(".", 1)[-1] if "." in t else t for t in unique_types[:5]),
             }
             result.append(chain)
@@ -537,11 +548,7 @@ def get_replay_buffer(base_dir: Optional[str] = None) -> ReplayBuffer:
     """Get or create the global ReplayBuffer instance."""
     global _buffer
     if _buffer is None:
-        _buffer = ReplayBuffer(
-            base_dir=base_dir or str(
-                Path(__file__).parent.parent / "data" / "replay_buffer"
-            )
-        )
+        _buffer = ReplayBuffer(base_dir=base_dir or str(Path(__file__).parent.parent / "data" / "replay_buffer"))
     return _buffer
 
 

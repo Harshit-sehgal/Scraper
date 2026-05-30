@@ -1,6 +1,6 @@
 """TopologyState — owns the field region graph and ALL topology-derived structures.
 
-Re-exports types/helpers from topology_state_types and TopologyView from
+Re-exports types / helpers from topology_state_types and TopologyView from
 topology_view for backward compatibility.
 """
 
@@ -35,7 +35,6 @@ __all__ = [
 ]
 
 
-
 class TopologyState:
     """Sole owner of the semantic field's topology structure."""
 
@@ -44,7 +43,7 @@ class TopologyState:
         tx = self._staging
         if tx is not None:
             return tx["tombstones"]
-        return self.__dict__.get('_tombstones_real', set())
+        return self.__dict__.get("_tombstones_real", set())
 
     @_tombstones.setter
     def _tombstones(self, value: Set[str]):
@@ -67,8 +66,11 @@ class TopologyState:
         if tx is not None:
             tx["structural_change"] = value
 
-    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None,
-                 read_callback: Optional[Callable[[str, int], None]] = None):
+    def __init__(
+        self,
+        delta_callback: Optional[Callable[[str, str, dict], None]] = None,
+        read_callback: Optional[Callable[[str, int], None]] = None,
+    ):
         self._delta_callback = delta_callback
         self._read_callback = read_callback
         # ─── Region Graph ──────────────────────────────────────────────
@@ -88,7 +90,7 @@ class TopologyState:
         self._cohesion_split_attempts: Dict[Tuple[str, str], float] = {}
         self._anchors: Set[Tuple[str, str]] = set()
         self._crystalline_atoms: List[dict] = []
-        
+
         # ─── Meso Clusters (Multi-Scale Topology) ────────────────────
         self._meso_clusters: List[dict] = []
 
@@ -100,13 +102,14 @@ class TopologyState:
         self._topology_epoch: int = 1
 
         # ─── Transaction Staging ──────────────────────────────────────
+
     @property
     def _staging(self) -> Optional[dict]:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"topology_staging_{id(self)}")
         return None
-    
+
     @_staging.setter
     def _staging(self, value: Optional[dict]):
         tx = active_transaction.get()
@@ -134,6 +137,7 @@ class TopologyState:
     def begin_transaction(self):
         """Start a transaction by snapshotting all topology structures."""
         from dataclasses import replace
+
         self._modified_regions.clear()
         self._structural_change = False
         self._staging = {
@@ -166,7 +170,8 @@ class TopologyState:
                     # Find live region
                     live = next((r for r in self._regions if r.region_id == rid), None)
                     if live and live.version != expected:
-                        raise ConflictError(f"MVCC CONFLICT: Region [{rid}] version {live.version} != expected {expected}")
+                        raise ConflictError(f"MVCC CONFLICT: Region [{rid}] version {
+                            live.version} != expected {expected}")
 
             # 2. Increment versions for all modified regions
             for rid in self._modified_regions:
@@ -195,7 +200,7 @@ class TopologyState:
             self._meso_clusters = self._staging["meso_clusters"]
             self._macro_continents = self._staging["macro_continents"]
             self._tombstones_real = self._staging["tombstones"]
-            
+
             self._staging = None
             self._modified_regions.clear()
 
@@ -207,13 +212,13 @@ class TopologyState:
 
     def restructure_topology(self, target_region_ids: Optional[List[str]] = None):
         """Forcibly rewire the substrate to escape metastable locks (Phase 52).
-        
+
         Breaks strong cohesion edges and increases regional temperature to
         encourage discovery of new topological minima.
         """
         regs = self._get_regions()
         targets = target_region_ids if target_region_ids else [r.region_id for r in regs if r.instability < 0.1]
-        
+
         for rid in targets:
             # 1. Break edges (Clear neighbors)
             self._record("break_topology_edges", {"region_id": rid})
@@ -224,7 +229,7 @@ class TopologyState:
                 self.set_region_temperature(rid, 0.9)
                 # 3. Momentum Reset
                 self.set_region_momentum(rid, 0.0)
-                
+
         self._record("restructure_topology", {"count": len(targets)})
 
     def shard_topology(self) -> Dict[str, List[str]]:
@@ -235,14 +240,14 @@ class TopologyState:
             shard_id = f"shard_{idx}"
             for role in community:
                 role_to_shard[role] = shard_id
-                
+
         shard_assignment: Dict[str, List[str]] = {}
         for r in self._get_regions():
             # Assign region to the shard of its first competing role
             primary_role = r.competing_roles[0] if r.competing_roles else "_unidentified"
             shard_id = role_to_shard.get(primary_role, "shard_default")
             shard_assignment.setdefault(shard_id, []).append(r.region_id)
-            
+
         return shard_assignment
 
     def _get_regions(self) -> List[FieldConflictRegion]:
@@ -276,6 +281,7 @@ class TopologyState:
             "macro_continents": "_macro_continents",
         }
         return getattr(self, attr_map[key])
+
     def _set_struct(self, key: str, val):
         if self._staging is not None:
             self._staging[key] = val
@@ -317,8 +323,7 @@ class TopologyState:
     def find(self, token: str, roles: Set[str], domain: str = "") -> Optional[RegionSnapshot]:
         view = self.get_view()
         for r in self._get_regions():
-            if (r.token == token and set(r.competing_roles) == roles
-                    and getattr(r, 'domain', '') == domain):
+            if r.token == token and set(r.competing_roles) == roles and getattr(r, "domain", "") == domain:
                 return view._snapshot(r)
         return None
 
@@ -338,7 +343,7 @@ class TopologyState:
             cohesion_split_attempts=self._get_struct("split_attempts"),
             meso_clusters=self._get_struct("meso_clusters"),
             macro_continents=self._get_struct("macro_continents"),
-            read_callback=self._read_callback
+            read_callback=self._read_callback,
         )
 
     def find_region_for_mutation(self, token: str, sorted_roles: tuple) -> Optional[str]:
@@ -405,12 +410,13 @@ class TopologyState:
     def distill_crystalline_atoms(self, integrity_threshold: float = 0.9, instability_threshold: float = 0.1) -> int:
         """Move extremely stable regions into the permanent atom store (Phase 34)."""
         import time
+
         regs = self._get_regions()
         atoms = self._get_struct("crystalline_atoms")
-        
+
         remaining = []
         new_atoms_count = 0
-        
+
         for r in regs:
             if r.integrity >= integrity_threshold and r.instability <= instability_threshold:
                 # Distill to atom
@@ -418,18 +424,18 @@ class TopologyState:
                     "token": r.token,
                     "roles": list(r.competing_roles),
                     "domain": r.domain,
-                    "timestamp": time.time()
+                    "timestamp": time.time(),
                 }
                 atoms.append(atom)
                 new_atoms_count += 1
             else:
                 remaining.append(r)
-                
+
         if new_atoms_count > 0:
             self._set_regions(remaining)
             self._set_struct("crystalline_atoms", atoms)
             self._record("distill_crystalline_atoms", {"count": new_atoms_count})
-            
+
         return new_atoms_count
 
     def get_cohesion_merge_success(self) -> Dict[Tuple[str, str], float]:
@@ -487,6 +493,7 @@ class TopologyState:
                     graph.setdefault(rb, set()).add(ra)
         if not graph:
             from app.field_laws import ROLE_EXCLUSIVITY
+
             for ra, rb in ROLE_EXCLUSIVITY:
                 graph.setdefault(ra, set()).add(rb)
                 graph.setdefault(rb, set()).add(ra)
@@ -542,9 +549,9 @@ class TopologyState:
 
     # ─── Controlled Mutations — Region Lifecycle ───────────────────────
 
-    def add(self, competing_roles: List[str], token: str,
-            instability: float = 0.5, integrity: float = 0.5,
-            domain: str = "") -> FieldConflictRegion:
+    def add(
+        self, competing_roles: List[str], token: str, instability: float = 0.5, integrity: float = 0.5, domain: str = ""
+    ) -> FieldConflictRegion:
         region = FieldConflictRegion(
             competing_roles=list(competing_roles),
             token=token,
@@ -558,12 +565,20 @@ class TopologyState:
         self._set_regions(regs)
         if self._staging is not None:
             self._staging["structural_change"] = True
-        self._record("add", {"competing_roles": competing_roles, "token": token, 
-                            "instability": instability, "integrity": integrity, "domain": domain})
-        
+        self._record(
+            "add",
+            {
+                "competing_roles": competing_roles,
+                "token": token,
+                "instability": instability,
+                "integrity": integrity,
+                "domain": domain,
+            },
+        )
+
         # Phase 71: Emit wave on new region creation
         self.emit_field_wave(region.region_id, instability)
-        
+
         return region
 
     def append_region(self, region: FieldConflictRegion):
@@ -574,7 +589,7 @@ class TopologyState:
         self._set_regions(regs)
         if self._staging is not None:
             self._staging["structural_change"] = True
-        # We don't record the full object, just enough to reconstruct if needed, 
+        # We don't record the full object, just enough to reconstruct if needed,
         # or use add() for replay.
 
     def remove(self, region: FieldConflictRegion) -> bool:
@@ -618,8 +633,7 @@ class TopologyState:
     def prune(self, min_instability: float = 0.02, min_energy: float = 0.5) -> int:
         regs = self._get_regions()
         before = len(regs)
-        regs = [r for r in regs
-                         if r.instability > min_instability or r.local_energy > min_energy]
+        regs = [r for r in regs if r.instability > min_instability or r.local_energy > min_energy]
         self._set_regions(regs)
         if len(regs) != before and self._staging is not None:
             self._staging["structural_change"] = True
@@ -638,7 +652,7 @@ class TopologyState:
 
     def self_prune(self, instability_threshold: float = 0.9, community_required: bool = True) -> int:
         """Autonomous topology pruning (Phase 62).
-        
+
         Removes regions that:
         1. Have very high instability (> threshold)
         2. Are NOT part of any detected community (isolated noise)
@@ -646,29 +660,29 @@ class TopologyState:
         regs = self._get_regions()
         if not regs:
             return 0
-            
+
         before = len(regs)
         in_community = set().union(*self.global_communities)
-        
+
         new_regs = []
         for r in regs:
             # Keep if stable OR in community OR part of the schema
             is_noise = r.instability > instability_threshold
             has_community = any(role in in_community for role in r.competing_roles)
-            
+
             if is_noise and community_required and not has_community:
                 self._record("prune_dead_zone", {"region_id": r.region_id, "instability": r.instability})
                 self._structural_change = True
                 continue
-                
+
             new_regs.append(r)
-            
+
         self._set_regions(new_regs)
         return before - len(new_regs)
 
     def induce_topological_laws(self, min_success_rate: float = 0.8, min_attempts: int = 10):
         """Autonomous law discovery (Phase 62).
-        
+
         Promotes frequently successful structural patterns into formal laws.
         """
         # 1. Analyze successful merges
@@ -681,7 +695,7 @@ class TopologyState:
                     current = self.topological_laws.get(pair, 0.0)
                     self.set_topological_law(pair, max(current, 0.5 + (rate - 0.5) * 0.5))
                     self._record("induce_law", {"pair": pair, "type": "affinity", "rate": rate})
-                    
+
         # 2. Analyze successful splits
         for pair, success in self._cohesion_split_success.items():
             attempts = self._cohesion_split_attempts.get(pair, 0)
@@ -736,15 +750,14 @@ class TopologyState:
             self._regions.clear()
         self._record("clear_regions", {})
 
-
     # ─── Controlled Mutations — Region Attributes ──────────────────────
 
     def get_region(self, region_id: Any) -> Optional[FieldConflictRegion]:
         """Internal helper to get a mutable region reference by ID or object."""
         rid = region_id
-        if hasattr(region_id, 'region_id'):
+        if hasattr(region_id, "region_id"):
             rid = region_id.region_id
-            
+
         for r in self._get_regions():
             if r.region_id == rid:
                 return r
@@ -752,11 +765,11 @@ class TopologyState:
 
     def set_region_instability(self, region_id: Any, value: float):
         r = self.get_region(region_id)
-        if r: 
+        if r:
             old_val = r.instability
             r.instability = max(0.01, min(1.0, value))
             self._record("set_region_instability", {"region_id": r.region_id, "value": value})
-            
+
             # Phase 71: Emit wave on significant instability spike
             delta = value - old_val
             if delta > 0.15:
@@ -769,7 +782,7 @@ class TopologyState:
 
     def set_region_energy(self, region_id: Any, value: float):
         r = self.get_region(region_id)
-        if r: 
+        if r:
             r.local_energy = max(0.0, min(10.0, value))
             self._record("set_region_energy", {"region_id": r.region_id, "value": value})
 
@@ -780,13 +793,13 @@ class TopologyState:
 
     def set_region_integrity(self, region_id: Any, value: float):
         r = self.get_region(region_id)
-        if r: 
+        if r:
             r.integrity = max(0.1, min(1.0, value))
             self._record("set_region_integrity", {"region_id": r.region_id, "value": value})
 
     def set_region_recurrence(self, region_id: Any, value: float):
         r = self.get_region(region_id)
-        if r: 
+        if r:
             r.recurrence_score = max(0.0, min(1.0, value))
             self._record("set_region_recurrence", {"region_id": r.region_id, "value": value})
 
@@ -855,18 +868,19 @@ class TopologyState:
         }
 
         LAW: Edge field forces are the canonical driver of all topology dynamics.
-        No external code should recompute forces from raw cohesion/law data.
+        No external code should recompute forces from raw cohesion / law data.
         """
         view = self.get_view()
         forces: Dict[Tuple[str, str], Dict[str, float | str]] = {}
         for edge in view.get_edge_fields():
-            pair = tuple(sorted([edge.source, edge.target]))  # type: ignore[assignment]
+            # type: ignore[assignment]
+            pair = tuple(sorted([edge.source, edge.target]))
             forces[pair] = {  # type: ignore[arg-type, index]
-                'affinity': edge.affinity,
-                'repulsion': edge.repulsion,
-                'pressure': edge.pressure,
-                'route_strength': edge.route_strength,
-                'semantics': edge.semantics,
+                "affinity": edge.affinity,
+                "repulsion": edge.repulsion,
+                "pressure": edge.pressure,
+                "route_strength": edge.route_strength,
+                "semantics": edge.semantics,
             }
         return forces  # type: ignore[return-value]
 
@@ -895,19 +909,23 @@ class TopologyState:
                 peer = pair[0] if pair[1] == role else pair[1]
                 if peer in source_region.competing_roles:
                     continue
-                # High-affinity edges with decent route_strength are good targets
-                if force['affinity'] > 0.3 and force['route_strength'] > 0.2:
-                    weight = force['affinity'] * force['route_strength']
+                # High-affinity edges with decent route_strength are good
+                # targets
+                if force["affinity"] > 0.3 and force["route_strength"] > 0.2:
+                    weight = force["affinity"] * force["route_strength"]
                     if peer not in route_targets or weight > route_targets[peer]:
                         route_targets[peer] = weight
 
         if not route_targets:
             # No alternative routes: dissipate trapped pressure as heat
             source_region.local_temperature = min(1.0, source_region.local_temperature + pressure_amount * 0.1)
-            self._record("redirect_repulsive_pressure_dissipate", {
-                "region_id": source_region.region_id,
-                "pressure_amount": round(pressure_amount, 4),
-            })
+            self._record(
+                "redirect_repulsive_pressure_dissipate",
+                {
+                    "region_id": source_region.region_id,
+                    "pressure_amount": round(pressure_amount, 4),
+                },
+            )
             return
 
         # 2. Normalize weights and redirect pressure
@@ -921,30 +939,38 @@ class TopologyState:
             # Find target regions containing this role
             for target_r in regs:
                 if target_role in target_r.competing_roles and target_r.region_id != source_region.region_id:
-                    # Apply edge-field-modulated pressure to target region state
+                    # Apply edge-field-modulated pressure to target region
+                    # state
                     target_r.instability = min(1.0, target_r.instability + redirect_amount * 0.05)
                     target_r.semantic_pressure = max(0.0, target_r.semantic_pressure + redirect_amount * 0.03)
                     redirected += redirect_amount
                     affected_targets.append(target_r.region_id)
                     # Record each target mutation for MVCC tracking
-                    self._record("redirect_pressure_to_target", {
-                        "region_id": target_r.region_id,  # MVCC: track target as modified
-                        "source": source_region.region_id,
-                        "target_role": target_role,
-                        "redirect_amount": round(redirect_amount, 4),
-                        "new_instability": round(target_r.instability, 4),
-                        "new_pressure": round(target_r.semantic_pressure, 4),
-                    })
+                    self._record(
+                        "redirect_pressure_to_target",
+                        {
+                            "region_id": target_r.region_id,  # MVCC: track target as modified
+                            "source": source_region.region_id,
+                            "target_role": target_role,
+                            "redirect_amount": round(redirect_amount, 4),
+                            "new_instability": round(target_r.instability, 4),
+                            "new_pressure": round(target_r.semantic_pressure, 4),
+                        },
+                    )
                     break
 
-        # 3. Any unredirected pressure heats the source (thermodynamic dissipation)
+        # 3. Any unredirected pressure heats the source (thermodynamic
+        # dissipation)
         remaining = pressure_amount - redirected
         if remaining > 0.01:
             source_region.local_temperature = min(1.0, source_region.local_temperature + remaining * 0.05)
-            self._record("redirect_repulsive_pressure_remainder", {
-                "region_id": source_region.region_id,
-                "remaining_heat": round(remaining, 4),
-            })
+            self._record(
+                "redirect_repulsive_pressure_remainder",
+                {
+                    "region_id": source_region.region_id,
+                    "remaining_heat": round(remaining, 4),
+                },
+            )
 
     def route_contradiction(self, role_a: str, role_b: str, strength: float = 0.1) -> dict:
         """Route a contradiction event through the unified edge field.
@@ -962,7 +988,7 @@ class TopologyState:
         Args:
             role_a: First role in the contradiction pair
             role_b: Second role in the contradiction pair
-            strength: How strong the contradiction pressure is (0-1)
+            strength: How strong the contradiction pressure is (0 - 1)
 
         Returns:
             dict with:
@@ -976,20 +1002,23 @@ class TopologyState:
 
         if not force:
             # No edge field data for this pair: establish a basic repulsive topological law
-            # An empty force dict {} means the pair was not found in get_edge_fields()
+            # An empty force dict {} means the pair was not found in
+            # get_edge_fields()
             current = self._topological_laws.get(pair, 0.0)
             self.set_topological_law(pair, min(current - strength * 0.3, -0.01))
             return {"redirected": 0.0, "excluded": strength, "through_edge_field": False}
 
-        is_repulsive = force.get('semantics') == 'repulsive' or force.get('repulsion', 0) > 0.3
+        is_repulsive = force.get("semantics") == "repulsive" or force.get("repulsion", 0) > 0.3
 
         if is_repulsive:
-            # Repulsive edge: redirect pressure via the topology, not scalar exclusion
+            # Repulsive edge: redirect pressure via the topology, not scalar
+            # exclusion
             for r in self._get_regions():
                 if role_a in r.competing_roles or role_b in r.competing_roles:
                     self._redirect_repulsive_pressure(r, strength * 0.5, forces)
 
-            # Strengthen the repulsive topological law to encode the contradiction
+            # Strengthen the repulsive topological law to encode the
+            # contradiction
             current_law = self._topological_laws.get(pair, 0.0)
             self.set_topological_law(pair, min(current_law - strength * 0.1, -0.01))
 
@@ -999,7 +1028,8 @@ class TopologyState:
                 "through_edge_field": True,
             }
         else:
-            # Non-repulsive pair contradicting: establish/strengthen a repulsive law
+            # Non-repulsive pair contradicting: establish / strengthen a
+            # repulsive law
             current_law = self._topological_laws.get(pair, 0.0)
             self.set_topological_law(pair, min(current_law - strength * 0.2, -0.01))
 
@@ -1044,11 +1074,12 @@ class TopologyState:
             roles = r.competing_roles
             for i in range(len(roles)):
                 for j in range(i + 1, len(roles)):
-                    pair = tuple(sorted([roles[i], roles[j]]))  # type: ignore[assignment]
+                    # type: ignore[assignment]
+                    pair = tuple(sorted([roles[i], roles[j]]))
                     f = forces.get(pair)  # type: ignore[arg-type]
                     if f:
-                        region_pressure = max(region_pressure, f['pressure'])
-                        region_affinity = max(region_affinity, f['affinity'])
+                        region_pressure = max(region_pressure, f["pressure"])
+                        region_affinity = max(region_affinity, f["affinity"])
 
             # Edge field modulates evolution
             # High pressure forces evolution; high affinity adds stability
@@ -1059,7 +1090,8 @@ class TopologyState:
             effects = r.evolve(force=local_force)
             all_effects.extend(effects)
 
-            # Survival: high affinity keeps regions alive even at low instability
+            # Survival: high affinity keeps regions alive even at low
+            # instability
             if r.instability > 0.001 or r.idle_cycles < 20 or region_affinity > 0.4:
                 survivors.append(r)
 
@@ -1106,23 +1138,26 @@ class TopologyState:
 
                     # Edge-field-modulated propagation
                     # pressure amplifies spread, affinity dampens
-                    spread_potential = r.instability * force['pressure']
+                    spread_potential = r.instability * force["pressure"]
 
-                    if force['semantics'] == 'repulsive':
+                    if force["semantics"] == "repulsive":
                         # ─── Repulsive Edge: Redirect Through Edge Field ───
                         # Accumulate pressure for redirection through alternative
                         # high-affinity routes instead of only scalar exclusion
                         repulsive_pressure += spread_potential * MAX_COUPLING_TRANSFER
-                        # Still emit a minimal exclusion signal for learning continuity
+                        # Still emit a minimal exclusion signal for learning
+                        # continuity
                         spread = spread_potential * MAX_COUPLING_TRANSFER * 0.1
                         if spread > 0.001:
                             effects.append((pair, spread))
-                    elif force['semantics'] == 'attractive':
-                        # Attractive edges propagate but dampened by containment
+                    elif force["semantics"] == "attractive":
+                        # Attractive edges propagate but dampened by
+                        # containment
                         spread = spread_potential * MAX_COUPLING_TRANSFER * 0.3
                         if spread > 0.001:
                             effects.append((pair, spread))
-                            # Also propagate instability directly through attractive edges
+                            # Also propagate instability directly through
+                            # attractive edges
                             for target_r in self._get_regions():
                                 if peer in target_r.competing_roles and target_r.region_id != r.region_id:
                                     target_r.instability = min(1.0, target_r.instability + spread * 0.005)
@@ -1135,16 +1170,20 @@ class TopologyState:
             # Redirect accumulated repulsive pressure through edge field routes
             if repulsive_pressure > 0.01:
                 self._redirect_repulsive_pressure(r, repulsive_pressure, forces)
-                self._record("redirect_repulsive_pressure", {
-                    "region_id": r.region_id,
-                    "pressure_redirected": round(repulsive_pressure, 4),
-                })
+                self._record(
+                    "redirect_repulsive_pressure",
+                    {
+                        "region_id": r.region_id,
+                        "pressure_redirected": round(repulsive_pressure, 4),
+                    },
+                )
 
             if not effects:
                 # Fallback: use legacy propagation when no edge field exists
                 effects = r.propagate()
             all_effects.extend(effects)
         return all_effects
+
     def redistribute_instability(self, damping: float = 1.0) -> dict:
         """Redistribute instability across regions using thermodynamic free energy gradients.
 
@@ -1158,6 +1197,7 @@ class TopologyState:
         Returns dict with flow tracking data for energy conservation recording.
         """
         from app.field_laws import COUPLING_COEFFICIENT, FREE_ENERGY_CLAMP
+
         regs = self._get_regions()
         if len(regs) < 2:
             return {"total_flow": 0.0, "source_flow": 0.0, "sink_flow": 0.0, "pairs_coupled": 0}
@@ -1174,7 +1214,7 @@ class TopologyState:
         # 1. Compute flows using thermodynamic free energy gradient
         deltas = {r.region_id: 0.0 for r in regs}
         source_flow = 0.0  # Flow OUT of source regions
-        sink_flow = 0.0    # Flow INTO sink regions
+        sink_flow = 0.0  # Flow INTO sink regions
         pairs_coupled = 0
 
         for i in range(len(regs)):
@@ -1187,11 +1227,13 @@ class TopologyState:
                 edge_conductance = 0.0
                 for ra in ri.competing_roles:
                     for rb in rj.competing_roles:
-                        pair = tuple(sorted([ra, rb]))  # type: ignore[assignment]
+                        # type: ignore[assignment]
+                        pair = tuple(sorted([ra, rb]))
                         force = forces.get(pair)  # type: ignore[arg-type]
                         if force:
-                            # Edge conductance = route_strength (how well signals flow)
-                            edge_conductance = max(edge_conductance, force['route_strength'])
+                            # Edge conductance = route_strength (how well
+                            # signals flow)
+                            edge_conductance = max(edge_conductance, force["route_strength"])
 
                 if edge_conductance < 0.01:
                     continue  # No field connection: no thermodynamic coupling
@@ -1208,7 +1250,8 @@ class TopologyState:
 
                 # Flow = conductance * gradient * damping * coefficient
                 # This is analogous to Ohm's law: I = G * V
-                # Flow direction: positive = ri → rj (ri loses instability, rj gains)
+                # Flow direction: positive = ri → rj (ri loses instability, rj
+                # gains)
                 flow = edge_conductance * fe_gradient * damping * COUPLING_COEFFICIENT
                 flow = max(-0.1, min(0.1, flow))
 
@@ -1230,11 +1273,14 @@ class TopologyState:
                     self.set_region_instability(rid, r.instability + delta)
 
         total_flow = round(sum(abs(d) for d in deltas.values()), 4)
-        self._record("redistribute_instability", {
-            "count": len(regs),
-            "total_flow": total_flow,
-            "pairs_coupled": pairs_coupled,
-        })
+        self._record(
+            "redistribute_instability",
+            {
+                "count": len(regs),
+                "total_flow": total_flow,
+                "pairs_coupled": pairs_coupled,
+            },
+        )
 
         return {
             "total_flow": total_flow,
@@ -1251,8 +1297,7 @@ class TopologyState:
         avg_convergence = sum(r.local_convergence for r in regs) / n
         avg_temp = sum(r.local_temperature for r in regs) / n
         avg_energy = sum(r.local_energy for r in regs) / n
-        return {"convergence": avg_convergence, "temperature": avg_temp,
-                "energy": avg_energy, "count": n}
+        return {"convergence": avg_convergence, "temperature": avg_temp, "energy": avg_energy, "count": n}
 
     def compute_entropy(self) -> float:
         regs = self._get_regions()
@@ -1324,12 +1369,12 @@ class TopologyState:
             avg_instability = sum(r.instability for r in cluster_regions) / len(cluster_regions)
             avg_convergence = sum(r.local_convergence for r in cluster_regions) / len(cluster_regions)
             avg_pressure = sum(r.semantic_pressure for r in cluster_regions) / len(cluster_regions)
-            shared_roles = list(set.intersection(
-                *[set(r.competing_roles) for r in cluster_regions]
-            )) if len(cluster_regions) > 0 else []
-            all_roles = list(set.union(
-                *[set(r.competing_roles) for r in cluster_regions]
-            ))
+            shared_roles = (
+                list(set.intersection(*[set(r.competing_roles) for r in cluster_regions]))
+                if len(cluster_regions) > 0
+                else []
+            )
+            all_roles = list(set.union(*[set(r.competing_roles) for r in cluster_regions]))
             tokens = list(set(r.token for r in cluster_regions))
 
             # Build region_id tuple for continuity tracking
@@ -1382,28 +1427,32 @@ class TopologyState:
             # Centroid: average of all competing role vectors (simulated from role names)
             # In a full implementation this would use actual manifold vectors
             role_hash = sum(hash(r) for r in all_roles) if all_roles else 0
-            centroid = (role_hash / 1e10 % 1.0, sum(hash(r) * 7 for r in all_roles) / 1e10 % 1.0) if all_roles else (0.0, 0.0)
+            centroid = (
+                (role_hash / 1e10 % 1.0, sum(hash(r) * 7 for r in all_roles) / 1e10 % 1.0) if all_roles else (0.0, 0.0)
+            )
 
             cluster_id = prev.get("cluster_id", f"meso_{uuid.uuid4().hex[:8]}")
 
-            clusters.append({
-                "cluster_id": cluster_id,
-                "size": len(cluster_regions),
-                "region_ids": [r.region_id for r in cluster_regions],
-                "tokens": tokens,
-                "shared_roles": shared_roles,
-                "all_roles": all_roles,
-                "avg_instability": round(avg_instability, 3),
-                "avg_convergence": round(avg_convergence, 3),
-                "avg_pressure": round(avg_pressure, 3),
-                # Active entity properties
-                "entropy": round(entropy, 3),
-                "drift": round(drift, 3),
-                "stability": round(stability, 3),
-                "boundary_strength": round(boundary_strength, 3),
-                "interaction_policy": interaction_policy,
-                "centroid": centroid,
-            })
+            clusters.append(
+                {
+                    "cluster_id": cluster_id,
+                    "size": len(cluster_regions),
+                    "region_ids": [r.region_id for r in cluster_regions],
+                    "tokens": tokens,
+                    "shared_roles": shared_roles,
+                    "all_roles": all_roles,
+                    "avg_instability": round(avg_instability, 3),
+                    "avg_convergence": round(avg_convergence, 3),
+                    "avg_pressure": round(avg_pressure, 3),
+                    # Active entity properties
+                    "entropy": round(entropy, 3),
+                    "drift": round(drift, 3),
+                    "stability": round(stability, 3),
+                    "boundary_strength": round(boundary_strength, 3),
+                    "interaction_policy": interaction_policy,
+                    "centroid": centroid,
+                }
+            )
 
         self._set_struct("meso_clusters", clusters)
         self._record("compute_meso_clusters", {"count": len(clusters)})
@@ -1437,15 +1486,18 @@ class TopologyState:
                 "avg_convergence": sum(r.local_convergence for r in regs) / len(regs),
                 "avg_instability": sum(r.instability for r in regs) / len(regs),
                 "fragmentation": 0.0,
-    "cluster_diversity": 0.0,
-    "pressure": sum(r.semantic_pressure for r in regs) / len(regs),
+                "cluster_diversity": 0.0,
+                "pressure": sum(r.semantic_pressure for r in regs) / len(regs),
             }
 
         total_size = sum(c["size"] for c in clusters)
         if total_size == 0:
             return {
-                "avg_convergence": 0.5, "avg_instability": 0.5,
-                "fragmentation": 0.0, "cluster_diversity": 0.0, "macro_pressure": 0.3,
+                "avg_convergence": 0.5,
+                "avg_instability": 0.5,
+                "fragmentation": 0.0,
+                "cluster_diversity": 0.0,
+                "macro_pressure": 0.3,
             }
 
         weighted_convergence = sum(c["avg_convergence"] * c["size"] for c in clusters) / total_size
@@ -1459,7 +1511,7 @@ class TopologyState:
         mean_inst = weighted_instability
         if len(clusters) > 1:
             variance = sum((c["avg_instability"] - mean_inst) ** 2 for c in clusters) / len(clusters)
-            diversity = variance ** 0.5
+            diversity = variance**0.5
         else:
             diversity = 0.0
 
@@ -1499,6 +1551,7 @@ class TopologyState:
 
         # Group clusters that share roles
         import uuid
+
         continents = []
         assigned = set()
         for i in range(len(clusters)):
@@ -1546,7 +1599,8 @@ class TopologyState:
             convergence = sum(c["avg_convergence"] * c["size"] for c in continent_clusters) / max(total_size, 1)
 
             # Guidance strength: how strongly this continent influences its clusters
-            # Derived from entropy + stability: stable diverse continents guide strongly
+            # Derived from entropy + stability: stable diverse continents guide
+            # strongly
             prev = prev_map.get(all_meso_ids, {})
             prev_guidance = prev.get("guidance_strength", 0.5)
             raw_guidance = min(1.0, stability * (1.0 + entropy) * 0.7)
@@ -1556,7 +1610,9 @@ class TopologyState:
             # High when clusters within the continent have varied instability
             if len(continent_clusters) > 1:
                 instabilities = [c["avg_instability"] for c in continent_clusters]
-                variance = sum((i - sum(instabilities)/len(instabilities))**2 for i in instabilities) / len(instabilities)
+                variance = sum((i - sum(instabilities) / len(instabilities)) ** 2 for i in instabilities) / len(
+                    instabilities
+                )
                 diversity_pressure = min(1.0, variance * 5.0)  # Scale up variance
             else:
                 diversity_pressure = 0.0  # Single cluster: no internal diversity
@@ -1572,19 +1628,21 @@ class TopologyState:
 
             continent_id = prev.get("continent_id", f"macro_{uuid.uuid4().hex[:8]}")
 
-            continents.append({
-                "continent_id": continent_id,
-                "size": total_regions,
-                "meso_cluster_ids": list(all_meso_ids),
-                "all_roles": all_roles,
-                "pressure": round(pressure, 3),
-                "entropy": round(entropy, 3),
-                "stability": round(stability, 3),
-                "convergence": round(convergence, 3),
-                "guidance_strength": round(guidance_strength, 3),
-                "diversity_pressure": round(diversity_pressure, 3),
-                "centroid": centroid,
-            })
+            continents.append(
+                {
+                    "continent_id": continent_id,
+                    "size": total_regions,
+                    "meso_cluster_ids": list(all_meso_ids),
+                    "all_roles": all_roles,
+                    "pressure": round(pressure, 3),
+                    "entropy": round(entropy, 3),
+                    "stability": round(stability, 3),
+                    "convergence": round(convergence, 3),
+                    "guidance_strength": round(guidance_strength, 3),
+                    "diversity_pressure": round(diversity_pressure, 3),
+                    "centroid": centroid,
+                }
+            )
 
         self._set_struct("macro_continents", continents)
         self._record("compute_macro_continents", {"count": len(continents)})
@@ -1613,7 +1671,8 @@ class TopologyState:
         reg_map = {r.region_id: r for r in regs}
         affected = 0
 
-        # Compute macro pressure for top-down influence (meso gets guidance from macro)
+        # Compute macro pressure for top-down influence (meso gets guidance
+        # from macro)
         continents = self._get_struct("macro_continents")
         macro_pressure_map = {}
         for cont in continents:
@@ -1638,7 +1697,8 @@ class TopologyState:
 
             # Modulate by policy
             if policy == "isolated":
-                # Isolated clusters have very weak feedback — regions are loosely coupled
+                # Isolated clusters have very weak feedback — regions are
+                # loosely coupled
                 boundary_factor = boundary * 3.0  # Strong boundary = very isolated
                 feedback_strength *= max(0.0, 1.0 - boundary_factor * 0.3)
             elif policy == "cooperative":
@@ -1671,7 +1731,8 @@ class TopologyState:
                     push = (1.0 - cluster_stability) * 0.05 * feedback_strength * push_mod
                     r.instability = min(1.0, r.instability + push)
 
-                # Macro top-down guidance: high macro pressure regions get extra push
+                # Macro top-down guidance: high macro pressure regions get
+                # extra push
                 if macro_pressure > 0.5:
                     r.instability = min(1.0, r.instability + macro_pressure * 0.01)
 
@@ -1679,7 +1740,7 @@ class TopologyState:
                 base_temp_influence = cluster["avg_instability"] * 0.05
                 # Isolated clusters heat up less
                 if policy == "isolated":
-                    base_temp_influence *= (1.0 - boundary * 0.5)
+                    base_temp_influence *= 1.0 - boundary * 0.5
                 r.local_temperature = r.local_temperature * 0.95 + base_temp_influence
 
                 # Boundary modulates pressure propagation
@@ -1729,14 +1790,16 @@ class TopologyState:
                 if not cluster:
                     continue
 
-                # 1. Stability guidance: stable continents pull clusters toward stability
+                # 1. Stability guidance: stable continents pull clusters toward
+                # stability
                 if c_stability > 0.6:
                     pull = (c_stability - 0.5) * guidance * 0.02
                     cluster["avg_instability"] = max(0.01, cluster["avg_instability"] - pull)
                     # Also nudge convergence upward
                     cluster["avg_convergence"] = min(1.0, cluster["avg_convergence"] + pull * 0.5)
 
-                # 2. Pressure diffusion: continent pressure shapes cluster pressure
+                # 2. Pressure diffusion: continent pressure shapes cluster
+                # pressure
                 pressure_diff = c_pressure - cluster["avg_pressure"]
                 cluster["avg_pressure"] = cluster["avg_pressure"] + pressure_diff * guidance * 0.05
 
@@ -1747,9 +1810,11 @@ class TopologyState:
                     release = d_pressure * guidance * 0.01
                     cluster["avg_instability"] = min(1.0, cluster["avg_instability"] + release)
 
-                # 4. Convergence guidance: continents channel toward convergence
+                # 4. Convergence guidance: continents channel toward
+                # convergence
                 if conv > 0.7:
-                    # High convergence continent: pull all clusters toward convergence
+                    # High convergence continent: pull all clusters toward
+                    # convergence
                     gap = conv - cluster["avg_convergence"]
                     cluster["avg_convergence"] = min(1.0, cluster["avg_convergence"] + gap * guidance * 0.03)
 
@@ -1780,6 +1845,7 @@ class TopologyState:
         multi-scale interaction. No scale bypass or procedural override.
         """
         import time
+
         now = time.time()
 
         # 1. Micro → Meso: Recompute clusters from evolved regions
@@ -1788,7 +1854,7 @@ class TopologyState:
         # 2. Meso → Micro: Apply meso feedback to regions
         meso_affected = self._evolve_meso_clusters()
 
-        # 3. Meso → Macro: Build/update continents from evolved clusters
+        # 3. Meso → Macro: Build / update continents from evolved clusters
         self.compute_macro_continents()
 
         # 4. Macro → Meso: Apply continent guidance to clusters
@@ -1800,15 +1866,19 @@ class TopologyState:
             self.compute_meso_clusters()
 
         self._last_pressure_flow_time = now
-        self._record("cross_scale_pressure_flow", {
-            "meso_feedback": meso_affected,
-            "macro_guidance": macro_affected,
-        })
+        self._record(
+            "cross_scale_pressure_flow",
+            {
+                "meso_feedback": meso_affected,
+                "macro_guidance": macro_affected,
+            },
+        )
 
     # ─── Serialization ───────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
         from dataclasses import asdict
+
         return {
             "regions": [asdict(r) for r in self._get_regions()],
             "communities": [list(c) for c in self.global_communities],
@@ -1832,7 +1902,7 @@ class TopologyState:
 
     def from_dict(self, data: dict):
         self.clear()
-        
+
         # Identity and Epoch (Phase 60)
         self._topology_epoch = data.get("topology_epoch", 1)
         self._tombstones = set(data.get("tombstones", []))
@@ -1844,7 +1914,7 @@ class TopologyState:
                 competing_roles=r_data["competing_roles"],
                 token=r_data["token"],
                 instability=r_data["instability"],
-                region_id=r_data.get("region_id")
+                region_id=r_data.get("region_id"),
             )
             for k, v in r_data.items():
                 if k not in ["competing_roles", "token", "instability", "region_id"]:
@@ -1880,7 +1950,7 @@ class TopologyState:
                         except ValueError:
                             target[tuple(k.split("|"))] = v
                 else:
-                    # Already a tuple/list
+                    # Already a tuple / list
                     target[tuple(k)] = v
             self._set_struct(struct_key, target)
 
@@ -1894,18 +1964,18 @@ class TopologyState:
         self._set_struct("macro_continents", list(data.get("macro_continents", [])))
 
     def merge(self, other_data: dict, alpha: float = 0.5):
-        """Merge remote topology state into local (Phase 32/60)."""
+        """Merge remote topology state into local (Phase 32 / 60)."""
         remote_epoch = other_data.get("topology_epoch", 1)
         remote_tombstones = set(other_data.get("tombstones", []))
-        
+
         # Phase 60: Causal Reconciliation Heuristic
         # 1. Update local tombstones (union)
         self._tombstones.update(remote_tombstones)
-        
+
         # 2. Sync Epoch
         if remote_epoch > self._topology_epoch:
             self._topology_epoch = remote_epoch
-        
+
         # 3. Prune local regions that are tombstones in remote
         if remote_epoch >= self._topology_epoch:
             regs = self._get_regions()
@@ -1916,13 +1986,13 @@ class TopologyState:
 
         remote_regions = other_data.get("regions", [])
         local_ids = {r.region_id: r for r in self._get_regions()}
-        
+
         for r_data in remote_regions:
             rid = r_data.get("region_id")
             # Phase 60: Skip if region is a local tombstone
             if rid in self._tombstones:
                 continue
-                
+
             if rid in local_ids:
                 # Merge existing region attributes (Phase 32)
                 l_reg = local_ids[rid]
@@ -1935,7 +2005,7 @@ class TopologyState:
                     competing_roles=r_data["competing_roles"],
                     token=r_data["token"],
                     instability=r_data["instability"],
-                    region_id=rid
+                    region_id=rid,
                 )
                 for k, v in r_data.items():
                     if k not in ["competing_roles", "token", "instability", "region_id"]:
@@ -1958,7 +2028,7 @@ class TopologyState:
                     pair = parse_topology_key(key_str)
                 except ValueError:
                     pass
-            
+
             if pair:
                 local = self.topological_laws.get(pair, 0.0)
                 merged = r_val if abs(r_val) > abs(local) else local
@@ -1969,14 +2039,14 @@ class TopologyState:
         for a in remote_anchors:
             if len(a) == 2:
                 self.record_anchor(tuple(a))
-            
+
         self._record("merge", {"remote_regions": len(remote_regions)})
 
     # ─── Active Field Waves (Decentralized Propagation) ──────────────
 
     def emit_field_wave(self, source_region_id: str, intensity: float):
         """Emit a semantic wave from a region into the field.
-        
+
         Instead of a global scheduler calling propagate(), individual regions
         now emit "waves" that ripple through the topology.
         """
@@ -1985,13 +2055,15 @@ class TopologyState:
 
         from app.event_dispatcher import get_dispatcher
         from app.semantic_events import SemanticEvent, SemanticEventType
-        
-        get_dispatcher().dispatch(SemanticEvent(
-            event_type=SemanticEventType.FIELD_WAVE,
-            source=f"region:{source_region_id}",
-            payload={"intensity": intensity, "source_id": source_region_id},
-            instability_delta=intensity * 0.1
-        ))
+
+        get_dispatcher().dispatch(
+            SemanticEvent(
+                event_type=SemanticEventType.FIELD_WAVE,
+                source=f"region:{source_region_id}",
+                payload={"intensity": intensity, "source_id": source_region_id},
+                instability_delta=intensity * 0.1,
+            )
+        )
 
     def process_field_wave(self, source_region_id: str, intensity: float):
         """Reactive handling of a field wave by neighboring regions."""
@@ -2001,12 +2073,12 @@ class TopologyState:
 
         forces = self._compute_edge_field_forces()
         regs = self._get_regions()
-        
+
         # 1. Propagate along edge field forces
         for target in regs:
             if target.region_id == source_region_id:
                 continue
-                
+
             # Find max route strength between any shared role pairs
             max_route = 0.0
             for ra in source.competing_roles:
@@ -2014,47 +2086,57 @@ class TopologyState:
                     pair = tuple(sorted([ra, rb]))  # type: ignore[assignment]
                     f = forces.get(pair)  # type: ignore[arg-type]
                     if f:
-                        max_route = max(max_route, f['route_strength'])
-            
+                        max_route = max(max_route, f["route_strength"])
+
             if max_route > 0.1:
                 # Wave intensity decays as it spreads
-                absorption = getattr(target, 'persistence', 0.5) * 0.2
+                absorption = getattr(target, "persistence", 0.5) * 0.2
                 received_intensity = intensity * max_route * (1.0 - absorption)
-                
+
                 if received_intensity > 0.01:
                     # Update target region
-                    # Phase 71: Intensity now has a stronger impact to overcome natural decay
+                    # Phase 71: Intensity now has a stronger impact to overcome
+                    # natural decay
                     target.instability = min(1.0, target.instability + received_intensity * 0.3)
                     target.semantic_pressure = max(0.0, target.semantic_pressure + received_intensity * 0.1)
-                    
+
                     # High intensity waves trigger immediate evolution pass
                     if received_intensity > 0.4:
                         target.evolve(force=True)
-                    
-                    self._record("wave_absorption", {
-                        "region_id": target.region_id,
-                        "source_id": source_region_id,
-                        "intensity": round(received_intensity, 4)
-                    })
-                    
+
+                    self._record(
+                        "wave_absorption",
+                        {
+                            "region_id": target.region_id,
+                            "source_id": source_region_id,
+                            "intensity": round(received_intensity, 4),
+                        },
+                    )
+
                     # Phase 71: Causal telemetry for field waves
                     from app.semantic_world_state import get_world_state
+
                     ws = get_world_state()
-                    ws.emit_telemetry("wave_absorption", {
-                        "region_id": target.region_id,
-                        "source_id": source_region_id,
-                        "intensity": round(received_intensity, 4)
-                    })
-                    
+                    ws.emit_telemetry(
+                        "wave_absorption",
+                        {
+                            "region_id": target.region_id,
+                            "source_id": source_region_id,
+                            "intensity": round(received_intensity, 4),
+                        },
+                    )
+
                     # Causal chaining: target may emit its own (weaker) wave
                     # (modulated to prevent infinite feedback loops)
                     if received_intensity > 0.2:
-                        # Schedule next wave hop via dispatcher to avoid deep recursion
+                        # Schedule next wave hop via dispatcher to avoid deep
+                        # recursion
                         from app.graph_update_scheduler import get_scheduler, TaskPriority
+
                         get_scheduler().schedule(
                             f"wave_hop:{target.region_id}",
                             TaskPriority.NORMAL,
                             self.emit_field_wave,
                             target.region_id,
-                            received_intensity * 0.5
+                            received_intensity * 0.5,
                         )

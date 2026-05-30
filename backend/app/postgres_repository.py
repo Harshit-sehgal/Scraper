@@ -57,13 +57,14 @@ def _get_database_url() -> str:
     if env_url:
         return env_url
     from app.config import settings
+
     url = getattr(settings, "DATABASE_URL", "") or ""
     if url:
         return url
     # Only allow fallback default in development mode
     env = os.getenv("DATAFORGE_ENV", "development").strip().lower()
     if env == "development":
-        return "postgresql://dataforge:dataforge@localhost:5432/dataforge"
+        return "postgresql://dataforge:dataforge@localhost:5432 / dataforge"
     raise RuntimeError(
         "DATAFORGE_DATABASE_URL is required in non-development environments. "
         "Set it to a valid Postgres connection string."
@@ -110,6 +111,7 @@ def _conn() -> Iterator[psycopg2.extensions.connection]:
         conn.rollback()
         try:
             from app.metrics_collector import record_error
+
             record_error("database")
         except Exception:
             pass
@@ -217,7 +219,8 @@ def _build_create_jobs_sql() -> str:
 
 def _build_create_recycle_bin_sql() -> str:
     """Build the full CREATE TABLE statement for the recycle_bin table."""
-    # recycle_bin uses the same columns as jobs, minus status (already in skeleton) plus deleted_at
+    # recycle_bin uses the same columns as jobs, minus status (already in
+    # skeleton) plus deleted_at
     cols = ""
     for col_def in _JOBS_COLUMNS_SQL:
         # Skip the fields already defined in the skeleton
@@ -233,7 +236,8 @@ def _ensure_required_tables(conn):
 
     # Add extra columns that may have been added in later migrations
     for col_def in _JOBS_COLUMNS_SQL:
-        # Use savepoints so individual column failures don't abort the transaction
+        # Use savepoints so individual column failures don't abort the
+        # transaction
         try:
             _execute(conn, "SAVEPOINT alter_jobs_col")
             _execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
@@ -274,11 +278,14 @@ def _ensure_schema():
     broken versions that skipped recycle_bin creation).
     """
     with _conn() as conn:
-        _execute(conn, """
+        _execute(
+            conn,
+            """
             CREATE TABLE IF NOT EXISTS schema_version (
                 version INTEGER PRIMARY KEY
             )
-        """)
+        """,
+        )
         row = _fetch_one(conn, "SELECT MAX(version) AS version FROM schema_version")
         current = row["version"] if row and row.get("version") is not None else 0
 
@@ -299,14 +306,18 @@ def _ensure_schema():
                 pass
 
             if current < 3:
-                # Version 2 -> 3: add world_state table for semantic state persistence
-                _execute(conn, """
+                # Version 2 -> 3: add world_state table for semantic state
+                # persistence
+                _execute(
+                    conn,
+                    """
                     CREATE TABLE IF NOT EXISTS world_state (
                         id TEXT PRIMARY KEY,
                         payload TEXT NOT NULL,
                         updated_at TEXT NOT NULL
                     )
-                """)
+                """,
+                )
                 pass
 
             _execute(conn, "DELETE FROM schema_version")
@@ -334,13 +345,13 @@ def _job_to_row(job: Job) -> dict:
         "schema_fields": json.dumps(
             [f.model_dump() if hasattr(f, "model_dump") else f for f in (job.schema_fields or [])]
         ),
-        "filters": json.dumps(
-            [f.model_dump() if hasattr(f, "model_dump") else f for f in (job.filters or [])]
-        ) if hasattr(job, "filters") else "[]",
-        "results": json.dumps(job.results or []),
-        "logs": json.dumps(
-            [log.model_dump() if hasattr(log, "model_dump") else log for log in (job.logs or [])]
+        "filters": (
+            json.dumps([f.model_dump() if hasattr(f, "model_dump") else f for f in (job.filters or [])])
+            if hasattr(job, "filters")
+            else "[]"
         ),
+        "results": json.dumps(job.results or []),
+        "logs": json.dumps([log.model_dump() if hasattr(log, "model_dump") else log for log in (job.logs or [])]),
         "total_records": job.total_records or 0,
         "filtered_records": job.filtered_records or 0,
         "total_llm_calls": job.total_llm_calls or 0,
@@ -368,9 +379,7 @@ def _job_to_row(job: Job) -> dict:
         ),
         "location": job.location or "",
         "preferred_domain": job.preferred_domain or "",
-        "source_policy": job.source_policy.value
-        if hasattr(job.source_policy, "value")
-        else str(job.source_policy),
+        "source_policy": job.source_policy.value if hasattr(job.source_policy, "value") else str(job.source_policy),
         "max_per_domain": job.max_per_domain or 4,
         "origin_location": job.origin_location or "",
         "max_distance_km": job.max_distance_km,
@@ -399,50 +408,52 @@ def _row_to_job(row: dict) -> Optional[Job]:
         except Exception:
             sp = SourcePolicy.ALL_SOURCES
 
-        return Job.model_validate({
-            "id": row["id"],
-            "name": row["name"],
-            "status": row["status"],
-            "mode": row.get("mode", "manual"),
-            "topic": row.get("topic", ""),
-            "intent": row.get("intent", ""),
-            "urls": json.loads(row.get("urls", "[]")),
-            "schema_fields": json.loads(row.get("schema_fields", "[]")),
-            "filters": json.loads(row.get("filters", "[]")),
-            "results": json.loads(row.get("results", "[]")),
-            "logs": json.loads(row.get("logs", "[]")),
-            "total_records": row.get("total_records", 0),
-            "filtered_records": row.get("filtered_records", 0),
-            "total_llm_calls": row.get("total_llm_calls", 0),
-            "error": row.get("error") or None,
-            "quality_report": json.loads(row.get("quality_report", "{}")),
-            "analysis": row.get("analysis") or None,
-            "discovered_urls": json.loads(row.get("discovered_urls", "[]")),
-            "selectors_map": json.loads(row.get("selectors_map", "{}")),
-            "search_params": json.loads(row.get("search_params", "{}")) or None,
-            "max_pages": row.get("max_pages", 0),
-            "progress_current": row.get("progress_current", 0),
-            "progress_total": row.get("progress_total", 0),
-            "estimated_cost_usd": row.get("estimated_cost_usd", 0),
-            "cancel_requested": bool(row.get("cancel_requested", False)),
-            "created_at": row.get("created_at", ""),
-            "completed_at": row.get("completed_at") or None,
-            "min_record_score": row.get("min_record_score", 0.35),
-            "location": row.get("location", ""),
-            "preferred_domain": row.get("preferred_domain", ""),
-            "source_policy": sp,
-            "max_per_domain": row.get("max_per_domain", 4),
-            "origin_location": row.get("origin_location", ""),
-            "max_distance_km": row.get("max_distance_km"),
-            "pagination": bool(row.get("pagination", False)),
-            "deduplicate": bool(row.get("deduplicate", True)),
-            "deduplicate_field": row.get("deduplicate_field", ""),
-            "started_at": row.get("started_at") if row.get("started_at") else None,
-            "results_on_disk": bool(row.get("results_on_disk", False)),
-            "results_file_path": row.get("results_file_path") if row.get("results_file_path") else None,
-            "warnings": json.loads(row.get("warnings", "[]")),
-            "acquisition_mode": row.get("acquisition_mode", "standard"),
-        })
+        return Job.model_validate(
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "status": row["status"],
+                "mode": row.get("mode", "manual"),
+                "topic": row.get("topic", ""),
+                "intent": row.get("intent", ""),
+                "urls": json.loads(row.get("urls", "[]")),
+                "schema_fields": json.loads(row.get("schema_fields", "[]")),
+                "filters": json.loads(row.get("filters", "[]")),
+                "results": json.loads(row.get("results", "[]")),
+                "logs": json.loads(row.get("logs", "[]")),
+                "total_records": row.get("total_records", 0),
+                "filtered_records": row.get("filtered_records", 0),
+                "total_llm_calls": row.get("total_llm_calls", 0),
+                "error": row.get("error") or None,
+                "quality_report": json.loads(row.get("quality_report", "{}")),
+                "analysis": row.get("analysis") or None,
+                "discovered_urls": json.loads(row.get("discovered_urls", "[]")),
+                "selectors_map": json.loads(row.get("selectors_map", "{}")),
+                "search_params": json.loads(row.get("search_params", "{}")) or None,
+                "max_pages": row.get("max_pages", 0),
+                "progress_current": row.get("progress_current", 0),
+                "progress_total": row.get("progress_total", 0),
+                "estimated_cost_usd": row.get("estimated_cost_usd", 0),
+                "cancel_requested": bool(row.get("cancel_requested", False)),
+                "created_at": row.get("created_at", ""),
+                "completed_at": row.get("completed_at") or None,
+                "min_record_score": row.get("min_record_score", 0.35),
+                "location": row.get("location", ""),
+                "preferred_domain": row.get("preferred_domain", ""),
+                "source_policy": sp,
+                "max_per_domain": row.get("max_per_domain", 4),
+                "origin_location": row.get("origin_location", ""),
+                "max_distance_km": row.get("max_distance_km"),
+                "pagination": bool(row.get("pagination", False)),
+                "deduplicate": bool(row.get("deduplicate", True)),
+                "deduplicate_field": row.get("deduplicate_field", ""),
+                "started_at": row.get("started_at") if row.get("started_at") else None,
+                "results_on_disk": bool(row.get("results_on_disk", False)),
+                "results_file_path": row.get("results_file_path") if row.get("results_file_path") else None,
+                "warnings": json.loads(row.get("warnings", "[]")),
+                "acquisition_mode": row.get("acquisition_mode", "standard"),
+            }
+        )
     except Exception as e:
         logger.warning("Failed to deserialize Postgres job row: %s", e)
         return None
@@ -459,6 +470,7 @@ class PostgresJobRepository(JobRepository):
     Uses psycopg2.pool.ThreadedConnectionPool for thread-safe connection management.
     Schema auto-migration runs on first access.
     """
+
     backend = "postgres"
 
     def __init__(self, auto_ensure_schema: bool = True):
@@ -575,7 +587,8 @@ class PostgresJobRepository(JobRepository):
                     list(row.values()),
                 )
 
-            # Only remove stale rows when explicitly requested (single-process mode)
+            # Only remove stale rows when explicitly requested (single-process
+            # mode)
             if prune_missing:
                 active_ids = list(jobs.keys())
                 _execute(
@@ -597,7 +610,8 @@ class PostgresJobRepository(JobRepository):
                     list(row.values()),
                 )
                 # Also soft-delete the job from the jobs table so it no
-                # longer appears in load_all() queries (WHERE deleted_at IS NULL).
+                # longer appears in load_all() queries (WHERE deleted_at IS
+                # NULL).
                 _execute(
                     conn,
                     "UPDATE jobs SET deleted_at = %s WHERE id = %s AND deleted_at IS NULL",
@@ -799,7 +813,7 @@ def verify_postgres_connectivity() -> dict:
     Uses a standalone connection (not the shared pool) so the pool is
     never leaked on failure or left open if the caller falls back to SQLite.
 
-    Returns a dict with 'ok': True/False and optional 'error' message.
+    Returns a dict with 'ok': True / False and optional 'error' message.
     """
     try:
         dsn = _get_database_url()
@@ -807,7 +821,10 @@ def verify_postgres_connectivity() -> dict:
         try:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1")
-                val = cur.fetchone()[0]
+                result = cur.fetchone()
+                if result is None:
+                    return {"ok": False, "error": "No result from health check query"}
+                val = result[0]
                 return {"ok": val == 1}
         finally:
             conn.close()

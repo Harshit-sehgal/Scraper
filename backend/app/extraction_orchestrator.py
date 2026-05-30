@@ -52,7 +52,7 @@ def _merge_composite_records(
 
     For complex pages (mixed data, multiple structures), different extraction
     passes may yield different subsets of fields. This merges them intelligently:
-    - If two records have the same key field (e.g., name/title), they're merged
+    - If two records have the same key field (e.g., name / title), they're merged
     - Records with disjoint field sets are kept separately
     - Higher-confidence values overwrite lower-confidence ones
     """
@@ -84,12 +84,11 @@ def _merge_composite_records(
                     if field == "record_score":
                         continue
                     existing_val = existing.get(field)
-                    if not existing_val or (
-                        existing_val in (None, "") and value not in (None, "")
-                    ):
+                    if not existing_val or (existing_val in (None, "") and value not in (None, "")):
                         existing[field] = value
                 # Recompute score
                 from app.utils.quality import score_record_quality
+
                 existing["record_score"] = score_record_quality(existing, schema_fields)
             else:
                 new_record = dict(record)
@@ -122,8 +121,11 @@ def _multi_pass_extraction(
 
     # Pass 1: Standard extraction
     pass1 = apply_selectors(
-        html, selectors_map, schema_fields,
-        base_url=base_url, user_intent=user_intent,
+        html,
+        selectors_map,
+        schema_fields,
+        base_url=base_url,
+        user_intent=user_intent,
     )
     if not isinstance(pass1, list):
         pass1 = []
@@ -141,19 +143,20 @@ def _multi_pass_extraction(
     container = selectors_map.get("item_container", "")
     if container:
         from bs4 import BeautifulSoup
+
         soup = BeautifulSoup(html, "html.parser")
 
-        # Try parent/ancestor levels
+        # Try parent / ancestor levels
         alt_containers = []
         for el in soup.select(container)[:3]:
-            parent = el.parent if hasattr(el, 'parent') and el.parent and el.parent.name != '[document]' else None
-            if parent and parent.name not in ('html', 'body'):
+            parent = el.parent if hasattr(el, "parent") and el.parent and el.parent.name != "[document]" else None
+            if parent and parent.name not in ("html", "body"):
                 # Build a selector for parent
                 parent_sel = parent.name
-                if parent.get('class'):
-                    classes = parent.get('class')
+                if parent.get("class"):
+                    classes = parent.get("class")
                     if isinstance(classes, list):
-                        parent_sel += '.' + '.'.join(classes[:2])
+                        parent_sel += "." + ".".join(classes[:2])
                 if parent_sel != container:
                     alt_containers.append(parent_sel)
 
@@ -162,8 +165,11 @@ def _multi_pass_extraction(
             alt_map["item_container"] = alt_sel
             try:
                 alt_result = apply_selectors(
-                    html, alt_map, schema_fields,
-                    base_url=base_url, user_intent=user_intent,
+                    html,
+                    alt_map,
+                    schema_fields,
+                    base_url=base_url,
+                    user_intent=user_intent,
                 )
                 if isinstance(alt_result, list) and alt_result:
                     passes.append(alt_result)
@@ -177,8 +183,11 @@ def _multi_pass_extraction(
             if raw:
                 from app.data_utils import align_extracted_keys_to_schema
                 from app.utils.quality import score_record_quality
+
                 aligned = align_extracted_keys_to_schema(
-                    raw, schema_fields, user_intent=user_intent,
+                    raw,
+                    schema_fields,
+                    user_intent=user_intent,
                 )
                 for rec in aligned:
                     rec["record_score"] = score_record_quality(rec, schema_fields)
@@ -212,14 +221,9 @@ async def orchestrate_extraction(
     The cascade falls back to regex if provided selectors fail.
     """
     memory = get_selector_memory()
-    force_container_discovery = bool(
-        provided_selectors and provided_selectors.get("force_container_discovery")
-    )
+    force_container_discovery = bool(provided_selectors and provided_selectors.get("force_container_discovery"))
 
-    gate_threshold = max(
-        min_record_score * settings.SCORE_GATE_THRESHOLD_FACTOR,
-        settings.SCORE_GATE_ABSOLUTE_MIN
-    )
+    gate_threshold = max(min_record_score * settings.SCORE_GATE_THRESHOLD_FACTOR, settings.SCORE_GATE_ABSOLUTE_MIN)
 
     def _record_field_provenance(
         records: list[dict],
@@ -246,10 +250,12 @@ async def orchestrate_extraction(
     # ── Gather network diagnostics ──
     import json
     from app.session_url_detector import detect_session_params
+
     session_detect = detect_session_params(url)
-    is_session = bool(session_detect.get("is_session_bound") or "/search/id/" in url)
+    is_session = bool(session_detect.get("is_session_bound") or "/search / id/" in url)
 
     from app.browser_network_capture import get_captures
+
     captured_payloads = get_captures(url)
     captured_count = len(captured_payloads) if captured_payloads else 0
 
@@ -277,6 +283,7 @@ async def orchestrate_extraction(
         try:
             payload = json.loads(body) if isinstance(body, str) else body
             from app.network_payload_extractor import find_record_arrays
+
             candidates = find_record_arrays(payload)
             record_arrays_found += len(candidates)
         except Exception:
@@ -284,6 +291,7 @@ async def orchestrate_extraction(
 
     # Extract network results
     from app.network_payload_extractor import extract_from_network_payloads, arbitrate_sources
+
     network_result = extract_from_network_payloads(bodies, schema_fields)
 
     best_candidate_path = network_result.source if network_result else None
@@ -301,7 +309,8 @@ async def orchestrate_extraction(
     if network_result:
         logger.info(
             "[Orchestrator] Network payload extraction found candidate with score %.1f and coverage %.2f",
-            network_result.score, network_result.field_coverage,
+            network_result.score,
+            network_result.field_coverage,
         )
 
     def _arbitrate_and_return(dom_res: ExtractionResult, warnings: list[str] | None = None) -> ExtractionResult:
@@ -324,14 +333,21 @@ async def orchestrate_extraction(
         )
 
         dom_cov = sum(
-            1 for r in dom_records[:20] for f in schema_fields
+            1
+            for r in dom_records[:20]
+            for f in schema_fields
             if r.get(f.name) is not None and str(r.get(f.name, "")).strip()
         ) / max(len(dom_records[:20]) * len(schema_fields), 1)
         net_cov = network_result.field_coverage
         net_score = network_result.score
 
         if winning_source == "dom" or winning_source == dom_res.method:
-            reason = "DOM coverage/score (%.2f / %.1f) is equal/better than Network (%.2f / %.1f)" % (dom_cov, dom_score, net_cov, net_score)
+            reason = "DOM coverage / score (%.2f / %.1f) is equal / better than Network (%.2f / %.1f)" % (
+                dom_cov,
+                dom_score,
+                net_cov,
+                net_score,
+            )
             network_diagnostics.append(f"arbitration winner: dom (Reason: {reason})")
             dom_res.network_diagnostics = list(network_diagnostics)
             return dom_res
@@ -341,7 +357,10 @@ async def orchestrate_extraction(
         if net_cov >= dom_cov + 0.2:
             reason = "Network field coverage (%.2f) significantly exceeds DOM coverage (%.2f)" % (net_cov, dom_cov)
         elif net_score > dom_score and net_cov >= dom_cov:
-            reason = "Network score (%.1f) exceeds DOM score (%.1f) with equal/better coverage" % (net_score, dom_score)
+            reason = "Network score (%.1f) exceeds DOM score (%.1f) with equal / better coverage" % (
+                net_score,
+                dom_score,
+            )
         else:
             reason = "Network payload won arbitration"
 
@@ -349,7 +368,8 @@ async def orchestrate_extraction(
 
         logger.info(
             "[Orchestrator] Network Payload won arbitration against DOM (%s vs %s)",
-            winning_source, dom_res.method,
+            winning_source,
+            dom_res.method,
         )
 
         # Record field-level provenance for the network extraction
@@ -386,7 +406,7 @@ async def orchestrate_extraction(
     # Before trying any DOM-based selectors, check if structured data is
     # available in script tags, hydration state, JSON-LD, or network payloads.
     # This is the most reliable source when available.
-    logger.info("[Orchestrator] Trying network/JSON extraction for %s", url)
+    logger.info("[Orchestrator] Trying network / JSON extraction for %s", url)
     evidence = collect_page_evidence(html, url=url)
     if evidence:
         logger.info(
@@ -412,24 +432,25 @@ async def orchestrate_extraction(
         avg_score = sum(scores) / len(scores) if scores else 0.0
         if avg_score >= gate_threshold:
             logger.info(
-                "[Orchestrator] Network/JSON extraction SUCCESS (%d records, avg score: %.2f)",
-                len(network_results), avg_score,
+                "[Orchestrator] Network / JSON extraction SUCCESS (%d records, avg score: %.2f)",
+                len(network_results),
+                avg_score,
             )
             _record_field_provenance(network_results, ExtractionMethod.DISCOVERY)
             return _arbitrate_and_return(ExtractionResult(network_results, "network_json", selector_success=True))
         else:
             logger.info(
-                "[Orchestrator] Network/JSON extraction LOW QUALITY (avg score: %.2f), falling through",
+                "[Orchestrator] Network / JSON extraction LOW QUALITY (avg score: %.2f), falling through",
                 avg_score,
             )
             if provenance_builder:
                 provenance_builder.add_fallback_step("network_json_low_quality")
     else:
-        logger.info("[Orchestrator] Network/JSON extraction returned no results, falling through")
+        logger.info("[Orchestrator] Network / JSON extraction returned no results, falling through")
         if provenance_builder:
             provenance_builder.add_fallback_step("network_json_empty")
 
-    # Phase 79/80: Strategy Self-Selection
+    # Phase 79 / 80: Strategy Self-Selection
     # ── Layer 1: Provided Selectors (from URL Analysis) ───────────────
     # If the user analyzed the URL via the URL Analyzer, we have pre-discovered
     # CSS selectors. Try these first — they skip memory and LLM discovery.
@@ -441,8 +462,11 @@ async def orchestrate_extraction(
     ):
         logger.info("[Orchestrator] Trying provided selectors from URL analysis for %s", url)
         provided_results = _multi_pass_extraction(
-            html, schema_fields, provided_selectors,
-            base_url=url, user_intent=user_intent,
+            html,
+            schema_fields,
+            provided_selectors,
+            base_url=url,
+            user_intent=user_intent,
         )
         if provided_results:
             scores = [r.get("record_score", 0.0) for r in provided_results]
@@ -451,9 +475,13 @@ async def orchestrate_extraction(
                 logger.info("[Orchestrator] Provided selectors SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, provided_selectors)
                 _record_field_provenance(provided_results, ExtractionMethod.DISCOVERY, provided_selectors)
-                return _arbitrate_and_return(ExtractionResult(provided_results, "discovery", selector_success=True, selectors=provided_selectors))
+                return _arbitrate_and_return(
+                    ExtractionResult(provided_results, "discovery", selector_success=True, selectors=provided_selectors)
+                )
             else:
-                logger.info("[Orchestrator] Provided selectors LOW QUALITY (avg score: %.2f), falling through", avg_score)
+                logger.info(
+                    "[Orchestrator] Provided selectors LOW QUALITY (avg score: %.2f), falling through", avg_score
+                )
                 if provenance_builder:
                     provenance_builder.add_fallback_step("provided_selectors_low_quality")
         else:
@@ -462,7 +490,8 @@ async def orchestrate_extraction(
                 provenance_builder.add_fallback_step("provided_selectors_empty")
 
     # ── Layer 2: Selector Memory ───────────────────────────────────────
-    # If force_llm_discovery, bypass_selector_memory, or force_container_discovery is set, skip memory.
+    # If force_llm_discovery, bypass_selector_memory, or
+    # force_container_discovery is set, skip memory.
     skip_memory = bool(
         provided_selectors
         and (
@@ -474,7 +503,9 @@ async def orchestrate_extraction(
     )
     remembered_selectors = None if skip_memory else memory.get_selectors(url)
     if force_container_discovery:
-        logger.info("[Orchestrator] Recovery requested force_container_discovery — skipping selectors, memory, and LLM discovery")
+        logger.info(
+            "[Orchestrator] Recovery requested force_container_discovery — skipping selectors, memory, and LLM discovery"
+        )
         if provenance_builder:
             provenance_builder.add_fallback_step("force_container_discovery")
     elif provided_selectors and provided_selectors.get("force_llm_discovery"):
@@ -489,9 +520,7 @@ async def orchestrate_extraction(
             provenance_builder.add_fallback_step("bypass_selector_memory")
     if remembered_selectors:
         logger.info("[Orchestrator] Trying remembered selectors for %s", url)
-        raw_results = apply_selectors(
-            html, remembered_selectors, schema_fields, base_url=url, user_intent=user_intent
-        )
+        raw_results = apply_selectors(html, remembered_selectors, schema_fields, base_url=url, user_intent=user_intent)
         if raw_results:
             # Safely ensure raw_results is a list
             if not isinstance(raw_results, list):
@@ -499,6 +528,7 @@ async def orchestrate_extraction(
 
             # Apply post-extraction semantic validation to memory results
             from app.utils.quality import post_extract_validate_records
+
             raw_results = post_extract_validate_records(raw_results, schema_fields, warnings=warnings)
 
             scores = [r.get("record_score", 0.0) for r in raw_results]
@@ -506,8 +536,9 @@ async def orchestrate_extraction(
 
             # Downgrade memory extraction on session-bound URLs
             from app.session_url_detector import detect_session_params
+
             session_detect = detect_session_params(url)
-            is_session = bool(session_detect.get("is_session_bound") or "/search/id/" in url)
+            is_session = bool(session_detect.get("is_session_bound") or "/search / id/" in url)
             fields_sel = remembered_selectors.get("fields", {})
             selectors_empty = not fields_sel or all(not sel for sel in fields_sel.values())
 
@@ -519,28 +550,38 @@ async def orchestrate_extraction(
                 memory.record_failure(url)
                 if provenance_builder:
                     provenance_builder.add_fallback_step("memory_session_downgraded")
-                if warnings is not None and "Memory extraction returned low-confidence records on session-bound URL" not in warnings:
+                if (
+                    warnings is not None
+                    and "Memory extraction returned low-confidence records on session-bound URL" not in warnings
+                ):
                     warnings.append("Memory extraction returned low-confidence records on session-bound URL")
             elif avg_score >= gate_threshold:
                 logger.info("[Orchestrator] Memory SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, remembered_selectors)
                 _record_field_provenance(raw_results, ExtractionMethod.MEMORY, remembered_selectors)
-                return _arbitrate_and_return(ExtractionResult(raw_results, "memory", selector_success=True, selectors=remembered_selectors), warnings=warnings)
+                return _arbitrate_and_return(
+                    ExtractionResult(raw_results, "memory", selector_success=True, selectors=remembered_selectors),
+                    warnings=warnings,
+                )
             else:
                 logger.info("[Orchestrator] Memory FAILURE (avg score: %.2f)", avg_score)
                 memory.record_failure(url)
                 if provenance_builder:
                     provenance_builder.add_fallback_step("memory_failed")
 
-                # Emit SelectorFailureEvent to support event-driven decouple loops (Phase 82)
+                # Emit SelectorFailureEvent to support event-driven decouple
+                # loops (Phase 82)
                 try:
                     from app.event_dispatcher import get_dispatcher
                     from app.semantic_events import SemanticEvent, SemanticEventType
-                    get_dispatcher().dispatch(SemanticEvent(
-                        event_type=SemanticEventType.SELECTOR_FAILURE,
-                        source="extraction_orchestrator",
-                        payload={"url": url, "avg_score": avg_score}
-                    ))
+
+                    get_dispatcher().dispatch(
+                        SemanticEvent(
+                            event_type=SemanticEventType.SELECTOR_FAILURE,
+                            source="extraction_orchestrator",
+                            payload={"url": url, "avg_score": avg_score},
+                        )
+                    )
                 except Exception as e:
                     logger.warning("[Orchestrator] Failed to dispatch selector failure event: %s", e)
 
@@ -582,7 +623,8 @@ async def orchestrate_extraction(
 
         logger.info("[Orchestrator] FIELD QUALITY MAP: %s", field_quality)
 
-        # Check for field-swapping by analyzing extracted values against expected types
+        # Check for field-swapping by analyzing extracted values against
+        # expected types
         extracted_values = {}
         if raw_results:
             for field in schema_fields:
@@ -597,8 +639,11 @@ async def orchestrate_extraction(
 
         # Multi-pass extraction for complex pages
         raw_results = _multi_pass_extraction(
-            html, schema_fields, discovered_selectors,
-            base_url=url, user_intent=user_intent,
+            html,
+            schema_fields,
+            discovered_selectors,
+            base_url=url,
+            user_intent=user_intent,
         )
 
         if raw_results:
@@ -608,7 +653,9 @@ async def orchestrate_extraction(
                 logger.info("[Orchestrator] Discovery SUCCESS (avg score: %.2f)", avg_score)
                 memory.record_success(url, discovered_selectors)
                 _record_field_provenance(raw_results, ExtractionMethod.DISCOVERY, discovered_selectors)
-                return _arbitrate_and_return(ExtractionResult(raw_results, "discovery", selector_success=True, selectors=discovered_selectors))
+                return _arbitrate_and_return(
+                    ExtractionResult(raw_results, "discovery", selector_success=True, selectors=discovered_selectors)
+                )
             else:
                 logger.info("[Orchestrator] Discovery LOW QUALITY (avg score: %.2f)", avg_score)
                 if provenance_builder:
@@ -617,19 +664,26 @@ async def orchestrate_extraction(
     # ── Layer 4: Container Discovery (general evidence-based) ────────
     logger.info("[Orchestrator] Trying general container discovery for %s", url)
     container_result = await multi_pass_container_extraction(
-        html, schema_fields, url=url, user_intent=user_intent,
+        html,
+        schema_fields,
+        url=url,
+        user_intent=user_intent,
     )
     if container_result.all_passed and container_result.final_records:
         logger.info(
             "[Orchestrator] Container discovery SUCCESS (%d records from %s)",
-            container_result.total_records, container_result.best_selector,
+            container_result.total_records,
+            container_result.best_selector,
         )
         _record_field_provenance(container_result.final_records, ExtractionMethod.DISCOVERY)
-        return _arbitrate_and_return(ExtractionResult(
-            container_result.final_records, "container_discovery",
-            selector_success=True,
-            selectors={"item_container": container_result.best_selector},
-        ))
+        return _arbitrate_and_return(
+            ExtractionResult(
+                container_result.final_records,
+                "container_discovery",
+                selector_success=True,
+                selectors={"item_container": container_result.best_selector},
+            )
+        )
     elif container_result.final_records:
         logger.info(
             "[Orchestrator] Container discovery PARTIAL (%d low-quality records)",
@@ -643,7 +697,8 @@ async def orchestrate_extraction(
         failure = classify_container_failure(container_result)
         logger.info("[Orchestrator] Container discovery failed: %s", failure["failure_class"])
         if provenance_builder:
-            provenance_builder.add_error(f"container_discovery: {failure['failure_class']}")
+            provenance_builder.add_error(f"container_discovery: {
+                failure['failure_class']}")
 
     # ── Layer 5: Rendered Visible-Text Extraction ────────────────────────
     # Try grouping visible text blocks into visual cards and extracting
@@ -657,7 +712,8 @@ async def orchestrate_extraction(
         if avg_score >= gate_threshold:
             logger.info(
                 "[Orchestrator] Visible-text extraction SUCCESS (%d records, avg score: %.2f)",
-                len(visible_results), avg_score,
+                len(visible_results),
+                avg_score,
             )
             _record_field_provenance(visible_results, ExtractionMethod.REGEX)
             return _arbitrate_and_return(ExtractionResult(visible_results, "visible_text", selector_success=False))
@@ -713,9 +769,15 @@ def _detect_field_swaps(
         likely_swaps: dict[str, str] = {}
         for field in fields:
             quality = quality_map.get(field.name, 1.0)
-            if quality < 0.3 and field.field_type in (FieldType.CURRENCY, FieldType.PHONE, FieldType.EMAIL, FieldType.URL):
+            if quality < 0.3 and field.field_type in (
+                FieldType.CURRENCY,
+                FieldType.PHONE,
+                FieldType.EMAIL,
+                FieldType.URL,
+            ):
                 # This field has low quality but should be easy to match — look for another
-                # field with unusually high quality that might have taken its selector
+                # field with unusually high quality that might have taken its
+                # selector
                 for other in fields:
                     if other.name == field.name:
                         continue
@@ -760,6 +822,7 @@ def _check_type_compatibility(field_type: FieldType, values: list) -> float:
     Returns a score from 0.0 (incompatible) to 1.0 (best observed match).
     """
     import re
+
     if not values:
         return 0.5  # No data to check
 
@@ -796,11 +859,15 @@ def _check_type_compatibility(field_type: FieldType, values: list) -> float:
         return bool_match / len(str_vals)
 
     if field_type == FieldType.DATE:
-        date_match = sum(1 for v in str_vals if re.search(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4}", v))
+        date_match = sum(
+            1 for v in str_vals if re.search(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4}", v)
+        )
         return date_match / len(str_vals)
 
-    # STRING, LIST_STRING, CODE, RATING, LOCATION, NUMBER — generic types, always match
+    # STRING, LIST_STRING, CODE, RATING, LOCATION, NUMBER — generic types,
+    # always match
     return 0.8
+
 
 def _align_selectors(selectors: dict, swaps: dict) -> dict:
     """Re-map selectors based on detected swaps."""

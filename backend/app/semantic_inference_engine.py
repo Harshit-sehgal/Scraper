@@ -35,6 +35,7 @@ class RoleEmbeddingEngine:
             return
         from app.field_laws import ROLE_EXCLUSIVITY
         from app.semantic_allocation_engine import _UNIVERSAL_ROOTS
+
         seeded = set()
         for ra, rb in ROLE_EXCLUSIVITY:
             for role in (ra, rb):
@@ -47,8 +48,10 @@ class RoleEmbeddingEngine:
                             break
                     vec = self._get_type_vector(best_type)
                     # Dampen baseline toward neutral to leave room for learning
-                    # Phase 71: Add tiny random jitter to prevent exact manifold collapse
+                    # Phase 71: Add tiny random jitter to prevent exact
+                    # manifold collapse
                     import random
+
                     for i in range(len(vec)):
                         jitter = (random.random() - 0.5) * 0.01
                         vec[i] = max(0.0, min(1.0, vec[i] * 0.85 + 0.5 * 0.15 + jitter))
@@ -83,17 +86,16 @@ class RoleEmbeddingEngine:
     def total_co_occurrences(self, value: int):
         self.ws.total_co_occurrences = value
 
-
     def get_compatibility(self, role: str, stype: SemanticType, token: Optional[SemanticToken] = None) -> float:
         """Geometric compatibility: dot product in the role manifold."""
         role_vec = self.manifold.get(role)
         if not role_vec:
             # Cold start: fallback to legacy cache or default
-            type_str = stype.value if hasattr(stype, 'value') else str(stype)
+            type_str = stype.value if hasattr(stype, "value") else str(stype)
             return self.compatibility_cache.get((role, type_str), 0.5)
 
         # Use token embedding if available and sufficiently differentiated
-        if token and hasattr(token, 'embedding') and any(v != 0.5 for v in token.embedding):
+        if token and hasattr(token, "embedding") and any(v != 0.5 for v in token.embedding):
             type_vec = token.embedding
         else:
             type_vec = self._get_type_vector(stype)
@@ -126,7 +128,7 @@ class RoleEmbeddingEngine:
         # This provides a cold-start bridge for structural roles.
         if stype == SemanticType.CODE:
             # Simple root check to avoid recursion with _infer_role_type
-            structural_roots = ['loc', 'city', 'addr', 'place', 'dest', 'orig', 'nam', 'comp', 'firm', 'brand']
+            structural_roots = ["loc", "city", "addr", "place", "dest", "orig", "nam", "comp", "firm", "brand"]
             role_lower = role.lower()
             if any(r in role_lower for r in structural_roots):
                 # Baseline 0.6 for structural codes matching structural roles
@@ -161,13 +163,20 @@ class RoleEmbeddingEngine:
         dim = self.dimension
         vec = [0.5] * dim
         type_idx = {
-            SemanticType.PRICE: 0, SemanticType.DATE: 1,
-            SemanticType.LOCATION: 2, SemanticType.ORGANIZATION: 3,
-            SemanticType.PHONE: 4, SemanticType.EMAIL: 5,
-            SemanticType.URL: 6, SemanticType.NUMBER: 7,
-            SemanticType.RATING: 8, SemanticType.DURATION: 9,
-            SemanticType.CODE: 10, SemanticType.NAME: 11,
-            SemanticType.TEXT: 12, SemanticType.IDENTIFIER: 13,
+            SemanticType.PRICE: 0,
+            SemanticType.DATE: 1,
+            SemanticType.LOCATION: 2,
+            SemanticType.ORGANIZATION: 3,
+            SemanticType.PHONE: 4,
+            SemanticType.EMAIL: 5,
+            SemanticType.URL: 6,
+            SemanticType.NUMBER: 7,
+            SemanticType.RATING: 8,
+            SemanticType.DURATION: 9,
+            SemanticType.CODE: 10,
+            SemanticType.NAME: 11,
+            SemanticType.TEXT: 12,
+            SemanticType.IDENTIFIER: 13,
         }.get(stype)
         if type_idx is not None and type_idx < dim:
             vec[type_idx] = 1.0
@@ -176,11 +185,13 @@ class RoleEmbeddingEngine:
         if dim >= 2:
             vec[-2] = 0.0
 
-        # Core Entity Bias: seeds for structural types are anchored in the last dimension
-        is_core = 1.0 if stype in [
-            SemanticType.PRICE, SemanticType.DATE,
-            SemanticType.LOCATION, SemanticType.ORGANIZATION
-        ] else 0.5
+        # Core Entity Bias: seeds for structural types are anchored in the last
+        # dimension
+        is_core = (
+            1.0
+            if stype in [SemanticType.PRICE, SemanticType.DATE, SemanticType.LOCATION, SemanticType.ORGANIZATION]
+            else 0.5
+        )
         vec[-1] = is_core
 
         return vec
@@ -201,18 +212,29 @@ class RoleEmbeddingEngine:
         # Scale by pressure [0.5, 2.0] and stability (1.0 - certainty)
         return base_rate * (0.5 + pressure * 1.5) * (1.0 - certainty)
 
-    def learn_from_allocation(self, role: str, token_type: SemanticType, _token_raw: str, success: bool, delta: float = 0.05, coherence: float = 1.0):
+    def learn_from_allocation(
+        self,
+        role: str,
+        token_type: SemanticType,
+        _token_raw: str,
+        success: bool,
+        delta: float = 0.05,
+        coherence: float = 1.0,
+    ):
         """Apply learning force directly to the manifold."""
         if coherence < 0.6:
             return
 
         # Identity Protection Law: only reinforce if types are compatible
         from app.semantic_allocation_engine import _infer_role_type
+
         ideal_type = _infer_role_type(role)
-        is_compatible = (token_type == ideal_type) or \
-                        (token_type == SemanticType.TEXT) or \
-                        (ideal_type == SemanticType.TEXT) or \
-                        (token_type == SemanticType.CODE)
+        is_compatible = (
+            (token_type == ideal_type)
+            or (token_type == SemanticType.TEXT)
+            or (ideal_type == SemanticType.TEXT)
+            or (token_type == SemanticType.CODE)
+        )
 
         if success and not is_compatible:
             return
@@ -225,11 +247,12 @@ class RoleEmbeddingEngine:
             self.ws.set_manifold_vector(role, self._get_type_vector(ideal_type))
 
         # Phase 66: Semantic Saturation (Attractor Skeletonization)
-        # Skip learning if role is extremely stable to reduce churn and journal bloat
+        # Skip learning if role is extremely stable to reduce churn and journal
+        # bloat
         certainty = self.ws._manifold.get_role_certainty(role)
         if success and certainty > 0.98:
             # High certainty role: only learn if the new signal is very strong
-            if delta < 0.1: # Increased breakthrough threshold
+            if delta < 0.1:  # Increased breakthrough threshold
                 return
 
         role_vec = self.ws.get_manifold_vector(role)
@@ -254,6 +277,7 @@ class RoleEmbeddingEngine:
 
         if not self.ws.has_manifold_role(role_name):
             from app.semantic_allocation_engine import _infer_role_type
+
             self.ws.set_manifold_vector(role_name, self._get_type_vector(_infer_role_type(role_name)))
 
         role_vec = self.ws.get_manifold_vector(role_name)
@@ -282,13 +306,14 @@ class RoleEmbeddingEngine:
             pressure = self.ws.get_system_pressure()
             policy = self.ws._observability.get_stability_policy(self.ws.capture_governance_snapshot())
         except AttributeError:
-            pressure = 1.0 # Fallback
+            pressure = 1.0  # Fallback
             policy = {"propagation_damping": 1.0}
 
         damping = policy.get("propagation_damping", 1.0)
         base_rate = 0.02 * (1.0 - self.get_certainty()) * (0.5 + pressure) * damping
 
-        # Thread-safety lock for shared manifold_copy mutations across shards — initialized in __init__
+        # Thread-safety lock for shared manifold_copy mutations across shards —
+        # initialized in __init__
         def _relax_roles_safe(roles, manifold_full, rate):
             """Wrapper that locks shared manifold mutations."""
             with self._relax_lock:
@@ -317,7 +342,7 @@ class RoleEmbeddingEngine:
         # Sync legacy compatibility cache
         for role in all_roles:
             for stype in SemanticType:
-                type_str = stype.value if hasattr(stype, 'value') else str(stype)
+                type_str = stype.value if hasattr(stype, "value") else str(stype)
                 self.ws.set_compatibility(role, type_str, self.get_compatibility(role, stype))
 
         self.detect_dimensionality_need()
@@ -334,7 +359,7 @@ class RoleEmbeddingEngine:
         for r in roles:
             instability = self.ws.metrics.schema_instability.get(r, 0.5)
             stability = max(0.0, 1.0 - instability)
-            hysteresis[r] = 1.0 - (stability ** 2) * 0.9
+            hysteresis[r] = 1.0 - (stability**2) * 0.9
 
         # Phase 1: Apply accumulated forces
         for role in roles:
@@ -377,6 +402,7 @@ class RoleEmbeddingEngine:
 
         # Phase 4: Re-Alignment (Restoring Force)
         from app.semantic_allocation_engine import _infer_role_type
+
         for role in roles:
             seed_type = _infer_role_type(role)
             seed_vec = self._get_type_vector(seed_type)
@@ -390,7 +416,7 @@ class RoleEmbeddingEngine:
 
         # Phase 5: Intent Steering (Phase 36)
         # Apply force toward user-defined cognitive goals
-        active_intents =        self.ws.active_intents
+        active_intents = self.ws.active_intents
         for intent_id, details in active_intents.items():
             target_vec = details["target_vec"]
             strength = details["strength"]
@@ -440,6 +466,7 @@ class RoleEmbeddingEngine:
 
     def learn_contradiction(self, role_a: str, role_b: str, token_type: str):
         from app.instability_api import InstabilityAPI
+
         inst_api = InstabilityAPI(ws=self.ws)
         current = inst_api.get_learned_exclusion(role_a, role_b)
         inst_api.set_exclusion(role_a, role_b, min(1.0, current + 0.15))
@@ -453,7 +480,7 @@ class RoleEmbeddingEngine:
                 continue
             n_vec = len(vec)
             avg = sum(vec) / n_vec
-            var = sum((x - avg)**2 for x in vec) / n_vec
+            var = sum((x - avg) ** 2 for x in vec) / n_vec
             total_v += var
 
         if not self.manifold:
@@ -477,9 +504,7 @@ class RoleEmbeddingEngine:
         # it indicates a crowded manifold (Semantic Collision).
         if certainty < 0.2 and self.dimension < 64:
             new_dim = self.dimension + 8
-            logging.getLogger(__name__).info(
-                f"DIMENSIONALITY INDUCTION: Expanding manifold resolution to {new_dim}."
-            )
+            logging.getLogger(__name__).info(f"DIMENSIONALITY INDUCTION: Expanding manifold resolution to {new_dim}.")
             self.ws.expand_dimensions(new_dim)
 
     def save_cache(self) -> dict:
@@ -511,13 +536,20 @@ class RelationshipEmbeddingSpace:
             token = graph.tokens[node_idx]
             vec = [0.5] * dim
             type_idx = {
-                SemanticType.PRICE: 0, SemanticType.DATE: 1,
-                SemanticType.LOCATION: 2, SemanticType.ORGANIZATION: 3,
-                SemanticType.PHONE: 4, SemanticType.EMAIL: 5,
-                SemanticType.URL: 6, SemanticType.NUMBER: 7,
-                SemanticType.RATING: 8, SemanticType.DURATION: 9,
-                SemanticType.CODE: 10, SemanticType.NAME: 11,
-                SemanticType.TEXT: 12, SemanticType.IDENTIFIER: 13,
+                SemanticType.PRICE: 0,
+                SemanticType.DATE: 1,
+                SemanticType.LOCATION: 2,
+                SemanticType.ORGANIZATION: 3,
+                SemanticType.PHONE: 4,
+                SemanticType.EMAIL: 5,
+                SemanticType.URL: 6,
+                SemanticType.NUMBER: 7,
+                SemanticType.RATING: 8,
+                SemanticType.DURATION: 9,
+                SemanticType.CODE: 10,
+                SemanticType.NAME: 11,
+                SemanticType.TEXT: 12,
+                SemanticType.IDENTIFIER: 13,
             }.get(token.primary_type)
 
             if type_idx is not None and type_idx < dim:
@@ -528,11 +560,14 @@ class RelationshipEmbeddingSpace:
                 centrality = len(node_edges) / max(len(graph.relationships), 1)
                 if dim >= 2:
                     vec[-2] = centrality
-                # Core Entity Bias: stable structural types have higher manifold priority
-                is_core = 1.0 if token.primary_type in [
-                    SemanticType.PRICE, SemanticType.DATE,
-                    SemanticType.LOCATION, SemanticType.ORGANIZATION
-                ] else 0.5
+                # Core Entity Bias: stable structural types have higher
+                # manifold priority
+                is_core = (
+                    1.0
+                    if token.primary_type
+                    in [SemanticType.PRICE, SemanticType.DATE, SemanticType.LOCATION, SemanticType.ORGANIZATION]
+                    else 0.5
+                )
                 vec[-1] = is_core
             return vec
         return [0.5] * dim

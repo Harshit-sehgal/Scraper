@@ -1,6 +1,6 @@
 """
 DataForge Chaos Engineering Framework
-Phase 5 Week 5-8: Test system resilience and validate recovery
+Phase 5 Week 5 - 8: Test system resilience and validate recovery
 
 This module provides failure injection and chaos testing capabilities to ensure
 the system remains operational under adverse conditions.
@@ -8,7 +8,7 @@ the system remains operational under adverse conditions.
 Failure Categories:
   1. Fetch Layer Failures (network, proxies, browsers)
   2. Extract Layer Failures (selectors, parsing, extraction)
-  3. Memory/State Failures (cache, persistence, data loss)
+  3. Memory / State Failures (cache, persistence, data loss)
   4. Intelligence Layer Failures (orchestration, decision-making)
   5. Distributed System Failures (node crashes, network partitions)
   6. Recovery Mechanism Failures (cascading failures, exhaustion)
@@ -21,49 +21,50 @@ from dataclasses import dataclass
 from enum import Enum
 import logging
 
-
 # ============================================================================
 # Failure Models
 # ============================================================================
 
+
 class FailureMode(Enum):
     """Types of failures that can be injected"""
+
     # Fetch Layer
     NETWORK_TIMEOUT = "network_timeout"
     NETWORK_PARTITION = "network_partition"
     PROXY_EXHAUSTION = "proxy_exhaustion"
     BROWSER_CRASH = "browser_crash"
     SSL_CERTIFICATE_ERROR = "ssl_certificate_error"
-    
+
     # Anti-Bot
     ANTI_BOT_ESCALATION = "anti_bot_escalation"
     CAPTCHA_LOOP = "captcha_loop"
     IP_BLACKLIST_EXPANSION = "ip_blacklist_expansion"
-    
+
     # Extract Layer
     SELECTOR_POISONING = "selector_poisoning"
     DOM_STRUCTURE_CHANGED = "dom_structure_changed"
     EXTRACTION_TIMEOUT = "extraction_timeout"
     INVALID_EXTRACTED_DATA = "invalid_extracted_data"
-    
-    # Memory/State
+
+    # Memory / State
     CACHE_CORRUPTION = "cache_corruption"
     STATE_INCONSISTENCY = "state_inconsistency"
     MEMORY_LEAK = "memory_leak"
     PERSISTENCE_FAILURE = "persistence_failure"
-    
-    # Intelligence/Orchestration
+
+    # Intelligence / Orchestration
     SEMANTIC_WORLD_STATE_CRASH = "semantic_world_state_crash"
     EVENT_DISPATCHER_STUCK = "event_dispatcher_stuck"
     STRATEGY_DECISION_FAILURE = "strategy_decision_failure"
     LEARNING_LOOP_DEADLOCK = "learning_loop_deadlock"
-    
+
     # Distributed
     NODE_CRASH = "node_crash"
     NETWORK_PARTITION_CLUSTER = "network_partition_cluster"
     GOSSIP_FAILURE = "gossip_failure"
     CONSENSUS_FAILURE = "consensus_failure"
-    
+
     # Cascading
     CASCADING_FAILURES = "cascading_failures"
     THUNDERING_HERD = "thundering_herd"
@@ -72,15 +73,17 @@ class FailureMode(Enum):
 
 class SeverityLevel(Enum):
     """Severity of failure"""
-    LOW = "low"        # Recoverable, <1% impact
-    MEDIUM = "medium"  # Recoverable, 1-10% impact
-    HIGH = "high"      # Recoverable with effort, 10-50% impact
+
+    LOW = "low"  # Recoverable, <1% impact
+    MEDIUM = "medium"  # Recoverable, 1 - 10% impact
+    HIGH = "high"  # Recoverable with effort, 10 - 50% impact
     CRITICAL = "critical"  # May require intervention, >50% impact
 
 
 @dataclass
 class FailureScenario:
     """Specification of a chaos test scenario"""
+
     name: str
     description: str
     failure_mode: FailureMode
@@ -98,13 +101,14 @@ class FailureScenario:
 # Chaos Simulator
 # ============================================================================
 
+
 class ChaosSimulator:
     """Main chaos engineering simulator"""
-    
+
     def __init__(self, system_interface=None):
         """
         Initialize chaos simulator
-        
+
         Args:
             system_interface: Interface to the system being tested
                              Allows injection of failures and observation
@@ -114,26 +118,23 @@ class ChaosSimulator:
         self.failure_history: List[Dict[str, Any]] = []
         self.recovery_metrics: Dict[str, Dict[str, float]] = {}
         self.logger = logging.getLogger("chaos_simulator")
-    
+
     async def inject_failure(
-        self, 
-        failure_mode: FailureMode, 
-        duration: float = 10.0,
-        intensity: float = 1.0
+        self, failure_mode: FailureMode, duration: float = 10.0, intensity: float = 1.0
     ) -> Dict[str, Any]:
         """
         Inject a failure into the system
-        
+
         Args:
             failure_mode: Type of failure to inject
             duration: How long to maintain the failure (seconds)
-            intensity: Intensity of failure (0.0-1.0)
-        
+            intensity: Intensity of failure (0.0 - 1.0)
+
         Returns:
             Metrics about the failure and recovery
         """
         self.logger.info(f"Injecting failure: {failure_mode.value}")
-        
+
         failure_start = time.time()
         impact_metrics = {
             "failure_mode": failure_mode.value,
@@ -145,66 +146,61 @@ class ChaosSimulator:
             "errors_during_failure": 0,
             "successes_during_failure": 0,
         }
-        
+
         # Mark failure as active
         self.active_failures[failure_mode.value] = True
-        
+
         try:
             # Wait for duration
             await asyncio.sleep(duration)
-            
+
             # Remove failure
             self.active_failures[failure_mode.value] = False
-            
+
             recovery_start = time.time()
-            
+
             # Wait for system to recover
-            recovered = await self._wait_for_recovery(
-                failure_mode, 
-                timeout=60.0
-            )
-            
+            recovered = await self._wait_for_recovery(failure_mode, timeout=60.0)
+
             recovery_time = time.time() - recovery_start
             impact_metrics["recovered"] = recovered
             impact_metrics["recovery_time"] = recovery_time
-            
+
         except Exception as e:
             self.logger.error(f"Error during chaos injection: {e}")
             impact_metrics["error"] = str(e)
-        
+
         self.failure_history.append(impact_metrics)
         return impact_metrics
-    
-    async def _wait_for_recovery(
-        self, 
-        failure_mode: FailureMode, 
-        timeout: float = 60.0
-    ) -> bool:
+
+    async def _wait_for_recovery(self, failure_mode: FailureMode, timeout: float = 60.0) -> bool:
         """
         Wait for system to recover from failure
-        
+
         Returns:
             True if recovered, False if timeout
         """
         start = time.time()
-        
+
         while time.time() - start < timeout:
             if self._is_system_healthy(failure_mode):
                 self.logger.info(f"System recovered from {failure_mode.value}")
                 return True
-            
+
             await asyncio.sleep(0.5)
-        
-        self.logger.error(f"System did not recover from {failure_mode.value} within {timeout}s")
+
+        self.logger.error(f"System did not recover from {
+            failure_mode.value} within {timeout}s")
         return False
-    
+
     def _is_system_healthy(self, _previous_failure: FailureMode) -> bool:
         """Check if system is healthy after failure"""
         try:
             from app.domain_health_alerts import get_domain_health_monitor
+
             monitor = get_domain_health_monitor()
-            
-            # If a specific current URL/domain is tracked, check it first
+
+            # If a specific current URL / domain is tracked, check it first
             if self.system and hasattr(self.system, "current_url"):
                 url = getattr(self.system, "current_url")
                 if url:
@@ -212,12 +208,13 @@ class ChaosSimulator:
                     if domain_health:
                         # Consider healthy if status is back to "healthy"
                         return domain_health.get("health_level") == "healthy"
-            
-            # Fallback/General check: if any domain in the system is unhealthy or critical, return False
+
+            # Fallback / General check: if any domain in the system is
+            # unhealthy or critical, return False
             healths = monitor.get_all_domains_health()
             if not healths:
                 return True  # If no domains are monitored yet, default to healthy
-                
+
             for h in healths:
                 if h.get("health_level") in ["unhealthy", "critical", "blacklisted"]:
                     return False
@@ -231,14 +228,14 @@ class ChaosSimulator:
         return self.active_failures.get(failure_mode.value, False)
 
 
-
 # ============================================================================
 # Failure Scenarios
 # ============================================================================
 
+
 class FailureScenarios:
     """Collection of predefined failure scenarios"""
-    
+
     @staticmethod
     def get_all_scenarios() -> List[FailureScenario]:
         """Get all failure scenarios"""
@@ -255,16 +252,11 @@ class FailureScenarios:
                 expected_success_rate=0.8,
                 triggers=["browser_pool.fetch()", "rate_limiter.check()"],
                 recovery_actions=["exponential_backoff", "proxy_rotation", "retry"],
-                validation_checks=[
-                    "extraction_retried",
-                    "backoff_applied",
-                    "system_recovers_after_timeout"
-                ]
+                validation_checks=["extraction_retried", "backoff_applied", "system_recovers_after_timeout"],
             ),
-            
             FailureScenario(
                 name="Network Partition (Total)",
-                description="Complete network isolation - no packets sent/received",
+                description="Complete network isolation - no packets sent / received",
                 failure_mode=FailureMode.NETWORK_PARTITION,
                 severity=SeverityLevel.HIGH,
                 duration_seconds=60.0,
@@ -277,10 +269,9 @@ class FailureScenarios:
                     "circuit_breaker_engaged",
                     "requests_queued",
                     "connectivity_restored",
-                    "backlog_processed"
-                ]
+                    "backlog_processed",
+                ],
             ),
-            
             FailureScenario(
                 name="Proxy Pool Exhaustion",
                 description="All proxies become unavailable simultaneously",
@@ -296,10 +287,9 @@ class FailureScenarios:
                     "proxy_fallback_used",
                     "direct_connections_tried",
                     "new_proxies_added",
-                    "extraction_continues"
-                ]
+                    "extraction_continues",
+                ],
             ),
-            
             FailureScenario(
                 name="Browser Crashes (5% of requests)",
                 description="Random 5% of browser instances crash",
@@ -315,10 +305,9 @@ class FailureScenarios:
                     "crashed_browsers_replaced",
                     "failed_extractions_retried",
                     "pool_size_maintained",
-                    "recovery_automatic"
-                ]
+                    "recovery_automatic",
+                ],
             ),
-            
             FailureScenario(
                 name="SSL Certificate Verification Failure",
                 description="All SSL certificates fail verification (MitM scenario)",
@@ -330,14 +319,8 @@ class FailureScenarios:
                 expected_success_rate=0.85,
                 triggers=["browser_pool.fetch()", "ssl_verification"],
                 recovery_actions=["retry_with_ssl_verification", "alert_ops", "fallback"],
-                validation_checks=[
-                    "ssl_errors_detected",
-                    "retry_triggered",
-                    "ops_alerted",
-                    "recovery_attempted"
-                ]
+                validation_checks=["ssl_errors_detected", "retry_triggered", "ops_alerted", "recovery_attempted"],
             ),
-            
             # ===== ANTI-BOT FAILURES (3 scenarios) =====
             FailureScenario(
                 name="Anti-Bot Escalation Cascade",
@@ -354,16 +337,15 @@ class FailureScenarios:
                     "rotate_proxies_aggressively",
                     "switch_user_agents",
                     "use_js_rendering",
-                    "blacklist_domain"
+                    "blacklist_domain",
                 ],
                 validation_checks=[
                     "detection_rate_climbing",
                     "recovery_strategies_applied",
                     "domain_health_recovered_or_blacklisted",
-                    "no_cascading_failure"
-                ]
+                    "no_cascading_failure",
+                ],
             ),
-            
             FailureScenario(
                 name="CAPTCHA Loop (10% of requests)",
                 description="CAPTCHA appears on 10% of requests, never solved",
@@ -378,16 +360,15 @@ class FailureScenarios:
                     "use_js_rendering",
                     "try_alternative_endpoints",
                     "increase_wait_time",
-                    "use_captcha_solver"
+                    "use_captcha_solver",
                 ],
                 validation_checks=[
                     "captchas_detected",
                     "recovery_strategies_attempted",
                     "js_rendering_used",
-                    "success_rate_recovered"
-                ]
+                    "success_rate_recovered",
+                ],
             ),
-            
             FailureScenario(
                 name="IP Blacklist Expansion",
                 description="IP reputation drops, more proxies become blacklisted",
@@ -398,20 +379,14 @@ class FailureScenarios:
                 expected_recovery_time_seconds=90.0,
                 expected_success_rate=0.6,
                 triggers=["proxy_manager.check_reputation()"],
-                recovery_actions=[
-                    "rotate_proxy_providers",
-                    "use_residential_proxies",
-                    "increase_delays",
-                    "use_vpn"
-                ],
+                recovery_actions=["rotate_proxy_providers", "use_residential_proxies", "increase_delays", "use_vpn"],
                 validation_checks=[
                     "blacklisted_ips_detected",
                     "proxy_provider_switched",
                     "new_ip_pool_established",
-                    "extraction_recovers"
-                ]
+                    "extraction_recovers",
+                ],
             ),
-            
             # ===== EXTRACT LAYER FAILURES (3 scenarios) =====
             FailureScenario(
                 name="Selector Poisoning Attack",
@@ -427,16 +402,15 @@ class FailureScenarios:
                     "selector_discovery",
                     "score_new_candidates",
                     "strategy_switch",
-                    "fallback_extraction"
+                    "fallback_extraction",
                 ],
                 validation_checks=[
                     "extraction_failures_detected",
                     "selector_discovery_triggered",
                     "new_selectors_evaluated",
-                    "extraction_resumes"
-                ]
+                    "extraction_resumes",
+                ],
             ),
-            
             FailureScenario(
                 name="DOM Structure Changed (Website Redesign)",
                 description="Website structure changes, rendering completely different",
@@ -451,17 +425,16 @@ class FailureScenarios:
                     "detect_structure_change",
                     "run_selector_discovery",
                     "invoke_ml_models",
-                    "establish_new_selectors"
+                    "establish_new_selectors",
                 ],
                 validation_checks=[
                     "change_detected_quickly",
                     "learning_loop_invoked",
                     "ml_models_trained",
                     "new_selectors_established",
-                    "extraction_recovers"
-                ]
+                    "extraction_recovers",
+                ],
             ),
-            
             FailureScenario(
                 name="Extraction Timeout (Slow Page Loading)",
                 description="All pages load extremely slowly (30s+), triggering timeouts",
@@ -472,21 +445,15 @@ class FailureScenarios:
                 expected_recovery_time_seconds=30.0,
                 expected_success_rate=0.8,
                 triggers=["selector_engine.execute()", "extraction_timeout"],
-                recovery_actions=[
-                    "increase_timeout",
-                    "use_js_rendering",
-                    "retry_with_backoff",
-                    "switch_strategy"
-                ],
+                recovery_actions=["increase_timeout", "use_js_rendering", "retry_with_backoff", "switch_strategy"],
                 validation_checks=[
                     "timeouts_detected",
                     "timeout_increased",
                     "extraction_resumes",
-                    "success_rate_recovers"
-                ]
+                    "success_rate_recovers",
+                ],
             ),
-            
-            # ===== STATE/MEMORY FAILURES (3 scenarios) =====
+            # ===== STATE / MEMORY FAILURES (3 scenarios) =====
             FailureScenario(
                 name="Selector Cache Corruption",
                 description="Cached selectors become corrupted or stale",
@@ -497,20 +464,9 @@ class FailureScenarios:
                 expected_recovery_time_seconds=10.0,
                 expected_success_rate=0.9,
                 triggers=["selector_memory.query()", "cache_manager.get()"],
-                recovery_actions=[
-                    "detect_invalid_cache",
-                    "invalidate_cache",
-                    "reload_from_disk",
-                    "rescore_selectors"
-                ],
-                validation_checks=[
-                    "corruption_detected",
-                    "cache_cleared",
-                    "fresh_data_loaded",
-                    "extraction_continues"
-                ]
+                recovery_actions=["detect_invalid_cache", "invalidate_cache", "reload_from_disk", "rescore_selectors"],
+                validation_checks=["corruption_detected", "cache_cleared", "fresh_data_loaded", "extraction_continues"],
             ),
-            
             FailureScenario(
                 name="State Inconsistency Between Nodes",
                 description="Distributed state becomes inconsistent (gossip lag)",
@@ -521,20 +477,14 @@ class FailureScenarios:
                 expected_recovery_time_seconds=30.0,
                 expected_success_rate=0.85,
                 triggers=["distributed_state_store.sync()"],
-                recovery_actions=[
-                    "detect_inconsistency",
-                    "increase_gossip_frequency",
-                    "resolve_conflicts",
-                    "re_sync"
-                ],
+                recovery_actions=["detect_inconsistency", "increase_gossip_frequency", "resolve_conflicts", "re_sync"],
                 validation_checks=[
                     "inconsistency_detected",
                     "gossip_intensified",
                     "conflict_resolved",
-                    "state_consistent"
-                ]
+                    "state_consistent",
+                ],
             ),
-            
             FailureScenario(
                 name="Memory Leak in Selector Memory",
                 description="Selector memory grows unbounded, consuming all RAM",
@@ -549,20 +499,19 @@ class FailureScenarios:
                     "detect_memory_growth",
                     "trigger_eviction",
                     "implement_lru_cache",
-                    "restart_if_necessary"
+                    "restart_if_necessary",
                 ],
                 validation_checks=[
                     "memory_growth_detected",
                     "eviction_triggered",
                     "memory_stabilized",
-                    "extraction_continues"
-                ]
+                    "extraction_continues",
+                ],
             ),
-            
             # ===== ORCHESTRATION FAILURES (2 scenarios) =====
             FailureScenario(
                 name="semantic_world_state Unavailable",
-                description="Central orchestrator becomes unavailable (crash/hang)",
+                description="Central orchestrator becomes unavailable (crash / hang)",
                 failure_mode=FailureMode.SEMANTIC_WORLD_STATE_CRASH,
                 severity=SeverityLevel.CRITICAL,
                 duration_seconds=30.0,
@@ -574,16 +523,15 @@ class FailureScenarios:
                     "detect_unavailability",
                     "failover_if_distributed",
                     "restart_component",
-                    "resume_work"
+                    "resume_work",
                 ],
                 validation_checks=[
                     "unavailability_detected_quickly",
                     "failover_triggered",
                     "extraction_resumes",
-                    "state_recovered"
-                ]
+                    "state_recovered",
+                ],
             ),
-            
             FailureScenario(
                 name="Learning Loop Deadlock",
                 description="Learning loop gets stuck (circular wait or infinite loop)",
@@ -594,20 +542,14 @@ class FailureScenarios:
                 expected_recovery_time_seconds=30.0,
                 expected_success_rate=1.0,  # Extraction still works
                 triggers=["domain_evolution_model.update()"],
-                recovery_actions=[
-                    "detect_deadlock",
-                    "timeout_learning",
-                    "skip_cycle",
-                    "investigate_cause"
-                ],
+                recovery_actions=["detect_deadlock", "timeout_learning", "skip_cycle", "investigate_cause"],
                 validation_checks=[
                     "deadlock_detected",
                     "learning_timeout",
                     "extraction_unaffected",
-                    "learning_resumes"
-                ]
+                    "learning_resumes",
+                ],
             ),
-            
             # ===== DISTRIBUTED FAILURES (3 scenarios) =====
             FailureScenario(
                 name="Node Crash (1 of 3 nodes)",
@@ -615,24 +557,18 @@ class FailureScenarios:
                 failure_mode=FailureMode.NODE_CRASH,
                 severity=SeverityLevel.MEDIUM,
                 duration_seconds=60.0,
-                expected_impact="2/3 capacity, workload rebalanced, no data loss",
+                expected_impact="2 / 3 capacity, workload rebalanced, no data loss",
                 expected_recovery_time_seconds=5.0,
                 expected_success_rate=0.67,
                 triggers=["heartbeat_manager.detect_failure()"],
-                recovery_actions=[
-                    "detect_crash",
-                    "rebalance_workload",
-                    "redistribute_urls",
-                    "increase_monitoring"
-                ],
+                recovery_actions=["detect_crash", "rebalance_workload", "redistribute_urls", "increase_monitoring"],
                 validation_checks=[
                     "crash_detected_within_3s",
                     "workload_rebalanced",
                     "urls_redistributed",
-                    "throughput_at_2_3_capacity"
-                ]
+                    "throughput_at_2_3_capacity",
+                ],
             ),
-            
             FailureScenario(
                 name="Network Partition in Cluster",
                 description="Network split: 2 nodes isolated from 1 node",
@@ -643,24 +579,18 @@ class FailureScenarios:
                 expected_recovery_time_seconds=30.0,
                 expected_success_rate=0.8,
                 triggers=["gossip_substrate.heartbeat()"],
-                recovery_actions=[
-                    "detect_partition",
-                    "identify_majority",
-                    "handle_minority",
-                    "resync_on_recovery"
-                ],
+                recovery_actions=["detect_partition", "identify_majority", "handle_minority", "resync_on_recovery"],
                 validation_checks=[
                     "partition_detected",
                     "quorum_identified",
                     "minority_paused_or_redirected",
                     "network_heals",
-                    "state_resynced"
-                ]
+                    "state_resynced",
+                ],
             ),
-            
             FailureScenario(
                 name="Gossip Protocol Failure",
-                description="Gossip messages corrupted/lost (30% packet loss)",
+                description="Gossip messages corrupted / lost (30% packet loss)",
                 failure_mode=FailureMode.GOSSIP_FAILURE,
                 severity=SeverityLevel.MEDIUM,
                 duration_seconds=120.0,
@@ -672,17 +602,16 @@ class FailureScenarios:
                     "detect_high_packet_loss",
                     "increase_gossip_frequency",
                     "use_alternative_paths",
-                    "increase_redundancy"
+                    "increase_redundancy",
                 ],
                 validation_checks=[
                     "packet_loss_detected",
                     "gossip_frequency_increased",
                     "state_eventually_consistent",
-                    "recovery_metrics_improve"
-                ]
+                    "recovery_metrics_improve",
+                ],
             ),
-            
-            # ===== CASCADING/COMPLEX FAILURES (3 scenarios) =====
+            # ===== CASCADING / COMPLEX FAILURES (3 scenarios) =====
             FailureScenario(
                 name="Cascading Failures: Network → Anti-Bot → Proxy",
                 description="Network timeout triggers aggressive anti-bot, exhausts proxies",
@@ -697,17 +626,16 @@ class FailureScenarios:
                     "circuit_breaker_network",
                     "reduce_anti_bot_aggressiveness",
                     "pause_extraction",
-                    "restore_services_sequentially"
+                    "restore_services_sequentially",
                 ],
                 validation_checks=[
                     "cascade_detected",
                     "circuit_breakers_engaged",
                     "extraction_paused",
                     "services_restored_sequentially",
-                    "full_recovery"
-                ]
+                    "full_recovery",
+                ],
             ),
-            
             FailureScenario(
                 name="Thundering Herd: All Nodes Retry Simultaneously",
                 description="All nodes retry at same time after failure (no backoff stagger)",
@@ -722,16 +650,10 @@ class FailureScenarios:
                     "detect_retry_spike",
                     "apply_jitter_to_backoff",
                     "stagger_retries",
-                    "throttle_if_needed"
+                    "throttle_if_needed",
                 ],
-                validation_checks=[
-                    "spike_detected",
-                    "jitter_applied",
-                    "retries_staggered",
-                    "load_normalized"
-                ]
+                validation_checks=["spike_detected", "jitter_applied", "retries_staggered", "load_normalized"],
             ),
-            
             FailureScenario(
                 name="Resource Exhaustion: Memory → CPU → Network",
                 description="System runs out of memory, GC thrashing, everything slows down",
@@ -747,18 +669,18 @@ class FailureScenarios:
                     "trigger_eviction",
                     "pause_non_critical_tasks",
                     "scale_out",
-                    "restart_if_necessary"
+                    "restart_if_necessary",
                 ],
                 validation_checks=[
                     "exhaustion_detected",
                     "eviction_triggered",
                     "non_critical_tasks_paused",
                     "performance_recovered",
-                    "scale_out_initiated"
-                ]
+                    "scale_out_initiated",
+                ],
             ),
         ]
-    
+
     @staticmethod
     def get_scenario_by_mode(mode: FailureMode) -> Optional[FailureScenario]:
         """Get a scenario by failure mode"""
@@ -772,42 +694,43 @@ class FailureScenarios:
 # Test Suite
 # ============================================================================
 
+
 class ChaosTestSuite:
     """Runs chaos engineering tests"""
-    
+
     def __init__(self):
         self.logger = logging.getLogger("chaos_test_suite")
         self.results: List[Dict[str, Any]] = []
-    
+
     async def run_all_scenarios(self) -> Dict[str, Any]:
         """Run all chaos scenarios"""
         scenarios = FailureScenarios.get_all_scenarios()
         self.logger.info(f"Running {len(scenarios)} chaos scenarios...")
-        
+
         passed = 0
         failed = 0
-        
+
         for scenario in scenarios:
             result = await self._run_scenario(scenario)
             self.results.append(result)
-            
+
             if result["passed"]:
                 passed += 1
             else:
                 failed += 1
-        
+
         return {
             "total": len(scenarios),
             "passed": passed,
             "failed": failed,
             "pass_rate": passed / len(scenarios) if scenarios else 0,
-            "results": self.results
+            "results": self.results,
         }
-    
+
     async def _run_scenario(self, scenario: FailureScenario) -> Dict[str, Any]:
         """Run a single scenario"""
         self.logger.info(f"Running scenario: {scenario.name}")
-        
+
         try:
             # This is a template - actual implementation would:
             # 1. Setup monitoring
@@ -815,7 +738,7 @@ class ChaosTestSuite:
             # 3. Monitor system behavior
             # 4. Measure recovery
             # 5. Validate against expectations
-            
+
             result: dict[str, Any] = {
                 "scenario": scenario.name,
                 "failure_mode": scenario.failure_mode.value,
@@ -825,9 +748,9 @@ class ChaosTestSuite:
                 "success_rate": scenario.expected_success_rate,
                 "errors": [],
             }
-            
+
             return result
-            
+
         except Exception as e:
             self.logger.error(f"Error running scenario {scenario.name}: {e}")
             return {
@@ -836,12 +759,12 @@ class ChaosTestSuite:
                 "passed": False,
                 "error": str(e),
             }
-    
+
     def generate_report(self) -> str:
         """Generate chaos test report"""
         total = len(self.results)
         passed = sum(1 for r in self.results if r.get("passed", False))
-        
+
         report = f"""
 ================================================================================
                       CHAOS ENGINEERING TEST REPORT
@@ -851,7 +774,7 @@ SUMMARY:
   Total Scenarios: {total}
   Passed: {passed}
   Failed: {total - passed}
-  Pass Rate: {passed/total*100:.1f}%
+  Pass Rate: {passed / total * 100:.1f}%
 
 SCENARIOS BY SEVERITY:
   Critical: {sum(1 for r in self.results if 'critical' in r.get('severity', '').lower())}
@@ -861,12 +784,12 @@ SCENARIOS BY SEVERITY:
 
 DETAILED RESULTS:
 """
-        
+
         for result in self.results:
             status = "✓ PASS" if result.get("passed") else "✗ FAIL"
             report += f"\n  {status} - {result.get('scenario', 'Unknown')}"
-        
-        report += "\n\n" + "="*80 + "\n"
+
+        report += "\n\n" + "=" * 80 + "\n"
         return report
 
 
@@ -874,9 +797,10 @@ DETAILED RESULTS:
 # Playbooks and Recovery Procedures
 # ============================================================================
 
+
 class OperationalPlaybooks:
     """Playbooks for operational responses to failures"""
-    
+
     @staticmethod
     def get_playbook(failure_mode: FailureMode) -> Dict[str, Any]:
         """Get the playbook for a specific failure mode"""
@@ -901,9 +825,8 @@ class OperationalPlaybooks:
                     "proxy_health",
                 ],
                 "escalation": "Infrastructure Team",
-                "estimated_recovery_time": "2-5 minutes",
+                "estimated_recovery_time": "2 - 5 minutes",
             },
-            
             FailureMode.ANTI_BOT_ESCALATION: {
                 "name": "Anti-Bot Escalation Recovery",
                 "severity": "CRITICAL",
@@ -926,9 +849,8 @@ class OperationalPlaybooks:
                     "domain_health_score",
                 ],
                 "escalation": "On-Call Engineer",
-                "estimated_recovery_time": "30-120 minutes",
+                "estimated_recovery_time": "30 - 120 minutes",
             },
-            
             FailureMode.SELECTOR_POISONING: {
                 "name": "Selector Poisoning Recovery",
                 "severity": "HIGH",
@@ -949,9 +871,8 @@ class OperationalPlaybooks:
                     "dom_structure_version",
                 ],
                 "escalation": "Team Lead (for manual selector review)",
-                "estimated_recovery_time": "10-30 minutes",
+                "estimated_recovery_time": "10 - 30 minutes",
             },
-            
             FailureMode.NODE_CRASH: {
                 "name": "Node Crash Recovery",
                 "severity": "MEDIUM",
@@ -973,14 +894,13 @@ class OperationalPlaybooks:
                     "error_rate",
                 ],
                 "escalation": "Infrastructure Team (if repeated crashes)",
-                "estimated_recovery_time": "3-10 minutes",
+                "estimated_recovery_time": "3 - 10 minutes",
             },
-            
             FailureMode.MEMORY_LEAK: {
                 "name": "Memory Leak Recovery",
                 "severity": "HIGH",
                 "steps": [
-                    "1. Detect: Memory usage growing >50MB/hour",
+                    "1. Detect: Memory usage growing >50MB / hour",
                     "2. Enable detailed memory profiling",
                     "3. Identify leaking component (likely selector_memory)",
                     "4. Trigger cache eviction (LRU policy)",
@@ -997,17 +917,20 @@ class OperationalPlaybooks:
                     "cache_size",
                 ],
                 "escalation": "Developer (for code fix)",
-                "estimated_recovery_time": "2-30 minutes (temp fix), 1-4 hours (permanent)",
+                "estimated_recovery_time": "2 - 30 minutes (temp fix), 1 - 4 hours (permanent)",
             },
         }
-        
-        return playbooks.get(failure_mode, {
-            "name": "Unknown Failure",
-            "severity": "UNKNOWN",
-            "steps": ["1. Investigate logs and metrics"],
-            "escalation": "On-Call Engineer",
-        })
-    
+
+        return playbooks.get(
+            failure_mode,
+            {
+                "name": "Unknown Failure",
+                "severity": "UNKNOWN",
+                "steps": ["1. Investigate logs and metrics"],
+                "escalation": "On-Call Engineer",
+            },
+        )
+
     @staticmethod
     def get_all_playbooks() -> Dict[str, Dict[str, Any]]:
         """Get all playbooks"""
@@ -1021,19 +944,17 @@ class OperationalPlaybooks:
 # Testing Helpers
 # ============================================================================
 
+
 async def run_chaos_test(scenario: FailureScenario) -> Dict[str, Any]:
     """
     Run a chaos test scenario
-    
+
     Example:
         scenario = FailureScenarios.get_scenario_by_mode(FailureMode.NETWORK_TIMEOUT)
         result = await run_chaos_test(scenario)
     """
     simulator = ChaosSimulator()
-    result = await simulator.inject_failure(
-        scenario.failure_mode,
-        duration=scenario.duration_seconds
-    )
+    result = await simulator.inject_failure(scenario.failure_mode, duration=scenario.duration_seconds)
     return result
 
 
@@ -1046,6 +967,7 @@ async def run_all_chaos_tests() -> Dict[str, Any]:
         "results": results,
         "report": report,
     }
+
 
 _simulator: ChaosSimulator | None = None
 
@@ -1062,9 +984,9 @@ if __name__ == "__main__":
     # Print all scenarios
     print("DataForge Chaos Engineering Scenarios:")
     print("=" * 80)
-    
+
     scenarios = FailureScenarios.get_all_scenarios()
-    
+
     # Group by category
     categories: dict[str, list[Any]] = {}
     for scenario in scenarios:
@@ -1072,10 +994,11 @@ if __name__ == "__main__":
         if cat not in categories:
             categories[cat] = []
         categories[cat].append(scenario)
-    
+
     for cat, scenarios_in_cat in sorted(categories.items()):
         print(f"\n{cat.upper()} FAILURES ({len(scenarios_in_cat)} scenarios):")
         for scenario in scenarios_in_cat:
             print(f"  - {scenario.name}")
             print(f"    Severity: {scenario.severity.value}")
-            print(f"    Expected Recovery: {scenario.expected_recovery_time_seconds}s")
+            print(f"    Expected Recovery: {
+                scenario.expected_recovery_time_seconds}s")

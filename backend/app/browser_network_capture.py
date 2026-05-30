@@ -1,5 +1,5 @@
 """
-Browser Network Capture — Intercepts fetch/XHR/GraphQL responses during Playwright page loads.
+Browser Network Capture — Intercepts fetch / XHR / GraphQL responses during Playwright page loads.
 
 This module captures actual browser network responses (not just inline scripts) for
 structured data extraction. Many modern SPAs load their data via API calls that never
@@ -48,9 +48,9 @@ _MAX_URLS: int = 1000
 _MAX_GLOBAL_BYTES: int = 256 * 1024 * 1024
 """Maximum total bytes across all URLS (256 MB)."""
 _MAX_STORAGE_ENTRIES_PER_AREA: int = 50
-"""Maximum cookies/storage entries stored per browser state area."""
+"""Maximum cookies / storage entries stored per browser state area."""
 _MAX_STORAGE_NAME_CHARS: int = 128
-"""Maximum key/name length retained for browser state evidence."""
+"""Maximum key / name length retained for browser state evidence."""
 
 _SESSION_STATE_KEY_PATTERNS: tuple[re.Pattern, ...] = tuple(
     re.compile(pattern, re.I)
@@ -169,14 +169,16 @@ def _sanitize_cookies(cookies: Any) -> list[dict[str, Any]]:
         if not isinstance(cookie, dict):
             continue
         entry = _sanitize_storage_entry(cookie.get("name", ""), cookie.get("value", ""), "cookie")
-        entry.update({
-            "domain": cookie.get("domain", ""),
-            "path": cookie.get("path", ""),
-            "expires": cookie.get("expires"),
-            "http_only": bool(cookie.get("httpOnly")),
-            "secure": bool(cookie.get("secure")),
-            "same_site": cookie.get("sameSite", ""),
-        })
+        entry.update(
+            {
+                "domain": cookie.get("domain", ""),
+                "path": cookie.get("path", ""),
+                "expires": cookie.get("expires"),
+                "http_only": bool(cookie.get("httpOnly")),
+                "secure": bool(cookie.get("secure")),
+                "same_site": cookie.get("sameSite", ""),
+            }
+        )
         sanitized.append(entry)
     return sanitized
 
@@ -212,7 +214,7 @@ async def collect_browser_state(page) -> dict[str, Any]:
     """Capture sanitized browser-side state evidence after a Playwright load.
 
     Raw cookie and storage values are intentionally not returned. The live
-    browser context keeps the real values for navigation/API requests; this
+    browser context keeps the real values for navigation / API requests; this
     evidence is only for diagnostics and recovery decisions.
     """
     raw_cookies: list[dict[str, Any]] = []
@@ -223,8 +225,7 @@ async def collect_browser_state(page) -> dict[str, Any]:
 
     storage_snapshot: dict[str, Any] = {}
     try:
-        storage_snapshot = await page.evaluate(
-            """async () => {
+        storage_snapshot = await page.evaluate("""async () => {
                 const readStorage = (storage) => {
                     const out = {};
                     if (!storage) return out;
@@ -252,8 +253,7 @@ async def collect_browser_state(page) -> dict[str, Any]:
                     indexedDbDatabases: indexedDbDatabases || [],
                     cacheStorageKeys: cacheStorageKeys || []
                 };
-            }"""
-        )
+            }""")
     except Exception as exc:
         logger.debug("[BrowserState] Could not read browser storage: %s", exc)
     if not isinstance(storage_snapshot, dict):
@@ -274,8 +274,7 @@ async def collect_browser_state(page) -> dict[str, Any]:
             if isinstance(db, dict)
         ],
         "cache_storage_keys": [
-            _sanitize_name(key)
-            for key in storage_snapshot.get("cacheStorageKeys", [])[:_MAX_STORAGE_ENTRIES_PER_AREA]
+            _sanitize_name(key) for key in storage_snapshot.get("cacheStorageKeys", [])[:_MAX_STORAGE_ENTRIES_PER_AREA]
         ],
     }
     candidates = _collect_session_candidates(state)
@@ -285,7 +284,7 @@ async def collect_browser_state(page) -> dict[str, Any]:
 
 
 def get_all_hydration_objects(url: str) -> list[dict]:
-    """Get all candidate hydration/subset objects from captured network data.
+    """Get all candidate hydration / subset objects from captured network data.
 
     Returns a list of objects that look like they could contain structured records
     (arrays of dicts with meaningful keys). This is useful for feeding into
@@ -320,6 +319,7 @@ def store_captures(url: str, payloads: list[dict]) -> None:
 
     # Estimate total bytes of new payloads
     import json
+
     total_new_bytes = 0
     for p in payloads:
         try:
@@ -353,14 +353,17 @@ def store_captures(url: str, payloads: list[dict]) -> None:
             total_bytes -= 1024
 
     _captured_payloads[url] = existing
-    
+
     # Global LRU eviction: keep most recently accessed URLs
     # Order by recency and cap at _MAX_URLS / _MAX_GLOBAL_BYTES
     _evict_lru_captures()
-    
+
     logger.info(
         "[BrowserNetwork] Stored %d network payloads for %s (total ~%.1f KB, %d URLs tracked)",
-        len(payloads), url, total_bytes / 1024, len(_captured_payloads),
+        len(payloads),
+        url,
+        total_bytes / 1024,
+        len(_captured_payloads),
     )
 
 
@@ -385,7 +388,9 @@ def _evict_lru_captures() -> None:
         if dropped:
             logger.debug(
                 "[BrowserNetwork] LRU evicted %s (%d payloads, %d URLs remain)",
-                oldest_url, len(dropped), len(_captured_payloads),
+                oldest_url,
+                len(dropped),
+                len(_captured_payloads),
             )
 
     # Cap by total bytes
@@ -408,7 +413,9 @@ def _evict_lru_captures() -> None:
             total_bytes -= oldest_bytes
             logger.debug(
                 "[BrowserNetwork] LRU byte-evicted %s (~%.1f KB, %d URLs remain)",
-                oldest_url, oldest_bytes / 1024, len(_captured_payloads),
+                oldest_url,
+                oldest_bytes / 1024,
+                len(_captured_payloads),
             )
 
 
@@ -416,11 +423,12 @@ def _evict_lru_captures() -> None:
 # Playwright interception setup
 # ---------------------------------------------------------------------------
 
+
 async def setup_network_capture(page) -> list[dict]:
     """Set up network response interception on a Playwright page.
 
     Registers a response listener that captures:
-    - XHR/fetch responses with JSON bodies
+    - XHR / fetch responses with JSON bodies
     - GraphQL responses
     - API responses
 
@@ -443,7 +451,7 @@ async def setup_network_capture(page) -> list[dict]:
         try:
             req = response.request
 
-            # Only capture XHR/fetch and API-like documents
+            # Only capture XHR / fetch and API-like documents
             resource_type = req.resource_type
             if resource_type not in ("xhr", "fetch", "websocket"):
                 # Also capture document responses that return JSON
@@ -484,12 +492,14 @@ async def setup_network_capture(page) -> list[dict]:
             if len(captured) >= _MAX_PAYLOADS_PER_URL:
                 logger.debug(
                     "[BrowserNetwork] Live capture payload count cap (%d) reached, skipping %s",
-                    _MAX_PAYLOADS_PER_URL, _truncate_url(url)
+                    _MAX_PAYLOADS_PER_URL,
+                    _truncate_url(url),
                 )
                 return
 
             # Estimate total bytes of existing captured payloads
             import json
+
             total_bytes = 0
             for p in captured:
                 try:
@@ -508,7 +518,8 @@ async def setup_network_capture(page) -> list[dict]:
             if total_bytes + new_bytes > _MAX_BYTES_PER_URL:
                 logger.debug(
                     "[BrowserNetwork] Live capture byte cap (%.1f MB) reached, skipping %s",
-                    _MAX_BYTES_PER_URL / (1024 * 1024), _truncate_url(url)
+                    _MAX_BYTES_PER_URL / (1024 * 1024),
+                    _truncate_url(url),
                 )
                 return
 
@@ -523,7 +534,11 @@ async def setup_network_capture(page) -> list[dict]:
 
             logger.debug(
                 "[BrowserNetwork] Captured %s %s (%s, status=%d, type=%s)",
-                req.method, _truncate_url(url), type(body).__name__, status, resource_type,
+                req.method,
+                _truncate_url(url),
+                type(body).__name__,
+                status,
+                resource_type,
             )
 
         except Exception as e:
@@ -569,11 +584,25 @@ def _is_irrelevant_url(url: str) -> bool:
             return True
 
     # Skip non-JSON extensions
-    path = urlparse(url).path.lower() if '//' in url else url.lower()
+    path = urlparse(url).path.lower() if "//" in url else url.lower()
     skip_extensions = (
-        ".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg",
-        ".webp", ".ico", ".woff", ".woff2", ".ttf", ".eot",
-        ".mp4", ".webm", ".mp3", ".wav",
+        ".js",
+        ".css",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".svg",
+        ".webp",
+        ".ico",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".eot",
+        ".mp4",
+        ".webm",
+        ".mp3",
+        ".wav",
     )
     if path.endswith(skip_extensions):
         return True
@@ -596,7 +625,7 @@ def _is_empty_payload(body: Any) -> bool:
     if isinstance(body, dict):
         if len(body) == 0:
             return True
-        # Check for common empty/error responses
+        # Check for common empty / error responses
         if any(k in body for k in ("errors", "error")):
             error_val = body.get("errors") or body.get("error")
             if error_val and isinstance(error_val, str):
@@ -619,6 +648,7 @@ def _truncate_url(url: str, max_len: int = 100) -> str:
 # ---------------------------------------------------------------------------
 # Filtering helpers
 # ---------------------------------------------------------------------------
+
 
 def filter_structured_payloads(payloads: list[dict]) -> list[dict]:
     """Filter captured payloads to only those likely containing structured records.

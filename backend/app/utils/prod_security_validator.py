@@ -58,7 +58,7 @@ def validate_production_credentials(settings) -> None:
             )
         if val.lower() in WEAK_CREDENTIAL_PLACEHOLDERS:
             raise ValueError(
-                f"Production check failed: {name} is set to a weak/placeholder value. "
+                f"Production check failed: {name} is set to a weak / placeholder value. "
                 f"Please generate a strong random key."
             )
         if len(val) < 16:
@@ -68,7 +68,10 @@ def validate_production_credentials(settings) -> None:
             )
 
     # 2. Database Password Validation (only if Storage Backend is Postgres)
-    storage_backend = getattr(settings, "STORAGE_BACKEND", "").strip().lower() or os.environ.get("DATAFORGE_STORAGE_BACKEND", "sqlite").strip().lower()
+    storage_backend = (
+        getattr(settings, "STORAGE_BACKEND", "").strip().lower()
+        or os.environ.get("DATAFORGE_STORAGE_BACKEND", "sqlite").strip().lower()
+    )
     if storage_backend == "postgres":
         # Resolve database URL
         env_url = os.environ.get("DATAFORGE_DATABASE_URL", "").strip()
@@ -94,14 +97,12 @@ def validate_production_credentials(settings) -> None:
         password = password.strip()
         if password.lower() in WEAK_CREDENTIAL_PLACEHOLDERS:
             raise ValueError(
-                "Production check failed: DATAFORGE_DATABASE_URL password is set to a weak/placeholder value. "
+                "Production check failed: DATAFORGE_DATABASE_URL password is set to a weak / placeholder value. "
                 "Please configure a strong, unique database password."
             )
 
         if len(password) < 8:
-            raise ValueError(
-                f"Production check failed: DATAFORGE_DATABASE_URL password is too short ({len(password)} chars). "
-                f"Must be at least 8 characters in production."
-            )
+            raise ValueError(f"Production check failed: DATAFORGE_DATABASE_URL password is too short ({
+                    len(password)} chars). " f"Must be at least 8 characters in production.")
 
     logger.info("Production security credential validation: ALL PASS")

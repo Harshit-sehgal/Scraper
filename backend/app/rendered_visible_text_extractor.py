@@ -13,7 +13,7 @@ bounding box data would be needed — tracked as future enhancement.
 
 Key capabilities:
   1. Group visible text blocks into visual cards using DOM-order proximity
-  2. Detect repeated card patterns (similar structure/patterns)
+  2. Detect repeated card patterns (similar structure / patterns)
   3. Extract field values from each card using pattern matching
   4. Assign values using proximity and label-value relationships
   5. Detect repeated clusters across cards for schema field identification
@@ -38,9 +38,11 @@ logger = logging.getLogger(__name__)
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class VisualCard:
     """A group of nearby text blocks that likely form a single result card."""
+
     index: int
     y_start: float
     y_end: float
@@ -64,6 +66,7 @@ class VisualCard:
 @dataclass
 class CardGroupingResult:
     """Result of grouping visible text blocks into visual cards."""
+
     cards: list[VisualCard]
     card_count: int
     has_repeated_structure: bool
@@ -83,13 +86,14 @@ MIN_CARDS_FOR_REPEAT = 2
 # Minimum combined text length for a meaningful card
 MIN_CARD_TEXT_LEN = 40
 
-# Estimated gap between cards (for cosmetic y_start/y_end only)
+# Estimated gap between cards (for cosmetic y_start / y_end only)
 CARD_Y_SPACING = 60.0
 
 
 # ---------------------------------------------------------------------------
 # Main public API
 # ---------------------------------------------------------------------------
+
 
 async def capture_bounding_boxes(page) -> list[dict]:
     """Capture bounding boxes of visible text elements using Playwright JS.
@@ -165,13 +169,15 @@ def extract_from_visible_blocks(
     if grouping.card_count < MIN_CARDS_FOR_REPEAT:
         logger.debug(
             "[VisibleTextExtractor] Only %d cards found (need %d)",
-            grouping.card_count, MIN_CARDS_FOR_REPEAT,
+            grouping.card_count,
+            MIN_CARDS_FOR_REPEAT,
         )
         return []
 
     logger.info(
         "[VisibleTextExtractor] Found %d visual cards, repeated=%s",
-        grouping.card_count, grouping.has_repeated_structure,
+        grouping.card_count,
+        grouping.has_repeated_structure,
     )
 
     # Extract records from each card
@@ -187,6 +193,7 @@ def extract_from_visible_blocks(
 
     # Score records
     from app.utils.quality import score_record_quality
+
     for r in records:
         r["record_score"] = score_record_quality(r, schema_fields)
     records.sort(key=lambda r: r.get("record_score", 0.0), reverse=True)
@@ -197,6 +204,7 @@ def extract_from_visible_blocks(
 # ---------------------------------------------------------------------------
 # Visual card grouping
 # ---------------------------------------------------------------------------
+
 
 def _group_into_cards(evidence: PageEvidence) -> CardGroupingResult:
     """Group visible text blocks into visual cards.
@@ -244,8 +252,9 @@ def _group_by_spatial_proximity(blocks: list[VisibleTextBlock], boxes: list[dict
 
     has_repeat = _detect_repeated_patterns(cards)
     sig = _build_cluster_signature(cards) if has_repeat else ""
-    return CardGroupingResult(cards=cards, card_count=len(cards),
-                              has_repeated_structure=has_repeat, cluster_signature=sig)
+    return CardGroupingResult(
+        cards=cards, card_count=len(cards), has_repeated_structure=has_repeat, cluster_signature=sig
+    )
 
 
 def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResult:
@@ -255,7 +264,7 @@ def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResul
 
     def _container_prefix(path: str, depth: int = 3) -> str:
         parts = path.split("/")
-        return "/".join(parts[:min(depth, len(parts))])
+        return "/".join(parts[: min(depth, len(parts))])
 
     groups: dict[str, list[VisibleTextBlock]] = {}
     for block in blocks:
@@ -268,7 +277,7 @@ def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResul
     # detecting repeated pattern boundaries within the same prefix
     cards: list[VisualCard] = []
     for prefix, group in groups.items():
-        # A good card has 3-12 blocks. If a group fits, keep it.
+        # A good card has 3 - 12 blocks. If a group fits, keep it.
         if len(group) <= 12:
             if _is_meaningful_card(group):
                 cards.append(_build_card(group, len(cards)))
@@ -298,7 +307,7 @@ def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResul
                 if _is_meaningful_card(sub_group):
                     cards.append(_build_card(sub_group, len(cards)))
 
-    # Third pass: if we have very few cards (0-1), try depth-2 prefix
+    # Third pass: if we have very few cards (0 - 1), try depth-2 prefix
     # (broader grouping) to catch cases where cards span deeper DOM
     if len(cards) <= 1:
         broader: dict[str, list[VisibleTextBlock]] = {}
@@ -416,6 +425,7 @@ def _score_card(blocks: list[VisibleTextBlock], combined: str) -> float:
 # Pattern detection
 # ---------------------------------------------------------------------------
 
+
 def _detect_repeated_patterns(cards: list[VisualCard]) -> bool:
     """Check if cards have repeated structural patterns."""
     if len(cards) < MIN_CARDS_FOR_REPEAT:
@@ -467,6 +477,7 @@ def _build_cluster_signature(cards: list[VisualCard]) -> str:
 # Record extraction from cards
 # ---------------------------------------------------------------------------
 
+
 def _extract_record_from_card(
     card: VisualCard,
     schema_fields: list,
@@ -496,7 +507,7 @@ def _extract_record_from_card(
                 return True
         return False
 
-    # Priority sort: typed fields first, string/org last
+    # Priority sort: typed fields first, string / org last
     _TYPED_PRIORITY: dict = {
         FieldType.EMAIL: 0,
         FieldType.PHONE: 0,
@@ -508,20 +519,29 @@ def _extract_record_from_card(
     sorted_fields = sorted(
         enumerate(schema_fields),
         key=lambda item: (
-            _TYPED_PRIORITY.get(item[1].field_type if hasattr(item[1], 'field_type') else None, 3),
-            0 if not any(w in (item[1].name or "").lower() for w in ("return", "arrival", "arrive", "dest", "to_")) else 1,
-        )
+            _TYPED_PRIORITY.get(item[1].field_type if hasattr(item[1], "field_type") else None, 3),
+            (
+                0
+                if not any(w in (item[1].name or "").lower() for w in ("return", "arrival", "arrive", "dest", "to_"))
+                else 1
+            ),
+        ),
     )
 
     for idx, field in sorted_fields:
-        field_type = field.field_type if hasattr(field, 'field_type') else FieldType.STRING
-        field_name = field.name.lower() if hasattr(field, 'name') else ""
-        field_desc = field.description.lower() if hasattr(field, 'description') else ""
+        field_type = field.field_type if hasattr(field, "field_type") else FieldType.STRING
+        field_name = field.name.lower() if hasattr(field, "name") else ""
+        field_desc = field.description.lower() if hasattr(field, "description") else ""
 
         value = _extract_card_field_stateful(
-            field_type, field_name, field_desc,
-            full_text, text_snippets,
-            matches_by_type, used_spans, used_snippet_indices,
+            field_type,
+            field_name,
+            field_desc,
+            full_text,
+            text_snippets,
+            matches_by_type,
+            used_spans,
+            used_snippet_indices,
         )
         if value and value not in ("", None, [], {}):
             record[field.name] = value
@@ -548,16 +568,18 @@ def _collect_card_pattern_matches(
     }
 
     # ── Email ─────────────────────────────────────────────────
-    for m in re.finditer(r'[\w.+-]+@[\w-]+\.[\w.-]+', full_text):
+    for m in re.finditer(r"[\w.+-]+@[\w-]+\.[\w.-]+", full_text):
         from app.html_utils import _valid_email
+
         validated = _valid_email(m.group(0))
         if validated:
             matches["email"].append((validated, m.start(), m.end()))
 
     # ── Phone ─────────────────────────────────────────────────
-    phone_pattern = re.compile(r'\+?\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}')
+    phone_pattern = re.compile(r"\+?\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}")
     for m in phone_pattern.finditer(full_text):
         from app.html_utils import _valid_phone
+
         validated = _valid_phone(m.group(0))
         if validated:
             matches["phone"].append((validated, m.start(), m.end()))
@@ -569,32 +591,68 @@ def _collect_card_pattern_matches(
             matches["url"].append((url, m.start(), m.end()))
 
     # ── Currency / Price ──────────────────────────────────────
-    for m in re.finditer(r'[\$\€\£\¥\₹]\s*\d+[\d,.]*', full_text):
+    for m in re.finditer(r"[\$\€\£\¥\₹]\s*\d+[\d,.]*", full_text):
         matches["currency"].append((m.group(0).replace(" ", ""), m.start(), m.end()))
 
     # ── Date ──────────────────────────────────────────────────
     date_patterns = [
-        re.compile(r'\d{4}-\d{2}-\d{2}'),
-        re.compile(r'\d{1,2}/\d{1,2}/\d{2,4}'),
-        re.compile(r'(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}', re.I),
+        re.compile(r"\d{4}-\d{2}-\d{2}"),
+        re.compile(r"\d{1,2}/\d{1,2}/\d{2,4}"),
+        re.compile(r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}", re.I),
     ]
     for dp in date_patterns:
         for m in dp.finditer(full_text):
             matches["date"].append((m.group(0), m.start(), m.end()))
 
     # ── Time ──────────────────────────────────────────────────
-    for m in re.finditer(r'\d{1,2}:\d{2}\s*(?:am|pm)?', full_text, re.I):
+    for m in re.finditer(r"\d{1,2}:\d{2}\s*(?:am|pm)?", full_text, re.I):
         matches["time"].append((m.group(0), m.start(), m.end()))
 
     # ── Location codes ────────────────────────────────────────
-    skip_codes = {"THE", "AND", "FOR", "ALL", "ANY", "NEW", "OLD", "OUT", "TOP", "BIG", "GET", "HOW", "ARE", "NOT", "CAN", "WAS", "OFF", "YOU", "HAS", "ITS", "BUT", "NOW", "MAY", "JAN", "FEB", "MAR", "APR", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
-    for m in re.finditer(r'\b[A-Z]{3}\b', full_text):
+    skip_codes = {
+        "THE",
+        "AND",
+        "FOR",
+        "ALL",
+        "ANY",
+        "NEW",
+        "OLD",
+        "OUT",
+        "TOP",
+        "BIG",
+        "GET",
+        "HOW",
+        "ARE",
+        "NOT",
+        "CAN",
+        "WAS",
+        "OFF",
+        "YOU",
+        "HAS",
+        "ITS",
+        "BUT",
+        "NOW",
+        "MAY",
+        "JAN",
+        "FEB",
+        "MAR",
+        "APR",
+        "JUN",
+        "JUL",
+        "AUG",
+        "SEP",
+        "OCT",
+        "NOV",
+        "DEC",
+    }
+    for m in re.finditer(r"\b[A-Z]{3}\b", full_text):
         if m.group(0) not in skip_codes:
             matches["code"].append((m.group(0), m.start(), m.end()))
 
     # ── Organization / Brand ──────────────────────────────────
-    # Scan full_text (not snippets) so positions are in full_text coordinate system
-    org_pattern = re.compile(r'\b([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+){1,4})\b')
+    # Scan full_text (not snippets) so positions are in full_text coordinate
+    # system
+    org_pattern = re.compile(r"\b([A-Z][a-zA-Z0 - 9]+(?:\s+[A-Z][a-zA-Z0 - 9]+){1,4})\b")
     for m in org_pattern.finditer(full_text):
         val = m.group(1).strip()
         # Skip common non-org patterns (descriptive labels and navigation text)
@@ -626,6 +684,7 @@ def _extract_card_field_stateful(
     used_snippet_indices: set[int],
 ) -> Any:
     """Extract a field value with stateful span tracking."""
+
     def _consume_match(matches: list) -> str | None:
         use_last = any(w in field_name for w in ("return", "arrival", "arrive", "end", "to_", "dest"))
 
@@ -683,18 +742,18 @@ def _extract_card_field_stateful(
         if result:
             return result
         # Fallback: named price
-        m = re.search(r'(?:price|total|fare|cost|amount)\s*:?\s*[\$\€\£\¥\₹]?\s*(\d+[\d,.]*)', full_text, re.I)
+        m = re.search(r"(?:price|total|fare|cost|amount)\s*:?\s*[\$\€\£\¥\₹]?\s*(\d+[\d,.]*)", full_text, re.I)
         if m and not _is_span_used(m.start(), m.end()):
             used_spans.append((m.start(), m.end()))
             val = m.group(1)
-            symbol_match = re.search(r'[\$\€\£\¥\₹]', full_text[:m.start() + 10])
+            symbol_match = re.search(r"[\$\€\£\¥\₹]", full_text[: m.start() + 10])
             symbol = symbol_match.group(0) if symbol_match else ""
             return f"{symbol}{val}" if symbol else val
         # Last resort: decimal number
-        num_m = re.search(r'(\d+\.\d{2})\b', full_text)
+        num_m = re.search(r"(\d+\.\d{2})\b", full_text)
         if num_m and not _is_span_used(num_m.start(), num_m.end()):
             used_spans.append((num_m.start(), num_m.end()))
-            symbol_match = re.search(r'[\$\€\£\¥\₹]', full_text[:num_m.start() + 10])
+            symbol_match = re.search(r"[\$\€\£\¥\₹]", full_text[: num_m.start() + 10])
             symbol = symbol_match.group(0) if symbol_match else ""
             return f"{symbol}{num_m.group(1)}" if symbol else num_m.group(1)
         return None
@@ -714,7 +773,7 @@ def _extract_card_field_stateful(
         if result:
             return result
         # Broader: location-like name
-        loc_pattern = re.compile(r'(?:at|from|to|in|near)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)', re.I)
+        loc_pattern = re.compile(r"(?:at|from|to|in|near)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)", re.I)
         m = loc_pattern.search(full_text)
         if m and not _is_span_used(m.start(), m.end()):
             used_spans.append((m.start(), m.end()))
@@ -736,9 +795,11 @@ def _extract_card_field_stateful(
                 continue
             if ptype:
                 continue
-            if len(text) < 4 or any(nav in text.lower() for nav in ["click", "sign", "login", "privacy", "terms", "copyright"]):
+            if len(text) < 4 or any(
+                nav in text.lower() for nav in ["click", "sign", "login", "privacy", "terms", "copyright"]
+            ):
                 continue
-            if re.match(r'^[A-Z][a-zA-Z\s\'-]+$', text) and len(text) <= 100:
+            if re.match(r"^[A-Z][a-zA-Z\s\'-]+$", text) and len(text) <= 100:
                 used_snippet_indices.add(i)
                 return text.strip()
 
@@ -771,7 +832,7 @@ def _extract_card_field_stateful(
     # ── Integer / Float / Number / Percentage ──────────────────────────
     if field_type in (FieldType.INTEGER, FieldType.FLOAT, FieldType.NUMBER, FieldType.PERCENTAGE):
         is_percentage = field_type == FieldType.PERCENTAGE
-        pattern = re.compile(r'\d+[\.,]?\d*%?' if is_percentage else r'\d+[\.,]?\d*')
+        pattern = re.compile(r"\d+[\.,]?\d*%?" if is_percentage else r"\d+[\.,]?\d*")
         matches_list = list(pattern.finditer(full_text))
         for m in matches_list:
             if _is_span_used(m.start(), m.end()):

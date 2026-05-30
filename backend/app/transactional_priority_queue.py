@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class PriorityLevel(IntEnum):
     """Priority levels for queued transactions. Lower number = higher priority."""
+
     CRITICAL = 0
     HIGH = 1
     NORMAL = 2
@@ -35,8 +36,7 @@ class PriorityLevel(IntEnum):
 class PriorityQueueEntry:
     """An entry in the transactional priority queue."""
 
-    __slots__ = ("priority", "timestamp", "aging_count", "label", "trace_id",
-                 "entry_id", "payload", "_tie_breaker")
+    __slots__ = ("priority", "timestamp", "aging_count", "label", "trace_id", "entry_id", "payload", "_tie_breaker")
 
     def __init__(
         self,
@@ -111,7 +111,7 @@ class TransactionalPriorityQueue:
         self._last_aging = time.time()
         self._counter = 0
         self._next_entry_id = 0
-        
+
         # Lazy deletion: track invalidated trace_ids to avoid O(n) remove
         self._invalid_trace_ids: set = set()
 
@@ -140,6 +140,7 @@ class TransactionalPriorityQueue:
             trace_id of the queued entry
         """
         import uuid
+
         tid = trace_id or str(uuid.uuid4())[:8]
 
         entry = PriorityQueueEntry(
@@ -152,21 +153,25 @@ class TransactionalPriorityQueue:
         with self._lock:
             # Calculate valid size (excluding lazily-deleted entries)
             valid_size = len(self._heap) - len(self._invalid_trace_ids)
-            
+
             if valid_size >= self._max_size:
                 # Evict lowest-priority entry (nlargest = slowest, but avoids heapify for eviction check)
-                # Only evict if new entry has higher priority than current lowest
+                # Only evict if new entry has higher priority than current
+                # lowest
                 if self._heap:
                     lowest = heapq.nlargest(1, self._heap)[0]
                     if lowest.effective_priority > entry.effective_priority:
-                        # Use lazy deletion: just mark as invalid (O(1) instead of O(n))
+                        # Use lazy deletion: just mark as invalid (O(1) instead
+                        # of O(n))
                         self._invalid_trace_ids.add(lowest.trace_id)
                         self._priority_counts[lowest.priority] = max(
                             0, self._priority_counts.get(lowest.priority, 0) - 1
                         )
                         logger.warning(
                             "PRIORITY QUEUE EVICTED: label=%s priority=%.2f to make room for %s",
-                            lowest.label, lowest.effective_priority, label,
+                            lowest.label,
+                            lowest.effective_priority,
+                            label,
                         )
                     else:
                         logger.warning("PRIORITY QUEUE FULL: dropping entry %s", label)
@@ -194,19 +199,17 @@ class TransactionalPriorityQueue:
             while self._heap and self._heap[0].trace_id in self._invalid_trace_ids:
                 invalid_entry = heapq.heappop(self._heap)
                 self._invalid_trace_ids.discard(invalid_entry.trace_id)
-            
+
             if not self._heap:
                 return None
-            
+
             entry = heapq.heappop(self._heap)
-            self._priority_counts[entry.priority] = max(
-                0, self._priority_counts.get(entry.priority, 0) - 1
-            )
+            self._priority_counts[entry.priority] = max(0, self._priority_counts.get(entry.priority, 0) - 1)
             return entry
 
     def peek(self) -> Optional[PriorityQueueEntry]:
         """Return the highest-priority entry without removing it.
-        
+
         Skips invalid entries (lazy deletion).
         """
         self._maybe_age()
@@ -215,14 +218,14 @@ class TransactionalPriorityQueue:
             while self._heap and self._heap[0].trace_id in self._invalid_trace_ids:
                 invalid_entry = heapq.heappop(self._heap)
                 self._invalid_trace_ids.discard(invalid_entry.trace_id)
-            
+
             if not self._heap:
                 return None
             return self._heap[0]
 
     def remove(self, trace_id: str) -> bool:
         """Remove an entry by trace_id (e.g., on timeout or cancellation).
-        
+
         Uses lazy deletion: O(1) operation by marking as invalid.
         Actual removal happens during pop() operations.
         """
@@ -232,9 +235,7 @@ class TransactionalPriorityQueue:
                 if entry.trace_id == trace_id:
                     # Lazy deletion: just mark as invalid
                     self._invalid_trace_ids.add(trace_id)
-                    self._priority_counts[entry.priority] = max(
-                        0, self._priority_counts.get(entry.priority, 0) - 1
-                    )
+                    self._priority_counts[entry.priority] = max(0, self._priority_counts.get(entry.priority, 0) - 1)
                     return True
         return False
 
@@ -284,8 +285,10 @@ class TransactionalPriorityQueue:
                         self._starvation_warnings += 1
                         logger.warning(
                             "STARVATION WARNING: label=%s waiting=%.1fs priority=%d aging=%d",
-                            entry.label, now - entry.timestamp,
-                            int(entry.priority), entry.aging_count,
+                            entry.label,
+                            now - entry.timestamp,
+                            int(entry.priority),
+                            entry.aging_count,
                         )
                         # Force-age this entry to prevent actual starvation
                         entry.aging_count += 2
@@ -313,12 +316,8 @@ class TransactionalPriorityQueue:
                 "completed": self._completed_count,
                 "aged": self._aged_count,
                 "starvation_warnings": self._starvation_warnings,
-                "priority_distribution": {
-                    p.name: self._priority_counts.get(p, 0) for p in PriorityLevel
-                },
-                "oldest_wait_seconds": round(
-                    time.time() - entries[0].timestamp, 2
-                ) if entries else 0.0,
+                "priority_distribution": {p.name: self._priority_counts.get(p, 0) for p in PriorityLevel},
+                "oldest_wait_seconds": round(time.time() - entries[0].timestamp, 2) if entries else 0.0,
                 "top_entries": [e.to_dict() for e in entries[:5]],
             }
 

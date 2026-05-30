@@ -1,4 +1,3 @@
-
 """
 Layer 2: Page Profiler
 ======================
@@ -17,9 +16,11 @@ from bs4 import BeautifulSoup, Tag
 @dataclass
 class StructureProfile:
     """Represents how the page organizes data, regardless of domain."""
+
     structure_type: str  # table, cards, list, key_value, mixed
-    container_selector: str  # CSS selector for data rows/cards
-    headers: List[str] = field(default_factory=list)  # Table headers or field labels
+    container_selector: str  # CSS selector for data rows / cards
+    # Table headers or field labels
+    headers: List[str] = field(default_factory=list)
     structure_confidence: float = 0.0  # How confident we are in detection
     sample_containers: List[str] = field(default_factory=list)  # Sample container HTML
 
@@ -27,23 +28,32 @@ class StructureProfile:
 @dataclass
 class ValuePatterns:
     """Represents what types of values the page contains, detected by pattern."""
+
     currencies: List[str] = field(default_factory=list)  # ["£", "$", "€", "₹"]
     dates: List[str] = field(default_factory=list)  # date format samples
-    ratings: List[str] = field(default_factory=list)  # ["4.5/5", "★★★", "8.5"]
+    # ["4.5 / 5", "★★★", "8.5"]
+    ratings: List[str] = field(default_factory=list)
     codes_3letter: List[str] = field(default_factory=list)  # ["LON", "PAR", "BOM"]
     phones: List[str] = field(default_factory=list)
     emails: List[str] = field(default_factory=list)
     numbers: List[str] = field(default_factory=list)
     durations: List[str] = field(default_factory=list)
     urls: List[str] = field(default_factory=list)
-    weights: List[str] = field(default_factory=list)  # ["250g", "1kg", "500 g", "2lb"]
+    # ["250g", "1kg", "500 g", "2lb"]
+    weights: List[str] = field(default_factory=list)
     percentages: List[str] = field(default_factory=list)  # ["8%", "20% off", "0.5%"]
-    times: List[str] = field(default_factory=list)  # ["14:30", "2:30 PM", "08:00"]
-    booleans: List[str] = field(default_factory=list)  # ["Available", "In Stock", "Yes", "No"]
-    dimensions: List[str] = field(default_factory=list)  # ["10x15cm", "5\"x7\"", "A4"]
-    quantities: List[str] = field(default_factory=list)  # ["Pack of 6", "12 pieces", "500ml"]
-    product_codes: List[str] = field(default_factory=list)  # ["SKU-12345", "#ABC123", "EAN 123456789"]
-    units: List[str] = field(default_factory=list)  # ["per kg", "per item", "each", "dozen"]
+    # ["14:30", "2:30 PM", "08:00"]
+    times: List[str] = field(default_factory=list)
+    # ["Available", "In Stock", "Yes", "No"]
+    booleans: List[str] = field(default_factory=list)
+    # ["10x15cm", "5\"x7\"", "A4"]
+    dimensions: List[str] = field(default_factory=list)
+    # ["Pack of 6", "12 pieces", "500ml"]
+    quantities: List[str] = field(default_factory=list)
+    # ["SKU-12345", "#ABC123", "EAN 123456789"]
+    product_codes: List[str] = field(default_factory=list)
+    # ["per kg", "per item", "each", "dozen"]
+    units: List[str] = field(default_factory=list)
     address_fragments: List[str] = field(default_factory=list)  # ["123 Main St", "New York, NY"]
 
 
@@ -53,20 +63,23 @@ VALUE_PATTERNS = {
         r"[\$\u20a8\u20ac\u00a3\u00a5\u20b9]\s*\d+[\d,]*\.?\d*",  # 238, $450, 5,200
         r"\d+[\d,]*\s*(inr|usd|eur|gbp|aud|cad)",  # 5000 INR, 100 USD
         r"(rs\.?|rupees?)\s*\d+",  # Rs 500, Rupees 1000
-        r"\d+\.?\d*\s*(cr|crore|l|lakh|k|m|mn|million|thousand)",  # 25L, 1.2Cr, 50K
+        # 25L, 1.2Cr, 50K
+        r"\d+\.?\d*\s*(cr|crore|l|lakh|k|m|mn|million|thousand)",
     ],
     "date": [
-        r"\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}",  # 22-05-2026, 05/22/2026
-        r"\d{4}[-\/]\d{2}[-\/]\d{1,2}",  # 2026-05-22
-        r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}",  # May 22
-        r"\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)",  # 22 May
+        r"\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}",  # 22 - 05 - 2026, 05 / 22 / 2026
+        r"\d{4}[-\/]\d{2}[-\/]\d{1,2}",  # 2026 - 05 - 22
+        # May 22
+        r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}",
+        # 22 May
+        r"\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)",
         r"\d{1,2}:\d{2}",  # 14:30, 2:30 PM
     ],
     "rating": [
-        r"\d+\.?\d*/\d+",  # 4.5/5, 8.5/10
+        r"\d+\.?\d*/\d+",  # 4.5 / 5, 8.5 / 10
         r"[★☆]{1,5}",  # ★★★, ☆☆☆
         r"\d+\.?\d*\s*(star|rating)",  # 4.5 stars
-        r"\[\d+\/5\]",  # [4/5]
+        r"\[\d+\/5\]",  # [4 / 5]
     ],
     "code_3letter": [
         r"\b[A-Z]{3}\b",  # LON, PAR, BOM, DEL
@@ -75,10 +88,10 @@ VALUE_PATTERNS = {
         r"\d+h\s*\d+m",  # 2h 30m
         r"\d+h$",  # 2h
         r"\d+:\d{2}",  # 02:30
-        r"\d+\s*hours?",  # 3 hours
+        r"\d+\s * hours?",  # 3 hours
     ],
     "phone": [
-        r"\+?\d[\d\s\-\(\)]{8,}",  # +91 9876543210, (555) 123-4567
+        r"\+?\d[\d\s\-\(\)]{8,}",  # +91 9876543210, (555) 123 - 4567
     ],
     "email": [
         r"[\w.+-]+@[\w-]+\.[\w.-]+",
@@ -91,45 +104,53 @@ VALUE_PATTERNS = {
         r"www\.[^\s]+",
     ],
     "weight": [
-        r"\d+[\.\,]?\d*\s*(?:g|kg|lb|lbs|ounce|oz|gram|kilo|kilogram)",  # 250g, 1kg, 500 g, 2lb
+        # 250g, 1kg, 500 g, 2lb
+        r"\d+[\.\,]?\d*\s*(?:g|kg|lb|lbs|ounce|oz|gram|kilo|kilogram)",
         r"(?:g|kg|lb|lbs|ounce|oz|gram|kilo|kilograms?)\s*\d+",  # kg 1, g 500
     ],
     "percentage": [
         r"\d+[\.\,]?\d*%",  # 8%, 20%, 0.5%
-        r"\d+[\.\,]?\d*\s*per\s*cent",  # 8 per cent
+        r"\d+[\.\,]?\d*\s * per\s * cent",  # 8 per cent
     ],
     "time": [
         r"\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?",  # 14:30, 2:30 PM, 08:00
         r"\d{1,2}\s*(?:AM|PM|am|pm)",  # 2 PM, 11 AM
     ],
     "boolean": [
-        r"\b(?:Yes|No|True|False|Available|Unavailable|In\s+Stock|Out\s+of\s+Stock|Sold\s+Out|Inactive|Active|Enabled|Disabled)\b",
+        r"\b(?:Yes|No|True|False|Available|Unavailable|In\s+Stock|Out\s+of\s+Stock|Sold\s+Out|Inactive|Active|Enabled|Disabled)\b",  # noqa: E501
     ],
     "dimension": [
-        r"\d+[\.\,]?\d*\s*(?:x|×|\*)\s*\d+[\.\,]?\d*\s*(?:cm|mm|m|in|inches|ft|feet)?",  # 10x15cm, 5x7
-        r"(?:A[0-5]|Letter|Legal|Tabloid)",  # Paper sizes
+        # 10x15cm, 5x7
+        r"\d+[\.\,]?\d*\s*(?:x|×|\*)\s*\d+[\.\,]?\d*\s*(?:cm|mm|m|in|inches|ft|feet)?",
+        r"(?:A[0 - 5]|Letter|Legal|Tabloid)",  # Paper sizes
     ],
     "quantity": [
-        r"(?:Pack|pack)\s*(?:of|/)?\s*\d+",  # Pack of 6, Pack/12
+        r"(?:Pack|pack)\s*(?:of|/)?\s*\d+",  # Pack of 6, Pack / 12
         r"\d+\s*(?:pieces?|units?|items?|count|pcs|qty)",  # 12 pieces, 6 units
-        r"\d+[\.\,]?\d*\s*(?:ml|l|L|litre|liter|gallon|fl oz)",  # 500ml, 1L, 2 litres
-        r"(?:each|per\s*dozen|per\s*piece|per\s*unit)",  # each, per dozen
+        # 500ml, 1L, 2 litres
+        r"\d+[\.\,]?\d*\s*(?:ml|l|L|litre|liter|gallon|fl oz)",
+        r"(?:each|per\s * dozen|per\s * piece|per\s * unit)",  # each, per dozen
     ],
     "product_code": [
-        r"\bSKU[-:\s]*[A-Za-z0-9-]+\b",  # SKU-12345, SKU: ABC123
-        r"\b(?:EAN|UPC|ISBN|ASIN)[-:\s]*[0-9]+\b",  # EAN 1234567890123
-        r"\b[0-9]{12,13}\b",  # EAN-13 / UPC-A barcode numbers only (12-13 digits)
+        r"\bSKU[-:\s]*[A-Za-z0 - 9-]+\b",  # SKU-12345, SKU: ABC123
+        r"\b(?:EAN|UPC|ISBN|ASIN)[-:\s]*[0 - 9]+\b",  # EAN 1234567890123
+        r"\b[0 - 9]{12,13}\b",
+        # EAN-13 / UPC-A barcode numbers only (12 - 13 digits)
     ],
     "unit_type": [
-        r"per\s*(?:kg|g|lb|piece|item|unit|dozen|litre|ml|pack|box|serving)",  # per kg, per piece
-        r"(?:each|per\s*kg|per\s*g|per\s*lb|/\s*kg|/\s*piece|/\s*item)",  # each, /kg
+        # per kg, per piece
+        r"per\s*(?:kg|g|lb|piece|item|unit|dozen|litre|ml|pack|box|serving)",
+        # each, /kg
+        r"(?:each|per\s * kg|per\s * g|per\s * lb|/\s * kg|/\s * piece|/\s * item)",
         r"\b(?:dozen|pack|box|carton|case|bundle|pair|set)\b",
-    ],    "address": [
-        r"\d+\s+[A-Za-z]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Drive|Dr|Boulevard|Blvd|Way|Circle|Cir|Court|Ct|Plaza|Square)",  # 123 Main St
+    ],
+    "address": [
+        # 123 Main St
+        r"\d+\s+[A-Za-z]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Drive|Dr|Boulevard|Blvd|Way|Circle|Cir|Court|Ct|Plaza|Square)",  # noqa: E501
         r"[A-Za-z ,]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln)\s+\d+",
-        r"\b(?:P\.?\s*O\.?\s*Box)\s+\d+",
-        r"\b[\w\s]+,\s*(?:NY|CA|TX|FL|IL|OH|PA|GA|NC|MI|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|AL|SC|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|WV|ID|HI|NH|ME|RI|MT|DE|SD|ND|AK|VT|WY|DC)\b",
-    ]
+        r"\b(?:P\.?\s * O\.?\s * Box)\s+\d+",
+        r"\b[\w\s]+,\s*(?:NY|CA|TX|FL|IL|OH|PA|GA|NC|MI|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|AL|SC|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|WV|ID|HI|NH|ME|RI|MT|DE|SD|ND|AK|VT|WY|DC)\b",  # noqa: E501
+    ],
 }
 
 
@@ -164,12 +185,7 @@ def detect_page_structure(html: str) -> StructureProfile:
         return structure
 
     # Default to mixed
-    return StructureProfile(
-        structure_type="mixed",
-        container_selector="body",
-        headers=[],
-        structure_confidence=0.3
-    )
+    return StructureProfile(structure_type="mixed", container_selector="body", headers=[], structure_confidence=0.3)
 
 
 def _detect_table_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
@@ -207,12 +223,12 @@ def _detect_table_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
         container_selector=container_sel,
         headers=best_headers,
         structure_confidence=confidence,
-        sample_containers=[str(rows[0]) if rows else ""]
+        sample_containers=[str(rows[0]) if rows else ""],
     )
 
 
 def _detect_cards_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
-    """Detect if page uses card/listings structure."""
+    """Detect if page uses card / listings structure."""
     # Card indicators (generic, not domain-specific)
     card_selectors = [
         ("div", {"class": re.compile(r"(card|item|result|listing|product)", re.I)}),
@@ -272,13 +288,13 @@ def _detect_cards_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
         container_selector=container_sel,
         headers=best_headers,
         structure_confidence=confidence,
-        sample_containers=sample_texts[:3]
+        sample_containers=sample_texts[:3],
     )
 
 
 def _detect_list_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
     """Detect if page uses list structure."""
-    # Check for ul/ol lists
+    # Check for ul / ol lists
     lists = soup.find_all(["ul", "ol"])
     best_list = None
     max_items = 0
@@ -301,7 +317,7 @@ def _detect_list_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
         container_selector=container_sel,
         headers=[],
         structure_confidence=confidence,
-        sample_containers=[str(best_list.find("li"))] if best_list.find("li") else []
+        sample_containers=[str(best_list.find("li"))] if best_list.find("li") else [],
     )
 
 
@@ -318,7 +334,7 @@ def _detect_key_value_structure(soup: BeautifulSoup) -> Optional[StructureProfil
                 container_selector="dl",
                 headers=headers,
                 structure_confidence=0.7,
-                sample_containers=[str(dl)]
+                sample_containers=[str(dl)],
             )
 
     # Check for 2-column tables
@@ -334,7 +350,7 @@ def _detect_key_value_structure(soup: BeautifulSoup) -> Optional[StructureProfil
                     container_selector="table tr",
                     headers=headers,
                     structure_confidence=0.6,
-                    sample_containers=[str(rows[0])]
+                    sample_containers=[str(rows[0])],
                 )
 
     return None
@@ -342,9 +358,9 @@ def _detect_key_value_structure(soup: BeautifulSoup) -> Optional[StructureProfil
 
 def _generate_container_selector(element) -> str:
     """Generate a reasonable CSS selector for a container element."""
-    if hasattr(element, 'name'):
+    if hasattr(element, "name"):
         tag = element.name
-        classes = element.get('class', [])
+        classes = element.get("class", [])
         if classes:
             class_sel = ".".join(classes[:2])
             return f"{tag}.{class_sel}"
@@ -366,12 +382,56 @@ def detect_value_patterns(html: str) -> ValuePatterns:
     patterns = ValuePatterns()
 
     # Common English words to exclude from 3-letter code detection
-    COMMON_3LETTER_WORDS = {"THE", "AND", "FOR", "ARE", "NOT", "YOU", "ALL", "CAN",
-                            "HAS", "WAS", "BUT", "ITS", "OUT", "NEW", "NOW", "HOW",
-                            "GET", "SEE", "USE", "MAY", "LET", "MAN", "WAY", "DAY",
-                            "OLD", "BIG", "FEW", "HOT", "TOP", "BAD", "RUN", "SIT",
-                            "DID", "LOT", "ASK", "TRY", "TOO", "OWN", "CUT", "HIM",
-                            "HER", "ONE", "TWO", "SIX", "TEN", "ANY", "EACH", "OUR"}
+    COMMON_3LETTER_WORDS = {
+        "THE",
+        "AND",
+        "FOR",
+        "ARE",
+        "NOT",
+        "YOU",
+        "ALL",
+        "CAN",
+        "HAS",
+        "WAS",
+        "BUT",
+        "ITS",
+        "OUT",
+        "NEW",
+        "NOW",
+        "HOW",
+        "GET",
+        "SEE",
+        "USE",
+        "MAY",
+        "LET",
+        "MAN",
+        "WAY",
+        "DAY",
+        "OLD",
+        "BIG",
+        "FEW",
+        "HOT",
+        "TOP",
+        "BAD",
+        "RUN",
+        "SIT",
+        "DID",
+        "LOT",
+        "ASK",
+        "TRY",
+        "TOO",
+        "OWN",
+        "CUT",
+        "HIM",
+        "HER",
+        "ONE",
+        "TWO",
+        "SIX",
+        "TEN",
+        "ANY",
+        "EACH",
+        "OUR",
+    }
 
     # Map pattern_type to ValuePatterns attribute
     pattern_map = {
@@ -414,4 +474,3 @@ def detect_value_patterns(html: str) -> ValuePatterns:
         setattr(patterns, attr_name, unique[:10])
 
     return patterns
-

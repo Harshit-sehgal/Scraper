@@ -29,11 +29,12 @@ from app.trend_analyzer import TrendAnalyzer
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/operator", tags=["operator"])
+router = APIRouter(prefix="/api / operator", tags=["operator"])
 
 
 class ModeBody(BaseModel):
     """Request body for switching operator modes."""
+
     mode: str
 
 
@@ -59,14 +60,16 @@ async def get_current_mode():
 
 
 @router.post("/mode")
-async def set_operator_mode(request: Request, body: ModeBody, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
+async def set_operator_mode(
+    request: Request, body: ModeBody, _role: UserRole = Depends(require_role([UserRole.ADMIN]))
+):
     """Switch the system to a different operator mode.
 
     Dynamically adjusts runtime settings (timeout, settle delay,
     stealth mode, etc.) for the selected operational profile.
 
     Requires admin-level privileges — this operation is powerful and can
-    switch the runtime into stealth/forensic/benchmark modes that bypass
+    switch the runtime into stealth / forensic / benchmark modes that bypass
     normal timing and anti-bot limits.
 
     Modes:
@@ -116,7 +119,7 @@ async def get_system_dashboard():
     - Operator mode and resource usage
     - Domain health summary (from domain_health_alerts)
     - Browser pool metrics
-    - Telemetry stats (recent scrape success/failure counts)
+    - Telemetry stats (recent scrape success / failure counts)
     - Resource governor report (memory, queue, token spend)
     """
     dashboard = get_governance_dashboard()
@@ -179,7 +182,7 @@ async def get_degradation_predictions(
     about to fail. Returns predictions sorted by severity.
 
     Args:
-        window: Number of recent telemetry events to analyze (10-500).
+        window: Number of recent telemetry events to analyze (10 - 500).
         min_confidence: Minimum confidence threshold (0.0 to 1.0).
 
     Returns:
@@ -216,14 +219,8 @@ async def get_degradation_predictions(
 
     # Filter by minimum confidence if requested
     if min_confidence > 0:
-        result["predictions"] = [
-            p for p in result["predictions"]
-            if p.get("confidence", 0) >= min_confidence
-        ]
-        result["top_risks"] = [
-            r for r in result["top_risks"]
-            if r.get("confidence", 0) >= min_confidence
-        ]
+        result["predictions"] = [p for p in result["predictions"] if p.get("confidence", 0) >= min_confidence]
+        result["top_risks"] = [r for r in result["top_risks"] if r.get("confidence", 0) >= min_confidence]
         result["summary"]["total_filtered"] = len(result["predictions"])
 
     return result
@@ -238,7 +235,7 @@ async def get_domain_prediction(
 
     Args:
         domain: Domain name to predict for (e.g., 'justdial.com').
-        window: Number of recent telemetry events to analyze (10-500).
+        window: Number of recent telemetry events to analyze (10 - 500).
 
     Returns:
         Predictions for the specified domain.
@@ -246,10 +243,7 @@ async def get_domain_prediction(
     telemetry_history = get_scrape_telemetry().get_recent(window)
 
     # Filter to only this domain's events
-    domain_events = [
-        e for e in telemetry_history
-        if TrendAnalyzer.extract_domain(e.get("url", "")) == domain.lower()
-    ]
+    domain_events = [e for e in telemetry_history if TrendAnalyzer.extract_domain(e.get("url", "")) == domain.lower()]
 
     if not domain_events:
         raise HTTPException(

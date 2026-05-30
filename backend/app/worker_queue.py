@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 class Priority(IntEnum):
     """Task priority levels. Lower number = higher priority."""
+
     CRITICAL = 0
     HIGH = 1
     NORMAL = 2
@@ -57,10 +58,19 @@ class QueueTask:
     """A single task in the worker queue."""
 
     __slots__ = (
-        "id", "type", "payload", "priority", "status",
-        "created_at", "started_at", "completed_at",
-        "attempts", "max_attempts", "last_error",
-        "scheduled_at", "timeout_seconds",
+        "id",
+        "type",
+        "payload",
+        "priority",
+        "status",
+        "created_at",
+        "started_at",
+        "completed_at",
+        "attempts",
+        "max_attempts",
+        "last_error",
+        "scheduled_at",
+        "timeout_seconds",
     )
 
     def __init__(
@@ -78,7 +88,7 @@ class QueueTask:
         self.payload = payload or {}
         self.priority = priority
         self.status = TaskStatus.PENDING
-        self.created_at = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.started_at: Optional[str] = None
         self.completed_at: Optional[str] = None
         self.attempts = 0
@@ -123,7 +133,7 @@ class QueueTask:
                 task.status = TaskStatus(raw_status)
             except ValueError:
                 task.status = TaskStatus.PENDING
-        # Normalize timestamps: convert datetime/date objects to ISO strings
+        # Normalize timestamps: convert datetime / date objects to ISO strings
         for _f in ("created_at", "started_at", "completed_at", "scheduled_at"):
             _v = d.get(_f)
             if _v is None:
@@ -140,6 +150,7 @@ class QueueTask:
 # ───────────────────────────────────────────────────────────────────────
 # SQLite-backed queue storage
 # ───────────────────────────────────────────────────────────────────────
+
 
 def _get_db_path() -> Path:
     """Resolve the queue database path."""
@@ -228,7 +239,8 @@ def _ensure_schema(db_path: Optional[Path] = None):
                     current = 1
 
                 if current < 2:
-                    # Add result column to task_history (used for storing successful task results)
+                    # Add result column to task_history (used for storing
+                    # successful task results)
                     try:
                         conn.execute("ALTER TABLE task_history ADD COLUMN result TEXT")
                     except Exception:
@@ -309,10 +321,16 @@ class WorkerQueue:
                         scheduled_at, attempts, max_attempts, timeout_seconds)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
-                        task.id, task.type, json.dumps(task.payload),
-                        int(task.priority), task.status, task.created_at,
-                        task.scheduled_at, task.attempts,
-                        task.max_attempts, task.timeout_seconds,
+                        task.id,
+                        task.type,
+                        json.dumps(task.payload),
+                        int(task.priority),
+                        task.status,
+                        task.created_at,
+                        task.scheduled_at,
+                        task.attempts,
+                        task.max_attempts,
+                        task.timeout_seconds,
                     ),
                 )
                 conn.commit()
@@ -340,24 +358,24 @@ class WorkerQueue:
         with _DB_LOCK:
             conn = self._conn()
             try:
-                row = conn.execute(
-                    """SELECT * FROM tasks
+                row = conn.execute("""SELECT * FROM tasks
                        WHERE status = 'pending'
                          AND scheduled_at <= datetime('now', 'localtime')
                        ORDER BY priority ASC, created_at ASC
-                       LIMIT 1"""
-                ).fetchone()
+                       LIMIT 1""").fetchone()
 
                 if row is None:
                     return None
 
                 task_data = dict(row)
-                task = QueueTask.from_dict({
-                    **task_data,
-                    "payload": json.loads(task_data["payload"]),
-                })
+                task = QueueTask.from_dict(
+                    {
+                        **task_data,
+                        "payload": json.loads(task_data["payload"]),
+                    }
+                )
                 task.status = TaskStatus.RUNNING
-                task.started_at = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                task.started_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 task.attempts += 1
 
                 conn.execute(
@@ -372,7 +390,7 @@ class WorkerQueue:
 
     async def complete(self, task_id: str, result: Optional[dict] = None):
         """Mark a task as completed successfully."""
-        now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         async with self._in_flight_lock:
             conn = self._conn()
             try:
@@ -388,11 +406,16 @@ class WorkerQueue:
                             last_error, result, timeout_seconds, finished_at)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
-                            task_data["id"], task_data["type"],
-                            task_data["payload"], task_data["priority"],
-                            TaskStatus.COMPLETED, task_data["created_at"],
-                            task_data["started_at"], now,
-                            task_data["attempts"], task_data["max_attempts"],
+                            task_data["id"],
+                            task_data["type"],
+                            task_data["payload"],
+                            task_data["priority"],
+                            TaskStatus.COMPLETED,
+                            task_data["created_at"],
+                            task_data["started_at"],
+                            now,
+                            task_data["attempts"],
+                            task_data["max_attempts"],
                             None,
                             json.dumps(result) if result else None,
                             task_data.get("timeout_seconds", 300),
@@ -426,7 +449,7 @@ class WorkerQueue:
             task_type: The task type, used for rate-limit state tracking.
                 If omitted, inferred from the DB row.
         """
-        now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         async with self._in_flight_lock:
             conn = self._conn()
             try:
@@ -448,23 +471,28 @@ class WorkerQueue:
                         else:
                             backoff = float(min(2 ** (attempts - 1) * 30, 3600))
 
-                        retry_at = (datetime.datetime.now() + datetime.timedelta(seconds=backoff)).strftime('%Y-%m-%d %H:%M:%S')
+                        retry_at = (datetime.datetime.now() + datetime.timedelta(seconds=backoff)).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
                         conn.execute(
                             "UPDATE tasks SET status = ?, last_error = ?, scheduled_at = ? WHERE id = ?",
                             (TaskStatus.PENDING, error, retry_at, task_id),
                         )
                         logger.info(
                             "Task %s failed (attempt %d/%d). Retrying in %ds: %s",
-                            task_id, attempts, max_attempts, backoff, error,
+                            task_id,
+                            attempts,
+                            max_attempts,
+                            backoff,
+                            error,
                         )
                     else:
                         # Move to dead letter queue (archive)
-                        task_data = dict(conn.execute(
-                            "SELECT * FROM tasks WHERE id = ?", (task_id,)
-                        ).fetchone())
+                        task_data = dict(conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone())
                         # Record worker failure counter for metrics
                         try:
                             from app.metrics_collector import record_worker_failure
+
                             record_worker_failure(actual_type)
                         except Exception:
                             pass
@@ -475,11 +503,16 @@ class WorkerQueue:
                                 last_error, result, timeout_seconds, finished_at)
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                             (
-                                task_data["id"], task_data["type"],
-                                task_data["payload"], task_data["priority"],
-                                TaskStatus.DEAD_LETTER, task_data["created_at"],
-                                task_data["started_at"], now,
-                                task_data["attempts"], task_data["max_attempts"],
+                                task_data["id"],
+                                task_data["type"],
+                                task_data["payload"],
+                                task_data["priority"],
+                                TaskStatus.DEAD_LETTER,
+                                task_data["created_at"],
+                                task_data["started_at"],
+                                now,
+                                task_data["attempts"],
+                                task_data["max_attempts"],
                                 error,
                                 None,
                                 task_data.get("timeout_seconds", 300),
@@ -489,7 +522,9 @@ class WorkerQueue:
                         conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
                         logger.warning(
                             "Task %s moved to dead letter after %d attempts: %s",
-                            task_id, attempts, error,
+                            task_id,
+                            attempts,
+                            error,
                         )
 
                 conn.commit()
@@ -502,7 +537,7 @@ class WorkerQueue:
         In-flight tasks also have their asyncio task cancelled.
         Returns True if cancelled.
         """
-        now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         async with self._in_flight_lock:
             # Check in-flight tasks first (running tasks)
             if task_id in self._in_flight:
@@ -512,7 +547,8 @@ class WorkerQueue:
                 conn = self._conn()
                 try:
                     row = conn.execute(
-                        "SELECT * FROM tasks WHERE id = ?", (task_id,),
+                        "SELECT * FROM tasks WHERE id = ?",
+                        (task_id,),
                     ).fetchone()
                     if row:
                         task_data = dict(row)
@@ -523,11 +559,16 @@ class WorkerQueue:
                                 last_error, result, timeout_seconds, finished_at)
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                             (
-                                task_data["id"], task_data["type"],
-                                task_data["payload"], task_data["priority"],
-                                TaskStatus.CANCELLED, task_data["created_at"],
-                                task_data.get("started_at"), now,
-                                task_data["attempts"], task_data["max_attempts"],
+                                task_data["id"],
+                                task_data["type"],
+                                task_data["payload"],
+                                task_data["priority"],
+                                TaskStatus.CANCELLED,
+                                task_data["created_at"],
+                                task_data.get("started_at"),
+                                now,
+                                task_data["attempts"],
+                                task_data["max_attempts"],
                                 "Cancelled by user (in-flight)",
                                 None,
                                 task_data.get("timeout_seconds", 300),
@@ -558,11 +599,16 @@ class WorkerQueue:
                         last_error, result, timeout_seconds, finished_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
-                        task_data["id"], task_data["type"],
-                        task_data["payload"], task_data["priority"],
-                        TaskStatus.CANCELLED, task_data["created_at"],
-                        task_data.get("started_at"), now,
-                        task_data["attempts"], task_data["max_attempts"],
+                        task_data["id"],
+                        task_data["type"],
+                        task_data["payload"],
+                        task_data["priority"],
+                        TaskStatus.CANCELLED,
+                        task_data["created_at"],
+                        task_data.get("started_at"),
+                        now,
+                        task_data["attempts"],
+                        task_data["max_attempts"],
                         "Cancelled by user",
                         None,
                         task_data.get("timeout_seconds", 300),
@@ -581,13 +627,15 @@ class WorkerQueue:
         """Start the background worker loop with recovery of stuck tasks."""
         if self._running:
             return
-        # Recover any tasks that were stuck in 'running' state from a previous crash
+        # Recover any tasks that were stuck in 'running' state from a previous
+        # crash
         self._recover_stuck_tasks()
         self._running = True
         self._worker_task = asyncio.create_task(self._worker_loop())
         logger.info(
             "Worker queue started: max_concurrency=%d, poll_interval=%.1fs",
-            self._max_concurrency, self._poll_interval,
+            self._max_concurrency,
+            self._poll_interval,
         )
 
     def _recover_stuck_tasks(self):
@@ -595,9 +643,7 @@ class WorkerQueue:
         with _DB_LOCK:
             conn = self._conn()
             try:
-                stuck = conn.execute(
-                    "SELECT COUNT(*) FROM tasks WHERE status = 'running'"
-                ).fetchone()[0]
+                stuck = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'running'").fetchone()[0]
                 if stuck:
                     # Do NOT increment attempts here — attempts are incremented
                     # only when _dequeue_one() hands the task to a worker.
@@ -648,9 +694,7 @@ class WorkerQueue:
                 async with self._in_flight_lock:
                     self._in_flight[task.id] = t
 
-                t.add_done_callback(lambda _, tid=task.id: asyncio.ensure_future(
-                    self._cleanup_in_flight(tid)
-                ))
+                t.add_done_callback(lambda _, tid=task.id: asyncio.ensure_future(self._cleanup_in_flight(tid)))
 
             except asyncio.CancelledError:
                 break
@@ -684,21 +728,27 @@ class WorkerQueue:
             retry_after = None
             try:
                 from app.utils.rate_limit import is_rate_limit_error, parse_retry_after
+
                 if is_rate_limit_error(body=error_msg):
                     retry_after = parse_retry_after()
                     if retry_after is not None:
                         logger.info(
                             "Task %s hit rate limit, honouring Retry-After: %.1fs",
-                            task.id, retry_after,
+                            task.id,
+                            retry_after,
                         )
-                    # Mark in-memory rate-limit state for the domain/task-type
+                    # Mark in-memory rate-limit state for the domain /
+                    # task-type
                     from app.utils.rate_limit import get_cooldown_seconds, mark_rate_limited
+
                     mark_rate_limited(task.type, retry_after=retry_after)
                     cooldown = get_cooldown_seconds(task.type)
                     if cooldown > 0:
                         logger.info(
                             "Task %s cooling down %.1fs for %s",
-                            task.id, cooldown, task.type,
+                            task.id,
+                            cooldown,
+                            task.type,
                         )
             except Exception:
                 pass
@@ -728,13 +778,15 @@ class WorkerQueue:
         try:
             # Check active tasks
             row = conn.execute(
-                "SELECT * FROM tasks WHERE id = ?", (task_id,),
+                "SELECT * FROM tasks WHERE id = ?",
+                (task_id,),
             ).fetchone()
             if row:
                 return dict(row)
             # Check history
             row = conn.execute(
-                "SELECT * FROM task_history WHERE id = ?", (task_id,),
+                "SELECT * FROM task_history WHERE id = ?",
+                (task_id,),
             ).fetchone()
             if row:
                 return dict(row)
@@ -746,29 +798,17 @@ class WorkerQueue:
         """Return queue status for monitoring."""
         conn = self._conn()
         try:
-            pending = conn.execute(
-                "SELECT COUNT(*) FROM tasks WHERE status = 'pending'"
-            ).fetchone()[0]
-            running = conn.execute(
-                "SELECT COUNT(*) FROM tasks WHERE status = 'running'"
-            ).fetchone()[0]
-            retrying = conn.execute(
-                "SELECT COUNT(*) FROM tasks WHERE status = 'retrying'"
-            ).fetchone()[0]
-            dead_letter = conn.execute(
-                "SELECT COUNT(*) FROM task_history WHERE status = 'dead_letter'"
-            ).fetchone()[0]
-            completed_24h = conn.execute(
-                """SELECT COUNT(*) FROM task_history
-                   WHERE finished_at >= datetime('now', '-1 day')"""
-            ).fetchone()[0]
+            pending = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'pending'").fetchone()[0]
+            running = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'running'").fetchone()[0]
+            retrying = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'retrying'").fetchone()[0]
+            dead_letter = conn.execute("SELECT COUNT(*) FROM task_history WHERE status = 'dead_letter'").fetchone()[0]
+            completed_24h = conn.execute("""SELECT COUNT(*) FROM task_history
+                   WHERE finished_at >= datetime('now', '-1 day')""").fetchone()[0]
 
             # Top pending by priority
-            top_pending = conn.execute(
-                """SELECT id, type, priority, created_at, attempts
+            top_pending = conn.execute("""SELECT id, type, priority, created_at, attempts
                    FROM tasks WHERE status = 'pending'
-                   ORDER BY priority ASC, created_at ASC LIMIT 10"""
-            ).fetchall()
+                   ORDER BY priority ASC, created_at ASC LIMIT 10""").fetchall()
 
             return {
                 "ok": True,
@@ -819,10 +859,13 @@ class WorkerQueue:
                     scheduled_at, attempts, max_attempts, timeout_seconds)
                    VALUES (?, ?, ?, ?, 'pending', ?, datetime('now', 'localtime'), 0, ?, ?)""",
                 (
-                    task_data["id"], task_data["type"],
-                    task_data["payload"], task_data["priority"],
+                    task_data["id"],
+                    task_data["type"],
+                    task_data["payload"],
+                    task_data["priority"],
                     task_data["created_at"],
-                    task_data["max_attempts"], timeout,
+                    task_data["max_attempts"],
+                    timeout,
                 ),
             )
             conn.execute(
@@ -875,12 +918,14 @@ def get_worker_queue(
     """
 
     # Resolve backend: explicit param > env var (checked first so pytest
-    # monkeypatch.setenv works even after pydantic-settings cached its value) > default
+    # monkeypatch.setenv works even after pydantic-settings cached its value)
+    # > default
     env_backend = os.environ.get("DATAFORGE_QUEUE_BACKEND", "").strip().lower()
     resolved_backend = backend or env_backend or settings.QUEUE_BACKEND.strip().lower()
 
     if resolved_backend == "postgres":
         from app.worker_queue_postgres import get_postgres_worker_queue
+
         return get_postgres_worker_queue()
 
     # SQLite backend (default)
@@ -901,6 +946,7 @@ def reset_worker_queue():
     _queue_instance = None
     try:
         from app.worker_queue_postgres import reset_postgres_worker_queue
+
         reset_postgres_worker_queue()
     except ImportError:
         pass

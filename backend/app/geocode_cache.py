@@ -70,7 +70,7 @@ class GeocodeCache:
             cursor = conn.cursor()
             cursor.execute("SELECT timestamp FROM negative_cache WHERE query_hash = ?", (q_hash,))
             row = cursor.fetchone()
-        
+
         if row:
             timestamp = row[0]
             elapsed_days = (time.time() - timestamp) / 86400.0
@@ -104,7 +104,7 @@ class GeocodeCache:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO geocoding_cache VALUES (?, ?, ?, ?, ?, ?)",
-                (q_hash, query, lat, lon, resolved_address, time.time())
+                (q_hash, query, lat, lon, resolved_address, time.time()),
             )
             conn.commit()
         logger.info("[Geocode Cache] Cached coordinates for query '%s' -> (%.4f, %.4f)", query, lat, lon)
@@ -113,10 +113,7 @@ class GeocodeCache:
         """Mark a query as failed in the negative cache to suppress retries."""
         q_hash = self._hash_query(query)
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO negative_cache VALUES (?, ?, ?)",
-                (q_hash, query, time.time())
-            )
+            conn.execute("INSERT OR REPLACE INTO negative_cache VALUES (?, ?, ?)", (q_hash, query, time.time()))
             conn.commit()
         logger.info("[Geocode Cache] Cached negative failure for query '%s'", query)
 

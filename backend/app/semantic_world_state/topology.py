@@ -6,6 +6,7 @@ from app.core_types import FieldConflictRegion
 
 logger = logging.getLogger(__name__)
 
+
 class TopologyMixin:
     def detect_communities(self):
         self._topology.detect_communities()
@@ -19,6 +20,7 @@ class TopologyMixin:
         """
         with self.transaction("propagation"):
             from app.failure_injector import get_injector
+
             get_injector().inject("propagate_field_regions")
 
             effects = self._topology.propagate_all()
@@ -27,10 +29,14 @@ class TopologyMixin:
                     current = self._instability.get_exclusion_by_key(key)
                     self._instability.set_exclusion(key, current + delta)
             count = self._topology.region_count()
-            self.record_delta("topology", "propagate_all", {
-                "regions": count,
-                "exclusion_effects": len(effects),
-            })
+            self.record_delta(
+                "topology",
+                "propagate_all",
+                {
+                    "regions": count,
+                    "exclusion_effects": len(effects),
+                },
+            )
             return count
 
     @requires_invariants
@@ -48,19 +54,27 @@ class TopologyMixin:
             self._topology.detect_communities()
             self._topology.cross_scale_pressure_flow()
 
-            self.record_delta("topology", "evolve_field", {
-                "region_count": self._topology.region_count(),
-                "pressure": self.metrics.field_pressure,
-            })
+            self.record_delta(
+                "topology",
+                "evolve_field",
+                {
+                    "region_count": self._topology.region_count(),
+                    "pressure": self.metrics.field_pressure,
+                },
+            )
 
     @requires_invariants
-    def capture_pre_allocation_field(self, tokens: list, schema_fields: list, is_noise: bool = False, domain: str = "") -> int:
+    def capture_pre_allocation_field(
+        self, tokens: list, schema_fields: list, is_noise: bool = False, domain: str = ""
+    ) -> int:
         """Capture pre-allocation conflict topology from tokens with Relational Recall (Phase 31)."""
         with self.transaction("pre_allocation_capture"):
             from app.failure_injector import get_injector
+
             get_injector().inject("capture_pre_allocation_field")
 
             from app.field_laws import ROLE_EXCLUSIVITY
+
             captured = 0
             value_roles: Dict[str, List[str]] = {}
             for t in tokens:
@@ -74,7 +88,7 @@ class TopologyMixin:
             for t in tokens:
                 if not t.raw:
                     continue
-                src = t.source_field if t.source_field else (schema_fields[0] if schema_fields else '')
+                src = t.source_field if t.source_field else (schema_fields[0] if schema_fields else "")
                 if t.raw in value_roles and len(value_roles[t.raw]) >= 2:
                     continue
                 for ra, rb in ROLE_EXCLUSIVITY:
@@ -161,7 +175,8 @@ class TopologyMixin:
                             tokens_with_basins.add(token_val)
                             self.field_activation_count += 1
 
-            # Create _unidentified basins for tokens not matching any schema field
+            # Create _unidentified basins for tokens not matching any schema
+            # field
             for t in tokens:
                 if not t.raw:
                     continue
@@ -172,6 +187,7 @@ class TopologyMixin:
                     # ─── Predictive Basin Pre-Heating (Phase 34) ───
                     hypo_roles = ["_unidentified"]
                     from app.topological_query import get_tql_engine
+
                     tql = get_tql_engine(ws=self)
 
                     nearby = tql.find_roles_near_type(t.primary_type, radius=0.4)
@@ -324,17 +340,15 @@ class TopologyMixin:
 
             health = self.get_cognitive_health()
             if health["system_energy"] > 8.0:
-                self._observability.emit_telemetry("health_alert", {
-                    "reason": "critical_energy",
-                    "value": health["system_energy"]
-                })
+                self._observability.emit_telemetry(
+                    "health_alert", {"reason": "critical_energy", "value": health["system_energy"]}
+                )
                 logger.warning("COGNITIVE HEALTH ALERT: Critical Energy Level Detected")
 
             if health["certainty"] < 0.1:
-                self._observability.emit_telemetry("health_alert", {
-                    "reason": "manifold_collapse",
-                    "value": health["certainty"]
-                })
+                self._observability.emit_telemetry(
+                    "health_alert", {"reason": "manifold_collapse", "value": health["certainty"]}
+                )
                 logger.warning("COGNITIVE HEALTH ALERT: Manifold Resolution Collapse")
 
             for role in self._manifold.role_anchors:
@@ -342,6 +356,7 @@ class TopologyMixin:
                 if instability > 0.8:
                     from app.semantic_allocation_engine import _infer_role_type
                     from app.semantic_inference_engine import RoleEmbeddingEngine
+
                     reng = RoleEmbeddingEngine()
 
                     seed_type = _infer_role_type(role)
@@ -350,10 +365,9 @@ class TopologyMixin:
                     self._manifold.set_manifold_vector(role, seed_vec)
                     self._energy.set_schema_instability(role, 0.5)
 
-                    self._observability.emit_telemetry("immune_recovery", {
-                        "role": role,
-                        "reason": "high_instability_anchor"
-                    })
+                    self._observability.emit_telemetry(
+                        "immune_recovery", {"role": role, "reason": "high_instability_anchor"}
+                    )
                     logger.info(f"IMMUNE RESPONSE: Recovered corrupted anchor role [{role}]")
 
             if macro_pressure > 0.8 or self.metrics.stability_debt > 1.0:
@@ -384,6 +398,7 @@ class TopologyMixin:
 
             try:
                 from app.semantic_inference_engine import RoleEmbeddingEngine
+
                 reng = RoleEmbeddingEngine()
                 anchored_roles = set()
                 for a, b in anchors:
@@ -391,6 +406,7 @@ class TopologyMixin:
                     anchored_roles.add(b)
 
                 import random
+
                 for role in reng.manifold.keys():
                     if role not in anchored_roles:
                         noise = [random.uniform(-0.1, 0.1) for _ in range(16)]
@@ -399,10 +415,7 @@ class TopologyMixin:
                 logger.warning("Manifold perturbation failed: %s", e)
 
             self._energy.stability_debt = 0.0
-            self.record_delta("global", "phase_transition", {
-                "debt_cleared": 1.0,
-                "anchors_preserved": len(anchors)
-            })
+            self.record_delta("global", "phase_transition", {"debt_cleared": 1.0, "anchors_preserved": len(anchors)})
 
     def _forecast_causal_needs(self):
         current = self.metrics.total_records_processed
@@ -443,7 +456,7 @@ class TopologyMixin:
 
             consensus_vec = [0.0] * 16
             for stable in stable_members:
-                vec = self._manifold.get_manifold_vector(stable) or [0.5]*16
+                vec = self._manifold.get_manifold_vector(stable) or [0.5] * 16
                 for i in range(16):
                     consensus_vec[i] += vec[i]
             for i in range(16):
@@ -463,22 +476,17 @@ class TopologyMixin:
 
     def local_view(self, role: str) -> dict:
         from app.field_laws import ROLE_EXCLUSIVITY
+
         neighbors = set()
         for ra, rb in ROLE_EXCLUSIVITY:
             if role == ra:
                 neighbors.add(rb)
             elif role == rb:
                 neighbors.add(ra)
-        local_exclusions = {
-            k: v for k, v in self.learned_exclusions.items()
-            if role in k
-        }
+        local_exclusions = {k: v for k, v in self.learned_exclusions.items() if role in k}
         view = self._topology.get_view()
         local_regions = view.get_regions_for_role(role)
-        local_compat = {
-            k: v for k, v in self.role_compatibility.items()
-            if k[0] == role
-        }
+        local_compat = {k: v for k, v in self.role_compatibility.items() if k[0] == role}
         return {
             "role": role,
             "neighbors": list(neighbors),
@@ -510,13 +518,15 @@ class TopologyMixin:
         elif view.region_count() > 0:
             regions_by_token: dict = {}
             for r in view.all_regions():
-                regions_by_token.setdefault(r.token, []).append({
-                    "roles": list(r.competing_roles),
-                    "instability": round(r.instability, 3),
-                    "pressure": round(r.semantic_pressure, 3),
-                    "recurrence": round(r.recurrence_score, 3),
-                    "persistence": round(r.persistence, 3),
-                })
+                regions_by_token.setdefault(r.token, []).append(
+                    {
+                        "roles": list(r.competing_roles),
+                        "instability": round(r.instability, 3),
+                        "pressure": round(r.semantic_pressure, 3),
+                        "recurrence": round(r.recurrence_score, 3),
+                        "persistence": round(r.persistence, 3),
+                    }
+                )
             chain["regions_by_token"] = regions_by_token
         return chain
 
@@ -524,28 +534,35 @@ class TopologyMixin:
         view = self._topology.get_view()
         regions = view.all_regions()
 
-        micro = [{"token": r.token, "roles": list(r.competing_roles),
-                   "instability": round(r.instability, 3),
-                   "convergence": round(r.local_convergence, 3)}
-                  for r in regions]
+        micro = [
+            {
+                "token": r.token,
+                "roles": list(r.competing_roles),
+                "instability": round(r.instability, 3),
+                "convergence": round(r.local_convergence, 3),
+            }
+            for r in regions
+        ]
 
         meso = []
         for cluster in view.get_meso_clusters():
-            meso.append({
-                "cluster_id": cluster.get("cluster_id", ""),
-                "size": cluster["size"],
-                "avg_instability": cluster["avg_instability"],
-                "avg_convergence": cluster["avg_convergence"],
-                "avg_pressure": cluster["avg_pressure"],
-                "tokens": cluster["tokens"],
-                "shared_roles": cluster["shared_roles"],
-                "all_roles": cluster["all_roles"],
-                "entropy": cluster.get("entropy", 0.0),
-                "drift": cluster.get("drift", 0.0),
-                "stability": cluster.get("stability", 0.5),
-                "boundary_strength": cluster.get("boundary_strength", 0.5),
-                "interaction_policy": cluster.get("interaction_policy", "neutral"),
-            })
+            meso.append(
+                {
+                    "cluster_id": cluster.get("cluster_id", ""),
+                    "size": cluster["size"],
+                    "avg_instability": cluster["avg_instability"],
+                    "avg_convergence": cluster["avg_convergence"],
+                    "avg_pressure": cluster["avg_pressure"],
+                    "tokens": cluster["tokens"],
+                    "shared_roles": cluster["shared_roles"],
+                    "all_roles": cluster["all_roles"],
+                    "entropy": cluster.get("entropy", 0.0),
+                    "drift": cluster.get("drift", 0.0),
+                    "stability": cluster.get("stability", 0.5),
+                    "boundary_strength": cluster.get("boundary_strength", 0.5),
+                    "interaction_policy": cluster.get("interaction_policy", "neutral"),
+                }
+            )
 
         macro_continents = view.get_macro_continents()
         continents_list: List[dict] = []
@@ -559,28 +576,32 @@ class TopologyMixin:
         }
 
         for continent in macro_continents:
-            continents_list.append({
-                "continent_id": continent.get("continent_id", ""),
-                "size": continent.get("size", 0),
-                "pressure": continent.get("pressure", 0.0),
-                "entropy": continent.get("entropy", 0.0),
-                "stability": continent.get("stability", 0.0),
-                "convergence": continent.get("convergence", 0.0),
-                "guidance_strength": continent.get("guidance_strength", 0.0),
-                "diversity_pressure": continent.get("diversity_pressure", 0.0),
-                "meso_cluster_count": len(continent.get("meso_cluster_ids", [])),
-                "all_roles": continent.get("all_roles", []),
-            })
+            continents_list.append(
+                {
+                    "continent_id": continent.get("continent_id", ""),
+                    "size": continent.get("size", 0),
+                    "pressure": continent.get("pressure", 0.0),
+                    "entropy": continent.get("entropy", 0.0),
+                    "stability": continent.get("stability", 0.0),
+                    "convergence": continent.get("convergence", 0.0),
+                    "guidance_strength": continent.get("guidance_strength", 0.0),
+                    "diversity_pressure": continent.get("diversity_pressure", 0.0),
+                    "meso_cluster_count": len(continent.get("meso_cluster_ids", [])),
+                    "all_roles": continent.get("all_roles", []),
+                }
+            )
 
         return {"micro": micro, "meso": meso, "macro": macro}
 
     @requires_invariants
     def observe_field_perturbation(self, output: dict, tokens: list):
         from app.instability_api import get_immune_system
+
         immune = get_immune_system(ws=self)
 
         source = output.get("source_url", "unknown_source")
         from app.field_laws import ROLE_EXCLUSIVITY
+
         alloc_conflicts = output.get("_allocation_conflicts", [])
 
         contested_roles = [fc.get("role", "") for fc in alloc_conflicts]
@@ -608,45 +629,56 @@ class TopologyMixin:
                     current = self._instability.get_exclusion(role, peer)
                     self._instability.set_exclusion(key, current + result["excluded"])
 
-                self._observability.emit_telemetry("allocation_conflict", {
-                    "role": role,
-                    "peer": peer,
-                    "candidate": candidate,
-                    "excluded": result["excluded"],
-                    "redirected": result["redirected"],
-                    "through_edge_field": result["through_edge_field"],
-                })
+                self._observability.emit_telemetry(
+                    "allocation_conflict",
+                    {
+                        "role": role,
+                        "peer": peer,
+                        "candidate": candidate,
+                        "excluded": result["excluded"],
+                        "redirected": result["redirected"],
+                        "through_edge_field": result["through_edge_field"],
+                    },
+                )
 
         contested_tokens_in_conflicts = set()
         for fc in alloc_conflicts:
             if fc.get("candidate"):
                 contested_tokens_in_conflicts.add(fc["candidate"])
         edge_field_routes = sum(
-            1 for fc in alloc_conflicts
+            1
+            for fc in alloc_conflicts
             for ra, rb in ROLE_EXCLUSIVITY
             if fc.get("role", "") in (ra, rb) and fc.get("candidate")
         )
 
-        self._observability.emit_telemetry("contradiction_pressure", {
-            "conflict_count": len(alloc_conflicts),
-            "edge_field_routes": edge_field_routes,
-            "contested_tokens": len(contested_tokens_in_conflicts),
-            "system_pressure": round(self.metrics.field_pressure, 3),
-        })
+        self._observability.emit_telemetry(
+            "contradiction_pressure",
+            {
+                "conflict_count": len(alloc_conflicts),
+                "edge_field_routes": edge_field_routes,
+                "contested_tokens": len(contested_tokens_in_conflicts),
+                "system_pressure": round(self.metrics.field_pressure, 3),
+            },
+        )
 
         contradiction_pressure = (len(alloc_conflicts) + edge_field_routes) / max(len(ROLE_EXCLUSIVITY), 1)
         if contradiction_pressure > 0.3 and self.metrics.field_pressure > 0.5:
             logger.info(
                 "CONTRADICTION PRESSURE TRIGGER: %.3f contradiction pressure, "
                 "forcing topology restructuring on node [%s]",
-                contradiction_pressure, self.node_id
+                contradiction_pressure,
+                self.node_id,
             )
             self._topology.restructure_topology()
-            self._observability.emit_telemetry("contradiction_restructuring", {
-                "contradiction_pressure": round(contradiction_pressure, 3),
-                "field_pressure": round(self.metrics.field_pressure, 3),
-                "conflict_count": len(alloc_conflicts),
-            })
+            self._observability.emit_telemetry(
+                "contradiction_restructuring",
+                {
+                    "contradiction_pressure": round(contradiction_pressure, 3),
+                    "field_pressure": round(self.metrics.field_pressure, 3),
+                    "conflict_count": len(alloc_conflicts),
+                },
+            )
 
         all_exclusions = set(ROLE_EXCLUSIVITY)
         for (r1, r2), strength in self.learned_exclusions.items():
@@ -693,7 +725,9 @@ class TopologyMixin:
             return 0
         pressure = self.metrics.field_pressure
         hot_neighborhoods = 0
-        self._total_energy_before = sum(r.local_energy for r in self._topology.iterate_regions()) if self._topology.region_count() > 0 else 0.0
+        self._total_energy_before = (
+            sum(r.local_energy for r in self._topology.iterate_regions()) if self._topology.region_count() > 0 else 0.0
+        )
         role_map: dict = {}
         for r in self._topology.iterate_regions():
             for role in r.competing_roles:
@@ -726,7 +760,7 @@ class TopologyMixin:
                 hot_neighborhoods += 1
         if self._topology.region_count() > 0:
             total = sum(r.local_energy for r in self._topology.iterate_regions())
-            target = getattr(self, '_total_energy_before', total)
+            target = getattr(self, "_total_energy_before", total)
             if total > 0 and abs(total - target) / max(target, 0.001) > 0.001:
                 scale = target / total
                 for r in self._topology.iterate_regions():
@@ -740,6 +774,7 @@ class TopologyMixin:
     def relax_topology(self, budget: Optional[Any] = None):
         """Gradual erosion of weak structures."""
         from app.runtime_budget import get_default_budget
+
         b = budget or get_default_budget()
 
         with self.transaction("relaxation"):
@@ -761,6 +796,7 @@ class TopologyMixin:
             distilled_atoms = self._topology.distill_crystalline_atoms()
             try:
                 from app.semantic_inference_engine import RoleEmbeddingEngine
+
                 reng = RoleEmbeddingEngine()
 
                 before_manifold = {k: list(v) for k, v in self.role_manifold.items()}
@@ -769,23 +805,30 @@ class TopologyMixin:
                 for role, v_after in self.role_manifold.items():
                     v_before = before_manifold.get(role)
                     if v_before:
-                        drift = sum((a - b)**2 for a, b in zip(v_before, v_after))**0.5
+                        drift = sum((a - b) ** 2 for a, b in zip(v_before, v_after)) ** 0.5
                         if drift > 0.001:
                             self._observability.log_drift(role, drift)
 
-                self._observability.emit_telemetry("manifold_relaxation", {
-                    "role_count": len(self.role_manifold),
-                    "active_drift": len([r for r in self.role_manifold if r in before_manifold])
-                })
+                self._observability.emit_telemetry(
+                    "manifold_relaxation",
+                    {
+                        "role_count": len(self.role_manifold),
+                        "active_drift": len([r for r in self.role_manifold if r in before_manifold]),
+                    },
+                )
             except Exception as e:
                 logger.warning("RoleEmbeddingEngine.relax_manifold failed in relax_topology: %s", e)
-                
-            self.record_delta("global", "relax_topology", {
-                "budget": b.usage_report,
-                "regions_pruned": pruned_regions,
-                "roles_pruned": pruned_roles,
-                "atoms_distilled": distilled_atoms
-            })
+
+            self.record_delta(
+                "global",
+                "relax_topology",
+                {
+                    "budget": b.usage_report,
+                    "regions_pruned": pruned_regions,
+                    "roles_pruned": pruned_roles,
+                    "atoms_distilled": distilled_atoms,
+                },
+            )
             return 0
 
     @requires_invariants
@@ -814,20 +857,26 @@ class TopologyMixin:
                         key = tuple(sorted(region.competing_roles))
                         current = self._instability.get_exclusion_by_key(key)
                         self._instability.set_exclusion(key, current + 0.05)
-                        dreams.append({
-                            "type": "exclusion",
-                            "roles": region.competing_roles,
-                            "token": region.token,
-                        })
+                        dreams.append(
+                            {
+                                "type": "exclusion",
+                                "roles": region.competing_roles,
+                                "token": region.token,
+                            }
+                        )
             self._topology.update_local_memory_from_instability()
-            self.record_delta("global", "dream", {
-                "requested_cycles": cycles,
-                "actual_cycles": b.cycle_count,
-                "dreams_count": len(dreams),
-                "budget": b.usage_report
-            })
+            self.record_delta(
+                "global",
+                "dream",
+                {
+                    "requested_cycles": cycles,
+                    "actual_cycles": b.cycle_count,
+                    "dreams_count": len(dreams),
+                    "budget": b.usage_report,
+                },
+            )
         return {
             "dreams": dreams,
             "status": "converging" if not dreams else "learning",
-            "budget_exhausted": b.is_exhausted
+            "budget_exhausted": b.is_exhausted,
         }

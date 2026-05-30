@@ -111,7 +111,7 @@ def classify_zero_result(
         acquisition_lineage: Acquisition pipeline lineage metadata.
         session_detection: Output of session_url_detector.detect_session_params.
         empty_check: Output of empty_response_detector.detect_empty_response.
-        anti_bot_score: Scored anti-bot risk from telemetry (0.0-1.0).
+        anti_bot_score: Scored anti-bot risk from telemetry (0.0 - 1.0).
         final_url: The final URL after all redirects.
         html: Raw HTML of the fetched page.
         visible_text: Visible text extracted from the page.
@@ -133,7 +133,10 @@ def classify_zero_result(
     html_length = len(html)
 
     # Stage 1: Empty response from the detector
-    if empty_check.get("is_empty") and empty_check.get("confidence", 0.0) >= settings.EMPTY_RESPONSE_CONFIDENCE_THRESHOLD:
+    if (
+        empty_check.get("is_empty")
+        and empty_check.get("confidence", 0.0) >= settings.EMPTY_RESPONSE_CONFIDENCE_THRESHOLD
+    ):
         return _build("empty_response", empty_check.get("confidence", 0.5))
 
     # Stage 2: Anti-bot block
@@ -187,10 +190,12 @@ def _build(failure_class: str, confidence: float) -> ZeroResultClassification:
 def _has_auth_patterns(text: str) -> bool:
     """Check text for authentication-related patterns using word-boundary matching."""
     import re
+
     text_lower = text.lower()
     for pattern in settings.ZERO_RESULT_AUTH_PATTERNS:
-        # Use word boundaries to avoid false positives (e.g. "design in" matching "sign in")
-        if re.search(r'\b' + re.escape(pattern) + r'\b', text_lower):
+        # Use word boundaries to avoid false positives (e.g. "design in"
+        # matching "sign in")
+        if re.search(r"\b" + re.escape(pattern) + r"\b", text_lower):
             return True
     return False
 

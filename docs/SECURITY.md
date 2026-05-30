@@ -9,7 +9,7 @@
 
 ### Network Security
 - **CORS** is restricted to configured origins (no wildcard).
-- **CSP** is enforced via nginx (currently allows CDN scripts — see limitations).
+- **CSP** is enforced via nginx — strict `script-src 'self'` (all assets vendored locally).
 - **X-Frame-Options: DENY** (clickjacking protection).
 - **X-Content-Type-Options: nosniff**.
 - Nginx blocks public `/metrics`, `/docs`, `/redoc`, and `/openapi.json`.
@@ -30,22 +30,22 @@
 - **API key stored in `localStorage`** — NOT suitable for shared browsers or public kiosks.
 - Dashboard should be used on **private/internal networks only**.
 
-### CSP Policy
-- Current CSP allows `cdn.jsdelivr.net` and `cdn.tailwindcss.com` for scripts.
-- **Fix:** Vendor all external assets locally, then tighten to `script-src 'self'`.
-
 ### Rate Limiting
 - **Single-process only** — not distributed across workers.
-- For multi-instance deployments, use nginx or WAF-level rate limiting.
+- For multi-instance deployments, use nginx or WAF-level rate limiting.### SSRF
 
-### SSRF
 - **Application-level only** — must be paired with network-layer egress controls (firewall rules, proxy ACLs) in production.
 - DNS rebinding attacks are not protected at application layer.
 
 ### Audit Logging
-- ❌ No logging of authentication failures, RBAC violations, or admin actions.
+
+- ✅ Structured event logging for auth events (failures + non-GET successes), RBAC violations, admin actions, job lifecycle, and data access.
+- Logs are written to `logs/audit.log` with automatic rotation (10 MB per file, 5 backups).
+- Integrated into `api_key_middleware`; see `app/audit_logger.py`.
+- Security events can be reviewed via the `get_recent_events()` API.
 
 ### Session Management
+
 - ❌ No session tokens — API keys are long-lived and never expire.
 - ❌ No refresh/rotation mechanism for keys.
 
@@ -88,9 +88,10 @@ Because this system fetches user-supplied URLs, **SSRF is a primary risk**. Prod
 | Authentication | ✅ Good | Timing-safe API key comparison |
 | Authorization | ✅ Good | RBAC with per-route enforcement |
 | Input Validation | ✅ Good | Pydantic models on all endpoints |
-| Network Security | ⚠️ Partial | CSP allows CDN; rate limiting single-process |
+| Network Security | ⚠️ Partial | CSP is strict `script-src 'self'`; rate limiting single-process |
 | SSRF Protection | ⚠️ Partial | App-level only; needs network-layer backing |
-| Audit Logging | ❌ Missing | No auth/security event logging |
+| Audit Logging | ✅ Implemented | Auth failures + non-GET mutations logged to rotating file |
 | Session Management | ❌ Missing | No token expiry or rotation |
 
-For detailed security assessment, see [audit/DELIVERABLE_7_SECURITY_REPORT.md](audit/DELIVERABLE_7_SECURITY_REPORT.md).
+For detailed security assessment, see [archive/audit/DELIVERABLE_7_SECURITY_REPORT.md](archive/audit/DELIVERABLE_7_SECURITY_REPORT.md) (archived baseline snapshot).
+

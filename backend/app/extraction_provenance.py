@@ -32,8 +32,10 @@ logger = logging.getLogger(__name__)
 # Provenance Data Model
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class ExtractionMethod:
     """Canonical names for extraction methods used in provenance tracking."""
+
     PROFILE = "profile"
     MEMORY = "memory"
     DISCOVERY = "discovery"
@@ -54,7 +56,7 @@ class FieldProvenance:
         field_name: Name of the field (e.g., "company_name").
         value: The extracted value (or None if not found).
         method: ExtractionMethod used (e.g., "discovery", "memory", "regex").
-        selector: The CSS selector used (or None if regex/LLM).
+        selector: The CSS selector used (or None if regex / LLM).
         confidence: Confidence score for this field [0, 1].
         transformed: Whether AI cleaning transformed this value.
         source_snippet: Truncated HTML snippet that was the extraction source.
@@ -62,6 +64,7 @@ class FieldProvenance:
         llm_hint: The hint provided to LLM for extraction (if applicable).
         fallback_chain: Ordered list of methods tried before success.
     """
+
     field_name: str = ""
     value: Any = None
     method: str = "unknown"
@@ -101,6 +104,7 @@ class ExtractionProvenance:
         fallback_path: The ordered extraction cascade that was attempted.
         errors: Any errors encountered during extraction.
     """
+
     url: str = ""
     domain: str = ""
     timestamp: float = field(default_factory=time.time)
@@ -115,8 +119,7 @@ class ExtractionProvenance:
     def to_dict(self) -> dict:
         result = asdict(self)
         result["fields"] = {
-            k: v.to_dict() if isinstance(v, FieldProvenance) else v
-            for k, v in result["fields"].items()
+            k: v.to_dict() if isinstance(v, FieldProvenance) else v for k, v in result["fields"].items()
         }
         return result
 
@@ -124,6 +127,7 @@ class ExtractionProvenance:
 # ═══════════════════════════════════════════════════════════════════════
 # Provenance Builder
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class ProvenanceBuilder:
     """Builds extraction provenance records progressively.
@@ -223,6 +227,7 @@ class ProvenanceBuilder:
     @staticmethod
     def _extract_domain(url: str) -> str:
         from urllib.parse import urlparse
+
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
@@ -233,6 +238,7 @@ class ProvenanceBuilder:
 # ═══════════════════════════════════════════════════════════════════════
 # Provenance Enricher
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def enrich_records_with_provenance(
     records: list[dict],
@@ -300,10 +306,7 @@ def summarize_provenance(provenance: ExtractionProvenance) -> dict:
     for fp in provenance.fields.values():
         method_confidence.setdefault(fp.method, []).append(fp.confidence)
 
-    avg_confidence = {
-        method: round(sum(scores) / len(scores), 3)
-        for method, scores in method_confidence.items()
-    }
+    avg_confidence = {method: round(sum(scores) / len(scores), 3) for method, scores in method_confidence.items()}
 
     # Fields with low confidence (potential issues)
     low_confidence_fields = [

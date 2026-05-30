@@ -38,9 +38,9 @@ This runs syntax, pyflakes, architecture validation, pytest, and production env 
 
 ## Known Production Gaps
 
-- Docker installs from `backend/requirements.txt`, not a strict lock file.
-- Postgres needs service-container CI and migration/init validation.
-- Dashboard uses CDN scripts; CSP was relaxed intentionally. Vendor those assets before strict production.
+- Docker installs from `backend/requirements.txt`, not a strict lock file (`requirements.lock.txt` exists but isn't used in Docker).
+- Postgres CI validation is complete (all tests pass with real Postgres service); production multi-instance coordination remains untested.
+- Dashboard assets are **vendored locally** (no CDN dependencies). Strict CSP (`script-src 'self'`) is enforced.
 - Rate limiting is not proven distributed.
 - Browser/Playwright behavior should be validated in the built image.
 - Nginx CORS allowlist must be changed from templates to real domains.

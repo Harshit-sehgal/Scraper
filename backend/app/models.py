@@ -12,28 +12,27 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
-
-
-# Field names reserved for system/metadata use — cannot be used as schema field names
+# Field names reserved for system / metadata use — cannot be used as schema field names
 # These are internal fields injected by the extraction pipeline at runtime
-RESERVED_FIELD_NAMES: frozenset = frozenset({
-    "_provenance",
-    "_extraction_method",
-    "_ai_source_structured",
-    "_calibrated_confidence",
-    "_acquisition_lineage",
-    "source_url",
-    "source_type",
-    "source_trust_score",
-    "scraped_at",
-    "record_score",
-    "_source_url",
-    "_field_provenance",
-    "_zero_result_failure",
-    "_element_text",
-    "_record_id",
-})
+RESERVED_FIELD_NAMES: frozenset = frozenset(
+    {
+        "_provenance",
+        "_extraction_method",
+        "_ai_source_structured",
+        "_calibrated_confidence",
+        "_acquisition_lineage",
+        "source_url",
+        "source_type",
+        "source_trust_score",
+        "scraped_at",
+        "record_score",
+        "_source_url",
+        "_field_provenance",
+        "_zero_result_failure",
+        "_element_text",
+        "_record_id",
+    }
+)
 
 
 class FieldType(str, Enum):
@@ -73,8 +72,8 @@ class FilterOperator(str, Enum):
 
 
 class ScrapeMode(str, Enum):
-    MANUAL = "manual"       # User provides URLs
-    AUTO = "auto"           # AI discovers best URLs
+    MANUAL = "manual"  # User provides URLs
+    AUTO = "auto"  # AI discovers best URLs
 
 
 class SourcePolicy(str, Enum):
@@ -85,6 +84,7 @@ class SourcePolicy(str, Enum):
 
 class SchemaField(BaseModel):
     """A single field definition in the extraction schema."""
+
     name: str = Field(..., description="Field name, e.g. 'company_name'", max_length=64)
     field_type: FieldType = Field(..., description="Data type for this field")
     description: str = Field("", description="Optional hint for the LLM about what this field is")
@@ -94,11 +94,8 @@ class SchemaField(BaseModel):
     @classmethod
     def validate_name(cls, v: str) -> str:
         v = v.strip().lower()
-        if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", v):
-            raise ValueError(
-                "Field name must be snake_case, start with a letter, "
-                "and be at most 64 characters"
-            )
+        if not re.fullmatch(r"[a-z][a-z0 - 9_]{0,63}", v):
+            raise ValueError("Field name must be snake_case, start with a letter, " "and be at most 64 characters")
         if v in RESERVED_FIELD_NAMES:
             raise ValueError(f"Field name '{v}' is reserved for system use")
         return v
@@ -106,6 +103,7 @@ class SchemaField(BaseModel):
 
 class FilterRule(BaseModel):
     """A single filter rule to apply to scraped data."""
+
     field_name: str = Field(..., description="Which schema field to filter on")
     operator: FilterOperator = Field(..., description="Filter operator")
     value: str = Field("", description="Value to compare against")
@@ -115,19 +113,23 @@ class FilterRule(BaseModel):
 
 class DiscoveryRequest(BaseModel):
     """Request body for auto-discovery mode."""
-    topic: str = Field(..., description="What topic/data to search for")
+
+    topic: str = Field(..., description="What topic / data to search for")
     location: str = Field("", description="Geographic focus, e.g. 'Chennai, India'")
     domain: str = Field("", description="Preferred domain to search, e.g. 'justdial.com'")
     num_results: int = Field(8, ge=1, le=50, description="How many URLs to discover")
     max_per_domain: int = Field(4, ge=1, le=25, description="Maximum URLs allowed per domain in discovery")
     source_policy: SourcePolicy = Field(SourcePolicy.ALL_SOURCES, description="Source inclusion policy for discovery")
-    schema_field_names: list[str] = Field(default_factory=list, description="Optional schema field names to improve search relevance")
+    schema_field_names: list[str] = Field(
+        default_factory=list, description="Optional schema field names to improve search relevance"
+    )
     origin_location: str = Field("", description="Center point for radius-aware optimization")
     max_distance_km: Optional[float] = Field(None, ge=0, description="Optional discovery radius in kilometers")
 
 
 class SchemaSuggestionRequest(BaseModel):
     """Request body to infer topic and schema fields from plain language."""
+
     intent: str = Field(..., description="Natural language description of what data to scrape")
     max_fields: int = Field(8, ge=1, le=20, description="Maximum number of fields to generate")
 
@@ -152,6 +154,7 @@ class SelectorMap(BaseModel):
 
 class JobCreate(BaseModel):
     """Request body to create a new scraping job."""
+
     name: str = Field(..., description="Human-readable job name")
     mode: ScrapeMode = Field(ScrapeMode.MANUAL, description="Manual or Auto discovery mode")
     intent: str = Field("", description="Natural language extraction intent")
@@ -161,7 +164,9 @@ class JobCreate(BaseModel):
     topic: str = Field("", description="Topic for auto-discovery")
     location: str = Field("", description="Location focus for auto-discovery")
     preferred_domain: str = Field("", description="Preferred domain for auto-discovery")
-    source_policy: SourcePolicy = Field(SourcePolicy.ALL_SOURCES, description="Controls which source types are included")
+    source_policy: SourcePolicy = Field(
+        SourcePolicy.ALL_SOURCES, description="Controls which source types are included"
+    )
     max_per_domain: int = Field(4, ge=1, le=25, description="Maximum discovered URLs per domain")
     origin_location: str = Field("", description="Center location for distance optimization")
     max_distance_km: Optional[float] = Field(None, ge=0, description="Keep records within this radius in km")
@@ -175,8 +180,12 @@ class JobCreate(BaseModel):
     deduplicate_field: str = Field("", description="Field to use for deduplication")
     # Selectors map from URL analysis (item_container + field selectors)
     selectors_map: dict = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
-    search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
-    min_record_score: float = Field(0.35, ge=0.0, le=1.0, description="Minimum quality score required per extracted record")
+    search_params: dict[str, str] | None = Field(
+        default=None, description="Search parameters for session-bound URL recovery"
+    )
+    min_record_score: float = Field(
+        0.35, ge=0.0, le=1.0, description="Minimum quality score required per extracted record"
+    )
 
     @model_validator(mode="after")
     def validate_mode_requirements(self):
@@ -185,11 +194,16 @@ class JobCreate(BaseModel):
             if not cleaned_urls:
                 raise ValueError("Manual mode requires at least one URL")
             from app.url_safety import validate_public_http_url
+
             for u in cleaned_urls:
                 try:
                     validate_public_http_url(u)
                 except ValueError as e:
-                    if "Only http and https are allowed" in str(e) or "scheme" in str(e) or not u.startswith(("http://", "https://")):
+                    if (
+                        "Only http and https are allowed" in str(e)
+                        or "scheme" in str(e)
+                        or not u.startswith(("http://", "https://"))
+                    ):
                         raise ValueError("Manual mode requires valid http(s) URLs")
                     raise ValueError(f"URL '{u}' failed security check: {e}")
             self.urls = cleaned_urls
@@ -201,14 +215,14 @@ class JobCreate(BaseModel):
             # Auto mode always discovers URLs itself.
             self.urls = []
 
-        # Validate selectors_map shape if present while keeping the external API as a dict.
+        # Validate selectors_map shape if present while keeping the external
+        # API as a dict.
         if self.selectors_map:
             if not isinstance(self.selectors_map, dict):
                 raise ValueError("selectors_map must be an object")
             if len(self.selectors_map) > 20:
                 raise ValueError("selectors_map must have at most 20 keys")
             self.selectors_map = SelectorMap.model_validate(self.selectors_map).model_dump()
-
 
         # ── search_params limits ──────────────────────────────────────────
         if self.search_params is not None:
@@ -236,6 +250,7 @@ class JobStatus(str, Enum):
 
 class LogEntry(BaseModel):
     """A single log entry for a job."""
+
     timestamp: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
     message: str
     level: str = "info"
@@ -243,6 +258,7 @@ class LogEntry(BaseModel):
 
 class Job(BaseModel):
     """A scraping job with its current state."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     mode: ScrapeMode = ScrapeMode.MANUAL
@@ -264,7 +280,9 @@ class Job(BaseModel):
     min_record_score: float = 0.35
     # Selectors map from URL analysis (pre-discovered CSS selectors)
     selectors_map: dict = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
-    search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
+    search_params: dict[str, str] | None = Field(
+        default=None, description="Search parameters for session-bound URL recovery"
+    )
     cancel_requested: bool = False
     status: JobStatus = JobStatus.PENDING
     created_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
@@ -285,6 +303,6 @@ class Job(BaseModel):
     results_on_disk: bool = Field(default=False, description="Whether results are stored in a compressed disk file")
     results_file_path: Optional[str] = Field(default=None, description="Path to the compressed results file")
     warnings: list[str] = Field(default_factory=list, description="Job warning logs and anomaly reports")
-    acquisition_mode: str = Field(default="standard", description="Acquisition mode: standard, aggressive, or deep_scan")
-
-
+    acquisition_mode: str = Field(
+        default="standard", description="Acquisition mode: standard, aggressive, or deep_scan"
+    )

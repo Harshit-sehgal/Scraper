@@ -28,6 +28,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.txt
           pip install pyflakes autoflake
+      - name: Python syntax check (compileall)
+        run: python -m compileall -q backend/app backend/tests scripts architecture_validator.py
+
       - name: Lint with pyflakes
         run: python -m pyflakes backend/app backend/tests
 

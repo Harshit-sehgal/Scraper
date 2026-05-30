@@ -84,6 +84,7 @@ def parse_retry_after(headers: Optional[dict] = None) -> Optional[float]:
     # Try parsing as HTTP-date
     try:
         from email.utils import parsedate_to_datetime
+
         retry_dt = parsedate_to_datetime(raw)
         delta = (retry_dt - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
         return max(0.0, delta)
@@ -94,7 +95,7 @@ def parse_retry_after(headers: Optional[dict] = None) -> Optional[float]:
 
 
 _RATE_LIMIT_STATE: dict[str, float] = {}
-"""In-memory rate-limit state keyed by domain/task-type: next_allowed_at timestamp."""
+"""In-memory rate-limit state keyed by domain / task-type: next_allowed_at timestamp."""
 
 
 def get_cooldown_seconds(domain_or_type: str, base_cooldown: float = 30.0) -> float:
@@ -113,7 +114,7 @@ def mark_rate_limited(
     retry_after: Optional[float] = None,
     max_cooldown: float = 300.0,
 ) -> None:
-    """Record that a rate limit was hit for a domain/task-type.
+    """Record that a rate limit was hit for a domain / task-type.
 
     Subsequent calls to ``get_cooldown_seconds`` will return > 0 until
     the cooldown expires.

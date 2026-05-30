@@ -1,4 +1,3 @@
-
 """
 Post-Processing Engine: Type coercion, Geospatial distance calculation, and Data Filtering.
 Uses geopy (free OpenStreetMap Nominatim geocoder) for distance calculations.
@@ -27,6 +26,7 @@ _LOCATION_NAME_HINTS = ("location", "address", "city", "area", "region", "zip", 
 def geocode_address(address: str) -> Optional[tuple[float, float]]:
     """Convert an address string to (latitude, longitude) using free OpenStreetMap."""
     from app.geocode_cache import get_geocode_cache
+
     cache = get_geocode_cache()
     cached = cache.get(address)
     if cached is not None:
@@ -48,7 +48,10 @@ def geocode_address(address: str) -> Optional[tuple[float, float]]:
             if attempt < max_retries - 1:
                 logging.warning(
                     "Geocoding attempt %d failed for '%s' (retrying in %.1fs): %s",
-                    attempt + 1, address, backoff, str(e)
+                    attempt + 1,
+                    address,
+                    backoff,
+                    str(e),
                 )
                 time.sleep(backoff)
                 backoff *= 2.0  # Exponential backoff
@@ -59,13 +62,9 @@ def geocode_address(address: str) -> Optional[tuple[float, float]]:
     return None
 
 
-def calculate_distance(
-    point1: tuple[float, float],
-    point2: tuple[float, float],
-    unit: str = "km"
-) -> float:
+def calculate_distance(point1: tuple[float, float], point2: tuple[float, float], unit: str = "km") -> float:
     """
-    Calculate straight-line (geodesic) distance between two lat/lng points.
+    Calculate straight-line (geodesic) distance between two lat / lng points.
     Returns distance in km or miles.
     """
     dist_km = geodesic(point1, point2).kilometers
@@ -77,6 +76,7 @@ def calculate_distance(
 # ──────────────────────────────────────────────
 # Type Coercion Engine
 # ──────────────────────────────────────────────
+
 
 def coerce_value(value: Any, field_type: FieldType):
     """
@@ -91,13 +91,13 @@ def coerce_value(value: Any, field_type: FieldType):
             if isinstance(value, (int, float)):
                 return int(value)
             # Extract first number from string like "Age: 25 years"
-            match = re.search(r'-?\d+', str(value))
+            match = re.search(r"-?\d+", str(value))
             return int(match.group()) if match else None
 
         elif field_type == FieldType.FLOAT:
             if isinstance(value, (int, float)):
                 return float(value)
-            match = re.search(r'-?\d+\.?\d*', str(value))
+            match = re.search(r"-?\d+\.?\d*", str(value))
             return float(match.group()) if match else None
 
         elif field_type == FieldType.BOOLEAN:
@@ -111,12 +111,12 @@ def coerce_value(value: Any, field_type: FieldType):
             return None
 
         elif field_type == FieldType.EMAIL:
-            match = re.search(r'[\w.+-]+@[\w-]+\.[\w.-]+', str(value))
+            match = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", str(value))
             return match.group() if match else str(value)
 
         elif field_type == FieldType.PHONE:
             # Keep digits, +, -, (, ), spaces
-            cleaned = re.sub(r'[^\d+\-() ]', '', str(value))
+            cleaned = re.sub(r"[^\d+\-() ]", "", str(value))
             return cleaned if cleaned else str(value)
 
         elif field_type == FieldType.LIST_STRING:
@@ -126,13 +126,13 @@ def coerce_value(value: Any, field_type: FieldType):
 
         elif field_type == FieldType.CURRENCY:
             # Extract number from currency strings like "$1,200.50" or "₹5000"
-            cleaned = re.sub(r'[^\d.\-]', '', str(value))
-            match = re.search(r'-?\d+\.?\d*', cleaned)
+            cleaned = re.sub(r"[^\d.\-]", "", str(value))
+            match = re.search(r"-?\d+\.?\d*", cleaned)
             return float(match.group()) if match else None
 
         elif field_type == FieldType.PERCENTAGE:
             # Extract number from "85%" or "85 percent"
-            match = re.search(r'-?\d+\.?\d*', str(value))
+            match = re.search(r"-?\d+\.?\d*", str(value))
             return float(match.group()) if match else None
 
         else:
@@ -169,7 +169,7 @@ def normalize_record(record: dict, schema_fields: list[SchemaField]) -> dict:
 
 
 def _looks_like_email(value: str) -> bool:
-    return bool(re.fullmatch(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", (value or "").strip()))
+    return bool(re.fullmatch(r"[A-Za-z0 - 9._%+-]+@[A-Za-z0 - 9.-]+\.[A-Za-z]{2,}", (value or "").strip()))
 
 
 def _looks_like_phone(value: str) -> bool:
@@ -263,6 +263,7 @@ def enforce_schema_integrity(record: dict, schema_fields: list[SchemaField]) -> 
 # Filter Engine
 # ──────────────────────────────────────────────
 
+
 def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField]) -> bool:
     """
     Check if a single record passes a filter rule.
@@ -276,9 +277,9 @@ def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField
 
     # Is Empty / Is Not Empty (works on None)
     if rule.operator == FilterOperator.IS_EMPTY:
-        return value is None or str(value).strip() == ''
+        return value is None or str(value).strip() == ""
     if rule.operator == FilterOperator.IS_NOT_EMPTY:
-        return value is not None and str(value).strip() != ''
+        return value is not None and str(value).strip() != ""
 
     if value is None:
         return False
@@ -288,8 +289,10 @@ def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField
 
         # Numeric comparisons
         if rule.operator in (
-            FilterOperator.GREATER_THAN, FilterOperator.LESS_THAN,
-            FilterOperator.GREATER_EQUAL, FilterOperator.LESS_EQUAL
+            FilterOperator.GREATER_THAN,
+            FilterOperator.LESS_THAN,
+            FilterOperator.GREATER_EQUAL,
+            FilterOperator.LESS_EQUAL,
         ):
             num_val = float(value) if not isinstance(value, (int, float)) else value
             num_compare = float(compare_value)
@@ -469,9 +472,7 @@ def apply_location_radius(
 
 
 def process_results(
-    raw_results: list[dict],
-    schema_fields: list[SchemaField],
-    filters: list[FilterRule]
+    raw_results: list[dict], schema_fields: list[SchemaField], filters: list[FilterRule]
 ) -> tuple[list[dict], int, int, dict]:
     """
     Full post-processing pipeline:
@@ -488,9 +489,7 @@ def process_results(
     if filters:
         filtered = []
         for record in coerced:
-            passes_all = all(
-                apply_filter(record, rule, schema_fields) for rule in filters
-            )
+            passes_all = all(apply_filter(record, rule, schema_fields) for rule in filters)
             if passes_all:
                 filtered.append(record)
     else:

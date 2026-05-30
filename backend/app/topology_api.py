@@ -14,13 +14,14 @@ logger = logging.getLogger(__name__)
 
 class TopologyAPI:
     """Controlled interface for topology mutations.
-    
+
     Delegates all state mutations to TopologyState.
     NEVER accesses ws.field_regions directly.
     """
 
     def __init__(self, ws):
         from app.topology_state import TopologyState
+
         if isinstance(ws, TopologyState):
             self._topology = ws
         else:
@@ -36,8 +37,9 @@ class TopologyAPI:
 
     # ─── Mutation Operations (state-changing) ────────────────────────────
 
-    def add_region(self, competing_roles: List[str], token: str, instability: float = 0.5,
-                   integrity: float = 0.5, domain: str = "") -> FieldConflictRegion:
+    def add_region(
+        self, competing_roles: List[str], token: str, instability: float = 0.5, integrity: float = 0.5, domain: str = ""
+    ) -> FieldConflictRegion:
         return self._topology.add(competing_roles, token, instability, integrity, domain)
 
     def remove_region(self, region) -> bool:

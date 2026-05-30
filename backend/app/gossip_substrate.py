@@ -24,34 +24,34 @@ logger = logging.getLogger(__name__)
 
 class VectorClock:
     """Track causality of events across distributed nodes."""
-    
+
     def __init__(self, node_id: str):
         self.node_id = node_id
         self.clock: Dict[str, int] = defaultdict(int)
         self.clock[node_id] = 0
-    
+
     def increment(self) -> None:
         """Increment this node's clock value."""
         self.clock[self.node_id] += 1
-    
+
     def update(self, other_clock: Dict[str, int]) -> None:
         """Update this node's clock based on received clock."""
         for node_id, ts in other_clock.items():
             self.clock[node_id] = max(self.clock.get(node_id, 0), ts)
         self.increment()
-    
+
     def to_dict(self) -> Dict[str, int]:
         """Export clock as dict."""
         return dict(self.clock)
-    
-    def compare(self, other: 'VectorClock') -> str:
+
+    def compare(self, other: "VectorClock") -> str:
         """Compare with another clock.
-        
+
         Returns: 'before', 'after', 'concurrent', or 'equal'
         """
         self_lt_other = False
         self_gt_other = False
-        
+
         all_nodes = set(self.clock.keys()) | set(other.clock.keys())
         for node_id in all_nodes:
             s = self.clock.get(node_id, 0)
@@ -60,34 +60,34 @@ class VectorClock:
                 self_lt_other = True
             if s > o:
                 self_gt_other = True
-        
+
         if self_lt_other and self_gt_other:
-            return 'concurrent'
+            return "concurrent"
         elif self_lt_other:
-            return 'before'
+            return "before"
         elif self_gt_other:
-            return 'after'
+            return "after"
         else:
-            return 'equal'
+            return "equal"
 
 
 class NodeHealth:
     """Track health and reliability of a peer node."""
-    
+
     def __init__(self):
         self.success_count = 0
         self.failure_count = 0
         self.last_seen = time.time()
         self.last_sync = 0.0
-    
+
     @property
     def reliability_score(self) -> float:
-        """Score from 0-1 indicating peer reliability."""
+        """Score from 0 - 1 indicating peer reliability."""
         total = self.success_count + self.failure_count
         if total == 0:
             return 0.5
         return self.success_count / total
-    
+
     @property
     def is_healthy(self) -> bool:
         """Is this peer currently healthy?"""
@@ -96,7 +96,7 @@ class NodeHealth:
 
 class GossipSubstrate:
     """Enhanced P2P gossip protocol for distributed state propagation.
-    
+
     Implements:
     - Push-Pull gossip (bidirectional state exchange)
     - Vector clocks for causality tracking
@@ -104,25 +104,26 @@ class GossipSubstrate:
     - State versioning with conflict detection
     - Topology awareness (prefer nearby nodes)
     """
-    
+
     def __init__(self, node_id: str = "default"):
         self.node_id = node_id
         self.vector_clock = VectorClock(node_id)
         self.peers: Dict[str, Any] = {}  # node_id -> state_provider
         self.peer_health: Dict[str, NodeHealth] = defaultdict(NodeHealth)
         self.known_nodes: Set[str] = set()
-        self.state_versions: Dict[str, Tuple[Any, Dict[str, int]]] = {}  # Track version + clock
+        # Track version + clock
+        self.state_versions: Dict[str, Tuple[Any, Dict[str, int]]] = {}
         self.conflicts: List[Dict[str, Any]] = []  # Log of detected conflicts
-    
+
     def register_node(self, node_id: str, provider: Any) -> None:
         """Register a virtual peer in the substrate."""
         self.peers[node_id] = provider
         self.known_nodes.add(node_id)
         logger.debug(f"[Gossip] Registered node: {node_id}")
-    
+
     def select_peers_for_gossip(self, count: int = 1) -> List[str]:
         """Select healthy peers for gossip, preferring reliable nodes.
-        
+
         Uses a weighted selection based on:
         - Reliability score
         - Recency of last contact
@@ -130,22 +131,22 @@ class GossipSubstrate:
         candidates = [n for n in self.known_nodes if n != self.node_id]
         if not candidates:
             return []
-        
+
         # Weight candidates by health
         weights = []
         for peer_id in candidates:
             health = self.peer_health[peer_id]
             reliability = health.reliability_score
-            
+
             # Prefer recently seen nodes
             time_penalty = max(0.0, (time.time() - health.last_seen) / 300)
             adjusted_weight = (reliability * 0.8) + (1 - time_penalty) * 0.2
             weights.append(adjusted_weight)
-        
+
         # Weighted random selection
         if max(weights) <= 0:
             return random.sample(candidates, min(count, len(candidates)))
-        
+
         selected = []
         for _ in range(min(count, len(candidates))):
             total = sum(weights)
@@ -157,16 +158,16 @@ class GossipSubstrate:
                     selected.append(candidates[i])
                     weights[i] = 0.0  # Don't pick same twice
                     break
-        
+
         return selected
-    
+
     def gossip(self, local_node_id: str, peer_id: Optional[str] = None) -> bool:
         """Perform one gossip cycle with a peer.
-        
+
         Args:
             local_node_id: ID of the local node
             peer_id: Optional specific peer to gossip with (auto-select if None)
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -175,91 +176,94 @@ class GossipSubstrate:
             if not candidates:
                 return False
             peer_id = candidates[0]
-        
+
         peer = self.peers.get(peer_id)
         local = self.peers.get(local_node_id)
-        
+
         if not peer or not local:
             self.peer_health[peer_id].failure_count += 1
             return False
-        
+
         try:
             # Phase 1: Pull state from peer
-            remote_clock = peer.get_vector_clock() if hasattr(peer, 'get_vector_clock') else {}
+            remote_clock = peer.get_vector_clock() if hasattr(peer, "get_vector_clock") else {}
             remote_state = peer.to_dict()
 
             # Check for conflicts (logged internally)
             self._detect_conflicts(local_node_id, peer_id, remote_state, remote_clock)
-            
+
             # Merge pull state
             self.vector_clock.update(remote_clock)
             local.merge_state(remote_state)
-            
+
             # Phase 2: Push local state to peer
             local_state = local.to_dict()
             peer.merge_state(local_state)
-            
+
             # Update health
             self.peer_health[peer_id].success_count += 1
             self.peer_health[peer_id].last_seen = time.time()
             self.peer_health[peer_id].last_sync = time.time()
-            
+
             logger.debug(f"[Gossip] {local_node_id} <-> {peer_id}: sync successful")
             return True
-            
+
         except Exception as e:
             self.peer_health[peer_id].failure_count += 1
             logger.warning(f"[Gossip] Sync with {peer_id} failed: {e}")
             return False
-    
+
     def _detect_conflicts(self, local_id: str, peer_id: str, remote_state: dict, remote_clock: dict) -> bool:
         """Detect if there are conflicting state changes.
-        
+
         Returns: True if conflicts detected
         """
         # Simple conflict detection: if state changed but we don't have causality
         # In a real system, this would use vector clock comparison
         key = f"{local_id}:{peer_id}"
-        
+
         if key in self.state_versions:
             prev_state, prev_clock = self.state_versions[key]
-            # If state changed but remote clock isn't strictly greater, we have concurrent changes
+            # If state changed but remote clock isn't strictly greater, we have
+            # concurrent changes
             if prev_state != remote_state:
-                self.conflicts.append({
-                    "local": local_id,
-                    "peer": peer_id,
-                    "timestamp": time.time(),
-                    "local_version": prev_state,
-                    "remote_version": remote_state,
-                })
+                self.conflicts.append(
+                    {
+                        "local": local_id,
+                        "peer": peer_id,
+                        "timestamp": time.time(),
+                        "local_version": prev_state,
+                        "remote_version": remote_state,
+                    }
+                )
                 return True
-        
+
         self.state_versions[key] = (remote_state, remote_clock)
         return False
-    
+
     def integrate_heartbeat(self, heartbeat_manager: Optional[HeartbeatManager] = None) -> None:
         """Push gossip substrate state into the heartbeat manager.
-        
+
         LAW: Distributed truth requires continuous verification.
-        This bridges gossip-level state into the heartbeat/health system.
+        This bridges gossip-level state into the heartbeat / health system.
         """
         if not heartbeat_manager:
             return
-        
+
         # Register each known peer as a heartbeat node
         for peer_id in self.known_nodes:
             if peer_id == self.node_id:
                 continue
             health = self.peer_health[peer_id]
             checksum = str(hash(frozenset(self.vector_clock.clock.items())))
-            
+
             heartbeat_manager.record_heartbeat(
                 node_id=peer_id,
                 clock=self.vector_clock.to_dict(),
                 checksum=checksum,
                 energy=health.reliability_score,
             )
-        
+
         # Also register local node
         heartbeat_manager.record_heartbeat(
             node_id=self.node_id,
@@ -267,49 +271,54 @@ class GossipSubstrate:
             checksum=str(hash(frozenset(self.vector_clock.clock.items()))),
             energy=1.0,
         )
-        
+
         logger.debug(
             "[Gossip] Integrated %d peers into heartbeat manager",
             len(self.known_nodes) - 1,
         )
 
-    def propagate_state_via_gossip(self, state_key: Optional[str] = None, state_value: Any = None, heartbeat_manager: Optional[HeartbeatManager] = None) -> int:
+    def propagate_state_via_gossip(
+        self,
+        state_key: Optional[str] = None,
+        state_value: Any = None,
+        heartbeat_manager: Optional[HeartbeatManager] = None,
+    ) -> int:
         """Propagate a state update through the gossip network.
-        
+
         This implements push-based state propagation:
           1. Update local clock for causality tracking
           2. Gossip with each known healthy peer
           3. If heartbeat_manager is provided, sync state there too
-        
+
         Args:
             state_key: Optional key for the state being propagated.
                        If None, performs a general gossip sync.
             state_value: Optional value for the state being propagated.
             heartbeat_manager: Optional heartbeat manager for observability.
-        
+
         Returns: Number of peers successfully updated
         """
         self.vector_clock.increment()
-        
+
         # Update local state version if state_key provided
         if state_key is not None:
             self.state_versions[f"state:{state_key}"] = (state_value, self.vector_clock.to_dict())
-        
+
         # Gossip with healthy peers
         peers = self.select_peers_for_gossip(count=3)
         success_count = 0
-        
+
         for peer_id in peers:
             # Simulate state transfer through peer provider
             peer_provider = self.peers.get(peer_id)
-            if peer_provider and hasattr(peer_provider, 'receive_state'):
+            if peer_provider and hasattr(peer_provider, "receive_state"):
                 try:
                     if state_key is not None:
                         peer_provider.receive_state(state_key, state_value, self.vector_clock.to_dict())
-                    elif hasattr(peer_provider, 'to_dict'):
+                    elif hasattr(peer_provider, "to_dict"):
                         # General gossip sync: exchange state
                         remote_state = peer_provider.to_dict()
-                        if hasattr(peer_provider, 'merge_state'):
+                        if hasattr(peer_provider, "merge_state"):
                             peer_provider.merge_state(remote_state)
                     success_count += 1
                     self.peer_health[peer_id].success_count += 1
@@ -317,14 +326,16 @@ class GossipSubstrate:
                 except Exception as e:
                     logger.warning("[Gossip] State propagation to %s failed: %s", peer_id, e)
                     self.peer_health[peer_id].failure_count += 1
-        
+
         # Sync with heartbeat manager for observability
         if heartbeat_manager:
             self.integrate_heartbeat(heartbeat_manager)
-        
+
         logger.debug(
             "[Gossip] Propagated state%s to %d/%d peers",
-            f" '{state_key}'" if state_key else "", success_count, len(peers),
+            f" '{state_key}'" if state_key else "",
+            success_count,
+            len(peers),
         )
         return success_count
 
@@ -350,7 +361,7 @@ class GossipSubstrate:
     def get_health_report(self) -> Dict[str, Any]:
         """Get health status of all peers."""
         peers_report: Dict[str, Dict[str, Any]] = {}
-        
+
         for node_id in self.known_nodes:
             if node_id == self.node_id:
                 continue
@@ -362,7 +373,7 @@ class GossipSubstrate:
                 "is_healthy": health.is_healthy,
                 "seconds_since_seen": time.time() - health.last_seen,
             }
-        
+
         report: Dict[str, Any] = {
             "local_node": self.node_id,
             "vector_clock": self.vector_clock.to_dict(),
@@ -370,7 +381,7 @@ class GossipSubstrate:
             "conflicts_detected": len(self.conflicts),
             "propagated_states": len([k for k in self.state_versions if k.startswith("state:")]),
         }
-        
+
         return report
 
 

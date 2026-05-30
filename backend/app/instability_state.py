@@ -9,18 +9,19 @@ from app.transaction_context import active_transaction
 
 
 class InstabilityState:
-    """Sole owner of the semantic field's tension/exclusion structure."""
+    """Sole owner of the semantic field's tension / exclusion structure."""
 
     def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
         self._delta_callback = delta_callback
         self._exclusions: Dict[tuple, float] = {}
+
     @property
     def _staging(self) -> Optional[Dict[tuple, float]]:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"instability_staging_{id(self)}")
         return None
-    
+
     @_staging.setter
     def _staging(self, value: Optional[Dict[tuple, float]]):
         tx = active_transaction.get()
@@ -82,7 +83,7 @@ class InstabilityState:
         sk = tuple(sorted(key))
         clamped = max(0.0, min(1.0, value))
         target = self._staging if self._staging is not None else self._exclusions
-        
+
         if clamped <= 0.01:
             target.pop(sk, None)
         else:
@@ -134,17 +135,15 @@ class InstabilityState:
     # ─── Serialization ───────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
-        return {
-            "learned_exclusions": {f"{k[0]}|{k[1]}": v for k, v in self._exclusions.items()}
-        }
+        return {"learned_exclusions": {f"{k[0]}|{k[1]}": v for k, v in self._exclusions.items()}}
 
     def from_dict(self, data: dict):
         self.clear()
         target = self._staging if self._staging is not None else self._exclusions
-        
+
         # Phase 47: Symmetry fix - extract nested dictionary if present
         source = data.get("learned_exclusions", data)
-        
+
         for k, v in source.items():
             if isinstance(k, str):
                 if "|" in k:
@@ -153,8 +152,9 @@ class InstabilityState:
                         sk = tuple(sorted(parts))
                         target[sk] = max(0.0, min(1.0, v))
                     continue
-                    
+
                 import ast
+
                 try:
                     k = ast.literal_eval(k)
                 except (ValueError, SyntaxError):
@@ -179,6 +179,5 @@ class InstabilityState:
                 # CRDT-lite: pick the strongest exclusion signal
                 if r_val > l_val:
                     self.set_exclusion(key, r_val)
-        
-        self._record("merge", {"remote_exclusions": len(remote_excl)})
 
+        self._record("merge", {"remote_exclusions": len(remote_excl)})

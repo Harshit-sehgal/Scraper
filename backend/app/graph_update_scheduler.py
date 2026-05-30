@@ -24,8 +24,14 @@ class TaskPriority(IntEnum):
 
 
 class CognitiveTask:
-    def __init__(self, task_id: str, priority: TaskPriority,
-                 handler: Callable, args: Optional[tuple] = None, kwargs: Optional[dict] = None):
+    def __init__(
+        self,
+        task_id: str,
+        priority: TaskPriority,
+        handler: Callable,
+        args: Optional[tuple] = None,
+        kwargs: Optional[dict] = None,
+    ):
         self.task_id = task_id
         self.priority = priority
         self.handler = handler
@@ -51,13 +57,10 @@ class GlobalCognitiveScheduler:
             "priority_counts": Counter(),
         }
 
-    def schedule(self, task_id: str, priority: TaskPriority,
-                 handler: Callable, *args: Any, **kwargs: Any) -> None:
+    def schedule(self, task_id: str, priority: TaskPriority, handler: Callable, *args: Any, **kwargs: Any) -> None:
         task = CognitiveTask(task_id, priority, handler, args, kwargs)
         heapq.heappush(self._task_queue, task)
-        logging.getLogger(__name__).debug(
-            f"TASK SCHEDULED: [{task_id}] Priority: {priority.name}"
-        )
+        logging.getLogger(__name__).debug(f"TASK SCHEDULED: [{task_id}] Priority: {priority.name}")
 
     def step(self, budget_ms: float = 100.0) -> int:
         if self._is_paused:
@@ -65,6 +68,7 @@ class GlobalCognitiveScheduler:
 
         # Phase 68: Active Governance Enforcement (Even if queue is empty)
         from app.policy_engine import get_policy_engine
+
         policy = get_policy_engine(ws=self.ws)
         policy.enforce_guardrails()
 
@@ -95,12 +99,10 @@ class GlobalCognitiveScheduler:
                 self._execution_stats["tasks_completed"] += 1
                 self._execution_stats["priority_counts"][task.priority.name] += 1
             except Exception as e:
-                logging.getLogger(__name__).error(
-                    f"TASK FAILED: [{task.task_id}] - {e}"
-                )
+                logging.getLogger(__name__).error(f"TASK FAILED: [{task.task_id}] - {e}")
                 # Record degradation telemetry (best-effort)
                 try:
-                    if hasattr(self, 'ws') and self.ws is not None:
+                    if hasattr(self, "ws") and self.ws is not None:
                         self.ws.record_degradation(
                             subsystem="cognitive_scheduler",
                             severity="warning",
@@ -136,12 +138,14 @@ class GraphUpdateScheduler:
 
     def on_instability(self, event: SemanticEvent) -> None:
         ws = get_world_state()
-        ws.record_decision({
-            "type": event.event_type.value,
-            "source": event.source,
-            "delta": event.instability_delta,
-            "timestamp": event.timestamp or 0,
-        })
+        ws.record_decision(
+            {
+                "type": event.event_type.value,
+                "source": event.source,
+                "delta": event.instability_delta,
+                "timestamp": event.timestamp or 0,
+            }
+        )
         ws.trim_decision_history()
 
         # Phase 71: Uncertainty spike now triggers a field wave from the source
@@ -159,11 +163,12 @@ class GraphUpdateScheduler:
         # If total field agitation is high, trigger a manifold relaxation pass
         if self._total_wave_intensity > 2.0:
             self.run_global_relaxation()
-            self._total_wave_intensity *= 0.5 # Dampen after work
+            self._total_wave_intensity *= 0.5  # Dampen after work
 
     def run_global_relaxation(self) -> None:
         """Global manifold relaxation triggered by field agitation."""
         from app.semantic_inference_engine import RoleEmbeddingEngine
+
         ie = RoleEmbeddingEngine()
         ws = get_world_state()
 
@@ -171,27 +176,31 @@ class GraphUpdateScheduler:
         ie.relax_manifold()
         pressure_after = ws.metrics.field_pressure
 
-        ws.snapshot(label=f"global_relaxation_agitation_{round(self._total_wave_intensity, 2)}")
+        ws.snapshot(label=f"global_relaxation_agitation_{
+            round(
+                    self._total_wave_intensity,
+                    2)}")
 
-        self.dispatcher.dispatch(SemanticEvent(
-            event_type=SemanticEventType.EQUILIBRIUM_REACHED,
-            source="global_relaxation",
-            payload={
-                "energy": ws.metrics.global_energy,
-                "agitation": self._total_wave_intensity,
-                "pressure_drop": pressure_before - pressure_after
-            },
-            instability_delta=-0.05
-        ))
+        self.dispatcher.dispatch(
+            SemanticEvent(
+                event_type=SemanticEventType.EQUILIBRIUM_REACHED,
+                source="global_relaxation",
+                payload={
+                    "energy": ws.metrics.global_energy,
+                    "agitation": self._total_wave_intensity,
+                    "pressure_drop": pressure_before - pressure_after,
+                },
+                instability_delta=-0.05,
+            )
+        )
 
-    def schedule(self, task_id: str, priority: TaskPriority,
-                 handler: Callable, *args: Any, **kwargs: Any) -> None:
+    def schedule(self, task_id: str, priority: TaskPriority, handler: Callable, *args: Any, **kwargs: Any) -> None:
         """Delegate scheduling to the active world state's scheduler."""
         ws = get_world_state()
-        if hasattr(ws, '_scheduler') and ws._scheduler:
+        if hasattr(ws, "_scheduler") and ws._scheduler:
             ws._scheduler.schedule(task_id, priority, handler, *args, **kwargs)
         else:
-            # Fallback for bootstrap/tests
+            # Fallback for bootstrap / tests
             logging.getLogger(__name__).warning(f"No active scheduler for task {task_id}")
 
 
@@ -204,6 +213,7 @@ def get_scheduler() -> GraphUpdateScheduler:
         _scheduler = object()
         _scheduler = GraphUpdateScheduler()
     return _scheduler
+
 
 def reset_scheduler() -> None:
     """Reset the global scheduler (for testing)."""

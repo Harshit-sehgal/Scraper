@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 # Failure Ontology
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class FailureCategory(str, Enum):
     """Formal ontology of all known extraction failure modes.
 
@@ -54,7 +55,7 @@ class FailureCategory(str, Enum):
     """Could not resolve the domain."""
 
     CONNECTION_TIMEOUT = "connection_timeout"
-    """TCP/TLS handshake or initial connection timed out."""
+    """TCP / TLS handshake or initial connection timed out."""
 
     HTTP_ERROR = "http_error"
     """Server returned a non-2xx status code (4xx, 5xx)."""
@@ -119,6 +120,7 @@ class FailureCategory(str, Enum):
 # Failure Classification Result
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class FailureClassification:
     """Result of classifying an extraction attempt."""
@@ -180,7 +182,7 @@ RECOVERY_STRATEGIES: dict[FailureCategory, dict] = {
     FailureCategory.ANTI_BOT_BLOCK: {
         "strategy": "rotate_and_backoff",
         "params": {"delay_ms": 15000, "rotate_proxy": True},
-        "description": "Back off significantly, optionally rotate IP/identity.",
+        "description": "Back off significantly, optionally rotate IP / identity.",
     },
     FailureCategory.CAPTCHA: {
         "strategy": "abort",
@@ -269,6 +271,7 @@ RECOVERY_STRATEGIES: dict[FailureCategory, dict] = {
 # Classifier
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def classify_failure(
     telemetry: Optional[dict] = None,
     html: Optional[str] = None,
@@ -302,92 +305,109 @@ def classify_failure(
     # These are strong signals that often directly indicate the category.
 
     # DNS / Connection errors
-    if any(kw in error_text for kw in [
-        "dns", "name resolution", "nodename nor servname",
-        "temporary failure in name resolution",
-    ]):
+    if any(
+        kw in error_text
+        for kw in [
+            "dns",
+            "name resolution",
+            "nodename nor servname",
+            "temporary failure in name resolution",
+        ]
+    ):
         signals.append({"signal": "dns_error", "source": "error_message"})
-        return _build_classification(
-            FailureCategory.DNS_RESOLUTION_FAILURE, 0.95, signals
-        )
+        return _build_classification(FailureCategory.DNS_RESOLUTION_FAILURE, 0.95, signals)
 
-    if any(kw in error_text for kw in [
-        "connection refused", "connection reset", "connection timed out",
-        "connection closed", "econnrefused", "econnreset",
-    ]):
+    if any(
+        kw in error_text
+        for kw in [
+            "connection refused",
+            "connection reset",
+            "connection timed out",
+            "connection closed",
+            "econnrefused",
+            "econnreset",
+        ]
+    ):
         signals.append({"signal": "connection_error", "source": "error_message"})
-        return _build_classification(
-            FailureCategory.CONNECTION_TIMEOUT, 0.90, signals
-        )
+        return _build_classification(FailureCategory.CONNECTION_TIMEOUT, 0.90, signals)
 
-    if any(kw in error_text for kw in [
-        "timeout", "timed out", "deadline exceeded",
-    ]):
+    if any(
+        kw in error_text
+        for kw in [
+            "timeout",
+            "timed out",
+            "deadline exceeded",
+        ]
+    ):
         signals.append({"signal": "timeout", "source": "error_message"})
         # Could be multiple categories; check for hydration specifics
         if telemetry.get("fetch_method") == "playwright":
             if telemetry.get("dom_nodes", 0) < settings.CLASSIFY_HYDRATION_DOM_THRESHOLD:
-                return _build_classification(
-                    FailureCategory.HYDRATION_FAILURE, 0.75, signals
-                )
-        return _build_classification(
-            FailureCategory.TIMEOUT, 0.70, signals
-        )
+                return _build_classification(FailureCategory.HYDRATION_FAILURE, 0.75, signals)
+        return _build_classification(FailureCategory.TIMEOUT, 0.70, signals)
 
-    if any(kw in error_text for kw in [
-        "browser", "crash", "target closed", "protocol error",
-        "page.navigate", "browser context",
-    ]):
+    if any(
+        kw in error_text
+        for kw in [
+            "browser",
+            "crash",
+            "target closed",
+            "protocol error",
+            "page.navigate",
+            "browser context",
+        ]
+    ):
         signals.append({"signal": "browser_crash", "source": "error_message"})
-        return _build_classification(
-            FailureCategory.BROWSER_CRASH, 0.90, signals
-        )
+        return _build_classification(FailureCategory.BROWSER_CRASH, 0.90, signals)
 
     # Selector decay / empty extraction failure
-    if any(kw in error_text for kw in [
-        "zero_records_extracted", "no records extracted", "selector decay", "empty page",
-    ]):
+    if any(
+        kw in error_text
+        for kw in [
+            "zero_records_extracted",
+            "no records extracted",
+            "selector decay",
+            "empty page",
+        ]
+    ):
         signals.append({"signal": "selector_decay_msg", "source": "error_message"})
-        return _build_classification(
-            FailureCategory.SELECTOR_DECAY, 0.85, signals
-        )
+        return _build_classification(FailureCategory.SELECTOR_DECAY, 0.85, signals)
 
     # Anti-bot block / WAF
-    if any(kw in error_text for kw in [
-        "403 forbidden", "forbidden", "waf challenge", "anti-bot", "cloudflare", "captcha", "ip banned", "access denied",
-    ]):
+    if any(
+        kw in error_text
+        for kw in [
+            "403 forbidden",
+            "forbidden",
+            "waf challenge",
+            "anti-bot",
+            "cloudflare",
+            "captcha",
+            "ip banned",
+            "access denied",
+        ]
+    ):
         signals.append({"signal": "anti_bot_msg", "source": "error_message"})
-        return _build_classification(
-            FailureCategory.ANTI_BOT_BLOCK, 0.90, signals
-        )
+        return _build_classification(FailureCategory.ANTI_BOT_BLOCK, 0.90, signals)
 
     # ── Stage 2: HTTP Status Code Analysis ────────────────────────────
     if status_code is not None:
         if status_code == 429:
             signals.append({"signal": "http_429", "source": "status_code"})
-            return _build_classification(
-                FailureCategory.RATE_LIMITED, 0.95, signals
-            )
+            return _build_classification(FailureCategory.RATE_LIMITED, 0.95, signals)
         if status_code in (403, 401):
             signals.append({"signal": f"http_{status_code}", "source": "status_code"})
-            # Could be anti-bot or IP ban — check for challenge patterns in HTML
+            # Could be anti-bot or IP ban — check for challenge patterns in
+            # HTML
             if html and _has_challenge_patterns(html):
-                return _build_classification(
-                    FailureCategory.ANTI_BOT_BLOCK, 0.85, signals
-                )
-            return _build_classification(
-                FailureCategory.IP_BANNED, 0.70, signals
-            )
+                return _build_classification(FailureCategory.ANTI_BOT_BLOCK, 0.85, signals)
+            return _build_classification(FailureCategory.IP_BANNED, 0.70, signals)
         if status_code in (502, 503, 504):
             signals.append({"signal": f"http_{status_code}", "source": "status_code"})
-            return _build_classification(
-                FailureCategory.HTTP_ERROR, 0.80, signals
-            )
+            return _build_classification(FailureCategory.HTTP_ERROR, 0.80, signals)
         if status_code == 404:
             signals.append({"signal": "http_404", "source": "status_code"})
-            return _build_classification(
-                FailureCategory.HTTP_ERROR, 0.75, signals
-            )
+            return _build_classification(FailureCategory.HTTP_ERROR, 0.75, signals)
 
     # ── Stage 3: HTML / DOM Signal Analysis ──────────────────────────
     if html is not None:
@@ -397,43 +417,31 @@ def classify_failure(
             signals.append({"signal": "challenge_detected", "source": "html_patterns"})
             anti_bot_score = telemetry.get("anti_bot_score", 0.0)
             if anti_bot_score > 0.8:
-                return _build_classification(
-                    FailureCategory.ANTI_BOT_BLOCK, 0.90, signals
-                )
-            return _build_classification(
-                FailureCategory.ANTI_BOT_BLOCK, 0.75, signals
-            )
+                return _build_classification(FailureCategory.ANTI_BOT_BLOCK, 0.90, signals)
+            return _build_classification(FailureCategory.ANTI_BOT_BLOCK, 0.75, signals)
 
         # CAPTCHA patterns
         if _has_captcha_patterns(html):
             signals.append({"signal": "captcha_detected", "source": "html_patterns"})
-            return _build_classification(
-                FailureCategory.CAPTCHA, 0.85, signals
-            )
+            return _build_classification(FailureCategory.CAPTCHA, 0.85, signals)
 
         # Malformed DOM — very few closing tags, very irregular
         if _is_malformed_dom(html):
             signals.append({"signal": "malformed_dom", "source": "html_structure"})
-            return _build_classification(
-                FailureCategory.MALFORMED_DOM, 0.70, signals
-            )
+            return _build_classification(FailureCategory.MALFORMED_DOM, 0.70, signals)
 
-        # Empty or near-empty page (checked AFTER challenge/malformed patterns
+        # Empty or near-empty page (checked AFTER challenge / malformed patterns
         # since challenge pages can also be short but aren't "empty")
         if len(html.strip()) < settings.CLASSIFY_EMPTY_PAGE_HTML_THRESHOLD:
             signals.append({"signal": "tiny_html", "source": "html_size"})
-            return _build_classification(
-                FailureCategory.EMPTY_PAGE, 0.85, signals
-            )
+            return _build_classification(FailureCategory.EMPTY_PAGE, 0.85, signals)
 
         # Lazy load indicators with few records
         dom_nodes = telemetry.get("dom_nodes", 0)
         extraction_method = (extraction_result or {}).get("method", "")
         if dom_nodes < settings.CLASSIFY_LAZYLOAD_DOM_THRESHOLD and extraction_method == "regex":
             signals.append({"signal": "low_dom_count", "source": "dom_analysis"})
-            return _build_classification(
-                FailureCategory.LAZY_LOAD_TIMEOUT, 0.65, signals
-            )
+            return _build_classification(FailureCategory.LAZY_LOAD_TIMEOUT, 0.65, signals)
 
     # ── Stage 4: Extraction Result Analysis ───────────────────────────
     if extraction_result is not None:
@@ -444,60 +452,45 @@ def classify_failure(
         if not records:
             signals.append({"signal": "no_records", "source": "extraction_result"})
             if method == "memory":
-                return _build_classification(
-                    FailureCategory.SELECTOR_DECAY, 0.80, signals
-                )
+                return _build_classification(FailureCategory.SELECTOR_DECAY, 0.80, signals)
             if method == "discovery" and not selector_success:
-                return _build_classification(
-                    FailureCategory.MALFORMED_DOM, 0.60, signals
-                )
-            return _build_classification(
-                FailureCategory.NO_RECORDS_EXTRACTED, 0.70, signals
-            )
+                return _build_classification(FailureCategory.MALFORMED_DOM, 0.60, signals)
+            return _build_classification(FailureCategory.NO_RECORDS_EXTRACTED, 0.70, signals)
 
         # Check for partial extraction (too many empty fields)
         if _is_partial_extraction(records, extraction_result.get("schema_fields", [])):
             signals.append({"signal": "partial_extraction", "source": "field_analysis"})
-            return _build_classification(
-                FailureCategory.PARTIAL_EXTRACTION, 0.65, signals
-            )
+            return _build_classification(FailureCategory.PARTIAL_EXTRACTION, 0.65, signals)
 
     # ── Stage 5: Telemetry-based heuristics ───────────────────────────
     if telemetry:
         anti_bot_score = telemetry.get("anti_bot_score", 0.0)
         if anti_bot_score > settings.CLASSIFY_ANTIBOT_SCORE_THRESHOLD and not html:
             signals.append({"signal": "high_anti_bot_no_html", "source": "telemetry"})
-            return _build_classification(
-                FailureCategory.ANTI_BOT_BLOCK, 0.70, signals
-            )
+            return _build_classification(FailureCategory.ANTI_BOT_BLOCK, 0.70, signals)
 
         fallback = telemetry.get("fallback_usage", "none")
         selector_hit = telemetry.get("selector_hit_rate", 1.0)
         if fallback != "none" and selector_hit < settings.CLASSIFY_LOW_SELECTOR_HIT_THRESHOLD:
             signals.append({"signal": "low_selector_hit", "source": "telemetry"})
-            return _build_classification(
-                FailureCategory.SELECTOR_MISMATCH, 0.60, signals
-            )
+            return _build_classification(FailureCategory.SELECTOR_MISMATCH, 0.60, signals)
 
     # ── Stage 6: Fallback to domain intelligence patterns ─────────────
     if domain_intel:
         decay_rate = domain_intel.get("selector_decay_rate", 0.0)
         if decay_rate > settings.CLASSIFY_DECAY_RATE_THRESHOLD:
             signals.append({"signal": "high_decay_rate", "source": "domain_intel"})
-            return _build_classification(
-                FailureCategory.SELECTOR_DECAY, 0.55, signals
-            )
+            return _build_classification(FailureCategory.SELECTOR_DECAY, 0.55, signals)
 
     # ── Default ───────────────────────────────────────────────────────
     signals.append({"signal": "no_classification_matched", "source": "fallthrough"})
-    return _build_classification(
-        FailureCategory.UNKNOWN, 0.30, signals
-    )
+    return _build_classification(FailureCategory.UNKNOWN, 0.30, signals)
 
 
 # ═══════════════════════════════════════════════════════════════════════
 # Internal Helpers
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def _build_classification(
     category: FailureCategory,
@@ -518,15 +511,30 @@ def _build_classification(
 # ─── Detection Patterns ────────────────────────────────────────────────
 
 _CHALLENGE_PATTERNS = [
-    "cf-browser-verification", "cf-challenge", "cf-turnstile",
-    "challenge-platform", "checking your browser",
-    "akamai-ghost", "ak_bmsc", "bm_sz", "dd-captcha",
-    "datadome", "perimeterx", "px-captcha",
-    "incapsula", "visid_incap", "access denied",
-    "blocked", "sorry, you have been blocked",
-    "please verify", "security check", "suspicious activity",
-    "enable javascript", "javascript is required",
-    "attention required", "verify you are human",
+    "cf-browser-verification",
+    "cf-challenge",
+    "cf-turnstile",
+    "challenge-platform",
+    "checking your browser",
+    "akamai-ghost",
+    "ak_bmsc",
+    "bm_sz",
+    "dd-captcha",
+    "datadome",
+    "perimeterx",
+    "px-captcha",
+    "incapsula",
+    "visid_incap",
+    "access denied",
+    "blocked",
+    "sorry, you have been blocked",
+    "please verify",
+    "security check",
+    "suspicious activity",
+    "enable javascript",
+    "javascript is required",
+    "attention required",
+    "verify you are human",
 ]
 
 
@@ -540,11 +548,17 @@ def _has_challenge_patterns(html: str) -> bool:
 
 
 _CAPTCHA_PATTERNS = [
-    "g-recaptcha", "h-captcha", "recaptcha",
-    "captcha", "i'm not a robot",
-    "image verification", "text verification",
-    "select all images", "enter the characters",
-    "captcha-container", "captcha_wrapper",
+    "g-recaptcha",
+    "h-captcha",
+    "recaptcha",
+    "captcha",
+    "i'm not a robot",
+    "image verification",
+    "text verification",
+    "select all images",
+    "enter the characters",
+    "captcha-container",
+    "captcha_wrapper",
 ]
 
 
@@ -560,6 +574,7 @@ def _has_captcha_patterns(html: str) -> bool:
 def _is_malformed_dom(html: str) -> bool:
     """Heuristic: detect severely malformed DOM."""
     import re
+
     # Count opening vs closing tags
     openings = len(re.findall(r"<[a-zA-Z][^>]*>", html))
     closings = len(re.findall(r"</[a-zA-Z][^>]*>", html))
@@ -591,6 +606,7 @@ def _is_partial_extraction(records: list[dict], schema_fields: list[str]) -> boo
 # Domain Intelligence Integration
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def update_domain_with_failure(
     domain_intel_registry: Any,
     url: str,
@@ -609,7 +625,8 @@ def update_domain_with_failure(
         intel.failure_history = {}
     intel.failure_history[category] = intel.failure_history.get(category, 0) + 1
 
-    # If a domain consistently produces the same failure, adjust preferred strategy
+    # If a domain consistently produces the same failure, adjust preferred
+    # strategy
     threshold = settings.CLASSIFY_FAILURE_PATTERN_THRESHOLD
     for cat, count in intel.failure_history.items():
         if count >= threshold:
@@ -620,14 +637,17 @@ def update_domain_with_failure(
                 intel.preferred_strategy = "httpx"
             elif cat in ("hydration_failure", "lazy_load_timeout"):
                 intel.hydration_delay_ms = min(
-                    intel.hydration_delay_ms + settings.CLASSIFY_HYDRATION_DELAY_INCREMENT, settings.CLASSIFY_HYDRATION_DELAY_MAX
+                    intel.hydration_delay_ms + settings.CLASSIFY_HYDRATION_DELAY_INCREMENT,
+                    settings.CLASSIFY_HYDRATION_DELAY_MAX,
                 )
             break
 
     intel.last_updated = time.time()
     logger.info(
         "Domain %s: failure classified as %s (confidence=%.2f, strategy=%s)",
-        intel.domain, category, classification.confidence,
+        intel.domain,
+        category,
+        classification.confidence,
         classification.recovery_strategy,
     )
 
@@ -660,10 +680,8 @@ def translate_exception_to_friendly_message(error: Exception | str) -> str:
         )
 
     if "anti-bot" in err_text or "captcha" in err_text or "cloudflare" in err_text or "ddos" in err_text:
-        return (
-            "🛡️ [Anti-Bot Defense Block] An active challenge or firewall (e.g. Cloudflare, Captcha, Access Denied) "
-            "was encountered. To protect our node reputation, we bypassed standard fallbacks and triggered proxy rotation."
-        )
+        return ("🛡️ [Anti-Bot Defense Block] An active challenge or firewall (e.g. Cloudflare, Captcha, Access Denied) "
+                "was encountered. To protect our node reputation, we bypassed standard fallbacks and triggered proxy rotation.")
 
     if "crash" in err_text or "closed" in err_text:
         return (
@@ -671,4 +689,4 @@ def translate_exception_to_friendly_message(error: Exception | str) -> str:
             "DataForge has recycled the process container and restarted the scrape cycle cleanly."
         )
 
-    return f"❌ [Extraction Impediment] A system error occurred: {error}. Classifying root cause and scheduled for dynamic recovery."
+    return f"❌ [Extraction Impediment] A system error occurred: {error}. Classifying root cause and scheduled for dynamic recovery."  # noqa: E501

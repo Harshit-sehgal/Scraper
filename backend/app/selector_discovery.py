@@ -102,7 +102,7 @@ async def analyze_url_for_fields(
     3. If redirected (session_expired) AND search_params provided, attempts
        recovery by POSTing to the site's search form to generate a fresh session
     4. Assesses content quality (landing page vs data page)
-    5. Analyzes page structure (table/cards/list/mixed)
+    5. Analyzes page structure (table / cards / list / mixed)
     6. Detects value patterns (currencies, dates, ratings, etc.)
     7. Uses LLM to discover all data fields and their selectors
     8. Returns suggested fields with types, confidence, and example values
@@ -114,7 +114,7 @@ async def analyze_url_for_fields(
         search_params: Optional dict of search parameters to POST to the
             site's search form if the URL has expired. Keys are semantic
             (e.g. origin, destination, departure_date, return_date, adults).
-            Values are the search values (e.g. "NYC", "LHR", "05/15/2026").
+            Values are the search values (e.g. "NYC", "LHR", "05 / 15 / 2026").
 
     Returns:
         dict with:
@@ -166,16 +166,17 @@ async def analyze_url_for_fields(
                 if not location:
                     break
                 from urllib.parse import urljoin as _urljoin
+
                 redirect_target = _urljoin(str(resp.url), location)
 
                 # SSRF: Validate each redirect hop target
                 from app.url_safety import validate_public_http_url
+
                 try:
                     validate_public_http_url(redirect_target)
                 except ValueError as e:
                     logger.warning(
-                        "[URLAnalyzer] Redirect target blocked by SSRF validation: %s → %s: %s",
-                        url, redirect_target, e
+                        "[URLAnalyzer] Redirect target blocked by SSRF validation: %s → %s: %s", url, redirect_target, e
                     )
                     break
 
@@ -183,9 +184,7 @@ async def analyze_url_for_fields(
 
             if str(resp.url) != url:
                 final_url = str(resp.url)
-                logger.info(
-                    "[URLAnalyzer] URL resolved: %s → %s (after %d redirect hops)", url, final_url, hops
-                )
+                logger.info("[URLAnalyzer] URL resolved: %s → %s (after %d redirect hops)", url, final_url, hops)
     except Exception as exc:
         logger.debug(
             "[URLAnalyzer] Could not determine final URL via httpx for %s: %s",
@@ -218,22 +217,33 @@ async def analyze_url_for_fields(
     except Exception as e:
         logger.error("[URLAnalyzer] Failed to fetch %s: %s", url, e)
         from app.acquisition_state import AcquisitionLineage, AcquisitionState
+
         return {
             "url": url,
             "redirect_info": redirect_info,
             "acquisition_lineage": AcquisitionLineage(
-                original_url=url, final_url=final_url,
+                original_url=url,
+                final_url=final_url,
                 state=AcquisitionState.DIRECT,
-                message=f"Failed to fetch URL: {str(e)}",
+                message=f"Failed to fetch URL: {
+                    str(e)}",
             ).model_dump(mode="json"),
-            "user_message": f"Failed to fetch the URL: {str(e)}",
+            "user_message": f"Failed to fetch the URL: {
+                str(e)}",
             "session_detection": session_detection,
             "canonical_url": session_detection.get("canonical_url", url),
             "content_quality": None,
-            "empty_check": {"is_empty": True, "empty_type": "blank", "confidence": 1.0, "message": "Failed to fetch", "suggestions": []},
+            "empty_check": {
+                "is_empty": True,
+                "empty_type": "blank",
+                "confidence": 1.0,
+                "message": "Failed to fetch",
+                "suggestions": [],
+            },
             "search_form": None,
             "search_recovery": None,
-            "error": f"Failed to fetch URL: {str(e)}",
+            "error": f"Failed to fetch URL: {
+                str(e)}",
             "page_structure": "unknown",
             "structure_confidence": 0.0,
             "estimated_record_count": 0,
@@ -245,11 +255,13 @@ async def analyze_url_for_fields(
 
     if not html or len(html.strip()) < 100:
         from app.acquisition_state import AcquisitionLineage, AcquisitionState
+
         return {
             "url": url,
             "redirect_info": redirect_info,
             "acquisition_lineage": AcquisitionLineage(
-                original_url=url, final_url=final_url,
+                original_url=url,
+                final_url=final_url,
                 state=AcquisitionState.DIRECT,
                 message="Fetched page appears empty",
             ).model_dump(mode="json"),
@@ -257,7 +269,13 @@ async def analyze_url_for_fields(
             "session_detection": session_detection,
             "canonical_url": session_detection.get("canonical_url", url),
             "content_quality": None,
-            "empty_check": {"is_empty": True, "empty_type": "blank", "confidence": 1.0, "message": "Fetched page appears empty", "suggestions": ["The URL may be incorrect or the server returned an empty page"]},
+            "empty_check": {
+                "is_empty": True,
+                "empty_type": "blank",
+                "confidence": 1.0,
+                "message": "Fetched page appears empty",
+                "suggestions": ["The URL may be incorrect or the server returned an empty page"],
+            },
             "search_form": None,
             "search_recovery": None,
             "error": "Fetched page appears empty",
@@ -281,12 +299,7 @@ async def analyze_url_for_fields(
         search_form = {"detected": False, "form_fields": [], "search_fields": [], "action": ""}
     search_recovery = None
 
-    if (
-        config.attempt_recovery
-        and redirect_info.get("redirected")
-        and search_params
-        and search_form.get("detected")
-    ):
+    if config.attempt_recovery and redirect_info.get("redirected") and search_params and search_form.get("detected"):
         logger.info(
             "[URLAnalyzer] Redirected URL with search params — attempting recovery via %s",
             search_form.get("action", "/search"),
@@ -347,8 +360,12 @@ async def analyze_url_for_fields(
 
     # ── Step 6b: Empty Response Check ─────────────────────────────────
     # Detect pages that return 200 but have no useful data
-    empty_check = detect_empty_response(html) if config.detect_empty_responses else EmptyResponseCheck(
-        is_empty=False, empty_type="", confidence=0.0, message="Empty response detection disabled"
+    empty_check = (
+        detect_empty_response(html)
+        if config.detect_empty_responses
+        else EmptyResponseCheck(
+            is_empty=False, empty_type="", confidence=0.0, message="Empty response detection disabled"
+        )
     )
 
     # ── Step 7: Extract container values and build structured prompt ─
@@ -358,7 +375,7 @@ async def analyze_url_for_fields(
     # visible page text for individual values
     if len(container_values) < 3:
         soup = BeautifulSoup(html, "html.parser")
-        for noise in soup(['script', 'style', 'nav', 'footer', 'header', 'noscript', 'svg', 'form']):
+        for noise in soup(["script", "style", "nav", "footer", "header", "noscript", "svg", "form"]):
             noise.decompose()
         visible_text = soup.get_text(separator=" ", strip=True)
         chunks = []
@@ -371,16 +388,20 @@ async def analyze_url_for_fields(
     prompt = build_url_analysis_prompt(container_values, page_analysis)
 
     try:
-        result = await llm_json(messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You output valid JSON objects for data schema design. "
-                    "No markdown, no commentary. Return ONLY the JSON."
-                ),
-            },
-            {"role": "user", "content": prompt}
-        ], temperature=settings.URL_ANALYZER_TEMPERATURE, timeout=settings.LLM_SELECTOR_TIMEOUT)
+        result = await llm_json(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You output valid JSON objects for data schema design. "
+                        "No markdown, no commentary. Return ONLY the JSON."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=settings.URL_ANALYZER_TEMPERATURE,
+            timeout=settings.LLM_SELECTOR_TIMEOUT,
+        )
     except Exception as e:
         logger.exception("[URLAnalyzer] LLM analysis failed for %s: %s", url, e)
         result = None
@@ -432,35 +453,40 @@ async def analyze_url_for_fields(
                 raw_type = str(f.get("type", "string")).lower().strip()
                 mapped_type = field_type_map.get(raw_type, "string")
 
-                suggested_fields.append({
-                    "name": name,
-                    "type": mapped_type,
-                    "selector": "",
-                    "example_value": f.get("example_value", ""),
-                    "confidence": min(float(f.get("confidence", 0.5)), 1.0),
-                    "description": str(f.get("description", "")),
-                })
+                suggested_fields.append(
+                    {
+                        "name": name,
+                        "type": mapped_type,
+                        "selector": "",
+                        "example_value": f.get("example_value", ""),
+                        "confidence": min(float(f.get("confidence", 0.5)), 1.0),
+                        "description": str(f.get("description", "")),
+                    }
+                )
 
     # If LLM returned no fields, use pattern analysis as fallback
     if not suggested_fields:
         for hint in _value_patterns_to_field_types(patterns):
-            suggested_fields.append({
-                "name": hint["type"],
-                "type": hint["type"],
-                "selector": "",
-                "example_value": hint.get("example", ""),
-                "confidence": hint["confidence"],
-                "description": hint.get("description", ""),
-            })
+            suggested_fields.append(
+                {
+                    "name": hint["type"],
+                    "type": hint["type"],
+                    "selector": "",
+                    "example_value": hint.get("example", ""),
+                    "confidence": hint["confidence"],
+                    "description": hint.get("description", ""),
+                }
+            )
 
-    # Post-processing: rename generic type-name fields to more descriptive names
+    # Post-processing: rename generic type-name fields to more descriptive
+    # names
     suggested_fields = _rename_generic_fields(suggested_fields)
 
     # Sort by confidence descending
     suggested_fields.sort(key=lambda f: f["confidence"], reverse=True)
 
     # Use URL-analyzer-specific field limit
-    suggested_fields = suggested_fields[:settings.URL_ANALYZER_MAX_FIELDS]
+    suggested_fields = suggested_fields[: settings.URL_ANALYZER_MAX_FIELDS]
 
     item_container = profile.container_selector
     estimated_records = 0
@@ -469,22 +495,30 @@ async def analyze_url_for_fields(
 
     elapsed = time.time() - start_time
 
-    # Log with redirect/quality/recovery context
+    # Log with redirect / quality / recovery context
     quality_warning = ""
     if redirect_info.get("redirected"):
-        quality_warning = f" [REDIRECTED: {redirect_info.get('redirect_type', 'unknown')}]"
+        quality_warning = f" [REDIRECTED: {
+            redirect_info.get(
+                'redirect_type', 'unknown')}]"
     if content_quality.get("quality") != "good":
-        quality_warning += f" [QUALITY: {content_quality.get('quality', 'unknown')}]"
+        quality_warning += f" [QUALITY: {
+            content_quality.get(
+                'quality', 'unknown')}]"
     if search_recovery and search_recovery.get("success"):
         quality_warning += " [RECOVERED via search form]"
     logger.info(
         "[URLAnalyzer] Analyzed %s: %s structure, %d fields suggested, %.1fs%s",
         url if not search_recovery else search_recovery.get("fresh_url", url),
-        profile.structure_type, len(suggested_fields), elapsed, quality_warning,
+        profile.structure_type,
+        len(suggested_fields),
+        elapsed,
+        quality_warning,
     )
 
     # Build acquisition lineage from the final state
     from app.acquisition_state import AcquisitionLineage, AcquisitionState
+
     acquisition_lineage = AcquisitionLineage.from_redirect_info(
         redirect_info=redirect_info,
         original_url=url,
@@ -499,15 +533,19 @@ async def analyze_url_for_fields(
     acquisition_lineage.ephemeral_params = list(session_detection.get("ephemeral_params") or [])
 
     # Enrich lineage with evidence-based quality signals
-    acquisition_lineage.data_evidence_score = round(
-        1.0 if content_quality.get("has_data_containers") else 0.0
-        + (0.5 if not empty_check.is_empty else 0.0)
-        - anti_bot_score * 0.3
-    ) / 1.5
+    acquisition_lineage.data_evidence_score = (
+        round(
+            1.0
+            if content_quality.get("has_data_containers")
+            else 0.0 + (0.5 if not empty_check.is_empty else 0.0) - anti_bot_score * 0.3
+        )
+        / 1.5
+    )
     acquisition_lineage.anti_bot_score = round(anti_bot_score, 3)
     acquisition_lineage.containers_detected = content_quality.get("data_container_count", 0)
     acquisition_lineage.forms_detected = 1 if (search_form or {}).get("detected") else 0
     from app.browser_network_capture import get_browser_state, get_captures
+
     browser_state_evidence = get_browser_state(url)
     acquisition_lineage.network_payloads_found = len(get_captures(url))
     if not acquisition_lineage.recommended_next_action:
@@ -553,13 +591,17 @@ async def analyze_url_for_fields(
     # escalate to a more aggressive mode and retry.
     escalated_mode = None
     max_depth = config.max_retries
-    if (_escalation_depth < max_depth
-            and should_escalate(mode_enum, acquisition_lineage.state.value, empty_check.is_empty)):
+    if _escalation_depth < max_depth and should_escalate(
+        mode_enum, acquisition_lineage.state.value, empty_check.is_empty
+    ):
         escalated_mode = escalate_mode(mode_enum)
         if escalated_mode != mode_enum:
             logger.info(
                 "[URLAnalyzer] Escalating from %s → %s (depth %d) due to state=%s",
-                mode_enum.value, escalated_mode.value, _escalation_depth + 1, acquisition_lineage.state.value,
+                mode_enum.value,
+                escalated_mode.value,
+                _escalation_depth + 1,
+                acquisition_lineage.state.value,
             )
             return await analyze_url_for_fields(
                 url=url,

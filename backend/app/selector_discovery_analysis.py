@@ -2,7 +2,7 @@
 
 Extracted from selector_discovery.py for modularity.
 
-Ownership boundary: these functions handle HTML/DOM parsing, structure
+Ownership boundary: these functions handle HTML / DOM parsing, structure
 analysis, and programmatic CSS selector discovery. LLM-based orchestration
 and URL-level concerns (redirects, recovery) live in sibling modules.
 """
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 def _get_feedback_engine():
     """Lazy import to respect test mocking at app.selector_discovery.MotifFeedbackEngine."""
     from app.selector_discovery import MotifFeedbackEngine as _MotifFeedbackEngine
+
     return _MotifFeedbackEngine()
 
 
@@ -54,7 +55,7 @@ def _analyze_page_data_type(html: str, schema_fields: list[SchemaField]) -> dict
             "product_codes": bool(patterns.product_codes),
             "units": bool(patterns.units),
             "addresses": bool(patterns.address_fragments),
-        }
+        },
     }
 
 
@@ -90,7 +91,7 @@ def build_selector_prompt(
     structure_context = f"""
 PAGE STRUCTURE DETECTED: {structure_type.upper()} (confidence: {structure_confidence:.2f})
 - This could be a table, card layout, list, or mixed structure
-- Target the DATA CONTAINER, not header/footer/navigation
+- Target the DATA CONTAINER, not header / footer / navigation
 - For card-based layouts: look for repeating divs with classes like card, item, result, flight-result, product, listing
 - For tables: target <tr> rows inside <tbody>, skip the <thead> header rows
 - The data container should contain MULTIPLE repeating items, each with the same structure
@@ -99,7 +100,8 @@ PAGE STRUCTURE DETECTED: {structure_type.upper()} (confidence: {structure_confid
     if patterns:
         detected = [k for k, v in patterns.items() if v]
         if detected:
-            structure_context += f"\nVALUE PATTERNS DETECTED: {', '.join(detected)}"
+            structure_context += f"\nVALUE PATTERNS DETECTED: {
+                ', '.join(detected)}"
 
     header_context = ""
     if headers:
@@ -108,9 +110,9 @@ PAGE STRUCTURE DETECTED: {structure_type.upper()} (confidence: {structure_confid
     field_hints = []
     for f in schema_fields:
         hint = f'  - "{f.name}"'
-        hint += f' (type: {f.field_type.value})'
+        hint += f" (type: {f.field_type.value})"
         if f.description:
-            hint += f': {f.description}'
+            hint += f": {f.description}"
         field_hints.append(hint)
 
     schema_str = "\n".join(field_hints)
@@ -126,9 +128,9 @@ USER SCHEMA:
 
 CRITICAL EXCLUSIONS (apply to ANY page type):
 - Navigation menus, header, footer
-- Filter/sort options, sidebar content
-- Login/signup forms, social media links
-- Copyright/terms/privacy pages
+- Filter / sort options, sidebar content
+- Login / signup forms, social media links
+- Copyright / terms / privacy pages
 
 EXTRACTION RULES:
 1. Return ONLY JSON: {{"item_container": "selector", "fields": {{"field_name": "selector"}}}}
@@ -171,16 +173,18 @@ async def discover_selectors(
 
     selectors = {}
     try:
-        selectors = await _llm_json(messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You output valid JSON objects for CSS selector extraction. "
-                    "No markdown, no commentary."
-                ),
-            },
-            {"role": "user", "content": prompt}
-        ], timeout=settings.LLM_SELECTOR_TIMEOUT)
+        selectors = await _llm_json(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You output valid JSON objects for CSS selector extraction. " "No markdown, no commentary."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            timeout=settings.LLM_SELECTOR_TIMEOUT,
+        )
     except Exception as e:
         logger.exception("[SelectorDiscovery] LLM extraction failed: %s", e)
 
@@ -238,12 +242,26 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
         parent = el.parent
         if not parent:
             continue
-        siblings = [c for c in parent.find_all(True, recursive=False)
-                     if c.name not in ("script", "style", "noscript", "select", "option",
-                                       "input", "button", "textarea", "form",
-                                       "nav", "header", "footer")]
-        same_class_count = sum(1 for c in siblings
-                               if " ".join(c.get("class", [])) == " ".join(el.get("class", [])))
+        siblings = [
+            c
+            for c in parent.find_all(True, recursive=False)
+            if c.name
+            not in (
+                "script",
+                "style",
+                "noscript",
+                "select",
+                "option",
+                "input",
+                "button",
+                "textarea",
+                "form",
+                "nav",
+                "header",
+                "footer",
+            )
+        ]
+        same_class_count = sum(1 for c in siblings if " ".join(c.get("class", [])) == " ".join(el.get("class", [])))
         if same_class_count < 2:
             continue
         parent_css = _build_css_for_element(parent)
@@ -254,19 +272,22 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
             if parent_page_matches < 2:
                 continue
         data_signal_count = sum(
-            1 for c in siblings
+            1
+            for c in siblings
             for t in [c.get_text(separator=" ", strip=True)]
             if _re.search(r"[\$£€¥₹]\s*\d+|\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)
         )
         if data_signal_count < 2:
             continue
-        candidates.append({
-            "selector": parent_css,
-            "item_selector": css,
-            "count": same_class_count,
-            "score": same_class_count * 3 + data_signal_count * 2,
-            "sample_text": text[:80],
-        })
+        candidates.append(
+            {
+                "selector": parent_css,
+                "item_selector": css,
+                "count": same_class_count,
+                "score": same_class_count * 3 + data_signal_count * 2,
+                "sample_text": text[:80],
+            }
+        )
 
     if not candidates:
         candidates = _discover_direct_repeating_elements(soup)
@@ -296,43 +317,43 @@ def _compute_ui_noise_score(elements: list, texts: list[str]) -> float:
     """Score how likely a container candidate is to be UI chrome vs data.
 
     Uses structural signals — no domain-specific phrases:
-    - High link/button ratio → likely nav/sidebar
-    - Short average text length → likely menu/filter labels
-    - Low percent of elements with price/date signals → likely non-data
-    - High ratio of elements near nav/header/footer tags → likely chrome
+    - High link / button ratio → likely nav / sidebar
+    - Short average text length → likely menu / filter labels
+    - Low percent of elements with price / date signals → likely non-data
+    - High ratio of elements near nav / header / footer tags → likely chrome
 
     Returns 0.0 (definitely data) to 1.0 (definitely UI chrome).
     """
     if not elements or not texts:
         return 1.0
     import re as _re
+
     n = len(texts)
-    link_ratio = sum(1 for el in elements if el.name == 'a') / max(n, 1)
-    form_ratio = sum(1 for el in elements if el.name in ('input', 'select', 'button', 'textarea')) / max(n, 1)
+    link_ratio = sum(1 for el in elements if el.name == "a") / max(n, 1)
+    form_ratio = sum(1 for el in elements if el.name in ("input", "select", "button", "textarea")) / max(n, 1)
     short_text_ratio = sum(1 for t in texts if len(t) < 15) / max(n, 1)
-    price_or_date_ratio = sum(
-        1 for t in texts
-        if _re.search(r"[\$£€¥₹]\s*\d+|\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)
-    ) / max(n, 1)
+    price_or_date_ratio = sum(1 for t in texts if _re.search(r"[\$£€¥₹]\s*\d+|\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)) / max(
+        n, 1
+    )
     low_diversity = 1.0 if len(set(t[:20] for t in texts)) < max(n * 0.3, 2) else 0.0
     near_chrome = 0
     for el in elements:
         p = el.parent
         for _ in range(3):
-            if not p or not hasattr(p, 'name'):
+            if not p or not hasattr(p, "name"):
                 break
-            if p.name in ('nav', 'header', 'footer', 'aside'):
+            if p.name in ("nav", "header", "footer", "aside"):
                 near_chrome += 1
                 break
-            p = p.parent if hasattr(p, 'parent') else None
+            p = p.parent if hasattr(p, "parent") else None
     near_chrome_ratio = near_chrome / max(n, 1)
     score = (
-        link_ratio * 0.3 +
-        form_ratio * 0.2 +
-        short_text_ratio * 0.3 +
-        (1.0 - price_or_date_ratio) * 0.4 +
-        low_diversity * 0.2 +
-        near_chrome_ratio * 0.3
+        link_ratio * 0.3
+        + form_ratio * 0.2
+        + short_text_ratio * 0.3
+        + (1.0 - price_or_date_ratio) * 0.4
+        + low_diversity * 0.2
+        + near_chrome_ratio * 0.3
     )
     return min(max(score, 0.0), 1.0)
 
@@ -344,13 +365,28 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:
     use that class directly as the item_container selector.
     """
     import re as _re
+
     candidates: list[dict] = []
     class_el_map: dict[str, list] = {}
 
     for el in soup.find_all(True):
-        if el.name in ("script", "style", "noscript", "svg", "meta", "link",
-                        "select", "option", "input", "button", "textarea",
-                        "form", "nav", "header", "footer"):
+        if el.name in (
+            "script",
+            "style",
+            "noscript",
+            "svg",
+            "meta",
+            "link",
+            "select",
+            "option",
+            "input",
+            "button",
+            "textarea",
+            "form",
+            "nav",
+            "header",
+            "footer",
+        ):
             continue
         css = _build_css_for_element(el)
         if not css:
@@ -372,14 +408,8 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:
         if empty_ratio > 0.3:
             continue
         avg_text_len = sum(len(t) for t in texts) / max(len(texts), 1)
-        data_signals = sum(
-            1 for t in non_empty
-            if _re.search(r"[\$£€¥₹]\s*\d+", t)
-        )
-        date_signals = sum(
-            1 for t in non_empty
-            if _re.search(r"\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)
-        )
+        data_signals = sum(1 for t in non_empty if _re.search(r"[\$£€¥₹]\s*\d+", t))
+        date_signals = sum(1 for t in non_empty if _re.search(r"\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t))
         text_diversity = len(set(t[:40] for t in non_empty))
         ui_noise_score = _compute_ui_noise_score(elements, non_empty)
         if ui_noise_score > 0.6:
@@ -389,13 +419,15 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:
         score = len(elements) * 0.5 + data_signals * 2 + date_signals * 2 + avg_text_len * 0.05 + text_diversity * 2
         if avg_text_len < 50:
             continue
-        candidates.append({
-            "selector": css,
-            "item_selector": css,
-            "count": len(elements),
-            "score": score,
-            "sample_text": non_empty[0][:80],
-        })
+        candidates.append(
+            {
+                "selector": css,
+                "item_selector": css,
+                "count": len(elements),
+                "score": score,
+                "sample_text": non_empty[0][:80],
+            }
+        )
 
     return candidates
 
@@ -409,10 +441,26 @@ def _fallback_parent_child_discovery(soup) -> list[dict]:
     import re as _re
 
     for parent in body.find_all(True):
-        children = [c for c in parent.find_all(True, recursive=False)
-                     if c.name not in ("script", "style", "noscript", "svg",
-                                       "select", "option", "input", "button",
-                                       "textarea", "form", "nav", "header", "footer")]
+        children = [
+            c
+            for c in parent.find_all(True, recursive=False)
+            if c.name
+            not in (
+                "script",
+                "style",
+                "noscript",
+                "svg",
+                "select",
+                "option",
+                "input",
+                "button",
+                "textarea",
+                "form",
+                "nav",
+                "header",
+                "footer",
+            )
+        ]
         if len(children) < 2:
             continue
 
@@ -430,9 +478,9 @@ def _fallback_parent_child_discovery(soup) -> list[dict]:
             continue
 
         data_signals = sum(
-            1 for t in non_empty
-            if _re.search(r"[\$£€¥₹]\s*\d", t)
-            or _re.search(r"\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}", t)
+            1
+            for t in non_empty
+            if _re.search(r"[\$£€¥₹]\s*\d", t) or _re.search(r"\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}", t)
         )
         if data_signals < 2:
             continue
@@ -443,13 +491,15 @@ def _fallback_parent_child_discovery(soup) -> list[dict]:
 
         css = _build_css_for_element(parent)
         if css:
-            candidates.append({
-                "selector": css,
-                "item_selector": "",
-                "count": len(children),
-                "score": score,
-                "sample_text": non_empty[0][:80] if non_empty else "",
-            })
+            candidates.append(
+                {
+                    "selector": css,
+                    "item_selector": "",
+                    "count": len(children),
+                    "score": score,
+                    "sample_text": non_empty[0][:80] if non_empty else "",
+                }
+            )
     return candidates
 
 
@@ -463,18 +513,44 @@ def _build_css_for_element(el) -> str | None:
         if el.name not in ("div", "span", "html", "body"):
             return f"{el.name}{cls_sel}"
         return cls_sel
-    if el.name not in ("div", "span", "html", "body", "main", "section", "article",
-                        "a", "p", "li", "ul", "ol", "img", "br", "i", "b",
-                        "strong", "em", "small", "label",
-                        "h1", "h2", "h3", "h4", "h5", "h6",
-                        "tr", "td", "th", "tbody", "thead"):
+    if el.name not in (
+        "div",
+        "span",
+        "html",
+        "body",
+        "main",
+        "section",
+        "article",
+        "a",
+        "p",
+        "li",
+        "ul",
+        "ol",
+        "img",
+        "br",
+        "i",
+        "b",
+        "strong",
+        "em",
+        "small",
+        "label",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "tr",
+        "td",
+        "th",
+        "tbody",
+        "thead",
+    ):
         return el.name
     return None
 
 
-def _infer_field_selectors_from_container(
-    container_sel: str, html: str, schema_fields: list[SchemaField]
-) -> dict:
+def _infer_field_selectors_from_container(container_sel: str, html: str, schema_fields: list[SchemaField]) -> dict:
     """Infer field-level selectors by scanning container items for type-matching text.
 
     Returns a dict mapping field_name to selector (string). Empty string means

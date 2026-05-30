@@ -1,0 +1,344 @@
+"""\
+Audit Logger — structured event logging for security-relevant actions.
+
+Provides a dedicated audit log separate from application logging:
+- Authentication events (login success / failure, RBAC violations)
+- Administrative actions (job deletion, system config changes)
+- Data access events (result exports, sensitive operations)
+
+Uses Python's RotatingFileHandler for log rotation.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import time
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from typing import Any, Optional
+
+# ─── Constants ─────────────────────────────────────────────────────────────
+AUDIT_LOG_DIR = "logs"
+AUDIT_LOG_FILE = "audit.log"
+AUDIT_LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+AUDIT_LOG_BACKUP_COUNT = 5
+
+# ─── Module-level state ───────────────────────────────────────────────────
+_logger: Optional[logging.Logger] = None
+
+
+def _get_audit_logger() -> logging.Logger:
+    """Get or create the audit logger singleton."""
+    global _logger
+    if _logger is not None:
+        return _logger
+
+    _logger = logging.getLogger("audit")
+    _logger.setLevel(logging.INFO)
+
+    # Prevent the audit logger from propagating to the root logger
+    _logger.propagate = False
+
+    # Only add handler if not already configured
+    if not _logger.handlers:
+        log_dir = Path(AUDIT_LOG_DIR)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / AUDIT_LOG_FILE
+
+        handler = RotatingFileHandler(
+            filename=str(log_path),
+            maxBytes=AUDIT_LOG_MAX_BYTES,
+            backupCount=AUDIT_LOG_BACKUP_COUNT,
+            encoding="utf-8",
+        )
+        handler.setLevel(logging.INFO)
+
+        formatter = logging.Formatter(
+            "%(asctime)s [AUDIT] %(message)s",
+            datefmt="%Y-%m-%dT%H:%M:%S",
+        )
+        handler.setFormatter(formatter)
+        _logger.addHandler(handler)
+
+    return _logger
+
+
+# ─── Audit Event Types ────────────────────────────────────────────────────
+
+
+class AuditEvent:
+    """Structured audit event with consistent fields."""
+
+    def __init__(
+        self,
+        event_type: str,
+        actor: str,
+        action: str,
+        resource: str,
+        details: Optional[dict[str, Any]] = None,
+        outcome: str = "success",
+    ):
+        self.timestamp = time.time()
+        self.event_type = event_type
+        self.actor = actor
+        self.action = action
+        self.resource = resource
+        self.details = details or {}
+        self.outcome = outcome
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "timestamp": self.timestamp,
+            "iso_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.timestamp)),
+            "event_type": self.event_type,
+            "actor": self.actor,
+            "action": self.action,
+            "resource": self.resource,
+            "outcome": self.outcome,
+            "details": self.details,
+        }
+
+    def to_log_line(self) -> str:
+        """Serialize to a single-line JSON for structured logging."""
+        return json.dumps(self.to_dict(), default=str)
+
+
+# ─── Public API ───────────────────────────────────────────────────────────
+
+
+def log_auth_event(
+    actor: str,
+    action: str,
+    resource: str = "",
+    outcome: str = "success",
+    details: Optional[dict[str, Any]] = None,
+) -> None:
+    """Log an authentication-related event.
+
+    Args:
+        actor: The identity attempting authentication (e.g. IP, key prefix)
+        action: The auth action (e.g. "login", "logout", "token_refresh")
+        resource: Optional resource being accessed
+        outcome: "success" or "failure"
+        details: Optional additional context
+    """
+    event = AuditEvent(
+        event_type="auth",
+        actor=actor,
+        action=action,
+        resource=resource,
+        outcome=outcome,
+        details=details,
+    )
+    _get_audit_logger().info(event.to_log_line())
+
+
+def log_rbac_event(
+    actor: str,
+    action: str,
+    resource: str,
+    role: str,
+    outcome: str = "denied",
+    details: Optional[dict[str, Any]] = None,
+) -> None:
+    """Log an RBAC authorization event.
+
+    Args:
+        actor: The user / role attempting the action
+        action: The action attempted (e.g. "delete_job", "create_job")
+        resource: The resource being accessed
+        role: The role assigned to the actor
+        outcome: "granted", "denied", or "escalation"
+        details: Optional additional context
+    """
+    event = AuditEvent(
+        event_type="rbac",
+        actor=actor,
+        action=action,
+        resource=resource,
+        outcome=outcome,
+        details={**(details or {}), "role": role},
+    )
+    _get_audit_logger().info(event.to_log_line())
+
+
+def log_admin_action(
+    actor: str,
+    action: str,
+    resource: str,
+    details: Optional[dict[str, Any]] = None,
+) -> None:
+    """Log an administrative action.
+
+    Args:
+        actor: The admin identity
+        action: The action performed
+        resource: The resource affected
+        details: Optional additional context
+    """
+    event = AuditEvent(
+        event_type="admin",
+        actor=actor,
+        action=action,
+        resource=resource,
+        outcome="success",
+        details=details,
+    )
+    _get_audit_logger().info(event.to_log_line())
+
+
+def log_data_access(
+    actor: str,
+    action: str,
+    resource: str,
+    details: Optional[dict[str, Any]] = None,
+) -> None:
+    """Log a data access event (exports, sensitive reads).
+
+    Args:
+        actor: The identity accessing data
+        action: The access action (e.g. "export_csv", "export_json")
+        resource: The resource being accessed
+        details: Optional additional context
+    """
+    event = AuditEvent(
+        event_type="data_access",
+        actor=actor,
+        action=action,
+        resource=resource,
+        outcome="success",
+        details=details,
+    )
+    _get_audit_logger().info(event.to_log_line())
+
+
+def log_job_event(
+    actor: str,
+    action: str,
+    job_id: str,
+    outcome: str = "success",
+    details: Optional[dict[str, Any]] = None,
+) -> None:
+    """Log a job lifecycle event.
+
+    Args:
+        actor: The identity that triggered the event
+        action: The job action (e.g. "created", "canceled", "deleted")
+        job_id: The job ID
+        outcome: "success" or "failure"
+        details: Optional additional context
+    """
+    event = AuditEvent(
+        event_type="job",
+        actor=actor,
+        action=action,
+        resource=f"job:{job_id}",
+        outcome=outcome,
+        details=details,
+    )
+    _get_audit_logger().info(event.to_log_line())
+
+
+def log_system_event(
+    action: str,
+    resource: str = "",
+    outcome: str = "success",
+    details: Optional[dict[str, Any]] = None,
+) -> None:
+    """Log a system-level event (startup, shutdown, config change).
+
+    Args:
+        action: The system action
+        resource: Optional resource affected
+        outcome: "success" or "failure"
+        details: Optional additional context
+    """
+    event = AuditEvent(
+        event_type="system",
+        actor="system",
+        action=action,
+        resource=resource,
+        outcome=outcome,
+        details=details,
+    )
+    _get_audit_logger().info(event.to_log_line())
+
+
+# ─── Validation ───────────────────────────────────────────────────────────
+
+
+def _parse_audit_log_line(line: str) -> Optional[dict[str, Any]]:
+    """Parse a single audit log line back into a dictionary.
+
+    Useful for testing and log analysis.
+    """
+    try:
+        # Extract the JSON portion after the timestamp prefix
+        # Format: "2026 - 05 - 30T12:00:00 [AUDIT] {...json...}"
+        if "[AUDIT]" in line:
+            json_start = line.index("[AUDIT]") + len("[AUDIT] ")
+            return json.loads(line[json_start:])
+        return json.loads(line)
+    except (ValueError, json.JSONDecodeError):
+        return None
+
+
+def get_audit_log_path() -> Path:
+    """Get the current audit log file path."""
+    return Path(AUDIT_LOG_DIR) / AUDIT_LOG_FILE
+
+
+def get_recent_events(count: int = 50) -> list[dict[str, Any]]:
+    """Return the most recent audit events from the log file.
+
+    Args:
+        count: Maximum number of events to return
+
+    Returns:
+        List of parsed audit event dictionaries, most recent first
+    """
+    log_path = get_audit_log_path()
+    if not log_path.exists():
+        return []
+
+    events: list[dict[str, Any]] = []
+    try:
+        with open(log_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                parsed = _parse_audit_log_line(line)
+                if parsed:
+                    events.append(parsed)
+    except (OSError, IOError) as e:
+        logging.getLogger(__name__).warning("Failed to read audit log: %s", e)
+        return []
+
+    return events[-count:]
+
+
+# ─── Integration with main.py ─────────────────────────────────────────────
+
+# These functions are meant to be called from middleware / hooks in main.py.
+
+# Example usage in main.py:
+#
+#   from app.audit_logger import log_auth_event, log_rbac_event
+#
+#   # Log auth failure in api_key_middleware:
+#   log_auth_event(
+#       actor=request.client.host if request.client else "unknown",
+#       action="api_key_auth",
+#       outcome="failure",
+#       details={"path": request.url.path},
+#   )
+
+
+def reset_audit_logger() -> None:
+    """Reset the audit logger singleton (for testing)."""
+    global _logger
+    if _logger:
+        _logger.handlers.clear()
+    _logger = None

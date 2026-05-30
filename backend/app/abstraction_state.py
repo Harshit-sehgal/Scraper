@@ -9,12 +9,14 @@ from app.transaction_context import active_transaction
 
 import time
 
+
 class AbstractionState:
     """Sole owner of the semantic field's hierarchical abstractions."""
 
     def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
         self._delta_callback = delta_callback
-        # Envelopes: envelope_id -> {constituents: Set[str], manifold_vec: list, level: int}
+        # Envelopes: envelope_id -> {constituents: Set[str], manifold_vec:
+        # list, level: int}
         self._envelopes: Dict[str, dict] = {}
         # Abstraction Levels: role -> level (0 = base, 1 = higher-order)
         self._role_levels: Dict[str, int] = {}
@@ -42,7 +44,7 @@ class AbstractionState:
         """Snapshot current state for staging."""
         self._staging = {
             "envelopes": {k: dict(v) for k, v in self._envelopes.items()},
-            "role_levels": dict(self._role_levels)
+            "role_levels": dict(self._role_levels),
         }
 
     def commit(self):
@@ -58,52 +60,48 @@ class AbstractionState:
     def _get_struct(self, key: str):
         if self._staging is not None:
             return self._staging[key]
-        attr_map = {
-            "envelopes": "_envelopes",
-            "role_levels": "_role_levels"
-        }
+        attr_map = {"envelopes": "_envelopes", "role_levels": "_role_levels"}
         return getattr(self, attr_map[key])
 
     def _set_struct(self, key: str, val):
         if self._staging is not None:
             self._staging[key] = val
         else:
-            attr_map = {
-                "envelopes": "_envelopes",
-                "role_levels": "_role_levels"
-            }
+            attr_map = {"envelopes": "_envelopes", "role_levels": "_role_levels"}
             setattr(self, attr_map[key], val)
 
     # ─── Controlled Mutations ────────────────────────────────────────────
 
-    def create_envelope(self, envelope_id: str, constituents: List[str], 
-                        manifold_vec: List[float], level: int = 1):
+    def create_envelope(self, envelope_id: str, constituents: List[str], manifold_vec: List[float], level: int = 1):
         """Distill a set of roles into a singular higher-order envelope (Phase 38)."""
         envelopes = self._get_struct("envelopes")
         levels = self._get_struct("role_levels")
-        
+
         envelopes[envelope_id] = {
             "constituents": set(constituents),
             "manifold_vec": list(manifold_vec),
             "level": level,
-            "created_at": time.time()
+            "created_at": time.time(),
         }
         levels[envelope_id] = level
-        
+
         self._set_struct("envelopes", envelopes)
         self._set_struct("role_levels", levels)
-        self._record("create_envelope", {
-            "envelope_id": envelope_id, 
-            "constituents": list(constituents),
-            "manifold_vec": list(manifold_vec),
-            "level": level
-        })
+        self._record(
+            "create_envelope",
+            {
+                "envelope_id": envelope_id,
+                "constituents": list(constituents),
+                "manifold_vec": list(manifold_vec),
+                "level": level,
+            },
+        )
 
     def dissolve_envelope(self, envelope_id: str):
         """Dissolve a higher-order concept back into its constituents."""
         envelopes = self._get_struct("envelopes")
         levels = self._get_struct("role_levels")
-        
+
         if envelope_id in envelopes:
             del envelopes[envelope_id]
             levels.pop(envelope_id, None)
@@ -129,11 +127,15 @@ class AbstractionState:
     def to_dict(self) -> dict:
         return {
             "abstraction": {
-                "envelopes": {k: {"constituents": list(v["constituents"]), 
-                                  "manifold_vec": list(v["manifold_vec"]),
-                                  "level": v["level"]} 
-                             for k, v in self.envelopes.items()},
-                "role_levels": dict(self._role_levels)
+                "envelopes": {
+                    k: {
+                        "constituents": list(v["constituents"]),
+                        "manifold_vec": list(v["manifold_vec"]),
+                        "level": v["level"],
+                    }
+                    for k, v in self.envelopes.items()
+                },
+                "role_levels": dict(self._role_levels),
             }
         }
 
@@ -141,10 +143,10 @@ class AbstractionState:
         self.clear()
         abs_data = data.get("abstraction", {})
         raw_envelopes = abs_data.get("envelopes", {})
-        self._envelopes = {k: {"constituents": set(v["constituents"]),
-                               "manifold_vec": list(v["manifold_vec"]),
-                               "level": v["level"]}
-                          for k, v in raw_envelopes.items()}
+        self._envelopes = {
+            k: {"constituents": set(v["constituents"]), "manifold_vec": list(v["manifold_vec"]), "level": v["level"]}
+            for k, v in raw_envelopes.items()
+        }
         self._role_levels = dict(abs_data.get("role_levels", {}))
 
     def clear(self):

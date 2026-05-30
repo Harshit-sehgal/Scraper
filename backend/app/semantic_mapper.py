@@ -1,4 +1,3 @@
-
 """
 Layer 3: Semantic Mapper
 =========================
@@ -18,9 +17,11 @@ from app.intent_parser import SEMANTIC_NEED_KEYWORDS, IntentSchema
 from app.page_profiler import StructureProfile, ValuePatterns
 from app.semantic_ir import SemanticType
 
+
 @dataclass
 class FieldMapping:
     """Mapping of a single extracted value to a semantic need."""
+
     field_name: str
     semantic_need: str
     original_value: str
@@ -34,6 +35,7 @@ class FieldMapping:
 @dataclass
 class RecordMapping:
     """Full mapping of an extracted record to user intent."""
+
     original_data: Dict[str, str]
     mapped_fields: Dict[str, str]
     confidence_scores: Dict[str, float]
@@ -58,9 +60,9 @@ _SEMANTIC_PATTERNS_RAW = {
         r"\+?\d[\d\s\-\(\)]{7,}",
     ],
     SemanticType.RATING: [
-        r"\d+\.?\d*\s*/\s*5",
+        r"\d+\.?\d*\s*/\s * 5",
         r"rated\s*\d+\.?\d*",
-        r"\d+\.?\d*\s*stars?",
+        r"\d+\.?\d*\s * stars?",
     ],
     SemanticType.URL: [
         r"https?://[^\s]+",
@@ -71,14 +73,15 @@ _SEMANTIC_PATTERNS_RAW = {
         r"\b\d+[A-Z\-_]+[A-Z\d\-_]*\b",
     ],
     SemanticType.DURATION: [
-        r"\d+h\s*\d*m|\d+h$",
+        r"\d+h\s*\d * m|\d+h$",
     ],
     SemanticType.CODE: [
         r"^[A-Z]{2,5}$",
     ],
 }
 
-# Pre-compile all regex patterns at module load (O(1) per call instead of O(n) recompilation)
+# Pre-compile all regex patterns at module load (O(1) per call instead of
+# O(n) recompilation)
 SEMANTIC_PATTERNS: Dict[SemanticType, List[Tuple[re.Pattern, int]]] = {}
 for stype, patterns in _SEMANTIC_PATTERNS_RAW.items():
     flags = 0 if stype == SemanticType.CODE else re.IGNORECASE
@@ -122,15 +125,43 @@ def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType
         if _NUMERIC_PATTERN.match(str(value).strip()):
             return SemanticType.NUMBER, 0.60
 
-    # 4. Organization/Entity context
+    # 4. Organization / Entity context
     v_str = str(value).strip()
     v_lower = v_str.lower()
     _UI_NOISE = {
-        'view', 'more', 'skip', 'contact', 'home', 'menu', 'search',
-        'filter', 'sort', 'send', 'get', 'touch', 'back', 'next',
-        'previous', 'click', 'here', 'read', 'learn', 'all', 'rights',
-        'reserved', 'copyright', 'powered', 'by', 'content', 'submit',
-        'cancel', 'save', 'delete', 'edit', 'update', 'share'
+        "view",
+        "more",
+        "skip",
+        "contact",
+        "home",
+        "menu",
+        "search",
+        "filter",
+        "sort",
+        "send",
+        "get",
+        "touch",
+        "back",
+        "next",
+        "previous",
+        "click",
+        "here",
+        "read",
+        "learn",
+        "all",
+        "rights",
+        "reserved",
+        "copyright",
+        "powered",
+        "by",
+        "content",
+        "submit",
+        "cancel",
+        "save",
+        "delete",
+        "edit",
+        "update",
+        "share",
     }
 
     if v_lower in _UI_NOISE:
@@ -151,7 +182,8 @@ def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType
             else:
                 return SemanticType.TEXT, 0.50
 
-    # Product-like (brand naming: starts lowercase, has internal uppercase, e.g. iPhone)
+    # Product-like (brand naming: starts lowercase, has internal uppercase,
+    # e.g. iPhone)
     if v_str and len(v_str) >= 3 and v_str[0].islower() and any(c.isupper() for c in v_str[1:]):
         return SemanticType.ORGANIZATION, 0.60
 
@@ -183,30 +215,33 @@ def is_child_fragment(value: str, seen_values: set) -> bool:
 
         # Strategy 1: Sub-numeric suppression (e.g., "238" inside "£238")
         if value_is_digit:
-            # Suppress if it's a boundary fragment (prefix/suffix)
+            # Suppress if it's a boundary fragment (prefix / suffix)
             is_boundary = seen_lower.startswith(value_lower) or seen_lower.endswith(value_lower)
 
-            # OR if it's bounded by common separators (middle fragment, e.g. "-05-" in date)
+            # OR if it's bounded by common separators (middle fragment, e.g.
+            # "-05-" in date)
             if not is_boundary:
                 # Check for separators around the value in the parent string
                 idx = seen_lower.find(value_lower)
                 if idx > 0 and idx + len(value_lower) < len(seen_lower):
-                    before = seen_lower[idx-1]
+                    before = seen_lower[idx - 1]
                     after = seen_lower[idx + len(value_lower)]
                     if before in " /-." and after in " /-.":
                         is_boundary = True
 
             if is_boundary:
-                # If the parent is a currency, date, or rated value, suppress pure digits
+                # If the parent is a currency, date, or rated value, suppress
+                # pure digits
                 if any(sym in seen_str for sym in "$\u20a8\u20ac\u00a3\u00a5\u20b9/-"):
                     return True
                 # If parent has numbers followed by text (e.g., "45000 miles")
                 if re.search(r"\d+\s*[a-zA-Z]+", seen_str):
                     return True
 
-        # Strategy 2: Prefix/Suffix suppression for fragments
+        # Strategy 2: Prefix / Suffix suppression for fragments
         if seen_lower.startswith(value_lower) or seen_lower.endswith(value_lower):
-            # Only suppress if it's very short and part of a multi-word or compound value
+            # Only suppress if it's very short and part of a multi-word or
+            # compound value
             if len(value_lower) < 5:
                 # If the separator is space or punctuation, it's a fragment
                 if value_is_digit or any(c in " /-,." for c in seen_lower.replace(value_lower, "", 1)):
@@ -221,12 +256,12 @@ def match_values_to_intent(
     intent: IntentSchema,
     page_profile: StructureProfile,
     value_patterns: ValuePatterns,
-    headers: Optional[List[str]] = None
+    headers: Optional[List[str]] = None,
 ) -> List[RecordMapping]:
     """
     Match extracted values to user intent by WHAT THEY ARE, not where they came from.
 
-    Input: extracted_records = [{"col1": "£238", "col2": "22-05-2026", "col3": "Lufthansa"}]
+    Input: extracted_records = [{"col1": "£238", "col2": "22 - 05 - 2026", "col3": "Lufthansa"}]
            intent = IntentSchema with semantic_needs = {"price": [...], "date": [...]}
     Output: RecordMapping with mapped fields and confidence scores
     """
@@ -235,22 +270,14 @@ def match_values_to_intent(
     mapped_records = []
 
     for record in extracted_records:
-        mapping = _map_single_record(
-            record,
-            intent,
-            headers,
-            value_patterns
-        )
+        mapping = _map_single_record(record, intent, headers, value_patterns)
         mapped_records.append(mapping)
 
     return mapped_records
 
 
 def _map_single_record(
-    record: Dict[str, str],
-    intent: IntentSchema,
-    headers: List[str],
-    value_patterns: ValuePatterns
+    record: Dict[str, str], intent: IntentSchema, headers: List[str], value_patterns: ValuePatterns
 ) -> RecordMapping:
     """Map a single record's values to user intent."""
     mapped_fields = {}
@@ -273,13 +300,7 @@ def _map_single_record(
     # For each semantic need the user has, try to find a matching value
     used_values: set[str] = set()
     for semantic_need in intent.semantic_needs.keys():
-        best_mapping = _find_best_value_for_need(
-            all_values,
-            semantic_need,
-            headers,
-            value_patterns,
-            used_values
-        )
+        best_mapping = _find_best_value_for_need(all_values, semantic_need, headers, value_patterns, used_values)
 
         if best_mapping:
             mapped_fields[best_mapping.field_name] = best_mapping.mapped_value
@@ -303,7 +324,7 @@ def _map_single_record(
         original_data=record,
         mapped_fields=mapped_fields,
         confidence_scores=confidence_scores,
-        unmatched_values=unmatched_values[:10]  # Limit
+        unmatched_values=unmatched_values[:10],  # Limit
     )
 
 
@@ -312,7 +333,7 @@ def _find_best_value_for_need(
     semantic_need: str,
     headers: List[str],
     value_patterns: ValuePatterns,
-    used_values: Optional[set] = None
+    used_values: Optional[set] = None,
 ) -> Optional[FieldMapping]:
     """
     Find the best value that matches a semantic need.
@@ -346,19 +367,22 @@ def _find_best_value_for_need(
             for compiled in patterns:
                 pattern = compiled[0]
                 if pattern.search(str(value)):
-                    # pattern is a compiled regex object, convert to string for display
+                    # pattern is a compiled regex object, convert to string for
+                    # display
                     pattern_str = pattern.pattern
                     snippet = pattern_str[:30] if len(pattern_str) > 30 else pattern_str
-                    candidates.append(FieldMapping(
-                        field_name=semantic_need,
-                        semantic_need=semantic_need,
-                        original_value=value,
-                        mapped_value=value.strip(),
-                        confidence=0.95,
-                        matched_by="pattern",
-                        evidence=f"Matched pattern {snippet}...",
-                        signals=[f"pattern_match:{snippet[:40]}", "high_confidence"]
-                    ))
+                    candidates.append(
+                        FieldMapping(
+                            field_name=semantic_need,
+                            semantic_need=semantic_need,
+                            original_value=value,
+                            mapped_value=value.strip(),
+                            confidence=0.95,
+                            matched_by="pattern",
+                            evidence=f"Matched pattern {snippet}...",
+                            signals=[f"pattern_match:{snippet[:40]}", "high_confidence"],
+                        )
+                    )
                     break
 
     if candidates:
@@ -382,7 +406,7 @@ def _find_best_value_for_need(
                             confidence=0.8,
                             matched_by="header",
                             evidence=f"Header '{header}' matches '{keyword}'",
-                            signals=[f"header_match:{header}", "keyword_matched"]
+                            signals=[f"header_match:{header}", "keyword_matched"],
                         )
 
     # Strategy 3: Value pattern detection from page
@@ -398,7 +422,7 @@ def _find_best_value_for_need(
                     confidence=0.7,
                     matched_by="page_pattern",
                     evidence=f"Page has {semantic_need} values",
-                    signals=[f"page_detected:{semantic_need}", "positional_inference"]
+                    signals=[f"page_detected:{semantic_need}", "positional_inference"],
                 )
 
     # Strategy 4: Fallback - return first non-empty value
@@ -412,7 +436,7 @@ def _find_best_value_for_need(
                 confidence=0.3,
                 matched_by="fallback",
                 evidence="No better match found",
-                signals=["low_confidence_fallback", "no_signal_matched"]
+                signals=["low_confidence_fallback", "no_signal_matched"],
             )
 
     return None
@@ -460,14 +484,43 @@ def _is_noise_value(value: str) -> bool:
 
     # Common noise patterns (domain-agnostic)
     noise_patterns = [
-        "about us", "contact us", "privacy policy", "terms", "conditions",
-        "home", "menu", "search", "filter", "sort", "show all", "view all",
-        "login", "sign up", "register", "signup", "signin",
-        "facebook", "twitter", "instagram", "linkedin", "youtube",
-        "copyright", "all rights", "powered by",
-        "click here", "read more", "learn more", "view more",
-        "call now", "book now", "buy now", "add to cart",
-        "next", "previous", "back", "continue",
+        "about us",
+        "contact us",
+        "privacy policy",
+        "terms",
+        "conditions",
+        "home",
+        "menu",
+        "search",
+        "filter",
+        "sort",
+        "show all",
+        "view all",
+        "login",
+        "sign up",
+        "register",
+        "signup",
+        "signin",
+        "facebook",
+        "twitter",
+        "instagram",
+        "linkedin",
+        "youtube",
+        "copyright",
+        "all rights",
+        "powered by",
+        "click here",
+        "read more",
+        "learn more",
+        "view more",
+        "call now",
+        "book now",
+        "buy now",
+        "add to cart",
+        "next",
+        "previous",
+        "back",
+        "continue",
     ]
 
     # Single word noise

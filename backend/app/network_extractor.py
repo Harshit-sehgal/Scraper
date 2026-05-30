@@ -8,7 +8,7 @@ Priority order (highest first):
   3. Window __INITIAL_STATE__ / __PRELOADED_STATE__
   4. Apollo / Relay client-side cache
   5. Inline structured JSON in <script> tags
-  6. Application/JSON responses captured during rendering
+  6. Application / JSON responses captured during rendering
 
 This module uses domain-agnostic heuristics rather than site-specific field
 names or selectors. It maps structured JSON keys to schema fields using
@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def extract_from_network(
     hydration_data: dict[str, Any],
     schema_fields: list,
@@ -41,7 +42,7 @@ def extract_from_network(
         schema_fields: Schema fields to map extracted values to.
         url: The page URL (for context).
         network_payloads: Optional list of captured network JSON payloads from
-                          browser network interception (fetch/XHR/GraphQL responses).
+                          browser network interception (fetch / XHR / GraphQL responses).
 
     Returns:
         List of extracted records aligned to schema fields, or empty list.
@@ -58,7 +59,8 @@ def extract_from_network(
         if extracted:
             logger.info(
                 "[NetworkExtractor] Extracted %d records from %d browser network payloads",
-                len(extracted), len(network_payloads),
+                len(extracted),
+                len(network_payloads),
             )
             records.extend(extracted)
 
@@ -106,7 +108,8 @@ def extract_from_network(
             if extracted:
                 logger.info(
                     "[NetworkExtractor] Extracted %d records from %s",
-                    len(extracted), var_name,
+                    len(extracted),
+                    var_name,
                 )
                 records.extend(extracted)
 
@@ -126,6 +129,7 @@ def extract_from_network(
         records = _deduplicate_records(records)
         # Score records
         from app.utils.quality import score_record_quality
+
         for r in records:
             r["record_score"] = score_record_quality(r, schema_fields)
         records.sort(key=lambda r: r.get("record_score", 0.0), reverse=True)
@@ -136,6 +140,7 @@ def extract_from_network(
 # ---------------------------------------------------------------------------
 # JSON-LD extraction
 # ---------------------------------------------------------------------------
+
 
 def _extract_from_jsonld(
     jsonld_data: list[dict],
@@ -235,7 +240,8 @@ def _map_jsonld_item(item: dict, schema_fields: list) -> dict | None:
     if handler:
         record = handler(item)
 
-    # Always try key-value alignment as well (in case type handler missed something)
+    # Always try key-value alignment as well (in case type handler missed
+    # something)
     key_mapped = _map_json_keys_to_schema(item, schema_fields)
     for k, v in key_mapped.items():
         if k not in record or not record.get(k):
@@ -252,6 +258,7 @@ def _map_jsonld_item(item: dict, schema_fields: list) -> dict | None:
 # Type-specific JSON-LD handlers
 # ---------------------------------------------------------------------------
 
+
 def _extract_product_fields(item: dict) -> dict:
     return {
         "name": item.get("name", "") or "",
@@ -264,7 +271,11 @@ def _extract_product_fields(item: dict) -> dict:
 
 
 def _extract_offer_fields(item: dict) -> dict:
-    price = item.get("price", "") or item.get("priceSpecification", {}).get("price", "") if isinstance(item.get("priceSpecification"), dict) else ""
+    price = (
+        item.get("price", "") or item.get("priceSpecification", {}).get("price", "")
+        if isinstance(item.get("priceSpecification"), dict)
+        else ""
+    )
     currency = item.get("priceCurrency", "") or ""
     price_str = f"{currency}{price}" if price and currency else str(price)
     return {
@@ -327,7 +338,11 @@ def _extract_hotel_fields(item: dict) -> dict:
         "name": item.get("name", "") or "",
         "description": item.get("description", "") or "",
         "address": _extract_address(item),
-        "rating": item.get("aggregateRating", {}).get("ratingValue", "") if isinstance(item.get("aggregateRating"), dict) else "",
+        "rating": (
+            item.get("aggregateRating", {}).get("ratingValue", "")
+            if isinstance(item.get("aggregateRating"), dict)
+            else ""
+        ),
         "price_range": item.get("priceRange", "") or "",
         "telephone": item.get("telephone", "") or "",
         "image": item.get("image", "") or "",
@@ -340,7 +355,11 @@ def _extract_restaurant_fields(item: dict) -> dict:
         "name": item.get("name", "") or "",
         "description": item.get("description", "") or "",
         "address": _extract_address(item),
-        "rating": item.get("aggregateRating", {}).get("ratingValue", "") if isinstance(item.get("aggregateRating"), dict) else "",
+        "rating": (
+            item.get("aggregateRating", {}).get("ratingValue", "")
+            if isinstance(item.get("aggregateRating"), dict)
+            else ""
+        ),
         "price_range": item.get("priceRange", "") or "",
         "telephone": item.get("telephone", "") or "",
         "cuisine": ", ".join(item.get("servesCuisine", [])) if isinstance(item.get("servesCuisine"), list) else "",
@@ -352,9 +371,19 @@ def _extract_job_fields(item: dict) -> dict:
     return {
         "title": item.get("title", "") or item.get("name", "") or "",
         "description": item.get("description", "") or "",
-        "company": item.get("hiringOrganization", {}).get("name", "") if isinstance(item.get("hiringOrganization"), dict) else "",
-        "location": _extract_address(item.get("jobLocation", {}) if isinstance(item.get("jobLocation"), dict) else item),
-        "salary": item.get("baseSalary", {}).get("value", {}).get("value", "") if isinstance(item.get("baseSalary"), dict) else "",
+        "company": (
+            item.get("hiringOrganization", {}).get("name", "")
+            if isinstance(item.get("hiringOrganization"), dict)
+            else ""
+        ),
+        "location": _extract_address(
+            item.get("jobLocation", {}) if isinstance(item.get("jobLocation"), dict) else item
+        ),
+        "salary": (
+            item.get("baseSalary", {}).get("value", {}).get("value", "")
+            if isinstance(item.get("baseSalary"), dict)
+            else ""
+        ),
         "employment_type": item.get("employmentType", "") or "",
         "url": item.get("url", "") or "",
     }
@@ -381,7 +410,11 @@ def _extract_business_fields(item: dict) -> dict:
         "telephone": item.get("telephone", "") or "",
         "email": item.get("email", "") or "",
         "url": item.get("url", "") or item.get("sameAs", "") or "",
-        "rating": item.get("aggregateRating", {}).get("ratingValue", "") if isinstance(item.get("aggregateRating"), dict) else "",
+        "rating": (
+            item.get("aggregateRating", {}).get("ratingValue", "")
+            if isinstance(item.get("aggregateRating"), dict)
+            else ""
+        ),
     }
 
 
@@ -413,7 +446,11 @@ def _extract_book_fields(item: dict) -> dict:
         "author": item.get("author", {}).get("name", "") if isinstance(item.get("author"), dict) else "",
         "isbn": item.get("isbn", "") or "",
         "description": item.get("description", "") or "",
-        "rating": item.get("aggregateRating", {}).get("ratingValue", "") if isinstance(item.get("aggregateRating"), dict) else "",
+        "rating": (
+            item.get("aggregateRating", {}).get("ratingValue", "")
+            if isinstance(item.get("aggregateRating"), dict)
+            else ""
+        ),
         "price": _extract_price_from_offers(item),
         "url": item.get("url", "") or "",
     }
@@ -424,7 +461,11 @@ def _extract_movie_fields(item: dict) -> dict:
         "name": item.get("name", "") or "",
         "description": item.get("description", "") or item.get("abstract", "") or "",
         "director": item.get("director", {}).get("name", "") if isinstance(item.get("director"), dict) else "",
-        "rating": item.get("aggregateRating", {}).get("ratingValue", "") if isinstance(item.get("aggregateRating"), dict) else "",
+        "rating": (
+            item.get("aggregateRating", {}).get("ratingValue", "")
+            if isinstance(item.get("aggregateRating"), dict)
+            else ""
+        ),
         "date_published": item.get("datePublished", "") or "",
         "image": item.get("image", "") or "",
     }
@@ -434,7 +475,11 @@ def _extract_app_fields(item: dict) -> dict:
     return {
         "name": item.get("name", "") or "",
         "description": item.get("description", "") or item.get("abstract", "") or "",
-        "rating": item.get("aggregateRating", {}).get("ratingValue", "") if isinstance(item.get("aggregateRating"), dict) else "",
+        "rating": (
+            item.get("aggregateRating", {}).get("ratingValue", "")
+            if isinstance(item.get("aggregateRating"), dict)
+            else ""
+        ),
         "price": item.get("offers", {}).get("price", "") if isinstance(item.get("offers"), dict) else "",
         "url": item.get("url", "") or item.get("sameAs", "") or "",
     }
@@ -443,6 +488,7 @@ def _extract_app_fields(item: dict) -> dict:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _extract_address(item: dict) -> str:
     """Extract a formatted address from a JSON-LD item."""
@@ -482,6 +528,7 @@ def _extract_price_from_offers(item: dict) -> str:
 # ---------------------------------------------------------------------------
 # Generic nested JSON extraction
 # ---------------------------------------------------------------------------
+
 
 def _extract_from_nested_json(
     data: dict,
@@ -569,6 +616,7 @@ def _count_field_matches(records: list[dict], schema_fields: list) -> int:
 # Key-value alignment (generic, any JSON structure)
 # ---------------------------------------------------------------------------
 
+
 def _map_json_keys_to_schema(
     item: dict,
     schema_fields: list,
@@ -576,7 +624,7 @@ def _map_json_keys_to_schema(
     """Map JSON keys to schema fields using key-level alignment.
 
     For each schema field, looks through the JSON item for matching keys
-    using exact match, alias match, and prefix/suffix match.
+    using exact match, alias match, and prefix / suffix match.
     """
     if not item or not isinstance(item, dict):
         return {}
@@ -589,7 +637,7 @@ def _map_json_keys_to_schema(
     for field in schema_fields:
         field_name = field.name
         field_lower = field_name.lower()
-        field_type = field.field_type if hasattr(field, 'field_type') else None
+        field_type = field.field_type if hasattr(field, "field_type") else None
 
         value = _find_value_for_field(field_name, field_lower, field_type, flat_values)
         if value is not None and value not in ("", [], {}):
@@ -640,7 +688,17 @@ def _flatten_json_keys(
 
 
 _ALIAS_MAP: dict[str, list[str]] = {
-    "name": ["name", "title", "label", "heading", "item_name", "product_name", "company_name", "business_name", "full_name"],
+    "name": [
+        "name",
+        "title",
+        "label",
+        "heading",
+        "item_name",
+        "product_name",
+        "company_name",
+        "business_name",
+        "full_name",
+    ],
     "description": ["description", "desc", "summary", "details", "about", "abstract", "text", "body"],
     "email": ["email", "e_mail", "mail", "contact_email", "email_address"],
     "phone": ["phone", "telephone", "tel", "phone_number", "contact_phone", "mobile", "cell"],
@@ -654,7 +712,16 @@ _ALIAS_MAP: dict[str, list[str]] = {
     "state": ["state", "region", "province", "territory"],
     "country": ["country", "nation"],
     "zip": ["zip", "postal_code", "zip_code", "postcode"],
-    "date": ["date", "start_date", "end_date", "date_published", "publication_date", "created_at", "updated_at", "available_from"],
+    "date": [
+        "date",
+        "start_date",
+        "end_date",
+        "date_published",
+        "publication_date",
+        "created_at",
+        "updated_at",
+        "available_from",
+    ],
     "time": ["time", "start_time", "end_time", "duration"],
     "category": ["category", "type", "kind", "genre", "classification", "section"],
     "status": ["status", "state", "availability", "condition"],
@@ -690,7 +757,7 @@ def _find_value_for_field(
         if alias in flat_values:
             return flat_values[alias]
 
-    # Step 3: Prefix/suffix match (e.g., field name "company_name" contains "name")
+    # Step 3: Prefix / suffix match (e.g., field name "company_name" contains "name")
     # Priority: longer prefix matches first
     candidates = []
     for key, value in flat_values.items():
@@ -698,8 +765,8 @@ def _find_value_for_field(
             continue
 
         # Exact word boundary match
-        key_words = set(re.split(r'[_\-\s]+', key))
-        field_words = set(re.split(r'[_\-\s]+', field_lower))
+        key_words = set(re.split(r"[_\-\s]+", key))
+        field_words = set(re.split(r"[_\-\s]+", field_lower))
 
         overlap = key_words & field_words
         if overlap:
@@ -719,11 +786,12 @@ def _find_value_for_field(
 # Apollo / Relay state extraction
 # ---------------------------------------------------------------------------
 
+
 def _extract_from_apollo_state(
     apollo_data: dict,
     schema_fields: list,
 ) -> list[dict]:
-    """Extract records from Apollo/Relay client-side cache state.
+    """Extract records from Apollo / Relay client-side cache state.
 
     Apollo state typically has ROOT_QUERY entries and __typename references.
     """
@@ -769,6 +837,7 @@ def _extract_from_apollo_state(
 # ---------------------------------------------------------------------------
 # Deduplication
 # ---------------------------------------------------------------------------
+
 
 def _extract_records_from_payloads(
     payloads: list[dict],

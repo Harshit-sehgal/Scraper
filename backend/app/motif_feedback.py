@@ -42,7 +42,7 @@ class MotifFeedbackEngine:
             schema_fields: The target schema fields
 
         Returns:
-            Dict mapping field names to hints about their expected patterns/relationships
+            Dict mapping field names to hints about their expected patterns / relationships
         """
         if not solidified_motifs:
             return {}
@@ -57,7 +57,8 @@ class MotifFeedbackEngine:
                 if field_name in field_names:
                     field_cooccurrence[field_name] += 1
 
-        # Fields that frequently appear in solidified motifs are well-structured
+        # Fields that frequently appear in solidified motifs are
+        # well-structured
         for field_name, count in field_cooccurrence.most_common(10):
             if count >= 2:  # At least 2 solidified patterns
                 hints[field_name] = (
@@ -87,10 +88,7 @@ class MotifFeedbackEngine:
         field_names = {f.name for f in schema_fields}
 
         # Filter motifs to only include fields in our schema
-        valid_motifs = [
-            tuple(f for f in motif if f in field_names)
-            for motif in solidified_motifs
-        ]
+        valid_motifs = [tuple(f for f in motif if f in field_names) for motif in solidified_motifs]
         valid_motifs = [m for m in valid_motifs if len(m) > 0]
 
         if not valid_motifs:
@@ -109,7 +107,6 @@ Use these patterns as hints: if you find one field from a group, look nearby for
 This can help with relative selector selection (e.g., if you find the price, the title might be a sibling or parent).
 """
         return context
-
 
     @staticmethod
     def extract_motifs_from_results(
@@ -170,11 +167,13 @@ This can help with relative selector selection (e.g., if you find the price, the
         for fname, neighbors in sorted(field_connections.items(), key=lambda x: -len(x[1])):
             if fname in assigned:
                 continue
-            # Start a new motif with this field and its strongly connected neighbors
+            # Start a new motif with this field and its strongly connected
+            # neighbors
             motif_fields = {fname}
             for neighbor in neighbors:
                 if neighbor not in assigned:
-                    # Check if this neighbor is also connected to other motif members
+                    # Check if this neighbor is also connected to other motif
+                    # members
                     neighbor_neighbors = field_connections.get(neighbor, set())
                     shared = motif_fields & neighbor_neighbors
                     if len(shared) >= 1 or len(motif_fields) == 1:
@@ -188,7 +187,8 @@ This can help with relative selector selection (e.g., if you find the price, the
         if motifs:
             logger.info(
                 "Extracted %d motifs from %d results: %s",
-                len(motifs), len(results),
+                len(motifs),
+                len(results),
                 ["(" + ", ".join(m) + ")" for m in motifs],
             )
 

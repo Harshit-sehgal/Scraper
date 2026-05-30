@@ -7,7 +7,7 @@ future fetch scheduling.
 
 Governance constraints
 ----------------------
-- Recovery must NEVER become a stealth/evasion bypass.  When a domain is in
+- Recovery must NEVER become a stealth / evasion bypass.  When a domain is in
   cooldown or has high anti-bot risk, the recommended action should always
   be truthful: ``"use_authorized_access_or_retry_later"``, not a silent retry.
 - Rate-limited / anti-bot-blocked domains get cooldown + truthful recommended
@@ -78,10 +78,10 @@ class DomainPolicyEntry:
     Cooldown triggers when pressure >= _COOLDOWN_PRESSURE_THRESHOLD (2.0)."""
 
     recent_rate_limits: int = 0
-    """How many 429/rate-limit responses this domain has received."""
+    """How many 429 / rate-limit responses this domain has received."""
 
     recent_antibot_blocks: int = 0
-    """How many anti-bot/captcha blocks this domain has received."""
+    """How many anti-bot / captcha blocks this domain has received."""
 
     total_attempts: int = 0
     """Total fetch attempts recorded for this domain."""
@@ -185,7 +185,7 @@ class DomainRuntimePolicy:
         )
 
     def set_abort_domain(self, url: str) -> None:
-        """Set an extended cooldown for this domain (abort/abandon)."""
+        """Set an extended cooldown for this domain (abort / abandon)."""
         entry = self.get_or_create(url)
         entry.cooldown_until = time.monotonic() + _DEFAULT_COOLDOWN_SECONDS * 3
         logger.warning(
@@ -215,7 +215,9 @@ class DomainRuntimePolicy:
         if entry.cooldown_until > time.monotonic():
             remaining = int(self.remaining_cooldown(url))
             if entry.recent_antibot_blocks > 0:
-                return f"use_authorized_access_or_retry_later (domain in cooldown for {remaining}s after anti-bot blocks)"
+                return (
+                    f"use_authorized_access_or_retry_later (domain in cooldown for {remaining}s after anti-bot blocks)"
+                )
             if entry.recent_rate_limits > 0:
                 return f"retry_later (domain rate-limited, cooldown {remaining}s)"
             return f"retry_later (domain in cooldown for {remaining}s)"

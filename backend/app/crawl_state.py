@@ -19,13 +19,7 @@ class CrawlStateAdapter:
         self._frontier = get_crawl_frontier()
         self._policy = get_crawl_policy()
 
-    async def add_url(
-        self, 
-        url: str, 
-        priority: int = 10, 
-        depth: int = 0, 
-        source_url: Optional[str] = None
-    ) -> bool:
+    async def add_url(self, url: str, priority: int = 10, depth: int = 0, source_url: Optional[str] = None) -> bool:
         """Add a URL to the frontier queue."""
         return await self._frontier.add_url(url, priority, depth, source_url)
 
@@ -55,6 +49,7 @@ class CrawlStateAdapter:
 
 
 _crawl_state: Optional[CrawlStateAdapter] = None
+
 
 def get_crawl_state() -> CrawlStateAdapter:
     global _crawl_state

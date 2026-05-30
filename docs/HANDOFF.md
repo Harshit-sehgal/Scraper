@@ -4,7 +4,7 @@ Last updated: 2026-05-29
 
 This document explains what has been done so far, what the project truthfully is now, and how to proceed from the current cleaned baseline.
 
-It is intended as the working plan after the truth-first cleanup. For detailed audit tables, evidence, and classification, see `docs/AUDIT_REPORT.md`. For the current claim policy and status categories, see `PROJECT_STATUS.md`.
+It is intended as the working plan after the truth-first cleanup. For the current project status, see `PROJECT_STATUS.md`. For detailed audit tables, evidence, and classification, see the deliverables in `docs/audit/`.
 
 ## Current Baseline
 
@@ -61,15 +61,15 @@ Current documented inventory:
 Where to read details:
 
 - `PROJECT_STATUS.md`
-- [`docs/audit/DELIVERABLE_1_TRUTH_INVENTORY.md`](audit/DELIVERABLE_1_TRUTH_INVENTORY.md) — Inventory of false claims
-- [`docs/audit/DELIVERABLE_2_ARCHITECTURE_MAP.md`](audit/DELIVERABLE_2_ARCHITECTURE_MAP.md) — Architecture reality vs claims
-- [`docs/audit/DELIVERABLE_3_CLAIMS_AUDIT.md`](audit/DELIVERABLE_3_CLAIMS_AUDIT.md) — Detailed claims audit
-- [`docs/audit/DELIVERABLE_4_ERROR_ISSUE_LIST.md`](audit/DELIVERABLE_4_ERROR_ISSUE_LIST.md) — Error and issue list
-- [`docs/audit/DELIVERABLE_5_TEST_TRUTH_REPORT.md`](audit/DELIVERABLE_5_TEST_TRUTH_REPORT.md) — Test truth assessment
-- [`docs/audit/DELIVERABLE_6_BENCHMARK_TRUTH_REPORT.md`](audit/DELIVERABLE_6_BENCHMARK_TRUTH_REPORT.md) — Benchmark truth report
-- [`docs/audit/DELIVERABLE_7_SECURITY_REPORT.md`](audit/DELIVERABLE_7_SECURITY_REPORT.md) — Security assessment
-- [`docs/audit/DELIVERABLE_8_DOCUMENTATION_CLEANUP.md`](audit/DELIVERABLE_8_DOCUMENTATION_CLEANUP.md) — Documentation cleanup plan
-- [`docs/audit/DELIVERABLE_9_CORRECTED_README.md`](audit/DELIVERABLE_9_CORRECTED_README.md) — Corrected README template
+- [`docs/archive/audit/DELIVERABLE_1_TRUTH_INVENTORY.md`](archive/audit/DELIVERABLE_1_TRUTH_INVENTORY.md) — Inventory of false claims (archived)
+- [`docs/archive/audit/DELIVERABLE_2_ARCHITECTURE_MAP.md`](archive/audit/DELIVERABLE_2_ARCHITECTURE_MAP.md) — Architecture reality vs claims (archived)
+- [`docs/archive/audit/DELIVERABLE_3_CLAIMS_AUDIT.md`](archive/audit/DELIVERABLE_3_CLAIMS_AUDIT.md) — Detailed claims audit (archived)
+- [`docs/archive/audit/DELIVERABLE_4_ERROR_ISSUE_LIST.md`](archive/audit/DELIVERABLE_4_ERROR_ISSUE_LIST.md) — Error and issue list (archived, all resolved)
+- [`docs/archive/audit/DELIVERABLE_5_TEST_TRUTH_REPORT.md`](archive/audit/DELIVERABLE_5_TEST_TRUTH_REPORT.md) — Test truth assessment (archived)
+- [`docs/archive/audit/DELIVERABLE_6_BENCHMARK_TRUTH_REPORT.md`](archive/audit/DELIVERABLE_6_BENCHMARK_TRUTH_REPORT.md) — Benchmark truth report (archived)
+- [`docs/archive/audit/DELIVERABLE_7_SECURITY_REPORT.md`](archive/audit/DELIVERABLE_7_SECURITY_REPORT.md) — Security assessment (archived)
+- [`docs/archive/audit/DELIVERABLE_8_DOCUMENTATION_CLEANUP.md`](archive/audit/DELIVERABLE_8_DOCUMENTATION_CLEANUP.md) — Documentation cleanup plan (archived, executed)
+- [`docs/archive/audit/DELIVERABLE_9_CORRECTED_README.md`](archive/audit/DELIVERABLE_9_CORRECTED_README.md) — Corrected README template (archived, applied)
 
 ### 2. Documentation Rewritten Around Evidence
 
@@ -77,7 +77,7 @@ Completed:
 
 - Rewrote `README.md` as a truthful project overview.
 - Created/updated `PROJECT_STATUS.md` as the current source of truth.
-- Created `docs/AUDIT_REPORT.md` with all requested audit deliverables.
+- Created audit deliverables in `docs/audit/` with evidence-based findings.
 - Created focused docs for architecture, API, setup, production, security, testing, benchmarking, limitations, and roadmap.
 - Removed or archived stale claims such as 100% maturity, production-ready, GA-certified, self-healing, and works on any website.
 - Reworded dashboard and frontend copy that implied real-time streaming or universal extraction.
@@ -90,16 +90,14 @@ PROJECT_STATUS.md
 docs/
   API.md
   ARCHITECTURE.md
-  AUDIT_REPORT.md
-  BENCHMARKING.md
   HANDOFF.md
   LIMITATIONS.md
   PRODUCTION.md
-  ROADMAP.md
+  PRODUCTION_STARTUP.md
   SECURITY.md
   SETUP.md
-  TESTING.md
-  archive/
+  audit/          (detailed audit deliverables)
+  archive/        (historical/outdated docs)
 ```
 
 ### 3. Test and Validation Baseline
@@ -115,13 +113,15 @@ PYTHONPATH=backend python3 -m pytest --collect-only -q -o addopts=
 PYTHONPATH=backend python3 -m pytest -q -ra -o addopts=
 ```
 
-Latest verified local test result:
+Latest verified local test result (initial audit — counts have since increased to 1,884):
 
 ```text
 1711 tests collected
 1657 passed
 54 skipped
 ```
+
+**Current test count (as of May 30, 2026):** 1,884 tests collected. See `PROJECT_STATUS.md`.
 
 Important interpretation:
 
@@ -189,12 +189,12 @@ Completed:
 - Removed universal extraction wording from frontend copy.
 - Changed dashboard wording from real-time streaming to polling view.
 - Removed misleading perfect/success wording.
-- Updated CSP to allow the current CDN-based dashboard behavior with documented caveats.
+- Updated CSP to allow the current CDN-based dashboard behavior with documented caveats. *(Resolved: assets now vendored locally, CSP is strict `script-src 'self'`.)*
 
 Remaining dashboard truth:
 
 - The dashboard should be treated as internal/private.
-- Production should either vendor CDN assets locally or intentionally accept and document a relaxed CSP.
+- **✅ CSP resolved:** Assets are vendored locally; strict `script-src 'self'` CSP is enforced.
 - Token handling should be redesigned before exposing the dashboard to hostile/shared environments.
 
 ### 8. Scripts and Release Gates
@@ -270,6 +270,8 @@ Do not claim:
 until the GitHub workflow is visibly green.
 
 ## Phase 2: Add Real Postgres Validation
+
+> **Status Update (May 30, 2026):** Postgres CI validation is now complete — real Postgres service container configured, all Postgres integration tests pass with 0 skipped. See `PROJECT_STATUS.md`.
 
 Goal: make Postgres support proven enough to describe as tested, not merely implemented.
 
@@ -543,6 +545,8 @@ unless the evidence is much stronger than the current project has.
 
 ## Phase 7: Dashboard Hardening
 
+> **Status Update (May 30, 2026):** CSP is now strict `script-src 'self'` — all CDN assets (Tailwind CSS, Chart.js) are vendored locally. Dashboard loads under production CSP. Token storage risk remains.
+
 Goal: make the dashboard safe enough for the intended deployment model.
 
 Current truth:
@@ -550,7 +554,7 @@ Current truth:
 - Dashboard exists.
 - Dashboard is internal/private.
 - Dashboard currently stores a normal API key in `localStorage`.
-- Dashboard uses CDN scripts that require relaxed CSP unless vendored.
+- Dashboard assets are vendored locally — strict CSP is enforced.
 - Dashboard polls APIs; it is not a WebSocket/SSE real-time streaming UI.
 
 Options:
@@ -675,7 +679,7 @@ Acceptance criteria:
 
 - Latest `main` commit has a visible CI run.
 - CI is green or failing for known documented reasons.
-- `docs/TESTING.md` reflects the CI truth.
+- Testing status is captured in `PROJECT_STATUS.md` and `docs/LIMITATIONS.md`.
 
 ### Issue 2: Add Postgres Service CI
 
@@ -770,8 +774,8 @@ You can show:
 - The cleaned repository.
 - `README.md`.
 - `PROJECT_STATUS.md`.
-- `docs/AUDIT_REPORT.md`.
-- Local validation output showing `1657 passed, 54 skipped`.
+- Audit deliverables in `docs/audit/`.
+- Local and CI validation output showing test suite status (see `PROJECT_STATUS.md` for current counts).
 - The current architecture and API docs.
 - The roadmap and known limitations.
 

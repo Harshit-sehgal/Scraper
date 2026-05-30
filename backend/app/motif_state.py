@@ -118,18 +118,18 @@ class MotifState:
         counts = self._get_struct("motif_counts")
         counts[motif] += 1
         self._set_struct("motif_counts", counts)
-        
+
         times = self._get_struct("motif_timestamps")
         times[motif] = current_record
         self._set_struct("motif_timestamps", times)
-        
+
         stabs = self._get_struct("motif_stability")
         stabs[motif] = self.compute_stability(motif, current_record)
         self._set_struct("motif_stability", stabs)
         self._record("reinforce", {"motif": motif, "current_record": current_record})
 
     def compute_stability(self, motif: Tuple[str, ...], total_records: int) -> float:
-        """Compute temporal stability score for a motif (0-1)."""
+        """Compute temporal stability score for a motif (0 - 1)."""
         if total_records == 0:
             return 0.0
         counts = self._get_struct("motif_counts")
@@ -218,14 +218,13 @@ class MotifState:
 
     def _parse_motif_key(self, key: str) -> tuple:
         import ast
+
         try:
             parsed = ast.literal_eval(key)
             if isinstance(parsed, tuple):
                 return parsed
         except (ValueError, SyntaxError):
-            logging.getLogger(__name__).debug(
-                "Fallback parsing motif key: %s", key
-            )
+            logging.getLogger(__name__).debug("Fallback parsing motif key: %s", key)
         return tuple(key.split(", "))
 
     def clear(self):
@@ -234,7 +233,7 @@ class MotifState:
         self._set_struct("motif_stability", {})
 
     def merge(self, other_data: dict):
-        """Merge motif memory from another node or branch (Phase 32/39)."""
+        """Merge motif memory from another node or branch (Phase 32 / 39)."""
         counts = self._get_struct("motif_counts")
         times = self._get_struct("motif_timestamps")
         stabs = self._get_struct("motif_stability")

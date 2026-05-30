@@ -19,8 +19,9 @@ async def generate_data_insight(results: list[dict]) -> str:
     if not results:
         return "No data available for analysis."
 
-    sample = results[:settings.INSIGHT_SAMPLE_SIZE]
-    prompt = f"Analyze these {len(results)} scraped records and provide 3 key insights or patterns found:\n\n{sample}"
+    sample = results[: settings.INSIGHT_SAMPLE_SIZE]
+    prompt = f"Analyze these {
+        len(results)} scraped records and provide 3 key insights or patterns found:\n\n{sample}"
 
     messages = [
         {"role": "system", "content": "You are a data analyst. Provide concise, valuable insights."},
@@ -60,6 +61,7 @@ Maximum number of fields: {max_fields}
 def suggest_schema_from_intent_sync(intent: str, max_fields: int | None = None) -> dict:
     """Sync version of suggest_schema_from_intent."""
     import asyncio
+
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
@@ -68,6 +70,7 @@ def suggest_schema_from_intent_sync(intent: str, max_fields: int | None = None) 
 
     if loop.is_running():
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(asyncio.run, suggest_schema_from_intent(intent, max_fields))
             return future.result()

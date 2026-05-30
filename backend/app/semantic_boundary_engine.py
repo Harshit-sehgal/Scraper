@@ -1,4 +1,3 @@
-
 """
 Semantic Boundary Engine
 =========================
@@ -17,8 +16,9 @@ from app.semantic_world_state import get_world_state
 @dataclass
 class BoundaryScore:
     """Scores for a potential boundary between two tokens."""
-    cohesion: float = 0.5  # 0-1, likelihood tokens belong together
-    separation: float = 0.5  # 0-1, likelihood tokens are separate
+
+    cohesion: float = 0.5  # 0 - 1, likelihood tokens belong together
+    separation: float = 0.5  # 0 - 1, likelihood tokens are separate
     transition: float = 0.0  # probability of role transition
     uncertainty: float = 0.0
 
@@ -29,6 +29,7 @@ class BoundaryScore:
 @dataclass
 class MergeDecision:
     """A recorded decision to merge or split two tokens."""
+
     type_a: str
     type_b: str
     value_a: str
@@ -41,6 +42,7 @@ class MergeDecision:
 @dataclass
 class TransitionScore:
     """Score for a type transition."""
+
     probability: float
     type_pair: str
 
@@ -50,20 +52,32 @@ class TransitionScore:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _BOOTSTRAP_SUFFIXES = {
-    'group', 'inc', 'ltd', 'limited', 'corp', 'corporation',
-    'industries', 'designs', 'designers', 'studio', 'associates',
-    'international', 'solutions', 'technologies', 'services'
+    "group",
+    "inc",
+    "ltd",
+    "limited",
+    "corp",
+    "corporation",
+    "industries",
+    "designs",
+    "designers",
+    "studio",
+    "associates",
+    "international",
+    "solutions",
+    "technologies",
+    "services",
 }
 
-_STOP_WORDS = {'the', 'a', 'an', 'and', 'of', 'for'}
+_STOP_WORDS = {"the", "a", "an", "and", "of", "for"}
 
 # High-confidence transition pairs (e.g. price followed by date)
 _HIGH_TRANSITION_PAIRS = {
-    ('price', 'date'),
-    ('price', 'location'),
-    ('date', 'price'),
-    ('rating', 'price'),
-    ('rating', 'date'),
+    ("price", "date"),
+    ("price", "location"),
+    ("date", "price"),
+    ("rating", "price"),
+    ("rating", "date"),
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -71,13 +85,13 @@ _HIGH_TRANSITION_PAIRS = {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _BOOTSTRAP_TRANSITIONS = {
-    ('organization', 'price'): 0.85,
-    ('organization', 'location'): 0.80,
-    ('location', 'price'): 0.85,
-    ('price', 'date'): 0.90,
-    ('date', 'price'): 0.90,
-    ('number', 'organization'): 0.70,
-    ('organization', 'number'): 0.70,
+    ("organization", "price"): 0.85,
+    ("organization", "location"): 0.80,
+    ("location", "price"): 0.85,
+    ("price", "date"): 0.90,
+    ("date", "price"): 0.90,
+    ("number", "organization"): 0.70,
+    ("organization", "number"): 0.70,
 }
 
 
@@ -123,6 +137,7 @@ class RoleTransitionDetector:
 # ═══════════════════════════════════════════════════════════════════════════════
 # COHESION MODEL
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class CohesionModel:
     """Learns which type-pair patterns should merge or split from experience.
@@ -212,20 +227,21 @@ class MotifLearner:
         ws = get_world_state()
         self.total_records += 1
 
-        # Record all n-grams of length 2-4 as motifs
+        # Record all n-grams of length 2 - 4 as motifs
         for size in range(2, min(len(types) + 1, 5)):
             for start in range(len(types) - size + 1):
-                motif = tuple(types[start:start + size])
+                motif = tuple(types[start: start + size])
                 ws.reinforce_motif(motif)
 
     def stability(self, motif: Tuple[str, ...]) -> float:
-        """Get the stability score for a type motif (0-1)."""
+        """Get the stability score for a type motif (0 - 1)."""
         return get_world_state().get_motif_stability(motif)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SEMANTIC BOUNDARY ENGINE
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class SemanticBoundaryEngine:
     """Scores adjacent token pairs for cohesion vs separation."""
@@ -239,13 +255,15 @@ class SemanticBoundaryEngine:
     def decision_history(self) -> list:
         return get_world_state().decision_history
 
-    def score_pair(self, type_a: str, type_b: str, value_a: str, value_b: str,
-                   position_a: int, position_b: int) -> BoundaryScore:
+    def score_pair(
+        self, type_a: str, type_b: str, value_a: str, value_b: str, position_a: int, position_b: int
+    ) -> BoundaryScore:
         """Score an adjacent token pair for cohesion vs separation."""
         score = BoundaryScore()
 
         # 1. TOPOLOGICAL MOTIF CHECK (Primary Strategy)
-        # If this sequence (A, B) is part of a stable recurring motif, prefer cohesion
+        # If this sequence (A, B) is part of a stable recurring motif, prefer
+        # cohesion
         motif = (type_a, type_b)
         stability = self.motif_learner.stability(motif)
         if stability > 0.6:
@@ -281,15 +299,15 @@ class SemanticBoundaryEngine:
                 score.cohesion = 1.0 - score.separation
             return score
 
-        # 5. Symbolic/Hardcoded fallbacks (Lowest priority)
+        # 5. Symbolic / Hardcoded fallbacks (Lowest priority)
         # "The" + org → merge
-        if value_a.lower() in _STOP_WORDS and type_b in ('org', 'organization'):
+        if value_a.lower() in _STOP_WORDS and type_b in ("org", "organization"):
             score.cohesion = 0.85
             score.separation = 0.1
             return score
 
         if type_a == type_b:
-            if type_a in ('org', 'organization'):
+            if type_a in ("org", "organization"):
                 if value_b.lower() in _BOOTSTRAP_SUFFIXES:
                     score.cohesion = 0.85
                     score.separation = 0.15
@@ -302,7 +320,7 @@ class SemanticBoundaryEngine:
             return score
 
         # Number + code: "3 BHK" → merge
-        if type_a == 'number' and type_b == 'code':
+        if type_a == "number" and type_b == "code":
             score.cohesion = 0.8
             score.separation = 0.2
             return score
@@ -321,21 +339,22 @@ class SemanticBoundaryEngine:
         """Import learned memory from persistence."""
         get_world_state().from_dict(state)
 
-    def decide_merge(self, type_a: str, type_b: str, value_a: str, value_b: str,
-                     position_a: int, position_b: int) -> bool:
+    def decide_merge(
+        self, type_a: str, type_b: str, value_a: str, value_b: str, position_a: int, position_b: int
+    ) -> bool:
         score = self.score_pair(type_a, type_b, value_a, value_b, position_a, position_b)
         return score.should_merge()
 
     def record_decision(self, decision: MergeDecision):
-        decision_dict = decision.__dict__ if hasattr(decision, '__dict__') else {}
+        decision_dict = decision.__dict__ if hasattr(decision, "__dict__") else {}
         get_world_state().record_decision(decision_dict)
         self.cohesion_model.record(decision.type_a, decision.type_b, decision.merged, decision.success)
         is_role_boundary = not decision.merged and decision.success
         self.transition_detector.observe_transition(decision.type_a, decision.type_b, is_role_boundary)
 
     def update_recent_decisions(self, coherence: float, threshold: float):
-        """Update the most recent decisions with coherence/success metadata.
-        
+        """Update the most recent decisions with coherence / success metadata.
+
         Uses controlled access through HistoryState to avoid in-place
         alias mutation of internal list elements.
         """
@@ -350,11 +369,12 @@ def group_adjacent_entities(records: list) -> list:
         return records
 
     for record in records:
-        # Step 1: Clean up child fragments that are already part of larger values
+        # Step 1: Clean up child fragments that are already part of larger
+        # values
         seen: set[str] = set()
         keys_to_delete = []
         from app.semantic_mapper import is_child_fragment
-        
+
         # Sort keys to ensure we process in a predictable order
         all_keys = list(record.keys())
         for k in all_keys:
@@ -364,7 +384,7 @@ def group_adjacent_entities(records: list) -> list:
                     keys_to_delete.append(k)
                 else:
                     seen.add(v)
-        
+
         for k in keys_to_delete:
             if k in record:
                 del record[k]
@@ -373,18 +393,20 @@ def group_adjacent_entities(records: list) -> list:
         def _get_topo_info(k):
             # New Format: {key}_seg_{type}_{i}_{start}_{end}
             # Old Format: {key}_seg_{type}_{i}
-            parts = k.rsplit('_', 2)
+            parts = k.rsplit("_", 2)
             if len(parts) >= 3 and parts[-1].isdigit() and parts[-2].isdigit():
-                return int(parts[-2]), int(parts[-1]), int(k.rsplit('_', 3)[-3] if '_' in k else 0)
-            
+                return int(parts[-2]), int(parts[-1]), int(k.rsplit("_", 3)[-3] if "_" in k else 0)
+
             # Fallback to linear index if spans missing
-            idx_part = k.rsplit('_', 1)[-1]
+            idx_part = k.rsplit("_", 1)[-1]
             idx = int(idx_part) if idx_part.isdigit() else 0
             return 0, 0, idx
 
         # Sort by start span if available, otherwise by linear index
-        seg_keys = sorted([k for k in record if '_seg_' in k], 
-                         key=lambda k: (info := _get_topo_info(k), info[0] if info[0] > 0 else info[2]))
+        seg_keys = sorted(
+            [k for k in record if "_seg_" in k],
+            key=lambda k: (info := _get_topo_info(k), info[0] if info[0] > 0 else info[2]),
+        )
         if len(seg_keys) < 2:
             continue
 
@@ -393,13 +415,13 @@ def group_adjacent_entities(records: list) -> list:
         while current_idx < len(seg_keys) - 1:
             k_head = seg_keys[current_idx]
             h_start, h_end, h_idx = _get_topo_info(k_head)
-            
+
             # Try to merge subsequent tokens into the head
             lookahead = 1
             while current_idx + lookahead < len(seg_keys):
                 k_next = seg_keys[current_idx + lookahead]
                 n_start, n_end, n_idx = _get_topo_info(k_next)
-                
+
                 # Adjacency check:
                 # If spans exist: max 3 chars gap
                 # If no spans: must be consecutive indices (e.g. 0 and 1)
@@ -411,21 +433,21 @@ def group_adjacent_entities(records: list) -> list:
                         break
 
                 # Extract types from key names
-                parts_h = k_head.split('_')
-                parts_n = k_next.split('_')
-                
+                parts_h = k_head.split("_")
+                parts_n = k_next.split("_")
+
                 # Format detection: new format has at least 5 parts
                 if len(parts_h) >= 5 and parts_h[-1].isdigit() and parts_h[-2].isdigit():
                     t_head = parts_h[-4]
-                    t_next = parts_n[-4] if len(parts_n) >= 5 else ''
+                    t_next = parts_n[-4] if len(parts_n) >= 5 else ""
                 else:
                     # Old format: {key}_seg_{type}_{i}
-                    t_head = parts_h[-2] if len(parts_h) >= 3 else ''
-                    t_next = parts_n[-2] if len(parts_n) >= 3 else ''
-                
-                v_head = record.get(k_head, '')
-                v_next = record.get(k_next, '')
-                
+                    t_head = parts_h[-2] if len(parts_h) >= 3 else ""
+                    t_next = parts_n[-2] if len(parts_n) >= 3 else ""
+
+                v_head = record.get(k_head, "")
+                v_next = record.get(k_next, "")
+
                 if v_head and v_next:
                     # Boundary engine scores based on types and values
                     if score_boundary(t_head, t_next, v_head, v_next, h_start, n_start):
@@ -437,10 +459,10 @@ def group_adjacent_entities(records: list) -> list:
                         h_end = n_end
                         lookahead += 1
                         continue
-                
+
                 # If no merge, stop lookahead for this head
                 break
-            
+
             # Move to the next un-merged token
             current_idx += lookahead
 
@@ -448,11 +470,12 @@ def group_adjacent_entities(records: list) -> list:
         for k in merged_keys:
             if k in record:
                 del record[k]
-                
+
     return records
 
 
 _boundary_engine: Optional[SemanticBoundaryEngine] = None
+
 
 def get_boundary_engine() -> SemanticBoundaryEngine:
     global _boundary_engine
@@ -460,15 +483,17 @@ def get_boundary_engine() -> SemanticBoundaryEngine:
         _boundary_engine = SemanticBoundaryEngine()
     return _boundary_engine
 
+
 def reset_boundary_engine():
     """Reset the global boundary engine (for testing)."""
     global _boundary_engine
     _boundary_engine = None
 
-def score_boundary(type_a: str, type_b: str, value_a: str, value_b: str,
-                   pos_a: int = 0, pos_b: int = 0) -> bool:
+
+def score_boundary(type_a: str, type_b: str, value_a: str, value_b: str, pos_a: int = 0, pos_b: int = 0) -> bool:
     engine = get_boundary_engine()
     return engine.decide_merge(type_a, type_b, value_a, value_b, pos_a, pos_b)
+
 
 def record_motif_observation(types: List[str]):
     engine = get_boundary_engine()

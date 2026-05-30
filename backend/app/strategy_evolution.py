@@ -6,7 +6,7 @@ Provides:
   - Per-domain strategy performance tracking
   - Automatic strategy selection based on domain characteristics
   - Strategy adjustments for persistent failures
-  - Learning from successful/failed attempts
+  - Learning from successful / failed attempts
 
 This system adjusts extraction strategies based on observed outcomes:
   - Starts with default strategy (Playwright)
@@ -35,11 +35,12 @@ class FetchStrategy(str, Enum):
     """Available fetch strategies."""
 
     PLAYWRIGHT_FULL = "playwright_full"  # Full browser render
-    PLAYWRIGHT_LIGHTWEIGHT = "playwright_lightweight"  # Minimal render, no media/fonts
-    PLAYWRIGHT_STEALTH = "playwright_stealth" # Extra stealth evasion
+    # Minimal render, no media / fonts
+    PLAYWRIGHT_LIGHTWEIGHT = "playwright_lightweight"
+    PLAYWRIGHT_STEALTH = "playwright_stealth"  # Extra stealth evasion
     HTTPX_BASIC = "httpx_basic"  # Raw HTTP, no JS
     HTTPX_WITH_UA = "httpx_with_ua"  # HTTP with browser user agent
-    HTTPX_SMART = "httpx_smart" # HTTP with session/cookies simulation
+    HTTPX_SMART = "httpx_smart"  # HTTP with session / cookies simulation
     HYBRID = "hybrid"  # Try HTTPX first, fallback to Playwright
     CACHED = "cached"  # Use cached response from domain
 
@@ -93,7 +94,7 @@ class StrategyRecommendation:
     recommended_strategy: FetchStrategy
     alternatives: List[FetchStrategy]
     reason: str
-    confidence: float  # 0-1: how confident in recommendation
+    confidence: float  # 0 - 1: how confident in recommendation
     estimated_success_rate: float  # Expected success rate
 
 
@@ -171,7 +172,8 @@ class DomainStrategyState:
         if not candidates:
             return FetchStrategy.PLAYWRIGHT_FULL
 
-        # Lower score = worse strategy; reuse the same scoring as get_best_strategy
+        # Lower score = worse strategy; reuse the same scoring as
+        # get_best_strategy
         def score(perf: StrategyPerformance) -> float:
             success_score = perf.success_rate * 60
             quality_score = perf.avg_quality * 30
@@ -191,7 +193,7 @@ class StrategyEvolutionEngine:
 
         # Evolution parameters
         self.min_samples_for_recommendation = 3
-        self.exploration_probability = 0.15 # 15% chance to explore
+        self.exploration_probability = 0.15  # 15% chance to explore
         self.learning_enabled = True
 
     def _get_or_create_state(self, domain: str) -> DomainStrategyState:
@@ -243,6 +245,7 @@ class StrategyEvolutionEngine:
     def recommend_strategy(self, domain: str) -> StrategyRecommendation:
         """Recommend a fetch strategy for a domain."""
         import random
+
         state = self._get_or_create_state(domain)
 
         # Exploration vs Exploitation
@@ -265,9 +268,11 @@ class StrategyEvolutionEngine:
             # Cold start: use dynamic evidence, not domain-name lists
             try:
                 from app.domain_intelligence import get_domain_intelligence
+
                 intel = get_domain_intelligence().get_intelligence(domain)
 
                 from app.anti_bot_engine import get_anti_bot_engine
+
                 anti_bot = get_anti_bot_engine()
 
                 if intel.anti_bot_risk > 0.6 or anti_bot.should_evolve_to_stealth(domain):
@@ -292,6 +297,7 @@ class StrategyEvolutionEngine:
         # Check anti-bot feedback even if we have samples
         try:
             from app.anti_bot_engine import get_anti_bot_engine
+
             if get_anti_bot_engine().should_evolve_to_stealth(domain):
                 return StrategyRecommendation(
                     recommended_strategy=FetchStrategy.PLAYWRIGHT_STEALTH,
@@ -306,17 +312,21 @@ class StrategyEvolutionEngine:
         best_strategy = state.get_best_strategy()
         best_perf = state.strategies[best_strategy]
 
-        # Timeout-aware: if PLAYWRIGHT_FULL has timeout errors, prefer LIGHTWEIGHT
+        # Timeout-aware: if PLAYWRIGHT_FULL has timeout errors, prefer
+        # LIGHTWEIGHT
         full_perf = state.strategies.get(FetchStrategy.PLAYWRIGHT_FULL)
         if full_perf and full_perf.failure_count > 0:
-            timeout_count = full_perf.error_patterns.get("TimeoutError", 0) + full_perf.error_patterns.get("asyncio.TimeoutError", 0)
+            timeout_count = full_perf.error_patterns.get("TimeoutError", 0) + full_perf.error_patterns.get(
+                "asyncio.TimeoutError", 0
+            )
             if timeout_count >= 2 and best_strategy == FetchStrategy.PLAYWRIGHT_FULL:
                 lightweight_perf = state.strategies.get(FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT)
                 if lightweight_perf and lightweight_perf.success_count > 0:
                     return StrategyRecommendation(
                         recommended_strategy=FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT,
                         alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],
-                        reason=f"Timeout-aware: PLAYWRIGHT_FULL had {timeout_count} timeouts, LIGHTWEIGHT has {lightweight_perf.success_count} successes",
+                        reason=f"Timeout-aware: PLAYWRIGHT_FULL had {timeout_count} timeouts, LIGHTWEIGHT has {
+                            lightweight_perf.success_count} successes",
                         confidence=0.7,
                         estimated_success_rate=lightweight_perf.success_rate,
                     )
@@ -354,8 +364,10 @@ class StrategyEvolutionEngine:
         if rec.recommended_strategy != state.current_strategy:
             logger.info(
                 "Evolving strategy for %s: %s → %s (%s)",
-                domain, state.current_strategy.value,
-                rec.recommended_strategy.value, rec.reason
+                domain,
+                state.current_strategy.value,
+                rec.recommended_strategy.value,
+                rec.reason,
             )
             state.current_strategy = rec.recommended_strategy
             state.strategy_switch_count += 1
@@ -370,43 +382,49 @@ class StrategyEvolutionEngine:
         strategies_report = []
         for strategy, perf in state.strategies.items():
             if perf.success_count + perf.failure_count > 0:
-                strategies_report.append({
-                    "strategy": strategy.value,
-                    "success_rate": round(perf.success_rate, 3),
-                    "success_count": perf.success_count,
-                    "failure_count": perf.failure_count,
-                    "avg_time_ms": round(perf.avg_time_ms, 0),
-                    "avg_quality": round(perf.avg_quality, 3),
-                    "consecutive_failures": perf.consecutive_failures,
-                    "health": "healthy" if perf.is_healthy else ("degraded" if perf.is_degraded else "neutral"),
-                })
+                strategies_report.append(
+                    {
+                        "strategy": strategy.value,
+                        "success_rate": round(perf.success_rate, 3),
+                        "success_count": perf.success_count,
+                        "failure_count": perf.failure_count,
+                        "avg_time_ms": round(perf.avg_time_ms, 0),
+                        "avg_quality": round(perf.avg_quality, 3),
+                        "consecutive_failures": perf.consecutive_failures,
+                        "health": "healthy" if perf.is_healthy else ("degraded" if perf.is_degraded else "neutral"),
+                    }
+                )
 
         # Include all strategies even if untried (for complete reporting)
         all_strategies_report = []
         for strategy in FetchStrategy:
             perf = state.strategies[strategy]
             if perf.success_count + perf.failure_count > 0:
-                all_strategies_report.append({
-                    "strategy": strategy.value,
-                    "success_rate": round(perf.success_rate, 3),
-                    "success_count": perf.success_count,
-                    "failure_count": perf.failure_count,
-                    "avg_time_ms": round(perf.avg_time_ms, 0),
-                    "avg_quality": round(perf.avg_quality, 3),
-                    "consecutive_failures": perf.consecutive_failures,
-                    "health": "healthy" if perf.is_healthy else ("degraded" if perf.is_degraded else "neutral"),
-                })
+                all_strategies_report.append(
+                    {
+                        "strategy": strategy.value,
+                        "success_rate": round(perf.success_rate, 3),
+                        "success_count": perf.success_count,
+                        "failure_count": perf.failure_count,
+                        "avg_time_ms": round(perf.avg_time_ms, 0),
+                        "avg_quality": round(perf.avg_quality, 3),
+                        "consecutive_failures": perf.consecutive_failures,
+                        "health": "healthy" if perf.is_healthy else ("degraded" if perf.is_degraded else "neutral"),
+                    }
+                )
             else:
-                all_strategies_report.append({
-                    "strategy": strategy.value,
-                    "success_rate": 0.0,
-                    "success_count": 0,
-                    "failure_count": 0,
-                    "avg_time_ms": 0.0,
-                    "avg_quality": 0.0,
-                    "consecutive_failures": 0,
-                    "health": "untried",
-                })
+                all_strategies_report.append(
+                    {
+                        "strategy": strategy.value,
+                        "success_rate": 0.0,
+                        "success_count": 0,
+                        "failure_count": 0,
+                        "avg_time_ms": 0.0,
+                        "avg_quality": 0.0,
+                        "consecutive_failures": 0,
+                        "health": "untried",
+                    }
+                )
 
         all_strategies_report.sort(key=lambda x: x["success_rate"], reverse=True)
 
@@ -463,13 +481,15 @@ class StrategyEvolutionEngine:
             else:
                 success_rate = 0.0
 
-            domains_report.append({
-                "domain": domain,
-                "current_strategy": state.current_strategy.value,
-                "strategy_switches": state.strategy_switch_count,
-                "total_attempts": attempts,
-                "overall_success_rate": round(success_rate, 3),
-            })
+            domains_report.append(
+                {
+                    "domain": domain,
+                    "current_strategy": state.current_strategy.value,
+                    "strategy_switches": state.strategy_switch_count,
+                    "total_attempts": attempts,
+                    "overall_success_rate": round(success_rate, 3),
+                }
+            )
             total_success_rate += success_rate
 
         return {

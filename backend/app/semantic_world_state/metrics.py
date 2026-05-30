@@ -3,6 +3,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class MetricsMixin:
     def get_derived_exclusion(self, role_a: str, role_b: str) -> float:
         """Compute exclusion strength from topology metrics — the dict is secondary.
@@ -19,7 +20,8 @@ class MetricsMixin:
         baseline = 0.0
 
         # 1. Motif pressure (topology-native): unstable motifs → exclusion
-        # Stable motifs REPEL exclusion (they indicate compatible neighborhoods)
+        # Stable motifs REPEL exclusion (they indicate compatible
+        # neighborhoods)
         ra_types = {t for r, t in self.role_compatibility if r == role_a}
         rb_types = {t for r, t in self.role_compatibility if r == role_b}
         for motif in self.motif_counts:
@@ -30,7 +32,8 @@ class MetricsMixin:
                 else:
                     baseline -= 0.03 * (stability - 0.5)
 
-        # 2. Compatibility pressure (topology-native): divergent type preferences → exclusion
+        # 2. Compatibility pressure (topology-native): divergent type
+        # preferences → exclusion
         observed_types = set()
         for r, t in self.role_compatibility:
             observed_types.add(t)
@@ -63,6 +66,7 @@ class MetricsMixin:
         graph geometry itself governs cognition.
         """
         from app.field_laws import ROLE_EXCLUSIVITY
+
         possible = len(ROLE_EXCLUSIVITY) + max(len(self.learned_exclusions), 1)
         actual = len(self.learned_exclusions)
         return min(actual / possible, 1.0) if possible > 0 else 0.0
@@ -73,11 +77,9 @@ class MetricsMixin:
         # High fragmentation, energy, or topology-native entropy increases pressure.
         # High certainty decreases pressure
         entropy_pressure = self.metrics.global_entropy * 0.15
-        pressure = (
-            health["system_energy"] / 10.0
-            + health["fragmentation"]
-            + entropy_pressure
-        ) - health["certainty"] * 0.5
+        pressure = (health["system_energy"] / 10.0 + health["fragmentation"] + entropy_pressure) - health[
+            "certainty"
+        ] * 0.5
         return max(0.1, min(2.0, pressure))
 
     def evaluate_topological_consistency(self) -> dict:
@@ -96,27 +98,23 @@ class MetricsMixin:
                     r1, r2 = constituents[i], constituents[j]
                     exclusion = self._instability.get_exclusion(r1, r2)
 
-                    # If constituents strongly repel each other, the envelope is contradictory
+                    # If constituents strongly repel each other, the envelope
+                    # is contradictory
                     if exclusion > 0.7:
-                        contradictions.append({
-                            "envelope": eid,
-                            "pair": (r1, r2),
-                            "exclusion": exclusion,
-                            "type": "internal_repulsion"
-                        })
+                        contradictions.append(
+                            {"envelope": eid, "pair": (r1, r2), "exclusion": exclusion, "type": "internal_repulsion"}
+                        )
 
         consistency_score = 1.0 - (len(contradictions) / max(len(envelopes), 1))
 
         if contradictions:
-            self.record_delta("global", "meta_reasoning", {
-                "consistency_score": consistency_score,
-                "contradiction_count": len(contradictions)
-            })
+            self.record_delta(
+                "global",
+                "meta_reasoning",
+                {"consistency_score": consistency_score, "contradiction_count": len(contradictions)},
+            )
 
-        return {
-            "score": consistency_score,
-            "contradictions": contradictions
-        }
+        return {"score": consistency_score, "contradictions": contradictions}
 
     # ─── Garbage Collection Gateway APIs ────────────────────────────────
     # These encapsulate all GC operations so topology_gc.py never needs
@@ -125,9 +123,7 @@ class MetricsMixin:
     def gc_collect_stale_regions(self, min_instability: float = 0.02, min_energy: float = 0.5) -> int:
         """Remove field regions below thresholds. Returns count removed."""
         before = self._topology.region_count()
-        self._topology.filter_regions(
-            lambda r: r.instability > min_instability or r.local_energy > min_energy
-        )
+        self._topology.filter_regions(lambda r: r.instability > min_instability or r.local_energy > min_energy)
         return before - self._topology.region_count()
 
     def gc_collect_stale_motifs(self, threshold: float = 0.05) -> int:

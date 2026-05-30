@@ -1,5 +1,5 @@
 """
-Job Results Store — Utility to compress and stream large record datasets to/from disk.
+Job Results Store — Utility to compress and stream large record datasets to / from disk.
 """
 
 import gzip
@@ -35,7 +35,8 @@ def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
     path = get_job_results_path(job_id)
     logger.info("Offloading %d records to disk for job %s at %s", len(results), job_id, path)
 
-    # Write to a temporary file first and then atomically rename it to prevent corruption
+    # Write to a temporary file first and then atomically rename it to prevent
+    # corruption
     temp_path = path.with_suffix(path.suffix + ".tmp")
     try:
         with gzip.open(temp_path, "wt", encoding="utf-8") as f:
@@ -166,19 +167,16 @@ def load_job_results_from_disk_safe(
                         f"{e}. Returned {len(results)} partial records."
                     )
                     logger.warning("%s", warning)
-                    # Stop processing at first corrupt line — rest is unreliable
+                    # Stop processing at first corrupt line — rest is
+                    # unreliable
                     break
     except (gzip.BadGzipFile, EOFError, OSError) as e:
         warning = (
-            f"Results file for job {job_id} is truncated or corrupt: {e}. "
-            f"Returned {len(results)} partial records."
+            f"Results file for job {job_id} is truncated or corrupt: {e}. " f"Returned {len(results)} partial records."
         )
         logger.warning("%s", warning)
     except Exception as e:
-        warning = (
-            f"Failed to read results file for job {job_id}: {e}. "
-            f"Returned {len(results)} partial records."
-        )
+        warning = f"Failed to read results file for job {job_id}: {e}. " f"Returned {len(results)} partial records."
         logger.warning("%s", warning)
 
     return results, warning

@@ -21,11 +21,13 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ShardStateSnapshot:
     """Standardized snapshot format for remote sharded state transfers."""
+
     node_id: str
     shard_id: str
     timestamp: float
     transaction_id: int
-    # Domain reputations: domain -> {consecutive_failures, total_fetches, cooldown_until, last_update}
+    # Domain reputations: domain -> {consecutive_failures, total_fetches,
+    # cooldown_until, last_update}
     domain_reputation: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     # Learned motifs: list of field co-occurrence lists
     motifs: List[List[str]] = field(default_factory=list)
@@ -43,6 +45,7 @@ class FederationManager:
     def __init__(self, world_state: Any) -> None:
         self.ws = world_state
         from app.config import settings
+
         self.node_id = settings.NODE_ID
         self.shard_id = settings.SHARD_ID
         self.registered_nodes: Dict[str, Dict[str, Any]] = {}
@@ -64,15 +67,13 @@ class FederationManager:
             "last_seen": time.time(),
             "status": "active",
         }
-        logger.info(
-            "[Federation] Registered remote node %s on shard %s",
-            node_id, shard_id
-        )
+        logger.info("[Federation] Registered remote node %s on shard %s", node_id, shard_id)
 
     def export_local_state(self) -> ShardStateSnapshot:
         """Export local world state, including domain reputations and transaction deltas."""
         # 1. Gather domain reputations from crawl policy engine
         from app.crawl_policy import get_crawl_policy
+
         policy = get_crawl_policy()
         domain_states = {}
         for domain, state in policy._domains.items():
@@ -83,10 +84,12 @@ class FederationManager:
                 "last_update": state.last_fetch_time,
             }
 
-        # 2. Gather learned motifs from world state (split dash hashes into arrays)
+        # 2. Gather learned motifs from world state (split dash hashes into
+        # arrays)
         motifs = [m.split("-") for m in getattr(self.ws, "_evolved_schema", set())]
 
-        # 3. Gather local topology coordinates from world state (serialize tuple keys)
+        # 3. Gather local topology coordinates from world state (serialize
+        # tuple keys)
         topology_coords = {}
         topology_metadata = {}
         if hasattr(self.ws, "_topology") and hasattr(self.ws._topology, "_neighborhood_cohesion"):
@@ -95,18 +98,21 @@ class FederationManager:
             for (src, tgt), cohesion in self.ws._topology._neighborhood_cohesion.items():
                 key = f"{src}:{tgt}"
                 topology_coords[key] = cohesion
-                meta = self.ws._topology._cohesion_metadata.get((src, tgt), {
-                    "node_id": self.node_id,
-                    "timestamp": time.time(),
-                    "version": 1,
-                    "epoch": getattr(self.ws._topology, "topology_epoch", 0)
-                })
+                meta = self.ws._topology._cohesion_metadata.get(
+                    (src, tgt),
+                    {
+                        "node_id": self.node_id,
+                        "timestamp": time.time(),
+                        "version": 1,
+                        "epoch": getattr(self.ws._topology, "topology_epoch", 0),
+                    },
+                )
                 topology_metadata[key] = meta
 
-        # 4. Gather local transaction journals/deltas
+        # 4. Gather local transaction journals / deltas
         delta_log = getattr(self.ws, "_current_journal", [])
 
-        # Fetch latest transaction depth/counter
+        # Fetch latest transaction depth / counter
         tx_id = getattr(self.ws, "_transaction_depth", 0)
 
         return ShardStateSnapshot(
@@ -135,6 +141,7 @@ class FederationManager:
 
         # Rule 1: LWW (Last-Write-Wins) for Domain Reputation State
         from app.crawl_policy import get_crawl_policy
+
         policy = get_crawl_policy()
         for domain, rep in remote.domain_reputation.items():
             local_state = policy._get_state(domain)
@@ -155,7 +162,8 @@ class FederationManager:
                 self.ws._evolved_schema.add(motif_hash)
                 merge_report["merged_motifs"] += 1
 
-        # Rule 3: Topological Affinity Merging via Deterministic Epoch & Version Consensus
+        # Rule 3: Topological Affinity Merging via Deterministic Epoch &
+        # Version Consensus
         if hasattr(self.ws, "_topology") and hasattr(self.ws._topology, "_neighborhood_cohesion"):
             if not hasattr(self.ws._topology, "_cohesion_metadata"):
                 self.ws._topology._cohesion_metadata = {}
@@ -166,32 +174,35 @@ class FederationManager:
                 parts = key.split(":")
                 if len(parts) == 2:
                     k = (parts[0], parts[1])
-                    
-                    # 1. Fetch remote version metadata, or default to standard LWW
-                    r_meta = remote_meta_dict.get(key, {
-                        "node_id": remote.node_id,
-                        "timestamp": remote.timestamp,
-                        "version": 1,
-                        "epoch": 0
-                    })
+
+                    # 1. Fetch remote version metadata, or default to standard
+                    # LWW
+                    r_meta = remote_meta_dict.get(
+                        key, {"node_id": remote.node_id, "timestamp": remote.timestamp, "version": 1, "epoch": 0}
+                    )
                     r_epoch = r_meta.get("epoch", 0)
                     r_ver = r_meta.get("version", 1)
                     r_ts = r_meta.get("timestamp", remote.timestamp)
                     r_node = r_meta.get("node_id", remote.node_id)
 
-                    # 2. Fetch local version metadata, or initialize standard local info if absent
-                    l_meta = self.ws._topology._cohesion_metadata.get(k, {
-                        "node_id": self.node_id,
-                        "timestamp": 0.0,
-                        "version": 0,
-                        "epoch": getattr(self.ws._topology, "topology_epoch", 0)
-                    })
+                    # 2. Fetch local version metadata, or initialize standard
+                    # local info if absent
+                    l_meta = self.ws._topology._cohesion_metadata.get(
+                        k,
+                        {
+                            "node_id": self.node_id,
+                            "timestamp": 0.0,
+                            "version": 0,
+                            "epoch": getattr(self.ws._topology, "topology_epoch", 0),
+                        },
+                    )
                     l_epoch = l_meta.get("epoch", getattr(self.ws._topology, "topology_epoch", 0))
                     l_ver = l_meta.get("version", 0)
                     l_ts = l_meta.get("timestamp", 0.0)
                     l_node = l_meta.get("node_id", self.node_id)
 
-                    # If remote metadata was not explicitly provided, fall back to cooperative averaging
+                    # If remote metadata was not explicitly provided, fall back
+                    # to cooperative averaging
                     if not remote_meta_dict or key not in remote_meta_dict:
                         if k in self.ws._topology._neighborhood_cohesion:
                             local_cohesion = self.ws._topology._neighborhood_cohesion[k]
@@ -202,7 +213,7 @@ class FederationManager:
                             "node_id": self.node_id,
                             "timestamp": time.time(),
                             "version": l_ver + 1,
-                            "epoch": l_epoch
+                            "epoch": l_epoch,
                         }
                         merge_report["reconciled_topologies"] += 1
                         continue
@@ -229,10 +240,7 @@ class FederationManager:
                         merge_report["reconciled_topologies"] += 1
 
         self.divergence_metrics["reconciled_merges"] += 1
-        logger.info(
-            "[Federation] Successfully merged remote state from node %s: %s",
-            remote.node_id, merge_report
-        )
+        logger.info("[Federation] Successfully merged remote state from node %s: %s", remote.node_id, merge_report)
         return merge_report
 
     def replay_deltas(self, deltas: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -286,18 +294,12 @@ class FederationManager:
         if not shared_keys:
             return 1.0  # Complete divergence
 
-        total_distance = sum(
-            abs(local_coords[k] - remote.topology[k])
-            for k in shared_keys
-        )
+        total_distance = sum(abs(local_coords[k] - remote.topology[k]) for k in shared_keys)
         avg_drift = total_distance / len(shared_keys)
-        
+
         self.divergence_metrics["last_drift_score"] = round(avg_drift, 4)
         if avg_drift > 0.5:
             self.divergence_metrics["drift_warnings"] += 1
-            logger.warning(
-                "[Federation] Significant drift divergence detected: %.4f",
-                avg_drift
-            )
+            logger.warning("[Federation] Significant drift divergence detected: %.4f", avg_drift)
 
         return avg_drift

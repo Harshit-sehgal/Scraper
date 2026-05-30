@@ -1,9 +1,11 @@
 from typing import Optional
 from app.models import SchemaField
 
+
 def normalize_scraped_record(record: dict, schema_fields: list[SchemaField]) -> dict:
     """Ensure consistent schema order and basic normalization of values."""
     from app.html_utils import _is_empty_value
+
     normalized: dict = {}
     for field in schema_fields:
         val = record.get(field.name)
@@ -17,9 +19,11 @@ def normalize_scraped_record(record: dict, schema_fields: list[SchemaField]) -> 
             normalized[mf] = record[mf]
     return normalized
 
+
 def _validate_extracted_data(record: dict, schema_fields: list[SchemaField]) -> bool:
     """Basic validation to ensure at least some meaningful data was found."""
     from app.html_utils import _is_empty_value
+
     meaningful_count = 0
     for field in schema_fields:
         val = record.get(field.name)
@@ -27,52 +31,61 @@ def _validate_extracted_data(record: dict, schema_fields: list[SchemaField]) -> 
             meaningful_count += 1
     return meaningful_count > 0
 
+
 def _dedupe_records(records: list[dict], schema_fields: list[SchemaField]) -> list[dict]:
     """Remove duplicate records based on normalized field content."""
     if not records:
         return []
 
     from app.utils.quality import normalized_dedup_text
+
     seen_keys = set()
     unique = []
 
     # Identify primary identifying fields (e.g., name, company)
     id_fields = [f.name for f in schema_fields if any(k in f.name.lower() for k in ["name", "company", "title"])]
     if not id_fields:
-        id_fields = [f.name for f in schema_fields] # fallback to all fields for domain-specific records
+        # fallback to all fields for domain-specific records
+        id_fields = [f.name for f in schema_fields]
 
     for record in records:
         id_vals = []
         for f in id_fields:
             v = record.get(f)
             id_vals.append(normalized_dedup_text(v))
-        
+
         key = "|".join(id_vals)
         if key not in seen_keys:
             unique.append(record)
             seen_keys.add(key)
-    
+
     return unique
 
-def _limit_source_records(records: list[dict], schema_fields: list[SchemaField], max_records: Optional[int] = None) -> list[dict]:
+
+def _limit_source_records(
+    records: list[dict], schema_fields: list[SchemaField], max_records: Optional[int] = None
+) -> list[dict]:
     """Limit the number of records from a single source, prioritizing those with contacts."""
     if max_records is None:
         from app.config import settings
+
         max_records = settings.MAX_RECORDS_PER_SOURCE
-    
+
     if len(records) <= max_records:
         return records
-    
+
     from app.models import FieldType
+
     email_fields = {f.name for f in schema_fields if f.field_type == FieldType.EMAIL}
     phone_fields = {f.name for f in schema_fields if f.field_type == FieldType.PHONE}
-    
+
     def _priority(r):
         has_email = 1 if any(r.get(f) for f in email_fields) else 0
         has_phone = 1 if any(r.get(f) for f in phone_fields) else 0
         return (has_email + has_phone, r.get("record_score", 0.0))
 
     return sorted(records, key=_priority, reverse=True)[:max_records]
+
 
 def _trim_prompt_value(value, max_chars: int = 180):
     if value is None:
@@ -82,9 +95,11 @@ def _trim_prompt_value(value, max_chars: int = 180):
         return text
     return text[:max_chars] + "..."
 
+
 def _prepare_records_for_ai(records: list[dict], schema_fields: list[SchemaField]) -> list[dict]:
     """Convert records to a compact JSON format for LLM processing."""
     from app.html_utils import _is_empty_value
+
     prepared = []
     for r in records:
         item = {}
@@ -96,9 +111,11 @@ def _prepare_records_for_ai(records: list[dict], schema_fields: list[SchemaField
             prepared.append(item)
     return prepared
 
+
 def _get_word_tokens(name: str) -> set[str]:
     """Split a field name into word tokens for boundary-safe matching."""
     import re
+
     return {t.lower() for t in re.split(r"[_\-\s]+", name) if t}
 
 
@@ -112,6 +129,7 @@ def _schema_type_alignment_bonus(profile_type: str | None, schema_field: SchemaF
     if not profile_type:
         return 0.0
     from app.config import settings
+
     compatible = settings.PROFILE_SELECTOR_TYPE_COMPATIBILITY.get(profile_type, ())
     if schema_field.field_type.value in compatible:
         return settings.PROFILE_ALIGNMENT_SCORE_TYPE_BONUS
@@ -151,9 +169,7 @@ def _alignment_score(
     if pk_tokens and sf_tokens:
         overlap = pk_tokens & sf_tokens
         if overlap:
-            score += settings.PROFILE_ALIGNMENT_SCORE_TOKEN_OVERLAP * len(overlap) / max(
-                len(pk_tokens), len(sf_tokens)
-            )
+            score += settings.PROFILE_ALIGNMENT_SCORE_TOKEN_OVERLAP * len(overlap) / max(len(pk_tokens), len(sf_tokens))
 
     if len(pk_lower) >= 3 and pk_lower in sf_lower:
         score += settings.PROFILE_ALIGNMENT_SCORE_SUBSTRING
@@ -206,6 +222,7 @@ def align_extracted_keys_to_schema(
     intent_boost_fields: set[str] = set()
     if user_intent:
         from app.intent_parser import keywords_to_tokens, parse_user_intent
+
         intent = parse_user_intent(user_intent)
         for _need, kws in intent.semantic_needs.items():
             intent_boost_fields |= keywords_to_tokens(kws)
@@ -217,17 +234,16 @@ def align_extracted_keys_to_schema(
         pk_tokens = _get_word_tokens(pk)
         pk_lower = pk.lower()
         if pk_lower in schema_name_set:
-            candidates.append((float('inf'), pk, schema_name_set[pk_lower]))
+            candidates.append((float("inf"), pk, schema_name_set[pk_lower]))
             continue
         for sf in schema_fields:
             sc = _alignment_score(pk, sf, pk_cfg)
             sf_tokens = _get_word_tokens(sf.name)
             if sf.description:
                 sf_tokens |= _get_word_tokens(sf.description)
-            if intent_boost_fields and (pk_tokens & intent_boost_fields) and (
-                sf_tokens & intent_boost_fields
-            ):
+            if intent_boost_fields and (pk_tokens & intent_boost_fields) and (sf_tokens & intent_boost_fields):
                 from app.config import settings
+
                 sc += settings.PROFILE_ALIGNMENT_SCORE_SYNONYM / 2
             if sc > 0:
                 candidates.append((sc, pk, sf.name))
@@ -265,9 +281,7 @@ def align_profile_keys_to_schema(
     profile_fields: dict | None = None,
 ) -> list[dict]:
     """Backward-compatible alias for profile-based extraction."""
-    return align_extracted_keys_to_schema(
-        raw_records, schema_fields, selector_field_defs=profile_fields
-    )
+    return align_extracted_keys_to_schema(raw_records, schema_fields, selector_field_defs=profile_fields)
 
 
 def process_raw_records(
@@ -296,7 +310,9 @@ def process_raw_records(
         norm["record_score"] = score_record_quality(norm, schema_fields)
         results.append(norm)
 
-    results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * settings.RECORD_ACCEPTANCE_FACTOR)]
+    results = [
+        r for r in results if r.get("record_score", 0.0) >= (min_record_score * settings.RECORD_ACCEPTANCE_FACTOR)
+    ]
     results = _dedupe_records(results, schema_fields)
     results = _limit_source_records(results, schema_fields)
     avg_score = sum(r.get("record_score", 0) for r in results) / max(len(results), 1)

@@ -1,12 +1,14 @@
 from typing import Dict, Optional
 import copy
 
+
 class VectorClock:
     """A vector clock for tracking causality in a distributed cognitive substrate.
-    
+
     LAW 11 (Implicit): Distributed truth requires causal ordering.
     No state merge can occur without partial ordering of events.
     """
+
     def __init__(self, node_id: str, clock: Optional[Dict[str, int]] = None):
         self.node_id = node_id
         self._clock = clock if clock else {node_id: 0}
@@ -28,24 +30,24 @@ class VectorClock:
 
     def compare(self, other: Dict[str, int]) -> str:
         """Compare with another clock to determine causality.
-        
+
         Returns:
             "equal", "ancestor", "descendant", or "concurrent"
         """
         self_newer = False
         other_newer = False
-        
+
         all_nodes = set(self._clock.keys()) | set(other.keys())
-        
+
         for node in all_nodes:
             v_self = self._clock.get(node, 0)
             v_other = other.get(node, 0)
-            
+
             if v_self > v_other:
                 self_newer = True
             elif v_other > v_self:
                 other_newer = True
-                
+
         if self_newer and other_newer:
             return "concurrent"
         if self_newer:
@@ -62,5 +64,5 @@ class VectorClock:
         return self.get_clock()
 
     @classmethod
-    def from_dict(cls, node_id: str, data: Dict[str, int]) -> 'VectorClock':
+    def from_dict(cls, node_id: str, data: Dict[str, int]) -> "VectorClock":
         return cls(node_id, copy.deepcopy(data))

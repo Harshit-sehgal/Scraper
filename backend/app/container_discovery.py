@@ -36,10 +36,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Text density thresholds
-DENSITY_TOO_LOW = 1.0       # Less than this = basically empty
-DENSITY_SPARSE = 3.0        # Between 1 and 3 = sparse
-DENSITY_GOOD_LOW = 5.0      # Minimum for a "good" container
-DENSITY_GOOD_HIGH = 120.0   # Maximum before it's prose (article text)
+DENSITY_TOO_LOW = 1.0  # Less than this = basically empty
+DENSITY_SPARSE = 3.0  # Between 1 and 3 = sparse
+DENSITY_GOOD_LOW = 5.0  # Minimum for a "good" container
+DENSITY_GOOD_HIGH = 120.0  # Maximum before it's prose (article text)
 
 # Minimum text length for a meaningful container
 MIN_CONTAINER_TEXT_LEN = 30
@@ -60,9 +60,11 @@ WEIGHT_CHILD_COUNT = 0.06
 # Result types
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ContainerRanking:
     """Ranked list of candidate containers with scores."""
+
     containers: list[CandidateContainer]
     best_selector: str = ""
     best_score: float = 0.0
@@ -80,6 +82,7 @@ class ContainerRanking:
 @dataclass
 class ContainerExtractionResult:
     """Result of extracting from a specific container."""
+
     selector: str
     records: list[dict]
     record_count: int
@@ -91,6 +94,7 @@ class ContainerExtractionResult:
 @dataclass
 class MultiPassResult:
     """Result of multi-pass container extraction."""
+
     all_passed: bool
     final_records: list[dict]
     total_records: int
@@ -103,6 +107,7 @@ class MultiPassResult:
 # ---------------------------------------------------------------------------
 # Core discovery
 # ---------------------------------------------------------------------------
+
 
 def discover_containers(
     html: str,
@@ -177,15 +182,17 @@ def _refine_container_score(
         score += WEIGHT_TEXT_LENGTH * 0.3
 
     # ── 3. Pattern diversity (most important signal) ────────────
-    pattern_count = sum([
-        container.has_price,
-        container.has_date,
-        container.has_time,
-        container.has_currency,
-        container.has_location,
-        container.has_organization,
-        container.has_contact,
-    ])
+    pattern_count = sum(
+        [
+            container.has_price,
+            container.has_date,
+            container.has_time,
+            container.has_currency,
+            container.has_location,
+            container.has_organization,
+            container.has_contact,
+        ]
+    )
     # More patterns = more likely a data container
     score += min(pattern_count * (WEIGHT_PATTERNS / 3), WEIGHT_PATTERNS)
 
@@ -233,14 +240,14 @@ def _refine_container_score(
     if container.depth < 3:
         score *= 0.5
 
-    # Pure price/button container with almost no text = narrow box
+    # Pure price / button container with almost no text = narrow box
     if (container.has_price or container.has_button) and not container.has_organization:
         if combined_len < 100:
             score *= 0.4
         elif combined_len < 200:
             score *= 0.7
 
-    # Container with only a link/button and no descriptive text
+    # Container with only a link / button and no descriptive text
     if container.has_link and not container.has_price and not container.has_date and not container.has_organization:
         if combined_len < 60:
             score *= 0.3
@@ -251,6 +258,7 @@ def _refine_container_score(
 # ---------------------------------------------------------------------------
 # Multi-pass extraction
 # ---------------------------------------------------------------------------
+
 
 async def multi_pass_container_extraction(
     html: str,
@@ -298,7 +306,10 @@ async def multi_pass_container_extraction(
             avg_q = result.avg_quality
             logger.info(
                 "[ContainerDiscovery] Pass %d (%s): %d records, avg quality %.2f",
-                passes_attempted, container.selector, result.record_count, avg_q,
+                passes_attempted,
+                container.selector,
+                result.record_count,
+                avg_q,
             )
 
             all_records.extend(result.records)
@@ -308,7 +319,10 @@ async def multi_pass_container_extraction(
                 best_selector = container.selector
                 logger.info(
                     "[ContainerDiscovery] Accepting pass %d (%s): quality=%.2f count=%d",
-                    passes_attempted, container.selector, avg_q, result.record_count,
+                    passes_attempted,
+                    container.selector,
+                    avg_q,
+                    result.record_count,
                 )
                 return MultiPassResult(
                     all_passed=True,
@@ -321,7 +335,9 @@ async def multi_pass_container_extraction(
         else:
             logger.debug(
                 "[ContainerDiscovery] Pass %d (%s) failed: %s",
-                passes_attempted, container.selector, result.failure_reason,
+                passes_attempted,
+                container.selector,
+                result.failure_reason,
             )
 
     # If we got here, no pass was good enough — return what we have
@@ -386,6 +402,7 @@ async def _extract_from_container(
 
         # Compute average quality
         from app.utils.quality import score_record_quality
+
         qualities = [score_record_quality(r, schema_fields) for r in records]
         avg_quality = sum(qualities) / len(qualities) if qualities else 0.0
 
@@ -421,7 +438,7 @@ def _extract_record_from_element(
     Uses stateful span tracking to ensure each text span is consumed by only
     one field. Fields named "origin"/"departure"/"from" get the first matching
     value; fields named "destination"/"arrival"/"return"/"to_" get the last.
-    String/organization fields are processed last so typed fields get first pick.
+    String / organization fields are processed last so typed fields get first pick.
     """
     record: dict = {}
     full_text = element.get_text(separator=" ", strip=True)
@@ -446,7 +463,7 @@ def _extract_record_from_element(
                 return True
         return False
 
-    # Process fields in order: typed fields first, string/org last
+    # Process fields in order: typed fields first, string / org last
     _TYPED_PRIORITY: dict = {
         FieldType.EMAIL: 0,
         FieldType.PHONE: 0,
@@ -455,25 +472,35 @@ def _extract_record_from_element(
         FieldType.DATE: 1,
     }
 
-    # Sort schema fields: typed first, then location/code, then string/org last
+    # Sort schema fields: typed first, then location / code, then string / org
+    # last
     sorted_fields = sorted(
         enumerate(schema_fields),
         key=lambda item: (
-            _TYPED_PRIORITY.get(item[1].field_type if hasattr(item[1], 'field_type') else None, 3),
+            _TYPED_PRIORITY.get(item[1].field_type if hasattr(item[1], "field_type") else None, 3),
             # Within same priority, fields with "use_last" semantics go second
-            0 if not any(w in (item[1].name or "").lower() for w in ("return", "arrival", "arrive", "dest", "to_")) else 1,
-        )
+            (
+                0
+                if not any(w in (item[1].name or "").lower() for w in ("return", "arrival", "arrive", "dest", "to_"))
+                else 1
+            ),
+        ),
     )
 
     for idx, field in sorted_fields:
-        field_type = field.field_type if hasattr(field, 'field_type') else FieldType.STRING
-        field_name = field.name.lower() if hasattr(field, 'name') else ""
-        field_desc = field.description.lower() if hasattr(field, 'description') else ""
+        field_type = field.field_type if hasattr(field, "field_type") else FieldType.STRING
+        field_name = field.name.lower() if hasattr(field, "name") else ""
+        field_desc = field.description.lower() if hasattr(field, "description") else ""
 
         value = _extract_field_value_stateful(
-            field_type, field_name, field_desc,
-            full_text, text_snippets,
-            matches_by_type, used_spans, used_snippet_indices,
+            field_type,
+            field_name,
+            field_desc,
+            full_text,
+            text_snippets,
+            matches_by_type,
+            used_spans,
+            used_snippet_indices,
         )
         if value:
             record[field.name] = value
@@ -512,13 +539,13 @@ def _collect_all_pattern_matches(
     }
 
     # ── Email ─────────────────────────────────────────────────
-    for m in re.finditer(r'[\w.+-]+@[\w-]+\.[\w.-]+', full_text):
+    for m in re.finditer(r"[\w.+-]+@[\w-]+\.[\w.-]+", full_text):
         validated = _valid_email(m.group(0))
         if validated:
             matches["email"].append((validated, m.start(), m.end()))
 
     # ── Phone ─────────────────────────────────────────────────
-    phone_pattern = re.compile(r'\+?\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}')
+    phone_pattern = re.compile(r"\+?\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}")
     for m in phone_pattern.finditer(full_text):
         validated = _valid_phone(m.group(0))
         if validated:
@@ -530,38 +557,75 @@ def _collect_all_pattern_matches(
         matches["url"].append((m.group(0), m.start(), m.end()))
 
     # ── Currency / Price ──────────────────────────────────────
-    currency_pattern = re.compile(r'[\$\€\£\¥\₹]\s*\d+[\d,.]*')
+    currency_pattern = re.compile(r"[\$\€\£\¥\₹]\s*\d+[\d,.]*")
     for m in currency_pattern.finditer(full_text):
         matches["currency"].append((m.group(0).replace(" ", ""), m.start(), m.end()))
 
     # ── Date ──────────────────────────────────────────────────
     date_patterns = [
-        re.compile(r'\d{4}-\d{2}-\d{2}'),
-        re.compile(r'\d{1,2}/\d{1,2}/\d{2,4}'),
-        re.compile(r'(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}', re.I),
+        re.compile(r"\d{4}-\d{2}-\d{2}"),
+        re.compile(r"\d{1,2}/\d{1,2}/\d{2,4}"),
+        re.compile(r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}", re.I),
     ]
     for dp in date_patterns:
         for m in dp.finditer(full_text):
             matches["date"].append((m.group(0), m.start(), m.end()))
 
     # ── Time ──────────────────────────────────────────────────
-    time_pattern = re.compile(r'\d{1,2}:\d{2}\s*(?:am|pm)?', re.I)
+    time_pattern = re.compile(r"\d{1,2}:\d{2}\s*(?:am|pm)?", re.I)
     for m in time_pattern.finditer(full_text):
         matches["time"].append((m.group(0), m.start(), m.end()))
 
     # ── Location codes (3-letter uppercase codes) ────────────────
-    skip_codes = {"THE", "AND", "FOR", "ALL", "ANY", "NEW", "OLD", "OUT", "TOP", "BIG", "GET", "HOW", "ARE", "NOT", "CAN", "WAS", "OFF", "YOU", "HAS", "ITS", "BUT", "NOW", "MAY", "JAN", "FEB", "MAR", "APR", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
-    for m in re.finditer(r'\b[A-Z]{3}\b', full_text):
+    skip_codes = {
+        "THE",
+        "AND",
+        "FOR",
+        "ALL",
+        "ANY",
+        "NEW",
+        "OLD",
+        "OUT",
+        "TOP",
+        "BIG",
+        "GET",
+        "HOW",
+        "ARE",
+        "NOT",
+        "CAN",
+        "WAS",
+        "OFF",
+        "YOU",
+        "HAS",
+        "ITS",
+        "BUT",
+        "NOW",
+        "MAY",
+        "JAN",
+        "FEB",
+        "MAR",
+        "APR",
+        "JUN",
+        "JUL",
+        "AUG",
+        "SEP",
+        "OCT",
+        "NOV",
+        "DEC",
+    }
+    for m in re.finditer(r"\b[A-Z]{3}\b", full_text):
         if m.group(0) not in skip_codes:
             matches["code"].append((m.group(0), m.start(), m.end()))
 
     # ── Organization / Brand (capitalized multi-word names) ──────
-    # Scan full_text (not snippets) so positions are in full_text coordinate system
-    org_pattern = re.compile(r'\b([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+){1,4})\b')
+    # Scan full_text (not snippets) so positions are in full_text coordinate
+    # system
+    org_pattern = re.compile(r"\b([A-Z][a-zA-Z0 - 9]+(?:\s+[A-Z][a-zA-Z0 - 9]+){1,4})\b")
     for m in org_pattern.finditer(full_text):
         val = m.group(1).strip()
         # Skip common non-org patterns
-        # Skip common non-org patterns (time/location labels, navigation text)
+        # Skip common non-org patterns (time / location labels, navigation
+        # text)
         skip_org_words = {"departure", "return", "arrival", "duration", "total", "details"}
         if val.lower() not in skip_org_words:
             matches["organization"].append((val, m.start(), m.end()))
@@ -594,6 +658,7 @@ def _extract_field_value_stateful(
     Consumes matches from matches_by_type so subsequent fields get
     different matches. Uses use_last heuristic for paired fields.
     """
+
     def _consume_match(matches: list) -> str | None:
         """Pop the next available match, respecting use_last."""
         use_last = any(w in field_name for w in ("return", "arrival", "arrive", "end", "to_", "dest"))
@@ -628,7 +693,9 @@ def _extract_field_value_stateful(
             if i not in used_snippet_indices:
                 # Skip noise snippets
                 lower = snippet.lower()
-                if any(nav in lower for nav in ["click", "sign", "login", "subscribe", "privacy", "terms", "copyright"]):
+                if any(
+                    nav in lower for nav in ["click", "sign", "login", "subscribe", "privacy", "terms", "copyright"]
+                ):
                     used_snippet_indices.add(i)
                     continue
                 if len(snippet) >= 3:
@@ -654,16 +721,16 @@ def _extract_field_value_stateful(
         if result:
             return result
         # Fallback: named price pattern
-        alt_pattern = re.compile(r'(?:price|total|fare|cost)\s*:?\s*[\$\€\£\¥\₹]?\s*(\d+[\d,.]*)', re.I)
+        alt_pattern = re.compile(r"(?:price|total|fare|cost)\s*:?\s*[\$\€\£\¥\₹]?\s*(\d+[\d,.]*)", re.I)
         m = alt_pattern.search(full_text)
         if m and not _is_span_used(m.start(), m.end()):
             used_spans.append((m.start(), m.end()))
             return m.group(1)
         # Last resort: decimal number
-        num_m = re.search(r'(\d+\.\d{2})\b', full_text)
+        num_m = re.search(r"(\d+\.\d{2})\b", full_text)
         if num_m and not _is_span_used(num_m.start(), num_m.end()):
             used_spans.append((num_m.start(), num_m.end()))
-            symbol_match = re.search(r'[\$\€\£\¥\₹]', full_text[:num_m.start() + 10])
+            symbol_match = re.search(r"[\$\€\£\¥\₹]", full_text[: num_m.start() + 10])
             symbol = symbol_match.group(0) if symbol_match else ""
             return f"{symbol}{num_m.group(1)}" if symbol else num_m.group(1)
         return None
@@ -693,7 +760,8 @@ def _extract_field_value_stateful(
     # ── Unhandled ──────────────────────────────────────────────────────
     logger.debug(
         "[ContainerDiscovery] No extraction logic for field '%s' with type %s",
-        field_name, field_type,
+        field_name,
+        field_type,
     )
 
     # ── String (default) ───────────────────────────────────────────────
@@ -723,6 +791,7 @@ def _extract_field_value_stateful(
 # ---------------------------------------------------------------------------
 # Failure classification for container extraction
 # ---------------------------------------------------------------------------
+
 
 def classify_container_failure(
     result: MultiPassResult,

@@ -19,7 +19,7 @@ from app.transaction_context import active_transaction
 
 
 class EnergyState:
-    """Sole owner of the semantic field's energy/macro-state variables."""
+    """Sole owner of the semantic field's energy / macro-state variables."""
 
     def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
         self._delta_callback = delta_callback
@@ -33,10 +33,12 @@ class EnergyState:
         self._dataset_coherence: float = 0.5
         self._schema_instability: dict = {}
         # ─── Energy Conservation Tracking ───────────────────────────────
-        self._total_energy_source: float = 0.0  # Cumulative energy flowing out (source regions)
-        self._total_energy_sink: float = 0.0    # Cumulative energy flowing in (sink regions)
-        
-        # ─── Internal Smoothed/Cached State ───────────────────────────
+        # Cumulative energy flowing out (source regions)
+        self._total_energy_source: float = 0.0
+        # Cumulative energy flowing in (sink regions)
+        self._total_energy_sink: float = 0.0
+
+        # ─── Internal Smoothed / Cached State ───────────────────────────
         self._convergence: float = 0.5
         self._temperature: float = 0.5
         self._integrity: float = 0.5
@@ -44,15 +46,16 @@ class EnergyState:
         self._smoothed_runtime: float = 0.3
         self._smoothed_temperature: float = 0.5
         self._stability_debt: float = 0.0
-        
+
         # ─── Transaction Staging ──────────────────────────────────────
+
     @property
     def _staging(self) -> Optional[dict]:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"energy_staging_{id(self)}")
         return None
-    
+
     @_staging.setter
     def _staging(self, value: Optional[dict]):
         tx = active_transaction.get()
@@ -140,17 +143,18 @@ class EnergyState:
 
     def rebalance_attractors(self, role_stabilities: Dict[str, float], threshold: float = 0.8):
         """Dissipate energy from monopolistic semantic basins (Phase 52).
-        
+
         If a role becomes too dominant (stability > threshold), we siphons
         energy into entropy to encourage exploration.
         """
         if self.global_entropy > 0.8:
-             return # Already high instability; no need for more dissipation
-             
+            return  # Already high instability; no need for more dissipation
+
         for role, stability in role_stabilities.items():
             if stability > threshold:
                 dissipation = (stability - threshold) * 2.0
-                # Reduce global energy, increase entropy (potential to kinetic shift)
+                # Reduce global energy, increase entropy (potential to kinetic
+                # shift)
                 cur_energy = self.global_energy
                 self.set_energy(cur_energy - dissipation * 0.1)
                 self.set_entropy(min(1.0, self.global_entropy + dissipation * 0.05))
@@ -236,7 +240,7 @@ class EnergyState:
     @property
     def energy_balance(self) -> float:
         """Net energy conservation balance.
-        
+
         energy_balance = total_source - total_sink.
         In a perfectly conserved field, this should approach 0 over time.
         Positive = more energy flowing out than in (net relaxation).
@@ -248,20 +252,23 @@ class EnergyState:
 
     def record_energy_flow(self, source_delta: float, sink_delta: float):
         """Record a redistribution flow for energy conservation tracking.
-        
+
         source_delta: amount of energy that flowed OUT of source regions
         sink_delta: amount of energy that flowed INTO sink regions
-        
+
         In a conserved system: sum(source_delta) ≈ sum(sink_delta)
         """
         cur_source = self._get_val("_total_energy_source")
         cur_sink = self._get_val("_total_energy_sink")
         self._set_val("_total_energy_source", cur_source + abs(source_delta))
         self._set_val("_total_energy_sink", cur_sink + abs(sink_delta))
-        self._record("record_energy_flow", {
-            "source_delta": round(source_delta, 4),
-            "sink_delta": round(sink_delta, 4),
-        })
+        self._record(
+            "record_energy_flow",
+            {
+                "source_delta": round(source_delta, 4),
+                "sink_delta": round(sink_delta, 4),
+            },
+        )
 
     @property
     def field_pressure(self) -> float:
@@ -375,7 +382,7 @@ class EnergyState:
         self._set_val("_schema_instability", inst)
         self._record("set_schema_instability", {"role": role, "value": value})
 
-    # ─── Bulk/Derived Setters ────────────────────────────────────────────
+    # ─── Bulk / Derived Setters ────────────────────────────────────────────
 
     def update_from_regions(self, regions: list, region_count: Optional[int] = None):
         if not regions:
@@ -384,10 +391,10 @@ class EnergyState:
         if n <= 0:
             return
         avg_convergence = sum(r.local_convergence for r in regions) / n
-        avg_temp = sum(getattr(r, 'local_temperature', 0.5) for r in regions) / n
+        avg_temp = sum(getattr(r, "local_temperature", 0.5) for r in regions) / n
         avg_energy = sum(r.local_energy for r in regions) / n
         avg_instability = sum(r.instability for r in regions) / n
-        
+
         self.set_convergence(avg_convergence)
         self.set_temperature(avg_temp)
         self.set_energy(avg_energy)
@@ -400,17 +407,18 @@ class EnergyState:
         n = region_count if region_count else len(regions)
         if n <= 0:
             return
-        avg_convergence = sum(getattr(r, 'integrity', 0.5) for r in regions) / n
-        avg_temp = sum(getattr(r, 'local_temperature', 0.5) for r in regions) / n
+        avg_convergence = sum(getattr(r, "integrity", 0.5) for r in regions) / n
+        avg_temp = sum(getattr(r, "local_temperature", 0.5) for r in regions) / n
         avg_energy = sum(r.local_energy for r in regions) / n
         avg_instability = sum(r.instability for r in regions) / n
-        
-        # Phase 56/58: Entropy Economy — smooth entropy growth but ensure it settled to 0
+
+        # Phase 56 / 58: Entropy Economy — smooth entropy growth but ensure it
+        # settled to 0
         cur_entropy = self._get_val("global_entropy")
         # Faster decay (0.5 weight) than growth (0.3 weight in previous iterations)
         # to ensure stabilization is responsive.
         self._set_val("global_entropy", cur_entropy * 0.5 + avg_instability * 0.5)
-        
+
         self._set_val("_convergence", avg_convergence)
         self._set_val("_temperature", avg_temp)
         # Update smoothed metrics (EMA-style)
@@ -486,17 +494,17 @@ class EnergyState:
 
     def merge(self, other_data: dict, alpha: float = 0.5):
         """Merge remote energy state into local (Phase 32)."""
-        
+
         def merge_field(field: str, remote_val: float, mode: str = "avg"):
             # All internal keys in EnergyState use underscores
             k = field if field.startswith("_") else f"_{field}"
             local_val = self._get_val(k)
-            
+
             if mode == "avg":
                 new_val = local_val * (1.0 - alpha) + remote_val * alpha
             elif mode == "max":
                 new_val = max(local_val, remote_val)
-            
+
             self._set_val(k, new_val)
 
         merge_field("global_energy", other_data.get("global_energy", 5.0))
@@ -506,7 +514,7 @@ class EnergyState:
         merge_field("cumulative_density", other_data.get("cumulative_density", 0.0))
         merge_field("cumulative_uncertainty", other_data.get("cumulative_uncertainty", 0.0))
         merge_field("dataset_coherence", other_data.get("dataset_coherence", 0.5))
-        
+
         # Merge derived metrics
         merge_field("_total_energy_source", other_data.get("_total_energy_source", 0.0), mode="max")
         merge_field("_total_energy_sink", other_data.get("_total_energy_sink", 0.0), mode="max")
@@ -523,6 +531,5 @@ class EnergyState:
         for role, r_val in remote_inst.items():
             l_val = self.get_schema_instability(role)
             self.set_schema_instability(role, l_val * (1.0 - alpha) + r_val * alpha)
-        
-        self._record("merge", {"alpha": alpha})
 
+        self._record("merge", {"alpha": alpha})

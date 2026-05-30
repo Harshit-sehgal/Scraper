@@ -2,6 +2,7 @@
 from typing import Tuple
 from app.invariant_firewall import requires_invariants
 
+
 class MemoryMixin:
     @requires_invariants
     def reinforce_motif(self, motif: Tuple[str, ...]):
@@ -9,7 +10,7 @@ class MemoryMixin:
         self._motif.reinforce(motif, self.metrics.total_records_processed)
 
     def get_motif_stability(self, motif: Tuple[str, ...]) -> float:
-        """Get temporal stability score for a motif (0-1)."""
+        """Get temporal stability score for a motif (0 - 1)."""
         return self._motif.compute_stability(motif, self.metrics.total_records_processed)
 
     @requires_invariants
@@ -24,8 +25,7 @@ class MemoryMixin:
         # Minimum context guard prevents firing on initialization defaults
         # (global_entropy starts at 0.5, above the 0.4 threshold).
         has_context = self.metrics.total_records_processed >= 5
-        should_decay = has_context and (self.metrics.global_entropy > 0.4 or
-                                        self.metrics.field_pressure > 0.3)
+        should_decay = has_context and (self.metrics.global_entropy > 0.4 or self.metrics.field_pressure > 0.3)
         if not should_decay:
             return
         self._manifold.decay_compatibilities(rate=rate)

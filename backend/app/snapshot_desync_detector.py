@@ -17,7 +17,8 @@ class DesyncReport:
     """Frozen report of a desync detection result."""
 
     __slots__ = (
-        "node_a", "node_b",
+        "node_a",
+        "node_b",
         "causal_relation",
         "divergence_score",
         "subsystem_divergence",
@@ -143,9 +144,7 @@ class SnapshotDesyncDetector:
         critical = divergence_score > self._threshold or epoch_gap > 2
 
         # 6. Recommended action
-        recommended_action = self._recommend_action(
-            causal_relation, divergence_score, epoch_gap, critical
-        )
+        recommended_action = self._recommend_action(causal_relation, divergence_score, epoch_gap, critical)
 
         report = DesyncReport(
             node_a=node_a,
@@ -165,7 +164,11 @@ class SnapshotDesyncDetector:
         if critical:
             logger.warning(
                 "DESYNC DETECTED: %s ↔ %s divergence=%.4f epoch_gap=%d action=%s",
-                node_a, node_b, divergence_score, epoch_gap, recommended_action,
+                node_a,
+                node_b,
+                divergence_score,
+                epoch_gap,
+                recommended_action,
             )
 
         return report
@@ -206,7 +209,7 @@ class SnapshotDesyncDetector:
     # ─── Subsystem Comparators ───────────────────────────────────────
 
     def _compare_topology(self, a: dict, b: dict) -> float:
-        """Compare topology regions and laws. Returns divergence 0-1."""
+        """Compare topology regions and laws. Returns divergence 0 - 1."""
         topo_a = a.get("topology", {})
         topo_b = b.get("topology", {})
 
@@ -239,16 +242,10 @@ class SnapshotDesyncDetector:
         epoch_b = topo_b.get("topology_epoch", 0)
         epoch_div = 1.0 if epoch_a != epoch_b else 0.0
 
-        return (
-            region_count_div * 0.25
-            + laws_div * 0.25
-            + cohesion_div * 0.20
-            + comm_div * 0.20
-            + epoch_div * 0.10
-        )
+        return region_count_div * 0.25 + laws_div * 0.25 + cohesion_div * 0.20 + comm_div * 0.20 + epoch_div * 0.10
 
     def _compare_manifold(self, a: dict, b: dict) -> float:
-        """Compare manifold role embeddings. Returns divergence 0-1."""
+        """Compare manifold role embeddings. Returns divergence 0 - 1."""
         man_a = a.get("manifold", {})
         man_b = b.get("manifold", {})
 
@@ -273,7 +270,7 @@ class SnapshotDesyncDetector:
             va = vec_a.get(role, [0.0] * 16)
             vb = vec_b.get(role, [0.0] * 16)
             if va and vb:
-                dist = sum(abs(x - y) for x, y in zip(va, vb[:len(va)])) / len(va)
+                dist = sum(abs(x - y) for x, y in zip(va, vb[: len(va)])) / len(va)
                 total_dist += dist
                 shared_count += 1
 
@@ -291,7 +288,7 @@ class SnapshotDesyncDetector:
         return (1.0 - role_jaccard) * 0.35 + avg_vec_dist * 0.35 + compat_div * 0.30
 
     def _compare_energy(self, a: dict, b: dict) -> float:
-        """Compare energy state metrics. Returns divergence 0-1."""
+        """Compare energy state metrics. Returns divergence 0 - 1."""
         energy_a = a.get("energy", {})
         energy_b = b.get("energy", {})
 
@@ -299,8 +296,7 @@ class SnapshotDesyncDetector:
             return 0.0
 
         # Compare key scalar metrics
-        keys = ["global_energy", "global_entropy", "convergence_score",
-                "field_pressure", "stability_debt"]
+        keys = ["global_energy", "global_entropy", "convergence_score", "field_pressure", "stability_debt"]
         total_div = 0.0
         count = 0
         for key in keys:
@@ -313,7 +309,7 @@ class SnapshotDesyncDetector:
         return total_div / count if count > 0 else 0.0
 
     def _compare_instability(self, a: dict, b: dict) -> float:
-        """Compare learned exclusions. Returns divergence 0-1."""
+        """Compare learned exclusions. Returns divergence 0 - 1."""
         inst_a = a.get("instability", {})
         inst_b = b.get("instability", {})
 
@@ -323,7 +319,7 @@ class SnapshotDesyncDetector:
         return self._dict_divergence(excl_a, excl_b)
 
     def _compare_history(self, a: dict, b: dict) -> float:
-        """Compare history states. Returns divergence 0-1."""
+        """Compare history states. Returns divergence 0 - 1."""
         hist_a = a.get("history", {})
         hist_b = b.get("history", {})
 
@@ -377,9 +373,7 @@ class SnapshotDesyncDetector:
 
         return diff_sum / diff_count if diff_count > 0 else 0.0
 
-    def _recommend_action(
-        self, causal_relation: str, divergence: float, epoch_gap: int, critical: bool
-    ) -> str:
+    def _recommend_action(self, causal_relation: str, divergence: float, epoch_gap: int, critical: bool) -> str:
         """Recommend an action based on divergence analysis."""
         if not critical:
             return "none"
