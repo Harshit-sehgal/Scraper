@@ -49,10 +49,28 @@ export function setMode(mode) {
 
 // ─── Global Keyboard Handler ───
 
+const TAB_KEYS = {
+    '1': 'jobs',
+    '2': 'new',
+    '3': 'recycle',
+    '4': 'cognition',
+    '5': 'dashboard',
+};
+
 export function onGlobalKeydown(e) {
     const typing = isTypingTarget(e.target);
     const jobsSearch = document.getElementById('jobs-search');
     const resultSearch = document.getElementById('inp-result-search');
+
+    // Number keys 1-5: switch between tabs (only when not typing)
+    if (!typing && e.key >= '1' && e.key <= '5') {
+        e.preventDefault();
+        const viewName = TAB_KEYS[e.key];
+        if (viewName) {
+            switchView(viewName);
+        }
+        return;
+    }
 
     if (!typing && e.key === 'n') {
         e.preventDefault();
