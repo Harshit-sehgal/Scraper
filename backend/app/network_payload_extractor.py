@@ -228,7 +228,7 @@ def _value_matches_type(value: Any, field_type: FieldType) -> bool:
     if field_type == FieldType.NUMBER or field_type == FieldType.INTEGER or field_type == FieldType.FLOAT:
         return bool(re.match(r"^-?\d+(\.\d+)?$", s))
     if field_type == FieldType.EMAIL:
-        return bool(re.search(r"[a-zA-Z0 - 9_.+-]+@[a-zA-Z0 - 9-]+\.[a-zA-Z0 - 9-.]+", s))
+        return bool(re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", s))
     if field_type == FieldType.URL:
         return s.startswith(("http://", "https://"))
     if field_type == FieldType.DATE:

@@ -728,9 +728,7 @@ Expected output:
 
     return f"""You are a data schema designer. Name each data field found on this webpage.
 
-I extracted these values from ONE data row on this {{
-        structure_type.upper()}} page (confidence: {{
-        structure_confidence:.0%}}):
+I extracted these values from ONE data row on this {structure_type.upper()} page (confidence: {structure_confidence:.0%}):
 
 {value_block}
 
@@ -1249,7 +1247,7 @@ _FIELD_NAME_HINTS: list[tuple[str, str, str]] = [
     # Currency values
     ("currency", "", "price"),
     # 3-letter uppercase codes
-    ("code", r"^[A-Z]{3}$", "airport_code"),
+    ("code", r"^[A-Z]{3}$", "three_letter_code"),
     # 2-letter uppercase codes
     ("code", r"^[A-Z]{2}$", "code_abbreviation"),
     # Mixed letter-digit codes (flight numbers, product codes)

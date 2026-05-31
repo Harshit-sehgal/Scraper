@@ -1,9 +1,9 @@
 import asyncio
 
-import g4f
-
 
 async def test_provider(provider):
+    import g4f
+
     print(f"Testing {provider.__name__}...")
     try:
         response = await g4f.client.AsyncClient().chat.completions.create(
@@ -21,6 +21,8 @@ async def test_provider(provider):
 
 
 async def main():
+    import g4f
+
     providers = [
         g4f.Provider.PollinationsAI,
         g4f.Provider.BlackboxPro,
@@ -32,4 +34,6 @@ async def main():
     for p in providers:
         await test_provider(p)
 
-asyncio.run(main())
+
+if __name__ == "__main__":
+    asyncio.run(main())

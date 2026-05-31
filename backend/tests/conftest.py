@@ -8,12 +8,24 @@ import pytest
 
 
 def pytest_addoption(parser):
-    """Register the --run-postgres CLI flag."""
+    """Register optional external-service test flags."""
     parser.addoption(
         "--run-postgres",
         action="store_true",
         default=False,
         help="Run tests marked with @pytest.mark.postgres (requires Docker + testcontainers).",
+    )
+    parser.addoption(
+        "--run-golden-dataset",
+        action="store_true",
+        default=False,
+        help="Run golden dataset tests against real websites (requires network).",
+    )
+    parser.addoption(
+        "--run-browser",
+        action="store_true",
+        default=False,
+        help="Run tests marked with @pytest.mark.browser (requires Playwright and local socket binding).",
     )
 
 
@@ -26,6 +38,10 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "golden_dataset: tests that hit real websites for extraction validation. Skipped by default (use --run-golden-dataset).",
+    )
+    config.addinivalue_line(
+        "markers",
+        "browser: tests that require Playwright/browser runtime and local HTTP server binding. Skipped by default.",
     )
     try:
         from testcontainers.postgres import PostgresContainer
@@ -52,14 +68,20 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Skip tests marked 'postgres' unless --run-postgres is provided."""
-    if config.getoption("--run-postgres", default=False):
-        return  # Don't skip anything
-
     skip_postgres = pytest.mark.skip(reason="need --run-postgres to run (Postgres integration tests)")
+    skip_golden = pytest.mark.skip(
+        reason="need --run-golden-dataset to run (network-dependent golden dataset validation)"
+    )
+    skip_browser = pytest.mark.skip(
+        reason="need --run-browser to run (requires Playwright and local socket binding)"
+    )
     for item in items:
-        if "postgres" in item.keywords:
+        if "postgres" in item.keywords and not config.getoption("--run-postgres", default=False):
             item.add_marker(skip_postgres)
+        if "golden_dataset" in item.keywords and not config.getoption("--run-golden-dataset", default=False):
+            item.add_marker(skip_golden)
+        if "browser" in item.keywords and not config.getoption("--run-browser", default=False):
+            item.add_marker(skip_browser)
 
 
 def pytest_sessionfinish(session, exitstatus):

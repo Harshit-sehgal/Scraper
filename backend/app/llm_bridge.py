@@ -169,8 +169,8 @@ async def _call_openai_compatible_text(
 
 
 def _groq_model_candidates() -> list[str]:
-    primary = (settings.GROQ_DEFAULT_MODEL or "llama-3.3 - 70b-versatile").strip()
-    fallback = (settings.GROQ_FALLBACK_MODEL or "llama-3.1 - 8b-instant").strip()
+    primary = (settings.GROQ_DEFAULT_MODEL or "llama-3.3-70b-versatile").strip()
+    fallback = (settings.GROQ_FALLBACK_MODEL or "llama-3.1-8b-instant").strip()
     models: list[str] = []
     for model in [primary, fallback]:
         if model and model not in models:

@@ -216,7 +216,7 @@ def _extract_field_by_pattern(
         if ftype == FieldType.CURRENCY:
             patterns = [r"(?:[$£€¥₹]|USD\s*|EUR\s*)\s*\d[\d,.]*"]
         elif ftype == FieldType.EMAIL:
-            patterns = [r"[a-zA-Z0 - 9_.+-]+@[a-zA-Z0 - 9-]+\.[a-zA-Z0 - 9-.]+"]
+            patterns = [r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"]
         elif ftype == FieldType.PHONE:
             patterns = [r"[\d\s\-()+]{7,20}"]
         elif ftype == FieldType.URL:
@@ -676,7 +676,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 if rating_node:
                     val = rating_node.get_text()
                 else:
-                    match = re.search(r"(\d+\.?\d*/\d+|\d+\.?\d*\s * stars?|★+)", text, re.I)
+                    match = re.search(r"(\d+\.?\d*/\d+|\d+\.?\d*\s*stars?|★+)", text, re.I)
                     val = match.group(1) if match else None
                 val = _sanitize_field_value(field, val)
 
@@ -696,7 +696,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 if code_node:
                     val = code_node.get_text()
                 else:
-                    match = re.search(r"(SKU[-:\s]*[A-Za-z0 - 9-]+|\b[0 - 9]{12,13}\b)", text, re.I)
+                    match = re.search(r"(SKU[-:\s]*[A-Za-z0-9-]+|\b[0-9]{12,13}\b)", text, re.I)
                     val = match.group(1) if match else None
                 val = _sanitize_field_value(field, val)
 

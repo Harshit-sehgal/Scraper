@@ -1,6 +1,6 @@
 # Production Startup Guide
 
-> **⚠️ PRE-PRODUCTION — NOT FULLY VALIDATED**
+> **PRE-PRODUCTION - NOT FULLY VALIDATED**
 >
 > This document describes the intended production deployment sequence.
 > Not all steps have been end-to-end validated in a production environment.
@@ -45,7 +45,7 @@ Replace every value in `.env.production.local` with strong, real values:
 python3 scripts/check_prod_env.py --env-file .env.production.local
 ```
 
-**Expected:** All checks pass with ✅. If any checks fail, fix them before proceeding.
+**Expected:** all checks pass. If any checks fail, fix them before proceeding.
 
 ---
 
@@ -266,7 +266,7 @@ These gaps should be addressed before production traffic:
 |-----|--------|------------|
 | **Rate limiting** is single-process only | Not safe for distributed deployments | Use nginx/cloud WAF rate limiting |
 | **Dashboard** stores API key in `localStorage` | Not safe for shared browsers | Restrict dashboard to private networks |
-| ✅ **Postgres** CI-validated | All Postgres tests pass with real container (0 skipped) | Ready for single-instance deployment |
+| **Postgres** service validation | Must be rerun with a real Postgres container and `--run-postgres` tests | Required before production deployment |
 | **Anti-bot** coverage incomplete | May fail on aggressive anti-bot sites | Add custom headers/delays per site |
 | **Extraction accuracy** unknown for real sites | Fixture benchmarks ≠ real-world results | Validate on target sites before relying on extraction |
 | **TLS/HTTPS** not enforced by application | Requires nginx or reverse proxy config | Ensure nginx terminates TLS |

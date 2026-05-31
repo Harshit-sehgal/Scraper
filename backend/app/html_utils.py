@@ -62,7 +62,7 @@ def _compact_text(text: str) -> str:
 
 
 def _normalized_text_key(text: str) -> str:
-    return re.sub(r"[^a-z0 - 9]+", " ", (text or "").strip().lower()).strip()
+    return re.sub(r"[^a-z0-9]+", " ", (text or "").strip().lower()).strip()
 
 
 def _is_placeholder_value(text: str) -> bool:
@@ -74,7 +74,7 @@ def _is_placeholder_value(text: str) -> bool:
     if len(key) < settings.SELECTOR_MIN_TEXT_LEN:
         # If extremely short but contains alphanumeric characters (e.g. "LON", "PAR", "238", "1"), it is valid.
         # Only treat as placeholder if it is purely symbols (e.g. "--", "...")
-        if not re.search(r"[a-zA-Z0 - 9]", key):
+        if not re.search(r"[a-zA-Z0-9]", key):
             return True
         return False
     if key.endswith(" page") and key.split()[0] in EMPTY_TOKENS:

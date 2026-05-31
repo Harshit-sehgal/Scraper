@@ -192,7 +192,7 @@ class TestLogFunctions:
         # Most recent event should be user-4
         assert events[-1]["actor"] == "user-4"
 
-    def test_get_recent_events_empty(self):
+    def test_get_recent_events_empty(self, temp_log_dir):
         """get_recent_events should return empty list when no log file exists."""
         events = get_recent_events(count=10)
         assert events == []

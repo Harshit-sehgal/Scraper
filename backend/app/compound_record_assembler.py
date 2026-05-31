@@ -299,7 +299,7 @@ def _extract_shared_fields(segments: list[dict[str, Any]], full_text: str) -> di
         shared["rating"] = rating_match.group(1)
 
     # Status / availability
-    status_match = re.search(r"\b(available|sold\s * out|in\s * stock|out\s * of\s * stock|pending)\b", full_text, re.I)
+    status_match = re.search(r"\b(available|sold\s*out|in\s*stock|out\s*of\s*stock|pending)\b", full_text, re.I)
     if status_match:
         shared["status"] = status_match.group(1)
 

@@ -13,4 +13,6 @@ async def test():
     insight = await generate_data_insight(records)
     print(f'\n=== Insight ===\n{insight}')
 
-asyncio.run(test())
+
+if __name__ == "__main__":
+    asyncio.run(test())

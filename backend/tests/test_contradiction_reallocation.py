@@ -11,10 +11,10 @@ def test_field_conflict_drives_exclusion_learning():
 
     # Record with deliberate conflicts
     output = {
-        "origin": "LAX",
-        "destination": "LAX",
+        "source": "LAX",
+        "target": "LAX",
         "_allocation_conflicts": [
-            {"role": "origin", "candidate": "LAX", "reason": "exclusivity", "score": 0.8},
+            {"role": "source", "candidate": "LAX", "reason": "exclusivity", "score": 0.8},
         ],
     }
 
@@ -25,7 +25,7 @@ def test_field_conflict_drives_exclusion_learning():
 
     ws.observe_field_perturbation(output, tokens)
 
-    key = ("destination", "origin")
+    key = ("source", "target")
     learned = ws.learned_exclusions.get(key, 0.0)
     assert learned > 0.0, f"Expected learned exclusion > 0 from field conflicts, got {learned}"
 
@@ -36,10 +36,10 @@ def test_no_field_conflict_does_not_reinforce():
     ws.clear()
 
     # Seed an existing exclusion
-    key = ("destination", "origin")
+    key = ("source", "target")
     ws._instability.set_exclusion(key, 0.5)
 
-    output = {"origin": "JFK", "destination": "LAX"}
+    output = {"source": "JFK", "target": "LAX"}
     tokens = [
         SemanticToken(raw="JFK", normalized="jfk", primary_type=SemanticType.LOCATION,
                       span=Span(0, 3), position=0),
@@ -61,7 +61,7 @@ def test_exclusion_to_topology_law_bridge():
     ws = get_world_state()
     ws.clear()
 
-    key = ("destination", "origin")
+    key = ("source", "target")
     # Set exclusion above threshold — should trigger topology law bridge
     ws.set_exclusion_by_key(key, 0.5)
 
@@ -75,7 +75,7 @@ def test_topology_law_to_exclusion_bridge():
     ws = get_world_state()
     ws.clear()
 
-    key = ("destination", "origin")
+    key = ("source", "target")
     # Set a strongly repulsive topological law
     ws._topology.set_topological_law(key, -0.6)
 
@@ -112,13 +112,13 @@ def test_contradiction_pressure_triggers_restructuring():
 
     # Create many allocation conflicts to drive contradiction_pressure > 0.3
     output = {
-        "origin": "LAX",
-        "destination": "LAX",
+        "source": "LAX",
+        "target": "LAX",
         "price": "100",
         "cost": "200",
         "_allocation_conflicts": [
-            {"role": "origin", "candidate": "LAX", "reason": "exclusivity", "score": 0.8},
-            {"role": "destination", "candidate": "LAX", "reason": "exclusivity", "score": 0.7},
+            {"role": "source", "candidate": "LAX", "reason": "exclusivity", "score": 0.8},
+            {"role": "target", "candidate": "LAX", "reason": "exclusivity", "score": 0.7},
             {"role": "price", "candidate": "100", "reason": "duplicate", "score": 0.6},
             {"role": "cost", "candidate": "200", "reason": "duplicate", "score": 0.5},
         ],
@@ -162,10 +162,10 @@ def test_contradiction_pressure_low_does_not_restructure():
         return original(*args, **kwargs)
 
     output = {
-        "origin": "JFK",
-        "destination": "LAX",
+        "source": "JFK",
+        "target": "LAX",
         "_allocation_conflicts": [
-            {"role": "origin", "candidate": "JFK", "reason": "exclusivity", "score": 0.8},
+            {"role": "source", "candidate": "JFK", "reason": "exclusivity", "score": 0.8},
         ],
     }
 
@@ -186,6 +186,6 @@ def test_contradiction_pressure_low_does_not_restructure():
         ws._topology.restructure_topology = original  # type: ignore[method-assign]
 
     # Verify observable outcome — exclusion was still learned
-    key = ("destination", "origin")
+    key = ("source", "target")
     learned = ws.learned_exclusions.get(key, 0.0)
     assert learned > 0.0, f"Expected exclusion learning even without restructuring, got {learned}"

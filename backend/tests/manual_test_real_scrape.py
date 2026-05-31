@@ -20,4 +20,6 @@ async def test():
     for r in results:
         print(json.dumps(r, ensure_ascii=False, indent=2))
 
-asyncio.run(test())
+
+if __name__ == "__main__":
+    asyncio.run(test())

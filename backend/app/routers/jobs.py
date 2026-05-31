@@ -577,7 +577,7 @@ def create_jobs_router(
             raise HTTPException(status_code=404, detail="Job not found")
         job = jobs_store[job_id]
         if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
-            raise HTTPException(status_code=409, detail="Cannot delete / recycle an active job. Cancel the job first.")
+            raise HTTPException(status_code=409, detail="Cannot delete/recycle an active job. Cancel the job first.")
         repo = get_job_repository()
         repo.move_to_recycle_bin(job_id)
         recycle_bin_store[job_id] = jobs_store.pop(job_id)

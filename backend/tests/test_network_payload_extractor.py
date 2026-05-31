@@ -489,6 +489,7 @@ class TestSourceArbitration:
     @pytest.mark.asyncio
     async def test_memory_downgraded_and_arbitration(self, monkeypatch):
         from app.extraction_orchestrator import orchestrate_extraction
+        from app.container_discovery import MultiPassResult
 
         url = "https://example.com/search/id/opaque_session_token_123"
         html = "<html><body>Some content</body></html>"
@@ -514,6 +515,24 @@ class TestSourceArbitration:
             return [{"origin_airport_code": "Guatemala City aerial view", "destination_airport_code": "JFK", "record_score": 0.7}]
 
         monkeypatch.setattr("app.extraction_orchestrator.apply_selectors", mock_apply_selectors)
+
+        async def no_discovered_selectors(*args, **kwargs):
+            return None
+
+        async def no_container_records(*args, **kwargs):
+            return MultiPassResult(
+                all_passed=False,
+                final_records=[],
+                total_records=0,
+                passes_attempted=1,
+                passes_succeeded=0,
+                failure_reason="disabled in unit test",
+            )
+
+        monkeypatch.setattr("app.extraction_orchestrator.discover_selectors", no_discovered_selectors)
+        monkeypatch.setattr("app.extraction_orchestrator.multi_pass_container_extraction", no_container_records)
+        monkeypatch.setattr("app.extraction_orchestrator.extract_from_visible_blocks", lambda *args, **kwargs: [])
+        monkeypatch.setattr("app.extraction_orchestrator.extract_with_regex", lambda *args, **kwargs: [])
 
         warnings = []
         _ = await orchestrate_extraction(

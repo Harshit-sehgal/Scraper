@@ -88,7 +88,7 @@ VALUE_PATTERNS = {
         r"\d+h\s*\d+m",  # 2h 30m
         r"\d+h$",  # 2h
         r"\d+:\d{2}",  # 02:30
-        r"\d+\s * hours?",  # 3 hours
+        r"\d+\s*hours?",  # 3 hours
     ],
     "phone": [
         r"\+?\d[\d\s\-\(\)]{8,}",  # +91 9876543210, (555) 123 - 4567
@@ -110,7 +110,7 @@ VALUE_PATTERNS = {
     ],
     "percentage": [
         r"\d+[\.\,]?\d*%",  # 8%, 20%, 0.5%
-        r"\d+[\.\,]?\d*\s * per\s * cent",  # 8 per cent
+        r"\d+[\.\,]?\d*\s*per\s*cent",  # 8 per cent
     ],
     "time": [
         r"\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?",  # 14:30, 2:30 PM, 08:00
@@ -122,33 +122,33 @@ VALUE_PATTERNS = {
     "dimension": [
         # 10x15cm, 5x7
         r"\d+[\.\,]?\d*\s*(?:x|×|\*)\s*\d+[\.\,]?\d*\s*(?:cm|mm|m|in|inches|ft|feet)?",
-        r"(?:A[0 - 5]|Letter|Legal|Tabloid)",  # Paper sizes
+        r"(?:A[0-5]|Letter|Legal|Tabloid)",  # Paper sizes
     ],
     "quantity": [
         r"(?:Pack|pack)\s*(?:of|/)?\s*\d+",  # Pack of 6, Pack / 12
         r"\d+\s*(?:pieces?|units?|items?|count|pcs|qty)",  # 12 pieces, 6 units
         # 500ml, 1L, 2 litres
         r"\d+[\.\,]?\d*\s*(?:ml|l|L|litre|liter|gallon|fl oz)",
-        r"(?:each|per\s * dozen|per\s * piece|per\s * unit)",  # each, per dozen
+        r"(?:each|per\s*dozen|per\s*piece|per\s*unit)",  # each, per dozen
     ],
     "product_code": [
-        r"\bSKU[-:\s]*[A-Za-z0 - 9-]+\b",  # SKU-12345, SKU: ABC123
-        r"\b(?:EAN|UPC|ISBN|ASIN)[-:\s]*[0 - 9]+\b",  # EAN 1234567890123
-        r"\b[0 - 9]{12,13}\b",
+        r"\bSKU[-:\s]*[A-Za-z0-9-]+\b",  # SKU-12345, SKU: ABC123
+        r"\b(?:EAN|UPC|ISBN|ASIN)[-:\s]*[0-9]+\b",  # EAN 1234567890123
+        r"\b[0-9]{12,13}\b",
         # EAN-13 / UPC-A barcode numbers only (12 - 13 digits)
     ],
     "unit_type": [
         # per kg, per piece
         r"per\s*(?:kg|g|lb|piece|item|unit|dozen|litre|ml|pack|box|serving)",
         # each, /kg
-        r"(?:each|per\s * kg|per\s * g|per\s * lb|/\s * kg|/\s * piece|/\s * item)",
+        r"(?:each|per\s*kg|per\s*g|per\s*lb|/\s*kg|/\s*piece|/\s*item)",
         r"\b(?:dozen|pack|box|carton|case|bundle|pair|set)\b",
     ],
     "address": [
         # 123 Main St
         r"\d+\s+[A-Za-z]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Drive|Dr|Boulevard|Blvd|Way|Circle|Cir|Court|Ct|Plaza|Square)",  # noqa: E501
         r"[A-Za-z ,]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln)\s+\d+",
-        r"\b(?:P\.?\s * O\.?\s * Box)\s+\d+",
+        r"\b(?:P\.?\s*O\.?\s*Box)\s+\d+",
         r"\b[\w\s]+,\s*(?:NY|CA|TX|FL|IL|OH|PA|GA|NC|MI|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|AL|SC|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|WV|ID|HI|NH|ME|RI|MT|DE|SD|ND|AK|VT|WY|DC)\b",  # noqa: E501
     ],
 }

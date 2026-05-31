@@ -169,7 +169,7 @@ def normalize_record(record: dict, schema_fields: list[SchemaField]) -> dict:
 
 
 def _looks_like_email(value: str) -> bool:
-    return bool(re.fullmatch(r"[A-Za-z0 - 9._%+-]+@[A-Za-z0 - 9.-]+\.[A-Za-z]{2,}", (value or "").strip()))
+    return bool(re.fullmatch(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", (value or "").strip()))
 
 
 def _looks_like_phone(value: str) -> bool:
