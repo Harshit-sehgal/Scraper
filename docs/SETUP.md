@@ -39,9 +39,26 @@ Use strong random values outside local development.
 
 ## Common Commands
 
+Use explicit local settings to avoid accidental Postgres dependency:
+
 ```bash
-PYTHONPATH=backend python3 -m pytest --collect-only -q -o addopts=
-PYTHONPATH=backend python3 -m pytest -q
+# Check syntax
+python3 -m compileall -q backend scripts architecture_validator.py
+
+# Validate architecture
+python3 architecture_validator.py
+
+# Collect tests without running
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+  python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
+
+# Run local test suite (SQLite mode)
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+  python3 -m pytest -q backend/tests -o addopts=
+
+# Lint
 python3 -m pyflakes backend/app scripts architecture_validator.py
+
+# Type check (ignores missing imports for packages)
 python3 -m mypy backend/app --ignore-missing-imports
 ```

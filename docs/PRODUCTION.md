@@ -39,7 +39,7 @@ This is intended to run syntax checks, static checks, architecture validation, p
 ## Known Production Gaps
 
 - Docker installs from `backend/requirements.txt`, not a strict lock file (`requirements.lock.txt` exists but isn't used in Docker).
-- Postgres service validation was not rerun in the current status snapshot. Treat Postgres production behavior as unvalidated until `--run-postgres` tests and deployment smoke checks pass against a real service.
+- Postgres storage and queue backend is validated locally (1881 passing tests against Postgres 16). Production behavior (migrations, multi-instance, failover, backup/restore) remains unvalidated until tested in the target deployment environment.
 - Dashboard assets are **vendored locally** (no CDN dependencies). Strict CSP (`script-src 'self'`) is enforced.
 - Rate limiting is not proven distributed.
 - Browser/Playwright behavior should be validated in the built image.

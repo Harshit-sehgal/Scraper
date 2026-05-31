@@ -100,4 +100,4 @@ Because this system fetches user-supplied URLs, **SSRF is a primary risk**. Prod
 | Audit Logging | Implemented | Logging code exists; route-by-route coverage still needs review |
 | Session Management | Missing | No token expiry or rotation |
 
-For detailed security assessment, see [archive/audit/DELIVERABLE_7_SECURITY_REPORT.md](archive/audit/DELIVERABLE_7_SECURITY_REPORT.md) (archived baseline snapshot).
+For detailed security assessment, see [archive/DELIVERABLE_7_SECURITY_REPORT.md](archive/DELIVERABLE_7_SECURITY_REPORT.md) (archived baseline snapshot in `docs/archive/`).
