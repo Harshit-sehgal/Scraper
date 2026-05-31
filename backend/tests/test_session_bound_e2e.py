@@ -74,13 +74,15 @@ class TestBrowserStateEvidenceCapture:
     def test_fixture_html_is_valid_page(self):
         path = os.path.join(FIXTURE_DIR, "e19cf6fcf7b7.html")
         assert os.path.exists(path), f"Fixture missing: {path}"
-        html = open(path).read()
+        with open(path) as f:
+            html = f.read()
         assert len(html) > 1000
         assert "<html" in html.lower()
 
     def test_fixture_has_recognizable_html_structure(self):
         path = os.path.join(FIXTURE_DIR, "e19cf6fcf7b7.html")
-        html = open(path).read()
+        with open(path) as f:
+            html = f.read()
         has_structure = any(
             tag in html.lower()
             for tag in ("<div", "<span", "<table", "<li", "<article")
@@ -89,7 +91,8 @@ class TestBrowserStateEvidenceCapture:
 
     def test_page_evidence_collector_finds_containers(self):
         path = os.path.join(FIXTURE_DIR, "e19cf6fcf7b7.html")
-        html = open(path).read()
+        with open(path) as f:
+            html = f.read()
         from app.page_evidence_collector import collect_page_evidence
         evidence = collect_page_evidence(
             html, url="https://example.com/search/id/test"
