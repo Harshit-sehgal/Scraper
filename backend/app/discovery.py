@@ -22,8 +22,8 @@ NOISY_URL_PARTS = (
     "/terms",
     "/tag/",
     "/wp-admin",
-    "facebook.com / sharer",
-    "linkedin.com / share",
+    "facebook.com/sharer",
+    "linkedin.com/share",
 )
 
 LISTING_HINTS = (

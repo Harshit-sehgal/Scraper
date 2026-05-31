@@ -5,7 +5,7 @@ from app.models import FieldType, SchemaField
 from app.scraper import scrape_url
 
 
-async def test():
+async def _test():
     fields = [
         SchemaField(name='book_title', field_type=FieldType.STRING, description='title of the book', required=False),
         SchemaField(name='price', field_type=FieldType.CURRENCY, description='price in pounds', required=False),
@@ -21,4 +21,4 @@ async def test():
 
 
 if __name__ == "__main__":
-    asyncio.run(test())
+    asyncio.run(_test())

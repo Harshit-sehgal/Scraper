@@ -96,10 +96,10 @@ class Settings(BaseSettings):
     GEOCODER_TIMEOUT: int = 10
     """Timeout for reverse geocoding lookups."""
     USER_AGENT: str = (
-        "Mozilla / 5.0 (Windows NT 10.0; Win64; x64) AppleWebKit / 537.36 "
-        "(KHTML, like Gecko) Chrome / 122.0.0.0 Safari / 537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     )
-    GEOCODER_USER_AGENT: str = "DataForge-Scraper / 2.0 (geocoder)"
+    GEOCODER_USER_AGENT: str = "DataForge-Scraper/2.0 (geocoder)"
     """User-agent for geocoding services."""
     MAX_RETRIES: int = 2
     """Number of retries for HTTP requests (httpx)."""
@@ -240,7 +240,7 @@ class Settings(BaseSettings):
     MOTIF_PRUNE_THRESHOLD: float = 0.2
 
     # ─── Paths ─────────────────────────────────────────────────────────────
-    SEMANTIC_STATE_PATH: str = "data / semantic_state.json"
+    SEMANTIC_STATE_PATH: str = "data/semantic_state.json"
 
     @property
     def SEMANTIC_STATE_PATH_DYNAMIC(self) -> str:
@@ -248,7 +248,7 @@ class Settings(BaseSettings):
         return os.environ.get("SEMANTIC_STATE_PATH") or self.SEMANTIC_STATE_PATH
 
     STATE_FILE_PATH: str = ""
-    """Override for jobs_state.json path. Empty = use default ./backend / data / jobs_state.json"""
+    """Override for jobs_state.json path. Empty = use default ./backend/data/jobs_state.json"""
 
     # ─── API Security ──────────────────────────────────────────────────────
     ENV: str = "development"
@@ -269,11 +269,11 @@ class Settings(BaseSettings):
     """Enable request duration and operation latency histograms in /metrics output."""
     METRICS_HISTOGRAM_BUCKETS: str = "0.01,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0,30.0,60.0,120.0"
     """Comma-separated bucket boundaries for duration histograms (seconds)."""
-    RATE_LIMIT_GLOBAL: str = "600 / minute"
+    RATE_LIMIT_GLOBAL: str = "600/minute"
     """Global rate limit for /api/* endpoints (slowapi format). Empty = disabled."""
-    RATE_LIMIT_JOB_CREATE: str = "10 / minute"
+    RATE_LIMIT_JOB_CREATE: str = "10/minute"
     """Stricter rate limit for job creation (POST /api / jobs)."""
-    RATE_LIMIT_DISCOVER: str = "20 / minute"
+    RATE_LIMIT_DISCOVER: str = "20/minute"
     """Rate limit for discovery endpoint."""
 
     # ─── Crawl Policy (operational governance) ─────────────────────────────
@@ -305,9 +305,9 @@ class Settings(BaseSettings):
     """Emit per-URL scrape telemetry events."""
 
     # ─── LLM Provider Settings ───────────────────────────────────────────────
-    GROQ_API_ENDPOINT: str = "https://api.groq.com / openai / v1 / chat / completions"
+    GROQ_API_ENDPOINT: str = "https://api.groq.com/openai/v1/chat/completions"
     """Groq API endpoint for LLM calls."""
-    POLLINATIONS_API_ENDPOINT: str = "https://text.pollinations.ai / openai"
+    POLLINATIONS_API_ENDPOINT: str = "https://text.pollinations.ai/openai"
     """Pollinations AI endpoint for LLM calls."""
 
     # ─── Proxy & Anti-Bot Evasion ──────────────────────────────────────────
@@ -530,16 +530,16 @@ class Settings(BaseSettings):
 
     # ─── Browser Stealth Pool ─────────────────────────────────────────────
     STEALTH_UA_POOL: str = (
-        "Mozilla / 5.0 (Windows NT 10.0; Win64; x64) AppleWebKit / 537.36 "
-        "(KHTML, like Gecko) Chrome / 122.0.0.0 Safari / 537.36,"
-        "Mozilla / 5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit / 537.36 "
-        "(KHTML, like Gecko) Chrome / 122.0.0.0 Safari / 537.36,"
-        "Mozilla / 5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko / 20100101 "
-        "Firefox / 123.0,"
-        "Mozilla / 5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko / 20100101 "
-        "Firefox / 123.0,"
-        "Mozilla / 5.0 (X11; Linux x86_64) AppleWebKit / 537.36 (KHTML, like Gecko) "
-        "Chrome / 122.0.0.0 Safari / 537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36,"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36,"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 "
+        "Firefox/123.0,"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 "
+        "Firefox/123.0,"
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/122.0.0.0 Safari/537.36"
     )
     """Comma-separated pool of stealth user-agent strings shared across browser_pool and anti_bot_engine."""
     STEALTH_VIEWPORT_WIDTHS: str = "1280,1366,1440,1536,1600,1920"
@@ -551,8 +551,8 @@ class Settings(BaseSettings):
     STEALTH_NAVIGATOR_LANGUAGES: str = "en-US,en"
     """Comma-separated navigator.languages for stealth JS injection."""
     STEALTH_TIMEZONE_POOL: str = (
-        "America / New_York,America / Chicago,America / Los_Angeles,"
-        "Europe / London,Europe / Berlin,Asia / Singapore,Asia / Tokyo,Australia / Sydney"
+        "America/New_York,America/Chicago,America/Los_Angeles,"
+        "Europe/London,Europe/Berlin,Asia/Singapore,Asia/Tokyo,Australia/Sydney"
     )
     """Comma-separated timezone IDs for stealth randomization."""
     STEALTH_HARDWARE_CONCURRENCY: int = 4
@@ -639,19 +639,24 @@ class Settings(BaseSettings):
     """Seconds between domain health alert notifications for the same domain."""
 
     # ─── Domain Intelligence Persistence ───────────────────────────────────
-    DOMAIN_INTELLIGENCE_PATH: str = "data / domain_intelligence.json"
+    DOMAIN_INTELLIGENCE_PATH: str = "data/domain_intelligence.json"
     """Path for domain intelligence persistence file."""
-    SELECTOR_MEMORY_PATH: str = "data / selector_memory.json"
+    SELECTOR_MEMORY_PATH: str = "data/selector_memory.json"
     """Path for selector memory persistence file."""
-    SELECTOR_DECAY_SNAPSHOT_PATH: str = "data / selector_decay_snapshots.json"
+    SELECTOR_DECAY_SNAPSHOT_PATH: str = "data/selector_decay_snapshots.json"
     """Path for selector decay snapshots."""
-    REGRESSION_REGISTRY_PATH: str = "data / regression_registry.json"
+    REGRESSION_REGISTRY_PATH: str = "data/regression_registry.json"
     """Path for regression capture registry."""
     SELECTOR_PROFILES_DIR: str = "profiles"
     """Directory for selector profile definitions."""
     FRONTEND_DIR: str = ""
     """Override for frontend static files directory. Empty = auto-detect."""
-    HTTPX_BASIC_USER_AGENT: str = "python-httpx / 0.27.0"
+    HTTPX_BASIC_USER_AGENT: str = "python-httpx/0.27.0"
+
+    @property
+    def TEST_SELECTOR_DECAY_PERSISTENCE(self) -> bool:
+        """Whether to persist selector decay snapshots during tests. Reads from TEST_SELECTOR_DECAY_PERSISTENCE env var dynamically."""
+        return (os.environ.get("TEST_SELECTOR_DECAY_PERSISTENCE") or "").strip().lower() in ("true", "1", "yes")
     """User-Agent for basic HTTPX requests (non-stealth)."""
 
     # ─── Federation / Sharding ──────────────────────────────────────────────

@@ -89,7 +89,9 @@ class SelectorDecayPredictor:
         import json
         import sys
 
-        if "pytest" in sys.modules and not os.environ.get("TEST_SELECTOR_DECAY_PERSISTENCE"):
+        from app.config import settings
+
+        if "pytest" in sys.modules and not settings.TEST_SELECTOR_DECAY_PERSISTENCE:
             return
         path = self._get_snapshots_path()
         if os.path.exists(path):
