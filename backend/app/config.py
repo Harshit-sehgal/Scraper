@@ -652,12 +652,12 @@ class Settings(BaseSettings):
     FRONTEND_DIR: str = ""
     """Override for frontend static files directory. Empty = auto-detect."""
     HTTPX_BASIC_USER_AGENT: str = "python-httpx/0.27.0"
+    """User-Agent for basic HTTPX requests (non-stealth)."""
 
     @property
     def TEST_SELECTOR_DECAY_PERSISTENCE(self) -> bool:
         """Whether to persist selector decay snapshots during tests. Reads from TEST_SELECTOR_DECAY_PERSISTENCE env var dynamically."""
         return (os.environ.get("TEST_SELECTOR_DECAY_PERSISTENCE") or "").strip().lower() in ("true", "1", "yes")
-    """User-Agent for basic HTTPX requests (non-stealth)."""
 
     # ─── Federation / Sharding ──────────────────────────────────────────────
     NODE_ID: str = "node-1"
