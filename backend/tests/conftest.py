@@ -168,7 +168,7 @@ class LocalASGIClient:
 
 @pytest.fixture()
 def client(monkeypatch):
-    async def fake_run_job(job_id: str):
+    async def fake_run_job(job_id: str, **kwargs):
         # Keep jobs in pending state unless a test explicitly changes them.
         await asyncio.sleep(0.01)
 
