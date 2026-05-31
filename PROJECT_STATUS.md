@@ -1,9 +1,9 @@
 # Project Status - DataForge Scraper
 
-**Date:** 2026-05-31
+**Date:** 2026-05-31 (updated)
 **Classification:** Current truth-first status report
 **Project status:** Pre-production candidate
-**Overall maturity:** 55-65% as a pre-production platform
+**Overall maturity:** ~65% as a pre-production platform (Postgres + browser E2E now validated)
 
 This document is an active status snapshot. It must be updated from fresh file inspection
 and command output. Older audit notes and archive documents are historical context only.
@@ -86,6 +86,33 @@ self-healing, anti-bot immune, or guaranteed accurate.
   # 1837 passed, 72 skipped in 105.19s
   ```
 
+- Verified: Postgres test suite passes with a live Postgres service:
+
+  ```bash
+  docker run --rm -d --name df-postgres \
+    -e POSTGRES_USER=dataforge -e POSTGRES_PASSWORD=test -e POSTGRES_DB=dataforge \
+    -p 5432:5432 postgres:16-alpine
+  # Create test user expected by conftest.py
+  docker exec df-postgres psql -U dataforge \
+    -c "CREATE USER testuser WITH PASSWORD 'testpassword' CREATEDB;"
+  docker exec df-postgres psql -U dataforge \
+    -c "CREATE DATABASE testdb OWNER testuser;"
+
+  PYTHONPATH=backend DATAFORGE_DATABASE_URL=postgresql://dataforge:test@localhost:5432/dataforge \
+    DATAFORGE_STORAGE_BACKEND=postgres \
+    python3 -m pytest -q backend/tests --run-postgres -o addopts= -p no:cacheprovider
+  # 1881 passed, 28 skipped in 119.73s
+  ```
+
+- Verified: browser E2E tests pass with Playwright + Chromium:
+
+  ```bash
+  PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+    python3 -m pytest -q backend/tests/test_playwright_browser_e2e.py \
+    backend/tests/test_session_bound_e2e.py --run-browser -o addopts= -p no:cacheprovider
+  # 39 passed in 10.76s
+  ```
+
 ## Partially Verified
 
 - Partially verified: route-level authorization is now mechanically documented and tested
@@ -101,15 +128,20 @@ self-healing, anti-bot immune, or guaranteed accurate.
 
 ## Implemented But Unvalidated
 
-- Implemented but unvalidated: Docker, Compose, Nginx, Prometheus, and Grafana files
-  exist, but this status snapshot does not verify that the production stack starts end
-  to end.
-- Implemented but unvalidated: Postgres storage and queue code exist, but Postgres tests
-  require a running service and were not run in this pass.
-- Implemented but unvalidated: Playwright extraction code exists, but browser install,
-  runtime behavior, and live extraction reliability were not validated in this pass.
+- Implemented but unvalidated: Docker Compose stack with Nginx, Prometheus, and Grafana
+  files exist, but this status snapshot does not verify that the full production stack
+  starts end to end.
 - Implemented but unvalidated: adaptive, semantic, topology, and recovery modules exist.
   They must remain experimental until real-world behavior and failure modes are measured.
+
+## Now Validated
+
+- Validated: Postgres storage and queue backend with 1881 passing tests against a live
+  Postgres 16 service. Postgres tests require `--run-postgres` and a running database.
+- Validated: Playwright + Chromium browser E2E tests with 39 passing tests against
+  local mock web servers. Browser tests require `--run-browser`.
+- Validated: Route auth matrix with 134 passing tests covering 81 registered routes.
+- Validated: Production secret validation with 48 passing tests rejecting placeholders.
 
 ## Simulated Or Fixture-Based
 
@@ -122,20 +154,20 @@ self-healing, anti-bot immune, or guaranteed accurate.
 
 - Verified: `backend/benchmarks` has one lightweight pytest check passing in this
   snapshot. Live benchmark execution remains unvalidated.
-- Unknown: Docker image build result.
-- Unknown: production Compose stack startup.
-- Unknown: Postgres integration behavior.
-- Unknown: Nginx proxy behavior.
+- Unknown: Docker Compose production stack startup with Nginx, Prometheus, and Grafana.
+- Unknown: Nginx proxy and reverse-proxy behavior.
 - Unknown: dashboard behavior under a browser-enforced production CSP.
-- Unknown: live extraction accuracy.
+- Unknown: live extraction accuracy against a real golden dataset.
 - Unknown: anti-bot effectiveness against real anti-bot systems.
+- Unknown: failure-recovery, load-testing, and backup/restore procedures.
 
 ## Known Blockers Before Production
 
 1. Production deployment is not validated end to end.
 2. Post-cleanup safe local test baseline exists, but CI must reproduce it from a fresh
    checkout before treating it as release evidence.
-3. Postgres, worker queue, and migration/init behavior need a real service validation.
+3. Postgres is validated locally (1881 passing tests), but worker queue + migration
+   behavior in a deployed environment needs service validation.
 4. Dashboard authentication/session handling is not suitable for public hostile-browser
    environments.
 5. Metrics and docs routes need verified production exposure controls.
@@ -143,14 +175,16 @@ self-healing, anti-bot immune, or guaranteed accurate.
    test.
 7. Real-world benchmark data with expected outputs is required before making accuracy
    claims.
+8. Docker Compose production stack (Nginx, Prometheus, Grafana) needs smoke-test validation.
 
 ## Allowed Current Claims
 
 - DataForge Scraper is a pre-production FastAPI and Playwright web extraction platform.
 - It has job APIs, extraction modules, storage code, exports, telemetry, diagnostics, and
   security utilities.
-- It supports local SQLite mode and has Postgres-related code that requires separate
-  validation.
+- It supports local SQLite mode and Postgres backend (validated with 1881 passing tests).
+- It includes validated Playwright + Chromium browser E2E tests (39 passing tests).
+- Route authorization is mechanically documented by a generated matrix (134 passing tests).
 - It includes an internal dashboard.
 - It includes experimental adaptive and semantic modules.
 - Route authorization is now mechanically documented by a generated matrix.
@@ -189,6 +223,16 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 
 env -i PATH="$PATH" PYTHONPATH=backend DATAFORGE_SKIP_DB_CHECK=true \
   python3 scripts/check_prod_env.py --env-file .env.production.example
+
+# Postgres tests (requires running Postgres container + testuser/testdb):
+PYTHONPATH=backend DATAFORGE_DATABASE_URL=postgresql://dataforge:test@localhost:5432/dataforge \
+  DATAFORGE_STORAGE_BACKEND=postgres \
+  python3 -m pytest -q backend/tests --run-postgres -o addopts=
+
+# Browser E2E tests (requires Playwright + Chromium installed):
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+  python3 -m pytest -q backend/tests/test_playwright_browser_e2e.py \
+  backend/tests/test_session_bound_e2e.py --run-browser -o addopts=
 ```
 
 The `.env.production.example` validation command is expected to fail because the file

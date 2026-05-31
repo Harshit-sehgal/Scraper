@@ -1,6 +1,6 @@
 # DataForge Scraper Handoff
 
-**Date:** 2026-05-31
+**Date:** 2026-05-31 (updated)
 **Status:** Current, truth-first handoff
 
 This handoff supersedes older status notes. For exact current evidence, use
@@ -26,20 +26,22 @@ self-healing, anti-bot immune, or guaranteed accurate.
   FastAPI app.
 - Route-auth tests: `134 passed in 1.88s`.
 - Production secret validation tests: `48 passed in 0.08s`.
+- **Postgres backend tests**: `1881 passed, 28 skipped in 119.73s`
+  (requires `--run-postgres` + live Postgres 16 container).
+- **Browser E2E tests**: `39 passed in 10.76s`
+  (requires `--run-browser` + Playwright with Chromium installed).
 - Architecture validator: `VALIDATION PASSED: Architecture is lawful.`
 - Python compile check passed.
 - Runtime artifacts were removed from source control and ignored.
 
-Skipped tests are not counted as passed. Browser/local-server E2E, golden
-dataset, and Postgres tests require explicit flags and environment support.
+Skipped tests are not counted as passed. Golden dataset tests require
+`--run-golden-dataset` flag and a configured `sites.json`.
 
 ## Still Unverified
 
-- Docker image build and production Compose startup.
-- Real Postgres service behavior.
-- Worker behavior against Postgres in a deployed environment.
-- Nginx/proxy behavior.
-- Browser runtime behavior outside the skipped default tests.
+- Docker Compose production stack (Nginx, Prometheus, Grafana) startup.
+- Worker queue behavior against Postgres in a deployed environment.
+- Nginx proxy behavior.
 - Dashboard behavior under production CSP/session constraints.
 - Live extraction accuracy on a real golden dataset.
 - Real-world anti-bot effectiveness.
@@ -47,15 +49,13 @@ dataset, and Postgres tests require explicit flags and environment support.
 
 ## Next Engineering Priorities
 
-1. Reproduce the default SQLite test baseline from a clean checkout.
-2. Run Postgres tests with a real service using `--run-postgres`.
-3. Run browser/local-server E2E tests in an environment that permits local socket
-   binding using `--run-browser`.
-4. Build and smoke-test the Docker and production Compose stack.
-5. Create a real golden dataset with expected outputs before publishing accuracy
-   numbers.
-6. Keep active docs aligned with command output; move stale reports to archive or
-   clearly mark them historical.
+1. Reproduce the full test baseline (SQLite + Postgres + browser) from a clean checkout.
+2. Build and smoke-test the Docker Compose production stack (Nginx, Prometheus, Grafana).
+3. Create a real golden dataset with expected outputs before publishing accuracy numbers.
+4. Harden dashboard session handling for production environments (move from sessionStorage
+   to secure patterns).
+5. Keep active docs aligned with command output; move stale reports to archive or clearly
+   mark them historical.
 
 ## Allowed Claims
 
