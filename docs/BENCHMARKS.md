@@ -1,6 +1,6 @@
 # Benchmarks
 
-**Date:** 2026-05-31  
+**Date:** 2026-05-31 (fresh)  
 **Status:** Benchmark tooling exists, but real-world accuracy is not proven
 
 ## Current Verified Benchmark Command
@@ -15,7 +15,7 @@ python3 -m pytest -q backend/benchmarks -o addopts=
 Latest verified result:
 
 ```text
-1 passed in 1.20s
+1 passed in 0.26s
 ```
 
 This is an offline smoke/config test. It does not run live extraction and does not prove real-world accuracy.

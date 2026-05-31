@@ -2,7 +2,7 @@
    DataForge — Recycle Bin
    ═══════════════════════════════════════════ */
 
-import { esc, toast } from './utils.js';
+import { esc, toast, showConfirm } from './utils.js';
 import { API, apiFetch } from './api.js';
 
 // ─── Refresh ───
@@ -59,7 +59,7 @@ export async function restoreJob(id) {
 // ─── Hard Delete ───
 
 export async function hardDeleteJob(id) {
-    if (!confirm('Permanently delete this job? This cannot be undone.')) return;
+    showConfirm('Delete Forever?', 'Permanently delete this job from the recycle bin? This cannot be undone.', async () => {
     try {
         const r = await apiFetch(`${API}/api/recycle_bin/${id}`, { method: 'DELETE' });
         const data = await r.json().catch(() => ({}));
@@ -69,12 +69,13 @@ export async function hardDeleteJob(id) {
     } catch (e) {
         toast(`Permanent delete failed: ${e.message}`, 'error');
     }
+    });
 }
 
 // ─── Clear All ───
 
 export async function clearRecycleBin() {
-    if (!confirm('Empty entire recycle bin? This cannot be undone.')) return;
+    showConfirm('Empty Recycle Bin?', 'Empty entire recycle bin? This cannot be undone.', async () => {
 
     try {
         const r = await apiFetch(`${API}/api/recycle_bin`, { method: 'DELETE' });
@@ -85,4 +86,5 @@ export async function clearRecycleBin() {
     } catch (e) {
         toast(`Recycle clear failed: ${e.message}`, 'error');
     }
+    });
 }

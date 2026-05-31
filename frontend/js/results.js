@@ -2,7 +2,7 @@
    DataForge — Results Viewing & Export
    ═══════════════════════════════════════════ */
 
-import { esc, jsStr, toast } from './utils.js';
+import { esc, jsStr, toast, showConfirm } from './utils.js';
 import { API, apiFetch } from './api.js';
 import { switchView } from './views.js';
 
@@ -15,9 +15,41 @@ export function setCurrentJobId(id) { currentJobId = id; }
 
 // ─── View Results ───
 
+function renderResultsSkeleton() {
+    // Show skeleton loading state in the results view
+    document.getElementById('res-title').textContent = 'Loading...';
+    document.getElementById('res-meta').textContent = 'Fetching results...';
+    document.getElementById('export-group').style.display = 'none';
+    document.getElementById('result-warning').style.display = 'none';
+    document.getElementById('lineage-summary').style.display = 'none';
+    document.getElementById('ai-insight-panel').classList.add('hidden');
+    document.getElementById('logs-panel').classList.add('hidden');
+    document.getElementById('quality-panel').classList.add('hidden');
+    document.getElementById('res-progress-wrap').classList.add('hidden');
+
+    const thead = document.getElementById('res-thead');
+    const tbody = document.getElementById('res-tbody');
+    thead.innerHTML = `
+        <tr>
+            ${['Column 1', 'Column 2', 'Column 3', 'Column 4', 'Column 5'].map((_, i) =>
+                `<th style="min-width:${100 + i * 20}px"><div class="skeleton-bar" style="width:${70 + i * 10}%;height:10px;margin:2px 0"></div></th>`
+            ).join('')}
+        </tr>`;
+    tbody.innerHTML = Array.from({length: 6}, (_, i) => `
+        <tr>
+            ${Array.from({length: 5}, (_, j) => `
+                <td><div class="skeleton-bar" style="width:${40 + (i + j) * 10}%;height:10px;margin:4px 0"></div></td>
+            `).join('')}
+        </tr>`).join('');
+
+    const label = document.getElementById('result-count-label');
+    if (label) label.textContent = 'loading...';
+}
+
 export async function viewResults(id) {
     currentJobId = id;
     switchView('results');
+    renderResultsSkeleton();
     try {
         const r = await apiFetch(`${API}/api/jobs/${id}`);
         const j = await r.json();
@@ -305,32 +337,33 @@ export async function onResultsCellDoubleClick(e) {
 
 export async function recleanCurrentJob() {
     if (!currentJobId) return;
-    if (!confirm('Run AI re-clean on this dataset without re-scraping URLs?')) return;
 
-    const btn = document.getElementById('btn-reclean');
-    const prev = btn ? btn.innerHTML : '';
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span> Re-cleaning...';
-    }
-
-    try {
-        const res = await apiFetch(`${API}/api/jobs/${currentJobId}/reclean`, { method: 'POST' });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.detail || 'Re-clean failed');
-
-        toast(`Re-cleaned rows: ${data.before_records || 0} -> ${data.after_records || 0}`, 'success');
-        await viewResults(currentJobId);
-        const { refreshJobs } = await import('./jobs.js');
-        await refreshJobs();
-    } catch (err) {
-        toast(`Re-clean error: ${err.message}`, 'error');
-    } finally {
+    showConfirm('AI Re-clean?', 'Run AI re-clean on this dataset without re-scraping URLs?', async () => {
+        const btn = document.getElementById('btn-reclean');
+        const prev = btn ? btn.innerHTML : '';
         if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = prev || 'AI Re-clean';
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Re-cleaning...';
         }
-    }
+
+        try {
+            const res = await apiFetch(`${API}/api/jobs/${currentJobId}/reclean`, { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || 'Re-clean failed');
+
+            toast(`Re-cleaned rows: ${data.before_records || 0} -> ${data.after_records || 0}`, 'success');
+            await viewResults(currentJobId);
+            const { refreshJobs } = await import('./jobs.js');
+            await refreshJobs();
+        } catch (err) {
+            toast(`Re-clean error: ${err.message}`, 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = prev || 'AI Re-clean';
+            }
+        }
+    });
 }
 
 // ─── Export ───

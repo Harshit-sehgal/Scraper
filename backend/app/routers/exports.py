@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import logging
 
 from collections.abc import AsyncIterator
 
@@ -9,6 +10,8 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 
 from app.utils.export import safe_export_filename
+
+logger = logging.getLogger(__name__)
 
 _PAGINATION_CHUNK_SIZE = 500
 
@@ -78,7 +81,7 @@ def create_exports_router(jobs_store: dict):
                 if job_id in fresh_jobs:
                     jobs_store[job_id] = fresh_jobs[job_id]
             except Exception:
-                __import__("logging").getLogger(__name__).debug("Failed to refresh job %s from repo for export", job_id)
+                logger.debug("Failed to refresh job %s from repo for export", job_id)
 
     @router.get("/api/jobs/{job_id}/export/csv")
     async def export_csv(job_id: str):
@@ -263,7 +266,6 @@ def create_exports_router(jobs_store: dict):
             )
             # Log corruption warning but still export partial data
             if warning:
-                logger = __import__("logging").getLogger(__name__)
                 logger.warning("Excel export for job %s: %s", job_id, warning)
 
         if not results_list:

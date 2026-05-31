@@ -7,7 +7,28 @@ import { API, apiFetch } from './api.js';
 
 // ─── Refresh Cognition ───
 
+export function renderCognitionSkeleton() {
+    // Show skeleton loading state in the cognition view
+    document.getElementById('kpi-pressure').innerHTML = '<span class="skeleton-bar" style="width:60%;height:14px;display:inline-block"></span>';
+    document.getElementById('kpi-integrity').innerHTML = '<span class="skeleton-bar" style="width:50%;height:14px;display:inline-block"></span>';
+    document.getElementById('kpi-energy').innerHTML = '<span class="skeleton-bar" style="width:55%;height:14px;display:inline-block"></span>';
+    document.getElementById('kpi-exclusions').innerHTML = '<span class="skeleton-bar" style="width:40%;height:14px;display:inline-block"></span>';
+    document.getElementById('kpi-basins').innerHTML = '<span class="skeleton-bar" style="width:45%;height:14px;display:inline-block"></span>';
+
+    ['community-list', 'schema-pattern-list', 'exclusion-list', 'role-similarity-list', 'basin-list'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.innerHTML = Array.from({length: 4}, () => `
+                <div style="padding:0.75rem;border-bottom:1px solid var(--line);">
+                    <div class="skeleton-bar" style="width:${60 + Math.random() * 30}%;height:10px;margin:2px 0"></div>
+                    <div class="skeleton-bar" style="width:${30 + Math.random() * 20}%;height:8px;margin:2px 0;opacity:0.6"></div>
+                </div>`).join('');
+        }
+    });
+}
+
 export async function refreshCognition() {
+    renderCognitionSkeleton();
     try {
         const res = await apiFetch(`${API}/api/system/topology`);
         if (!res.ok) throw new Error('Topology unavailable');

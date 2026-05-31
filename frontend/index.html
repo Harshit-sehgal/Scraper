@@ -250,7 +250,7 @@
                     <p class="hint-block">Enter a URL first, let the scraper analyze it and suggest data fields. Then select what you want and scrape with anti-bot protection.</p>
 
                     <div class="analyzer-input-row">
-                        <input type="url" id="inp-analyze-url" placeholder="https://example.com/products" class="analyzer-url-input">
+                        <input type="url" id="inp-analyze-url" placeholder="https://example.com/products" class="analyzer-url-input" aria-label="URL to analyze">
                         <button type="button" class="btn primary" data-action="analyze-url" id="btn-analyze-url">
                             <span class="analyze-btn-text">Analyze URL</span>
                             <span class="spinner hidden" id="analyze-spinner"></span>
@@ -312,13 +312,13 @@
                     <!-- Job Name -->
                     <div class="section">
                         <label class="section-label" for="inp-name">Name</label>
-                        <input type="text" id="inp-name" placeholder="e.g. Chennai Interior Designers" required>
+                        <input type="text" id="inp-name" placeholder="e.g. Chennai Interior Designers" required aria-label="Job name">
                     </div>
 
                     <!-- Intent -->
                     <div class="section">
                         <label class="section-label" for="inp-intent">Describe The Data You Want</label>
-                        <textarea id="inp-intent" rows="3" placeholder="Example: Find interior designers in Chennai, include company name, phone, email, address and keep only businesses within 15 km of T Nagar."></textarea>
+                        <textarea id="inp-intent" rows="3" placeholder="Example: Find interior designers in Chennai, include company name, phone, email, address and keep only businesses within 15 km of T Nagar." aria-label="Data description"></textarea>
                         <div class="form-actions" style="border-top: 0; margin-top: 0.5rem; padding-top: 0; justify-content: flex-start;">
                             <button type="button" class="btn secondary small" data-action="suggest-schema" id="btn-suggest-schema">Suggest topic + schema from intent</button>
                         </div>
@@ -328,42 +328,42 @@
                     <!-- Manual Mode: URLs -->
                     <div class="section" id="section-manual">
                         <label class="section-label" for="inp-urls">Target URLs <span class="hint">one per line</span></label>
-                        <textarea id="inp-urls" rows="4" placeholder="https://example.com/directory&#10;https://example.com/page2"></textarea>
+                        <textarea id="inp-urls" rows="4" placeholder="https://example.com/directory&#10;https://example.com/page2" aria-label="Target URLs"></textarea>
                     </div>
 
                     <!-- Auto Mode: Topic -->
                     <div class="section hidden" id="section-auto">
                         <label class="section-label" for="inp-topic">What do you want to find?</label>
-                        <input type="text" id="inp-topic" placeholder="e.g. Interior designers in Chennai with contact info">
+                        <input type="text" id="inp-topic" placeholder="e.g. Interior designers in Chennai with contact info" aria-label="Search topic">
 
                         <div class="row-2" style="margin-top: 0.75rem;">
                             <div>
                                 <label class="section-label small" for="inp-location">Location focus</label>
-                                <input type="text" id="inp-location" placeholder="e.g. Chennai, India">
+                                <input type="text" id="inp-location" placeholder="e.g. Chennai, India" aria-label="Location focus">
                             </div>
                             <div>
                                 <label class="section-label small" for="inp-domain">Preferred domain</label>
-                                <input type="text" id="inp-domain" placeholder="e.g. justdial.com (optional)">
+                                <input type="text" id="inp-domain" placeholder="e.g. justdial.com (optional)" aria-label="Preferred domain">
                             </div>
                         </div>
                         <div class="row-2" style="margin-top: 0.75rem;">
                             <div>
                                 <label class="section-label small" for="inp-origin-location">Origin for radius optimization</label>
-                                <input type="text" id="inp-origin-location" placeholder="e.g. T Nagar, Chennai">
+                                <input type="text" id="inp-origin-location" placeholder="e.g. T Nagar, Chennai" aria-label="Origin location for radius">
                             </div>
                             <div>
                                 <label class="section-label small" for="inp-max-distance-km">Max distance (km)</label>
-                                <input type="number" id="inp-max-distance-km" min="0" step="0.5" placeholder="e.g. 15">
+                                <input type="number" id="inp-max-distance-km" min="0" step="0.5" placeholder="e.g. 15" aria-label="Max distance in km">
                             </div>
                         </div>
                         <div class="row-2" style="margin-top: 0.75rem;">
                             <div>
                                 <label class="section-label small" for="inp-discover-pages">Max Pages to Discover</label>
-                                <input type="number" id="inp-discover-pages" placeholder="Default: 12" value="12" min="1" max="20">
+                                <input type="number" id="inp-discover-pages" placeholder="Default: 12" value="12" min="1" max="20" aria-label="Max pages to discover">
                             </div>
                             <div>
                                 <label class="section-label small" for="inp-max-per-domain">Max URLs per domain</label>
-                                <input type="number" id="inp-max-per-domain" placeholder="Default: 4" value="4" min="1" max="25">
+                                <input type="number" id="inp-max-per-domain" placeholder="Default: 4" value="4" min="1" max="25" aria-label="Max URLs per domain">
                             </div>
                         </div>
 
@@ -376,7 +376,7 @@
                     <!-- Schema -->
                     <div class="section">
                         <label class="section-label" for="inp-source-policy">Source Coverage Policy</label>
-                        <select id="inp-source-policy">
+                        <select id="inp-source-policy" aria-label="Source coverage policy">
                             <option value="official_plus_directory" selected>Official + Directory (recommended)</option>
                             <option value="official_only">Official only (strict)</option>
                             <option value="all_sources">All sources (max coverage)</option>
@@ -408,27 +408,27 @@
                         <div class="advanced-body">
                             <div class="row-2">
                                 <label class="check-label">
-                                    <input type="checkbox" id="chk-dedup" checked>
+                                    <input type="checkbox" id="chk-dedup" checked aria-label="Remove duplicate records">
                                     <span>Remove duplicate records</span>
                                 </label>
                                 <div>
                                     <label class="section-label small" for="inp-dedup-field">Dedup by field</label>
-                                    <input type="text" id="inp-dedup-field" placeholder="e.g. company_name">
+                                    <input type="text" id="inp-dedup-field" placeholder="e.g. company_name" aria-label="Deduplicate by field">
                                 </div>
                             </div>
                             <div class="row-2" style="margin-top: 0.5rem;">
                                 <label class="check-label">
-                                    <input type="checkbox" id="chk-pagination">
+                                    <input type="checkbox" id="chk-pagination" aria-label="Follow pagination">
                                     <span>Follow pagination</span>
                                 </label>
                                 <div>
                                     <label class="section-label small" for="inp-max-pages">Max pages</label>
-                                    <input type="number" id="inp-max-pages" value="10" min="1" max="100">
+                                    <input type="number" id="inp-max-pages" value="10" min="1" max="100" aria-label="Max pages">
                                 </div>
                             </div>
                             <div style="margin-top: 0.75rem;">
                                 <label class="section-label small" for="inp-min-score">Minimum record quality score (0 to 1)</label>
-                                <input type="number" id="inp-min-score" value="0.35" min="0" max="1" step="0.05">
+                                <input type="number" id="inp-min-score" value="0.35" min="0" max="1" step="0.05" aria-label="Minimum record quality score">
                             </div>
                         </div>
                     </details>
@@ -581,6 +581,38 @@
 
     <!-- Toast -->
     <div id="toasts"></div>
+
+    <!-- API Key Modal -->
+    <div id="apikey-overlay" class="shortcut-overlay hidden">
+        <div class="shortcut-modal">
+            <h2 id="apikey-modal-title">🔑 API Key</h2>
+            <p id="apikey-modal-desc" class="modal-desc">Enter your DataForge API key for production access.</p>
+            <form id="apikey-form" class="api-key-form" onsubmit="return false;">
+                <input type="password" id="apikey-input" class="mono-input" placeholder="Paste your API key here..." autocomplete="off" spellcheck="false" aria-label="API key">
+                <label class="check-label" style="margin-top: 0.5rem;">
+                    <input type="checkbox" id="apikey-toggle-vis">
+                    <span>Show key</span>
+                </label>
+            </form>
+            <p id="apikey-error" class="api-key-error hidden"></p>
+            <div class="shortcut-close-row" style="margin-top: 1rem;">
+                <button class="btn ghost small" data-action="close-apikey" id="btn-apikey-cancel">Cancel</button>
+                <button class="btn primary small" data-action="save-apikey" id="btn-apikey-save">Save Key</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal (replaces browser confirm()) -->
+    <div id="confirm-overlay" class="shortcut-overlay hidden">
+        <div class="shortcut-modal confirm-modal">
+            <h2 id="confirm-modal-title">Confirm</h2>
+            <p id="confirm-modal-desc" class="modal-desc">Are you sure?</p>
+            <div class="shortcut-close-row" style="margin-top: 1rem; justify-content: flex-end; gap: 0.5rem;">
+                <button class="btn ghost small" data-action="close-confirm" id="btn-confirm-cancel">Cancel</button>
+                <button class="btn primary small danger-confirm-btn" data-action="confirm-action" id="btn-confirm-ok">Confirm</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Shortcuts Modal -->
     <div id="shortcut-overlay" class="shortcut-overlay hidden">

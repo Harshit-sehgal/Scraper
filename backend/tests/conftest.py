@@ -143,10 +143,31 @@ def reset_failure_injection():
 
 
 class LocalASGIClient:
-    """Small sync wrapper around httpx ASGITransport that avoids TestClient threads."""
+    """Small sync wrapper around httpx ASGITransport that avoids TestClient threads.
+
+    Uses a single persistent event loop rather than calling ``asyncio.run()``
+    per request, which avoids ResourceWarnings from sockets that outlive a
+    short-lived loop.
+    """
 
     def __init__(self, app):
         self.app = app
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+
+    def close(self):
+        """Shut down the persistent event loop and release resources.
+
+        Note: ``asyncio.all_tasks()`` is deliberately not called here because
+        its ``loop`` parameter was removed in Python 3.12 and the httpx
+        ``AsyncClient`` context manager in ``_request()`` already handles
+        proper socket cleanup.
+        """
+        try:
+            self._loop.run_until_complete(self._loop.shutdown_asyncgens())
+        finally:
+            self._loop.close()
+            asyncio.set_event_loop(None)
 
     async def _request(self, method: str, url: str, **kwargs):
         transport = httpx.ASGITransport(app=self.app)
@@ -154,7 +175,7 @@ class LocalASGIClient:
             return await client.request(method, url, **kwargs)
 
     def request(self, method: str, url: str, **kwargs):
-        return asyncio.run(self._request(method, url, **kwargs))
+        return self._loop.run_until_complete(self._request(method, url, **kwargs))
 
     def get(self, url: str, **kwargs):
         return self.request("GET", url, **kwargs)
@@ -183,7 +204,13 @@ def client(monkeypatch):
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
-    yield LocalASGIClient(main_mod.app)
+    # Reset rate limiter counters so rapid test requests don't trigger 429s
+    if hasattr(main_mod, "rate_limiter"):
+        main_mod.rate_limiter.reset()
 
+    client = LocalASGIClient(main_mod.app)
+    yield client
+
+    client.close()
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()

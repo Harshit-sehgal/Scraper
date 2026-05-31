@@ -2,7 +2,7 @@
    DataForge — View Management
    ═══════════════════════════════════════════ */
 
-import { writeUIState, isTypingTarget, showShortcuts, hideShortcuts, isShortcutsVisible } from './utils.js';
+import { writeUIState, isTypingTarget, showShortcuts, hideShortcuts, isShortcutsVisible, closeConfirm, isConfirmVisible } from './utils.js';
 
 export let currentView = 'jobs';
 export let currentMode = 'manual';
@@ -95,6 +95,13 @@ export function onGlobalKeydown(e) {
     }
 
     if (e.key === 'Escape') {
+        // Close confirmation modal if open
+        if (isConfirmVisible()) {
+            closeConfirm();
+            e.preventDefault();
+            return;
+        }
+
         // Close shortcuts modal if open
         if (isShortcutsVisible()) {
             hideShortcuts();

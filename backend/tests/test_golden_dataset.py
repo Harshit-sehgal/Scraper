@@ -24,9 +24,14 @@ EXPECTED_DIR = GOLDEN_DATASET_DIR / "expected"
 
 
 def load_sites() -> list[dict]:
-    """Load golden dataset site definitions."""
+    """Load golden dataset site definitions.
+
+    Returns an empty list if the sites file is missing, rather than calling
+    pytest.skip() during parametrization (which can cause collection issues).
+    Each test function handles the missing-file case via its own assertions.
+    """
     if not SITES_FILE.exists():
-        pytest.skip(f"Golden dataset file not found: {SITES_FILE}")
+        return []
     with open(SITES_FILE, "r") as f:
         data = json.load(f)
     return data.get("sites", [])
@@ -106,10 +111,7 @@ def compute_f1(
         "false_negatives": false_negatives,
         "extracted_count": len(extracted),
         "expected_count": len(expected),
-    }
-
-
-# ── Tests ─────────────────────────────────────────────────────────────────
+    }# ── Tests ─────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.golden_dataset
@@ -122,6 +124,9 @@ async def test_golden_dataset_site(site_def):
     reachable and extraction produces records, but does not assert a minimum
     F1 threshold. The golden dataset is a framework being built out; actual
     expected outputs and thresholds will be refined over time.
+
+    When sites.json is missing, load_sites() returns an empty list and this
+    parametrized test generates zero items (clean skip without collection error).
     """
     url = site_def["url"]
     site_id = site_def["id"]

@@ -1271,6 +1271,47 @@ tr:hover td {
     font-weight: 600;
 }
 
+.modal-desc {
+    color: var(--ink-soft);
+    font-size: 0.84rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
+}
+
+.api-key-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.mono-input {
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    color: var(--ink-main);
+    font-size: 0.85rem;
+    font-family: var(--mono);
+    padding: 0.56rem 0.68rem;
+    outline: 0;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.3s ease;
+}
+
+.mono-input:focus {
+    border-color: var(--focus);
+    box-shadow: 0 0 0 3px rgba(15, 143, 131, 0.15);
+}
+
+.api-key-error {
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    color: var(--danger);
+    background: var(--danger-soft);
+    border: 1px solid rgba(210, 70, 70, 0.25);
+}
+
 kbd {
     display: inline-flex;
     align-items: center;
@@ -1297,6 +1338,56 @@ kbd {
     margin-top: 1.2rem;
     display: flex;
     justify-content: flex-end;
+}
+
+/* ─── Confirmation Modal ─── */
+.confirm-modal {
+    max-width: 380px;
+    text-align: center;
+}
+
+.confirm-modal h2 {
+    margin-bottom: 0.6rem;
+}
+
+.confirm-modal .modal-desc {
+    font-size: 0.88rem;
+    color: var(--ink-main);
+    margin-bottom: 0;
+}
+
+.danger-confirm-btn {
+    background: linear-gradient(110deg, var(--danger) 0%, #c0392b 100%) !important;
+    border-color: rgba(192, 57, 43, 0.45) !important;
+    box-shadow: 0 8px 22px rgba(210, 70, 70, 0.25) !important;
+}
+
+.danger-confirm-btn:hover {
+    background: linear-gradient(110deg, #c0392b 0%, #a93226 100%) !important;
+}
+
+/* ─── Copy ID Button ─── */
+.btn-copy-id {
+    opacity: 0.5;
+    transition: opacity 0.15s ease;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    padding: 0;
+    margin-left: 0.3rem;
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    vertical-align: middle;
+}
+
+.btn-copy-id:hover {
+    opacity: 1;
+    color: var(--accent);
+}
+
+.btn-copy-id.copied {
+    opacity: 1;
+    color: var(--success);
 }
 
 /* ─── Responsive ─── */

@@ -17,7 +17,7 @@ export * from './js/cognition.js';
 export * from './js/dashboard.js';
 
 // ─── Init ───
-import { readUIState, updateJobsLastUpdatedLabel, initTheme, toggleTheme, showShortcuts, hideShortcuts, setEnginePolling } from './js/utils.js';
+import { readUIState, updateJobsLastUpdatedLabel, initTheme, toggleTheme, showShortcuts, hideShortcuts, setEnginePolling, closeConfirm, executeConfirm } from './js/utils.js';
 import { refreshSystemStatus, refreshJobs, refreshJobsManual, onJobsFilterChanged } from './js/jobs.js';
 import { onGlobalKeydown, switchView } from './js/views.js';
 import { onResultsSliderInput, onResultsTableScroll, onResultsCellDoubleClick, renderFilteredResults } from './js/results.js';
@@ -28,7 +28,7 @@ import { refreshDashboard, switchOperatorMode } from './js/dashboard.js';
 import { refreshRecycleBin, restoreJob, hardDeleteJob, clearRecycleBin } from './js/recycle.js';
 import { cancelJob, deleteJob, clearTerminalJobs } from './js/jobs.js';
 import { viewResults, recleanCurrentJob, exportCSV, exportJSON, exportExcel } from './js/results.js';
-import { showApiKeyPrompt, showAdminKeyPrompt } from './js/api.js';
+import { showApiKeyPrompt, showAdminKeyPrompt, closeKeyModal, saveKeyFromModal, isKeyModalVisible } from './js/api.js';
 import { setMode } from './js/views.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -67,6 +67,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 e.preventDefault();
                 analyzeURL();
             }
+        });
+    }
+
+    // ── API Key Modal: Enter saves, Escape cancels ──
+    const apikeyInput = document.getElementById('apikey-input');
+    if (apikeyInput) {
+        apikeyInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveKeyFromModal();
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                closeKeyModal();
+            }
+        });
+    }
+
+    // ── API Key Toggle Visibility ──
+    const apikeyToggle = document.getElementById('apikey-toggle-vis');
+    if (apikeyToggle) {
+        apikeyToggle.addEventListener('change', () => {
+            const input = document.getElementById('apikey-input');
+            if (input) input.type = apikeyToggle.checked ? 'text' : 'password';
         });
     }
 
@@ -166,6 +190,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (msg) import('./js/utils.js').then(m => m.toast(msg, 'info'));
                 break;
             }
+            case 'save-apikey':               saveKeyFromModal(); break;
+            case 'close-apikey':               closeKeyModal(); break;
             case 'show-api-key':              showApiKeyPrompt(); break;
             case 'show-admin-key':            showAdminKeyPrompt(); break;
             case 'switch-view':               if (view) switchView(view); break;
@@ -191,6 +217,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'toggle-theme':              toggleTheme(); break;
             case 'show-shortcuts':             showShortcuts(); break;
             case 'close-shortcuts':            hideShortcuts(); break;
+            case 'close-confirm':               closeConfirm(); break;
+            case 'confirm-action':              executeConfirm(); break;
+            case 'copy-job-id':                 if (id) navigator.clipboard?.writeText(id).then(() => {
+                                                    btn.textContent = '✓';
+                                                    btn.classList.add('copied');
+                                                    setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 2000);
+                                                }).catch(() => {}); break;
             case 'refresh-cognition':          refreshCognition(); break;
             case 'toggle-field-item': {
                 const checkbox = btn.querySelector('.analyze-field-checkbox');
