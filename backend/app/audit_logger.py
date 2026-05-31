@@ -340,5 +340,7 @@ def reset_audit_logger() -> None:
     """Reset the audit logger singleton (for testing)."""
     global _logger
     if _logger:
+        for handler in list(_logger.handlers):
+            handler.close()
         _logger.handlers.clear()
     _logger = None
