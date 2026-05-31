@@ -1,255 +1,104 @@
 # Project Status - DataForge Scraper
 
-**Date:** 2026-05-31 (Phases 1-9 complete)
-**Last refreshed:** 2026-05-31
-**Classification:** Current truth-first status report
-**Project status:** Pre-production candidate
-**Overall maturity:** ~70% as a pre-production platform (Postgres + browser E2E validated, benchmark naming corrected, stale docs archived, runtime artifacts removed, golden dataset parametrization fixed, module classification documented, config audit complete, rate limiter route key bug fixed, security docs refreshed, handoff document created)
+**Last refreshed:** 2026-06-01T00:49:22+05:30
+**Commit inspected:** `7fa1640130249ff504e0f2557e5e30c50cf25cb4`
+**Branch inspected:** `main`
+**Backup branch created before edits:** `backup-dataforge-truth-baseline-20260531-230634`
+**Status:** Pre-production candidate
+**Maturity:** about 72% as a pre-production platform, not production-ready
 
-This document is an active status snapshot. It must be updated from fresh file inspection
-and command output. Older audit notes and archive documents are historical context only.
+This file is the current truth source. It must be updated only from fresh code inspection and command output. Archived audit documents are historical context, not current evidence.
 
-## Current Truth Snapshot
+## Current Description
 
-DataForge Scraper is a FastAPI and Playwright web extraction backend with job APIs,
-storage code, export endpoints, telemetry, security utilities, and an internal static
-dashboard. It also contains adaptive, semantic, and benchmark modules that need careful
-validation before they are described as product capabilities.
+DataForge Scraper is a pre-production FastAPI + Playwright web extraction platform for accessible websites. It supports configurable scraping jobs, browser-assisted page loading, schema/selector/network/visible-text extraction paths, local SQLite storage, Postgres storage and queue code, result exports, telemetry, diagnostics, API-key/RBAC utilities, SSRF-oriented URL checks, rate limiting, audit logging, and an internal static dashboard.
 
-The project should not be described as production-ready, universal, fully autonomous,
-self-healing, anti-bot immune, or guaranteed accurate.
+It also contains experimental adaptive, semantic, topology, selector-memory, replay, and strategy-evolution modules. Those modules are not production-validated product capabilities unless listed as verified below.
 
-## Verified In Current Cleanup Pass
+## Verified Capabilities
 
-- Verified: production environment validation now rejects generated placeholder secrets
-  such as `CHANGE_ME_GENERATE_STRONG_*` and `replace_this_*`.
-- Verified: production environment validation now rejects reused user/operator/admin API
-  keys.
-- Verified: `.env.production.example` contains placeholders instead of generated-looking
-  secrets and intentionally fails production validation until real values are supplied.
-- Verified: route-auth matrix tooling exists at `scripts/route_auth_matrix.py`.
-- Verified: the generated route-auth matrix currently reports 81 registered route
-  entries:
-  - 47 authenticated-user routes
-  - 15 operator-or-admin routes
-  - 11 admin routes
-  - 4 development-docs routes
-  - 3 public routes
-  - 1 metrics route protected only when `DATAFORGE_METRICS_TOKEN` is configured
-- Verified: generated route-auth tests passed:
+| Claim | Evidence | Status |
+| --- | --- | --- |
+| FastAPI backend exists | `backend/app/main.py` defines the app, middleware, static mounts, health/readiness, metrics, and routers | Verified |
+| Playwright browser path exists | `backend/app/browser.py`, `backend/app/scraper.py`, and browser tests exercise Chromium-backed extraction | Verified |
+| Job APIs exist | `backend/app/routers/jobs.py` and route matrix list job lifecycle endpoints | Verified |
+| Export APIs exist | `backend/app/routers/exports.py` exposes CSV/JSON/Excel export routes | Verified |
+| SQLite local storage exists | `backend/app/storage_interface.py` and SQLite-backed tests | Verified |
+| Postgres storage/queue code works locally | `1883 passed, 28 skipped in 129.55s` with `--run-postgres` | Verified locally |
+| API key/RBAC utilities exist | `backend/app/utils/rbac.py`, route dependencies, route-auth tests | Verified |
+| SSRF-oriented URL safety checks exist | `backend/app/url_safety.py` rejects non-http(s), loopback/private IPs, metadata hosts, and internal names | Verified by code inspection and tests |
+| Rate limiting exists | `backend/app/rate_limiter.py`; route key bug not observed in current code | Verified, single-process only |
+| Production env validator rejects placeholders | `.env.production.example` fails validation intentionally, including metrics token placeholder; production security tests pass | Verified |
+| Docs disabled in production app config | `backend/app/main.py` disables `/docs`, `/redoc`, `/openapi.json` when `settings.ENV == "production"` | Verified by code inspection |
+| Internal dashboard exists | `frontend/` static files and FastAPI static mounts | Verified, internal-only |
+| Compose production files exist | `Dockerfile`, `docker-compose.prod.yml`, `nginx.conf`, Prometheus, Grafana files | Verified files exist |
+| Docker image builds locally | `docker build -f Dockerfile -t dataforge:local .` built image `2d6822c8ca4f` | Verified locally |
+| Local production Compose smoke works | Temporary ignored `.env`, backend/worker/Postgres healthy, Nginx health/readiness/app routes checked, docs/OpenAPI/metrics blocked externally, Prometheus targets up, container Chromium launches, one worker job completed with one record | Verified locally, not target production |
 
-  ```bash
-  PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-    python3 -m pytest -q backend/tests/test_route_auth_matrix.py \
-    backend/tests/test_route_auth_matrix_generator.py -o addopts= -p no:cacheprovider
-  # 134 passed in 0.50s
-  ```
+## Fresh Validation Results
 
-- Verified: production secret validation tests passed:
-
-  ```bash
-  PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-    python3 -m pytest -q backend/tests/test_check_prod_env.py \
-    backend/tests/test_prod_security_validator.py -o addopts= -p no:cacheprovider
-  # 48 passed in 0.12s
-  ```
-
-- Verified: touched Python files compiled successfully:
-
-  ```bash
-  python3 -m py_compile scripts/route_auth_matrix.py scripts/check_prod_env.py \
-    backend/app/utils/prod_security_validator.py backend/app/routers/scraper.py \
-    backend/tests/test_route_auth_matrix_generator.py
-  ```
-
-- Verified: repository test collection is currently clean for tests and benchmarks:
-
-  ```bash
-  PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-    python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
-  # 1910 tests collected in 0.40s
-  ```
-
-- Verified: benchmark pytest entry point no longer errors during default execution:
-
-  ```bash
-  PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-    python3 -m pytest -q backend/benchmarks -o addopts=
-  # 1 passed in 0.26s
-  ```
-
-- Verified: full default backend pytest suite currently passes with SQLite when optional
-  browser/local-server, golden dataset, and Postgres tests are skipped by default:
-
-  ```bash
-  PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-    python3 -m pytest -q backend/tests -o addopts=
-  # 1837 passed, 72 skipped in 107.87s
-  ```
-
-- Verified: Postgres test suite passes with a live Postgres service:
-
-  ```bash
-  docker run --rm -d --name df-postgres \
-    -e POSTGRES_USER=dataforge -e POSTGRES_PASSWORD=test -e POSTGRES_DB=dataforge \
-    -p 5432:5432 postgres:16-alpine
-  # Create test user expected by conftest.py
-  docker exec df-postgres psql -U dataforge \
-    -c "CREATE USER testuser WITH PASSWORD 'testpassword' CREATEDB;"
-  docker exec df-postgres psql -U dataforge \
-    -c "CREATE DATABASE testdb OWNER testuser;"
-
-  PYTHONPATH=backend DATAFORGE_DATABASE_URL=postgresql://dataforge:test@localhost:5432/dataforge \
-    DATAFORGE_STORAGE_BACKEND=postgres \
-    python3 -m pytest -q backend/tests --run-postgres -o addopts= -p no:cacheprovider
-  # 1881 passed, 28 skipped in 119.73s
-  ```
-
-- Verified: browser E2E tests pass with Playwright + Chromium:
-
-  ```bash
-  PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-    python3 -m pytest -q backend/tests/test_playwright_browser_e2e.py \
-    backend/tests/test_session_bound_e2e.py --run-browser -o addopts= -p no:cacheprovider
-  # 39 passed in 10.76s
-  ```
+| Command | Result | What It Proves |
+| --- | --- | --- |
+| `python3 -m compileall -q backend scripts architecture_validator.py` | Passed with no output | Python syntax is valid for checked paths |
+| `PYTHONPATH=backend python3 architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=` | `1912 tests collected in 0.41s` | Test collection is clean |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests -o addopts=` | `1839 passed, 72 skipped in 107.06s` | Safe SQLite backend suite passes locally |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/benchmarks -o addopts=` | `1 passed in 0.27s` | Benchmark package smoke/config test passes |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests/test_route_auth_matrix.py backend/tests/test_route_auth_matrix_generator.py -o addopts=` | `134 passed in 1.25s` | Route-auth matrix tests pass |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests/test_check_prod_env.py backend/tests/test_prod_security_validator.py -o addopts=` | `48 passed in 0.09s` | Production secret validation tests pass |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests/test_route_auth_matrix.py backend/tests/test_route_auth_matrix_generator.py backend/tests/test_check_prod_env.py backend/tests/test_prod_security_validator.py -o addopts=` | `182 passed in 1.31s` | Combined route-auth and production-security checks pass |
+| `env -i PATH="$PATH" PYTHONPATH=backend DATAFORGE_SKIP_DB_CHECK=true python3 scripts/check_prod_env.py --env-file .env.production.example` | Failed intentionally on placeholder API keys, database password/URL, metrics token, operator/admin keys, and Grafana password | Production example is not deployable as-is |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=postgres python3 -m pytest backend/tests --run-postgres -q -o addopts=` | `1883 passed, 28 skipped in 129.55s` | Postgres repository and queue tests pass locally with Docker/testcontainers |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests --run-browser -q -o addopts=` | `1856 passed, 55 skipped in 116.73s` | Browser/local-server tests pass locally |
+| `docker build -f Dockerfile -t dataforge:local .` | Successfully built `2d6822c8ca4f` and tagged `dataforge:local` | Docker image builds locally |
+| `./bin/docker-compose -f docker-compose.prod.yml up -d --build dataforge worker nginx prometheus` with a temporary ignored `.env` | Backend and worker healthy; Postgres healthy; Nginx, Prometheus, and Grafana running | Local Compose startup works in this environment |
+| Nginx smoke via `curl http://127.0.0.1:18080...` | `/health` 200, `/ready` 200, `/app/` 200, `/docs` 404, `/redoc` 404, `/openapi.json` 404, `/metrics` 404 | Public Nginx route behavior works locally |
+| Container browser smoke | `docker exec dataforge-scraper ... playwright chromium ...` printed `ok` | Chromium launches in the built API container |
+| Prometheus target check | `dataforge up '' http://dataforge:8000/metrics`; `prometheus up '' http://localhost:9090/metrics` | Prometheus scrapes internal metrics with the configured bearer token |
+| Worker smoke through Nginx | One `https://example.com` manual job completed with `total_records: 1`, `error: null`, `quality_final_records: 1` | Worker, Postgres queue/storage, browser extraction path, and Nginx API routing work for a minimal local smoke case |
+| `python3 -m pytest backend/tests/test_golden_dataset.py --run-golden-dataset -q -o addopts=` | Stopped after one visible test and several minutes with no progress | Live golden dataset run is not validated in this pass |
 
 ## Partially Verified
 
-- Partially verified: route-level authorization is now mechanically documented and tested
-  for registered routes. This is not a penetration test and does not prove complete
-  security.
-- Partially verified: production secret validation has stronger placeholder and duplicate
-  key detection. It still depends on operators supplying strong secrets outside source
-  control.
-- Partially verified: `/metrics` has optional token protection. It is unsafe to expose
-  publicly unless `DATAFORGE_METRICS_TOKEN` and network controls are configured.
-- Partially verified: FastAPI docs routes are classified as development-docs routes.
-  Production deployment must disable or block them.
+- Route authorization is mechanically documented and tested for registered FastAPI routes. This is not a penetration test.
+- `/metrics` is protected when `DATAFORGE_METRICS_TOKEN` is configured. Local Compose verified Nginx blocks public `/metrics` and Prometheus scrapes the internal route with a bearer token.
+- Browser extraction is validated against local tests, not against a broad real-world website corpus.
+- Postgres repository and queue behavior is validated locally, including a minimal Compose worker smoke. Failover, backup, restore, and load behavior are not validated.
+- CSP headers are served by Nginx locally; browser-enforced production behavior was not validated against a real domain.
 
-## Implemented But Unvalidated
+## Experimental Or Unvalidated
 
-- Implemented but unvalidated: Docker Compose stack with Nginx, Prometheus, and Grafana
-  files exist, but this status snapshot does not verify that the full production stack
-  starts end to end.
-- Implemented but unvalidated: adaptive, semantic, topology, and recovery modules exist.
-  They must remain experimental until real-world behavior and failure modes are measured.
+- Semantic world state, topology state, federation/gossip, strategy evolution beyond tested behavior, selector ML/decay, self-tuning extraction, replay buffers, chaos/failure injection, manifold/motif/energy/intent/acquisition/instability/domain evolution modules.
+- Golden dataset live accuracy. Expected files exist, but thresholds are not enforced and the live run did not complete.
+- Public target deployment, TLS, Grafana login/dashboard behavior, backups, load tests, failover, alert delivery, disaster recovery, and incident response.
 
-## Now Validated
+## Current Blockers
 
-- Validated: Postgres storage and queue backend with 1881 passing tests against a live
-  Postgres 16 service. Postgres tests require `--run-postgres` and a running database.
-- Validated: Playwright + Chromium browser E2E tests with 39 passing tests against
-  local mock web servers. Browser tests require `--run-browser`.
-- Validated: Route auth matrix with 134 passing tests covering 81 registered routes.
-- Validated: Production secret validation with 48 passing tests rejecting placeholders.
-- Validated: Golden dataset parametrization no longer breaks collection when `sites.json` is absent.
-- Validated: `.gitignore` typo fixed (duplicate `/data\ /` line removed).
-- Validated: Runtime artifacts (`logs/audit.log`, `data/semantic_state.json*`) removed from disk.
-- Validated: Module classification document created — 127 modules classified across 11 layers (docs/MODULE_CLASSIFICATION.md).
-- Validated: Config audit document created — 10 scattered env reads documented, all advisory (docs/CONFIG_AUDIT.md).
-- Validated: Rate limiter route key path spaces removed — was matching `"/api / url / analyze"` (with spaces), now matches `"/api/url/analyze"` correctly.
-- Validated: Final handoff document created (docs/HANDOFF.md) with architecture summary, verified claims, blockers, and reproducible commands.
-- Validated: All documentation updated with consistent numbers from the latest run (1910 collected, 1837 passed / 72 skipped in 107.87s, 1 benchmark passed in 0.26s).## Simulated Or Fixture-Based
-
-- Simulated: hostile, longevity, replay, and similar benchmark scripts (`benchmark_*.py`)
-use fixtures or generated conditions unless explicitly run against a documented live
-dataset.
-- Partially verified: golden dataset has `sites.json` (5 targets) and `expected/` output
-files. These are **observational tests** (log F1 but do not fail on mismatch). They do
-not prove real-world extraction accuracy until validated against live targets.## Unknown In This Snapshot
-
-- Unknown: Docker Compose production stack startup with Nginx, Prometheus, and Grafana.
-- Unknown: Nginx proxy and reverse-proxy behavior.
-- Unknown: dashboard behavior under a browser-enforced production CSP.
-- Unknown: live extraction accuracy against a real golden dataset.
-- Unknown: anti-bot effectiveness against real anti-bot systems.
-- Unknown: failure-recovery, load-testing, and backup/restore procedures.
-- Unknown: CI pipeline behavior from a fresh checkout.
-
-## Known Blockers Before Production
-
-1. Production deployment is not validated end to end.
-2. Post-cleanup safe local test baseline exists, but CI must reproduce it from a fresh
-   checkout before treating it as release evidence.
-3. Postgres is validated locally (1881 passing tests), but worker queue + migration
-   behavior in a deployed environment needs service validation.
-4. Dashboard authentication/session handling is not suitable for public hostile-browser
-   environments.
-5. Metrics and docs routes need verified production exposure controls.
-6. CORS, CSP, API docs, rate limits, and route authorization need a production-mode smoke
-   test.
-7. Real-world benchmark data with expected outputs is required before making accuracy
-   claims.
-8. Docker Compose production stack (Nginx, Prometheus, Grafana) needs smoke-test validation.
+1. The local Compose smoke used a temporary generated `.env`, not real production secrets or a public target environment.
+2. Live golden dataset validation timed out/stalled and does not prove extraction accuracy.
+3. Dashboard remains internal-only until session and hostile-browser risks are reviewed.
+4. Rate limiting is in-memory and single-process only.
+5. TLS, Grafana dashboard/login behavior, production backup/restore, load, alert delivery, disaster recovery, and incident-response gates are unvalidated.
 
 ## Allowed Current Claims
 
-- DataForge Scraper is a pre-production FastAPI and Playwright web extraction platform.
-- It has job APIs, extraction modules, storage code, exports, telemetry, diagnostics, and
-  security utilities.
-- It supports local SQLite mode and Postgres backend (validated with 1881 passing tests).
-- It includes validated Playwright + Chromium browser E2E tests (39 passing tests).
-- Route authorization is mechanically documented by a generated matrix (134 passing tests).
-- It includes an internal dashboard.
-- It includes experimental adaptive and semantic modules.
-- Benchmark package has 1 honest pytest collection check; 3 standalone benchmark scripts
-  are named `benchmark_*.py` (not falsely collected as tests).
-- Runtime artifacts (logs, DBs, lock files, `__pycache__` directories) have been removed from disk.
-- `.gitignore` typo fixed (duplicate line removed).
-- Golden dataset parametrization handles missing `sites.json` without collection errors.
-- 15 stale audit documents have been archived to `docs/archive/`.
+- Pre-production FastAPI + Playwright web extraction platform.
+- Configurable jobs, browser-assisted extraction, structured extraction, storage, exports, diagnostics, and telemetry exist.
+- SQLite local mode is tested.
+- Postgres repository and queue tests pass locally with `--run-postgres`.
+- Browser/local-server tests pass locally with `--run-browser`.
+- Docker image build and a minimal local production Compose smoke pass.
+- Route-auth matrix tests and production secret validation tests pass locally.
+- Docker/Nginx/Postgres/Prometheus/Grafana deployment files exist.
+- Experimental adaptive/semantic modules exist but are not production-validated.
 
 ## Banned Claims
 
-- Production-ready
-- Enterprise-grade
-- Universal scraper
-- Works on every website
-- Fully autonomous
-- Fully self-healing
-- Anti-bot immune
-- Guaranteed accurate
-- 100% complete
-- All tests pass, unless followed by the exact fresh command and output
+Do not claim production-ready, enterprise-grade, universal scraper, scrapes every website, bypasses all anti-bot systems, anti-bot immune, fully autonomous, fully self-healing, guaranteed extraction, 100% accurate, complete, fully benchmarked, zero bugs, or production security without new evidence.
 
-## Production Readiness Checklist
+## Next Actions
 
-See **[docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md)** for the complete gate-by-gate checklist (secrets, deployment, health, security, database, dashboard, monitoring, extraction, operations) that must pass before the project can be described as production-ready.
-
-## Reproducible Commands
-
-Use these commands to regenerate the current status before updating this file:
-
-```bash
-python3 -m compileall -q backend scripts architecture_validator.py
-
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-  python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
-
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-  python3 -m pytest -q backend/tests -o addopts=
-
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-  python3 -m pytest -q backend/benchmarks -o addopts=
-
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-  python3 scripts/route_auth_matrix.py --format markdown
-
-env -i PATH="$PATH" PYTHONPATH=backend DATAFORGE_SKIP_DB_CHECK=true \
-  python3 scripts/check_prod_env.py --env-file .env.production.example
-
-# Postgres tests (requires running Postgres container + testuser/testdb):
-PYTHONPATH=backend DATAFORGE_DATABASE_URL=postgresql://dataforge:test@localhost:5432/dataforge \
-  DATAFORGE_STORAGE_BACKEND=postgres \
-  python3 -m pytest -q backend/tests --run-postgres -o addopts=
-
-# Browser E2E tests (requires Playwright + Chromium installed):
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-  python3 -m pytest -q backend/tests/test_playwright_browser_e2e.py \
-  backend/tests/test_session_bound_e2e.py --run-browser -o addopts=
-```
-
-The `.env.production.example` validation command is expected to fail because the file
-contains placeholders. A passing production check requires real strong secrets supplied
-outside the repository.
+1. Create a real uncommitted production `.env` for the target environment and rerun the production checks there.
+2. Add timeout controls and enforced thresholds to golden dataset tests.
+3. Add production-mode dashboard/CSP checks against a browser and real origin.
+4. Add backup/restore, load, alert delivery, and recovery validation.

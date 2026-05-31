@@ -1,68 +1,64 @@
 # Testing
 
-**Date:** 2026-05-31  
+**Last refreshed:** 2026-06-01
 **Status:** Current local testing truth
 
-## Safe Local Baseline
+Use explicit environment variables so local `.env` files do not change results.
 
-Run local tests with SQLite and without loading local `.env` files:
-
-```bash
-PYTHONPATH=backend \
-DATAFORGE_DOTENV_PATH=/dev/null \
-DATAFORGE_STORAGE_BACKEND=sqlite \
-python3 -m pytest -q backend/tests -o addopts=
-```
-
-Latest verified result in this workspace:
-
-```text
-1837 passed, 72 skipped in 107.87s
-```
-
-## Collection
+## Required Local Commands
 
 ```bash
-PYTHONPATH=backend \
-DATAFORGE_DOTENV_PATH=/dev/null \
-DATAFORGE_STORAGE_BACKEND=sqlite \
-python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
+python3 -m compileall -q backend scripts architecture_validator.py
+PYTHONPATH=backend python3 architecture_validator.py
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests -o addopts=
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/benchmarks -o addopts=
 ```
 
-Latest verified result:
+## Latest Results
 
-```text
-1910 tests collected in 0.41s
-```
+| Command | Result | Meaning |
+| --- | --- | --- |
+| `compileall` | Passed with no output | Syntax is valid for checked Python files |
+| `architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Architecture rules pass |
+| Pytest collection | `1912 tests collected in 0.41s` | Collection is clean |
+| Safe SQLite backend suite | `1839 passed, 72 skipped in 107.06s` | Default local backend tests pass |
+| Benchmark package | `1 passed in 0.27s` | Benchmark smoke/config test passes only |
+| Route auth tests | `134 passed in 1.25s` | Route-auth matrix tests pass |
+| Production security tests | `48 passed in 0.09s` | Placeholder/secret validation tests pass |
+| Combined route/security tests | `182 passed in 1.31s` | Route-auth and production-security checks pass together |
+| Postgres optional suite | `1883 passed, 28 skipped in 129.55s` | Postgres repository/queue tests pass locally |
+| Browser optional suite | `1856 passed, 55 skipped in 116.73s` | Browser/local-server tests pass locally |
+| Golden dataset optional suite | Stopped after one visible test and no progress for several minutes | Not validated |
 
-## Optional Test Groups
+## Optional Groups
 
-Postgres tests require a reachable Postgres service:
+Postgres:
 
 ```bash
-PYTHONPATH=backend python3 -m pytest backend/tests --run-postgres -q -o addopts=
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=postgres python3 -m pytest backend/tests --run-postgres -q -o addopts=
 ```
 
-Golden dataset tests require reviewed target metadata, expected outputs, and permission to access the target sites:
+Browser:
 
 ```bash
-PYTHONPATH=backend python3 -m pytest backend/tests/test_golden_dataset.py --run-golden-dataset -q -o addopts=
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests --run-browser -q -o addopts=
 ```
 
-Browser/local-server E2E tests require Playwright and permission to bind a local HTTP server:
+Golden dataset:
 
 ```bash
-PYTHONPATH=backend python3 -m pytest backend/tests --run-browser -q -o addopts=
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/test_golden_dataset.py --run-golden-dataset -q -o addopts=
 ```
 
-## Manual Scripts
+## What Tests Do Not Prove
 
-`backend/tests/manual_*.py` scripts are not proof of default pytest health. They are import-safe after cleanup, but they remain manual validation tools.
+- Passing local tests does not prove production readiness.
+- Browser tests prove local Playwright behavior, not broad website compatibility.
+- Postgres tests prove local repository/queue behavior, not production failover or backups.
+- Golden dataset tests do not currently enforce accuracy thresholds.
+- Route-auth tests do not replace a security review or penetration test.
 
-## Rules
+## Manual Tests
 
-- Do not count skipped tests as passed.
-- Do not claim Postgres support is verified unless `--run-postgres` is run against a live service.
-- Do not claim golden dataset accuracy unless `--run-golden-dataset` is run with reviewed expected outputs.
-- Do not claim production readiness from unit tests.
-- Include the exact command and environment when reporting test results.
+`backend/tests/manual_*.py` files are manual validation tools, not proof of default pytest health. Live network tests require explicit flags and should not be counted as safe offline tests.

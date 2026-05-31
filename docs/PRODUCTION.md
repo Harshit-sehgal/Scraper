@@ -1,24 +1,11 @@
 # Production
 
-The repository includes production deployment files, but production readiness is not fully validated until the target deployment passes release gates with real secrets, real domains, Postgres, browser support, and proxy/metrics checks.
+**Last refreshed:** 2026-06-01
+**Status:** Deployment files exist; local production-like Compose smoke passed, but target production is not validated
 
-## Required Env Validation
+The repository includes production deployment files. A local Compose smoke passed with a temporary ignored `.env`, but production readiness still requires validation in the target environment with real secrets, TLS, monitoring operations, backups, load testing, and incident procedures.
 
-Production server and worker entrypoints run:
-
-```bash
-python3 scripts/check_prod_env.py --env-file "${DATAFORGE_ENV_FILE:-.env}"
-```
-
-when `DATAFORGE_ENV=production`.
-
-The checker rejects placeholder API keys, placeholder database passwords, wildcard CORS, non-Postgres storage, missing operator/admin keys, and weak Grafana passwords.
-
-`.env.production.example` intentionally fails validation until placeholders are replaced.
-
-## Production Stack
-
-Files present:
+## Files Present
 
 - `Dockerfile`
 - `docker-compose.prod.yml`
@@ -27,25 +14,48 @@ Files present:
 - `prometheus_alerts.yml`
 - `grafana/`
 - `.env.production.example`
+- `scripts/start_server.sh`
+- `scripts/start_worker.sh`
+- `scripts/check_prod_env.py`
+- `scripts/verify_release.sh`
 
-## Release Gate
+## Current Evidence
+
+| Gate | Evidence | Status |
+| --- | --- | --- |
+| Production env placeholder rejection | `.env.production.example` intentionally fails validation, including placeholder metrics token | Validated |
+| Docker image build | `docker build -f Dockerfile -t dataforge:local .` built `2d6822c8ca4f` | Validated locally |
+| Full Compose startup | Local `up -d --build` started backend, worker, Postgres, Nginx, Prometheus, and Grafana with a temporary ignored `.env` | Validated locally |
+| Nginx routing | `/health` 200, `/ready` 200, `/app/` 200, `/docs`/`/redoc`/`/openapi.json`/`/metrics` 404 | Validated locally |
+| Containerized browser extraction | Chromium launched in the API container; one worker job against `https://example.com` completed with 1 record | Validated minimal smoke |
+| Prometheus/Grafana runtime behavior | Prometheus targets `dataforge` and `prometheus` were `up`; Grafana container was running, but login/dashboards were not checked | Partially validated |
+
+## Required Env Validation
+
+Server and worker startup scripts run production validation when `DATAFORGE_ENV=production`:
 
 ```bash
-scripts/verify_release.sh
+python3 scripts/check_prod_env.py --env-file "${DATAFORGE_ENV_FILE:-.env}"
 ```
 
-This is intended to run syntax checks, static checks, architecture validation, pytest, and production env validation. Treat its output as current only when the command has been run in the target environment.
+The checker rejects placeholder API keys, placeholder database credentials, wildcard CORS, unsafe production defaults, missing operator/admin keys, duplicate role keys, and weak Grafana passwords.
 
-## Production Readiness Checklist
+`.env.production.example` is a template and must fail until real values are supplied outside source control.
 
-See **[docs/PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)** for the full gate-by-gate checklist that must pass before the project can be described as production-ready.
+## Dependency Note
 
-## Known Production Gaps
+The Dockerfile installs Python packages from `backend/requirements.lock.txt`, not the loose `requirements.txt`. This supports reproducible dependency installation. The image builds locally, but it should still be built in CI and in the target deployment environment.
 
-- Docker installs from `backend/requirements.txt`, not a strict lock file (`requirements.lock.txt` exists but isn't used in Docker).
-- Postgres storage and queue backend is validated locally (1881 passing tests against Postgres 16). Production behavior (migrations, multi-instance, failover, backup/restore) remains unvalidated until tested in the target deployment environment.
-- Dashboard assets are **vendored locally** (no CDN dependencies). Strict CSP (`script-src 'self'`) is enforced.
-- Rate limiting is in-memory and single-process only — not distributed across workers. Nginx-level rate limiting zones are pre-configured in `nginx.conf`.
-- Browser/Playwright behavior should be validated in the built image.
-- Nginx CORS allowlist must be changed from templates to real domains.
-- Metrics exposure must be tested through the intended internal Prometheus path.
+## Before Public Deployment
+
+- Rebuild the Docker image in CI/target infrastructure.
+- Start the production Compose stack with a real uncommitted `.env` for the target environment.
+- Verify `/health`, `/ready`, `/docs`, `/redoc`, `/openapi.json`, and `/metrics` through the target ingress.
+- Verify worker startup and job processing under concurrent and failure scenarios.
+- Verify Postgres persistence, backup, restore, and migration behavior.
+- Verify browser extraction inside the built image.
+- Verify CORS/CSP with the intended production domain.
+- Verify Prometheus scrape path, alert rules, alert delivery, and Grafana provisioning/login.
+- Run load tests and failure drills.
+
+See `docs/PRODUCTION_READINESS.md` for the gate checklist.

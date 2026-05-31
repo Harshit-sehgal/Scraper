@@ -306,6 +306,8 @@ class TestCheckProdEnvIntegration:
             "DATAFORGE_STORAGE_BACKEND": "postgres",
             "DATAFORGE_DATABASE_URL": "postgresql://dataforge:secure-password-123@postgres:5432/dataforge",
             "DATAFORGE_WORKER_QUEUE": "true",
+            "DATAFORGE_QUEUE_BACKEND": "postgres",
+            "DATAFORGE_METRICS_TOKEN": "metrics-token-a1b2c3d4e5f6a1b2",
             "DATAFORGE_ENV": "production",
             "GRAFANA_PASSWORD": "strong-grafana-password-123",
         })
@@ -319,6 +321,8 @@ class TestCheckProdEnvIntegration:
             ("DATAFORGE_STORAGE_BACKEND", True, mod.check_storage_backend),
             ("DATAFORGE_DATABASE_URL", True, mod.check_database_url),
             ("DATAFORGE_WORKER_QUEUE", True, mod.check_worker_queue),
+            ("DATAFORGE_QUEUE_BACKEND", True, mod.check_queue_backend),
+            ("DATAFORGE_METRICS_TOKEN", True, lambda v: mod._check_api_key_not_default("DATAFORGE_METRICS_TOKEN", v)),
             ("DATAFORGE_ENV", True, None),
             ("GRAFANA_PASSWORD", True, mod.check_grafana_password),
         ]
@@ -405,6 +409,8 @@ class TestCheckProdEnvIntegration:
             "DATAFORGE_STORAGE_BACKEND": "postgres",
             "DATAFORGE_DATABASE_URL": "postgresql://dataforge:strong-password-xyz@postgres:5432/dataforge",
             "DATAFORGE_WORKER_QUEUE": "true",
+            "DATAFORGE_QUEUE_BACKEND": "postgres",
+            "DATAFORGE_METRICS_TOKEN": "metrics-token-strong-value-xyz",
             "DATAFORGE_ENV": "production",
             "GRAFANA_PASSWORD": "strong-grafana-password-xyz",
         })
@@ -417,6 +423,13 @@ class TestCheckProdEnvIntegration:
             mod.check_var(env, "DATAFORGE_STORAGE_BACKEND", required=True, validator=mod.check_storage_backend),
             mod.check_var(env, "DATAFORGE_DATABASE_URL", required=True, validator=mod.check_database_url),
             mod.check_var(env, "DATAFORGE_WORKER_QUEUE", required=True, validator=mod.check_worker_queue),
+            mod.check_var(env, "DATAFORGE_QUEUE_BACKEND", required=True, validator=mod.check_queue_backend),
+            mod.check_var(
+                env,
+                "DATAFORGE_METRICS_TOKEN",
+                required=True,
+                validator=lambda v: mod._check_api_key_not_default("DATAFORGE_METRICS_TOKEN", v),
+            ),
             mod.check_var(env, "DATAFORGE_ENV", required=True, validator=mod.check_env),
             mod.check_var(env, "GRAFANA_PASSWORD", required=True, validator=mod.check_grafana_password),
         ]

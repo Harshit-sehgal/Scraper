@@ -1,77 +1,48 @@
 # Code Quality Standards
 
-This document defines the expected quality checks for DataForge Scraper. It is not
-proof that every check currently passes. Only fresh command output should be used as
-evidence.
+**Last refreshed:** 2026-06-01
+
+This document defines expected quality checks. It is not proof that every lint/type/coverage check currently passes. Only fresh command output should be used as evidence.
 
 ## Current Verified Snapshot
 
-Verified on 2026-05-31:
+- `python3 -m compileall -q backend scripts architecture_validator.py` passed with no output.
+- `PYTHONPATH=backend python3 architecture_validator.py` passed with `VALIDATION PASSED: Architecture is lawful.`
+- Pytest collection completed with `1912 tests collected in 0.41s`.
+- Safe SQLite backend suite passed with `1839 passed, 72 skipped in 107.06s`.
+- Route-auth tests passed with `134 passed in 1.25s`.
+- Production security tests passed with `48 passed in 0.09s`.
+- Docker image build passed locally with image `2d6822c8ca4f`.
+- Local Compose smoke passed for backend, worker, Postgres, Nginx, Prometheus scrape, container Chromium, and a one-job worker path.
 
-- Verified: `python3 -m compileall -q backend scripts architecture_validator.py` passed.
-- Verified: `python3 architecture_validator.py` passed with `VALIDATION PASSED: Architecture is lawful.`
-- Verified: pytest collection for `backend/tests backend/benchmarks` completed with `1910 tests collected in 0.41s`.
-- Verified: full default backend pytest suite passed with `1837 passed, 72 skipped in 107.87s`.
-- Verified: `backend/tests/test_pyflakes_fixes.py` passed, which runs pyflakes over `backend/app` and `backend/tests`.
+## Not Verified In This Snapshot
 
-Not verified in this snapshot:
-
-- `flake8` result.
-- `mypy` result.
-- coverage percentage.
-- coverage percentage.
-
-Do not claim zero lint/type errors unless the relevant commands have just been run.
+- `flake8`
+- `mypy`
+- coverage percentage
+- target-environment Docker/Compose startup
 
 ## Required Checks
 
-Run these before claiming code quality status:
-
 ```bash
 python3 -m compileall -q backend scripts architecture_validator.py
-```
-
-```bash
-python3 architecture_validator.py
-```
-
-```bash
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-  python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
-```
-
-```bash
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-  python3 -m pytest -q backend/tests -o addopts=
+PYTHONPATH=backend python3 architecture_validator.py
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests -o addopts=
 ```
 
 Optional, if installed:
 
 ```bash
-flake8 backend/
-```
-
-```bash
-mypy backend/app --ignore-missing-imports
-```
-
-```bash
-pyflakes backend/app scripts
+python3 -m pyflakes backend/app scripts architecture_validator.py
+python3 -m mypy backend/app --ignore-missing-imports
 ```
 
 ## Standards
 
 - Keep generated files, logs, databases, caches, and lock files out of source control.
-- Prefer centralized configuration over scattered direct environment reads in app code.
-- Keep tests honest: skip optional external-service tests explicitly and document why.
+- Prefer centralized configuration over scattered environment reads in app code.
+- Keep optional external-service tests explicitly marked and documented.
 - Do not weaken security checks to make tests pass.
 - Do not describe fixture or simulated benchmarks as real-world validation.
 - Add focused tests for new behavior and regression tests for bug fixes.
-- Use clear exception handling; avoid silent broad `except` blocks unless intentionally
-  documented.
-
-## Formatting
-
-The repository contains `.flake8` configuration. New Python code should remain readable,
-typed where useful, and formatted consistently with nearby code. Use `black` only when
-the scope is intentional; avoid broad formatting churn during unrelated fixes.

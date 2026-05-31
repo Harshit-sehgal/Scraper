@@ -304,6 +304,16 @@ class TestStrategyEvolutionEngine:
         assert recommendation.confidence < 0.5
         assert "Cold start" in recommendation.reason
 
+    def test_cold_start_does_not_randomly_explore(self):
+        """Cold-start domains should use the safe browser path before random exploration."""
+        engine = StrategyEvolutionEngine()
+        engine.exploration_probability = 1.0
+
+        recommendation = engine.recommend_strategy("new-js-domain.example")
+
+        assert recommendation.recommended_strategy == FetchStrategy.PLAYWRIGHT_FULL
+        assert "Cold start" in recommendation.reason
+
     def test_recommend_strategy_with_data(self):
         """Test strategy recommendation with sufficient data."""
         engine = StrategyEvolutionEngine()

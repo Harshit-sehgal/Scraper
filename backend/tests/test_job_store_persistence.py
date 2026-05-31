@@ -254,6 +254,25 @@ def test_restart_recovery_writes_failed_status_to_db(isolated_db, monkeypatch):
     assert row[0] == "failed", f"DB row still has status={row[0]!r}, expected 'failed'"
 
 
+def test_load_state_can_skip_restart_recovery_for_worker_reads(isolated_db):
+    """Worker hot-path reads must not mark active jobs as restart-recovered."""
+    import sqlite3 as _sqlite3
+
+    job = _make_job(status=JobStatus.RUNNING)
+    save_state({job.id: job}, {})
+
+    jobs, _, _ = load_state(recover_in_progress=False)
+    assert jobs[job.id].status == JobStatus.RUNNING
+    assert jobs[job.id].error in (None, "")
+
+    from app.job_store import _get_db_path
+
+    conn = _sqlite3.connect(str(_get_db_path()))
+    row = conn.execute("SELECT status, error FROM jobs WHERE id = ?", (job.id,)).fetchone()
+    conn.close()
+    assert row in {("running", None), ("running", "")}
+
+
 def test_restart_recovery_survives_second_load(isolated_db):
     """After recovery, a second load_state() must not re-recover the same job."""
     job = _make_job(status=JobStatus.PENDING)

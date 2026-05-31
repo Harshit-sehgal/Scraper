@@ -1,68 +1,48 @@
 # Architecture
 
-## Reality Summary
+**Last refreshed:** 2026-06-01
+**Status:** Actual architecture map from code inspection and fresh validation
 
-DataForge Scraper is a FastAPI application with browser-assisted extraction, job state management, result export, telemetry, and experimental adaptive/semantic components. It is pre-production. The codebase is larger than a simple scraper, but several advanced parts are implemented without production-like validation.
+DataForge Scraper is organized as a FastAPI backend, Playwright/browser extraction layer, storage and queue abstractions, export utilities, telemetry/diagnostics, security helpers, a static dashboard, and a set of experimental adaptive modules.
 
-## Backend
+## Layer Map
 
-- Entry point: `backend/app/main.py`
-- Routers: `backend/app/routers/jobs.py`, `exports.py`, `scraper.py`, `operator.py`
-- Models: `backend/app/models.py`
-- Config: `backend/app/config.py`
+| Layer | Main files | Purpose | Maturity | Test coverage | Risk | Recommendation |
+| --- | --- | --- | --- | --- | --- | --- |
+| API layer | `backend/app/main.py`, `backend/app/routers/*.py` | FastAPI app, middleware, health/readiness, job/export/scraper/operator routes | Core | Route auth tests, API tests in safe suite | Production exposure must be verified through Nginx | Keep |
+| Job lifecycle | `backend/app/job_store.py`, `backend/app/services/*`, `backend/app/worker*.py` | Job persistence, state changes, queue dispatch | Core | Safe suite, Postgres optional suite, local Compose worker smoke | Multi-job/failure production behavior unvalidated | Keep and broaden deployment tests |
+| Scraper/browser | `backend/app/scraper.py`, `backend/app/browser.py`, `backend/app/browser_pool.py` | HTTP/browser fetch, Playwright orchestration, page loading | Core | Browser suite: `1856 passed, 55 skipped`; container Chromium smoke | Broad real-world extraction not proven | Keep, add benchmark corpus |
+| Extraction | `backend/app/extraction_orchestrator.py`, `backend/app/extractors/*`, `backend/app/schema_*.py` | Schema, selector, network payload, text fallback extraction | Core | Unit/API/browser tests | Real-world accuracy not proven | Keep, add benchmarks |
+| Cleaning/enrichment | `backend/app/data_cleaner.py`, `backend/app/enrichment.py`, validators | Normalize and validate extracted records | Stable supporting | Safe suite | Quality varies by site/schema | Keep |
+| Storage | `backend/app/storage_interface.py`, `backend/app/postgres_repository.py`, `backend/app/job_store.py` | SQLite local storage and Postgres repository selection | Core | SQLite safe suite; Postgres `1883 passed, 28 skipped`; Compose smoke | Production migration/failover/backups unvalidated | Keep, add deployment tests |
+| Export | `backend/app/routers/exports.py`, `backend/app/utils/export.py` | CSV/JSON/Excel result export | Core | Safe suite | Large export behavior unvalidated | Keep |
+| Telemetry/diagnostics | `backend/app/telemetry.py`, `backend/app/metrics.py`, `backend/app/diagnostics.py`, router endpoints | Observability, diagnostics, Prometheus metrics | Stable supporting | Safe suite, route matrix, local Prometheus target check | Target-network exposure still needs validation | Keep, verify target deployment |
+| Security/auth | `backend/app/utils/rbac.py`, `backend/app/url_safety.py`, `backend/app/rate_limiter.py`, `backend/app/utils/prod_security_validator.py` | API keys, roles, URL safety, rate limiting, env validation | Core supporting | Route-auth and prod-security tests pass | Not a penetration test; rate limit is in-memory | Keep, harden |
+| Dashboard | `frontend/`, static mounts in `main.py` | Internal static dashboard | Partial | Backend/static route coverage only | Public session/security model unvalidated | Keep internal |
+| Experimental/adaptive | semantic/topology/federation/gossip/replay/strategy/selector-memory modules | Research and adaptive extraction behavior | Experimental | Mixed unit coverage | Easy to overclaim as intelligence/self-healing | Keep isolated and label |
+| Infrastructure | `Dockerfile`, `docker-compose*.yml`, `nginx.conf`, `prometheus*.yml`, `grafana/`, `scripts/` | Local/prod deployment, validation, monitoring config | Pre-production | Docker build and local Compose smoke pass | Target deployment, TLS, backups, load, alerts unvalidated | Keep, validate target environment |
 
-Status: verified import and local tests.
+## Verified Architecture Evidence
 
-## Scraper and Extraction
+```text
+python3 -m compileall -q backend scripts architecture_validator.py
+# passed with no output
 
-The scraper uses Playwright/browser flows, HTML utility helpers, selector discovery, visible-text extraction, network payload extraction, schema-field handling, and zero-result classification.
+PYTHONPATH=backend python3 architecture_validator.py
+# VALIDATION PASSED: Architecture is lawful.
+```
 
-Status: implemented and partially verified. Local Playwright E2E tests (39 passing) validated with Chromium.
+## Entry Points
 
-## Job Orchestration
+- API server: `backend/app/main.py`
+- Worker entry: `scripts/start_worker.sh`, `scripts/run_worker.py`
+- Production API entry: `scripts/start_server.sh`
+- Production env validation: `scripts/check_prod_env.py`
+- Release validation: `scripts/verify_release.sh`, `scripts/verify_all.sh`
 
-Jobs can be created, listed, fetched, canceled, deleted, recycled, and exported. Worker queue support exists and production worker startup now validates required production env.
+## Current Risk Summary
 
-Status: implemented and locally verified for basic API flows. Distributed production behavior is not fully validated.
-
-## Storage
-
-SQLite-style local state remains the default path. Postgres repository and queue support exist and have been validated locally (1881 passing tests against Postgres 16). Multi-instance behavior and production migration workflows are not tested here.
-
-## Metrics and Telemetry
-
-Metrics and telemetry collectors exist. `/metrics` emits Prometheus-style data. Production Nginx blocks public `/metrics`; direct backend exposure should set `DATAFORGE_METRICS_TOKEN`.
-
-Status: implemented and partially verified.
-
-## Dashboard
-
-The main dashboard and semantic dashboard are static frontend files served from `/app` and `/dashboard`. The dashboard uses polling, not WebSocket/SSE streaming.
-
-Status: implemented for internal/private use. API key storage in `sessionStorage` (cleared on tab close) remains a security limitation.
-
-## Security
-
-The backend has API key middleware, user/operator/admin RBAC dependencies on sensitive routes, request-size limiting, SSRF-oriented URL checks, CORS config, and production env validation.
-
-Status: partially verified. A generated route-level authorization matrix exists in `docs/ROUTE_AUTH_MATRIX.md`, but it is route-registration evidence rather than a penetration test.
-
-## Production Deployment
-
-The repo includes Dockerfile, production compose, Nginx, Prometheus, Grafana, env examples, smoke scripts, and release verification scripts.
-
-Status: implemented but not end-to-end validated in this audit.
-
-## Advanced Components
-
-The following components are **EXPERIMENTAL / NOT FULLY VALIDATED**:
-
-- **Semantic world state** - Implemented but not validated in production-like scenarios.
-- **Topology engine** - Site modeling is implemented; effectiveness on varied sites is unproven.
-- **Replay buffer** - Replay functionality exists but not hardened for production.
-- **Strategy evolution** - Per-domain strategy learning is implemented but untested in real-world conditions.
-- **Selector memory** - Learned pattern storage exists; convergence behavior unknown.
-- **Recovery logic** - Recovery strategies are defined; simulated benchmarks do not prove real-world effectiveness.
-- **Adaptive extraction** - Self-tuning parameters exist; real-world reliability is not validated.
-
-**Status**: implemented but unevenly validated. These components should NOT be described as fully autonomous or fully self-healing.
+- The architecture is coherent enough for pre-production engineering.
+- Local Docker build and Compose smoke are validated; target production deployment is not validated.
+- Experimental modules must stay out of public feature claims until measured.
+- Benchmark and golden dataset evidence is not strong enough for accuracy claims.

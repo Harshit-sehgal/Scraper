@@ -1,49 +1,55 @@
+# Python caches and build output
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
-.env
-.env.*
-!.env.example
-!.env.production.example
-!backend/.env.example
-venv/
 *.egg-info/
 dist/
 build/
-.DS_Store
-*.csv
-*.json
-!docs/archive/*.csv
-!grafana/dashboards/*.json
-frontend/node_modules/
+
+# Local virtual environments and tool caches
+venv/
+.venv/
+env/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 backend/.mypy_cache/
 backend/.venv/
-backend/data/
-server.log
 .coverage
 backend/.coverage
-.commandcode/
 
-# Runtime logs
+# Local environment files. Keep committed examples.
+.env
+.env.*
+!.env.example
+!.env.production.example
+!backend/.env.example
+
+# Runtime logs, state, databases, and lock files
 logs/
-
-# Runtime databases
+*.log
+server.log
 data/
-backend/app/data/*.db
-backend/data/*.db
-data/*.db
+backend/data/
+backend/app/data/
+*.db
 *.sqlite
 *.sqlite3
-
-# Runtime/test lock artifacts
 *.lock
-backend/tests/*.json.lock
-data/*.json.lock
-backend/app/data/*.lock
 
-# Runtime JSON state files
-backend/data/*.json
-data/*.json
+# Local generated exports/outputs
+exports/
+output/
+outputs/
+reports/
+*.csv
+
+# Frontend dependencies and browser artifacts
+frontend/node_modules/
+node_modules/
+playwright-report/
+test-results/
+
+# Local/editor metadata
+.DS_Store
+.commandcode/

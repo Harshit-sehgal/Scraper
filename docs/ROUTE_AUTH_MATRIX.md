@@ -1,29 +1,15 @@
 # Route Authorization Matrix
 
-**Date:** 2026-05-31
+**Last refreshed:** 2026-06-01
 **Status:** Generated from the registered FastAPI app
 
-The route authorization matrix is generated from `app.main:app` rather than hand-written docs.
+Generate the matrix:
 
 ```bash
-PYTHONPATH=backend \
-DATAFORGE_DOTENV_PATH=/dev/null \
-DATAFORGE_STORAGE_BACKEND=sqlite \
-python3 scripts/route_auth_matrix.py --format markdown
-```
-
-JSON output is also available:
-
-```bash
-PYTHONPATH=backend \
-DATAFORGE_DOTENV_PATH=/dev/null \
-DATAFORGE_STORAGE_BACKEND=sqlite \
-python3 scripts/route_auth_matrix.py --format json
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 scripts/route_auth_matrix.py --format markdown
 ```
 
 ## Current Generated Summary
-
-Verified in this workspace:
 
 ```text
 81 route entries
@@ -35,35 +21,30 @@ Verified in this workspace:
 1 metrics-token-if-configured route
 ```
 
-## Current Security Findings
+## Public Route Justification
 
-Verified:
+- `/` is a root status endpoint.
+- `/health` is a liveness endpoint.
+- `/ready` is a readiness endpoint; production responses should stay minimal.
 
-- API mutation routes now require operator/admin or admin access in the generated matrix.
-- Regression replay generation routes are operator/admin protected:
-  - `POST /api/scraper/regressions/{entry_id}/generate-test`
-  - `POST /api/scraper/regressions/generate-all-tests`
-- `POST /api/system/merge/knowledge` is admin-only and still has an additional legacy `X-Admin-Key` check when `ADMIN_API_KEY` is configured.
-- `/metrics` is token-protected only when `DATAFORGE_METRICS_TOKEN` is configured.
-- FastAPI docs routes are registered in the app and must be disabled or blocked in production.
+Static dashboard mounts at `/app` and `/dashboard` are internal surfaces and should not be treated as public-product endpoints.
 
-Unknown:
+## Metrics And Docs
 
-- This matrix proves route registration and dependency classification. It is not a penetration test.
-- Production proxy behavior was not tested in this pass.
-- Full browser/dashboard exposure was not tested in this pass.
+- `/metrics` requires `DATAFORGE_METRICS_TOKEN` only when that token is configured.
+- FastAPI docs routes are disabled by app config when `DATAFORGE_ENV=production`.
+- Local Compose verified Nginx returns 404 for public `/docs`, `/redoc`, `/openapi.json`, and `/metrics`; repeat this behind the target ingress.
 
 ## Enforcement Test
 
 ```bash
-PYTHONPATH=backend \
-DATAFORGE_DOTENV_PATH=/dev/null \
-DATAFORGE_STORAGE_BACKEND=sqlite \
-python3 -m pytest -q backend/tests/test_route_auth_matrix_generator.py backend/tests/test_route_auth_matrix.py -o addopts=
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests/test_route_auth_matrix.py backend/tests/test_route_auth_matrix_generator.py -o addopts=
 ```
 
 Latest verified result:
 
 ```text
-134 passed in 0.50s
+134 passed in 1.25s
 ```
+
+This proves route registration and dependency classification. It is not a penetration test.

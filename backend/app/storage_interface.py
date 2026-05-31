@@ -24,8 +24,13 @@ class JobRepository(ABC):
         pass
 
     @abstractmethod
-    def load_all(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
-        """Load active jobs, recycled jobs, and world state in a single DB read pass."""
+    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+        """Load active jobs, recycled jobs, and world state in a single DB read pass.
+
+        Args:
+            recover_in_progress: When True, pending/running jobs are marked failed as
+                startup recovery. Worker hot-path reads must pass False.
+        """
         pass
 
     @abstractmethod
@@ -95,19 +100,19 @@ class SQLiteJobRepository(JobRepository):
     def load_jobs(self) -> dict[str, Job]:
         from app.job_store import load_state
 
-        jobs, _, _ = load_state()
+        jobs, _, _ = load_state(recover_in_progress=False)
         return jobs
 
     def load_recycle_bin(self) -> dict[str, Job]:
         from app.job_store import load_state
 
-        _, recycle, _ = load_state()
+        _, recycle, _ = load_state(recover_in_progress=False)
         return recycle
 
-    def load_all(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
         from app.job_store import load_state
 
-        return load_state()
+        return load_state(recover_in_progress=recover_in_progress)
 
     def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
         from app.job_store import save_state

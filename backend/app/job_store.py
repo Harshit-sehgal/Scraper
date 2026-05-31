@@ -443,8 +443,13 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
         logger.info("SQLite schema migrated to version %d", current)
 
 
-def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
-    """Load jobs and recycle bin from SQLite."""
+def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+    """Load jobs and recycle bin from SQLite.
+
+    Args:
+        recover_in_progress: Mark pending/running jobs failed during startup
+            recovery. Set False for normal worker/API reads.
+    """
     with _DB_LOCK:
         conn = _get_connection()
         try:
@@ -462,26 +467,27 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
                 if job:
                     recycle_bin_store[job.id] = job
 
-            dirty_recovery = False
-            for job in jobs_store.values():
-                if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
-                    job.status = JobStatus.FAILED
-                    job.error = "Recovered after restart while still in progress."
-                    job.completed_at = datetime.datetime.now().isoformat()
-                    job.cancel_requested = False
+            if recover_in_progress:
+                dirty_recovery = False
+                for job in jobs_store.values():
+                    if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
+                        job.status = JobStatus.FAILED
+                        job.error = "Recovered after restart while still in progress."
+                        job.completed_at = datetime.datetime.now().isoformat()
+                        job.cancel_requested = False
 
-                    row = _job_to_row(job)
-                    columns = ", ".join(row.keys())
-                    placeholders = ", ".join("?" for _ in row)
-                    values = list(row.values())
-                    conn.execute(
-                        f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",
-                        values,
-                    )
-                    dirty_recovery = True
+                        row = _job_to_row(job)
+                        columns = ", ".join(row.keys())
+                        placeholders = ", ".join("?" for _ in row)
+                        values = list(row.values())
+                        conn.execute(
+                            f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",
+                            values,
+                        )
+                        dirty_recovery = True
 
-            if dirty_recovery:
-                conn.commit()
+                if dirty_recovery:
+                    conn.commit()
 
             world_state_data = None
             try:

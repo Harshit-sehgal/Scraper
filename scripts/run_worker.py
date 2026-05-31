@@ -43,7 +43,7 @@ async def scrape_job_handler(task) -> dict:
         raise ValueError(f"No job_id in task payload: {task}")
 
     repo = get_job_repository()
-    jobs_store, recycle_bin_store, _ = repo.load_all()
+    jobs_store, recycle_bin_store, _ = repo.load_all(recover_in_progress=False)
 
     job = jobs_store.get(job_id)
     if not job:

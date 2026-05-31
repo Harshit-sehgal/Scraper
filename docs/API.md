@@ -1,6 +1,6 @@
 # API
 
-This route list was generated from the FastAPI app during the audit. Production disables `/docs`, `/redoc`, and `/openapi.json` through app settings and Nginx.
+This route list was generated from the FastAPI app during the audit. Production app config disables `/docs`, `/redoc`, and `/openapi.json`; Nginx behavior still needs runtime validation in a started production stack.
 
 ## Public / Probe Routes
 
@@ -62,7 +62,7 @@ Admin-only routes include system merge, scheduler step, refactor compression, di
 
 ## Metrics
 
-`GET /metrics` is protected by `DATAFORGE_METRICS_TOKEN` if configured. Production Nginx returns 404 for public `/metrics` and Prometheus is expected to scrape internally.
+`GET /metrics` is protected by `DATAFORGE_METRICS_TOKEN` if configured. Local Compose verified public Nginx returns 404 for `/metrics`, while Prometheus scrapes `http://dataforge:8000/metrics` internally with the configured bearer token. Repeat this check behind the target ingress.
 
 ## Auth Notes
 

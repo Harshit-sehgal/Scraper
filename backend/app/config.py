@@ -15,11 +15,13 @@ import os
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_SETTINGS_ENV_FILE = os.getenv("DATAFORGE_DOTENV_PATH", ".env").strip() or ".env"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="DATAFORGE_",
-        env_file=".env",
+        env_file=_SETTINGS_ENV_FILE,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -249,6 +251,8 @@ class Settings(BaseSettings):
 
     STATE_FILE_PATH: str = ""
     """Override for jobs_state.json path. Empty = use default ./backend/data/jobs_state.json"""
+    AUDIT_LOG_DIR: str = ""
+    """Override for audit log directory. Empty = use audit logger default."""
 
     # ─── API Security ──────────────────────────────────────────────────────
     ENV: str = "development"

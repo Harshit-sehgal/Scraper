@@ -1,0 +1,75 @@
+{
+  "sites": [
+    {
+      "id": "books_toscrape",
+      "url": "https://books.toscrape.com/",
+      "description": "Books to Scrape — demo ecommerce site with predictable HTML structure",
+      "schema": {
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "price": { "type": "currency", "required": false },
+          "rating": { "type": "string", "required": false }
+        }
+      },
+      "category": "ecommerce",
+      "min_expected_records": 20,
+      "notes": "Stable demo site. 50 books per page with consistent structure."
+    },
+    {
+      "id": "quotes_toscrape",
+      "url": "https://quotes.toscrape.com/",
+      "description": "Quotes to Scrape — demo content site with paginated quotes",
+      "schema": {
+        "fields": {
+          "quote": { "type": "string", "required": true },
+          "author": { "type": "string", "required": false }
+        }
+      },
+      "category": "listing",
+      "min_expected_records": 10,
+      "notes": "Stable demo site. 10 quotes per page."
+    },
+    {
+      "id": "scrapethissite_simple",
+      "url": "https://www.scrapethissite.com/pages/simple/",
+      "description": "ScrapeThisSite — simple country listing page",
+      "schema": {
+        "fields": {
+          "country": { "type": "string", "required": true },
+          "capital": { "type": "string", "required": false }
+        }
+      },
+      "category": "listing",
+      "min_expected_records": 50,
+      "notes": "Stable educational scraping site."
+    },
+    {
+      "id": "example_com",
+      "url": "https://example.com/",
+      "description": "Example domain — minimal page for connectivity validation",
+      "schema": {
+        "fields": {
+          "heading": { "type": "string", "required": false },
+          "paragraph": { "type": "string", "required": false }
+        }
+      },
+      "category": "static",
+      "min_expected_records": 0,
+      "notes": "Minimal page, IANA reserved domain."
+    },
+    {
+      "id": "httpbin_html",
+      "url": "https://httpbin.org/html",
+      "description": "HTTPBin HTML endpoint — returns simple HTML document",
+      "schema": {
+        "fields": {
+          "heading": { "type": "string", "required": false },
+          "paragraph": { "type": "string", "required": false }
+        }
+      },
+      "category": "static",
+      "min_expected_records": 1,
+      "notes": "Always available HTTP test service."
+    }
+  ]
+}

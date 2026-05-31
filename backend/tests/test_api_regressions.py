@@ -537,11 +537,14 @@ def test_run_job_creates_logs(monkeypatch):
         urls=["https://log.example"],
         schema_fields=[SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True)],
     )
+    job.error = "Recovered after restart while still in progress."
     main_mod.jobs_store[job.id] = job
 
     asyncio.run(main_mod._run_job_wrapper(job.id))
 
     finished = main_mod.jobs_store[job.id]
+    assert finished.status == JobStatus.COMPLETED
+    assert finished.error == ""
     assert len(finished.logs) > 0
     assert any("Initializing job" in log.message for log in finished.logs)
     assert any("Scraping started" in log.message for log in finished.logs)
