@@ -532,9 +532,9 @@ class Settings(BaseSettings):
     """Default locale for browser contexts."""
 
     # ─── LLM Provider Models ──────────────────────────────────────────────
-    GROQ_DEFAULT_MODEL: str = "llama-3.3 - 70b-versatile"
+    GROQ_DEFAULT_MODEL: str = "llama-3.3-70b-versatile"
     """Default model for Groq LLM calls."""
-    GROQ_FALLBACK_MODEL: str = "llama-3.1 - 8b-instant"
+    GROQ_FALLBACK_MODEL: str = "llama-3.1-8b-instant"
     """Fallback model when default Groq model fails."""
     G4F_JSON_MODEL: str = "gpt-4o-mini"
     """Model for g4f JSON fallback calls."""

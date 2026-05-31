@@ -41,6 +41,34 @@ DEFAULT_DB_PASSWORD_VALUES = {
     "postgres",
 }
 
+WEAK_CREDENTIAL_VALUES = DEFAULT_DB_PASSWORD_VALUES | {
+    "admin",
+    "grafana",
+    "change-me-to-a-random-secret",
+    "dev-key",
+    "test-key",
+    "your-api-key-here",
+    "change-me-admin-key",
+    "change-me-operator-key",
+    "change-me-user-key",
+}
+
+PLACEHOLDER_PREFIXES = (
+    "change-me",
+    "change-this",
+    "changeme",
+    "replace-me",
+    "replace-this",
+    "your-",
+)
+
+PLACEHOLDER_FRAGMENTS = (
+    "placeholder",
+    "example-secret",
+    "example-key",
+    "generate-strong",
+)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -151,6 +179,19 @@ def _mask_value(name: str, value: str) -> str:
     return value
 
 
+def _normalize_secret(value: str) -> str:
+    return value.strip().lower().replace("_", "-").replace(" ", "-")
+
+
+def _is_placeholder_secret(value: str) -> bool:
+    normalized = _normalize_secret(value)
+    return (
+        normalized in WEAK_CREDENTIAL_VALUES
+        or normalized.startswith(PLACEHOLDER_PREFIXES)
+        or any(fragment in normalized for fragment in PLACEHOLDER_FRAGMENTS)
+    )
+
+
 def check_cors_origins(value: str) -> bool:
     """Validate that CORS_ORIGINS is a JSON array and does not contain '*'."""
     try:
@@ -214,15 +255,7 @@ def check_queue_backend(value: str) -> bool:
 
 def check_grafana_password(value: str) -> bool:
     """Validate GRAFANA_PASSWORD is not a default/placeholder value."""
-    default_values = {
-        "admin",
-        "password",
-        "grafana",
-        "change-me",
-        "change-me-to-a-strong-password",
-        "change-this-to-a-strong-password",
-    }
-    if value.lower() in default_values:
+    if _is_placeholder_secret(value):
         print(
             f"  [FAIL]  GRAFANA_PASSWORD={_mask_value('GRAFANA_PASSWORD', value)} "
             "is a known default/placeholder value. "
@@ -265,28 +298,7 @@ def check_database_url(value: str) -> bool:
 
 def check_api_key(value: str) -> bool:
     """Validate DATAFORGE_API_KEY is not a default/placeholder value."""
-    default_values = {
-        "change-me",
-        "change-me-to-a-random-secret",
-        "change-this-to-a-strong-password",
-        "dev-key",
-        "test-key",
-        "your-api-key-here",
-    }
-    if value.lower() in default_values:
-        print(
-            f"  [FAIL]  DATAFORGE_API_KEY={_mask_value('DATAFORGE_API_KEY', value)} "
-            "is a known default/placeholder value. "
-            "Generate a strong random key with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
-        )
-        return False
-    if len(value) < 16:
-        print(
-            f"  [FAIL]  DATAFORGE_API_KEY is too short ({len(value)} chars). "
-            "Must be at least 16 characters."
-        )
-        return False
-    return True
+    return _check_api_key_not_default("DATAFORGE_API_KEY", value)
 
 
 def check_db_password(value: str) -> bool:
@@ -296,7 +308,7 @@ def check_db_password(value: str) -> bool:
 
 def _check_password_secret(name: str, value: str) -> bool:
     """Validate a database-style password is not a default/placeholder value."""
-    if value.lower() in DEFAULT_DB_PASSWORD_VALUES:
+    if _is_placeholder_secret(value):
         print(
             f"  [FAIL]  {name}={_mask_value(name, value)} "
             "is a known default/placeholder value. "
@@ -324,18 +336,7 @@ def _check_api_key_not_default(name: str, value: str) -> bool:
     Returns:
         True if valid, False otherwise.
     """
-    default_values = {
-        "change-me",
-        "change-me-to-a-random-secret",
-        "change-this-to-a-strong-password",
-        "dev-key",
-        "test-key",
-        "your-api-key-here",
-        "change-me-admin-key",
-        "change-me-operator-key",
-        "change-me-user-key",
-    }
-    if value.lower() in default_values:
+    if _is_placeholder_secret(value):
         print(
             f"  [FAIL]  {name}={_mask_value(name, value)} "
             "is a known default/placeholder value. "
@@ -349,6 +350,34 @@ def _check_api_key_not_default(name: str, value: str) -> bool:
         )
         return False
     return True
+
+
+def check_distinct_api_keys(env: dict[str, str]) -> bool:
+    """Validate that user, operator, and admin API keys are not reused."""
+    key_names = [
+        "DATAFORGE_API_KEY",
+        "DATAFORGE_OPERATOR_API_KEY",
+        "DATAFORGE_ADMIN_API_KEY",
+    ]
+    seen: dict[str, str] = {}
+    ok = True
+    for name in key_names:
+        value = env.get(name, "").strip()
+        if not value:
+            continue
+        previous = seen.get(value)
+        if previous:
+            print(
+                f"  [FAIL]  {name} reuses the same secret as {previous}. "
+                "Production user, operator, and admin API keys must be distinct."
+            )
+            ok = False
+        else:
+            seen[value] = name
+    if ok:
+        print("  [OK]    API role keys are distinct")
+    return ok
+
 
 def check_env(value: str) -> bool:
     """Validate DATAFORGE_ENV is set to 'production'."""
@@ -447,6 +476,9 @@ def main() -> int:
         passed = check_var(env, name, required=required, validator=validator, hint=hint)
         if not passed:
             all_pass = False
+
+    if not check_distinct_api_keys(env):
+        all_pass = False
 
     # ── Postgres Connectivity (if storage backend is postgres) ───────────
     if all_pass and env.get("DATAFORGE_STORAGE_BACKEND", "").lower() == "postgres":

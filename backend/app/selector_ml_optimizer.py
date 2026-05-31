@@ -85,7 +85,7 @@ class SelectorFeatureExtractor:
         # Robust tag counting using regex
         # Matches alphanumeric tags starting with a letter, either at start or
         # after a combinator / space
-        tag_matches = re.findall(r"(?:^|[\s>+~])([a-zA-Z][a-zA-Z0 - 9-]*)", selector)
+        tag_matches = re.findall(r"(?:^|[\s>+~])([a-zA-Z][a-zA-Z0-9-]*)", selector)
         tag_count = len(tag_matches)
 
         pseudo_count = selector.count(":")

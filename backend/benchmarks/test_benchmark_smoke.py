@@ -371,7 +371,7 @@ class SiteResult:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-async def test_site(site: SiteTest, index: int, total: int) -> SiteResult:
+async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:
     """Run scrape_url against one site and return structured results."""
     print(f"\n  [{index}/{total}] {site.name:25} ({site.category:15}) {site.url[:60]}...")
     print(f"         Schema: {[f.name for f in site.schema]}")
@@ -491,7 +491,7 @@ async def run_all_tests():
     results: list[SiteResult] = []
 
     for i, site in enumerate(SITES, 1):
-        result = await test_site(site, i, len(SITES))
+        result = await run_site_check(site, i, len(SITES))
         results.append(result)
         # Respectful delay between sites
         if i < len(SITES):
@@ -716,3 +716,9 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+def test_benchmark_smoke_configuration_is_importable():
+    """Keep pytest collection honest without running live benchmark traffic."""
+    assert SITES
+    assert all(site.url.startswith(("http://", "https://")) for site in SITES)

@@ -31,6 +31,50 @@ WEAK_CREDENTIAL_PLACEHOLDERS = {
     "change-me-user-key",
 }
 
+PLACEHOLDER_PREFIXES = (
+    "change-me",
+    "change-this",
+    "changeme",
+    "replace-me",
+    "replace-this",
+    "your-",
+)
+
+PLACEHOLDER_FRAGMENTS = (
+    "placeholder",
+    "example-secret",
+    "example-key",
+    "generate-strong",
+)
+
+
+def _normalize_secret(value: str) -> str:
+    return value.strip().lower().replace("_", "-").replace(" ", "-")
+
+
+def _is_weak_or_placeholder(value: str) -> bool:
+    normalized = _normalize_secret(value)
+    return (
+        normalized in WEAK_CREDENTIAL_PLACEHOLDERS
+        or normalized.startswith(PLACEHOLDER_PREFIXES)
+        or any(fragment in normalized for fragment in PLACEHOLDER_FRAGMENTS)
+    )
+
+
+def _validate_distinct_api_keys(keys_to_check: list[tuple[str, str]]) -> None:
+    seen: dict[str, str] = {}
+    for name, value in keys_to_check:
+        val = (value or "").strip()
+        if not val:
+            continue
+        previous = seen.get(val)
+        if previous:
+            raise ValueError(
+                f"Production check failed: {name} reuses the same secret as {previous}. "
+                "Production user, operator, and admin API keys must be distinct."
+            )
+        seen[val] = name
+
 
 def validate_production_credentials(settings) -> None:
     """Validate that API keys and database password are secure in production.
@@ -56,9 +100,9 @@ def validate_production_credentials(settings) -> None:
                 f"Production check failed: {name} is empty or not configured. "
                 f"In production mode, all key roles must be secured."
             )
-        if val.lower() in WEAK_CREDENTIAL_PLACEHOLDERS:
+        if _is_weak_or_placeholder(val):
             raise ValueError(
-                f"Production check failed: {name} is set to a weak / placeholder value. "
+                f"Production check failed: {name} is set to a weak/placeholder value. "
                 f"Please generate a strong random key."
             )
         if len(val) < 16:
@@ -66,6 +110,8 @@ def validate_production_credentials(settings) -> None:
                 f"Production check failed: {name} is too short ({len(val)} chars). "
                 f"Must be at least 16 characters in production."
             )
+
+    _validate_distinct_api_keys(keys_to_check)
 
     # 2. Database Password Validation (only if Storage Backend is Postgres)
     storage_backend = (
@@ -92,17 +138,19 @@ def validate_production_credentials(settings) -> None:
             raise ValueError(
                 "Production check failed: DATAFORGE_DATABASE_URL does not contain a password. "
                 "A strong database password is required."
-            )
+        )
 
         password = password.strip()
-        if password.lower() in WEAK_CREDENTIAL_PLACEHOLDERS:
+        if _is_weak_or_placeholder(password):
             raise ValueError(
-                "Production check failed: DATAFORGE_DATABASE_URL password is set to a weak / placeholder value. "
+                "Production check failed: DATAFORGE_DATABASE_URL password is set to a weak/placeholder value. "
                 "Please configure a strong, unique database password."
             )
 
         if len(password) < 8:
-            raise ValueError(f"Production check failed: DATAFORGE_DATABASE_URL password is too short ({
-                    len(password)} chars). " f"Must be at least 8 characters in production.")
+            raise ValueError(
+                "Production check failed: DATAFORGE_DATABASE_URL password is too short "
+                f"({len(password)} chars). Must be at least 8 characters in production."
+            )
 
     logger.info("Production security credential validation: ALL PASS")

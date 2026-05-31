@@ -5,6 +5,7 @@ outputs. They are SKIPPED BY DEFAULT because they depend on network access and
 external site availability.
 
 Run with: pytest --run-golden-dataset backend/tests/test_golden_dataset.py -v
+The marker and CLI flag are registered in backend/tests/conftest.py.
 
 Accuracy is measured as F1 score at the record level, with penalties for
 extra/missing records and extra/missing fields (matching benchmark accuracy).
@@ -20,34 +21,6 @@ from app.models import FieldType, SchemaField
 GOLDEN_DATASET_DIR = Path(__file__).resolve().parent / "golden_dataset"
 SITES_FILE = GOLDEN_DATASET_DIR / "sites.json"
 EXPECTED_DIR = GOLDEN_DATASET_DIR / "expected"
-
-
-def pytest_addoption(parser):
-    parser.addoption(
-        "--run-golden-dataset",
-        action="store_true",
-        default=False,
-        help="Run golden dataset tests against real websites (requires network).",
-    )
-
-
-def pytest_configure(config):
-    config.addinivalue_line(
-        "markers",
-        "golden_dataset: tests that hit real websites for extraction validation. "
-        "Skipped by default (use --run-golden-dataset).",
-    )
-
-
-def pytest_collection_modifyitems(config, items):
-    if config.getoption("--run-golden-dataset", default=False):
-        return  # Don't skip
-    skip_golden = pytest.mark.skip(
-        reason="need --run-golden-dataset to run (network-dependent golden dataset validation)"
-    )
-    for item in items:
-        if "golden_dataset" in item.keywords:
-            item.add_marker(skip_golden)
 
 
 def load_sites() -> list[dict]:

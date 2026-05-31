@@ -15,7 +15,29 @@ have no effect.  We must use monkeypatch.setattr() on the singleton.
 """
 
 import pytest
-from fastapi.testclient import TestClient
+import asyncio
+import httpx
+
+
+class LocalASGIClient:
+    """Small sync wrapper around httpx ASGITransport."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def _request(self, method: str, url: str, **kwargs):
+        transport = httpx.ASGITransport(app=self.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+            return await ac.request(method, url, **kwargs)
+
+    def request(self, method: str, url: str, **kwargs):
+        return asyncio.run(self._request(method, url, **kwargs))
+
+    def get(self, url: str, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url: str, **kwargs):
+        return self.request("POST", url, **kwargs)
 
 
 # ── Route matrix: (method, path, min_role) ────────────────────────────────
@@ -143,9 +165,11 @@ def _setup_settings(monkeypatch):
 
 @pytest.fixture
 def client():
-    """Create a TestClient pointing at the app.
+    """Create an ASGI client pointing at the app without running lifespan.
 
-    The lifespan handler runs automatically with TestClient in FastAPI >= 0.98.
+    These tests verify auth middleware and route guards. Running the full
+    startup lifespan makes them slow and can hang on unrelated background
+    services, which obscures the route-auth signal.
     """
     import os
     mp = pytest.MonkeyPatch()
@@ -154,8 +178,7 @@ def client():
 
     try:
         from app.main import app
-        with TestClient(app) as c:
-            yield c
+        yield LocalASGIClient(app)
     except Exception as e:
         pytest.skip(f"Could not initialize app for auth tests: {e}")
     finally:

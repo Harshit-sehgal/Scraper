@@ -199,6 +199,8 @@ class TestCheckProdEnvValidators:
         assert not mod.check_api_key("dev-key"), "'dev-key' should fail"
         assert not mod.check_api_key("test-key"), "'test-key' should fail"
         assert not mod.check_api_key("your-api-key-here"), "placeholder should fail"
+        assert not mod.check_api_key("CHANGE_ME_GENERATE_STRONG_API_KEY")
+        assert not mod.check_api_key("replace_this_with_random_key")
 
     def test_check_api_key_rejects_short_keys(self):
         """API keys shorter than 16 chars should fail."""
@@ -219,6 +221,40 @@ class TestCheckProdEnvValidators:
         assert not mod.check_db_password("change-me-to-a-strong-password"), "default placeholder should fail"
         assert not mod.check_db_password("password"), "'password' should fail"
         assert not mod.check_db_password("postgres"), "'postgres' should fail"
+        assert not mod.check_db_password("CHANGE_ME_GENERATE_STRONG_DB_PASSWORD")
+        assert not mod.check_db_password("replace_this_with_random_password")
+
+    def test_check_database_url_rejects_placeholder_password_pattern(self):
+        """Database URL password validation should reject generated placeholder text."""
+        mod = self._import_module()
+        assert not mod.check_database_url(
+            "postgresql://dataforge:CHANGE_ME_GENERATE_STRONG_DB_PASSWORD@localhost:5432/db"
+        )
+
+    def test_check_grafana_password_rejects_placeholder_pattern(self):
+        """Grafana password validation should reject generated placeholder text."""
+        mod = self._import_module()
+        assert not mod.check_grafana_password("CHANGE_ME_GENERATE_STRONG_GRAFANA_PASSWORD")
+
+    def test_check_distinct_api_keys_rejects_reused_role_key(self):
+        """Production role API keys must be separate secrets."""
+        mod = self._import_module()
+        env = {
+            "DATAFORGE_API_KEY": "same-strong-key-value-123",
+            "DATAFORGE_OPERATOR_API_KEY": "same-strong-key-value-123",
+            "DATAFORGE_ADMIN_API_KEY": "different-strong-key-value-123",
+        }
+        assert not mod.check_distinct_api_keys(env)
+
+    def test_check_distinct_api_keys_accepts_unique_role_keys(self):
+        """Distinct production role API keys should pass the role separation check."""
+        mod = self._import_module()
+        env = {
+            "DATAFORGE_API_KEY": "user-strong-key-value-123",
+            "DATAFORGE_OPERATOR_API_KEY": "operator-strong-key-value-123",
+            "DATAFORGE_ADMIN_API_KEY": "admin-strong-key-value-123",
+        }
+        assert mod.check_distinct_api_keys(env)
 
     def test_check_db_password_rejects_short_passwords(self):
         """Passwords shorter than 8 chars should fail."""

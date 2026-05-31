@@ -1,226 +1,164 @@
 # DataForge Scraper
 
-**Status: Pre-Production Candidate**
+DataForge Scraper is a pre-production web extraction platform built with FastAPI
+and Playwright. It is designed to run configurable scraping jobs, extract structured
+records from accessible web pages, store results, export data, and expose telemetry
+and diagnostics.
 
-A backend-driven web extraction platform built with FastAPI and Playwright. It creates scraping jobs, automates browser-based extraction, stores structured results, and provides APIs for job management, export, and observability.
+It is not a universal scraper and it is not production-ready without further
+validation.
 
-This is not a "magic scraper that works on any website." It is a practical tool for extracting structured data from accessible public web pages — given appropriate selectors, configuration, and respect for the target website's legal and technical constraints.
+## What It Does
 
----
+- Creates, lists, cancels, recleans, deletes, restores, and exports scraping jobs.
+- Uses browser-assisted extraction for pages that need rendering.
+- Supports schema and selector-based extraction with validation and fallback paths.
+- Stores job state and results using local SQLite by default, with Postgres-related
+  code available for configured deployments.
+- Exports job results as CSV, JSON, and Excel.
+- Exposes health, readiness, metrics, telemetry, and diagnostic endpoints.
+- Provides API-key authentication, RBAC utilities, SSRF-oriented URL checks, and
+  production environment validation.
+- Includes a static internal dashboard.
+- Includes experimental adaptive, semantic, topology, selector-memory, replay, and
+  strategy-evolution modules.
 
-## What It Is
+## What It Does Not Do
 
-- A FastAPI backend with 55+ API endpoints for job management, scraping, export, and system monitoring
-- Playwright-based browser automation for JavaScript-rendered pages
-- Job orchestration with in-process queue (Postgres-backed optional)
-- SQLite storage (default) or Postgres (requires configuration)
-- Structured data extraction with field validation
-- CSV/JSON/Excel export
-- Prometheus metrics with Grafana dashboards
-- In-memory rate limiting, SSRF protection, API key authentication
-- A dashboard (client-side, for internal use)
-- Testing infrastructure (2,207 tests) and benchmark tooling
+- It does not work on every website.
+- It does not bypass all anti-bot systems.
+- It does not guarantee extraction accuracy.
+- It does not provide public-production security out of the box.
+- It does not prove real-world benchmark accuracy yet.
+- It does not provide validated autonomous self-healing.
 
-## What It Is Not
+## Current Status
 
-- ❌ Not a universal scraper — requires selectors/configuration per site
-- ❌ Not production-ready — requires security hardening for public deployment
-- ❌ Not fully self-healing — recovery handlers exist but are not stress-validated
-- ❌ Not anti-bot immune — basic evasion exists, not validated against real countermeasures
-- ❌ Not real-time streaming — dashboard polls for updates (no WebSockets)
-- ❌ Not distributed — rate limiting and queue are in-process by default
-- ❌ Not fully benchmarked — benchmark tooling exists but is not CI-integrated
+Status: pre-production candidate.
 
----
+Current verified snapshot, generated on 2026-05-31:
+
+| Area | Current evidence |
+| --- | --- |
+| Python syntax | `python3 -m compileall -q backend scripts architecture_validator.py` passed |
+| Pytest collection | `1910 tests collected in 0.41s` for `backend/tests backend/benchmarks` |
+| Route auth matrix | Generated from registered FastAPI routes; 81 route entries |
+| Route auth tests | `134 passed in 1.88s` for route-auth matrix tests |
+| Production secret tests | `48 passed in 0.08s` for production secret validation tests |
+| Benchmarks package | `1 passed in 0.36s`; this is an import/configuration check, not a live benchmark |
+| Architecture validator | `VALIDATION PASSED: Architecture is lawful.` |
+| Full default backend test run | `1837 passed, 72 skipped in 105.19s` with SQLite and optional browser/golden/Postgres groups skipped |
+| Docker/Postgres/Nginx stack | Unknown in this snapshot; not validated here |
+
+See [PROJECT_STATUS.md](PROJECT_STATUS.md) for the current truth table.
 
 ## Quick Start
 
 ```bash
-# Clone and set up
 cp .env.example .env
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 playwright install chromium
-
-# Start the server
-python -m app.main
 ```
 
+Start the API from the repository root:
+
 ```bash
-# Test it
+PYTHONPATH=backend DATAFORGE_STORAGE_BACKEND=sqlite uvicorn app.main:app --reload
+```
+
+Smoke check:
+
+```bash
 curl http://localhost:8000/health
-curl http://localhost:8000/api/jobs
+curl http://localhost:8000/ready
 ```
 
----
+Most `/api/*` routes require an API key once keys are configured.
 
-## Running Tests
+## Validation Commands
+
+Use explicit local settings so `.env` does not accidentally force Postgres during
+local checks:
 
 ```bash
-# All unit tests (SQLite default)
-PYTHONPATH=backend DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest backend/tests/ -q
-
-# With Postgres tests (requires Docker)
-PYTHONPATH=backend python3 -m pytest backend/tests/ --run-postgres -q
-
-# With golden dataset tests (hits real websites)
-PYTHONPATH=backend python3 -m pytest backend/tests/ --run-golden-dataset -q
+python3 -m compileall -q backend scripts architecture_validator.py
 ```
-
-**Note:** Tests require `DATAFORGE_STORAGE_BACKEND=sqlite` unless Postgres is running. The `.env` file defaults to `postgres` — override or unset it when running tests without Postgres.
-
----
-
-## Code Quality & Standards
-
-The codebase has been thoroughly audited and cleaned:
-
-| Metric | Status |
-|--------|--------|
-| **Flake8 Compliance** | ✅ **0 errors** (5,406+ errors fixed) |
-| **Code Style** | ✅ PEP 8 compliant (black-formatted) |
-| **Line Length** | ✅ 130-char limit (.flake8 configured) |
-| **Type Checking** | ✅ mypy: 0 errors (`--ignore-missing-imports`) |
-| **Backend Files** | ✅ 151 app modules (0 flake8 errors) |
-| **Test Files** | ✅ 115 test/benchmark files (0 flake8 errors) |
-
-### Code Quality Commands
 
 ```bash
-# Check for style errors
-flake8 backend/ --exit-zero
-
-# Format new code
-black <file> --line-length=120
-
-# Auto-fix simple issues
-autopep8 <file> --in-place --aggressive
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+  python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
 ```
 
-See [docs/SETUP.md#code-quality](docs/SETUP.md) for details.
+```bash
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+  python3 -m pytest -q backend/tests -o addopts=
+```
 
----
+```bash
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+  python3 -m pytest -q backend/benchmarks -o addopts=
+```
 
-## Current Status
+```bash
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+  python3 scripts/route_auth_matrix.py --format markdown
+```
 
-| Area | Status |
-|------|--------|
-| Backend syntax & imports | ✅ Verified (compileall + pyflakes + flake8 clean) |
-| API routes | ✅ 55 endpoints registered and serving |
-| SQLite storage | ✅ Working |
-| Postgres storage | ⚠️ Code exists, requires running container |
-| Tests (collected) | ✅ 2,207 tests across 145 files |
-| Tests (passing with SQLite) | ✅ ~1,843 passed, ~55 skipped, 0 failures |
-| Postgres tests | ⚠️ Skipped by default (need `--run-postgres`) |
-| Golden dataset tests | ⚠️ Skipped by default |
-| Manual tests (14) | ❌ Not integrated into pytest |
-| Benchmarks (4) | ✅ Collected by pytest (but partially simulated) |
-| CI pipeline | ⚠️ Exists, not verified in this audit |
-| RBAC | ⚠️ Keys separated in .env.example (requires user generation) |
-| Rate limiting | ⚠️ In-memory only (single-process) |
-| Dashboard CSP | ⚠️ Vendored assets exist, CSP is strict |
-| Production startup gate | ✅ Credential validation in lifespan |
-| Type checking | ✅ mypy: 0 errors with `--ignore-missing-imports` |
+Production template validation is expected to fail until placeholders are replaced:
 
----
-
-## Known Limitations
-
-See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for a comprehensive list.
-
-Key limitations:
-- Extraction accuracy depends on website structure — not guaranteed
-- Anti-bot measures are basic — real-world effectiveness unknown
-- Rate limiting is per-process, not distributed
-- Dashboard stores API key in localStorage (XSS risk for public deployment)
-- Production deployment requires manual configuration validation
-- Benchmark results are partially simulated
-
----
+```bash
+env -i PATH="$PATH" PYTHONPATH=backend DATAFORGE_SKIP_DB_CHECK=true \
+  python3 scripts/check_prod_env.py --env-file .env.production.example
+```
 
 ## Project Structure
 
-```
+```text
 backend/
   app/
-    main.py                  — FastAPI application entry point
-    routers/                 — API route handlers (jobs, scraper, exports, operator)
-    services/                — Background services (job_runner, state)
-    utils/                   — Utilities (env, rbac, export, rate_limit, quality, prod_security_validator)
-    config.py                — Configuration (partial — some modules use direct os.getenv)
-    scraper.py               — Playwright-based scraping
-    extraction_orchestrator.py — Extraction coordination
-    field_laws.py            — Field validation rules
-    selector_engine.py       — CSS/XPath selector management
-    worker_queue.py          — Job queue (in-process)
-    worker_queue_postgres.py — Job queue (Postgres-backed)
-    storage_interface.py     — Storage backend factory
-    postgres_repository.py   — Postgres repository
-    state_store.py           — State persistence
-    ... (151 Python modules)
-  tests/
-    test_*.py                — 2,207 tests across 145 files
-    fixtures/pages/          — 42 fixture HTML pages
-    manual_*.py              — 14 manual test scripts (not pytest-collected)
-  benchmarks/
-    test_benchmark_hostile.py — Simulated hostile benchmark (pytest-collected)
-    test_benchmark_replay.py  — State replay benchmark (pytest-collected)
-    test_benchmark_longevity.py — Long-running stability test (pytest-collected)
-    test_benchmark_smoke.py   — Smoke test (pytest-collected, offline check only)
-frontend/
-  index.html                 — Main dashboard
-  dashboard/                 — Dashboard views
-  js/                        — Modular JavaScript
-docs/                        — Documentation
-scripts/                     — Utility scripts
+    main.py                         FastAPI app, middleware, health/readiness/metrics
+    routers/                        API routers
+    services/                       job and background service helpers
+    utils/                          auth, export, validation, security utilities
+    scraper.py                      scraping entry points
+    extraction_orchestrator.py      extraction coordination
+    storage_interface.py            storage backend selection
+    worker_queue.py                 local worker queue
+    worker_queue_postgres.py        Postgres-backed queue code
+  tests/                            pytest suite
+  benchmarks/                       benchmark scripts and lightweight pytest checks
+frontend/                           static internal dashboard
+docs/                               current and historical documentation
+scripts/                            validation and operational helper scripts
 ```
-
----
 
 ## Production Warning
 
-This project is a **pre-production candidate**. Before deploying publicly:
+Do not deploy this publicly without completing production validation:
 
-1. Generate unique, strong API keys for each role (user, operator, admin)
-2. Add a production startup gate that validates all required secrets
-3. Rotate any credentials that were exposed in `.env` files
-4. Verify CSP compatibility with the dashboard
-5. Add container healthchecks
-6. Set up proper secret management (not `.env` files)
-7. Configure CORS origins for your actual domain
-8. Set up proper Postgres with failover
-9. Verify Nginx configuration for your deployment
+- Generate strong, unique user/operator/admin API keys.
+- Replace all placeholders in `.env.production.example` outside source control.
+- Validate Postgres, worker queue, migrations/init, and storage behavior.
+- Validate Docker image build and production Compose startup.
+- Verify Nginx routing, CSP, CORS, docs exposure, metrics exposure, health, and
+  readiness in production mode.
+- Treat the dashboard as internal-only until session handling and hostile-browser
+  risks are addressed.
+- Run a real route authorization matrix test against the deployed environment.
+- Add real-world benchmark datasets with expected outputs before making accuracy
+  claims.
 
----
+## Documentation
 
-## Contributing
+- [PROJECT_STATUS.md](PROJECT_STATUS.md) - current truth-first status snapshot
+- [docs/ROUTE_AUTH_MATRIX.md](docs/ROUTE_AUTH_MATRIX.md) - generated route authorization evidence
+- [docs/SECURITY.md](docs/SECURITY.md) - current security posture and limitations
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - architecture overview
+- [docs/LIMITATIONS.md](docs/LIMITATIONS.md) - known limitations
+- [docs/PRODUCTION.md](docs/PRODUCTION.md) - production readiness notes
+- [docs/BENCHMARKS.md](docs/BENCHMARKS.md) - benchmark scope and limitations
 
-- **Code Quality:** All code must pass flake8 validation (0 errors required)
-  - Run `flake8 backend/ --exit-zero` before committing
-  - Use `black <file> --line-length=120` for auto-formatting
-  - Configuration: `.flake8` (130-char limit, sensible defaults)
-- **Tests:** Tests must pass before merging: `DATAFORGE_STORAGE_BACKEND=sqlite PYTHONPATH=backend python3 -m pytest backend/tests/ -q`
-  - New features should include tests
-  - Manual test scripts: Follow `manual_test_*.py` naming
-  - Benchmark scripts: Follow `test_benchmark_*.py` naming for pytest collection
-
-- **Code Style:**
-  - PEP 8 compliant (enforced by flake8)
-  - Use `let`/`const` instead of `var` in JavaScript
-  - Black-formatted Python code (line length 120)
-
-- **Error Handling:**
-  - No silent `except: pass` — all exception handlers must log or include a comment
-  - All exceptions must be intentional and documented
-
-- **Configuration:**
-  - Direct `os.getenv` calls should be migrated to `config.py`
-  - No hardcoded secrets — use environment variables or `.env`
-  - Use strong, random values for API keys outside local development
-
-- **Documentation:**
-  - Keep READMEs updated when changing APIs or configuration
-  - Document all new environment variables in `.env.example`
-  - Add docstrings to public functions and classes
+Archived docs are historical unless they explicitly say they are current.

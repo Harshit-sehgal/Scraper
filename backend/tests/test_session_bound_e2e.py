@@ -13,6 +13,7 @@ import threading
 import http.server
 import json
 import os
+import pytest
 from app.models import Job, JobStatus, SchemaField, FieldType
 from app.zero_result_classifier import classify_zero_result
 
@@ -453,6 +454,7 @@ class _SessionBoundHandler(http.server.BaseHTTPRequestHandler):
         pass  # silence server logs during tests
 
 
+@pytest.mark.browser
 class TestLocalSessionBoundServer:
     """End-to-end test with a real local HTTP server simulating session-bound behavior."""
 

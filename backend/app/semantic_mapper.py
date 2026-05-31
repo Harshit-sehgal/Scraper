@@ -60,9 +60,9 @@ _SEMANTIC_PATTERNS_RAW = {
         r"\+?\d[\d\s\-\(\)]{7,}",
     ],
     SemanticType.RATING: [
-        r"\d+\.?\d*\s*/\s * 5",
+        r"\d+\.?\d*\s*/\s*5",
         r"rated\s*\d+\.?\d*",
-        r"\d+\.?\d*\s * stars?",
+        r"\d+\.?\d*\s*stars?",
     ],
     SemanticType.URL: [
         r"https?://[^\s]+",
@@ -71,9 +71,10 @@ _SEMANTIC_PATTERNS_RAW = {
     SemanticType.IDENTIFIER: [
         r"\b[A-Z\-_]+\d+[A-Z\d\-_]*\b",
         r"\b\d+[A-Z\-_]+[A-Z\d\-_]*\b",
+        r"\b[A-Z]{2,}(?:[_-][A-Z0-9]+)+\b",
     ],
     SemanticType.DURATION: [
-        r"\d+h\s*\d * m|\d+h$",
+        r"\d+h\s*\d*m|\d+h$",
     ],
     SemanticType.CODE: [
         r"^[A-Z]{2,5}$",

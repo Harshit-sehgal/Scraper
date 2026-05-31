@@ -1,119 +1,196 @@
-# Project Status — DataForge Scraper
+# Project Status - DataForge Scraper
 
-**Date:** May 30, 2026<br>
-**Classification:** Truth-First Status Report<br>
-**Overall Maturity:** ~58% (Pre-Production Candidate — Core Verified, Multiple Known Issues)
+**Date:** 2026-05-31
+**Classification:** Current truth-first status report
+**Project status:** Pre-production candidate
+**Overall maturity:** 55-65% as a pre-production platform
 
----
+This document is an active status snapshot. It must be updated from fresh file inspection
+and command output. Older audit notes and archive documents are historical context only.
 
-## ✅ Verified
+## Current Truth Snapshot
 
-- FastAPI backend starts and serves 55 API routes successfully.
-- Python syntax is clean (`compileall` passes, 0 errors).
-- Zero pyflakes warnings across all application code.
-- Mypy static type checking passes with 0 errors (`--ignore-missing-imports`).
-- 2,207 tests collected across 145 files.
-- SQLite storage backend works for CRUD operations out of the box.
-- 4 benchmark scripts renamed and collected by pytest.
-- URL safety module has 16 passing tests preventing SSRF attacks.
-- In-memory rate limiting operates correctly.
-- Nginx reverse proxy configured with strict Content Security Policy (CSP).
-- Prometheus metrics and Grafana dashboards configured.
-- Job lifecycle (create, cancel, results, recycle bin) functions work.
-- CSV/JSON/Excel export endpoints work.
-- 42 fixture HTML pages for extraction testing.
+DataForge Scraper is a FastAPI and Playwright web extraction backend with job APIs,
+storage code, export endpoints, telemetry, security utilities, and an internal static
+dashboard. It also contains adaptive, semantic, and benchmark modules that need careful
+validation before they are described as product capabilities.
 
-## ⚠️ Partially Verified
+The project should not be described as production-ready, universal, fully autonomous,
+self-healing, anti-bot immune, or guaranteed accurate.
 
-- **Postgres support**: Code exists but tests require `--run-postgres` flag and a running container.
-- **Execution accuracy**: Semantic pipeline and LLM bridge exist. Real accuracy depends on site structure.
-- **Anti-bot evasion**: Basic evasion exists (`anti_bot_engine.py`). Real-world effectiveness is unknown.
-- **CI pipeline**: Workflow file exists (`.github/workflows/ci.yml`) but was not validated in this audit.
-- **Production startup gate**: Credential validation exists but depends on `DATAFORGE_ENV=production` being set.
-- **Route-level access control**: `require_role` decorators exist, but all API keys in `.env.example` are empty — RBAC is only functional once users generate keys.
+## Verified In Current Cleanup Pass
 
-## 🔶 Implemented but Not Fully Validated
+- Verified: production environment validation now rejects generated placeholder secrets
+  such as `CHANGE_ME_GENERATE_STRONG_*` and `replace_this_*`.
+- Verified: production environment validation now rejects reused user/operator/admin API
+  keys.
+- Verified: `.env.production.example` contains placeholders instead of generated-looking
+  secrets and intentionally fails production validation until real values are supplied.
+- Verified: route-auth matrix tooling exists at `scripts/route_auth_matrix.py`.
+- Verified: the generated route-auth matrix currently reports 81 registered route
+  entries:
+  - 47 authenticated-user routes
+  - 15 operator-or-admin routes
+  - 11 admin routes
+  - 4 development-docs routes
+  - 3 public routes
+  - 1 metrics route protected only when `DATAFORGE_METRICS_TOKEN` is configured
+- Verified: generated route-auth tests passed:
 
-- **Semantic world state**: CRDT-based state management exists. Real-world behavior under load unknown.
-- **Adaptive extraction**: Self-tuning extraction code exists but not stress-validated.
-- **Selector discovery**: Automated selector discovery code exists but accuracy unmeasured.
-- **Federation**: Sharded federation code exists but untested in multi-node deployment.
-- **Crawl frontier**: Code exists.
-- **Benchmark accuracy**: Metrics exist but hostile benchmark uses simulated data.
-- **Frontend CSP compatibility**: Vendored assets exist, but browser rendering not verified against strict CSP.
-- **Dashboard localStorage**: UI state stored in localStorage. Not suitable for public deployment without hardening.
+  ```bash
+  PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+    python3 -m pytest -q backend/tests/test_route_auth_matrix.py \
+    backend/tests/test_route_auth_matrix_generator.py -o addopts= -p no:cacheprovider
+  # 134 passed in 1.88s
+  ```
 
-## ❌ Known Issues
+- Verified: production secret validation tests passed:
 
-- **E01 — Test env isolation (🟢 Fixed)**: Conftest.py forces `DATAFORGE_STORAGE_BACKEND=sqlite` and clears `DATAFORGE_DATABASE_URL`. Residual ~40 failures only if conftest is bypassed (e.g., running outside pytest).
-- **E03 — Credentials on disk (🔴 Critical)**: Real GROQ_API_KEY, DB passwords, Grafana password in `.env` on disk. Rotate immediately.
-- **E05 — Manual test integration (🟠 High)**: 14 manual test scripts in `backend/tests/` not collected by pytest.
-- **E06 — Dashboard localStorage (🟠 High)**: API key stored in `localStorage` — XSS vulnerability for public deployment.
-- **E07 — Config centralization (🟠 High)**: Direct `os.getenv` calls remain in `state_store.py` and `__init__.py`, bypassing centralized config.
-- **E08 — CDN reference in vendored assets (🟢 Fixed)**: Unused `tailwind.min.js` with CDN warning deleted. No breakage — file was not referenced anywhere.
-- **E14 — pyflakes test dep (🟡 Medium)**: `test_pyflakes_fixes.py` depends on pyflakes being installed.
-- **E15 — Event loop scope (🔵 Low)**: `asyncio_default_fixture_loop_scope = function` in pytest.ini may cause issues.
-- **E16 — Hardcoded paths (🔵 Low)**: Some test files assume specific working directory.
-- **E18/19 — Runtime artifacts (⚪ Cleanup)**: `backend/data/*.db` and `logs/*.log` on disk.
-- **D10 naming collision (🟢 Fixed)**: `DELIVERABLE_10_FIELD_LAWS.md` renamed to `DELIVERABLE_10_FIELD_LAWS_LEGACY.md`.
+  ```bash
+  PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+    python3 -m pytest -q backend/tests/test_check_prod_env.py \
+    backend/tests/test_prod_security_validator.py -o addopts= -p no:cacheprovider
+  # 48 passed in 0.08s
+  ```
 
-## 🟠 Production Blockers
+- Verified: touched Python files compiled successfully:
 
-1. **RBAC requires user action** — API keys must be generated (`.env.example` has empty keys).
-3. **No distributed rate limiting** — In-memory only, single-process.
-4. **Grafana dashboard config** — Assumes datasource availability, not validated.
-5. **Docker deployment not validated** — No CI test with actual `docker compose up`.
+  ```bash
+  python3 -m py_compile scripts/route_auth_matrix.py scripts/check_prod_env.py \
+    backend/app/utils/prod_security_validator.py backend/app/routers/scraper.py \
+    backend/tests/test_route_auth_matrix_generator.py
+  ```
 
-## 📊 Benchmark Limitations
+- Verified: repository test collection is currently clean for tests and benchmarks:
 
-| Benchmark | Classification | Evidence |
-|-----------|---------------|----------|
-| `test_benchmark_hostile.py` | Simulated | Uses fixture pages, not real hostile sites |
-| `test_benchmark_smoke.py` | Offline import check only | `test_run_smoke_benchmark()` creates a single `SiteResult` — does not run real extraction |
-| `test_benchmark_replay.py` | Synthetic | Replays Causality workload on mock data |
-| `test_benchmark_longevity.py` | Simulated | Runs cycles on fixture data, not live |
+  ```bash
+  PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+    python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts= -p no:cacheprovider
+  # 1910 tests collected in 0.41s
+  ```
 
-All benchmarks are **collected by pytest** but none test real-world extraction against live websites.
+- Verified: benchmark pytest entry point no longer errors during default execution:
 
-## 🔬 Current Test Status
+  ```bash
+  PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+    python3 -m pytest -q backend/benchmarks -o addopts= -p no:cacheprovider
+  # 1 passed in 0.36s
+  ```
 
-| Metric | Value |
-|--------|-------|
-| Tests collected | 2,207 |
-| Test files | 145 |
-| Python syntax | ✅ Clean |
-| Pyflakes warnings | ✅ Zero |
-| Benchmarks collected | ✅ 4/4 |
-| Manual tests integrated | ⚠️ test_manual_tests.py exists (import validation) |
-| Estimated passing (SQLite) | ~1,843 (E01 fix applied — conftest forces SQLite) |
+- Verified: full default backend pytest suite currently passes with SQLite when optional
+  browser/local-server, golden dataset, and Postgres tests are skipped by default:
 
-## ✅ What Can Be Claimed Honestly
+  ```bash
+  PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+    python3 -m pytest -q backend/tests -o addopts= -p no:cacheprovider
+  # 1837 passed, 72 skipped in 105.19s
+  ```
 
-- "FastAPI backend imports successfully and serves 55 routes."
-- "SQLite-based job storage and management works."
-- "Playwright-based extraction works for configured sites."
-- "The project has 2,207 tests covering most components."
-- "In-memory rate limiting and SSRF protection exist."
-- "Production deployment files exist but require validation."
-- "The project is a pre-production candidate with known issues."
+## Partially Verified
 
-## ❌ What Must Not Be Claimed Yet
+- Partially verified: route-level authorization is now mechanically documented and tested
+  for registered routes. This is not a penetration test and does not prove complete
+  security.
+- Partially verified: production secret validation has stronger placeholder and duplicate
+  key detection. It still depends on operators supplying strong secrets outside source
+  control.
+- Partially verified: `/metrics` has optional token protection. It is unsafe to expose
+  publicly unless `DATAFORGE_METRICS_TOKEN` and network controls are configured.
+- Partially verified: FastAPI docs routes are classified as development-docs routes.
+  Production deployment must disable or block them.
 
-- "100% production ready" — Has known production blockers.
-- "Fully self-healing" — Recovery handlers not stress-validated.
-- "Works on any website" — Extraction depends on site structure.
-- "Enterprise-grade security" — localStorage XSS, no distributed rate limiting.
-- "All tests pass" unconditionally — passes with SQLite override; requires `DATAFORGE_STORAGE_BACKEND=sqlite`.
-- "Fully secure" — Real credentials on disk, RBAC requires user action.
-- "Complete" — Manual tests not integrated, benchmarks are simulated.
+## Implemented But Unvalidated
 
-## Next Validation Steps
+- Implemented but unvalidated: Docker, Compose, Nginx, Prometheus, and Grafana files
+  exist, but this status snapshot does not verify that the production stack starts end
+  to end.
+- Implemented but unvalidated: Postgres storage and queue code exist, but Postgres tests
+  require a running service and were not run in this pass.
+- Implemented but unvalidated: Playwright extraction code exists, but browser install,
+  runtime behavior, and live extraction reliability were not validated in this pass.
+- Implemented but unvalidated: adaptive, semantic, topology, and recovery modules exist.
+  They must remain experimental until real-world behavior and failure modes are measured.
 
-1. ✅ E01: Conftest.py already overrides `STORAGE_BACKEND=sqlite`. Ensure no residual `.env` interferes.
-2. Fix E03: Rotate exposed credentials immediately
-3. Integrate manual tests into pytest (E05)
-4. Add CI pipeline validation
-5. Run full test suite without `.env` to confirm zero env-bleed failures
-6. Fix frontend localStorage risk for public deployment
-7. Centralize remaining `os.getenv` calls
-8. Add real-world extraction benchmarks
+## Simulated Or Fixture-Based
+
+- Simulated: hostile, longevity, replay, and similar benchmark modules use fixtures or
+  generated conditions unless explicitly run against a documented live dataset.
+- Placeholder: a golden dataset without real `sites.json` metadata and expected outputs
+  cannot prove extraction accuracy.
+
+## Unknown In This Snapshot
+
+- Verified: `backend/benchmarks` has one lightweight pytest check passing in this
+  snapshot. Live benchmark execution remains unvalidated.
+- Unknown: Docker image build result.
+- Unknown: production Compose stack startup.
+- Unknown: Postgres integration behavior.
+- Unknown: Nginx proxy behavior.
+- Unknown: dashboard behavior under a browser-enforced production CSP.
+- Unknown: live extraction accuracy.
+- Unknown: anti-bot effectiveness against real anti-bot systems.
+
+## Known Blockers Before Production
+
+1. Production deployment is not validated end to end.
+2. Post-cleanup safe local test baseline exists, but CI must reproduce it from a fresh
+   checkout before treating it as release evidence.
+3. Postgres, worker queue, and migration/init behavior need a real service validation.
+4. Dashboard authentication/session handling is not suitable for public hostile-browser
+   environments.
+5. Metrics and docs routes need verified production exposure controls.
+6. CORS, CSP, API docs, rate limits, and route authorization need a production-mode smoke
+   test.
+7. Real-world benchmark data with expected outputs is required before making accuracy
+   claims.
+
+## Allowed Current Claims
+
+- DataForge Scraper is a pre-production FastAPI and Playwright web extraction platform.
+- It has job APIs, extraction modules, storage code, exports, telemetry, diagnostics, and
+  security utilities.
+- It supports local SQLite mode and has Postgres-related code that requires separate
+  validation.
+- It includes an internal dashboard.
+- It includes experimental adaptive and semantic modules.
+- Route authorization is now mechanically documented by a generated matrix.
+
+## Banned Claims
+
+- Production-ready
+- Enterprise-grade
+- Universal scraper
+- Works on every website
+- Fully autonomous
+- Fully self-healing
+- Anti-bot immune
+- Guaranteed accurate
+- 100% complete
+- All tests pass, unless followed by the exact fresh command and output
+
+## Reproducible Commands
+
+Use these commands to regenerate the current status before updating this file:
+
+```bash
+python3 -m compileall -q backend scripts architecture_validator.py
+
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+  python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
+
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+  python3 -m pytest -q backend/tests -o addopts=
+
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+  python3 -m pytest -q backend/benchmarks -o addopts=
+
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+  python3 scripts/route_auth_matrix.py --format markdown
+
+env -i PATH="$PATH" PYTHONPATH=backend DATAFORGE_SKIP_DB_CHECK=true \
+  python3 scripts/check_prod_env.py --env-file .env.production.example
+```
+
+The `.env.production.example` validation command is expected to fail because the file
+contains placeholders. A passing production check requires real strong secrets supplied
+outside the repository.

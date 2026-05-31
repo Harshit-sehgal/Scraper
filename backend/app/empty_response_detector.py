@@ -54,7 +54,7 @@ DATA_SIGNAL_PATTERNS: list[re.Pattern] = [
     re.compile(r"\d{4}-\d{2}-\d{2}"),  # ISO dates: 2026 - 05 - 15
     re.compile(r"\d+\.\d{1,2}%"),  # Percentages: 85.5%
     re.compile(r"\b\d{1,3}(,\d{3})*\b"),  # Large numbers: 1,234,567
-    re.compile(r"@[a-zA-Z0 - 9._-]+\.[a-z]{2,}"),  # Emails
+    re.compile(r"@[a-zA-Z0-9._-]+\.[a-z]{2,}"),  # Emails
     re.compile(r"\+\d{1,3}[\s-]?\d{3,}"),  # Phone numbers
     re.compile(r"https?://[^\s<\"]+"),  # URLs
 ]
@@ -67,9 +67,9 @@ EMPTY_PAGE_SIGNALS: dict[str, list[re.Pattern]] = {
         re.compile(r"we\s+use\s+cookies", re.I),
     ],
     "login_wall": [
-        re.compile(r"sign\s * in\s+to\s+(continue|view|access)", re.I),
-        re.compile(r"log\s * in\s+to\s+(continue|view|access)", re.I),
-        re.compile(r"please\s+(log|sign)\s * in", re.I),
+        re.compile(r"sign\s*in\s+to\s+(continue|view|access)", re.I),
+        re.compile(r"log\s*in\s+to\s+(continue|view|access)", re.I),
+        re.compile(r"please\s+(log|sign)\s*in", re.I),
         re.compile(r"create\s+(an?\s+)?account\s+to\s+continue", re.I),
     ],
     "captcha": [

@@ -27,9 +27,9 @@ Status: implemented and locally verified for basic API flows. Distributed produc
 
 ## Storage
 
-SQLite-style local state remains the default path. Postgres repository and queue support exist and pass all tests with a real Postgres service container (0 skipped).
+SQLite-style local state remains the default path. Postgres repository and queue support exist, but this snapshot does not validate a real Postgres service or multi-instance behavior.
 
-Status: SQLite paths are locally tested. Postgres support is CI-validated with a real service container — all integration tests pass.
+Status: SQLite paths are locally tested. Postgres support is implemented but must be revalidated with a running service before production claims.
 
 ## Metrics and Telemetry
 
@@ -47,7 +47,7 @@ Status: implemented for internal/private use. API key storage in `localStorage` 
 
 The backend has API key middleware, user/operator/admin RBAC dependencies on sensitive routes, request-size limiting, SSRF-oriented URL checks, CORS config, and production env validation.
 
-Status: partially verified. A complete route-level authorization matrix and production threat model remain open work.
+Status: partially verified. A generated route-level authorization matrix exists in `docs/ROUTE_AUTH_MATRIX.md`, but it is route-registration evidence rather than a penetration test.
 
 ## Production Deployment
 
@@ -59,12 +59,12 @@ Status: implemented but not end-to-end validated in this audit.
 
 The following components are **EXPERIMENTAL / NOT FULLY VALIDATED**:
 
-- **Semantic world state** — ⚠️ Implemented but not validated in production-like scenarios.
-- **Topology engine** — ⚠️ Site modeling is implemented; effectiveness on varied sites is unproven.
-- **Replay buffer** — ⚠️ Replay functionality exists but not hardened for production.
-- **Strategy evolution** — ⚠️ Per-domain strategy learning is implemented but untested in real-world conditions.
-- **Selector memory** — ⚠️ Learned pattern storage exists; convergence behavior unknown.
-- **Recovery logic** — ⚠️ Recovery strategies are defined; simulated benchmarks don't prove real-world effectiveness.
-- **Adaptive extraction** — ⚠️ Self-tuning parameters exist; real-world reliability not validated.
+- **Semantic world state** - Implemented but not validated in production-like scenarios.
+- **Topology engine** - Site modeling is implemented; effectiveness on varied sites is unproven.
+- **Replay buffer** - Replay functionality exists but not hardened for production.
+- **Strategy evolution** - Per-domain strategy learning is implemented but untested in real-world conditions.
+- **Selector memory** - Learned pattern storage exists; convergence behavior unknown.
+- **Recovery logic** - Recovery strategies are defined; simulated benchmarks do not prove real-world effectiveness.
+- **Adaptive extraction** - Self-tuning parameters exist; real-world reliability is not validated.
 
 **Status**: implemented but unevenly validated. These components should NOT be described as fully autonomous or fully self-healing.

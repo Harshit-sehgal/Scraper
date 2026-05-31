@@ -14,12 +14,7 @@ fully compatible with the /app/ frontend and job system.
 from app.models import SchemaField, FieldType
 from app.scraper import scrape_url
 import asyncio
-import os
 from pathlib import Path
-
-os.environ['DATAFORGE_STATE_FILE'] = str(
-    Path(__file__).resolve().parent.parent / 'data' / 'jobs_state_test.json'
-)
 
 
 FLIGHT_SCHEMA = [
@@ -51,6 +46,12 @@ def clean_airport(text: str | None) -> str | None:
 
 
 async def test_flights_scrape():
+    import os
+
+    os.environ['DATAFORGE_STATE_FILE'] = str(
+        Path(__file__).resolve().parent.parent / 'data' / 'jobs_state_test.json'
+    )
+
     url = (
         "https://www.flightsnholidays.co.uk/flight-result.aspx"
         "?From=LHR&To=PAR&ddate=05/22/2026&retdate=05/27/2026"

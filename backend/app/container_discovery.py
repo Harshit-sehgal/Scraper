@@ -620,7 +620,7 @@ def _collect_all_pattern_matches(
     # ── Organization / Brand (capitalized multi-word names) ──────
     # Scan full_text (not snippets) so positions are in full_text coordinate
     # system
-    org_pattern = re.compile(r"\b([A-Z][a-zA-Z0 - 9]+(?:\s+[A-Z][a-zA-Z0 - 9]+){1,4})\b")
+    org_pattern = re.compile(r"\b([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+){1,4})\b")
     for m in org_pattern.finditer(full_text):
         val = m.group(1).strip()
         # Skip common non-org patterns

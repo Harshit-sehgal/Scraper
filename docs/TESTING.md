@@ -17,7 +17,7 @@ python3 -m pytest -q backend/tests -o addopts=
 Latest verified result in this workspace:
 
 ```text
-1848 passed, 54 skipped in 117.88s
+1837 passed, 72 skipped in 105.19s
 ```
 
 ## Collection
@@ -32,7 +32,7 @@ python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
 Latest verified result:
 
 ```text
-1903 tests collected in 2.16s
+1910 tests collected in 0.41s
 ```
 
 ## Optional Test Groups
@@ -47,6 +47,12 @@ Golden dataset tests require reviewed target metadata, expected outputs, and per
 
 ```bash
 PYTHONPATH=backend python3 -m pytest backend/tests/test_golden_dataset.py --run-golden-dataset -q -o addopts=
+```
+
+Browser/local-server E2E tests require Playwright and permission to bind a local HTTP server:
+
+```bash
+PYTHONPATH=backend python3 -m pytest backend/tests --run-browser -q -o addopts=
 ```
 
 ## Manual Scripts

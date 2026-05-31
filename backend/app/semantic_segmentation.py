@@ -197,10 +197,10 @@ DETECTION_PATTERNS = {
         r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2},?\s+\d{2,4}",
     ],
     "duration": [
-        r"\d+h\s*\d * m",
+        r"\d+h\s*\d*m",
         r"\d+h$",
         r"\d+:\d{2}",
-        r"\d+\s * hours?",
+        r"\d+\s*hours?",
     ],
     "code": [
         r"\b[A-Z]{2,5}\b",
@@ -225,6 +225,7 @@ DETECTION_PATTERNS = {
     "identifier": [
         r"\b[A-Z\-_]+\d+[A-Z\d\-_]*\b",
         r"\b\d+[A-Z\-_]+[A-Z\d\-_]*\b",
+        r"\b[A-Z]{2,}(?:[_-][A-Z0-9]+)+\b",
     ],
     "organization": [
         r"\b[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})+\b",
@@ -418,7 +419,7 @@ def _classify_with_ambiguity(raw: str, primary_type: SemanticType) -> Dict[Seman
             distribution = {SemanticType.NUMBER: 0.9, SemanticType.CODE: 0.1}
         elif re.match(r"^[A-Z]{3}$", raw):
             distribution = {SemanticType.CODE: 0.7, SemanticType.TEXT: 0.3}
-        elif re.match(r"^[A-Z0 - 9]{4,5}$", raw):
+        elif re.match(r"^[A-Z0-9]{4,5}$", raw):
             distribution = {SemanticType.CODE: 0.8, SemanticType.TEXT: 0.2}
 
     elif primary_type == SemanticType.NUMBER:
@@ -583,8 +584,10 @@ def _classify_fallback(text: str) -> SemanticType:
     # letters)
     if re.fullmatch(r"[A-Z]{2,5}", stripped):
         return SemanticType.CODE
-    if re.fullmatch(r"[A-Z][A-Z0 - 9]{2,7}", stripped):
+    if re.fullmatch(r"[A-Z][A-Z0-9]{2,7}", stripped):
         return SemanticType.CODE
+    if re.fullmatch(r"[A-Z]{2,}(?:[_-][A-Z0-9]+)+", stripped):
+        return SemanticType.IDENTIFIER
 
     # Number-like (entire string is a number)
     if re.fullmatch(r"\d+\.?\d*%?", stripped):
@@ -595,7 +598,7 @@ def _classify_fallback(text: str) -> SemanticType:
         return SemanticType.RATING
 
     # Duration-like
-    if re.fullmatch(r"\d+h\s*\d * m|\d+h|\d+:\d{2}|(?:\d+\s * hours?)", lower):
+    if re.fullmatch(r"\d+h\s*\d*m|\d+h|\d+:\d{2}|(?:\d+\s*hours?)", lower):
         return SemanticType.DURATION
 
     # Number with suffix: "5+", "25L", "10K"
@@ -610,7 +613,7 @@ def _classify_fallback(text: str) -> SemanticType:
 
     # Product-like: brand naming pattern (iPhone, iPad, macOS, eBay)
     # Starts lowercase, has AT LEAST one internal uppercase
-    if re.fullmatch(r"[a-z][A-Za-z0 - 9]{2,}", stripped) and re.search(r"[A-Z]", stripped[1:]):
+    if re.fullmatch(r"[a-z][A-Za-z0-9]{2,}", stripped) and re.search(r"[A-Z]", stripped[1:]):
         return SemanticType.ORGANIZATION
 
     return SemanticType.TEXT
@@ -865,7 +868,7 @@ def is_likely_noise(text: str) -> Tuple[bool, float, List[str]]:
         return False, 0.2, ["too_short_for_noise_classification"]
 
     # Universal structural navigation check (NOT domain-specific)
-    key = re.sub(r"[^a-z0 - 9\s]+", " ", text.lower()).strip()
+    key = re.sub(r"[^a-z0-9\s]+", " ", text.lower()).strip()
     nav_markers = [
         "about us",
         "contact us",
@@ -1151,7 +1154,7 @@ def is_likely_noise_field(name: str, value: str) -> Tuple[bool, float, List[str]
     if not value:
         return True, 1.0, ["empty_value"]
 
-    key = re.sub(r"[^a-z0 - 9]+", " ", value.lower().strip()).strip()
+    key = re.sub(r"[^a-z0-9]+", " ", value.lower().strip()).strip()
     if not key or len(key) < 2:
         return False, 0.3, ["too_short_to_classify"]
 
@@ -1163,7 +1166,7 @@ def is_likely_noise_field(name: str, value: str) -> Tuple[bool, float, List[str]
     # For text / name fields: plain text is expected, check only obvious noise
     if is_text_field:
         # Universal structural navigation patterns (NOT domain-specific)
-        nav_key = re.sub(r"[^a-z0 - 9\s]+", "", key)
+        nav_key = re.sub(r"[^a-z0-9\s]+", "", key)
         nav_markers = [
             "about us",
             "contact us",

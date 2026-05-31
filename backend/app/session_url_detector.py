@@ -39,11 +39,11 @@ SESSION_PARAM_PATTERNS: list[re.Pattern] = [
 # (long hex strings, base64-like strings, UUIDs, etc.)
 SESSION_VALUE_PATTERNS: list[re.Pattern] = [
     # UUIDs: 8 - 4-4 - 4-12 hex chars
-    re.compile(r"^[0 - 9a-f]{8}-[0 - 9a-f]{4}-[0 - 9a-f]{4}-[0 - 9a-f]{4}-[0 - 9a-f]{12}$", re.I),
+    re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I),
     # Long hex strings (32+ chars, like MD5 / SHA hashes)
-    re.compile(r"^[0 - 9a-f]{32,}$", re.I),
+    re.compile(r"^[0-9a-f]{32,}$", re.I),
     # Base64-like strings (long, with +/ and = padding)
-    re.compile(r"^[A-Za-z0 - 9+/]{40,}={0,2}$"),
+    re.compile(r"^[A-Za-z0-9+/]{40,}={0,2}$"),
     # Numeric IDs that are very long (10+ digits, likely internal tracking)
     re.compile(r"^\d{10,}$"),
 ]
@@ -80,9 +80,9 @@ def _looks_like_opaque_path_token(segment: str) -> bool:
     """Return True when a path segment looks like a transient opaque token."""
     if len(segment) < 8:
         return False
-    if re.fullmatch(r"[0 - 9a-f]{16,}", segment, re.I):
+    if re.fullmatch(r"[0-9a-f]{16,}", segment, re.I):
         return True
-    if re.fullmatch(r"[A-Za-z0 - 9_-]{10,}", segment):
+    if re.fullmatch(r"[A-Za-z0-9_-]{10,}", segment):
         has_alpha = bool(re.search(r"[A-Za-z]", segment))
         has_digit = bool(re.search(r"\d", segment))
         mixed_case = bool(re.search(r"[a-z]", segment)) and bool(re.search(r"[A-Z]", segment))
@@ -153,7 +153,7 @@ def detect_session_params(url: str) -> dict:
     ephemeral_path_indexes: set[int] = set()
     for idx, segment in enumerate(path_segments):
         # Long hex-like path segments (e.g., /search / abc123def456ghi)
-        if re.match(r"^[0 - 9a-f]{16,}$", segment, re.I):
+        if re.match(r"^[0-9a-f]{16,}$", segment, re.I):
             confidence_score = max(confidence_score, settings.SESSION_PATH_HASH_CONFIDENCE)
             ephemeral_params.append(f"path:/{segment}")
             details.append((f"path:/{segment}", "path segment looks like a session hash"))

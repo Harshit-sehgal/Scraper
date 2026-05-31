@@ -1,11 +1,16 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from app.main import app
 
-client = TestClient(app)
+
+def get_client():
+    return TestClient(app)
 
 
 def test_manual_mode():
+    client = get_client()
     print("=== Testing MANUAL Mode ===")
     response = client.post("/api/jobs", json={
         "name": "Test Manual Job",
@@ -35,6 +40,7 @@ def test_manual_mode():
 
 
 def test_auto_mode():
+    client = get_client()
     print("\n=== Testing AUTO Mode ===")
     response = client.post("/api/jobs", json={
         "name": "Test Auto Job",
@@ -64,6 +70,5 @@ def test_auto_mode():
 
 
 if __name__ == "__main__":
-    import json
     test_manual_mode()
     test_auto_mode()

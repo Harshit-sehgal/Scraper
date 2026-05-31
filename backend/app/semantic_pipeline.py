@@ -153,7 +153,17 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
     be = get_boundary_engine()
 
     # Entity-relevant types (types that indicate a real data record)
-    ENTITY_TYPES = {"organization", "price", "date", "code", "location", "rating", "duration", "name"}
+    ENTITY_TYPES = {
+        "organization",
+        "price",
+        "date",
+        "code",
+        "identifier",
+        "location",
+        "rating",
+        "duration",
+        "name",
+    }
 
     for record in records:
         all_text = " ".join(str(v) for v in record.values() if v and isinstance(v, str))
@@ -420,6 +430,10 @@ def run_pipeline(
             output: dict = {}
             field_owned = {fc["role"] for fc in getattr(alloc_graph, "field_conflicts", [])}
             for role_name in schema_fields:
+                if role_name in record and record.get(role_name) is not None and role_name not in field_owned:
+                    output[role_name] = record.get(role_name)
+                    continue
+
                 role = alloc_graph.roles.get(role_name)
                 allocator_confident = role and role.filled_by and role.fill_confidence > 0.8
                 if role_name in field_owned and not allocator_confident:

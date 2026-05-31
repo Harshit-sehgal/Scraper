@@ -18,6 +18,8 @@ import pytest
 
 from app.models import SchemaField, FieldType
 
+pytestmark = pytest.mark.browser
+
 # Skip if Playwright is not installed
 pytest.importorskip("playwright")
 

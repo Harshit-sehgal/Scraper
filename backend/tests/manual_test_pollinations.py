@@ -47,5 +47,5 @@ def test_pollinations_api():
         logging.exception(e)
         print("Error:", e)
 
-
-test_pollinations_api()
+if __name__ == "__main__":
+    test_pollinations_api()
