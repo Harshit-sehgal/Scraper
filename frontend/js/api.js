@@ -42,27 +42,80 @@ export function setAdminKey(key) {
     _adminKey = key;
 }
 
-export function showApiKeyPrompt() {
-    const current = getApiKey();
-    const key = prompt('Enter your DataForge API key:', current);
-    if (key !== null) {
-        setApiKey(key.trim());
-        if (key.trim()) {
-            toast('API key set', 'success');
-            // These are imported dynamically to avoid circular deps
-            import('./jobs.js').then(m => { m.refreshSystemStatus(); m.refreshJobs(); });
-        }
+// ─── Modal Key Management ───
+
+let _pendingKeyType = null; // 'api' | 'admin'
+
+function setupKeyModal(type) {
+    const overlay = document.getElementById('apikey-overlay');
+    const input = document.getElementById('apikey-input');
+    const title = document.getElementById('apikey-modal-title');
+    const desc = document.getElementById('apikey-modal-desc');
+    const error = document.getElementById('apikey-error');
+
+    if (!overlay || !input || !title || !desc || !error) return;
+
+    error.classList.add('hidden');
+    input.value = '';
+
+    if (type === 'admin') {
+        title.textContent = '\u{1F6E1}\uFE0F Admin Key';
+        desc.textContent = 'Enter your DataForge Admin key for protected actions (session only).';
+    } else {
+        title.textContent = '\u{1F511} API Key';
+        desc.textContent = 'Enter your DataForge API key for production access.';
+        try { input.value = sessionStorage.getItem('dataforge_api_key') || ''; } catch { /* ignore */ }
     }
+
+    _pendingKeyType = type;
+    overlay.classList.remove('hidden');
+    setTimeout(() => input.focus(), 100);
+}
+
+function closeKeyModal() {
+    const overlay = document.getElementById('apikey-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    _pendingKeyType = null;
+}
+
+function saveKeyFromModal() {
+    if (!_pendingKeyType) return;
+
+    const input = document.getElementById('apikey-input');
+    const error = document.getElementById('apikey-error');
+    if (!input || !error) return;
+
+    const key = input.value.trim();
+
+    if (!key) {
+        error.textContent = 'Please enter a key or click Cancel.';
+        error.classList.remove('hidden');
+        return;
+    }
+
+    if (_pendingKeyType === 'admin') {
+        setAdminKey(key);
+        toast('Admin key set for this session', 'success');
+    } else {
+        setApiKey(key);
+        toast('API key set', 'success');
+        import('./jobs.js').then(m => { m.refreshSystemStatus(); m.refreshJobs(); });
+    }
+
+    closeKeyModal();
+}
+
+export function showApiKeyPrompt() {
+    setupKeyModal('api');
 }
 
 export function showAdminKeyPrompt() {
-    const key = prompt('Enter your DataForge Admin key (for this session only):');
-    if (key !== null) {
-        setAdminKey(key.trim());
-        if (key.trim()) {
-            toast('Admin key set for this session', 'success');
-        }
-    }
+    setupKeyModal('admin');
+}
+
+function isKeyModalVisible() {
+    const overlay = document.getElementById('apikey-overlay');
+    return overlay && !overlay.classList.contains('hidden');
 }
 
 // ─── 403 Throttle ───
@@ -88,7 +141,7 @@ export async function apiFetch(url, options = {}) {
         const res = await fetch(url, { ...rest, headers });
         if (res.status === 403 && !admin) {
             const now = Date.now();
-            if (now - lastApi403 > 15000) {
+            if (now - lastApi403 > 15000 && !isKeyModalVisible()) {
                 lastApi403 = now;
                 showApiKeyPrompt();
             }
@@ -98,3 +151,5 @@ export async function apiFetch(url, options = {}) {
         throw err;
     }
 }
+
+export { getApiKey, isKeyModalVisible, closeKeyModal, saveKeyFromModal };

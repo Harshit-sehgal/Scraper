@@ -65,5 +65,5 @@ python3 -m pytest -q backend/tests/test_route_auth_matrix_generator.py backend/t
 Latest verified result:
 
 ```text
-134 passed in 1.88s
+134 passed in 0.50s
 ```

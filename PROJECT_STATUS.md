@@ -1,9 +1,10 @@
 # Project Status - DataForge Scraper
 
-**Date:** 2026-05-31 (cleanup pass)
+**Date:** 2026-05-31 (Phases 1-9 complete)
+**Last refreshed:** 2026-05-31
 **Classification:** Current truth-first status report
 **Project status:** Pre-production candidate
-**Overall maturity:** ~65% as a pre-production platform (Postgres + browser E2E validated, benchmark naming corrected, stale docs archived)
+**Overall maturity:** ~70% as a pre-production platform (Postgres + browser E2E validated, benchmark naming corrected, stale docs archived, runtime artifacts removed, golden dataset parametrization fixed, module classification documented, config audit complete, rate limiter route key bug fixed, security docs refreshed, handoff document created)
 
 This document is an active status snapshot. It must be updated from fresh file inspection
 and command output. Older audit notes and archive documents are historical context only.
@@ -41,7 +42,7 @@ self-healing, anti-bot immune, or guaranteed accurate.
   PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
     python3 -m pytest -q backend/tests/test_route_auth_matrix.py \
     backend/tests/test_route_auth_matrix_generator.py -o addopts= -p no:cacheprovider
-  # 134 passed in 1.88s
+  # 134 passed in 0.50s
   ```
 
 - Verified: production secret validation tests passed:
@@ -50,7 +51,7 @@ self-healing, anti-bot immune, or guaranteed accurate.
   PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
     python3 -m pytest -q backend/tests/test_check_prod_env.py \
     backend/tests/test_prod_security_validator.py -o addopts= -p no:cacheprovider
-  # 48 passed in 0.08s
+  # 48 passed in 0.12s
   ```
 
 - Verified: touched Python files compiled successfully:
@@ -65,16 +66,16 @@ self-healing, anti-bot immune, or guaranteed accurate.
 
   ```bash
   PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-    python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts= -p no:cacheprovider
-  # 1910 tests collected in 0.41s
+    python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
+  # 1910 tests collected in 0.40s
   ```
 
 - Verified: benchmark pytest entry point no longer errors during default execution:
 
   ```bash
   PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-    python3 -m pytest -q backend/benchmarks -o addopts= -p no:cacheprovider
-  # 1 passed in 0.36s
+    python3 -m pytest -q backend/benchmarks -o addopts=
+  # 1 passed in 0.26s
   ```
 
 - Verified: full default backend pytest suite currently passes with SQLite when optional
@@ -82,8 +83,8 @@ self-healing, anti-bot immune, or guaranteed accurate.
 
   ```bash
   PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-    python3 -m pytest -q backend/tests -o addopts= -p no:cacheprovider
-  # 1837 passed, 72 skipped in 105.19s
+    python3 -m pytest -q backend/tests -o addopts=
+  # 1837 passed, 72 skipped in 107.87s
   ```
 
 - Verified: Postgres test suite passes with a live Postgres service:
@@ -141,7 +142,15 @@ self-healing, anti-bot immune, or guaranteed accurate.
 - Validated: Playwright + Chromium browser E2E tests with 39 passing tests against
   local mock web servers. Browser tests require `--run-browser`.
 - Validated: Route auth matrix with 134 passing tests covering 81 registered routes.
-- Validated: Production secret validation with 48 passing tests rejecting placeholders.## Simulated Or Fixture-Based
+- Validated: Production secret validation with 48 passing tests rejecting placeholders.
+- Validated: Golden dataset parametrization no longer breaks collection when `sites.json` is absent.
+- Validated: `.gitignore` typo fixed (duplicate `/data\ /` line removed).
+- Validated: Runtime artifacts (`logs/audit.log`, `data/semantic_state.json*`) removed from disk.
+- Validated: Module classification document created — 127 modules classified across 11 layers (docs/MODULE_CLASSIFICATION.md).
+- Validated: Config audit document created — 10 scattered env reads documented, all advisory (docs/CONFIG_AUDIT.md).
+- Validated: Rate limiter route key path spaces removed — was matching `"/api / url / analyze"` (with spaces), now matches `"/api/url/analyze"` correctly.
+- Validated: Final handoff document created (docs/HANDOFF.md) with architecture summary, verified claims, blockers, and reproducible commands.
+- Validated: All documentation updated with consistent numbers from the latest run (1910 collected, 1837 passed / 72 skipped in 107.87s, 1 benchmark passed in 0.26s).## Simulated Or Fixture-Based
 
 - Simulated: hostile, longevity, replay, and similar benchmark scripts (`benchmark_*.py`)
 use fixtures or generated conditions unless explicitly run against a documented live
@@ -156,6 +165,7 @@ not prove real-world extraction accuracy until validated against live targets.##
 - Unknown: live extraction accuracy against a real golden dataset.
 - Unknown: anti-bot effectiveness against real anti-bot systems.
 - Unknown: failure-recovery, load-testing, and backup/restore procedures.
+- Unknown: CI pipeline behavior from a fresh checkout.
 
 ## Known Blockers Before Production
 
@@ -185,7 +195,9 @@ not prove real-world extraction accuracy until validated against live targets.##
 - It includes experimental adaptive and semantic modules.
 - Benchmark package has 1 honest pytest collection check; 3 standalone benchmark scripts
   are named `benchmark_*.py` (not falsely collected as tests).
-- Runtime artifacts (logs, DBs, lock files) have been removed from disk.
+- Runtime artifacts (logs, DBs, lock files, `__pycache__` directories) have been removed from disk.
+- `.gitignore` typo fixed (duplicate line removed).
+- Golden dataset parametrization handles missing `sites.json` without collection errors.
 - 15 stale audit documents have been archived to `docs/archive/`.
 
 ## Banned Claims

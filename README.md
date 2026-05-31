@@ -43,11 +43,13 @@ Current verified snapshot, generated on 2026-05-31:
 | Python syntax | `python3 -m compileall -q backend scripts architecture_validator.py` passed |
 | Pytest collection | `1910 tests collected in 0.41s` for `backend/tests backend/benchmarks` |
 | Route auth matrix | Generated from registered FastAPI routes; 81 route entries |
-| Route auth tests | `134 passed in 1.88s` for route-auth matrix tests |
-| Production secret tests | `48 passed in 0.08s` for production secret validation tests |
-| Benchmarks package | `1 passed in 0.36s`; this is an import/configuration check, not a live benchmark. 3 standalone benchmark scripts exist as `benchmark_*.py` (not collected by pytest) |
+| Route auth tests | `134 passed in 0.50s` for route-auth matrix tests |
+| Production secret tests | `48 passed in 0.12s` for production secret validation tests |
+| Benchmarks package | `1 passed in 0.26s`; this is an import/configuration check, not a live benchmark. 3 standalone benchmark scripts exist as `benchmark_*.py` (not collected by pytest) |
 | Architecture validator | `VALIDATION PASSED: Architecture is lawful.` |
-| Full default backend test run | `1837 passed, 72 skipped in 105.19s` with SQLite and optional browser/golden/Postgres groups skipped |
+| Full default backend test run | `1837 passed, 72 skipped in 107.87s` with SQLite and optional browser/golden/Postgres groups skipped |
+| Golden dataset tests | `8 skipped` by default when `--run-golden-dataset` is not passed; parametrization handles missing `sites.json` cleanly |
+| Runtime artifacts | Logs, lock files, `__pycache__` directories removed from disk; `.gitignore` typo fixed |
 | Docker/Postgres/Nginx stack | Unknown in this snapshot; not validated here |
 
 See [PROJECT_STATUS.md](PROJECT_STATUS.md) for the current truth table.

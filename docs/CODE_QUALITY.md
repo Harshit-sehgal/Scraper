@@ -11,7 +11,7 @@ Verified on 2026-05-31:
 - Verified: `python3 -m compileall -q backend scripts architecture_validator.py` passed.
 - Verified: `python3 architecture_validator.py` passed with `VALIDATION PASSED: Architecture is lawful.`
 - Verified: pytest collection for `backend/tests backend/benchmarks` completed with `1910 tests collected in 0.41s`.
-- Verified: full default backend pytest suite passed with `1837 passed, 72 skipped in 105.19s`.
+- Verified: full default backend pytest suite passed with `1837 passed, 72 skipped in 107.87s`.
 - Verified: `backend/tests/test_pyflakes_fixes.py` passed, which runs pyflakes over `backend/app` and `backend/tests`.
 
 Not verified in this snapshot:

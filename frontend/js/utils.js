@@ -187,6 +187,46 @@ export function updateJobsLastUpdatedLabel(forceText = '') {
     el.textContent = `Updated ${mins}m ago`;
 }
 
+// ─── Confirmation Modal ───
+
+let _pendingConfirm = null;
+
+export function showConfirm(title, description, onConfirm) {
+    const overlay = document.getElementById('confirm-overlay');
+    const titleEl = document.getElementById('confirm-modal-title');
+    const descEl = document.getElementById('confirm-modal-desc');
+    if (!overlay || !titleEl || !descEl) return;
+
+    titleEl.textContent = title;
+    descEl.textContent = description;
+    overlay.classList.remove('hidden');
+    _pendingConfirm = onConfirm || null;
+
+    // Focus the cancel button by default (safer)
+    const cancelBtn = document.getElementById('btn-confirm-cancel');
+    if (cancelBtn) setTimeout(() => cancelBtn.focus(), 50);
+}
+
+export function closeConfirm() {
+    const overlay = document.getElementById('confirm-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    _pendingConfirm = null;
+}
+
+export function executeConfirm() {
+    if (typeof _pendingConfirm === 'function') {
+        const fn = _pendingConfirm;
+        _pendingConfirm = null;
+        closeConfirm();
+        fn();
+    }
+}
+
+export function isConfirmVisible() {
+    const overlay = document.getElementById('confirm-overlay');
+    return overlay && !overlay.classList.contains('hidden');
+}
+
 // ─── Keyboard Helpers ───
 
 export function isTypingTarget(target) {

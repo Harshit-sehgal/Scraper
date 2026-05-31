@@ -3,6 +3,7 @@ import logging
 import asyncio
 
 import time
+from typing import Literal
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 import httpx
@@ -425,7 +426,7 @@ async def fetch_page_content(
         # detection
         try:
             if skip_networkidle:
-                wait_until = "domcontentloaded"
+                wait_until: Literal["domcontentloaded", "networkidle"] = "domcontentloaded"
             elif strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
                 wait_until = "networkidle"
             else:
@@ -436,7 +437,6 @@ async def fetch_page_content(
                 initial_timeout = timeout_ms
             else:
                 initial_timeout = min(settings.PLAYWRIGHT_TIMEOUT, 15000)
-            # type: ignore[arg-type]
             await page.goto(url, wait_until=wait_until, timeout=initial_timeout)
 
             # SSRF: validate the final page URL is not private / internal after

@@ -75,9 +75,9 @@ These modules **exist in the codebase** but are **not validated as production ca
 |----------|---------|------|
 | 🔴 Critical | Production Docker stack not validated | Infrastructure |
 | 🔴 Critical | Worker startup and queue behavior not validated in production mode | Operations |
-| 🟠 High | Route-level auth matrix not complete | Security |
+| 🟠 High | Route-level auth matrix is comprehensive (81 routes); generation and testing validated | Security |
 | 🟠 High | Dashboard token storage is sessionStorage (suitable only for internal/private use) | Security |
-| 🟠 High | Rate limiting is in-memory/single-process | Reliability |
+| 🟠 High | Rate limiting is in-memory/single-process — nginx-level zones pre-configured | Reliability |
 | 🟠 High | Metrics exposure must be validated in intended network topology | Operations |
 | 🟡 Medium | No load test or disaster recovery drill verified | Reliability |
 | 🟡 Medium | No backup/restore procedure documented | Operations |
@@ -112,10 +112,12 @@ These modules **exist in the codebase** but are **not validated as production ca
 - `PROJECT_STATUS.md` — Rewritten as current truth source
 - `docs/LIMITATIONS.md` — Updated golden dataset description, removed placeholder language
 - `docs/ARCHITECTURE.md` — Updated storage/scraper sections
-- `docs/PRODUCTION.md` — Added cross-reference to checklist
-- `docs/SECURITY.md` — Fixed broken link, corrected localStorage→sessionStorage
+- `docs/PRODUCTION.md` — Added cross-reference to checklist; updated rate limiting gap description
+- `docs/SECURITY.md` — Fixed broken link, corrected localStorage→sessionStorage, added fresh auth matrix numbers (81 routes, 134 tests)
+- `docs/BENCHMARKS.md` — Updated benchmark smoke test time (0.26s)
 - `docs/SETUP.md` — Fixed test commands with correct env vars
 - `backend/app/config.py` — Fixed misplaced docstring; fixed CORS wildcard default
+- `backend/app/rate_limiter.py` — Fixed broken route keys (paths contained spaces: `/api / url / analyze` → `/api/url/analyze`)
 - `.gitignore` — Updated to block all real env files and runtime artifacts
 - `pytest.ini` — Fixed (pre-existing changes)
 - Multiple test files and manual test scripts — Fixed import-time network calls, malformed patterns

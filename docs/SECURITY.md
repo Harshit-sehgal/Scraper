@@ -5,7 +5,7 @@
 ### Authentication & Authorization
 - **API key middleware** protects `/api/*` when keys are configured (via `secrets.compare_digest`, timing-safe).
 - **RBAC** supports user, operator, and admin roles with per-route enforcement.
-- **Generated route matrix** is available in `docs/ROUTE_AUTH_MATRIX.md`.
+- **Generated route matrix** is available in `docs/ROUTE_AUTH_MATRIX.md` (81 routes: 47 authenticated-user, 15 operator-or-admin, 11 admin, 4 dev-docs, 3 public, 1 metrics-token). Verified: 134 route auth tests pass (fresh).
 - Input validation via Pydantic models on all API request bodies.
 
 ### Network Security

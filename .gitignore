@@ -32,7 +32,6 @@ logs/
 
 # Runtime databases
 data/
-/data\ /
 backend/app/data/*.db
 backend/data/*.db
 data/*.db
@@ -44,3 +43,7 @@ data/*.db
 backend/tests/*.json.lock
 data/*.json.lock
 backend/app/data/*.lock
+
+# Runtime JSON state files
+backend/data/*.json
+data/*.json

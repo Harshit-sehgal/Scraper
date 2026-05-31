@@ -39,20 +39,20 @@ class RateLimitExceeded(Exception):
 _ROUTE_LIMITS: dict[str, tuple[int, float]] = {
     # Format: prefix -> (max_requests, window_seconds)
     # 10 per minute — expensive browser + LLM
-    "/api / url / analyze": (10, 60.0),
+    "/api/url/analyze": (10, 60.0),
     # 15 per minute — network calls
-    "/api / discover": (15, 60.0),
-    "/api / schema / suggest": (15, 60.0),  # 15 per minute — LLM calls
+    "/api/discover": (15, 60.0),
+    "/api/schema/suggest": (15, 60.0),  # 15 per minute — LLM calls
     # 5 per minute — expensive diagnostic
-    "/api / scraper / diagnostics": (5, 60.0),
+    "/api/scraper/diagnostics": (5, 60.0),
     # 20 per minute — ML computation
-    "/api / scraper / ml": (20, 60.0),
+    "/api/scraper/ml": (20, 60.0),
     # 20 per minute — strategy mutations
-    "/api / scraper / strategy": (20, 60.0),
+    "/api/scraper/strategy": (20, 60.0),
     # 60 per minute — job creation / mutation
-    "/api / jobs": (60, 60.0),
+    "/api/jobs": (60, 60.0),
     # 30 per minute — recycle bin mutations
-    "/api / recycle_bin": (30, 60.0),
+    "/api/recycle_bin": (30, 60.0),
 }
 
 

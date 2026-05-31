@@ -2,7 +2,7 @@
    DataForge — Jobs Management
    ═══════════════════════════════════════════ */
 
-import { esc, toast, setEngineStatus, setJobsUpdatedAt, updateJobsLastUpdatedLabel, writeUIState } from './utils.js';
+import { esc, toast, setEngineStatus, setJobsUpdatedAt, updateJobsLastUpdatedLabel, writeUIState, showConfirm } from './utils.js';
 import { API, apiFetch } from './api.js';
 import { currentView } from './views.js';
 
@@ -31,6 +31,9 @@ export async function refreshSystemStatus() {
 // ─── Refresh Jobs ───
 
 export async function refreshJobs() {
+    // Show skeleton while loading
+    renderSkeleton();
+
     try {
         const res = await apiFetch(`${API}/api/jobs`);
         const data = await res.json();
@@ -43,7 +46,43 @@ export async function refreshJobs() {
     } catch (e) {
         setEngineStatus('Offline', true);
         updateJobsLastUpdatedLabel('Unable to refresh');
+        // If cache is empty, show empty state on error
+        if (!jobsCache.length) {
+            const list = document.getElementById('jobs-list');
+            const empty = document.getElementById('empty-state');
+            if (list && empty) {
+                list.innerHTML = '';
+                list.appendChild(empty);
+                empty.classList.remove('hidden');
+                empty.querySelector('p').textContent = 'Unable to connect to server';
+                empty.querySelector('.subtle').textContent = 'Check that the backend is running on ' + API;
+            }
+        }
     }
+}
+
+// ─── Skeleton Loading ───
+
+function renderSkeleton() {
+    const list = document.getElementById('jobs-list');
+    if (!list) return;
+
+    const rows = Array.from({ length: 4 }, () => `
+        <div class="skeleton">
+            <div class="skeleton-grid">
+                <div class="skeleton-bar wide"></div>
+                <div class="skeleton-bar narrow"></div>
+                <div class="skeleton-bar med"></div>
+                <div class="skeleton-bar narrow"></div>
+                <div style="display:flex; gap:0.3rem; justify-content:flex-end;">
+                    <div class="skeleton-bar" style="width:40px; height:22px; border-radius:999px;"></div>
+                    <div class="skeleton-bar" style="width:28px; height:22px; border-radius:999px;"></div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    list.innerHTML = rows;
 }
 
 export async function refreshJobsManual() {
@@ -96,7 +135,7 @@ async function pollJob(id) {
 
         // If looking at this job's results, refresh logs/progress
         if (currentView === 'results') {
-            const { currentJobId } = await import('./state.js');
+            const { currentJobId } = await import('./results.js');
             if (currentJobId === id) {
                 const logsPanel = document.getElementById('logs-panel');
                 if (Array.isArray(j.logs) && j.logs.length) {
@@ -138,7 +177,7 @@ async function pollJob(id) {
 // ─── CRUD ───
 
 export async function cancelJob(id) {
-    if (!confirm('Cancel this running job?')) return;
+    showConfirm('Cancel Job?', 'Cancel this running job?', async () => {
     try {
         const r = await apiFetch(`${API}/api/jobs/${id}/cancel`, { method: 'POST' });
         const data = await r.json().catch(() => ({}));
@@ -148,10 +187,11 @@ export async function cancelJob(id) {
     } catch (e) {
         toast(`Cancel failed: ${e.message}`, 'error');
     }
+    });
 }
 
 export async function deleteJob(id) {
-    if (!confirm('Delete this job?')) return;
+    showConfirm('Delete Job?', 'Move this job to the recycle bin?', async () => {
     try {
         const r = await apiFetch(`${API}/api/jobs/${id}`, { method: 'DELETE' });
         const data = await r.json().catch(() => ({}));
@@ -161,11 +201,12 @@ export async function deleteJob(id) {
     } catch (e) {
         toast(`Delete failed: ${e.message}`, 'error');
     }
+    });
 }
 
 export async function clearTerminalJobs() {
     const keepRecent = 5;
-    if (!confirm(`Clear completed/failed/canceled jobs and keep the latest ${keepRecent}?`)) return;
+    showConfirm('Clear Terminal Jobs?', `Remove completed/failed/canceled jobs, keeping the latest ${keepRecent}?`, async () => {
 
     try {
         const r = await apiFetch(`${API}/api/jobs/cleanup/terminal?keep_recent=${keepRecent}`, { method: 'DELETE' });
@@ -176,6 +217,7 @@ export async function clearTerminalJobs() {
     } catch (e) {
         toast(`Cleanup failed: ${e.message}`, 'error');
     }
+    });
 }
 
 // ─── Filtering ───
@@ -233,6 +275,7 @@ function renderJobs(jobs) {
                 <div class="job-name-col">
                     <div class="job-name">
                         ${esc(j.name)}
+                        <button class="btn-copy-id" data-action="copy-job-id" data-id="${j.id}" title="Copy job ID">📋</button>
                         <span class="mode-tag">${j.mode === 'auto' ? 'auto' : 'manual'}</span>
                     </div>
                     ${isActive && hasProgress ? `

@@ -1,6 +1,8 @@
 # Golden Dataset — Real-World Extraction Validation
 
-**Status:** 🚧 **PLACEHOLDER** — Real-world extraction validation is not yet implemented.
+**Status:** ✅ **Partially implemented** — sites.json and expected outputs exist
+for 5 real-world demo websites. Tests are **observational** (log F1 but do not
+fail on mismatch) and skipped by default (`--run-golden-dataset`).
 
 ## Purpose
 
@@ -11,71 +13,69 @@ Running extraction against these URLs and comparing results against the golden
 ## Current State
 
 - ✅ **Fixture-based benchmarks** exist at `backend/benchmarks/` — these use simplified
-  HTML fixtures, not real websites. Accuracy: 85%+ F1 on test data.
-- ❌ **Golden dataset with real-world websites** not yet created.
-- ❌ **Live benchmark scripts** exist at `scripts/live_benchmark.py` and
-  `scripts/validate_books.py` but are manual, not automated.
+  HTML fixtures, not real websites.
+- ✅ **`sites.json`** exists with 5 target sites (books.toscrape.com, quotes.toscrape.com,
+  scrapethissite.com, example.com, httpbin.org).
+- ✅ **Expected output files** exist for all 5 sites in `backend/tests/golden_dataset/expected/`.
+- ⚠️ **Tests are observational** — they log F1 scores but do not assert minimum accuracy
+  thresholds. Thresholds must be refined through real-world validation.
+- ❌ **Live benchmark scripts** (`scripts/live_benchmark.py`, `scripts/validate_books.py`)
+  exist but are manual, not automated.
 
-## Planned Structure
-
-When implemented, the golden dataset should follow this structure:
+## Structure
 
 ```
 backend/tests/golden_dataset/
 ├── README.md              (this file)
-├── sites.json             (metadata about test sites)
+├── sites.json             (metadata about 5 test sites)
 ├── expected/
-│   ├── example_com.json   (expected output for https://example.com)
-│   ├── books_site.json    (expected output for books.toscrape.com)
-│   └── ...
-└── test_golden_dataset.py (pytest runner that validates extraction)
+│   ├── books_toscrape.json
+│   ├── quotes_toscrape.json
+│   ├── scrapethissite_simple.json
+│   ├── example_com.json
+│   └── httpbin_html.json
+└── test_golden_dataset.py (pytest runner — skipped by default)
 ```
 
-### `sites.json` Schema
+### `sites.json` Structure
 
 ```json
 {
   "sites": [
     {
-      "id": "example_com",
-      "url": "https://example.com",
-      "description": "Example domain for basic connectivity",
+      "id": "books_toscrape",
+      "url": "https://books.toscrape.com/",
+      "description": "Books to Scrape — demo ecommerce site",
       "schema": {
         "fields": {
           "title": {"type": "string", "required": true},
-          "description": {"type": "string"}
+          "price": {"type": "currency"},
+          "rating": {"type": "string"}
         }
       },
-      "category": "static",
-      "expected_record_count": 1
+      "category": "ecommerce",
+      "min_expected_records": 20
     }
   ]
 }
 ```
 
-### Expected Output Format
+## Running the Tests
 
-Each expected output file should contain the exact records expected from extraction:
+```bash
+# Default: skipped cleanly
+PYTHONPATH=backend python3 -m pytest backend/tests/test_golden_dataset.py
 
-```json
-[
-  {
-    "title": "Example Domain",
-    "description": "This domain is for use in illustrative examples..."
-  }
-]
+# With network access to real sites
+PYTHONPATH=backend python3 -m pytest backend/tests/test_golden_dataset.py --run-golden-dataset -v
 ```
 
-## Implementation Notes
+## Limitations
 
-- Golden dataset validation should use `scripts/validate_books.py` and
-  `scripts/validate_flights.py` as reference implementations.
-- Tests should be marked with `@pytest.mark.golden_dataset` and skipped by default
-  (require explicit `--run-golden-dataset` flag to avoid flaky CI failures from
-  real website changes).
-- Accuracy should be measured as F1 score at the record level.
-- Record extra/missing fields should be penalized (as implemented in benchmark
-  accuracy scoring).
+- Tests require network access to real, externally hosted websites.
+- Tests may fail flakily if target sites change structure.
+- F1 scoring is logged but not asserted — thresholds need refinement.
+- Not a substitute for real accuracy benchmarks.
 
 ## Related Resources
 
@@ -83,4 +83,3 @@ Each expected output file should contain the exact records expected from extract
 - `scripts/live_benchmark.py` — Manual live benchmark runner
 - `scripts/validate_books.py` — Validation against books.toscrape.com
 - `scripts/validate_flights.py` — Validation against flightsnholidays.co.uk
-- `docs/audit/DELIVERABLE_6_BENCHMARK_TRUTH_REPORT.md` — Benchmark audit
