@@ -17,7 +17,7 @@ Status: verified import and local tests.
 
 The scraper uses Playwright/browser flows, HTML utility helpers, selector discovery, visible-text extraction, network payload extraction, schema-field handling, and zero-result classification.
 
-Status: implemented and partially verified. Local Playwright E2E tests passed in an environment with browser/socket permissions.
+Status: implemented and partially verified. Local Playwright E2E tests (39 passing) validated with Chromium.
 
 ## Job Orchestration
 
@@ -27,9 +27,7 @@ Status: implemented and locally verified for basic API flows. Distributed produc
 
 ## Storage
 
-SQLite-style local state remains the default path. Postgres repository and queue support exist, but this snapshot does not validate a real Postgres service or multi-instance behavior.
-
-Status: SQLite paths are locally tested. Postgres support is implemented but must be revalidated with a running service before production claims.
+SQLite-style local state remains the default path. Postgres repository and queue support exist and have been validated locally (1881 passing tests against Postgres 16). Multi-instance behavior and production migration workflows are not tested here.
 
 ## Metrics and Telemetry
 
