@@ -7,7 +7,6 @@ Raises ValueError on any validation failure to prevent application startup.
 from __future__ import annotations
 
 import logging
-import os
 from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
@@ -114,14 +113,10 @@ def validate_production_credentials(settings) -> None:
     _validate_distinct_api_keys(keys_to_check)
 
     # 2. Database Password Validation (only if Storage Backend is Postgres)
-    storage_backend = (
-        getattr(settings, "STORAGE_BACKEND", "").strip().lower()
-        or os.environ.get("DATAFORGE_STORAGE_BACKEND", "sqlite").strip().lower()
-    )
+    storage_backend = settings.STORAGE_BACKEND
     if storage_backend == "postgres":
         # Resolve database URL
-        env_url = os.environ.get("DATAFORGE_DATABASE_URL", "").strip()
-        db_url = env_url or getattr(settings, "DATABASE_URL", "") or ""
+        db_url = settings.DATABASE_URL
         if not db_url:
             raise ValueError(
                 "Production check failed: STORAGE_BACKEND is set to postgres but "

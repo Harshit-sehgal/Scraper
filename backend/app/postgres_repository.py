@@ -15,7 +15,6 @@ Usage:
 import datetime
 import json
 import logging
-import os
 import threading
 from contextlib import contextmanager
 from typing import Iterator, Optional
@@ -51,18 +50,13 @@ def _get_database_url() -> str:
     2. settings.DATABASE_URL (from .env file or pydantic-settings)
     3. Development fallback default
     """
-    # Check raw env var first so pytest testcontainers fixtures that set
-    # the env var after import time are still picked up.
-    env_url = os.environ.get("DATAFORGE_DATABASE_URL", "").strip()
-    if env_url:
-        return env_url
     from app.config import settings
 
-    url = getattr(settings, "DATABASE_URL", "") or ""
+    url = settings.DATABASE_URL
     if url:
         return url
     # Only allow fallback default in development mode
-    env = os.getenv("DATAFORGE_ENV", "development").strip().lower()
+    env = settings.ENV.strip().lower()
     if env == "development":
         return "postgresql://dataforge:dataforge@localhost:5432 / dataforge"
     raise RuntimeError(
