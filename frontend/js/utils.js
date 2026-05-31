@@ -55,7 +55,31 @@ const THEME_KEY = 'dataforge_theme_v1';
 
 export function initTheme() {
     const preferred = localStorage.getItem(THEME_KEY);
-    if (preferred === 'dark' || (!preferred && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    if (preferred) {
+        // User explicitly set a preference — use it
+        if (preferred === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            updateThemeToggleIcon('dark');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+            updateThemeToggleIcon('light');
+        }
+    } else {
+        // No explicit preference — follow system
+        applySystemTheme();
+        // Listen for OS-level theme changes
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        mq.addEventListener('change', (e) => {
+            if (!localStorage.getItem(THEME_KEY)) {
+                applySystemTheme();
+            }
+        });
+    }
+}
+
+function applySystemTheme() {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (isDark) {
         document.documentElement.setAttribute('data-theme', 'dark');
         updateThemeToggleIcon('dark');
     } else {
