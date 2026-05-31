@@ -39,6 +39,7 @@ services:
       - DATAFORGE_SMOKE_TEST_MODE=${DATAFORGE_SMOKE_TEST_MODE:-false}
       - DATAFORGE_ALLOWED_INTERNAL_HOSTS=${DATAFORGE_ALLOWED_INTERNAL_HOSTS:-}
       - DATAFORGE_SEMANTIC_STATE_PATH=/app/backend/data/semantic_state.json
+      - DATAFORGE_AUDIT_LOG_DIR=/app/backend/data/logs
     volumes:
       - dataforge_data:/app/backend/data
     depends_on:
@@ -91,12 +92,19 @@ services:
       - DATAFORGE_SMOKE_TEST_MODE=${DATAFORGE_SMOKE_TEST_MODE:-false}
       - DATAFORGE_ALLOWED_INTERNAL_HOSTS=${DATAFORGE_ALLOWED_INTERNAL_HOSTS:-}
       - DATAFORGE_SEMANTIC_STATE_PATH=/app/backend/data/semantic_state.json
+      - DATAFORGE_AUDIT_LOG_DIR=/app/backend/data/logs
     volumes:
       - dataforge_data:/app/backend/data
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "from pathlib import Path; cmd=Path('/proc/1/cmdline').read_text().replace('\\x00', ' '); raise SystemExit(0 if 'scripts/run_worker.py' in cmd else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     logging: *default-logging
     deploy:
       resources:
@@ -178,17 +186,25 @@ services:
     container_name: dataforge-prometheus
     expose:
       - "9090"
+    env_file:
+      - .env
+    environment:
+      - DATAFORGE_METRICS_TOKEN=${DATAFORGE_METRICS_TOKEN:?DATAFORGE_METRICS_TOKEN is required}
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml.template:ro
       - ./prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro
       - prometheus_data:/prometheus
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=30d"
-      - "--web.console.libraries=/etc/prometheus/console_libraries"
-      - "--web.console.templates=/etc/prometheus/consoles"
-      - "--web.enable-lifecycle"
+      - |
+        sed "s|__DATAFORGE_METRICS_TOKEN__|$${DATAFORGE_METRICS_TOKEN}|g" /etc/prometheus/prometheus.yml.template > /tmp/prometheus.yml
+        exec /bin/prometheus \
+          --config.file=/tmp/prometheus.yml \
+          --storage.tsdb.path=/prometheus \
+          --storage.tsdb.retention.time=30d \
+          --web.console.libraries=/etc/prometheus/console_libraries \
+          --web.console.templates=/etc/prometheus/consoles \
+          --web.enable-lifecycle
     restart: unless-stopped
     logging: *default-logging
     deploy:

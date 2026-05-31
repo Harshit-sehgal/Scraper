@@ -32,6 +32,9 @@ scrape_configs:
   # ─── DataForge Application Metrics ──────────────────────────────────
   - job_name: 'dataforge'
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials: "__DATAFORGE_METRICS_TOKEN__"
     static_configs:
       - targets: ['dataforge:8000']
         labels:

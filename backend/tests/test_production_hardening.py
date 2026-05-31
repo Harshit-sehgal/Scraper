@@ -63,8 +63,10 @@ def test_production_prometheus_mounts_alert_rules():
     prometheus = (root / "prometheus.yml").read_text()
 
     assert 'rule_files:\n  - "prometheus_alerts.yml"' in prometheus
-    assert "./prometheus.yml:/etc/prometheus/prometheus.yml:ro" in compose
+    assert "./prometheus.yml:/etc/prometheus/prometheus.yml.template:ro" in compose
     assert "./prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro" in compose
+    assert "DATAFORGE_METRICS_TOKEN" in compose
+    assert "__DATAFORGE_METRICS_TOKEN__" in prometheus
 
 
 def test_prometheus_does_not_reference_undeployed_alertmanager():

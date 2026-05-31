@@ -655,6 +655,7 @@ async def run_job(
                 persist_state_single_critical_fn()
         else:
             job.status = JobStatus.COMPLETED
+            job.error = ""
         job.cancel_requested = False
         job.completed_at = datetime.datetime.now().isoformat()
         job.progress_current = job.progress_total

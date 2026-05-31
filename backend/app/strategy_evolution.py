@@ -248,20 +248,6 @@ class StrategyEvolutionEngine:
 
         state = self._get_or_create_state(domain)
 
-        # Exploration vs Exploitation
-        if random.random() < self.exploration_probability:
-            # Randomly pick a strategy we haven't failed too much on
-            untried = [s for s in FetchStrategy if state.strategies[s].failure_count < 3]
-            if untried:
-                selected = random.choice(untried)
-                return StrategyRecommendation(
-                    recommended_strategy=selected,
-                    alternatives=[FetchStrategy.PLAYWRIGHT_FULL],
-                    reason="Exploration: testing alternative strategy",
-                    confidence=0.3,
-                    estimated_success_rate=0.5,
-                )
-
         total_attempts = sum(s.success_count + s.failure_count for s in state.strategies.values())
 
         if total_attempts < self.min_samples_for_recommendation:
@@ -293,6 +279,22 @@ class StrategyEvolutionEngine:
                 confidence=0.4,
                 estimated_success_rate=0.6,
             )
+
+        # Exploration vs exploitation is only useful after the cold-start safe
+        # path has gathered enough samples. Exploring before that can choose a
+        # non-browser fetch for JavaScript-backed pages and miss network data.
+        if random.random() < self.exploration_probability:
+            # Randomly pick a strategy we haven't failed too much on
+            untried = [s for s in FetchStrategy if state.strategies[s].failure_count < 3]
+            if untried:
+                selected = random.choice(untried)
+                return StrategyRecommendation(
+                    recommended_strategy=selected,
+                    alternatives=[FetchStrategy.PLAYWRIGHT_FULL],
+                    reason="Exploration: testing alternative strategy",
+                    confidence=0.3,
+                    estimated_success_rate=0.5,
+                )
 
         # Check anti-bot feedback even if we have samples
         try:

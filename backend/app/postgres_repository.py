@@ -500,7 +500,7 @@ class PostgresJobRepository(JobRepository):
                     jobs[job.id] = job
             return jobs
 
-    def load_all(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
         self._ensure()
         with _conn() as conn:
             # Load jobs
@@ -511,30 +511,31 @@ class PostgresJobRepository(JobRepository):
                 if job:
                     jobs_store[job.id] = job
 
-            # Recover in-progress jobs (same as SQLite behavior)
-            now_iso = datetime.datetime.now().isoformat()
-            dirty_ids = []
-            for job in list(jobs_store.values()):
-                if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
-                    job.status = JobStatus.FAILED
-                    job.error = "Recovered after restart while still in progress."
-                    job.completed_at = now_iso
-                    job.cancel_requested = False
-                    dirty_ids.append(job.id)
+            if recover_in_progress:
+                # Recover in-progress jobs (same as SQLite behavior)
+                now_iso = datetime.datetime.now().isoformat()
+                dirty_ids = []
+                for job in list(jobs_store.values()):
+                    if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
+                        job.status = JobStatus.FAILED
+                        job.error = "Recovered after restart while still in progress."
+                        job.completed_at = now_iso
+                        job.cancel_requested = False
+                        dirty_ids.append(job.id)
 
-            # Persist recovery to DB
-            if dirty_ids:
-                _execute(
-                    conn,
-                    """UPDATE jobs
-                       SET status = 'failed',
-                           error = 'Recovered after restart while still in progress.',
-                           completed_at = %s,
-                           cancel_requested = FALSE
-                       WHERE id = ANY(%s)""",
-                    (now_iso, dirty_ids),
-                )
-                logger.info("Recovered %d in-progress job(s) in Postgres", len(dirty_ids))
+                # Persist recovery to DB
+                if dirty_ids:
+                    _execute(
+                        conn,
+                        """UPDATE jobs
+                           SET status = 'failed',
+                               error = 'Recovered after restart while still in progress.',
+                               completed_at = %s,
+                               cancel_requested = FALSE
+                           WHERE id = ANY(%s)""",
+                        (now_iso, dirty_ids),
+                    )
+                    logger.info("Recovered %d in-progress job(s) in Postgres", len(dirty_ids))
 
             # Load recycle bin
             recycle_rows = _fetch_all(conn, "SELECT * FROM recycle_bin")

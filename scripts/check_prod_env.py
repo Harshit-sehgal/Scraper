@@ -29,6 +29,7 @@ REQUIRED_VARS = [
     "DATAFORGE_STORAGE_BACKEND",
     "DATAFORGE_DATABASE_URL",
     "DATAFORGE_WORKER_QUEUE",
+    "DATAFORGE_METRICS_TOKEN",
     "DATAFORGE_ENV",
 ]
 
@@ -454,6 +455,8 @@ def main() -> int:
          "Must be 'true' for production"),
         ("DATAFORGE_QUEUE_BACKEND", True, check_queue_backend,
          "Must be 'postgres' for production — set DATAFORGE_QUEUE_BACKEND=postgres"),
+        ("DATAFORGE_METRICS_TOKEN", True, lambda v: _check_api_key_not_default("DATAFORGE_METRICS_TOKEN", v),
+         'Metrics scrape token for Prometheus. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"'),
         ("DATAFORGE_ENV", True, check_env,
          "Must be set to 'production'"),
         ("DATAFORGE_OPERATOR_API_KEY", True, lambda v: _check_api_key_not_default("DATAFORGE_OPERATOR_API_KEY", v),

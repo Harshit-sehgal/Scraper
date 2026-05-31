@@ -26,7 +26,7 @@ ENV PYTHONPATH=/app/backend \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
     libdbus-1-3 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 \
-    libgbm1 libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0 \
+    libgbm1 libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0 libxfixes3 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -73,8 +73,9 @@ FROM deps AS production
 # Create non-root user
 RUN groupadd -r dataforge && useradd -r -g dataforge -d /app -s /usr/sbin/nologin dataforge
 
-# Install Playwright browsers (only chromium, minimal deps)
-RUN mkdir -p /ms-playwright && playwright install chromium 2>&1 | tail -3 && playwright install-deps chromium && chown -R dataforge:dataforge /ms-playwright
+# Install Playwright browser binaries. The base image stage installs the runtime
+# libraries explicitly, so avoid a second apt-driven install-deps pass here.
+RUN mkdir -p /ms-playwright && playwright install chromium 2>&1 | tail -3 && chown -R dataforge:dataforge /ms-playwright
 
 # Copy application code
 COPY backend/ backend/

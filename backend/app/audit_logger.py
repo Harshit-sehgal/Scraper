@@ -42,7 +42,13 @@ def _get_audit_logger() -> logging.Logger:
 
     # Only add handler if not already configured
     if not _logger.handlers:
-        log_dir = Path(AUDIT_LOG_DIR)
+        try:
+            from app.config import settings
+            configured_log_dir = settings.AUDIT_LOG_DIR
+        except Exception:
+            configured_log_dir = ""
+
+        log_dir = Path(configured_log_dir or AUDIT_LOG_DIR)
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = log_dir / AUDIT_LOG_FILE
 
@@ -286,7 +292,12 @@ def _parse_audit_log_line(line: str) -> Optional[dict[str, Any]]:
 
 def get_audit_log_path() -> Path:
     """Get the current audit log file path."""
-    return Path(AUDIT_LOG_DIR) / AUDIT_LOG_FILE
+    try:
+        from app.config import settings
+        configured_log_dir = settings.AUDIT_LOG_DIR
+    except Exception:
+        configured_log_dir = ""
+    return Path(configured_log_dir or AUDIT_LOG_DIR) / AUDIT_LOG_FILE
 
 
 def get_recent_events(count: int = 50) -> list[dict[str, Any]]:

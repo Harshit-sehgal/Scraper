@@ -1,54 +1,39 @@
-# Known Limitations
+# Limitations
 
-## Extraction Accuracy
+**Last refreshed:** 2026-06-01
 
-- Benchmarks use **simplified HTML fixtures**, not real websites. Real-world accuracy depends on page structure consistency and schema accuracy.
-- A golden dataset exists at `backend/tests/golden_dataset/` with 5 target sites, expected output files, and observational F1-scoring tests. **Tests log F1 but do not fail on mismatch** — they are observational checks, not hard accuracy validation. Run with `--run-golden-dataset` for live site checks.
-- Recovery benchmarks use simulated metrics, not real failure injection.
+DataForge Scraper is a configurable extraction platform, not an all-powerful scraper.
 
-## Anti-Bot & Site Compatibility
+## Product Limits
 
-- The scraper does not work on every website.
-- Extraction quality depends on site structure, rendering behavior, authentication, anti-bot controls, rate limits, and schema quality.
-- The project is **not** a complete anti-bot solution.
-- Advanced anti-bot scenarios (Cloudflare, DataDome, etc.) are not fully validated.
+- It works only on accessible websites where scraping is allowed and technically feasible.
+- It cannot guarantee extraction from every site or every page structure.
+- It cannot guarantee bypass of anti-bot systems.
+- It cannot guarantee extraction accuracy without benchmark datasets and thresholds.
+- It is a pre-production candidate, not a validated public production service.
 
-## Production Readiness
+## Validation Limits
 
-- Production readiness is not proven until the production stack is validated end to end.
-- Postgres support is CI-validated with a real Postgres service container. All Postgres tests pass (0 skipped).
-- No load testing has been performed.
-- No disaster recovery or backup/restore procedures are documented.
+- Safe SQLite tests pass locally: `1839 passed, 72 skipped in 107.06s`.
+- Postgres tests pass locally with Docker/testcontainers: `1883 passed, 28 skipped in 129.55s`.
+- Browser/local-server tests pass locally: `1856 passed, 55 skipped in 116.73s`.
+- Benchmark pytest package has only one smoke/config test: `1 passed in 0.27s`.
+- Golden dataset live validation did not complete in this pass.
+- Docker image build and a minimal local Compose smoke passed.
+- Target production deployment, TLS, load, backups, alert delivery, and disaster recovery were not validated.
 
-## Dashboard
+## Security Limits
 
-- Dashboard auth is suitable for private/internal use only, **not** hostile shared browsers.
-- Dashboard API key is stored in `sessionStorage` (cleared on tab close, better than localStorage, but still not suitable for shared machines).
-- Dashboard telemetry is polled, not streamed (no WebSocket/SSE).
-- Dashboard assets (Tailwind CSS, Chart.js) are **vendored locally** — strict `script-src 'self'` CSP is enforced.
+- Route auth is tested, but that is not a penetration test.
+- Metrics protection depends on `DATAFORGE_METRICS_TOKEN` and correct production routing; local Compose verified Nginx blocks public `/metrics` and Prometheus scrapes internally.
+- Rate limiting is in-memory and single-process.
+- Dashboard is internal-only until browser/session risks are addressed.
+- URL safety checks reduce SSRF risk but do not replace production network controls.
 
-## Security
+## Ethical And Legal Boundary
 
-- Rate limiting is single-process only (not distributed — bypassed by multi-instance deployment).
-- Application SSRF checks should be backed by network-level egress controls.
-- Audit logging is integrated into auth middleware (failures + non-GET mutations); RBAC, admin action, and data access logging integration pending in route handlers.
-- API keys are long-lived (no expiration or rotation mechanism).
+Use this project only on websites where scraping is allowed or authorized. Respect robots.txt, terms of service, rate limits, access controls, and applicable law. Do not use it to scrape private, sensitive, or restricted data without permission. Anti-bot detection should support responsible failure handling, not abusive bypassing.
 
-## Testing & Benchmarks
+## Banned Claims
 
-- ~54 of 1,884 tests skip due to missing external dependencies (Postgres, API keys).
-- Manual benchmark scripts (`backend/benchmarks/`) are not collected by pytest.
-- Code coverage percentage is not measured.
-- Some adaptive/semantic components are experimental or weakly validated.
-
-## Deployment
-
-- Docker dependency installation is not fully lock-file based (uses `requirements.txt`, not `requirements.lock.txt`).
-- Production startup validation exists but is only active when `DATAFORGE_ENV=production`.
-- Nginx CORS allowlist must be customized for each deployment.
-
-## Advanced Features
-
-- Semantic/LLM extraction requires a GROQ_API_KEY and is optional.
-- Selector learning, domain evolution, topology engine, and other advanced components exist but are unevenly tested.
-- "Self-healing" and "autonomous adaptation" concepts are aspirational — not validated system behavior.
+Do not claim production-ready, enterprise-grade, universal scraper, works on every website, anti-bot immune, fully autonomous, fully self-healing, guaranteed extraction, 100% accurate, complete, or fully benchmarked.
