@@ -3,7 +3,7 @@
 ## Extraction Accuracy
 
 - Benchmarks use **simplified HTML fixtures**, not real websites. Real-world accuracy depends on page structure consistency and schema accuracy.
-- A golden dataset skeleton exists at `backend/tests/golden_dataset/` with 5 stable scraping targets and F1-scoring tests. Run with `--run-golden-dataset` to begin populating real-world validation.
+- A golden dataset exists at `backend/tests/golden_dataset/` with 5 target sites, expected output files, and observational F1-scoring tests. **Tests log F1 but do not fail on mismatch** — they are observational checks, not hard accuracy validation. Run with `--run-golden-dataset` for live site checks.
 - Recovery benchmarks use simulated metrics, not real failure injection.
 
 ## Anti-Bot & Site Compatibility

@@ -45,7 +45,7 @@ Current verified snapshot, generated on 2026-05-31:
 | Route auth matrix | Generated from registered FastAPI routes; 81 route entries |
 | Route auth tests | `134 passed in 1.88s` for route-auth matrix tests |
 | Production secret tests | `48 passed in 0.08s` for production secret validation tests |
-| Benchmarks package | `1 passed in 0.36s`; this is an import/configuration check, not a live benchmark |
+| Benchmarks package | `1 passed in 0.36s`; this is an import/configuration check, not a live benchmark. 3 standalone benchmark scripts exist as `benchmark_*.py` (not collected by pytest) |
 | Architecture validator | `VALIDATION PASSED: Architecture is lawful.` |
 | Full default backend test run | `1837 passed, 72 skipped in 105.19s` with SQLite and optional browser/golden/Postgres groups skipped |
 | Docker/Postgres/Nginx stack | Unknown in this snapshot; not validated here |
@@ -129,7 +129,7 @@ backend/
     worker_queue.py                 local worker queue
     worker_queue_postgres.py        Postgres-backed queue code
   tests/                            pytest suite
-  benchmarks/                       benchmark scripts and lightweight pytest checks
+  benchmarks/                       benchmark scripts and collection (`test_benchmark_smoke.py`) and standalone benchmark scripts (`benchmark_*.py`, not collected by pytest)
 frontend/                           static internal dashboard
 docs/                               current and historical documentation
 scripts/                            validation and operational helper scripts

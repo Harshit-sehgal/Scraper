@@ -1,9 +1,9 @@
 # Project Status - DataForge Scraper
 
-**Date:** 2026-05-31 (updated)
+**Date:** 2026-05-31 (cleanup pass)
 **Classification:** Current truth-first status report
 **Project status:** Pre-production candidate
-**Overall maturity:** ~65% as a pre-production platform (Postgres + browser E2E now validated)
+**Overall maturity:** ~65% as a pre-production platform (Postgres + browser E2E validated, benchmark naming corrected, stale docs archived)
 
 This document is an active status snapshot. It must be updated from fresh file inspection
 and command output. Older audit notes and archive documents are historical context only.
@@ -141,19 +141,15 @@ self-healing, anti-bot immune, or guaranteed accurate.
 - Validated: Playwright + Chromium browser E2E tests with 39 passing tests against
   local mock web servers. Browser tests require `--run-browser`.
 - Validated: Route auth matrix with 134 passing tests covering 81 registered routes.
-- Validated: Production secret validation with 48 passing tests rejecting placeholders.
+- Validated: Production secret validation with 48 passing tests rejecting placeholders.## Simulated Or Fixture-Based
 
-## Simulated Or Fixture-Based
+- Simulated: hostile, longevity, replay, and similar benchmark scripts (`benchmark_*.py`)
+use fixtures or generated conditions unless explicitly run against a documented live
+dataset.
+- Partially verified: golden dataset has `sites.json` (5 targets) and `expected/` output
+files. These are **observational tests** (log F1 but do not fail on mismatch). They do
+not prove real-world extraction accuracy until validated against live targets.## Unknown In This Snapshot
 
-- Simulated: hostile, longevity, replay, and similar benchmark modules use fixtures or
-  generated conditions unless explicitly run against a documented live dataset.
-- Placeholder: a golden dataset without real `sites.json` metadata and expected outputs
-  cannot prove extraction accuracy.
-
-## Unknown In This Snapshot
-
-- Verified: `backend/benchmarks` has one lightweight pytest check passing in this
-  snapshot. Live benchmark execution remains unvalidated.
 - Unknown: Docker Compose production stack startup with Nginx, Prometheus, and Grafana.
 - Unknown: Nginx proxy and reverse-proxy behavior.
 - Unknown: dashboard behavior under a browser-enforced production CSP.
@@ -187,7 +183,10 @@ self-healing, anti-bot immune, or guaranteed accurate.
 - Route authorization is mechanically documented by a generated matrix (134 passing tests).
 - It includes an internal dashboard.
 - It includes experimental adaptive and semantic modules.
-- Route authorization is now mechanically documented by a generated matrix.
+- Benchmark package has 1 honest pytest collection check; 3 standalone benchmark scripts
+  are named `benchmark_*.py` (not falsely collected as tests).
+- Runtime artifacts (logs, DBs, lock files) have been removed from disk.
+- 15 stale audit documents have been archived to `docs/archive/`.
 
 ## Banned Claims
 
