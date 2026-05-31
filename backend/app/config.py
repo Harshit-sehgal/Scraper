@@ -241,6 +241,12 @@ class Settings(BaseSettings):
 
     # ─── Paths ─────────────────────────────────────────────────────────────
     SEMANTIC_STATE_PATH: str = "data / semantic_state.json"
+
+    @property
+    def SEMANTIC_STATE_PATH_DYNAMIC(self) -> str:
+        """Semantic state path (dynamic). Reads from SEMANTIC_STATE_PATH env var dynamically, falls back to static SEMANTIC_STATE_PATH field."""
+        return os.environ.get("SEMANTIC_STATE_PATH") or self.SEMANTIC_STATE_PATH
+
     STATE_FILE_PATH: str = ""
     """Override for jobs_state.json path. Empty = use default ./backend / data / jobs_state.json"""
 
@@ -423,6 +429,31 @@ class Settings(BaseSettings):
     def WORKER_QUEUE(self) -> bool:
         """Whether worker queue mode is enabled. Read from DATAFORGE_WORKER_QUEUE env var dynamically."""
         return (os.environ.get("DATAFORGE_WORKER_QUEUE") or "").strip().lower() in ("1", "true", "yes")
+
+    @property
+    def SMOKE_TEST_MODE(self) -> bool:
+        """Whether smoke test mode is enabled. Reads from DATAFORGE_SMOKE_TEST_MODE env var dynamically."""
+        return (os.environ.get("DATAFORGE_SMOKE_TEST_MODE") or "").strip().lower() in ("true", "1", "yes")
+
+    @property
+    def STORAGE_BACKEND(self) -> str:
+        """Storage backend. Reads from DATAFORGE_STORAGE_BACKEND env var dynamically. Default: 'sqlite'."""
+        return (os.environ.get("DATAFORGE_STORAGE_BACKEND") or "sqlite").strip().lower()
+
+    @property
+    def DATABASE_URL(self) -> str:
+        """Database URL. Reads from DATAFORGE_DATABASE_URL env var dynamically."""
+        return (os.environ.get("DATAFORGE_DATABASE_URL") or "").strip()
+
+    @property
+    def QUEUE_BACKEND_DYNAMIC(self) -> str:
+        """Queue backend (dynamic). Reads from DATAFORGE_QUEUE_BACKEND env var dynamically, falls back to static QUEUE_BACKEND field."""
+        return (os.environ.get("DATAFORGE_QUEUE_BACKEND") or self.QUEUE_BACKEND).strip().lower()
+
+    @property
+    def STATE_FILE(self) -> str:
+        """State file path (legacy alias). Reads from DATAFORGE_STATE_FILE env var dynamically."""
+        return (os.environ.get("DATAFORGE_STATE_FILE") or "").strip()
 
     # ─── Queue Backend ─────────────────────────────────────────────────────
     QUEUE_BACKEND: str = "sqlite"

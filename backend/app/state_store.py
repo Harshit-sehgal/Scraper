@@ -11,7 +11,6 @@ Storage safety features:
 import datetime
 import json
 import logging
-import os
 import shutil
 import atexit
 from pathlib import Path
@@ -38,15 +37,10 @@ def _now_iso() -> str:
 def get_state_file_path() -> Path:
     from app.config import settings
 
-    # Legacy env var checked first so that runtime overrides (e.g. tests)
-    # take effect even when pydantic has already loaded a static default
-    # from .env or the import-time environment.
-    legacy_env_path = os.getenv("DATAFORGE_STATE_FILE", "").strip()
-    if legacy_env_path:
-        logging.warning(
-            "DATAFORGE_STATE_FILE is deprecated; use DATAFORGE_STATE_FILE_PATH instead."
-        )
-        return Path(legacy_env_path).expanduser()
+    # Check settings.STATE_FILE first (dynamic @property that reads from
+    # DATAFORGE_STATE_FILE env var), then fall back to STATE_FILE_PATH.
+    if settings.STATE_FILE:
+        return Path(settings.STATE_FILE).expanduser()
 
     if settings.STATE_FILE_PATH:
         return Path(settings.STATE_FILE_PATH).expanduser()

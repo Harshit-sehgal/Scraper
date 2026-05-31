@@ -28,13 +28,7 @@ def _get_lock_path() -> str:
 
 
 def get_canonical_cache_path() -> str:
-    legacy_path = os.environ.get("SEMANTIC_STATE_PATH")
-    if legacy_path:
-        logging.getLogger(__name__).warning(
-            "SEMANTIC_STATE_PATH is deprecated; use DATAFORGE_SEMANTIC_STATE_PATH instead."
-        )
-        return legacy_path
-    return settings.SEMANTIC_STATE_PATH
+    return settings.SEMANTIC_STATE_PATH_DYNAMIC
 
 
 def _acquire_lock():

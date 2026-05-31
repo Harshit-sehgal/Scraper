@@ -323,19 +323,16 @@ def get_job_repository() -> JobRepository:
     The repository is cached as a module-level singleton so that
     all callers share the same instance.
     """
-    import os
-
     global _repository_instance
     if _repository_instance is not None:
         return _repository_instance
 
-    # Check os.environ first so runtime overrides (pytest fixtures that set
-    # env vars after import time) are picked up even though pydantic-settings
-    # caches its values at construction time.
-    storage_backend = os.environ.get("DATAFORGE_STORAGE_BACKEND", "sqlite").strip().lower()
+    from app.config import settings
+
+    storage_backend = settings.STORAGE_BACKEND
 
     if storage_backend == "postgres":
-        database_url = os.environ.get("DATAFORGE_DATABASE_URL", "").strip()
+        database_url = settings.DATABASE_URL
         if not database_url:
             raise RuntimeError(
                 "DATAFORGE_STORAGE_BACKEND=postgres requires DATAFORGE_DATABASE_URL "
