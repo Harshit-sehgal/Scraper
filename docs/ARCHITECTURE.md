@@ -39,7 +39,7 @@ Status: implemented and partially verified.
 
 The main dashboard and semantic dashboard are static frontend files served from `/app` and `/dashboard`. The dashboard uses polling, not WebSocket/SSE streaming.
 
-Status: implemented for internal/private use. API key storage in `localStorage` remains a security limitation.
+Status: implemented for internal/private use. API key storage in `sessionStorage` (cleared on tab close) remains a security limitation.
 
 ## Security
 

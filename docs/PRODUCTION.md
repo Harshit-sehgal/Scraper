@@ -36,6 +36,10 @@ scripts/verify_release.sh
 
 This is intended to run syntax checks, static checks, architecture validation, pytest, and production env validation. Treat its output as current only when the command has been run in the target environment.
 
+## Production Readiness Checklist
+
+See **[docs/PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)** for the full gate-by-gate checklist that must pass before the project can be described as production-ready.
+
 ## Known Production Gaps
 
 - Docker installs from `backend/requirements.txt`, not a strict lock file (`requirements.lock.txt` exists but isn't used in Docker).
