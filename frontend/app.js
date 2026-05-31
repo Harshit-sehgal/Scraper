@@ -17,7 +17,7 @@ export * from './js/cognition.js';
 export * from './js/dashboard.js';
 
 // ─── Init ───
-import { readUIState, updateJobsLastUpdatedLabel } from './js/utils.js';
+import { readUIState, updateJobsLastUpdatedLabel, initTheme, toggleTheme, showShortcuts, hideShortcuts, setEnginePolling } from './js/utils.js';
 import { refreshSystemStatus, refreshJobs, refreshJobsManual, onJobsFilterChanged } from './js/jobs.js';
 import { onGlobalKeydown, switchView } from './js/views.js';
 import { onResultsSliderInput, onResultsTableScroll, onResultsCellDoubleClick, renderFilteredResults } from './js/results.js';
@@ -100,6 +100,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
+    // ── Init theme ──
+    initTheme();
+
     // ── Initial view ──
     const initialView = ['jobs', 'new', 'recycle', 'cognition', 'dashboard'].includes(String(uiState.view || ''))
         ? String(uiState.view)
@@ -111,10 +114,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const refreshInterval = (typeof window.DATAFORGE_REFRESH_INTERVAL === 'number') ? window.DATAFORGE_REFRESH_INTERVAL : 10000;
     const statusInterval = (typeof window.DATAFORGE_STATUS_INTERVAL === 'number') ? window.DATAFORGE_STATUS_INTERVAL : 10000;
     setInterval(() => {
-        refreshJobs();
+        setEnginePolling(true);
+        Promise.resolve(refreshJobs()).catch(() => setEnginePolling(false));
         updateJobsLastUpdatedLabel();
     }, refreshInterval);
     setInterval(refreshSystemStatus, statusInterval);
+
+    // Engine connection check
+    window.addEventListener('online', () => setEnginePolling(true));
+    window.addEventListener('offline', () => setEnginePolling(false));
 
     // Dashboard polling (every 30s)
     setInterval(() => {
@@ -180,7 +188,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'export-csv':                exportCSV(); break;
             case 'export-json':               exportJSON(); break;
             case 'export-excel':              exportExcel(); break;
-            case 'refresh-cognition':         refreshCognition(); break;
+            case 'toggle-theme':              toggleTheme(); break;
+            case 'show-shortcuts':             showShortcuts(); break;
+            case 'close-shortcuts':            hideShortcuts(); break;
+            case 'refresh-cognition':          refreshCognition(); break;
             case 'toggle-field-item': {
                 const checkbox = btn.querySelector('.analyze-field-checkbox');
                 if (checkbox) {

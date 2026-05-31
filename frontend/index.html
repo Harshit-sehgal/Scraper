@@ -31,6 +31,8 @@
                             <button class="btn ghost small" data-action="show-api-key" title="Set API key for production access" style="font-size:0.75rem; padding:0.2rem 0.5rem;">🔑 Key</button>
                             <button class="btn ghost small" data-action="show-admin-key" title="Set admin key for protected actions" style="font-size:0.75rem; padding:0.2rem 0.5rem;">🛡️ Admin</button>
                             <span class="shortcut-hint" title="Keyboard shortcuts">N new • / search • Esc clear</span>
+                            <button class="topbar-btn" id="btn-shortcuts" title="Keyboard shortcuts" data-action="show-shortcuts">?</button>
+                            <button class="topbar-btn" id="btn-theme-toggle" title="Toggle dark mode" data-action="toggle-theme">🌙</button>
                 <span class="engine-status" id="engine-status"><span class="dot"></span><span id="engine-status-text">Ready</span></span>
             </div>
         </header>
@@ -579,6 +581,38 @@
 
     <!-- Toast -->
     <div id="toasts"></div>
+
+    <!-- Shortcuts Modal -->
+    <div id="shortcut-overlay" class="shortcut-overlay hidden">
+        <div class="shortcut-modal">
+            <h2>⌨️ Keyboard Shortcuts</h2>
+            <div class="shortcut-list">
+                <div class="shortcut-item">
+                    <span class="shortcut-key"><kbd>N</kbd></span>
+                    <span class="shortcut-desc">Create a new job</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-key"><kbd>/</kbd></span>
+                    <span class="shortcut-desc">Focus search bar</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-key"><kbd>Esc</kbd></span>
+                    <span class="shortcut-desc">Clear search / Close modals</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-key"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> <kbd>5</kbd></span>
+                    <span class="shortcut-desc">Switch tabs (Jobs, New, Recycle, Cognition, Dashboard)</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-key"><kbd>?</kbd></span>
+                    <span class="shortcut-desc">Show this help</span>
+                </div>
+            </div>
+            <div class="shortcut-close-row">
+                <button class="btn secondary small" data-action="close-shortcuts">Close</button>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="/app/app.js"></script>
 </body>

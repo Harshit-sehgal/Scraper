@@ -10,9 +10,6 @@ export function esc(s) {
     return d.innerHTML;
 }
 
-// Safer escaping for JavaScript string contexts (onclick handlers).
-// HTML-escapes AND escapes characters that could break out of JS strings:
-//   ' (single quote), " (double quote), \ (backslash), \n (newline), \r (carriage return)
 export function jsStr(s) {
     if (typeof s !== 'string') s = String(s || '');
     return s
@@ -42,6 +39,67 @@ export function setEngineStatus(text, offline = false) {
     if (!el || !textEl) return;
     textEl.textContent = text;
     el.classList.toggle('offline', offline);
+}
+
+export function setEnginePolling(active) {
+    const el = document.getElementById('engine-status');
+    if (!el) return;
+    const dot = el.querySelector('.dot');
+    if (!dot) return;
+    dot.classList.toggle('polling', active);
+}
+
+// ─── Dark Mode ───
+
+const THEME_KEY = 'dataforge_theme_v1';
+
+export function initTheme() {
+    const preferred = localStorage.getItem(THEME_KEY);
+    if (preferred === 'dark' || (!preferred && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        updateThemeToggleIcon('dark');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+        updateThemeToggleIcon('light');
+    }
+}
+
+export function toggleTheme() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem(THEME_KEY, 'light');
+        updateThemeToggleIcon('light');
+        toast('Light mode', 'info');
+    } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem(THEME_KEY, 'dark');
+        updateThemeToggleIcon('dark');
+        toast('Dark mode', 'info');
+    }
+}
+
+function updateThemeToggleIcon(theme) {
+    const btn = document.getElementById('btn-theme-toggle');
+    if (!btn) return;
+    btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+
+// ─── Shortcut Help Modal ───
+
+export function showShortcuts() {
+    const overlay = document.getElementById('shortcut-overlay');
+    if (overlay) overlay.classList.remove('hidden');
+}
+
+export function hideShortcuts() {
+    const overlay = document.getElementById('shortcut-overlay');
+    if (overlay) overlay.classList.add('hidden');
+}
+
+export function isShortcutsVisible() {
+    const overlay = document.getElementById('shortcut-overlay');
+    return overlay && !overlay.classList.contains('hidden');
 }
 
 // ─── UI State Persistence ───

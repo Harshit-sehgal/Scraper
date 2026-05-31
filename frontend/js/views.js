@@ -2,7 +2,7 @@
    DataForge — View Management
    ═══════════════════════════════════════════ */
 
-import { writeUIState, isTypingTarget } from './utils.js';
+import { writeUIState, isTypingTarget, showShortcuts, hideShortcuts, isShortcutsVisible } from './utils.js';
 
 export let currentView = 'jobs';
 export let currentMode = 'manual';
@@ -77,6 +77,13 @@ export function onGlobalKeydown(e) {
     }
 
     if (e.key === 'Escape') {
+        // Close shortcuts modal if open
+        if (isShortcutsVisible()) {
+            hideShortcuts();
+            e.preventDefault();
+            return;
+        }
+
         if (document.activeElement === jobsSearch && jobsSearch?.value) {
             jobsSearch.value = '';
             import('./jobs.js').then(m => m.onJobsFilterChanged()).catch(() => {});
@@ -89,5 +96,10 @@ export function onGlobalKeydown(e) {
             import('./results.js').then(m => m.renderFilteredResults()).catch(() => {});
             e.preventDefault();
         }
+    }
+
+    if (!typing && e.key === '?') {
+        e.preventDefault();
+        showShortcuts();
     }
 }
