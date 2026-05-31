@@ -263,8 +263,8 @@ class Settings(BaseSettings):
     """If set, /metrics endpoint requires Authorization: Bearer <token> or X-API-Key header."""
     ALERT_WEBHOOK_URL: Optional[str] = None
     """URL to send webhook alerts for domain anti-bot level shifts."""
-    CORS_ORIGINS: list[str] = ["*"]
-    """Allowed origins for CORS. Defaults to '*' but should be locked down in production."""
+    CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:8000", "http://127.0.0.1:5173", "http://127.0.0.1:8000"]
+    """Allowed origins for CORS. Defaults to localhost for dev; must be locked to real domains in production."""
     METRICS_ENABLE_HISTOGRAMS: bool = True
     """Enable request duration and operation latency histograms in /metrics output."""
     METRICS_HISTOGRAM_BUCKETS: str = "0.01,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0,30.0,60.0,120.0"
