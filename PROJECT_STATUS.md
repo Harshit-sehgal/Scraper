@@ -201,6 +201,10 @@ not prove real-world extraction accuracy until validated against live targets.##
 - 100% complete
 - All tests pass, unless followed by the exact fresh command and output
 
+## Production Readiness Checklist
+
+See **[docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md)** for the complete gate-by-gate checklist (secrets, deployment, health, security, database, dashboard, monitoring, extraction, operations) that must pass before the project can be described as production-ready.
+
 ## Reproducible Commands
 
 Use these commands to regenerate the current status before updating this file:

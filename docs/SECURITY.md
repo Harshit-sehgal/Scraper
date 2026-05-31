@@ -28,7 +28,7 @@
 ## Important Limitations
 
 ### Dashboard
-- **API key stored in `localStorage`** — NOT suitable for shared browsers or public kiosks.
+- **API key stored in `sessionStorage`** — cleared when the browser tab closes. Still NOT suitable for shared browsers or public kiosks.
 - Dashboard should be used on **private/internal networks only**.
 
 ### Rate Limiting

@@ -23,7 +23,7 @@
 ## Dashboard
 
 - Dashboard auth is suitable for private/internal use only, **not** hostile shared browsers.
-- Dashboard API key is stored in `localStorage` (insecure for shared machines).
+- Dashboard API key is stored in `sessionStorage` (cleared on tab close, better than localStorage, but still not suitable for shared machines).
 - Dashboard telemetry is polled, not streamed (no WebSocket/SSE).
 - Dashboard assets (Tailwind CSS, Chart.js) are **vendored locally** — strict `script-src 'self'` CSP is enforced.
 
