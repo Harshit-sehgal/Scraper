@@ -10,8 +10,8 @@ This document describes implemented controls and remaining risks. It is not a pe
 | Area | Evidence | Status |
 | --- | --- | --- |
 | API key auth | `backend/app/utils/rbac.py`, middleware in `backend/app/main.py` | Verified |
-| RBAC route matrix | Covered by combined route/security/CORS command: `183 passed in 1.83s` | Verified |
-| Production secret validation | Covered by combined route/security/CORS command: `183 passed in 1.83s`; `.env.production.example` fails intentionally on placeholders including metrics token | Verified |
+| RBAC route matrix | Freshly regenerated with `scripts/route_auth_matrix.py --format markdown`; archived combined route/security/CORS evidence remains in prior refresh docs | Verified for route registration evidence |
+| Production secret validation | `scripts/check_prod_env.py --env-file .env.production.example` failed intentionally on placeholders; older combined route/security/CORS evidence remains archived | Verified for placeholder rejection |
 | URL safety/SSRF checks | `backend/app/url_safety.py` rejects non-http(s), loopback/private IPs, metadata hosts, and internal names | Verified by code/tests |
 | Rate limiting | `backend/app/rate_limiter.py` | Verified, single-process only |
 | Public LLM fallback control | `DATAFORGE_LLM_ENABLE_PUBLIC_FALLBACKS=false` by default; tests verify disabled Pollinations/g4f fallbacks do not make unauthenticated external calls | Verified |

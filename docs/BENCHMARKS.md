@@ -12,7 +12,7 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 Result:
 
 ```text
-1 passed in 0.25s
+1 passed, 1 skipped in 0.26s
 ```
 
 This is an offline smoke/config test. It does not run live extraction and does not prove accuracy.

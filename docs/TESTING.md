@@ -17,17 +17,17 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 
 ## Latest Results
 
+Only the rows below with `/usr/bin/python3` were freshly rerun in this cleanup; the remaining historical rows in the repository should be treated as archived evidence until rerun.
+
 | Command | Result | Meaning |
 | --- | --- | --- |
 | `compileall` | Passed with no output | Syntax is valid for checked Python files |
 | `architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Architecture rules pass |
-| Pytest collection | `1916 tests collected in 0.40s` | Collection is clean |
-| Safe SQLite backend suite | `1843 passed, 72 skipped in 119.06s` | Default local backend tests pass |
-| Benchmark package | `1 passed in 0.25s` | Benchmark smoke/config test passes only |
-| Combined route/security/CORS tests | `183 passed in 1.83s` | Route-auth, production-security, and CORS preflight checks pass together |
-| Postgres optional suite | `1885 passed, 28 skipped in 138.54s` | Local Postgres repository/queue tests pass |
-| Browser optional suite | `1858 passed, 55 skipped in 125.64s` | Local browser/local-server tests pass |
-| Golden dataset optional suite | `8 passed in 53.97s`; F1 books `0.650`, quotes `1.000`, countries `0.680`, example `1.000`, httpbin `1.000` | Live golden checks pass modest enforced thresholds |
+| Pytest collection | `1920 tests collected in 0.43s` | Collection is clean |
+| Safe SQLite backend suite | `1846 passed, 72 skipped in 121.71s` | Default local backend tests pass |
+| Benchmark package | `1 passed, 1 skipped in 0.26s` | Benchmark smoke/config test passes only |
+| Route auth matrix | Generated from the registered FastAPI app with `scripts/route_auth_matrix.py --format markdown` | Route access documentation is current |
+| Production env example | `scripts/check_prod_env.py --env-file .env.production.example` fails intentionally on placeholders | Example env is not deployable as-is |
 
 ## Optional Groups
 
@@ -54,7 +54,7 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 - Passing local tests does not prove production readiness.
 - Browser tests prove local Playwright behavior, not broad website compatibility.
 - Postgres tests prove local repository/queue behavior, not production failover or backups.
-- Golden dataset thresholds are modest and do not prove broad extraction accuracy.
+- Archived Postgres/browser/Compose/Docker/golden-dataset results should be treated as historical unless rerun in this refresh.
 - Route-auth tests do not replace a security review or penetration test.
 
 ## Manual Tests
