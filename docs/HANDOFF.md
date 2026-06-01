@@ -11,8 +11,8 @@ DataForge Scraper is a pre-production FastAPI + Playwright extraction platform. 
 | --- | --- |
 | Syntax | `compileall` passed with no output |
 | Architecture | `VALIDATION PASSED: Architecture is lawful.` |
-| Collection | `1914 tests collected in 0.40s` |
-| Safe SQLite suite | `1841 passed, 72 skipped in 116.54s` |
+| Collection | `1916 tests collected in 0.40s` |
+| Safe SQLite suite | `1843 passed, 72 skipped in 119.06s` |
 | Benchmark smoke | `1 passed in 0.25s` |
 | Combined route/security/CORS tests | `183 passed in 1.83s` |
 | Postgres optional suite | `1885 passed, 28 skipped in 138.54s` |
