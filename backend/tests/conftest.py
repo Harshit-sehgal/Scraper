@@ -92,6 +92,28 @@ def pytest_sessionfinish(session, exitstatus):
     except Exception:
         pass
 
+    # Clean up test-generated sqlite files, logs, and locks to avoid workspace pollution
+    try:
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[2]
+        backend_data = root / "backend" / "data"
+        global_data = root / "data"
+        logs_dir = root / "logs"
+
+        # List of directories to clean safely
+        for p in [backend_data, global_data, logs_dir]:
+            if p.exists():
+                for item in list(p.glob("**/*")):
+                    if item.is_file() and item.name != ".gitkeep" and item.suffix in [".db", ".db-journal", ".db-wal", ".db-shm", ".lock", ".log", ".json"]:
+                        # Ensure we do not delete golden dataset files
+                        if "golden_dataset" not in str(item.resolve()):
+                            try:
+                                item.unlink()
+                            except OSError:
+                                pass
+    except Exception:
+        pass
+
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = ROOT / "backend"
