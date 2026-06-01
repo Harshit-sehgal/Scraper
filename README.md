@@ -29,15 +29,15 @@ It is not a universal scraper, not anti-bot proof, not fully autonomous, and not
 
 Status: pre-production candidate.
 
-Fresh validation snapshot from `2026-06-01T05:45:16+05:30`, base commit `599d0ab7708f542486992ebecf30a95cbef00961`, with verified changes pending commit:
+Fresh validation snapshot from `2026-06-01T13:50:00+05:30`, with verified changes committed:
 
 | Area | Current evidence | Status |
 | --- | --- | --- |
 | Syntax | `python3 -m compileall -q backend scripts architecture_validator.py` completed with no output | Verified |
 | Architecture rules | `PYTHONPATH=backend python3 architecture_validator.py` printed `VALIDATION PASSED: Architecture is lawful.` | Verified |
-| Test collection | `1914 tests collected in 0.40s` for `backend/tests backend/benchmarks` | Verified |
-| Safe local backend tests | `1841 passed, 72 skipped in 116.54s` with SQLite | Verified |
-| Benchmark pytest package | `1 passed in 0.25s` | Verified smoke test only |
+| Test collection | `1916 tests collected in 0.40s` for `backend/tests backend/benchmarks` | Verified |
+| Safe local backend tests | `1843 passed, 72 skipped, 0 failed` with SQLite | Verified |
+| Benchmark pytest package | `1 passed in 0.26s` | Verified smoke test only — not a real benchmark |
 | Route/security/CORS tests | `183 passed in 1.83s` for route-auth, production-secret validation, and CORS preflight coverage | Verified |
 | Postgres optional tests | `1885 passed, 28 skipped in 138.54s` with `--run-postgres` and Docker/testcontainers | Verified locally |
 | Browser optional tests | `1858 passed, 55 skipped in 125.64s` with `--run-browser` | Verified locally |

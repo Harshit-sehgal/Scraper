@@ -1,10 +1,6 @@
-import pytest
 import time
-import os
 from unittest.mock import MagicMock
-from fastapi import Request
 from app.rate_limiter import DatabaseSlidingWindowCounter, RateLimiterMiddleware
-from app.config import settings
 
 def test_db_sliding_window_counter_sqlite():
     """Verify that DatabaseSlidingWindowCounter behaves correctly using SQLite storage."""

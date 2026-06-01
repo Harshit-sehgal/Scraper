@@ -1,12 +1,11 @@
 # Project Status - DataForge Scraper
 
-**Last refreshed:** 2026-06-01T05:45:16+05:30
+**Last refreshed:** 2026-06-01T13:50:00+05:30
 **Base commit inspected:** `599d0ab7708f542486992ebecf30a95cbef00961`
-**Working tree at refresh:** verified changes pending commit
+**Working tree at refresh:** verified changes committed
 **Branch inspected:** `main`
-**Backup branch created before edits:** `backup-dataforge-current-20260601-0000`
-**Status:** Local production-candidate validation passed; target production remains unvalidated
-**Maturity:** about 78% as a local production candidate, not public production-ready
+**Status:** Pre-production candidate — core tests pass locally; target production, Docker, Postgres, browser, and security gates partially validated
+**Maturity:** about 60–65% on the project maturity scale — local app works, core tests pass, architecture exists, but production stack, benchmark assertions, and many deployment gates remain unvalidated in a target environment
 
 This file is the current truth source. It must be updated only from fresh code inspection and command output. Archived audit documents are historical context, not current evidence.
 
@@ -43,9 +42,9 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | --- | --- | --- |
 | `python3 -m compileall -q backend scripts architecture_validator.py` | Passed with no output | Python syntax is valid for checked paths |
 | `PYTHONPATH=backend python3 architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass |
-| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=` | `1914 tests collected in 0.40s` | Test collection is clean |
-| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests -o addopts=` | `1841 passed, 72 skipped in 116.54s` | Safe SQLite backend suite passes locally |
-| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/benchmarks -o addopts=` | `1 passed in 0.25s` | Benchmark package smoke/config test passes |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=` | `1916 tests collected in 0.40s` | Test collection is clean |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests -o addopts=` | `1843 passed, 72 skipped, 0 failed` | Safe SQLite backend suite passes locally |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/benchmarks -o addopts=` | `1 passed in 0.26s` | Benchmark package smoke/config test passes — not a real benchmark |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests/test_route_auth_matrix.py backend/tests/test_route_auth_matrix_generator.py backend/tests/test_check_prod_env.py backend/tests/test_prod_security_validator.py backend/tests/test_production_hardening.py::test_backend_cors_origins_enforcement -o addopts=` | `183 passed in 1.83s` | Combined route-auth, production-security, and CORS preflight checks pass |
 | `env -i PATH="$PATH" PYTHONPATH=backend DATAFORGE_SKIP_DB_CHECK=true python3 scripts/check_prod_env.py --env-file .env.production.example` | Failed intentionally on placeholder API keys, database password/URL, metrics token, operator/admin keys, and Grafana password | Production example is not deployable as-is |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=postgres python3 -m pytest backend/tests --run-postgres -q -o addopts=` | `1885 passed, 28 skipped in 138.54s` | Postgres repository and queue tests pass locally |
@@ -80,6 +79,8 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 1. The local Compose smoke used a temporary generated `.env`, not real production secrets or a public target environment.
 2. Dashboard remains internal-only until session and hostile-browser risks are reviewed.
 3. TLS, Grafana dashboard/login behavior, real load, failover, alert delivery, disaster recovery, and incident-response gates are unvalidated.
+4. Benchmark suite is a single smoke test — no real benchmark assertions with precision/recall/F1 thresholds enforced.
+5. Runtime artifacts (DB files, lock files, log files, semantic_state.json) are recreated during test runs and must be cleaned before commits. `.gitignore` blocks them from tracking, but they remain on disk.
 
 ## Allowed Current Claims
 
@@ -104,3 +105,6 @@ Do not claim production-ready, enterprise-grade, universal scraper, scrapes ever
 2. Improve golden dataset extraction quality, especially books (`F1=0.650`) and country listing (`F1=0.680`).
 3. Add production-mode dashboard/CSP checks against a browser and real origin.
 4. Add backup/restore, load, alert delivery, and recovery validation.
+5. Add real benchmark tests with enforceable thresholds.
+6. Clean runtime artifacts before every commit.
+7. Run Postgres (`--run-postgres`) and browser (`--run-browser`) test suites in CI to validate those backends automatically.
