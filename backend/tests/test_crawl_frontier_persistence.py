@@ -5,36 +5,54 @@ Unit Tests for SQLite Persistence and Continuity of the Crawl Frontier.
 from __future__ import annotations
 
 import os
-from pathlib import Path
+import tempfile
 import pytest
 from app.crawl_frontier import CrawlFrontier
-
-# Match the path resolution used in crawl_frontier.py
-_BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent / "backend"
-_DB_PATH = str(_BACKEND_ROOT / "data" / "crawl_frontier.db")
 
 
 @pytest.fixture(autouse=True)
 def clean_db(monkeypatch):
     from app.config import settings
     from app import crawl_policy
+    from app.crawl_frontier import CrawlFrontier
 
     monkeypatch.setattr(settings, "CRAWL_RESPECT_ROBOTS", False)
     crawl_policy._policy_engine = None
 
-    db_path = _DB_PATH
-    if os.path.exists(db_path):
-        try:
-            os.remove(db_path)
-        except Exception:
-            pass
+    # Use an isolated temporary database path so this test never collides
+    # with other test processes writing to the shared crawl_frontier.db.
+    tmp_dir = tempfile.mkdtemp(prefix="crawl_frontier_test_")
+    db_path = os.path.join(tmp_dir, "crawl_frontier.db")
+
+    # Patch _init_db and _load_from_db to override the db_path before
+    # they access it. This avoids the instance-attribute-shadows-class-
+    # attribute problem with direct monkeypatch.setattr on _db_path.
+    original_init_db = CrawlFrontier._init_db
+
+    def patched_init_db(self):
+        self._db_path = db_path
+        return original_init_db(self)
+
+    monkeypatch.setattr(CrawlFrontier, "_init_db", patched_init_db)
+
+    original_load = CrawlFrontier._load_from_db
+
+    def patched_load(self):
+        self._db_path = db_path
+        return original_load(self)
+
+    monkeypatch.setattr(CrawlFrontier, "_load_from_db", patched_load)
+
     yield
+
     crawl_policy._policy_engine = None
-    if os.path.exists(db_path):
-        try:
-            os.remove(db_path)
-        except Exception:
-            pass
+    # Clean up the temp directory
+    try:
+        for f in os.listdir(tmp_dir):
+            os.remove(os.path.join(tmp_dir, f))
+        os.rmdir(tmp_dir)
+    except Exception:
+        pass
 
 
 @pytest.mark.asyncio

@@ -172,6 +172,80 @@ jobs:
           PASSED=$(grep "passed" /tmp/benchmark_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
           echo "Benchmark tests passed: $PASSED"
 
+  test-browser-e2e:
+    name: Browser E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -q -r requirements-dev.txt
+      
+      - name: Install Playwright Chromium with system deps
+        run: |
+          python -m playwright install --with-deps chromium
+      
+      - name: Run browser e2e tests
+        run: |
+          PYTHONPATH=backend \
+          DATAFORGE_DOTENV_PATH=/dev/null \
+          DATAFORGE_STORAGE_BACKEND=sqlite \
+          python3 -m pytest -q backend/tests --run-browser -o addopts= \
+          --tb=short \
+          --timeout=300 \
+          2>&1 | tee /tmp/browser_results.txt
+          
+          PASSED=$(grep "passed" /tmp/browser_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
+          FAILED=$(grep "failed" /tmp/browser_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
+          echo "Browser tests: $PASSED passed, $FAILED failed"
+          
+          if [ "$FAILED" -gt 0 ]; then
+            echo "FAILED: Browser e2e tests have failures"
+            exit 1
+          fi
+
+  test-golden-dataset:
+    name: Golden Dataset Live Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -q -r requirements-dev.txt
+      
+      - name: Run golden dataset tests
+        run: |
+          PYTHONPATH=backend \
+          DATAFORGE_DOTENV_PATH=/dev/null \
+          DATAFORGE_STORAGE_BACKEND=sqlite \
+          python3 -m pytest -q backend/tests/test_golden_dataset.py --run-golden-dataset -o addopts= \
+          --tb=short \
+          --timeout=120 \
+          2>&1 | tee /tmp/golden_results.txt
+          
+          PASSED=$(grep "passed" /tmp/golden_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
+          FAILED=$(grep "failed" /tmp/golden_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
+          echo "Golden dataset tests: $PASSED passed, $FAILED failed"
+          
+          if [ "$FAILED" -gt 0 ]; then
+            echo "FAILED: Golden dataset tests have failures"
+            exit 1
+          fi
+
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest
@@ -239,7 +313,7 @@ jobs:
   final-report:
     name: Generate Validation Report
     runs-on: ubuntu-latest
-    needs: [syntax-and-architecture, test-collection, test-sqlite, test-security, test-benchmarks, docker-build]
+    needs: [syntax-and-architecture, test-collection, test-sqlite, test-security, test-benchmarks, test-browser-e2e, test-golden-dataset, docker-build]
     if: always()
     steps:
       - uses: actions/checkout@v3
@@ -257,6 +331,8 @@ jobs:
           echo "- SQLite Backend Tests: ${{ needs.test-sqlite.result }}" >> /tmp/report.md
           echo "- Security Tests: ${{ needs.test-security.result }}" >> /tmp/report.md
           echo "- Benchmark Smoke Tests: ${{ needs.test-benchmarks.result }}" >> /tmp/report.md
+          echo "- Browser E2E Tests: ${{ needs.test-browser-e2e.result }}" >> /tmp/report.md
+          echo "- Golden Dataset Tests: ${{ needs.test-golden-dataset.result }}" >> /tmp/report.md
           echo "- Docker Build: ${{ needs.docker-build.result }}" >> /tmp/report.md
           echo "" >> /tmp/report.md
           
@@ -288,7 +364,7 @@ jobs:
   notify-on-failure:
     name: Notify on Failure
     runs-on: ubuntu-latest
-    needs: [syntax-and-architecture, test-collection, test-sqlite, test-security]
+    needs: [syntax-and-architecture, test-collection, test-sqlite, test-security, test-browser-e2e, test-golden-dataset]
     if: failure()
     steps:
       - name: Notify Slack
