@@ -1,162 +1,275 @@
-# DataForge Operational Incident Runbook
+# Incident Runbook
 
-**Last refreshed:** 2026-06-01
-**Status:** Verified Operational Procedures
+**Last updated:** 2026-06-01  
+**Owner:** DevOps/SRE Team  
+**Escalation:** [Engineering Lead] → [VP Engineering]
 
-This document provides step-by-step procedures for SREs and system operators to diagnose, mitigate, and resolve production incidents.
-
----
-
-## 1. API Ingress Failure (502 / 504 Bad Gateway)
-
-### Symptoms
-- Public endpoints (`/health`, `/ready`) return HTTP 502 or 504.
-- Ingress Nginx log reports: `[error] ... connect() failed (111: Connection refused) while connecting to upstream`.
-
-### Diagnosis
-1. Check backend API container health status:
-   ```bash
-   docker compose -f docker-compose.prod.yml ps dataforge
-   ```
-2. Inspect the latest API server log files:
-   ```bash
-   docker compose -f docker-compose.prod.yml logs --tail=100 dataforge
-   ```
-
-### Resolution
-- **Case A: Out of Memory (OOM) Crash**
-  If the log reports an OOM event or exit code `137`, restart the API server container:
-  ```bash
-  docker compose -f docker-compose.prod.yml restart dataforge
-  ```
-- **Case B: Persistent DB Connection Stall**
-  If the API server is stuck trying to connect to Postgres, restart the Postgres container first:
-  ```bash
-  docker compose -f docker-compose.prod.yml restart postgres
-  docker compose -f docker-compose.prod.yml restart dataforge
-  ```
+This runbook documents responses to common production incidents.
 
 ---
 
-## 2. Worker Queue Stall or Bottleneck
+## Severity Levels
 
-### Symptoms
-- Scraping jobs remain stuck in `pending` or `running` state indefinitely.
-- No new scraped records are saved, and the worker container logs show no execution activity.
-
-### Diagnosis
-1. Inspect running worker containers:
-   ```bash
-   docker compose -f docker-compose.prod.yml ps worker
-   ```
-2. Check the worker queue length and stuck task counts via the diagnostics API (requires Operator/Admin Key):
-   ```bash
-   curl -H "X-API-Key: $DATAFORGE_ADMIN_API_KEY" http://localhost:18080/api/system/status
-   ```
-3. Look for lock contention in worker logs:
-   ```bash
-   docker compose -f docker-compose.prod.yml logs --tail=200 worker
-   ```
-
-### Resolution
-1. Force-restart worker containers to break any stuck asyncio event loops:
-   ```bash
-   docker compose -f docker-compose.prod.yml restart worker
-   ```
-2. If tasks remain locked, trigger a diagnostic queue recovery command:
-   ```bash
-   curl -X POST -H "X-API-Key: $DATAFORGE_ADMIN_API_KEY" http://localhost:18080/api/system/scheduler/step
-   ```
-3. If the queue is saturated, scale the number of background worker instances:
-   ```bash
-   docker compose -f docker-compose.prod.yml up -d --scale worker=3
-   ```
+- **SEV 1 (Critical):** Service is down or data is at risk. Respond immediately. (Target: Fix < 15 min)
+- **SEV 2 (High):** Service is degraded; features are unavailable. Respond within 5 min. (Target: Fix < 1 hour)
+- **SEV 3 (Medium):** Feature is limited; workarounds exist. Respond within 1 hour. (Target: Fix < 4 hours)
+- **SEV 4 (Low):** Cosmetic issue or minor bug. Plan fix for next sprint.
 
 ---
 
-## 3. Browser Context Memory Exhaustion
+## Quick Reference
 
-### Symptoms
-- The host server reports extremely high RAM utilization (>90%).
-- Worker containers crash frequently with exit code `137`.
-- Playwright logs report: `Target closed`, `Browser process crashed`, or `Failed to launch chromium`.
+| Symptom | SEV | Likely Cause | First Action |
+| ------- | --- | ------------ | ------------ |
+| `/health` returns non-200 | 1 | API down | `docker logs dataforge-api` |
+| Jobs stuck in queue | 2 | Worker stalled | `docker restart dataforge-worker` |
+| Memory > 80% | 2 | Memory leak/Chromium | `docker stats` then `docker update --memory` |
+| DB connection errors | 2 | Pool exhausted | Check `pg_stat_activity` count |
+| Slow responses (>30s) | 3 | Network or rendering | Check target site responsiveness |
+| Backup missing | 3 | Cron failed | Manual backup: `bash scripts/backup_postgres.sh` |
 
-### Diagnosis
-1. Check the active process tree on the host for zombie Chromium processes:
-   ```bash
-   ps aux | grep -i chromium
-   ```
-2. Verify browser extraction performance via the scraper telemetry API:
-   ```bash
-   curl -H "X-API-Key: $DATAFORGE_API_KEY" http://localhost:18080/api/scraper/browser
-   ```
-
-### Resolution
-1. Drain zombie browser processes inside the worker container:
-   ```bash
-   docker compose -f docker-compose.prod.yml exec worker pkill -f chromium || true
-   ```
-2. Restart the worker container to free up browser pools completely:
-   ```bash
-   docker compose -f docker-compose.prod.yml restart worker
-   ```
-3. Ensure timeouts are constrained in the job request. If a single page load is hanging, lower the timeout parameter.
+For full details on each incident, see sections below.
 
 ---
 
-## 4. Postgres Connection Pool Saturation
+## SEV 1: API Service Down
 
-### Symptoms
-- API responses are extremely slow (>5000ms) or time out.
-- Backend server logs report: `asyncpg.exceptions.TooManyConnectionsError: sorry, too many clients already`.
+**Check container:**
+```bash
+docker ps | grep dataforge-api
+docker logs --tail 50 dataforge-api
+```
 
-### Diagnosis
-1. Check active database connection counts inside Postgres:
-   ```bash
-   docker compose -f docker-compose.prod.yml exec postgres psql -U dataforge -d dataforge -c \
-     "SELECT count(*), state FROM pg_stat_activity GROUP BY state;"
-   ```
+**If not running:**
+```bash
+docker restart dataforge-api
+docker logs -f dataforge-api
+```
 
-### Resolution
-1. Drain inactive connections by restarting the database pool (highly disruptive but effective):
-   ```bash
-   docker compose -f docker-compose.prod.yml restart postgres
-   docker compose -f docker-compose.prod.yml restart dataforge worker
-   ```
-2. If connection spikes recur, open `.env.production` and adjust connection limits or configure a connection pooler (e.g. PgBouncer).
+**If restarting (CrashLoop):**
+```bash
+# Check for startup errors
+docker logs dataforge-api --tail 200 | grep -i "error\|fatal"
 
----
+# Common fixes:
+# 1. Database connection: Check DATAFORGE_DATABASE_URL in .env.production
+# 2. Missing env vars: Check all required vars are set
+# 3. Port conflict: Check if 8000 is in use (netstat -tlnp | grep 8000)
 
-## 5. Rate Limit counter Breaches (HTTP 429)
+# Edit and retry
+vi /path/to/.env.production
+docker restart dataforge-api
+```
 
-### Symptoms
-- Clients receive HTTP 429 Too Many Requests responses on core endpoints.
-
-### Diagnosis
-1. Verify if the client has genuinely exceeded their quota or if rate limits are too restrictive.
-2. Inspect Nginx limits:
-   ```bash
-   docker compose -f docker-compose.prod.yml logs nginx | grep "limited by"
-   ```
-
-### Resolution
-- **Temporary bypass**: Increase standard rate limits in `nginx.conf` (e.g. rate from `30r/s` to `60r/s`), then reload Nginx without downtime:
-  ```bash
-  docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
-  ```
+**Verify recovery:**
+```bash
+curl -i https://your-domain.com/health
+# Expected: 200 OK
+```
 
 ---
 
-## 6. Disaster Recovery: Restoring Database Backups
+## SEV 2: Worker Not Processing Jobs
 
-In the event of database corruption or loss, execute the following recovery steps immediately:
+**Check worker:**
+```bash
+docker ps | grep dataforge-worker
+docker logs --tail 50 dataforge-worker
+```
 
-1. Locate the latest secure compressed SQL backup file inside the `backups/` directory (e.g. `backups/backup_20260601_120000.sql.gz`).
-2. Run the automated restore utility:
-   ```bash
-   ./scripts/restore_postgres.sh backups/backup_20260601_120000.sql.gz
-   ```
-3. Restart the API server and workers to reinitialize storage interface states:
-   ```bash
-   docker compose -f docker-compose.prod.yml restart dataforge worker
-   ```
+**If not running:**
+```bash
+docker restart dataforge-worker
+docker logs -f dataforge-worker
+```
+
+**If running but stalled:**
+```bash
+# Check for stuck browser processes
+docker exec dataforge-worker ps aux | grep chromium
+
+# Kill and let worker restart
+docker exec dataforge-worker pkill -f chromium
+
+# Or force restart worker
+docker restart dataforge-worker
+```
+
+**Verify:**
+```bash
+# Submit test job
+curl -X POST https://your-domain.com/api/jobs \
+  -H "X-API-Key: $TEST_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "extraction_mode": "manual", "schema": {"title": "string"}}'
+
+# Wait 10s and check status
+sleep 10
+curl -s https://your-domain.com/api/jobs/$JOB_ID | jq .status
+# Expected: "processing" or "completed"
+```
+
+---
+
+## SEV 2: High Memory Usage
+
+**Check usage:**
+```bash
+docker stats dataforge-worker --no-stream
+```
+
+**If > 80%:**
+```bash
+# Increase container memory
+docker update --memory 8g dataforge-worker
+docker restart dataforge-worker
+
+# Kill browser processes
+docker exec dataforge-worker pkill -f chromium
+```
+
+**Prevent future issues:**
+```bash
+# Limit concurrent jobs in .env.production:
+DATAFORGE_WORKER_MAX_CONCURRENT_JOBS=2
+
+# Restart
+docker restart dataforge-worker
+```
+
+---
+
+## SEV 2: Database Connection Pool Exhausted
+
+**Check connections:**
+```bash
+psql -h your-postgres-host -U dataforge -d dataforge_prod -c \
+  "SELECT count(*) FROM pg_stat_activity;"
+```
+
+**If > 90 connections:**
+```bash
+# Kill idle connections
+psql -h your-postgres-host -U admin -d dataforge_prod -c \
+  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity \
+   WHERE state = 'idle' AND state_change < now() - interval '5 minutes';"
+
+# Restart API and worker
+docker restart dataforge-api dataforge-worker
+```
+
+---
+
+## SEV 3: Slow Job Extraction (> 30s)
+
+**Check if network-bound:**
+```bash
+curl -w "time_total: %{time_total}\n" -o /dev/null \
+  https://target-url.com
+# If < 2s, likely not network issue
+```
+
+**Check worker CPU:**
+```bash
+docker stats dataforge-worker --no-stream
+# If CPU < 10%, likely network-bound (nothing to do)
+# If CPU > 80%, may be schema extraction or AI call
+```
+
+**Common causes:**
+- Target website is slow (nothing to do)
+- Complex JavaScript rendering (expected for JS-heavy sites)
+- AI-powered extraction making Groq API call (documented latency)
+
+---
+
+## SEV 3: Backup Failed
+
+**Check last backup:**
+```bash
+ls -la /var/lib/dataforge/backups/ | tail -3
+```
+
+**Try manual backup:**
+```bash
+bash scripts/backup_postgres.sh
+ls -la /var/lib/dataforge/backups/ | tail -1
+```
+
+**If manual succeeds:**
+- Backup system is OK; cron issue
+- Check `grep backup /var/log/cron` or `journalctl -u backup-dataforge.timer`
+
+**If manual fails:**
+```bash
+# Check disk space
+df -h /var/lib/dataforge/backups/
+
+# Check Postgres access
+psql -h your-postgres-host -U dataforge -d dataforge_prod -c "SELECT 1;"
+
+# Fix issue and retry
+bash scripts/backup_postgres.sh
+```
+
+---
+
+## Post-Incident
+
+1. **Document timeline:** When did it start? When did we notice? When was it fixed?
+2. **Send all-clear message:** Notify team via Slack
+3. **Schedule postmortem** within 24 hours
+4. **Identify root cause:** Not "we restarted the container" but "why did it crash?"
+5. **Action items:** What prevents this from happening again?
+
+---
+
+## Escalation Contacts
+
+| Role | Phone | Slack |
+| ---- | ----- | ----- |
+| On-call Engineer | XXX-XXX-XXXX | @on-call |
+| Engineering Lead | XXX-XXX-XXXX | @eng-lead |
+| VP Engineering | XXX-XXX-XXXX | @vp-eng |
+
+---
+
+## Useful Commands
+
+```bash
+# Health checks
+curl -i https://your-domain.com/health
+curl -s https://your-domain.com/diagnostics | jq .
+
+# Container logs
+docker logs --tail 100 -f dataforge-api
+docker logs --tail 100 -f dataforge-worker
+
+# Database
+psql -h your-postgres-host -U dataforge -d dataforge_prod -c "SELECT count(*) FROM jobs;"
+
+# Resource usage
+docker stats dataforge-api dataforge-worker dataforge-postgres
+
+# Backup/restore
+bash scripts/backup_postgres.sh
+bash scripts/restore_postgres.sh dataforge_prod /path/to/backup.sql
+```
+
+---
+
+## Disaster Recovery: Postgres Restore
+
+```bash
+# 1. Stop containers
+docker-compose stop dataforge-api dataforge-worker
+
+# 2. Restore from backup
+bash scripts/restore_postgres.sh dataforge_prod /var/lib/dataforge/backups/latest.sql
+
+# 3. Restart containers
+docker-compose start dataforge-api dataforge-worker
+
+# 4. Verify
+curl -i https://your-domain.com/health
+```

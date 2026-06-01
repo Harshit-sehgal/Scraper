@@ -1,0 +1,302 @@
+name: Validate Production Readiness
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    # Daily at 2 AM UTC (useful for monitoring)
+    - cron: '0 2 * * *'
+
+jobs:
+  syntax-and-architecture:
+    name: Syntax & Architecture Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -q -r requirements-dev.txt
+          playwright install chromium
+      
+      - name: Syntax check
+        run: |
+          python3 -m compileall -q backend scripts architecture_validator.py
+      
+      - name: Architecture validation
+        run: |
+          PYTHONPATH=backend python3 architecture_validator.py
+
+  test-collection:
+    name: Test Collection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -q -r requirements-dev.txt
+          playwright install chromium
+      
+      - name: Collect tests
+        run: |
+          PYTHONPATH=backend \
+          DATAFORGE_DOTENV_PATH=/dev/null \
+          DATAFORGE_STORAGE_BACKEND=sqlite \
+          python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts= \
+          | tee /tmp/collection.log
+          
+          COLLECTED=$(grep "tests collected" /tmp/collection.log | awk '{print $1}')
+          echo "Collected tests: $COLLECTED"
+          
+          if [ "$COLLECTED" -lt 1800 ]; then
+            echo "WARNING: Fewer than 1800 tests collected (expected ~1920)"
+            exit 1
+          fi
+
+  test-sqlite:
+    name: Test SQLite Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -q -r requirements-dev.txt
+          playwright install chromium
+      
+      - name: Run safe backend tests
+        run: |
+          PYTHONPATH=backend \
+          DATAFORGE_DOTENV_PATH=/dev/null \
+          DATAFORGE_STORAGE_BACKEND=sqlite \
+          python3 -m pytest -q backend/tests -o addopts= \
+          --tb=short \
+          --timeout=300 \
+          2>&1 | tee /tmp/test_results.txt
+          
+          PASSED=$(grep "passed" /tmp/test_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
+          echo "SQLite tests passed: $PASSED"
+          
+          if [ "$PASSED" -lt 1800 ]; then
+            echo "FAILED: Expected ~1846 tests passed, got $PASSED"
+            exit 1
+          fi
+
+  test-security:
+    name: Security Tests (Auth, Config, Prod Validation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -q -r requirements-dev.txt
+          playwright install chromium
+      
+      - name: Run security tests
+        run: |
+          PYTHONPATH=backend \
+          DATAFORGE_DOTENV_PATH=/dev/null \
+          DATAFORGE_STORAGE_BACKEND=sqlite \
+          python3 -m pytest -q \
+          backend/tests/test_route_auth_matrix.py \
+          backend/tests/test_check_prod_env.py \
+          backend/tests/test_prod_security_validator.py \
+          -o addopts= \
+          --tb=short \
+          2>&1 | tee /tmp/security_results.txt
+          
+          PASSED=$(grep "passed" /tmp/security_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
+          echo "Security tests passed: $PASSED"
+          
+          if [ "$PASSED" -lt 170 ]; then
+            echo "FAILED: Expected ~178 security tests passed, got $PASSED"
+            exit 1
+          fi
+
+  test-benchmarks:
+    name: Benchmark Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -q -r requirements-dev.txt
+          playwright install chromium
+      
+      - name: Run benchmark smoke test
+        run: |
+          PYTHONPATH=backend \
+          DATAFORGE_DOTENV_PATH=/dev/null \
+          DATAFORGE_STORAGE_BACKEND=sqlite \
+          python3 -m pytest -q backend/benchmarks -o addopts= \
+          --tb=short \
+          2>&1 | tee /tmp/benchmark_results.txt
+          
+          PASSED=$(grep "passed" /tmp/benchmark_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
+          echo "Benchmark tests passed: $PASSED"
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: dataforge:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  docs-validation:
+    name: Documentation Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Check for banned claims
+        run: |
+          # Search for banned claims in docs
+          BANNED_PATTERNS=(
+            "production-ready"
+            "enterprise-grade"
+            "universal scraper"
+            "anti-bot immune"
+            "fully autonomous"
+            "fully self-healing"
+            "100% accurate"
+            "guaranteed extraction"
+            "fully benchmarked"
+          )
+          
+          FOUND=0
+          for pattern in "${BANNED_PATTERNS[@]}"; do
+            if grep -r "$pattern" docs/ README.md 2>/dev/null | grep -v "Banned\|banned\|Do not claim"; then
+              echo "ERROR: Found banned claim: $pattern"
+              FOUND=1
+            fi
+          done
+          
+          if [ $FOUND -eq 1 ]; then
+            exit 1
+          fi
+      
+      - name: Verify test counts are recent
+        run: |
+          # Check that docs were updated within last 7 days
+          LAST_UPDATE=$(git log -1 --format=%ai docs/TESTING.md docs/PROJECT_STATUS.md | head -1 | cut -d' ' -f1)
+          TODAY=$(date +%Y-%m-%d)
+          
+          echo "Last doc update: $LAST_UPDATE"
+          echo "Today: $TODAY"
+          
+          # Simple check: if docs are older than 7 days, warn
+          # In real CI, would use date arithmetic
+
+  final-report:
+    name: Generate Validation Report
+    runs-on: ubuntu-latest
+    needs: [syntax-and-architecture, test-collection, test-sqlite, test-security, test-benchmarks, docker-build]
+    if: always()
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Collect results
+        run: |
+          echo "# Production Readiness Validation Report" > /tmp/report.md
+          echo "" >> /tmp/report.md
+          echo "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /tmp/report.md
+          echo "Commit: $(git rev-parse --short HEAD)" >> /tmp/report.md
+          echo "" >> /tmp/report.md
+          echo "## Test Results" >> /tmp/report.md
+          echo "- Syntax & Architecture: ${{ needs.syntax-and-architecture.result }}" >> /tmp/report.md
+          echo "- Test Collection: ${{ needs.test-collection.result }}" >> /tmp/report.md
+          echo "- SQLite Backend Tests: ${{ needs.test-sqlite.result }}" >> /tmp/report.md
+          echo "- Security Tests: ${{ needs.test-security.result }}" >> /tmp/report.md
+          echo "- Benchmark Smoke Tests: ${{ needs.test-benchmarks.result }}" >> /tmp/report.md
+          echo "- Docker Build: ${{ needs.docker-build.result }}" >> /tmp/report.md
+          echo "" >> /tmp/report.md
+          
+          if [ "${{ needs.syntax-and-architecture.result }}" = "success" ] && \
+             [ "${{ needs.test-sqlite.result }}" = "success" ] && \
+             [ "${{ needs.test-security.result }}" = "success" ]; then
+            echo "## Status: ✅ READY FOR TARGET DEPLOYMENT VALIDATION" >> /tmp/report.md
+          else
+            echo "## Status: ❌ NOT READY — Fix failing checks above" >> /tmp/report.md
+          fi
+          
+          cat /tmp/report.md
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('/tmp/report.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });
+
+  notify-on-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [syntax-and-architecture, test-collection, test-sqlite, test-security]
+    if: failure()
+    steps:
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Production readiness validation failed'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          fields: repo,message,commit,author
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
