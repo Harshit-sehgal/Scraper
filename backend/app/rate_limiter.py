@@ -98,6 +98,170 @@ def _get_route_key(path: str) -> str:
     return "default"
 
 
+class DatabaseSlidingWindowCounter:
+    """Sliding window rate limit counter backed by a SQLite or Postgres database."""
+
+    def __init__(self, max_requests: int, window_seconds: float, key: str) -> None:
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self.key = key
+        self._initialized = False
+
+    def _ensure_table(self) -> None:
+        if self._initialized:
+            return
+        from app.config import settings
+        backend = settings.STORAGE_BACKEND
+        if backend == "postgres":
+            try:
+                from app.postgres_repository import _conn, _execute
+                with _conn() as conn:
+                    _execute(conn, """
+                        CREATE TABLE IF NOT EXISTS rate_limits (
+                            key VARCHAR(255) NOT NULL,
+                            timestamp DOUBLE PRECISION NOT NULL
+                        )
+                    """)
+                    _execute(conn, "CREATE INDEX IF NOT EXISTS idx_rate_limits_key_ts ON rate_limits(key, timestamp)")
+                self._initialized = True
+            except Exception as e:
+                logger.warning("Failed to initialize Postgres rate limit table: %s", e)
+        else:
+            try:
+                from app.job_store import _get_connection, _DB_LOCK
+                with _DB_LOCK:
+                    conn = _get_connection()
+                    try:
+                        conn.execute("""
+                            CREATE TABLE IF NOT EXISTS rate_limits (
+                                key TEXT NOT NULL,
+                                timestamp REAL NOT NULL
+                            )
+                        """)
+                        conn.execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_key_ts ON rate_limits(key, timestamp)")
+                        conn.commit()
+                    finally:
+                        conn.close()
+                self._initialized = True
+            except Exception as e:
+                logger.warning("Failed to initialize SQLite rate limit table: %s", e)
+
+    def allow(self) -> bool:
+        self._ensure_table()
+        from app.config import settings
+        backend = settings.STORAGE_BACKEND
+        now = time.time()
+        cutoff = now - self.window_seconds
+
+        if backend == "postgres":
+            try:
+                from app.postgres_repository import _conn, _execute, _fetch_one
+                with _conn() as conn:
+                    # Prune old entries
+                    _execute(conn, "DELETE FROM rate_limits WHERE key = %s AND timestamp <= %s", (self.key, cutoff))
+                    # Check current count
+                    row = _fetch_one(conn, "SELECT COUNT(*) AS count FROM rate_limits WHERE key = %s", (self.key,))
+                    count = row["count"] if row else 0
+                    if count >= self.max_requests:
+                        return False
+                    # Insert new request timestamp
+                    _execute(conn, "INSERT INTO rate_limits (key, timestamp) VALUES (%s, %s)", (self.key, now))
+                return True
+            except Exception as e:
+                logger.warning("Postgres rate limiter database error: %s. Falling back to in-memory behavior.", e)
+                return False
+        else:
+            try:
+                from app.job_store import _get_connection, _DB_LOCK
+                with _DB_LOCK:
+                    conn = _get_connection()
+                    try:
+                        # Prune old entries
+                        conn.execute("DELETE FROM rate_limits WHERE key = ? AND timestamp <= ?", (self.key, cutoff))
+                        # Check current count
+                        row = conn.execute("SELECT COUNT(*) AS count FROM rate_limits WHERE key = ?", (self.key,)).fetchone()
+                        count = row["count"] if row else 0
+                        if count >= self.max_requests:
+                            return False
+                        # Insert new request timestamp
+                        conn.execute("INSERT INTO rate_limits (key, timestamp) VALUES (?, ?)", (self.key, now))
+                        conn.commit()
+                    finally:
+                        conn.close()
+                return True
+            except Exception as e:
+                logger.warning("SQLite rate limiter database error: %s. Falling back to in-memory behavior.", e)
+                return False
+
+    def remaining(self) -> int:
+        self._ensure_table()
+        from app.config import settings
+        backend = settings.STORAGE_BACKEND
+        now = time.time()
+        cutoff = now - self.window_seconds
+
+        if backend == "postgres":
+            try:
+                from app.postgres_repository import _conn, _execute, _fetch_one
+                with _conn() as conn:
+                    _execute(conn, "DELETE FROM rate_limits WHERE key = %s AND timestamp <= %s", (self.key, cutoff))
+                    row = _fetch_one(conn, "SELECT COUNT(*) AS count FROM rate_limits WHERE key = %s", (self.key,))
+                    count = row["count"] if row else 0
+                    return max(0, self.max_requests - count)
+            except Exception:
+                return 0
+        else:
+            try:
+                from app.job_store import _get_connection, _DB_LOCK
+                with _DB_LOCK:
+                    conn = _get_connection()
+                    try:
+                        conn.execute("DELETE FROM rate_limits WHERE key = ? AND timestamp <= ?", (self.key, cutoff))
+                        row = conn.execute("SELECT COUNT(*) AS count FROM rate_limits WHERE key = ?", (self.key,)).fetchone()
+                        count = row["count"] if row else 0
+                        return max(0, self.max_requests - count)
+                    finally:
+                        conn.close()
+            except Exception:
+                return 0
+
+    def reset_in(self) -> float:
+        self._ensure_table()
+        from app.config import settings
+        backend = settings.STORAGE_BACKEND
+        now = time.time()
+
+        if backend == "postgres":
+            try:
+                from app.postgres_repository import _conn, _fetch_one
+                with _conn() as conn:
+                    row = _fetch_one(conn, "SELECT MIN(timestamp) AS min_ts FROM rate_limits WHERE key = %s", (self.key,))
+                    min_ts = row["min_ts"] if row and row.get("min_ts") is not None else None
+                    if min_ts is None:
+                        return 0.0
+                    return max(0.0, self.window_seconds - (now - min_ts))
+            except Exception:
+                return 0.0
+        else:
+            try:
+                from app.job_store import _get_connection, _DB_LOCK
+                with _DB_LOCK:
+                    conn = _get_connection()
+                    try:
+                        row = conn.execute("SELECT MIN(timestamp) AS min_ts FROM rate_limits WHERE key = ?", (self.key,)).fetchone()
+                        min_ts = row["min_ts"] if row and row[0] is not None else None
+                        if min_ts is None:
+                            return 0.0
+                        return max(0.0, self.window_seconds - (now - min_ts))
+                    finally:
+                        conn.close()
+            except Exception:
+                return 0.0
+
+    def is_expired(self) -> bool:
+        return False
+
+
 class SlidingWindowCounter:
     """Sliding window rate limit counter for a single key."""
 
@@ -282,7 +446,11 @@ class RateLimiterMiddleware:
 
         # Get or create counter
         if key not in self._counters:
-            self._counters[key] = SlidingWindowCounter(max_req, window_sec)
+            from app.config import settings
+            if settings.RATE_LIMIT_DB_BACKED:
+                self._counters[key] = DatabaseSlidingWindowCounter(max_req, window_sec, key)
+            else:
+                self._counters[key] = SlidingWindowCounter(max_req, window_sec)
         counter = self._counters[key]
 
         # Check rate limit
