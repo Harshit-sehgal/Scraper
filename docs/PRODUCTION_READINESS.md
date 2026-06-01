@@ -19,6 +19,7 @@ The project is not public production-ready. A local production-like Compose smok
 | Nginx routing | Validated locally | `/docs`, `/redoc`, `/openapi.json`, and `/metrics` returned 404; `/app/`, `/health`, and `/ready` returned 200 | Repeat behind target ingress |
 | TLS | Not started | No TLS validation in this repo pass | Put behind real TLS termination |
 | CORS | Validated locally | Allowed origin returned `200` with `access-control-allow-origin`; disallowed origin returned `400` without allow-origin | Test with real origin |
+| Rate Limiter | Validated | Database-backed shared rate limiter (`DatabaseSlidingWindowCounter`) works under SQLite/Postgres backends | Verify connection pool scaling under high concurrent load |
 | CSP | In progress | Nginx served CSP/security headers locally; browser behavior against target origin is untested | Test dashboard under CSP in browser |
 | Metrics | Validated locally | Public `/metrics` blocked by Nginx; Prometheus scraped internal `/metrics` with token | Repeat with target network policy |
 | Prometheus | Validated locally | `promtool check config` passed, 5 alert rules loaded, `dataforge` and `prometheus` targets were `up` | Verify alert firing/delivery and retention in target |
