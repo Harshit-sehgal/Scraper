@@ -16,12 +16,31 @@ import urllib.request
 import urllib.error
 import subprocess
 
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BACKEND_DIR = os.path.join(ROOT_DIR, "backend")
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
 def run_command(cmd: list[str]) -> tuple[int, str]:
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, check=False)
         return res.returncode, res.stdout.strip() or res.stderr.strip()
     except Exception as e:
         return -1, str(e)
+
+
+def run_compose_ps() -> tuple[int, str, str]:
+    """Return (exit_code, output, command_label) for the best available Compose command."""
+    code, out = run_command(["docker", "compose", "-f", "docker-compose.prod.yml", "ps", "--format", "json"])
+    if code == 0:
+        return code, out, "docker compose"
+
+    code, out = run_command(["docker-compose", "-f", "docker-compose.prod.yml", "ps"])
+    if code == 0:
+        return code, out, "docker-compose"
+
+    return code, out, "none"
 
 def main():
     print("=" * 70)
@@ -52,15 +71,10 @@ def main():
 
     # 2. Container Stack Health Checks
     print("\n[2] Docker Compose Container Statuses...")
-    code, ps_out = run_command(["docker", "compose", "-f", "docker-compose.prod.yml", "ps", "--format", "json"])
+    code, ps_out, compose_label = run_compose_ps()
     if code != 0:
-        # Try old syntax or simple ps
-        code, ps_out = run_command(["docker-compose", "-f", "docker-compose.prod.yml", "ps"])
-        if code != 0:
-            print("  [FAIL] Could not execute Docker Compose status checks. Is the stack started?")
-            print(f"         Error: {ps_out}")
-        else:
-            print("  [OK] Stack is running (using legacy docker-compose ps). Check container health manually.")
+        print("  [FAIL] Could not execute Docker Compose status checks. Is the stack started?")
+        print(f"         Error: {ps_out}")
     else:
         try:
             # Parse container statuses
@@ -87,7 +101,7 @@ def main():
                 if unhealthy:
                     print(f"  [FAIL] The following containers are not healthy: {', '.join(unhealthy)}")
                 else:
-                    print("  [OK] All core containers (backend, worker, Postgres, Nginx, Prometheus, Grafana) are healthy.")
+                    print(f"  [OK] All core containers are healthy via {compose_label}.")
         except Exception as e:
             print(f"  [WARNING] Could not parse Compose JSON status: {e}. Ps output follows:")
             print(ps_out)

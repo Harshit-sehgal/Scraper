@@ -29,22 +29,18 @@ It is not a universal scraper, not anti-bot proof, not fully autonomous, and not
 
 Status: pre-production candidate.
 
-Fresh validation snapshot from `2026-06-01T14:04:00+05:30`, with verified changes committed:
+Fresh validation snapshot from `2026-06-01`, with current local verification and archived evidence called out where applicable:
 
 | Area | Current evidence | Status |
 | --- | --- | --- |
 | Syntax | `python3 -m compileall -q backend scripts architecture_validator.py` completed with no output | Verified |
 | Architecture rules | `PYTHONPATH=backend python3 architecture_validator.py` printed `VALIDATION PASSED: Architecture is lawful.` | Verified |
-| Test collection | `1916 tests collected in 0.40s` for `backend/tests backend/benchmarks` | Verified |
-| Safe local backend tests | `1843 passed, 72 skipped, 0 failed` with SQLite | Verified |
-| Benchmark pytest package | `1 passed in 0.26s` | Verified smoke test only — not a real benchmark |
-| Route/security/CORS tests | `183 passed in 1.83s` for route-auth, production-secret validation, and CORS preflight coverage | Verified |
-| Postgres optional tests | `1885 passed, 28 skipped in 138.54s` with `--run-postgres` and Docker/testcontainers | Verified locally |
-| Browser optional tests | `1858 passed, 55 skipped in 125.64s` with `--run-browser` | Verified locally |
-| Production env example | `.env.production.example` intentionally fails validation because it contains placeholders, including the metrics token | Verified |
-| Docker build | Production smoke built image `796fe80630f771d4da8257eb7ec3f07a003f92f63d668ac1ffc3b43007ee9fc9` | Verified locally |
-| Compose stack smoke | `bash scripts/smoke_prod_stack.sh` passed with backend/worker/Postgres healthy, Nginx route checks, Prometheus targets, container Chromium, and one deterministic worker job with 4 records | Verified locally, not target production |
-| Golden dataset live run | `8 passed in 53.97s`; F1: books `0.650`, quotes `1.000`, countries `0.680`, example `1.000`, httpbin `1.000` | Verified with modest enforced thresholds |
+| Test collection | `1920 tests collected in 0.43s` for `backend/tests backend/benchmarks` | Verified |
+| Safe local backend tests | `1846 passed, 72 skipped in 121.71s` with SQLite | Verified |
+| Benchmark pytest package | `1 passed, 1 skipped in 0.26s` | Verified smoke test only — not a real benchmark |
+| Route auth matrix | Generated from the registered FastAPI app with `scripts/route_auth_matrix.py --format markdown` | Verified |
+| Production env example | `scripts/check_prod_env.py --env-file .env.production.example` intentionally fails on placeholders | Verified |
+| Archived local evidence | Postgres/browser/Compose/Docker/golden-dataset results exist in archived docs; they were not freshly rerun in this cleanup | Documented but unverified in this refresh |
 
 See `PROJECT_STATUS.md` for the current truth source.
 

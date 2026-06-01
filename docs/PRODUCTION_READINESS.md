@@ -3,7 +3,7 @@
 **Last refreshed:** 2026-06-01
 **Allowed statuses:** Not started, In progress, Validated, Failed, Unknown
 
-The project is not public production-ready. A local production-like Compose smoke passed with a temporary ignored `.env`, but target deployment with real secrets, TLS, sustained load, alert delivery, failover, and operational runbooks is not validated.
+This project is not public production-ready. Historical local Compose smoke evidence exists in the repository, but target deployment with real secrets, TLS, sustained load, alert delivery, failover, and operational runbooks is not validated in this cleanup refresh.
 
 | Gate | Status | Evidence | Next action |
 | --- | --- | --- | --- |
