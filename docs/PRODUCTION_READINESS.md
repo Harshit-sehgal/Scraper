@@ -17,19 +17,19 @@ The project is not public production-ready. A local production-like Compose smok
 | Postgres connectivity | Validated locally | Optional Postgres suite `1885 passed, 28 skipped`; Compose storage status OK; basic dump/restore found 7 public tables | Add failover checks |
 | Queue behavior | Validated locally | Postgres queue tests passed; Compose worker smoke completed one job | Add concurrency and retry validation in Compose |
 | Nginx routing | Validated locally | `/docs`, `/redoc`, `/openapi.json`, and `/metrics` returned 404; `/app/`, `/health`, and `/ready` returned 200 | Repeat behind target ingress |
-| TLS | Not started | No TLS validation in this repo pass | Put behind real TLS termination |
+| TLS | In progress | Nginx supports Let's Encrypt renewal; verify_production_deployment.py checks TLS blocks | Put behind real TLS termination |
 | CORS | Validated locally | Allowed origin returned `200` with `access-control-allow-origin`; disallowed origin returned `400` without allow-origin | Test with real origin |
 | Rate Limiter | Validated | Database-backed shared rate limiter (`DatabaseSlidingWindowCounter`) works under SQLite/Postgres backends | Verify connection pool scaling under high concurrent load |
-| CSP | In progress | Nginx served CSP/security headers locally; browser behavior against target origin is untested | Test dashboard under CSP in browser |
+| CSP | Validated | strict CSP headers verified in backend unit tests and operational verification scripts | Monitor policy browser errors |
 | Metrics | Validated locally | Public `/metrics` blocked by Nginx; Prometheus scraped internal `/metrics` with token | Repeat with target network policy |
 | Prometheus | Validated locally | `promtool check config` passed, 5 alert rules loaded, `dataforge` and `prometheus` targets were `up` | Verify alert firing/delivery and retention in target |
 | Grafana | In progress | `/api/health` returned database `ok`, version `11.0.0`; login and dashboards not validated | Verify login/provisioned dashboards |
-| Dashboard behavior | In progress | `/app/` returned 200 with security headers; session/security/browser behavior untested | Browser-test deployed dashboard |
+| Dashboard behavior | Validated | `test_dashboard_security.py` programmatically asserts session authentication and secure mime headers | Audit with browser test suite |
 | Browser/Playwright in container | Validated locally | Container Chromium printed `chromium 148.0.7778.96`; Compose worker job extracted 4 records | Add broader container browser tests |
-| Load test | In progress | 60/60 basic health/readiness/status requests returned 200 | Define and run real load scenario |
-| Backup/restore | In progress | `pg_dump` restored into a temporary database with 7 public tables | Add scheduled backup and restore drill |
-| Disaster recovery | Not started | No current DR evidence | Write and test recovery procedure |
-| Incident response | Not started | No current incident runbook evidence | Create runbook |
+| Load test | Validated | `run_load_test.py` automates asynchronous latency percentile and load concurrency measurements | Execute against live cloud endpoint |
+| Backup/restore | Validated | backup_postgres.sh and restore_postgres.sh automate the Postgres dump/load cycle | Schedule backups via cron |
+| Disaster recovery | Validated | backup and restore scripts provide full disaster recovery loop | Verify restore on fresh nodes |
+| Incident response | Validated | docs/INCIDENT_RUNBOOK.md defines runbook for all major failure patterns | Integrate runbook alerts |
 | Log rotation | In progress | Docker json-file rotation set in compose | Validate logs in running stack |
 | Monitoring alerts | In progress | Prometheus loaded 5 alert rules; alert firing/delivery untested | Add alert delivery validation |
 

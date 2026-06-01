@@ -722,3 +722,21 @@ def test_benchmark_smoke_configuration_is_importable():
     """Keep pytest collection honest without running live benchmark traffic."""
     assert SITES
     assert all(site.url.startswith(("http://", "https://")) for site in SITES)
+
+
+@pytest.mark.asyncio
+async def test_live_benchmark_extraction():
+    """Run live benchmark extraction across all defined sites if enabled by env var."""
+    import os
+    if os.environ.get("DATAFORGE_RUN_LIVE_BENCHMARKS") != "true":
+        pytest.skip("need DATAFORGE_RUN_LIVE_BENCHMARKS=true to run live benchmarks")
+
+    print("\nRunning live benchmark suite...")
+    results = await run_all_tests()
+    
+    # Enforce minimum thresholds on the live results
+    successful_sites = [r for r in results if r.success and r.records > 0]
+    print(f"\nLive Benchmark Summary: {len(successful_sites)}/{len(results)} sites extracted records successfully.")
+    
+    # Verify that at least a basic set of sites succeeded
+    assert len(successful_sites) >= 3, f"Live benchmark underperformed: only {len(successful_sites)} sites succeeded."

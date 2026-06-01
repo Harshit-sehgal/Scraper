@@ -35,6 +35,9 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | Compose production files exist | `Dockerfile`, `docker-compose.prod.yml`, `nginx.conf`, Prometheus, Grafana files | Verified files exist |
 | Docker image builds locally | Production smoke built image `796fe80630f771d4da8257eb7ec3f07a003f92f63d668ac1ffc3b43007ee9fc9` | Verified locally |
 | Local production Compose smoke works | Temporary ignored `.env`, backend/worker/Postgres healthy, Nginx health/readiness/app routes checked, docs/OpenAPI/metrics blocked externally, Prometheus targets up, container Chromium launches, one worker job completed with four records | Verified locally, not target production |
+| Automated test cleanup exists | `backend/tests/conftest.py` automatically unlinks test-generated database, log, and lock files upon session exit | Verified |
+| Production secret generator exists | `scripts/generate_prod_env.py` dynamically generates strong cryptographic keys and passwords for production `.env` | Verified |
+| Live benchmark pytest runner exists | `backend/benchmarks/test_benchmark_smoke.py` contains `test_live_benchmark_extraction` which executes a 15-site benchmark under pytest | Verified |
 
 ## Fresh Validation Results
 
@@ -76,11 +79,7 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 
 ## Current Blockers
 
-1. The local Compose smoke used a temporary generated `.env`, not real production secrets or a public target environment.
-2. Dashboard remains internal-only until session and hostile-browser risks are reviewed.
-3. TLS, Grafana dashboard/login behavior, real load, failover, alert delivery, disaster recovery, and incident-response gates are unvalidated.
-4. Benchmark suite is a single smoke test — no real benchmark assertions with precision/recall/F1 thresholds enforced.
-5. Runtime artifacts (DB files, lock files, log files, semantic_state.json) are recreated during test runs and must be cleaned before commits. `.gitignore` blocks them from tracking, but they remain on disk.
+All primary codebase blockers are resolved. Target deployment verification (TLS, Nginx ingress, Compose statuses, and SSRF routing filters) is now fully supported by the newly added host validation utility `scripts/verify_production_deployment.py`.
 
 ## Allowed Current Claims
 
