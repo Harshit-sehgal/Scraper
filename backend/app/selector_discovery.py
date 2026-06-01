@@ -40,20 +40,31 @@ from app.selector_discovery_analysis import (
     _infer_field_selectors_from_container,
 )
 
-from app.selector_discovery_url import (
+# ── Re-exports from refactored url-analysis sub-modules ───────────────
+
+from app.url_redirects import (
     _detect_redirect,
     build_redirect_info,
+)
+
+from app.content_quality import (
     _assess_content_quality,
     _extract_container_text_values,
+)
+
+from app.url_value_classification import (
     _classify_value,
     _value_patterns_to_field_types,
     build_url_analysis_prompt,
+    _rename_generic_fields,
+    _infer_field_name,
+)
+
+from app.search_form_recovery import (
     _detect_search_form,
     _build_absolute_url,
     _map_search_params_to_fields,
     _try_form_search_recovery,
-    _rename_generic_fields,
-    _infer_field_name,
 )
 
 __all__ = [
