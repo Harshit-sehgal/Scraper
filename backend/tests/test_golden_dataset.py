@@ -12,6 +12,7 @@ extra/missing records and extra/missing fields (matching benchmark accuracy).
 """
 
 import json
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -117,13 +118,13 @@ def compute_f1(
 @pytest.mark.golden_dataset
 @pytest.mark.parametrize("site_def", load_sites(), ids=lambda s: s["id"])
 @pytest.mark.asyncio
-async def test_golden_dataset_site(site_def):
+async def test_golden_dataset_site(site_def, monkeypatch):
     """Run extraction against a golden dataset site and compare to expected.
 
-    NOTE: This test is currently OBSERVATIONAL — it verifies the site is
-    reachable and extraction produces records, but does not assert a minimum
-    F1 threshold. The golden dataset is a framework being built out; actual
-    expected outputs and thresholds will be refined over time.
+    This live test verifies the site is reachable, extraction produces enough
+    records, and expected-output files meet the site's configured minimum F1
+    threshold. Thresholds are intentionally modest until the benchmark corpus
+    is broadened and selectors are improved.
 
     When sites.json is missing, load_sites() returns an empty list and this
     parametrized test generates zero items (clean skip without collection error).
@@ -131,6 +132,7 @@ async def test_golden_dataset_site(site_def):
     url = site_def["url"]
     site_id = site_def["id"]
     min_expected = site_def.get("min_expected_records", 0)
+    expected = load_expected(site_id)
 
     # Build schema fields from site definition
     fields_def = site_def.get("schema", {}).get("fields", {})
@@ -152,11 +154,24 @@ async def test_golden_dataset_site(site_def):
     if not schema_fields:
         pytest.skip(f"No schema fields defined for {site_id}")
 
-    # Run extraction
+    timeout_seconds = float(site_def.get("timeout_seconds", 60))
+    from app.config import settings
+
+    expected_count = len(expected or [])
+    benchmark_record_limit = max(settings.MAX_RECORDS_PER_SOURCE, min_expected, expected_count)
+    monkeypatch.setattr(settings, "MAX_RECORDS_PER_SOURCE", benchmark_record_limit)
+
+    # Run extraction with a per-site timeout so live validation cannot hang the
+    # entire suite on a single slow or unreachable website.
     from app.scraper import scrape_url  # noqa: E402 — lazy import for network tests
 
     try:
-        results = await scrape_url(url, schema_fields, min_record_score=0.0)
+        results = await asyncio.wait_for(
+            scrape_url(url, schema_fields, min_record_score=0.0),
+            timeout=timeout_seconds,
+        )
+    except asyncio.TimeoutError:
+        pytest.fail(f"Extraction timed out for {site_id} ({url}) after {timeout_seconds:g}s")
     except Exception as e:
         pytest.fail(f"Extraction failed for {site_id} ({url}): {e}")
 
@@ -166,7 +181,6 @@ async def test_golden_dataset_site(site_def):
     )
 
     # Compare with expected output if available
-    expected = load_expected(site_id)
     if expected:
         key_fields = list(fields_def.keys())[:2]  # First 2 fields as key
         f1_result = compute_f1(results, expected, key_fields=key_fields)
@@ -176,6 +190,11 @@ async def test_golden_dataset_site(site_def):
               f"recall={f1_result['recall']:.3f}, "
               f"extracted={f1_result['extracted_count']}, "
               f"expected={f1_result['expected_count']})")
+        min_f1 = site_def.get("min_f1")
+        assert min_f1 is not None, f"{site_id}: expected output exists but min_f1 is not configured"
+        assert f1_result["f1"] >= float(min_f1), (
+            f"{site_id}: F1 {f1_result['f1']:.3f} is below configured threshold {float(min_f1):.3f}"
+        )
     else:
         print(f"\n  [{site_id}] {len(results)} records extracted (no expected output file)")
 

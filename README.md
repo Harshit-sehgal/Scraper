@@ -29,23 +29,22 @@ It is not a universal scraper, not anti-bot proof, not fully autonomous, and not
 
 Status: pre-production candidate.
 
-Fresh validation snapshot from `2026-06-01T00:49:22+05:30`, commit `7fa1640130249ff504e0f2557e5e30c50cf25cb4`:
+Fresh validation snapshot from `2026-06-01T05:45:16+05:30`, base commit `599d0ab7708f542486992ebecf30a95cbef00961`, with verified changes pending commit:
 
 | Area | Current evidence | Status |
 | --- | --- | --- |
 | Syntax | `python3 -m compileall -q backend scripts architecture_validator.py` completed with no output | Verified |
 | Architecture rules | `PYTHONPATH=backend python3 architecture_validator.py` printed `VALIDATION PASSED: Architecture is lawful.` | Verified |
-| Test collection | `1912 tests collected in 0.41s` for `backend/tests backend/benchmarks` | Verified |
-| Safe local backend tests | `1839 passed, 72 skipped in 107.06s` with SQLite | Verified |
-| Benchmark pytest package | `1 passed in 0.27s` | Verified smoke test only |
-| Route auth tests | `134 passed in 1.25s` | Verified route-matrix test coverage |
-| Production secret tests | `48 passed in 0.09s` | Verified |
-| Postgres optional tests | `1883 passed, 28 skipped in 129.55s` with `--run-postgres` and Docker/testcontainers | Verified locally |
-| Browser optional tests | `1856 passed, 55 skipped in 116.73s` with `--run-browser` | Verified locally |
+| Test collection | `1914 tests collected in 0.40s` for `backend/tests backend/benchmarks` | Verified |
+| Safe local backend tests | `1841 passed, 72 skipped in 116.54s` with SQLite | Verified |
+| Benchmark pytest package | `1 passed in 0.25s` | Verified smoke test only |
+| Route/security/CORS tests | `183 passed in 1.83s` for route-auth, production-secret validation, and CORS preflight coverage | Verified |
+| Postgres optional tests | `1885 passed, 28 skipped in 138.54s` with `--run-postgres` and Docker/testcontainers | Verified locally |
+| Browser optional tests | `1858 passed, 55 skipped in 125.64s` with `--run-browser` | Verified locally |
 | Production env example | `.env.production.example` intentionally fails validation because it contains placeholders, including the metrics token | Verified |
-| Docker build | `docker build -f Dockerfile -t dataforge:local .` built image `2d6822c8ca4f` | Verified locally |
-| Compose stack smoke | Local Compose with a temporary ignored `.env`: backend/worker/Postgres healthy, `/health` 200, `/ready` 200, `/docs`/`/redoc`/`/openapi.json`/`/metrics` 404 through Nginx, Prometheus targets up, Chromium launches in container, one `example.com` job completed with 1 record | Verified locally, not target production |
-| Golden dataset live run | `test_golden_dataset.py --run-golden-dataset` completed one test then timed out/stalled and was stopped | Failed/inconclusive |
+| Docker build | Production smoke built image `796fe80630f771d4da8257eb7ec3f07a003f92f63d668ac1ffc3b43007ee9fc9` | Verified locally |
+| Compose stack smoke | `bash scripts/smoke_prod_stack.sh` passed with backend/worker/Postgres healthy, Nginx route checks, Prometheus targets, container Chromium, and one deterministic worker job with 4 records | Verified locally, not target production |
+| Golden dataset live run | `8 passed in 53.97s`; F1: books `0.650`, quotes `1.000`, countries `0.680`, example `1.000`, httpbin `1.000` | Verified with modest enforced thresholds |
 
 See `PROJECT_STATUS.md` for the current truth source.
 

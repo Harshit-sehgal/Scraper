@@ -38,13 +38,13 @@ Static dashboard mounts at `/app` and `/dashboard` are internal surfaces and sho
 ## Enforcement Test
 
 ```bash
-PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests/test_route_auth_matrix.py backend/tests/test_route_auth_matrix_generator.py -o addopts=
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests/test_route_auth_matrix.py backend/tests/test_route_auth_matrix_generator.py backend/tests/test_check_prod_env.py backend/tests/test_prod_security_validator.py backend/tests/test_production_hardening.py::test_backend_cors_origins_enforcement -o addopts=
 ```
 
 Latest verified result:
 
 ```text
-134 passed in 1.25s
+183 passed in 1.83s
 ```
 
-This proves route registration and dependency classification. It is not a penetration test.
+This proves route registration/dependency classification, production-secret validation tests, and backend CORS preflight behavior. It is not a penetration test.

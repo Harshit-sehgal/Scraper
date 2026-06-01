@@ -12,7 +12,7 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 Result:
 
 ```text
-1 passed in 0.27s
+1 passed in 0.25s
 ```
 
 This is an offline smoke/config test. It does not run live extraction and does not prove accuracy.
@@ -28,7 +28,7 @@ Files exist:
 - `backend/tests/golden_dataset/expected/quotes_toscrape.json`
 - `backend/tests/golden_dataset/expected/scrapethissite_simple.json`
 
-The golden test computes record-level F1 when expected output exists, but it currently logs the score and does not enforce a minimum threshold. A live run in this audit was stopped after one visible test and several minutes without progress. Therefore golden accuracy is unvalidated.
+The golden test computes record-level F1 when expected output exists and now enforces modest per-site thresholds from `sites.json`. The current live command completed with `8 passed in 53.97s`: books `F1=0.650`, quotes `F1=1.000`, countries `F1=0.680`, example `F1=1.000`, and httpbin `F1=1.000`. This is useful regression evidence, not proof of broad real-world extraction accuracy.
 
 ## Benchmark Classification
 
@@ -39,13 +39,13 @@ The golden test computes record-level F1 when expected output exists, but it cur
 | Fixture extraction tests | Synthetic | Regression behavior on controlled HTML | Live website behavior |
 | Hostile/recovery simulations | Simulated | Code behavior under generated conditions | Anti-bot resilience |
 | Replay/longevity modules | Simulated/manual | Internal state behavior | Production reliability |
-| Golden dataset tests | Optional/incomplete | Can support future accuracy validation | Current benchmark proof |
+| Golden dataset tests | Optional/live | Enforced modest F1 thresholds on five accessible sample sites | Broad benchmark proof |
 
 ## Allowed Claims
 
 - The project includes benchmark and golden-dataset scaffolding.
 - The benchmark pytest smoke test passes.
-- Golden expected-output files exist.
+- Golden expected-output files exist and the current live suite passes modest enforced thresholds.
 
 ## Banned Claims
 

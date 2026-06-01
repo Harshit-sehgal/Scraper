@@ -114,10 +114,10 @@ class TestMatchDomain:
     def teardown_method(self):
         reload_profiles()
 
-    def test_match_returns_none_for_empty_profiles(self):
-        # With no profiles, any URL should return None
+    def test_match_returns_profile_for_known_profile(self):
         result = _match_domain("https://example.com/page")
-        assert result is None
+        assert result is not None
+        assert result["domain"] == "example.com"
 
     def test_match_handles_invalid_url(self):
         result = _match_domain("not-a-url")

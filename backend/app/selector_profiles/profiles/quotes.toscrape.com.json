@@ -1,0 +1,18 @@
+{
+  "domain": "quotes.toscrape.com",
+  "description": "Quotes to Scrape quote cards",
+  "wait_for": "div.quote",
+  "item_container": "div.quote",
+  "fields": {
+    "quote": {
+      "selector": ".text",
+      "type": "text",
+      "attribute": "text"
+    },
+    "author": {
+      "selector": ".author",
+      "type": "text",
+      "attribute": "text"
+    }
+  }
+}

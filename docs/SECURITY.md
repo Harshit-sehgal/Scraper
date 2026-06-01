@@ -10,12 +10,13 @@ This document describes implemented controls and remaining risks. It is not a pe
 | Area | Evidence | Status |
 | --- | --- | --- |
 | API key auth | `backend/app/utils/rbac.py`, middleware in `backend/app/main.py` | Verified |
-| RBAC route matrix | `134 passed in 1.25s` for route-auth matrix tests | Verified |
-| Production secret validation | `48 passed in 0.09s`; `.env.production.example` fails intentionally on placeholders including metrics token | Verified |
+| RBAC route matrix | Covered by combined route/security/CORS command: `183 passed in 1.83s` | Verified |
+| Production secret validation | Covered by combined route/security/CORS command: `183 passed in 1.83s`; `.env.production.example` fails intentionally on placeholders including metrics token | Verified |
 | URL safety/SSRF checks | `backend/app/url_safety.py` rejects non-http(s), loopback/private IPs, metadata hosts, and internal names | Verified by code/tests |
 | Rate limiting | `backend/app/rate_limiter.py` | Verified, single-process only |
+| Public LLM fallback control | `DATAFORGE_LLM_ENABLE_PUBLIC_FALLBACKS=false` by default; tests verify disabled Pollinations/g4f fallbacks do not make unauthenticated external calls | Verified |
 | Audit logging | Audit logging modules and tests exist; production Compose sets `DATAFORGE_AUDIT_LOG_DIR=/app/backend/data/logs` so read-only root does not break writes | Partially verified |
-| CORS config | Central settings in `backend/app/config.py`; production must not use wildcard origins | Partially verified |
+| CORS config | Central settings in `backend/app/config.py`; local Nginx preflight returned `200` for `https://yourdomain.com` and `400` for `https://evil.example` | Verified locally |
 | CSP | `nginx.conf` includes security headers; `/app/` locally returned CSP, X-Frame-Options, nosniff, Referrer-Policy, and Permissions-Policy headers | Partially verified |
 | Metrics protection | `/metrics` uses token protection when `DATAFORGE_METRICS_TOKEN` is configured; local Nginx returned 404 for public `/metrics`; Prometheus scraped internal `/metrics` with bearer token | Verified locally |
 | Docs exposure | FastAPI docs routes disabled when `DATAFORGE_ENV=production`; local Nginx returned 404 for `/docs`, `/redoc`, and `/openapi.json` | Verified locally |
@@ -45,6 +46,7 @@ URL safety checks reject unsupported schemes and common private/internal targets
 - CORS/CSP must be verified against the real production origin.
 - Browser extraction can touch untrusted pages; sandbox, egress, timeout, and resource limits need deployment validation.
 - Secrets are validated for placeholders/shape, but operators must generate and protect real secrets.
+- Enabling public LLM fallbacks can send prompts to third-party services and should remain disabled unless explicitly reviewed.
 
 ## Before Public Deployment
 

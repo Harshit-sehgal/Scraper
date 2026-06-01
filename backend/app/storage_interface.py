@@ -341,7 +341,7 @@ def get_job_repository() -> JobRepository:
         if not database_url:
             raise RuntimeError(
                 "DATAFORGE_STORAGE_BACKEND=postgres requires DATAFORGE_DATABASE_URL "
-                "to be set. Example: postgresql://user:pass@host:5432 / dataforge"
+                "to be set. Example: postgresql://user:pass@host:5432/dataforge"
             )
         try:
             from app.postgres_repository import PostgresJobRepository, verify_postgres_connectivity

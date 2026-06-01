@@ -90,6 +90,13 @@ echo -e "  $PASS  .env file exists"
 # Read env values safely through Python
 DATAFORGE_API_KEY="$(_get_env DATAFORGE_API_KEY)"
 DATAFORGE_OPERATOR_API_KEY="$(_get_env DATAFORGE_OPERATOR_API_KEY)"
+SMOKE_PORT="$(_get_env PORT 80)"
+if [ "${SMOKE_PORT}" = "80" ]; then
+    SMOKE_BASE_URL="${SMOKE_BASE_URL:-http://localhost}"
+else
+    SMOKE_BASE_URL="${SMOKE_BASE_URL:-http://localhost:${SMOKE_PORT}}"
+fi
+echo -e "  $INFO  Smoke HTTP base URL: $SMOKE_BASE_URL"
 
 if [ -z "${DATAFORGE_OPERATOR_API_KEY:-}" ]; then
     echo -e "  $INFO  DATAFORGE_OPERATOR_API_KEY not set — job creation may fail if ADMIN is required"
@@ -167,7 +174,7 @@ echo ""
 echo "─── Step 5: Health and readiness probes ──────────────────────────────"
 
 # /health — liveness
-HEALTH=$(curl -s http://localhost/health 2>/dev/null || echo '{"status":"unreachable"}')
+HEALTH=$(curl -s "$SMOKE_BASE_URL/health" 2>/dev/null || echo '{"status":"unreachable"}')
 if echo "$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ok'" 2>/dev/null; then
     echo -e "  $PASS  /health returns ok"
 else
@@ -178,7 +185,7 @@ fi
 # /ready — readiness: in production the endpoint returns only {"status":"ready"}
 # to avoid leaking backend/schema details. We check only status=='ready' here.
 # Backend verification is done via the authenticated /api/system/storage/status.
-READY=$(curl -s http://localhost/ready 2>/dev/null || echo '{"status":"unreachable"}')
+READY=$(curl -s "$SMOKE_BASE_URL/ready" 2>/dev/null || echo '{"status":"unreachable"}')
 if echo "$READY" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ready'" 2>/dev/null; then
     echo -e "  $PASS  /ready returns ready"
 else
@@ -190,7 +197,7 @@ fi
 echo ""
 echo "─── Step 6: API authenticated endpoints ──────────────────────────────"
 
-STATUS=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" http://localhost/api/system/status 2>/dev/null || echo '{"status":"unreachable"}')
+STATUS=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" "$SMOKE_BASE_URL/api/system/status" 2>/dev/null || echo '{"status":"unreachable"}')
 if echo "$STATUS" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='online'; assert d.get('backend')=='postgres'" 2>/dev/null; then
     echo -e "  $PASS  /api/system/status returns online+postgres"
 else
@@ -198,7 +205,7 @@ else
     ALL_PASS=false
 fi
 
-STORAGE=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" http://localhost/api/system/storage/status 2>/dev/null || echo '{"backend":"unreachable"}')
+STORAGE=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" "$SMOKE_BASE_URL/api/system/storage/status" 2>/dev/null || echo '{"backend":"unreachable"}')
 if echo "$STORAGE" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('backend')=='postgres'; assert d.get('ok')==True" 2>/dev/null; then
     echo -e "  $PASS  /api/system/storage/status returns postgres+ok"
 else
@@ -225,7 +232,7 @@ JOB_RESPONSE=$(curl -s -X POST \
     -H "X-API-Key: $DATAFORGE_OPERATOR_API_KEY" \
     -H "Content-Type: application/json" \
     -d '{"name":"Smoke Test Job","mode":"manual","urls":["http://nginx/smoke/records.html"],"schema_fields":[{"name":"name","field_type":"string","required":true},{"name":"email","field_type":"email","required":true},{"name":"role","field_type":"string","required":true},{"name":"team","field_type":"string","required":true}]}' \
-    http://localhost/api/jobs 2>/dev/null || echo '{"error":"unreachable"}')
+    "$SMOKE_BASE_URL/api/jobs" 2>/dev/null || echo '{"error":"unreachable"}')
 
 JOB_ID=$(echo "$JOB_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('job_id',''))" 2>/dev/null || echo "")
 if [ -n "$JOB_ID" ]; then
@@ -249,7 +256,7 @@ if [ -n "$JOB_ID" ]; then
     POLL_DEADLINE=$((SECONDS + 90))
     while [ $SECONDS -lt $POLL_DEADLINE ]; do
         JOB_STATUS=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" \
-            "http://localhost/api/jobs/$JOB_ID" 2>/dev/null || echo '{"status":"unreachable"}')
+            "$SMOKE_BASE_URL/api/jobs/$JOB_ID" 2>/dev/null || echo '{"status":"unreachable"}')
         STATUS_VALUE=$(echo "$JOB_STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))" 2>/dev/null || echo "unknown")
         
         if echo "$STATUS_VALUE" | grep -qE "$TERMINAL_STATUSES"; then
@@ -273,7 +280,7 @@ if [ -n "$JOB_ID" ]; then
     else
         # Assert expected record count from local smoke HTML page
         RESULTS_RESPONSE=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" \
-            "http://localhost/api/jobs/$JOB_ID/results" 2>/dev/null || echo '{"results":[]}')
+            "$SMOKE_BASE_URL/api/jobs/$JOB_ID/results" 2>/dev/null || echo '{"results":[]}')
         RECORD_COUNT=$(echo "$RESULTS_RESPONSE" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('results', [])))" 2>/dev/null || echo "0")
         
         if [ "$RECORD_COUNT" -ge 2 ]; then

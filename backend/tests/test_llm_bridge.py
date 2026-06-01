@@ -321,6 +321,7 @@ class TestLlmJson:
                 patch("app.llm_bridge._call_openai_compatible_json") as mock_call,
                 patch("app.llm_bridge.settings.GROQ_API_ENDPOINT", "http://groq"),
                 patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
+                patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),
             ):
                 # Groq fails, Pollinations succeeds
                 mock_call.side_effect = [
@@ -346,6 +347,19 @@ class TestLlmJson:
             result = await llm_json([{"role": "user", "content": "hi"}])
             assert result == {}  # Empty dict fallback
 
+    @pytest.mark.asyncio
+    async def test_public_fallbacks_disabled_skips_unauthenticated_http(self):
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("app.llm_bridge._call_openai_compatible_json") as mock_json,
+            patch("app.llm_bridge.asyncio.to_thread") as mock_thread,
+            patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", False),
+        ):
+            result = await llm_json([{"role": "user", "content": "hi"}])
+            assert result == {}
+            mock_json.assert_not_called()
+            mock_thread.assert_not_called()
+
 
 class TestLlmJsonFast:
     @pytest.mark.asyncio
@@ -369,6 +383,7 @@ class TestLlmJsonFast:
                   side_effect=Exception("fail")),
             patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
             patch("app.llm_bridge._record_llm_degradation"),
+            patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),
         ):
             result = await llm_json_fast([{"role": "user", "content": "hi"}])
             assert result == {}
@@ -398,6 +413,7 @@ class TestLlmText:
             patch("app.llm_bridge.asyncio.to_thread",
                   side_effect=Exception("g4f fail")),
             patch("app.llm_bridge._record_llm_degradation"),
+            patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),
         ):
             result = await llm_text([{"role": "user", "content": "hi"}])
             assert result == ""

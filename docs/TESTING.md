@@ -21,15 +21,13 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 | --- | --- | --- |
 | `compileall` | Passed with no output | Syntax is valid for checked Python files |
 | `architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Architecture rules pass |
-| Pytest collection | `1912 tests collected in 0.41s` | Collection is clean |
-| Safe SQLite backend suite | `1839 passed, 72 skipped in 107.06s` | Default local backend tests pass |
-| Benchmark package | `1 passed in 0.27s` | Benchmark smoke/config test passes only |
-| Route auth tests | `134 passed in 1.25s` | Route-auth matrix tests pass |
-| Production security tests | `48 passed in 0.09s` | Placeholder/secret validation tests pass |
-| Combined route/security tests | `182 passed in 1.31s` | Route-auth and production-security checks pass together |
-| Postgres optional suite | `1883 passed, 28 skipped in 129.55s` | Postgres repository/queue tests pass locally |
-| Browser optional suite | `1856 passed, 55 skipped in 116.73s` | Browser/local-server tests pass locally |
-| Golden dataset optional suite | Stopped after one visible test and no progress for several minutes | Not validated |
+| Pytest collection | `1914 tests collected in 0.40s` | Collection is clean |
+| Safe SQLite backend suite | `1841 passed, 72 skipped in 116.54s` | Default local backend tests pass |
+| Benchmark package | `1 passed in 0.25s` | Benchmark smoke/config test passes only |
+| Combined route/security/CORS tests | `183 passed in 1.83s` | Route-auth, production-security, and CORS preflight checks pass together |
+| Postgres optional suite | `1885 passed, 28 skipped in 138.54s` | Local Postgres repository/queue tests pass |
+| Browser optional suite | `1858 passed, 55 skipped in 125.64s` | Local browser/local-server tests pass |
+| Golden dataset optional suite | `8 passed in 53.97s`; F1 books `0.650`, quotes `1.000`, countries `0.680`, example `1.000`, httpbin `1.000` | Live golden checks pass modest enforced thresholds |
 
 ## Optional Groups
 
@@ -56,7 +54,7 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 - Passing local tests does not prove production readiness.
 - Browser tests prove local Playwright behavior, not broad website compatibility.
 - Postgres tests prove local repository/queue behavior, not production failover or backups.
-- Golden dataset tests do not currently enforce accuracy thresholds.
+- Golden dataset thresholds are modest and do not prove broad extraction accuracy.
 - Route-auth tests do not replace a security review or penetration test.
 
 ## Manual Tests

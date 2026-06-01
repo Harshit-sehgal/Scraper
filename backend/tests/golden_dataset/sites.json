@@ -13,6 +13,8 @@
       },
       "category": "ecommerce",
       "min_expected_records": 20,
+      "min_f1": 0.65,
+      "timeout_seconds": 60,
       "notes": "Stable demo site. 50 books per page with consistent structure."
     },
     {
@@ -27,6 +29,8 @@
       },
       "category": "listing",
       "min_expected_records": 10,
+      "min_f1": 1.0,
+      "timeout_seconds": 60,
       "notes": "Stable demo site. 10 quotes per page."
     },
     {
@@ -41,6 +45,8 @@
       },
       "category": "listing",
       "min_expected_records": 50,
+      "min_f1": 0.65,
+      "timeout_seconds": 60,
       "notes": "Stable educational scraping site."
     },
     {
@@ -55,6 +61,8 @@
       },
       "category": "static",
       "min_expected_records": 0,
+      "min_f1": 1.0,
+      "timeout_seconds": 45,
       "notes": "Minimal page, IANA reserved domain."
     },
     {
@@ -69,6 +77,8 @@
       },
       "category": "static",
       "min_expected_records": 1,
+      "min_f1": 1.0,
+      "timeout_seconds": 45,
       "notes": "Always available HTTP test service."
     }
   ]

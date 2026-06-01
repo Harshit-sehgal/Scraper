@@ -1,0 +1,23 @@
+{
+  "domain": "books.toscrape.com",
+  "description": "Books to Scrape product listing cards",
+  "wait_for": "article.product_pod",
+  "item_container": "article.product_pod",
+  "fields": {
+    "title": {
+      "selector": "h3 a",
+      "type": "text",
+      "attribute": "title"
+    },
+    "price": {
+      "selector": ".price_color",
+      "type": "text",
+      "attribute": "text"
+    },
+    "rating": {
+      "selector": "p.star-rating",
+      "type": "text",
+      "attribute": "class"
+    }
+  }
+}

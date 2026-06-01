@@ -8,12 +8,13 @@ This document defines expected quality checks. It is not proof that every lint/t
 
 - `python3 -m compileall -q backend scripts architecture_validator.py` passed with no output.
 - `PYTHONPATH=backend python3 architecture_validator.py` passed with `VALIDATION PASSED: Architecture is lawful.`
-- Pytest collection completed with `1912 tests collected in 0.41s`.
-- Safe SQLite backend suite passed with `1839 passed, 72 skipped in 107.06s`.
-- Route-auth tests passed with `134 passed in 1.25s`.
-- Production security tests passed with `48 passed in 0.09s`.
-- Docker image build passed locally with image `2d6822c8ca4f`.
-- Local Compose smoke passed for backend, worker, Postgres, Nginx, Prometheus scrape, container Chromium, and a one-job worker path.
+- Pytest collection completed with `1914 tests collected in 0.40s`.
+- Safe SQLite backend suite passed with `1841 passed, 72 skipped in 116.54s`.
+- Combined route-auth, production-security, and CORS preflight tests passed with `183 passed in 1.83s`.
+- Postgres optional tests passed with `1885 passed, 28 skipped in 138.54s`.
+- Browser optional tests passed with `1858 passed, 55 skipped in 125.64s`.
+- Golden dataset live tests passed with `8 passed in 53.97s` and modest enforced F1 thresholds.
+- Local Compose smoke built image `796fe80630f771d4da8257eb7ec3f07a003f92f63d668ac1ffc3b43007ee9fc9` and passed backend, worker, Postgres, Nginx, Prometheus, Grafana health, container Chromium, and one deterministic worker job.
 
 ## Not Verified In This Snapshot
 

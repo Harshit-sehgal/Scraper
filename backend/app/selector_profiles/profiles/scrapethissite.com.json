@@ -1,0 +1,18 @@
+{
+  "domain": "scrapethissite.com",
+  "description": "ScrapeThisSite simple country listing",
+  "wait_for": ".country",
+  "item_container": ".country",
+  "fields": {
+    "country": {
+      "selector": ".country-name",
+      "type": "text",
+      "attribute": "text"
+    },
+    "capital": {
+      "selector": ".country-capital",
+      "type": "text",
+      "attribute": "text"
+    }
+  }
+}
