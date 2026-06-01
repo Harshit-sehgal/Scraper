@@ -21,8 +21,8 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 | --- | --- | --- |
 | `compileall` | Passed with no output | Syntax is valid for checked Python files |
 | `architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Architecture rules pass |
-| Pytest collection | `1914 tests collected in 0.40s` | Collection is clean |
-| Safe SQLite backend suite | `1841 passed, 72 skipped in 116.54s` | Default local backend tests pass |
+| Pytest collection | `1916 tests collected in 0.40s` | Collection is clean |
+| Safe SQLite backend suite | `1843 passed, 72 skipped in 119.06s` | Default local backend tests pass |
 | Benchmark package | `1 passed in 0.25s` | Benchmark smoke/config test passes only |
 | Combined route/security/CORS tests | `183 passed in 1.83s` | Route-auth, production-security, and CORS preflight checks pass together |
 | Postgres optional suite | `1885 passed, 28 skipped in 138.54s` | Local Postgres repository/queue tests pass |

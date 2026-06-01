@@ -14,7 +14,7 @@ DataForge Scraper is a configurable extraction platform, not an all-powerful scr
 
 ## Validation Limits
 
-- Safe SQLite tests pass locally: `1841 passed, 72 skipped in 116.54s`.
+- Safe SQLite tests pass locally: `1843 passed, 72 skipped in 119.06s`.
 - Postgres tests pass locally with Docker/testcontainers: `1885 passed, 28 skipped in 138.54s`.
 - Browser/local-server tests pass locally: `1858 passed, 55 skipped in 125.64s`.
 - Benchmark pytest package has only one smoke/config test: `1 passed in 0.25s`.
