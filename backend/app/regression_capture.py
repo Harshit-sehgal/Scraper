@@ -499,7 +499,7 @@ def {safe_name}(hostile_base_url):
     url = f"{{hostile_base_url}}/regression/{entry.id}"
     results = asyncio.run(scrape_url(url, fields, min_record_score=0.2))
     # Expected: extraction should handle this failure mode gracefully
-    assert len(results) == 0
+    assert len(results) == 0, f"Expected 0 results for regression fixture {entry.id}, got {{len(results)}}"
 """
 
         return test_code.strip()
