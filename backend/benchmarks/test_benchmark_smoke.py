@@ -16,6 +16,7 @@ import logging
 import os
 import time
 import sys
+import pytest
 from dataclasses import dataclass, field
 
 # Ensure backend is on the path

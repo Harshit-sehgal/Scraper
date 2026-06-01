@@ -1,6 +1,3 @@
-import pytest
-from app import main as main_mod
-
 def test_dashboard_security_headers(client):
     """Verify that static dashboard endpoints serve robust security headers."""
     # Test main dashboard route
@@ -16,7 +13,6 @@ def test_dashboard_security_headers(client):
     # Validate security headers served by uvicorn/FastAPI fallback
     # Note: Production headers are primarily injected by Nginx (verified by scripts/verify_production_deployment.py),
     # but the FastAPI backend should serve standard secure headers where possible.
-    headers = {k.lower(): v for k, v in resp.headers.items()}
     
     # Verify Content Security Policy is configured correctly in the app settings if served
     from app.config import settings
