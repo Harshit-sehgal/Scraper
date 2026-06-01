@@ -125,7 +125,7 @@ async def get_scraper_diagnostics(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Trend Analysis & Telemetry Intelligence
+# Trend Analysis & Telemetry Intelligence (EXPERIMENTAL / RESEARCH ONLY)
 # ═══════════════════════════════════════════════════════════════════════
 
 
@@ -213,7 +213,7 @@ async def get_domain_trend(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Regression Capture & Autonomous Benchmark Evolution
+# Regression Capture & Autonomous Benchmark Evolution (EXPERIMENTAL / RESEARCH ONLY)
 # ═══════════════════════════════════════════════════════════════════════
 
 
@@ -289,7 +289,7 @@ async def generate_all_replay_tests(_role: UserRole = Depends(require_role([User
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Economic Tracking & Cost Analysis
+# Economic Tracking & Cost Analysis (EXPERIMENTAL / RESEARCH ONLY)
 # ═══════════════════════════════════════════════════════════════════════
 
 
@@ -330,7 +330,7 @@ async def get_extraction_economics(window: int = Query(200, ge=10, le=1000)):
     }
 
 
-# ─── Domain Health Monitoring Endpoints ──────────────────────────────────
+# ─── Domain Health Monitoring Endpoints (EXPERIMENTAL / RESEARCH ONLY) ───
 
 
 @router.get("/health/domains")
@@ -426,7 +426,7 @@ async def get_system_health_summary():
     }
 
 
-# ─── Selector Memory Stats Endpoints ──────────────────────────────────────
+# ─── Selector Memory Stats Endpoints (EXPERIMENTAL / RESEARCH ONLY) ───────
 
 
 @router.get("/selectors/stats")
@@ -544,7 +544,7 @@ async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)
     }
 
 
-# ─── ML Selector Optimization Endpoints ──────────────────────────────────
+# ─── ML Selector Optimization Endpoints (EXPERIMENTAL / RESEARCH ONLY) ───
 
 
 @router.post("/ml/optimize/domain/{domain}")
@@ -643,7 +643,7 @@ async def record_selector_learning(
     }
 
 
-# ─── Strategy Evolution Endpoints ────────────────────────────────────────
+# ─── Strategy Evolution Endpoints (EXPERIMENTAL / RESEARCH ONLY) ─────────
 
 
 @router.get("/strategy/recommend/{domain}")

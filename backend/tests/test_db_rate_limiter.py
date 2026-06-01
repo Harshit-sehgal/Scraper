@@ -3,40 +3,47 @@ from unittest.mock import MagicMock
 from app.rate_limiter import DatabaseSlidingWindowCounter, RateLimiterMiddleware
 
 def test_db_sliding_window_counter_sqlite():
-    """Verify that DatabaseSlidingWindowCounter behaves correctly using SQLite storage."""
-    # Ensure any legacy test tables are dropped
+    """Verify that DatabaseSlidingWindowCounter behaves correctly using SQLite storage.
+
+    Uses a unique key prefix to avoid colliding with other tests that share
+    the same rate_limits table. Cleans up test data on completion.
+    """
     from app.job_store import _get_connection, _DB_LOCK
-    with _DB_LOCK:
-        conn = _get_connection()
-        try:
-            conn.execute("DROP TABLE IF EXISTS rate_limits")
-            conn.commit()
-        finally:
-            conn.close()
 
-    counter = DatabaseSlidingWindowCounter(max_requests=3, window_seconds=2.0, key="test_key_sqlite")
+    test_key = "_test_sliding_window_sqlite_"
+    counter = DatabaseSlidingWindowCounter(max_requests=3, window_seconds=2.0, key=test_key)
 
-    # Verify initial limit state
-    assert counter.remaining() == 3
-    assert counter.reset_in() == 0.0
+    try:
+        # Verify initial limit state
+        assert counter.remaining() == 3
+        assert counter.reset_in() == 0.0
 
-    # First request
-    assert counter.allow() is True
-    assert counter.remaining() == 2
+        # First request
+        assert counter.allow() is True
+        assert counter.remaining() == 2
 
-    # Second and third requests
-    assert counter.allow() is True
-    assert counter.allow() is True
-    assert counter.remaining() == 0
+        # Second and third requests
+        assert counter.allow() is True
+        assert counter.allow() is True
+        assert counter.remaining() == 0
 
-    # Fourth request should be blocked
-    assert counter.allow() is False
+        # Fourth request should be blocked
+        assert counter.allow() is False
 
-    # Wait for the window to reset
-    time.sleep(2.1)
-    assert counter.remaining() == 3
-    assert counter.allow() is True
-    assert counter.remaining() == 2
+        # Wait for the window to reset
+        time.sleep(2.1)
+        assert counter.remaining() == 3
+        assert counter.allow() is True
+        assert counter.remaining() == 2
+    finally:
+        # Clean up test data to avoid shared state collision
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                conn.execute("DELETE FROM rate_limits WHERE key = ?", (test_key,))
+                conn.commit()
+            finally:
+                conn.close()
 
 def test_rate_limiter_middleware_db_backed_selection():
     """Verify that RateLimiterMiddleware selects the database-backed counter when configured."""

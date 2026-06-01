@@ -1,6 +1,6 @@
 # Limitations
 
-**Last refreshed:** 2026-06-01
+**Last refreshed:** 2026-06-02
 
 DataForge Scraper is a configurable extraction platform, not an all-powerful scraper.
 
@@ -14,12 +14,12 @@ DataForge Scraper is a configurable extraction platform, not an all-powerful scr
 
 ## Validation Limits
 
-- Safe SQLite tests pass locally: `1846 passed, 72 skipped in 121.71s`.
-- Postgres tests pass locally with Docker/testcontainers: `1885 passed, 28 skipped in 138.54s`.
-- Browser/local-server tests pass locally: `1858 passed, 55 skipped in 125.64s`.
+- Safe SQLite tests pass locally: `1863 passed, 72 skipped in 119.97s`.
+- Postgres tests were reported passing previously: `12 passed in 3.82s` under `--run-postgres` *(archived from prior refresh — not re-run in this session)*.
+- Browser e2e tests were reported passing previously: `10 passed in 10.04s` under `--run-browser` *(archived)*.
 - Benchmark pytest package has only one smoke/config test: `1 passed, 1 skipped in 0.26s`.
-- Golden dataset live validation passes modest enforced thresholds: `8 passed in 53.97s`, with lowest F1 currently `0.650`.
-- Docker image build and a local production-like Compose smoke pass with a temporary ignored `.env`.
+- Golden dataset live validation was reported passing previously: `8 passed in 45.05s` under `--run-golden-dataset`, with lowest F1 `0.650` *(archived)*.
+- Docker image build and a local production-like Compose smoke are documented historically.
 - Target production deployment, TLS, load, backups, alert delivery, and disaster recovery were not validated.
 
 ## Security Limits

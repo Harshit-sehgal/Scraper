@@ -1,6 +1,6 @@
 # Architecture
 
-**Last refreshed:** 2026-06-01
+**Last refreshed:** 2026-06-02
 **Status:** Actual architecture map from code inspection and fresh validation
 
 DataForge Scraper is organized as a FastAPI backend, Playwright/browser extraction layer, storage and queue abstractions, export utilities, telemetry/diagnostics, security helpers, a static dashboard, and a set of experimental adaptive modules.
@@ -14,7 +14,7 @@ DataForge Scraper is organized as a FastAPI backend, Playwright/browser extracti
 | Scraper/browser | `backend/app/scraper.py`, `backend/app/browser_pool.py`, `backend/app/browser_network_capture.py` | HTTP/browser fetch, Playwright orchestration, page loading | Core | Browser suite evidence exists in archived docs; not freshly rerun in this cleanup | Broad real-world extraction not proven | Keep, add benchmark corpus |
 | Extraction | `backend/app/extraction_orchestrator.py`, `backend/app/extractors/*`, `backend/app/schema_*.py` | Schema, selector, network payload, text fallback extraction | Core | Unit/API/browser tests | Real-world accuracy not proven | Keep, add benchmarks |
 | Cleaning/enrichment | `backend/app/data_cleaner.py`, `backend/app/enrichment.py`, validators | Normalize and validate extracted records | Stable supporting | Safe suite | Quality varies by site/schema | Keep |
-| Storage | `backend/app/storage_interface.py`, `backend/app/postgres_repository.py`, `backend/app/job_store.py` | SQLite local storage and Postgres repository selection | Core | SQLite safe suite; Postgres `1885 passed, 28 skipped`; Compose smoke and basic dump/restore | Production migration/failover/backups unvalidated | Keep, add deployment tests |
+| Storage | `backend/app/storage_interface.py`, `backend/app/postgres_repository.py`, `backend/app/job_store.py` | SQLite local storage and Postgres repository selection | Core | SQLite safe suite; Postgres optional suite *(archived from prior refresh)* | Production migration/failover/backups unvalidated | Keep, add deployment tests |
 | Export | `backend/app/routers/exports.py`, `backend/app/utils/export.py` | CSV/JSON/Excel result export | Core | Safe suite | Large export behavior unvalidated | Keep |
 | Telemetry/diagnostics | `backend/app/telemetry.py`, `backend/app/metrics.py`, `backend/app/diagnostics.py`, router endpoints | Observability, diagnostics, Prometheus metrics | Stable supporting | Safe suite, route matrix, local Prometheus target check | Target-network exposure still needs validation | Keep, verify target deployment |
 | Security/auth | `backend/app/utils/rbac.py`, `backend/app/url_safety.py`, `backend/app/rate_limiter.py`, `backend/app/utils/prod_security_validator.py` | API keys, roles, URL safety, rate limiting, env validation | Core supporting | Route-auth and prod-security tests pass | Not a penetration test; rate limit is in-memory | Keep, harden |

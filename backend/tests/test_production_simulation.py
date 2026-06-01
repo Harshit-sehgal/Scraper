@@ -14,10 +14,8 @@ All tests use actual codebase APIs — no external dependencies required.
 Run with: PYTHONPATH=backend python3 -m pytest -q backend/tests/test_production_simulation.py
 """
 
-import json
 import sqlite3
 import time
-from unittest.mock import patch, MagicMock
 import pytest
 from app.models import Job
 
@@ -105,50 +103,83 @@ class TestDatabaseFailure:
 
 
 class TestRateLimiting:
-    """Verify rate limiting enforcement scenarios."""
+    """Verify rate limiting enforcement scenarios.
+
+    Uses unique key prefixes to avoid colliding with other tests
+    that share the same rate_limits table. Cleans up test data
+    on completion.
+    """
+
+    def _cleanup_rate_limit_keys(self, *keys: str) -> None:
+        """Delete rate_limits entries for the given keys to prevent shared state collision."""
+        from app.job_store import _get_connection, _DB_LOCK
+        try:
+            with _DB_LOCK:
+                conn = _get_connection()
+                try:
+                    for key in keys:
+                        conn.execute("DELETE FROM rate_limits WHERE key = ?", (key,))
+                    conn.commit()
+                finally:
+                    conn.close()
+        except Exception:
+            pass  # Table may not exist yet — that's fine
 
     def test_rate_limiter_enforces_max_requests(self):
         """Rate limiter should block requests that exceed limit."""
         from app.rate_limiter import DatabaseSlidingWindowCounter
+
+        test_key = "_test_rate_limit_enforce_"
+        self._cleanup_rate_limit_keys(test_key)
         
-        # Create counter with max 5 requests per 10 seconds
-        limiter = DatabaseSlidingWindowCounter(
-            max_requests=5,
-            window_seconds=10,
-            key="test-key-1"
-        )
-        
-        # First 5 requests should succeed
-        for i in range(5):
-            result = limiter.allow()
-            assert result is True
-        
-        # 6th request should fail
-        assert limiter.allow() is False
+        try:
+            # Create counter with max 5 requests per 10 seconds
+            limiter = DatabaseSlidingWindowCounter(
+                max_requests=5,
+                window_seconds=10,
+                key=test_key
+            )
+            
+            # First 5 requests should succeed
+            for i in range(5):
+                result = limiter.allow()
+                assert result is True
+            
+            # 6th request should fail
+            assert limiter.allow() is False
+        finally:
+            self._cleanup_rate_limit_keys(test_key)
 
     def test_different_keys_have_independent_limits(self):
         """Different rate limit keys should have independent counters."""
         from app.rate_limiter import DatabaseSlidingWindowCounter
         
-        limiter1 = DatabaseSlidingWindowCounter(
-            max_requests=2,
-            window_seconds=10,
-            key="api-key-1"
-        )
-        limiter2 = DatabaseSlidingWindowCounter(
-            max_requests=2,
-            window_seconds=10,
-            key="api-key-2"
-        )
+        key1 = "_test_rate_limit_key1_"
+        key2 = "_test_rate_limit_key2_"
+        self._cleanup_rate_limit_keys(key1, key2)
         
-        # Use up limit for key1
-        assert limiter1.allow() is True
-        assert limiter1.allow() is True
-        assert limiter1.allow() is False  # Exceeded
-        
-        # key2 should still have requests
-        assert limiter2.allow() is True
-        assert limiter2.allow() is True
+        try:
+            limiter1 = DatabaseSlidingWindowCounter(
+                max_requests=2,
+                window_seconds=10,
+                key=key1
+            )
+            limiter2 = DatabaseSlidingWindowCounter(
+                max_requests=2,
+                window_seconds=10,
+                key=key2
+            )
+            
+            # Use up limit for key1
+            assert limiter1.allow() is True
+            assert limiter1.allow() is True
+            assert limiter1.allow() is False  # Exceeded
+            
+            # key2 should still have requests
+            assert limiter2.allow() is True
+            assert limiter2.allow() is True
+        finally:
+            self._cleanup_rate_limit_keys(key1, key2)
 
 
 class TestExtractionFailure:
@@ -228,7 +259,7 @@ class TestConcurrentJobLoad:
                 name=f"state-test-{i}",
                 status=state,
                 urls=[f"https://example.com/{i}"],
-                error=f"error-msg" if state == JobStatus.FAILED else None,
+                error="error-msg" if state == JobStatus.FAILED else None,
             )
             jobs[job.id] = job
         
