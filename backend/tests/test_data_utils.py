@@ -149,6 +149,12 @@ class TestLimitSourceRecords:
         assert result[0]["name"] == "Has Both"
         assert result[1]["name"] in ("Has Email", "Has Phone")
 
+    def test_over_limit_preserves_order_without_contact_fields(self):
+        schema = [SchemaField(name="title", field_type=FieldType.STRING, description="", required=False)]
+        records = [{"title": f"Record {i}", "record_score": 1.0 - (i * 0.01)} for i in range(5)]
+        result = _limit_source_records(records, schema, max_records=3)
+        assert [r["title"] for r in result] == ["Record 0", "Record 1", "Record 2"]
+
     def test_empty_returns_all(self):
         assert _limit_source_records([], FULL_SCHEMA) == []
 

@@ -78,6 +78,8 @@ def _limit_source_records(
 
     email_fields = {f.name for f in schema_fields if f.field_type == FieldType.EMAIL}
     phone_fields = {f.name for f in schema_fields if f.field_type == FieldType.PHONE}
+    if not email_fields and not phone_fields:
+        return records[:max_records]
 
     def _priority(r):
         has_email = 1 if any(r.get(f) for f in email_fields) else 0

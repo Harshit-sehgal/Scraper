@@ -313,6 +313,12 @@ class Settings(BaseSettings):
     """Groq API endpoint for LLM calls."""
     POLLINATIONS_API_ENDPOINT: str = "https://text.pollinations.ai/openai"
     """Pollinations AI endpoint for LLM calls."""
+    LLM_ENABLE_PUBLIC_FALLBACKS: bool = False
+    """Allow unauthenticated public LLM fallbacks such as Pollinations/g4f.
+
+    Disabled by default so local validation and production deployments do not
+    make unconfigured external AI calls.
+    """
 
     # ─── Proxy & Anti-Bot Evasion ──────────────────────────────────────────
     PROXY_ROTATION_ENABLED: bool = False

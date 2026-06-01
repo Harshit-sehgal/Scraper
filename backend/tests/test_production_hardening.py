@@ -62,7 +62,7 @@ def test_production_prometheus_mounts_alert_rules():
     compose = (root / "docker-compose.prod.yml").read_text()
     prometheus = (root / "prometheus.yml").read_text()
 
-    assert 'rule_files:\n  - "prometheus_alerts.yml"' in prometheus
+    assert 'rule_files:\n  - "/etc/prometheus/prometheus_alerts.yml"' in prometheus
     assert "./prometheus.yml:/etc/prometheus/prometheus.yml.template:ro" in compose
     assert "./prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro" in compose
     assert "DATAFORGE_METRICS_TOKEN" in compose
@@ -299,7 +299,9 @@ def test_backend_cors_origins_enforcement(client, monkeypatch):
     """Verify that backend CORS rejects/allows origins based on settings.CORS_ORIGINS."""
     from app import main as main_mod
     from app.config import settings
-    # Set CORS_ORIGINS in settings
+    # Set production-like API auth and CORS settings. Preflight requests must
+    # still be answered by CORSMiddleware without requiring an API key.
+    monkeypatch.setattr(settings, "API_KEY", "testkey")
     monkeypatch.setattr(settings, "CORS_ORIGINS", ["https://trusted.com"])
 
     # Locate and patch the CORSMiddleware instance in the ASGI middleware stack

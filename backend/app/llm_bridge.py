@@ -190,6 +190,11 @@ def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning
         logging.getLogger(__name__).debug("Telemetry skipped (WS unavailable): %s", e)
 
 
+def _public_llm_fallbacks_enabled() -> bool:
+    """Return whether unauthenticated public LLM fallbacks may be called."""
+    return bool(settings.LLM_ENABLE_PUBLIC_FALLBACKS)
+
+
 async def llm_json(messages: list[dict], temperature: float | None = None, timeout: int | None = None):
     try:
         from app.metrics_collector import record_llm_call
@@ -225,47 +230,48 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
                 logging.error("%s failed (%s): %s", stage, model, e)
                 _record_llm_degradation(subsystem="groq", cause=f"{stage} ({model}) failed: {e}")
 
-    try:
-        payload = {
-            "model": "openai",
-            "messages": messages,
-            "temperature": temperature,
-            "response_format": {"type": "json_object"},
-        }
-        parsed = await _call_openai_compatible_json(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
-        if parsed is not None:
-            return parsed
-    except Exception as e:
-        logging.error("Pollinations JSON call failed (prompt_len=%d): %s", len(messages), e)
-        _record_llm_degradation(subsystem="pollinations", cause=f"JSON call failed: {e}")
+    if _public_llm_fallbacks_enabled():
+        try:
+            payload = {
+                "model": "openai",
+                "messages": messages,
+                "temperature": temperature,
+                "response_format": {"type": "json_object"},
+            }
+            parsed = await _call_openai_compatible_json(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
+            if parsed is not None:
+                return parsed
+        except Exception as e:
+            logging.error("Pollinations JSON call failed (prompt_len=%d): %s", len(messages), e)
+            _record_llm_degradation(subsystem="pollinations", cause=f"JSON call failed: {e}")
 
-    try:
+        try:
 
-        def _run_g4f_json():
-            try:
-                from g4f.client import Client  # type: ignore
-            except ImportError:
-                logging.warning("g4f not installed — skipping g4f JSON fallback")
-                return None
-            client = Client()
-            res = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages,
-                timeout=timeout,
-            )
-            if not res.choices:
-                raise ValueError("Empty choices in LLM response")
-            return res.choices[0].message.content.strip()
+            def _run_g4f_json():
+                try:
+                    from g4f.client import Client  # type: ignore
+                except ImportError:
+                    logging.warning("g4f not installed — skipping g4f JSON fallback")
+                    return None
+                client = Client()
+                res = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=messages,
+                    timeout=timeout,
+                )
+                if not res.choices:
+                    raise ValueError("Empty choices in LLM response")
+                return res.choices[0].message.content.strip()
 
-        content = await asyncio.to_thread(_run_g4f_json)
-        if content is None:
-            return {}
-        parsed = _extract_json_payload(content)
-        if parsed is not None:
-            return parsed
-    except Exception as e:
-        logging.error("g4f JSON fallback failed (prompt_len=%d): %s", len(messages), e)
-        _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
+            content = await asyncio.to_thread(_run_g4f_json)
+            if content is None:
+                return {}
+            parsed = _extract_json_payload(content)
+            if parsed is not None:
+                return parsed
+        except Exception as e:
+            logging.error("g4f JSON fallback failed (prompt_len=%d): %s", len(messages), e)
+            _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
 
     return {}
 
@@ -306,24 +312,25 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
                 logging.error("%s failed (%s): %s", stage, model, e)
                 _record_llm_degradation(subsystem="groq_fast", cause=f"{stage} ({model}) failed: {e}")
 
-    try:
-        payload = {
-            "model": "openai",
-            "messages": messages,
-            "temperature": temperature,
-            "response_format": {"type": "json_object"},
-        }
-        parsed = await _call_openai_compatible_json(
-            settings.POLLINATIONS_API_ENDPOINT,
-            payload,
-            timeout=timeout,
-        )
-        if parsed is not None:
-            return parsed
-    except Exception as e:
-        logging.exception(e)
-        logging.error("Pollinations fast JSON call failed: %s", e)
-        _record_llm_degradation(subsystem="pollinations_fast", cause=f"Fast JSON call failed: {e}")
+    if _public_llm_fallbacks_enabled():
+        try:
+            payload = {
+                "model": "openai",
+                "messages": messages,
+                "temperature": temperature,
+                "response_format": {"type": "json_object"},
+            }
+            parsed = await _call_openai_compatible_json(
+                settings.POLLINATIONS_API_ENDPOINT,
+                payload,
+                timeout=timeout,
+            )
+            if parsed is not None:
+                return parsed
+        except Exception as e:
+            logging.exception(e)
+            logging.error("Pollinations fast JSON call failed: %s", e)
+            _record_llm_degradation(subsystem="pollinations_fast", cause=f"Fast JSON call failed: {e}")
 
     return {}
 
@@ -362,45 +369,48 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
                 stage = "Groq text call" if idx == 0 else "Groq text fallback model call"
                 logging.error("%s failed (%s): %s", stage, model, e)
 
-    try:
-        payload = {
-            "model": "openai",
-            "messages": messages,
-            "temperature": temperature,
-        }
-        text = await _call_openai_compatible_text(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
-        if text:
-            return text
-    except Exception as e:
-        logging.exception(e)
-        logging.error("Pollinations text call failed: %s", e)
+    if _public_llm_fallbacks_enabled():
+        try:
+            payload = {
+                "model": "openai",
+                "messages": messages,
+                "temperature": temperature,
+            }
+            text = await _call_openai_compatible_text(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
+            if text:
+                return text
+        except Exception as e:
+            logging.exception(e)
+            logging.error("Pollinations text call failed: %s", e)
 
-    try:
+        try:
 
-        def _run_g4f_text():
-            try:
-                from g4f.client import Client  # type: ignore[import-untyped]
-            except ImportError:
-                logging.warning("g4f not installed — skipping g4f text fallback")
-                return None
-            client = Client()
-            res = client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                timeout=timeout,
-            )
-            if not res.choices:
-                raise ValueError("Empty choices in LLM response")
-            return (res.choices[0].message.content or "").strip()
+            def _run_g4f_text():
+                try:
+                    from g4f.client import Client  # type: ignore[import-untyped]
+                except ImportError:
+                    logging.warning("g4f not installed — skipping g4f text fallback")
+                    return None
+                client = Client()
+                res = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=messages,
+                    timeout=timeout,
+                )
+                if not res.choices:
+                    raise ValueError("Empty choices in LLM response")
+                return (res.choices[0].message.content or "").strip()
 
-        result = await asyncio.to_thread(_run_g4f_text)
-        if result is None:
+            result = await asyncio.to_thread(_run_g4f_text)
+            if result is None:
+                return ""
+            return result
+        except Exception as e:
+            logging.exception(e)
+            logging.error("g4f text fallback failed: %s", e)
             return ""
-        return result
-    except Exception as e:
-        logging.exception(e)
-        logging.error("g4f text fallback failed: %s", e)
-        return ""
+
+    return ""
 
 
 # ─── Plugin Architecture (Phase 43) ──────────────────────────────────

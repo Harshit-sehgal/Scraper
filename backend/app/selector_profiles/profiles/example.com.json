@@ -1,0 +1,18 @@
+{
+  "domain": "example.com",
+  "description": "IANA example domain page",
+  "wait_for": "h1",
+  "item_container": "body",
+  "fields": {
+    "heading": {
+      "selector": "h1",
+      "type": "text",
+      "attribute": "text"
+    },
+    "paragraph": {
+      "selector": "p",
+      "type": "text",
+      "attribute": "text"
+    }
+  }
+}

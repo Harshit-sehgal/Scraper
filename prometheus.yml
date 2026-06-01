@@ -21,7 +21,7 @@ global:
 # Rule files are evaluated locally. Alertmanager routing is intentionally
 # omitted until an alertmanager service and routing config are deployed.
 rule_files:
-  - "prometheus_alerts.yml"
+  - "/etc/prometheus/prometheus_alerts.yml"
 
 scrape_configs:
   # ─── Prometheus Self-monitoring ──────────────────────────────────────

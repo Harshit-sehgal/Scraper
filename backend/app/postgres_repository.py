@@ -58,7 +58,7 @@ def _get_database_url() -> str:
     # Only allow fallback default in development mode
     env = settings.ENV.strip().lower()
     if env == "development":
-        return "postgresql://dataforge:dataforge@localhost:5432 / dataforge"
+        return "postgresql://dataforge:dataforge@localhost:5432/dataforge"
     raise RuntimeError(
         "DATAFORGE_DATABASE_URL is required in non-development environments. "
         "Set it to a valid Postgres connection string."
