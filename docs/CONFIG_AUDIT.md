@@ -1,6 +1,6 @@
 # Config And Environment Variable Audit
 
-**Last refreshed:** 2026-06-01
+**Last refreshed:** 2026-06-02
 **Status:** Centralized config exists; scattered env reads are limited and documented
 
 ## Config Source Of Truth

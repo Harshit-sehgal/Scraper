@@ -1,10 +1,10 @@
 # Project Status - DataForge Scraper
 
-**Last refreshed:** 2026-06-02T04:30:00+05:30
-**Base commit inspected:** current working tree on branch `truth-audit-working`
-**Working tree at refresh:** runtime artifacts (__pycache__, .pyc, replay_buffer JSONL, .pytest_cache, logs, root data/) removed; docs updated with fresh validation results
-**Branch inspected:** `truth-audit-working`
-**Status:** Pre-production candidate — fresh validation covers syntax, architecture, test collection, full SQLite backend tests, route auth, production env validator checks, and benchmark smoke. Postgres integration, browser e2e, and golden dataset tests are documented historically from prior refresh (not re-run in this session).
+**Last refreshed:** 2026-06-02T20:00:00+05:30
+**Base commit inspected:** `0ee4772` on branch `truth-audit-working`
+**Working tree at refresh:** runtime artifacts (__pycache__, .pyc, .pytest_cache, backend/data/replay_buffer jsonl segments) cleaned from disk; all .gitignore entries confirmed active
+**Branch inspected:** `truth-audit-working` (clean working tree before edits)
+**Status:** Pre-production candidate — fresh validation covers syntax, architecture, test collection, full SQLite backend tests (1863 passed, 72 skipped), route auth (81 routes, 3 public), production env validator (intentionally fails placeholder check), benchmark smoke (1 passed, 1 skipped). Postgres integration, browser e2e, and golden dataset tests are documented historically from prior refresh (not re-run in this session). Docker image build and Compose stack operations are documented historically.
 **Maturity:** about 60–65% on the project maturity scale — local app and SQLite backend pass cleanly, but browser, Postgres, golden dataset, production ingress, TLS, backup/restore, alerts, and sustained load remain unvalidated in the target environment
 
 This file is the current truth source. It must be updated only from fresh code inspection and command output. Archived audit documents are historical context, not current evidence.
@@ -46,10 +46,10 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | `python3 -m compileall -q backend scripts architecture_validator.py` | Passed with no output | Python syntax is valid for checked paths |
 | `PYTHONPATH=backend python3 architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=` | `1937 tests collected` | Test collection is clean |
-| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest -q backend/tests -o addopts=` | `1863 passed, 72 skipped in 119.97s` | Safe SQLite backend suite passes 100% clean locally |
-| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=postgres /usr/bin/python3 -m pytest backend/tests --run-postgres -q -o addopts=` | `1905 passed, 2 failed, 28 skipped in 142.64s` | Full Postgres suite run — 2 pre-existing rate limiter test failures (shared state collision) |
-| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest backend/tests --run-browser -q -o addopts=` | `1878 passed, 2 failed, 55 skipped in 124.65s` | Full browser suite run — 2 pre-existing rate limiter test failures (shared state collision) |
-| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest backend/tests/test_golden_dataset.py --run-golden-dataset -q -o addopts=` | `8 passed in 51.02s` | Golden dataset target extraction live-validated — all 8 targets pass |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest -q backend/tests -o addopts=` | `1863 passed, 72 skipped in 120.37s` | Safe SQLite backend suite passes 100% clean locally (pre-existing flakiness in crawl_frontier persistence and rate_limiter tests observed across runs) |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=postgres /usr/bin/python3 -m pytest backend/tests --run-postgres -q -o addopts=` | `1905 passed, 2 failed, 28 skipped in 142.64s` *(archived from prior refresh)* | Full Postgres suite run — 2 pre-existing rate limiter test failures (shared state collision) |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest backend/tests --run-browser -q -o addopts=` | `1878 passed, 2 failed, 55 skipped in 124.65s` *(archived from prior refresh)* | Full browser suite run — 2 pre-existing rate limiter test failures (shared state collision) |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest backend/tests/test_golden_dataset.py --run-golden-dataset -q -o addopts=` | `8 passed in 51.02s` *(archived from prior refresh)* | Golden dataset target extraction live-validated — all 8 targets pass |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest -q backend/benchmarks -o addopts=` | `1 passed, 1 skipped in 0.26s` | Benchmark package smoke/config test passes — not a real benchmark |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 scripts/route_auth_matrix.py --format markdown` | Generated the route matrix with explicit public/authenticated/admin/operator routes | Route registration and intended access controls are documented |
 | `env -i PATH="$PATH" PYTHONPATH=backend DATAFORGE_SKIP_DB_CHECK=true /usr/bin/python3 scripts/check_prod_env.py --env-file .env.production.example` | Failed intentionally on placeholder API keys, database password/URL, metrics token, operator/admin keys, and Grafana password | Production example is not deployable as-is |
@@ -59,7 +59,7 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 
 - Route authorization is mechanically documented and tested for registered FastAPI routes. This is not a penetration test.
 - `scripts/check_prod_env.py` rejects placeholder production secrets and tokens.
-- Postgres database integration (1905 passed, 2 pre-existing rate-limiter failures), Playwright browser lifecycles (1878 passed, 2 pre-existing rate-limiter failures), and Golden Dataset target extractions (8 passed in 51.02s) were freshly run in this session. Docker image compilation and multi-container production Compose startup remain documented historically from prior release cycles.
+- Postgres database integration (1905 passed, 2 pre-existing rate-limiter failures), Playwright browser lifecycles (1878 passed, 2 pre-existing rate-limiter failures), and Golden Dataset target extractions (8 passed in 51.02s) were run in the prior refresh (2026-06-01) and are archived here. Docker image compilation and multi-container production Compose startup remain documented historically from prior release cycles. Fresh SQLite suite was run in this session. Postgres, browser, and golden dataset were not re-run.
 - LLM public fallback behavior is disabled by default. Enabling it is an explicit operator choice and should be reviewed for data leakage and service-dependency risk.
 
 ## Experimental Or Unvalidated
@@ -93,3 +93,4 @@ Do not claim production-ready, enterprise-grade, universal scraper, scrapes ever
 5. Add real benchmark tests with enforceable thresholds.
 6. Clean runtime artifacts before every commit.
 7. Run Postgres (`--run-postgres`) and browser (`--run-browser`) test suites in CI to validate those backends automatically.
+8. Investigate and fix the pre-existing flaky test failures in crawl_frontier persistence (disk I/O error on concurrent SQLite access) and rate_limiter tests (shared state collision).

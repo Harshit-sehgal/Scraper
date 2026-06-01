@@ -1,6 +1,6 @@
 # Security
 
-**Last refreshed:** 2026-06-01
+**Last refreshed:** 2026-06-02
 **Status:** Security controls exist, but public-production security is not validated
 
 This document describes implemented controls and remaining risks. It is not a penetration-test report.

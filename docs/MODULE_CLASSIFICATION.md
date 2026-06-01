@@ -1,6 +1,6 @@
 # Module Classification
 
-**Last refreshed:** 2026-06-01
+**Last refreshed:** 2026-06-02
 **Scope:** Major modules/packages, not every helper file
 **Observed count:** `151` Python files under `backend/app`
 
