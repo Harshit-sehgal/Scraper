@@ -279,6 +279,9 @@ class Settings(BaseSettings):
     """Stricter rate limit for job creation (POST /api / jobs)."""
     RATE_LIMIT_DISCOVER: str = "20/minute"
     """Rate limit for discovery endpoint."""
+    RATE_LIMIT_DB_BACKED: bool = False
+    """Enable shared, database-backed rate limiting for multi-process environments."""
+
 
     # ─── Crawl Policy (operational governance) ─────────────────────────────
     CRAWL_MAX_TOTAL_CONCURRENCY: int = 10
