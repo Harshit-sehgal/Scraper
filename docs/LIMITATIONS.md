@@ -26,7 +26,7 @@ DataForge Scraper is a configurable extraction platform, not an all-powerful scr
 
 - Route auth is tested, but that is not a penetration test.
 - Metrics protection depends on `DATAFORGE_METRICS_TOKEN` and correct production routing; local Compose verified Nginx blocks public `/metrics` and Prometheus scrapes internally.
-- Rate limiting is in-memory and single-process.
+- Rate limiting supports in-memory single-process mode by default, and shared database-backed multi-process mode when configured.
 - Dashboard is internal-only until browser/session risks are addressed.
 - URL safety checks reduce SSRF risk but do not replace production network controls.
 

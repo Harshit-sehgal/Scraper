@@ -28,7 +28,7 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | Postgres storage/queue code works locally | `1885 passed, 28 skipped in 138.54s` with `--run-postgres` | Verified locally |
 | API key/RBAC utilities exist | `backend/app/utils/rbac.py`, route dependencies, route-auth tests | Verified |
 | SSRF-oriented URL safety checks exist | `backend/app/url_safety.py` rejects non-http(s), loopback/private IPs, metadata hosts, and internal names | Verified by code inspection and tests |
-| Rate limiting exists | `backend/app/rate_limiter.py`; route key bug not observed in current code | Verified, single-process only |
+| Rate limiting exists | `backend/app/rate_limiter.py`; `DatabaseSlidingWindowCounter` implements thread/process-safe sliding window counters using SQLite or Postgres | Verified, in-memory or shared DB-backed |
 | Unauthenticated public LLM fallbacks are disabled by default | `settings.LLM_ENABLE_PUBLIC_FALLBACKS` defaults to `False`; tests verify disabled fallbacks do not issue unauthenticated Pollinations/g4f calls | Verified |
 | Production env validator rejects placeholders | `.env.production.example` fails validation intentionally, including metrics token placeholder; production security tests pass | Verified |
 | Docs disabled in production app config | `backend/app/main.py` disables `/docs`, `/redoc`, `/openapi.json` when `settings.ENV == "production"` | Verified by code inspection |
@@ -79,8 +79,7 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 
 1. The local Compose smoke used a temporary generated `.env`, not real production secrets or a public target environment.
 2. Dashboard remains internal-only until session and hostile-browser risks are reviewed.
-3. Rate limiting is in-memory and single-process only.
-4. TLS, Grafana dashboard/login behavior, real load, failover, alert delivery, disaster recovery, and incident-response gates are unvalidated.
+3. TLS, Grafana dashboard/login behavior, real load, failover, alert delivery, disaster recovery, and incident-response gates are unvalidated.
 
 ## Allowed Current Claims
 
