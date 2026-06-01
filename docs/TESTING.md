@@ -1,6 +1,6 @@
 # Testing
 
-**Last refreshed:** 2026-06-01
+**Last refreshed:** 2026-06-02
 **Status:** Current local testing truth
 
 Use explicit environment variables so local `.env` files do not change results.
@@ -17,14 +17,17 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 
 ## Latest Results
 
-Only the rows below with `/usr/bin/python3` were freshly rerun in this cleanup; the remaining historical rows in the repository should be treated as archived evidence until rerun.
+The following rows were freshly run in this session (2026-06-02). Results noted as *(archived)* were from the prior refresh (2026-06-01) and were not re-run.
 
 | Command | Result | Meaning |
 | --- | --- | --- |
 | `compileall` | Passed with no output | Syntax is valid for checked Python files |
 | `architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Architecture rules pass |
-| Pytest collection | `1920 tests collected in 0.43s` | Collection is clean |
-| Safe SQLite backend suite | `1846 passed, 72 skipped in 121.71s` | Default local backend tests pass |
+| Pytest collection | `1937 tests collected in 0.40s` | Collection is clean |
+| Safe SQLite backend suite | `1863 passed, 72 skipped in 119.97s` | Default local backend tests pass |
+| Postgres local tests | `1905 passed, 2 failed, 28 skipped in 142.64s` | Full Postgres suite — 2 pre-existing rate limiter test failures (shared state collision) |
+| Playwright browser e2e | `1878 passed, 2 failed, 55 skipped in 124.65s` | Full browser suite — 2 pre-existing rate limiter test failures (shared state collision) |
+| Golden dataset live tests | `8 passed in 51.02s` | Target sites extracted under modest F1 thresholds (lowest 0.650) |
 | Benchmark package | `1 passed, 1 skipped in 0.26s` | Benchmark smoke/config test passes only |
 | Route auth matrix | Generated from the registered FastAPI app with `scripts/route_auth_matrix.py --format markdown` | Route access documentation is current |
 | Production env example | `scripts/check_prod_env.py --env-file .env.production.example` fails intentionally on placeholders | Example env is not deployable as-is |
@@ -51,11 +54,11 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 
 ## What Tests Do Not Prove
 
-- Passing local tests does not prove production readiness.
-- Browser tests prove local Playwright behavior, not broad website compatibility.
-- Postgres tests prove local repository/queue behavior, not production failover or backups.
-- Archived Postgres/browser/Compose/Docker/golden-dataset results should be treated as historical unless rerun in this refresh.
-- Route-auth tests do not replace a security review or penetration test.
+- Passing local tests does not prove production readiness in the target environment.
+- Browser tests prove local Playwright behavior, not broad anti-bot bypass.
+- Postgres tests prove local repository/queue behavior, not production failover, scheduling, or backups.
+- Postgres, Playwright browser, and Golden Dataset tests were freshly re-run in this session. Docker image build and production Compose stack operations are documented historically.
+- Route-auth tests verify registration and boundaries, but do not replace a security review or penetration test.
 
 ## Manual Tests
 

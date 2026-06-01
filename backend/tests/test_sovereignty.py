@@ -152,8 +152,8 @@ def test_manifold_merge_sovereignty():
         }
     }
 
-    # Call the merge logic
-    from app.main import merge_knowledge
+    # Call the merge logic from the experimental router
+    from app.routers.experimental import merge_knowledge
     from unittest.mock import MagicMock
     import asyncio
 

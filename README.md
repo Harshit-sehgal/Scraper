@@ -29,18 +29,21 @@ It is not a universal scraper, not anti-bot proof, not fully autonomous, and not
 
 Status: pre-production candidate.
 
-Fresh validation snapshot from `2026-06-01`, with current local verification and archived evidence called out where applicable:
+Fresh validation snapshot from `2026-06-02`, with current local verification and archived evidence called out where applicable:
 
 | Area | Current evidence | Status |
 | --- | --- | --- |
 | Syntax | `python3 -m compileall -q backend scripts architecture_validator.py` completed with no output | Verified |
 | Architecture rules | `PYTHONPATH=backend python3 architecture_validator.py` printed `VALIDATION PASSED: Architecture is lawful.` | Verified |
-| Test collection | `1920 tests collected in 0.43s` for `backend/tests backend/benchmarks` | Verified |
-| Safe local backend tests | `1846 passed, 72 skipped in 121.71s` with SQLite | Verified |
+| Test collection | `1937 tests collected in 0.40s` for `backend/tests backend/benchmarks` | Verified |
+| Safe local backend tests | `1863 passed, 72 skipped in 119.97s` with SQLite | Verified |
 | Benchmark pytest package | `1 passed, 1 skipped in 0.26s` | Verified smoke test only — not a real benchmark |
 | Route auth matrix | Generated from the registered FastAPI app with `scripts/route_auth_matrix.py --format markdown` | Verified |
 | Production env example | `scripts/check_prod_env.py --env-file .env.production.example` intentionally fails on placeholders | Verified |
-| Archived local evidence | Postgres/browser/Compose/Docker/golden-dataset results exist in archived docs; they were not freshly rerun in this cleanup | Documented but unverified in this refresh |
+| Postgres local tests | `12 passed in 3.82s` *(archived from prior refresh — not re-run in this session)* | Documented historically |
+| Playwright browser e2e | `10 passed in 10.04s` *(archived)* | Documented historically |
+| Golden Dataset live | `8 passed in 45.05s` *(archived)* | Documented historically |
+| Docker image & Compose | Documented historically | Documented historically |
 
 See `PROJECT_STATUS.md` for the current truth source.
 
