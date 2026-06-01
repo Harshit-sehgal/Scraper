@@ -12,13 +12,13 @@ DataForge Scraper is a pre-production FastAPI + Playwright extraction platform. 
 | Syntax | `compileall` passed with no output | Freshly verified |
 | Architecture | `VALIDATION PASSED: Architecture is lawful.` | Freshly verified |
 | Collection | `1937 tests collected in 0.40s` | Freshly verified |
-| Safe SQLite suite | `1863 passed, 72 skipped in 119.97s` | Freshly verified |
+| Safe SQLite suite | `1863 passed, 72 skipped in 120.37s` | Freshly verified |
 | Benchmark smoke | `1 passed, 1 skipped in 0.26s` | Freshly verified |
 | Route auth matrix | 81 routes, 3 public, correct enforcement | Freshly verified |
 | Prod env validation | Intentionally fails placeholders | Freshly verified |
-| Postgres integration | `1905 passed, 2 failed, 28 skipped in 142.64s` | Pre-existing rate limiter failures |
-| Browser e2e suite | `1878 passed, 2 failed, 55 skipped in 124.65s` | Pre-existing rate limiter failures |
-| Golden live tests | `8 passed in 51.02s` | All 8 targets pass |
+| Postgres integration | `1905 passed, 2 failed, 28 skipped in 142.64s` *(archived from prior refresh)* | Pre-existing rate limiter failures |
+| Browser e2e suite | `1878 passed, 2 failed, 55 skipped in 124.65s` *(archived from prior refresh)* | Pre-existing rate limiter failures |
+| Golden live tests | `8 passed in 51.02s` *(archived from prior refresh)* | All 8 targets pass |
 | Docker build & Compose | Documented historically | Not re-run in this session |
 
 ## Most Important Remaining Work

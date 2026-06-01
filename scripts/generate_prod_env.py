@@ -2,9 +2,9 @@
 """
 Production Environment Configuration Generator.
 
-This script dynamically generates a secure, production-ready '.env.production' file
-with strong, unique, randomly generated cryptographic keys and passwords, ensuring
-no default placeholders leak into production environments.
+This script dynamically generates a production environment file with strong,
+unique, randomly generated cryptographic keys and passwords, preventing default
+placeholders from leaking into deployment.
 """
 import os
 import secrets

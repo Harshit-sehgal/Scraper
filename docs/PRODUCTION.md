@@ -1,6 +1,6 @@
 # Production
 
-**Last refreshed:** 2026-06-01
+**Last refreshed:** 2026-06-02
 **Status:** Deployment files exist; local production-like Compose smoke passed on 2026-06-01; target production is not validated
 
 The repository includes production deployment files. A local Compose smoke passed on 2026-06-01 with a temporary ignored `.env`. Production readiness still requires validation in the target environment with real secrets, TLS, monitoring operations, backups, load testing, failover checks, and incident procedures.
