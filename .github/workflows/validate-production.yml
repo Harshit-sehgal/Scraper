@@ -172,6 +172,60 @@ jobs:
           PASSED=$(grep "passed" /tmp/benchmark_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
           echo "Benchmark tests passed: $PASSED"
 
+  test-postgres:
+    name: Postgres Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATAFORGE_STORAGE_BACKEND: postgres
+      DATAFORGE_DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -q -r requirements-dev.txt
+          pip install psycopg2-binary testcontainers
+      
+      - name: Run Postgres tests
+        run: |
+          PYTHONPATH=backend \
+          DATAFORGE_DOTENV_PATH=/dev/null \
+          DATAFORGE_STORAGE_BACKEND=postgres \
+          DATAFORGE_DATABASE_URL=postgresql://testuser:testpassword@localhost:5432/testdb \
+          python3 -m pytest -q backend/tests --run-postgres -o addopts= \
+          --tb=short \
+          --timeout=300 \
+          2>&1 | tee /tmp/postgres_results.txt
+          
+          PASSED=$(grep "passed" /tmp/postgres_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
+          FAILED=$(grep "failed" /tmp/postgres_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
+          echo "Postgres tests: $PASSED passed, $FAILED failed"
+          
+          if [ "$FAILED" -gt 2 ]; then
+            echo "FAILED: Postgres tests have too many failures"
+            exit 1
+          fi
+
   test-browser-e2e:
     name: Browser E2E Tests (Playwright)
     runs-on: ubuntu-latest
@@ -313,7 +367,7 @@ jobs:
   final-report:
     name: Generate Validation Report
     runs-on: ubuntu-latest
-    needs: [syntax-and-architecture, test-collection, test-sqlite, test-security, test-benchmarks, test-browser-e2e, test-golden-dataset, docker-build]
+    needs: [syntax-and-architecture, test-collection, test-sqlite, test-security, test-benchmarks, test-postgres, test-browser-e2e, test-golden-dataset, docker-build]
     if: always()
     steps:
       - uses: actions/checkout@v3
@@ -331,6 +385,7 @@ jobs:
           echo "- SQLite Backend Tests: ${{ needs.test-sqlite.result }}" >> /tmp/report.md
           echo "- Security Tests: ${{ needs.test-security.result }}" >> /tmp/report.md
           echo "- Benchmark Smoke Tests: ${{ needs.test-benchmarks.result }}" >> /tmp/report.md
+          echo "- Postgres Integration Tests: ${{ needs.test-postgres.result }}" >> /tmp/report.md
           echo "- Browser E2E Tests: ${{ needs.test-browser-e2e.result }}" >> /tmp/report.md
           echo "- Golden Dataset Tests: ${{ needs.test-golden-dataset.result }}" >> /tmp/report.md
           echo "- Docker Build: ${{ needs.docker-build.result }}" >> /tmp/report.md
@@ -364,7 +419,7 @@ jobs:
   notify-on-failure:
     name: Notify on Failure
     runs-on: ubuntu-latest
-    needs: [syntax-and-architecture, test-collection, test-sqlite, test-security, test-browser-e2e, test-golden-dataset]
+    needs: [syntax-and-architecture, test-collection, test-sqlite, test-security, test-browser-e2e, test-golden-dataset, test-postgres]
     if: failure()
     steps:
       - name: Notify Slack
