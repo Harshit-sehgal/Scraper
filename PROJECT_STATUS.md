@@ -1,7 +1,7 @@
 # Project Status - DataForge Scraper
 
-**Last refreshed:** 2026-06-01T13:50:00+05:30
-**Base commit inspected:** `599d0ab7708f542486992ebecf30a95cbef00961`
+**Last refreshed:** 2026-06-01T14:04:00+05:30
+**Base commit inspected:** `078cb5148d2dccfcf851673c2c7184c562bdb3f5`
 **Working tree at refresh:** verified changes committed
 **Branch inspected:** `main`
 **Status:** Pre-production candidate — core tests pass locally; target production, Docker, Postgres, browser, and security gates partially validated
