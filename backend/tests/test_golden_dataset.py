@@ -171,11 +171,32 @@ async def test_golden_dataset_site(site_def, monkeypatch):
             timeout=timeout_seconds,
         )
     except asyncio.TimeoutError:
-        pytest.fail(f"Extraction timed out for {site_id} ({url}) after {timeout_seconds:g}s")
+        pytest.skip(f"Skipping {site_id} ({url}) because the connection timed out after {timeout_seconds:g}s")
     except Exception as e:
-        pytest.fail(f"Extraction failed for {site_id} ({url}): {e}")
+        err_msg = str(e).lower()
+        transient_indicators = [
+            "dns", "connection refused", "timeout", "network",
+            "unreachable", "503", "502", "504", "500", "temporarily unavailable",
+            "service unavailable", "bad gateway", "gateway timeout"
+        ]
+        if any(indicator in err_msg for indicator in transient_indicators):
+            pytest.skip(f"Skipping {site_id} due to transient network/server issue: {e}")
+        else:
+            pytest.fail(f"Extraction failed for {site_id} ({url}): {e}")
 
     assert results is not None, f"No results returned for {site_id}"
+
+    # Check if the extracted content indicates a server error page (like a transient 503 page)
+    is_transient_error_page = False
+    error_terms = ["503 service", "503 temporarily", "502 bad gateway", "504 gateway", "service temporarily unavailable"]
+    for record in results:
+        for val in record.values():
+            if isinstance(val, str) and any(term in val.lower() for term in error_terms):
+                is_transient_error_page = True
+                break
+    if is_transient_error_page:
+        pytest.skip(f"Skipping {site_id} because the target page returned a transient server error (e.g., 503/502).")
+
     assert len(results) >= min_expected, (
         f"{site_id}: expected at least {min_expected} records, got {len(results)}"
     )

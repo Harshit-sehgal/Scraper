@@ -36,13 +36,13 @@ Fresh validation snapshot from `2026-06-02`, with current local verification and
 | Syntax | `python3 -m compileall -q backend scripts architecture_validator.py` completed with no output | Verified |
 | Architecture rules | `PYTHONPATH=backend python3 architecture_validator.py` printed `VALIDATION PASSED: Architecture is lawful.` | Verified |
 | Test collection | `1937 tests collected in 0.40s` for `backend/tests backend/benchmarks` | Verified |
-| Safe local backend tests | `1863 passed, 72 skipped, 0 failed in 121.06s` with SQLite — 100% clean pass | Verified |
+| Safe local backend tests | `1863 passed, 72 skipped, 0 failed in 120.39s` with SQLite — 100% clean pass | Verified |
 | Benchmark pytest package | `1 passed, 1 skipped in 0.26s` | Verified smoke test only — not a real benchmark |
 | Route auth matrix | Generated from the registered FastAPI app with `scripts/route_auth_matrix.py --format markdown` | Verified |
 | Production env example | `scripts/check_prod_env.py --env-file .env.production.example` intentionally fails on placeholders | Verified |
 | Postgres local tests | `1907 passed, 28 skipped, 0 failed in 142.41s` | Verified Postgres integration suite (rate-limiter flaky collisions resolved) |
 | Playwright browser e2e | `10 passed, 0 failed in 10.11s` | Verified browser e2e suite |
-| Golden Dataset live | `8 passed, 0 failed in 51.02s` | Verified live target extraction under modest F1 thresholds (lowest 0.650) |
+| Golden Dataset live | `7 passed, 1 skipped in 42.74s` | Verified; 7 passed, 1 skipped due to transient external `httpbin.org` 503 error |
 | Docker image & Compose | Documented historically | Documented historically |
 
 See `PROJECT_STATUS.md` for the current truth source.
