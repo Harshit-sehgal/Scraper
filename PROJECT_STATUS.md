@@ -126,6 +126,9 @@ Each major claim is classified: Verified (V), Partially verified (P), Unverified
 - Benchmark package has only 1 smoke/config test (`1 passed, 1 skipped`).
 - No real benchmark corpus, thresholds, CI integration, or accuracy measurement pipeline.
 
+### Investigations conducted
+- `bin/docker-compose` — the task flagged a potential 59MB vendored binary. File **does not exist** in this repository. Docker Compose is expected to be installed system-wide or via `docker compose` plugin.
+
 ## Allowed Current Claims
 
 - Pre-production FastAPI + Playwright web extraction platform.
