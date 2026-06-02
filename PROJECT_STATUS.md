@@ -66,9 +66,73 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 - Semantic world state, topology state, federation/gossip, strategy evolution beyond tested behavior, selector ML/decay, self-tuning extraction, replay buffers, chaos/failure injection, manifold/motif/energy/intent/acquisition/instability/domain evolution modules.
 - Public target deployment, TLS, Grafana login/dashboard behavior, real load tests, failover, alert delivery, disaster recovery, and incident response.
 
+## Maturity Score
+
+Area | Current % | Reason
+--- | --- | ---
+Core backend (API, jobs, lifecycle) | 75% | Routes work, SQLite tested, Postgres optional. Production scaling/HA unvalidated.
+Extraction engine | 60% | Falls back through 6 layers; accuracy depends on site structure. Not benchmarked broadly.
+Storage (SQLite/Postgres) | 65% | SQLite works and tested. Postgres code exists; production failover/migration unvalidated.
+Tests | 60% | Suite runs at 1862 passed + 72 skipped + 1 flaky failure. Postgres/browser/golden suites not freshly run.
+Docs truth | 85% | Honest, no banned claims. Stale test counts corrected this session.
+Security | 50% | RBAC, URL safety, rate limiting exist. No penetration test, no TLS validation, dashboard is internal-only.
+Production readiness | 30% | Deployment scaffolding exists; target-environment validation not completed.
+Benchmarks | 20% | Smoke test passes. Golden dataset exists (modest F1 thresholds). Not a real benchmark.
+Dashboard | 50% | Internal static dashboard works. Session/hostile-browser risks unresolved.
+Experimental modules | 40% | Code exists and tests pass. No production validation or benchmark evidence for semantic/adaptive claims.
+
+Overall maturity: **55-60%** — core extraction works locally; Postgres, browser, security, benchmarks, and production deployment all need target-environment validation before higher scores are justified.
+
+## Claims Audit
+
+Each major claim is classified: Verified (V), Partially verified (P), Unverified (U), Historical only (H), Banned (B).
+
+| Claim | Source | Evidence | Status |
+| --- | --- | --- | --- |
+| FastAPI backend exists | README, code | `backend/app/main.py` defines the app, middleware, routes | V |
+| Playwright browser extraction | README, code | `backend/app/scraper.py`, `backend/app/browser_pool.py`, browser tests | V |
+| Job lifecycle APIs | README | `backend/app/routers/jobs.py`, route matrix | V |
+| CSV/JSON/Excel exports | README | `backend/app/routers/exports.py`, export tests | V |
+| SQLite local storage | README | `backend/app/storage_interface.py`, SQLite test suite | V |
+| Postgres storage/queue | README | `backend/app/postgres_repository.py`, optional Postgres tests | P (local only) |
+| API key RBAC | README | `backend/app/utils/rbac.py`, route-auth tests | V |
+| SSRF-oriented URL safety | README | `backend/app/url_safety.py`, security tests | V |
+| Rate limiting | README | `backend/app/rate_limiter.py`, in-memory + shared DB | V |
+| Public LLM fallbacks disabled by default | README, config | `settings.LLM_ENABLE_PUBLIC_FALLBACKS=false`, tests verify | V |
+| Production env placeholder rejection | README | `scripts/check_prod_env.py` intentionally fails on example env | V |
+| Internal dashboard | README | `frontend/` static files, FastAPI mounts | V |
+| Docker/Compose deployment | README, docs | `Dockerfile`, `docker-compose*.yml`, `nginx.conf` exist | H (locally validated historically) |
+| Golden dataset benchmarks | docs/BENCHMARKS | `8 passed` with modest F1 thresholds (lowest 0.650) | H (not freshly re-run) |
+| Production-ready | *nowhere claimed* | Gates in PRODUCTION_READINESS.md target-environment-unvalidated | B |
+| Universal scraper | *nowhere claimed* | LIMITATIONS.md explicitly denies this | B |
+| Anti-bot immune | *nowhere claimed* | LIMITATIONS.md explicitly denies this | B |
+| Fully autonomous | *nowhere claimed* | README explicitly denies this | B |
+| Fully self-healing | *nowhere claimed* | README, LIMITATIONS explicitly deny this | B |
+| Guaranteed extraction accuracy | *nowhere claimed* | LIMITATIONS.md explicitly denies this | B |
+| 100% accurate | *nowhere claimed* | BENCHMARKS.md explicitly denies this | B |
+| Fully benchmarked | *nowhere claimed* | BENCHMARKS.md explicitly denies this | B |
+
 ## Current Blockers
 
-Target deployment verification is still unproven in this refresh: TLS, target ingress, sustained load, backup/restore, alert delivery, and real production browser behavior remain unvalidated. The verifier script itself now runs to completion and reports those gaps cleanly instead of crashing.
+### Test suite flakiness
+- **`test_browser_pool_hard_recycling`** (newly discovered this session): test pollution from shared `BrowserPool` state — the test sets `_cumulative_fetches = 199` but prior tests may have left side-effects.
+- Previously documented flaky tests (rate limiter state collision, crawl_frontier disk I/O) were not re-run this refresh.
+- Full SQLite suite: **1862 passed, 72 skipped, 1 failed**.
+
+### Unfresh optional suites
+- Postgres (`1905 passed, 2 failed, 28 skipped`), browser (`1878 passed, 2 failed, 55 skipped`), golden dataset (`8 passed in 51.02s`) — all results are **archived from 2026-06-01**, not freshly re-run.
+
+### Target deployment unvalidated
+- TLS, real ingress, production `.env` with real secrets, Nginx routing, CORS/CSP in browser, docs/metrics blocking, Grafana login/dashboard provisioning, Prometheus alert delivery, backup/restore cycle, load testing, failover, log rotation, disaster recovery — **all unvalidated**.
+
+### Generated runtime artifacts on disk (gitignored)
+- `backend/data/replay_buffer/` — **102 MB** across 51 JSONL segment files. These are generated runtime data from the experimental replay buffer module. Properly gitignored via `backend/data/`. Recommend occasional cleanup to reclaim disk space.
+- `backend/data/benchmarks/`, `backend/data/checkpoints/`, `backend/data/governance/`, `backend/data/results/` — other gitignored runtime directories.
+- `__pycache__/` directories (10 on disk) — gitignored, safe to `find . -name __pycache__ -type d -exec rm -rf {} +` periodically.
+
+### Missing benchmarks
+- Benchmark package has only 1 smoke/config test (`1 passed, 1 skipped`).
+- No real benchmark corpus, thresholds, CI integration, or accuracy measurement pipeline.
 
 ## Allowed Current Claims
 
