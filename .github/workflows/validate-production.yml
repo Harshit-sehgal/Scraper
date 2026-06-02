@@ -6,9 +6,6 @@ on:
     - cron: '0 2 * * *'
   workflow_dispatch:
 
-env:
-  SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-
 jobs:
   syntax-and-architecture:
     name: Syntax & Architecture Validation
@@ -388,12 +385,12 @@ jobs:
       - test-postgres
       - test-browser-e2e
       - test-golden-dataset
-    if: failure() && env.SLACK_WEBHOOK != ''
+    if: failure() && secrets.SLACK_WEBHOOK != ''
     steps:
       - name: Notify Slack
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
           text: 'Production readiness validation failed'
-          webhook_url: ${{ env.SLACK_WEBHOOK }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
           fields: repo,message,commit,author
