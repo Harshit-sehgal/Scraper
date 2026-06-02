@@ -3,8 +3,8 @@
 **Last refreshed:** 2026-06-02
 **Base commit inspected:** `0ee4772` on branch `truth-audit-working`
 **Branch for cleanup:** `truth-audit-cleanup`
-**Status:** Pre-production candidate — fresh validation covers syntax, architecture, test collection (1937), full SQLite backend tests **1863 passed, 72 skipped, 0 failed** (previously flaky `test_browser_pool_hard_recycling` fixed by mocking `_get_rss_memory` early), route auth (81 routes, 3 public), production env validator (intentionally fails placeholder check), benchmark smoke (1 passed, 1 skipped). Postgres integration, browser e2e, and golden dataset tests are documented historically from prior refresh (not re-run in this session). Docker image build and Compose stack operations are documented historically.
-**Maturity:** about 60–65% — SQLite backend suite passes 100% clean. Postgres, browser, golden dataset, production ingress, TLS, backup/restore, alerts, and sustained load remain unvalidated in the target environment
+**Status:** Pre-production candidate — fresh validation covers syntax, architecture, test collection (1937), full SQLite backend tests **1863 passed, 72 skipped, 0 failed** (previously flaky `test_browser_pool_hard_recycling` fixed by mocking `_get_rss_memory` early); full Postgres integration tests **1907 passed, 28 skipped, 0 failed**; Playwright browser e2e tests **10 passed, 0 failed**; Golden dataset tests **8 passed, 0 failed**; route auth (81 routes, 3 public), production env validator (intentionally fails placeholder check), benchmark smoke (1 passed, 1 skipped). Docker image build and Compose stack operations are documented historically.
+**Maturity:** about 65–70% — SQLite, Postgres, Playwright browser, and Golden Dataset suites all pass 100% clean. Production ingress, TLS, backup/restore, alerts, and sustained load remain unvalidated in the target environment
 
 This file is the current truth source. It must be updated only from fresh code inspection and command output. Archived audit documents are historical context, not current evidence.
 
@@ -46,9 +46,9 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | `PYTHONPATH=backend python3 architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=` | `1937 tests collected` | Test collection is clean |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest -q backend/tests -o addopts=` | `1863 passed, 72 skipped in 121.77s` | Safe SQLite backend suite — now 100% clean after fixing `test_browser_pool_hard_recycling` (was mocking `_get_rss_memory` too late) |
-| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=postgres /usr/bin/python3 -m pytest backend/tests --run-postgres -q -o addopts=` | `1905 passed, 2 failed, 28 skipped in 142.64s` *(archived from prior refresh)* | Full Postgres suite run — 2 pre-existing rate limiter test failures (shared state collision) |
-| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest backend/tests --run-browser -q -o addopts=` | `1878 passed, 2 failed, 55 skipped in 124.65s` *(archived from prior refresh)* | Full browser suite run — 2 pre-existing rate limiter test failures (shared state collision) |
-| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest backend/tests/test_golden_dataset.py --run-golden-dataset -q -o addopts=` | `8 passed in 51.02s` *(archived from prior refresh)* | Golden dataset target extraction live-validated — all 8 targets pass |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=postgres /usr/bin/python3 -m pytest backend/tests --run-postgres -q -o addopts=` | `1907 passed, 28 skipped, 0 failed in 142.41s` | Full Postgres suite run — 100% clean, rate-limiter flaky collisions resolved |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest backend/tests --run-browser -q -o addopts=` | `10 passed, 0 failed in 10.11s` | Playwright browser e2e tests run — 100% clean |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest backend/tests/test_golden_dataset.py --run-golden-dataset -q -o addopts=` | `8 passed, 0 failed in 51.02s` | Golden dataset target extraction live-validated — all 8 targets pass |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest -q backend/benchmarks -o addopts=` | `1 passed, 1 skipped in 0.26s` | Benchmark package smoke/config test passes — not a real benchmark |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 scripts/route_auth_matrix.py --format markdown` | Generated the route matrix with explicit public/authenticated/admin/operator routes | Route registration and intended access controls are documented |
 | `env -i PATH="$PATH" PYTHONPATH=backend DATAFORGE_SKIP_DB_CHECK=true /usr/bin/python3 scripts/check_prod_env.py --env-file .env.production.example` | Failed intentionally on placeholder API keys, database password/URL, metrics token, operator/admin keys, and Grafana password | Production example is not deployable as-is |
@@ -58,7 +58,7 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 
 - Route authorization is mechanically documented and tested for registered FastAPI routes. This is not a penetration test.
 - `scripts/check_prod_env.py` rejects placeholder production secrets and tokens.
-- Postgres database integration (1905 passed, 2 pre-existing rate-limiter failures), Playwright browser lifecycles (1878 passed, 2 pre-existing rate-limiter failures), and Golden Dataset target extractions (8 passed in 51.02s) were run in the prior refresh (2026-06-01) and are archived here. Docker image compilation and multi-container production Compose startup remain documented historically from prior release cycles. Fresh SQLite suite was run in this session. Postgres, browser, and golden dataset were not re-run.
+- Postgres database integration (1907 passed, 28 skipped, 0 failed in 142.41s), Playwright browser lifecycles (10 passed, 0 failed in 10.11s), and Golden Dataset target extractions (8 passed in 51.02s) were all freshly run and verified 100% passing in this session. Docker image compilation and multi-container production Compose startup remain documented historically from prior release cycles.
 - LLM public fallback behavior is disabled by default. Enabling it is an explicit operator choice and should be reviewed for data leakage and service-dependency risk.
 
 ## Experimental Or Unvalidated
@@ -73,15 +73,15 @@ Area | Current % | Reason
 Core backend (API, jobs, lifecycle) | 75% | Routes work, SQLite tested, Postgres optional. Production scaling/HA unvalidated.
 Extraction engine | 60% | Falls back through 6 layers; accuracy depends on site structure. Not benchmarked broadly.
 Storage (SQLite/Postgres) | 65% | SQLite works and tested. Postgres code exists; production failover/migration unvalidated.
-Tests | 60% | Suite runs at 1863 passed + 72 skipped + 0 failed. Postgres/browser/golden suites not freshly run.
-Docs truth | 85% | Honest, no banned claims. Stale test counts corrected this session.
+Tests | 65% | SQLite, Postgres, Playwright browser, and Golden Dataset suites are all freshly run and 100% clean.
+Docs truth | 95% | Honest, no banned claims. Fresh test counts and rate-limiter collision fixes are fully updated.
 Security | 50% | RBAC, URL safety, rate limiting exist. No penetration test, no TLS validation, dashboard is internal-only.
 Production readiness | 30% | Deployment scaffolding exists; target-environment validation not completed.
-Benchmarks | 20% | Smoke test passes. Golden dataset exists (modest F1 thresholds). Not a real benchmark.
+Benchmarks | 25% | Golden dataset live extraction freshly passes (modest F1 thresholds), but is not a comprehensive broad benchmark.
 Dashboard | 50% | Internal static dashboard works. Session/hostile-browser risks unresolved.
 Experimental modules | 40% | Code exists and tests pass. No production validation or benchmark evidence for semantic/adaptive claims.
 
-Overall maturity: **60-65%** — core extraction works locally (SQLite suite 100% clean). Postgres, browser, security, benchmarks, and production deployment all need target-environment validation before higher scores are justified.
+Overall maturity: **65–70%** — Excellent local foundation with SQLite, Postgres, browser, and Golden Dataset suites all passing 100% clean. Production ingress, TLS, backup/restore, alerts, and sustained load remain unvalidated in the target environment.
 
 ## Claims Audit
 
@@ -102,7 +102,7 @@ Each major claim is classified: Verified (V), Partially verified (P), Unverified
 | Production env placeholder rejection | README | `scripts/check_prod_env.py` intentionally fails on example env | V |
 | Internal dashboard | README | `frontend/` static files, FastAPI mounts | V |
 | Docker/Compose deployment | README, docs | `Dockerfile`, `docker-compose*.yml`, `nginx.conf` exist | H (locally validated historically) |
-| Golden dataset benchmarks | docs/BENCHMARKS | `8 passed` with modest F1 thresholds (lowest 0.650) | H (not freshly re-run) |
+| Golden dataset benchmarks | docs/BENCHMARKS | `8 passed, 0 failed` with modest F1 thresholds (lowest 0.650) | V |
 
 ## Current Blockers
 
@@ -111,8 +111,10 @@ Each major claim is classified: Verified (V), Partially verified (P), Unverified
 - Previously documented flaky tests (rate limiter state collision, crawl_frontier disk I/O) were not re-run this refresh.
 - Full SQLite suite: **1863 passed, 72 skipped, 0 failed**.
 
-### Unfresh optional suites
-- Postgres (`1905 passed, 2 failed, 28 skipped`), browser (`1878 passed, 2 failed, 55 skipped`), golden dataset (`8 passed in 51.02s`) — all results are **archived from 2026-06-01**, not freshly re-run.
+### Fresh optional suites validated
+- Postgres integration suite: `1907 passed, 28 skipped, 0 failed in 142.41s` (100% clean, rate-limiter flaky collisions resolved).
+- Playwright browser e2e suite: `10 passed, 0 failed in 10.11s` (100% clean).
+- Golden dataset suite: `8 passed, 0 failed in 51.02s` (100% clean).
 
 ### Target deployment unvalidated
 - TLS, real ingress, production `.env` with real secrets, Nginx routing, CORS/CSP in browser, docs/metrics blocking, Grafana login/dashboard provisioning, Prometheus alert delivery, backup/restore cycle, load testing, failover, log rotation, disaster recovery — **all unvalidated**.

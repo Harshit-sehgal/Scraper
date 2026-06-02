@@ -42,7 +42,7 @@ URL safety checks reject unsupported schemes and common private/internal targets
 - No production penetration test has been run.
 - Target-environment Nginx/docs/metrics exposure was not tested.
 - Dashboard session/security model is internal-only.
-- Rate limiting is in-memory and does not coordinate across multiple workers.
+- Rate limiting is in-memory by default but supports database-backed (SQLite or Postgres) sliding window coordination across multiple processes.
 - CORS/CSP must be verified against the real production origin.
 - Browser extraction can touch untrusted pages; sandbox, egress, timeout, and resource limits need deployment validation.
 - Secrets are validated for placeholders/shape, but operators must generate and protect real secrets.
