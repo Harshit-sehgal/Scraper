@@ -1,6 +1,6 @@
 # Project Status - DataForge Scraper
 
-**Last refreshed:** 2026-06-02
+**Last refreshed:** 2026-06-03
 **Commit inspected:** `7cc7980598858a74e50882e987c10b7593c66f54`
 **Working tree at refresh:** committed snapshot
 **GitHub Actions status:** CI verified manually on commit `7cc7980...` (Passed, Run ID: `26825966780`); production-readiness workflow manually executed on `2026-06-02` with result ✅ Passed (Run ID: `26825965444`).
@@ -45,11 +45,15 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | `python3 -m compileall -q backend scripts architecture_validator.py` | Passed with no output | Python syntax is valid for checked paths |
 | `PYTHONPATH=backend python3 architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass |
 | `python3 -m mypy backend/app --ignore-missing-imports` | `Success: no issues found in 158 source files` | Mypy static type checking passes 100% clean |
-| `pytest --collect-only` | `2017 tests collected` | Test collection is discoverable and clean |
-| SQLite backend suite | `1841 passed, 72 skipped` | Safe SQLite backend functional test suite passes |
-| Postgres integration suite | `1885 passed, 28 skipped` | Postgres database models, repositories, and queues pass |
-| Playwright browser/local-server suite | `1858 passed, 55 skipped` | Playwright extraction flows and server checks pass |
+| `pytest --collect-only` | `2043 tests collected` | Test collection is discoverable and clean |
+| SQLite backend suite | `1970 passed, 73 skipped` | Safe SQLite backend functional test suite passes |
+| Postgres integration suite | `2014 passed, 29 skipped` | Postgres database models, repositories, and queues pass |
+| Playwright browser/local-server suite | `1858 passed, 55 skipped` | Playwright extraction flows and server checks pass (historical count — not freshly rerun) |
 | route-auth + production-security + CORS checks | `183 passed` | Route-level permissions, auth matrix, and CORS settings validated |
+| Bandit security scan | `53 Low, 8 Medium, 0 High` | Security static analysis baseline established |
+| pip-audit dependency audit | `No known vulnerabilities found` | Dependency supply chain hygiene verified |
+| Ruff lint | `0 errors` | Linting passes cleanly |
+| Mypy type check | `Success: 166 source files` | Static type checking passes 100% clean |
 | Golden dataset live run | `8 passed in 53.97s` | Golden dataset target extraction live-validated under enforced F1 thresholds |
 | Benchmark smoke/config test | `1 passed` | Benchmark package smoke and configuration verified |
 | `scripts/smoke_prod_stack.sh` | Passed | Local production-like multi-container smoke test passes |
@@ -103,6 +107,52 @@ Each major claim is classified: Verified (V), Partially verified (P), Unverified
 | Internal dashboard | README | `frontend/` static files, FastAPI mounts | V |
 | Docker/Compose deployment | README, docs | `Dockerfile`, `docker-compose*.yml`, `nginx.conf` exist | H (locally validated historically) |
 | Golden dataset benchmarks | docs/BENCHMARKS | `8 passed in 53.97s` with enforced F1 thresholds | V |
+
+## Deep Research Report Audit
+
+The following is the comprehensive audit against `deep-research-report.md` checklist items:
+
+### High Priority
+| Item | Status | Details |
+| --- | --- | --- |
+| Add root LICENSE and THIRD_PARTY_NOTICES.md | ✅ Done | MIT license + vendor asset notices exist |
+| Introduce pyproject.toml and unify tool config | ✅ Done | Ruff, mypy, pytest, coverage all configured |
+| Freeze stable API contract and job model | ✅ Partial | 26 contract tests in `test_api_contract.py` cover SchemaField, JobCreate, Job, enums, export shapes |
+| Rebuild main.py into thin app factory + router registration | 🔲 Deferred | Major architectural refactor — needs design input |
+| Split scraper.py into fetch, orchestration, post-process | 🔲 Deferred | Major refactor — needs design input |
+| Split run_job() into component phases | 🔲 Deferred | Major refactor — needs design input |
+| Consolidate repository interfaces | 🔲 Deferred | Reduces SQLite/Postgres duplication — needs design input |
+| Fix rate limiter DB fallback behavior | ✅ Done | `DatabaseSlidingWindowCounter.allow()` correctly falls back to in-memory counter |
+| Preserve and harden URL safety boundary | ✅ Done | Comprehensive SSRF checks + 32 tests in `test_url_safety.py` |
+| Separate experimental modules into experimental/ namespace | 🔲 Deferred | `ENABLE_EXPERIMENTAL_ROUTES` flag exists; physical move needs design input |
+
+### Medium Priority
+| Item | Status | Details |
+| --- | --- | --- |
+| Replace pyflakes + .flake8 with Ruff | ✅ Done | `.flake8` removed, Ruff in pyproject.toml + pre-commit + CI |
+| Add coverage thresholds | ✅ Done | `fail_under = 50` in pyproject.toml (actual: 75.3%) |
+| Add contract tests for exports and job lifecycle | ✅ Done | 26 contract tests in `test_api_contract.py` |
+| Add deterministic fixture-based extraction tests | 🔲 Deferred | Additive work — existing extraction tests provide coverage |
+| Simplify dashboard to read-only internal surface | ✅ Done | Frontend is static/internal-only, no session handling |
+| Add dependency audit and SBOM generation | ✅ Done | pip-audit: 0 vulnerabilities; Bandit: 53 Low/8 Medium/0 High |
+| Rationalize env vars into groups | ✅ Partial | `ENABLE_EXPERIMENTAL_ROUTES` added; ~180 settings still ungrouped |
+
+### Low Priority
+| Item | Status | Details |
+| --- | --- | --- |
+| Rework monitoring stack after core app stable | 🔲 Deferred | Post-stability work |
+| Revisit semantic/topology subsystems as separate roadmap | 🔲 Deferred | Requires feature prioritization |
+
+### Toolchain Status
+| Tool | Status | Details |
+| --- | --- | --- |
+| Ruff | ✅ Configured | pyproject.toml + pre-commit + CI |
+| Ruff formatter | ✅ Configured | pre-commit has ruff-format |
+| mypy | ✅ 0 errors | 166 source files, `Success: no issues found` |
+| pytest + pytest-cov | ✅ Configured | `fail_under = 50`, actual: 75.3% |
+| Bandit | ✅ Running | 53 Low/8 Medium/0 High — baseline established |
+| pip-audit | ✅ Running | 0 known vulnerabilities |
+| pre-commit | ✅ Configured | `.pre-commit-config.yaml` with 4 repos |
 
 ## Current Blockers
 
