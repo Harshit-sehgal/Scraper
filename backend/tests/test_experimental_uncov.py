@@ -10,9 +10,6 @@ Modules covered: field_laws, invariant_firewall, gossip_substrate,
 vector_clock, manifold_state, motif_state, energy_state, instability_state.
 """
 
-import pytest
-
-
 class TestFieldLaws:
     """field_laws.py — foundational constants, zero upward dependencies."""
 
