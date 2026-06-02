@@ -65,8 +65,8 @@ jobs:
           COLLECTED=$(grep "tests collected" /tmp/collection.log | awk '{print $1}')
           echo "Collected tests: $COLLECTED"
           
-          if [ "$COLLECTED" -lt 1800 ]; then
-            echo "WARNING: Fewer than 1800 tests collected (expected ~1920)"
+          if [ "$COLLECTED" -lt 1900 ]; then
+            echo "WARNING: Fewer than 1900 tests collected (expected ~1937)"
             exit 1
           fi
 
@@ -100,8 +100,8 @@ jobs:
           PASSED=$(grep "passed" /tmp/test_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
           echo "SQLite tests passed: $PASSED"
           
-          if [ "$PASSED" -lt 1800 ]; then
-            echo "FAILED: Expected ~1846 tests passed, got $PASSED"
+          if [ "$PASSED" -lt 1840 ]; then
+            echo "FAILED: Expected ~1863 tests passed, got $PASSED"
             exit 1
           fi
 
