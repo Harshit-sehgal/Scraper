@@ -101,7 +101,7 @@ Each major claim is classified: Verified (V), Partially verified (P), Unverified
 | Production env placeholder rejection | README | `scripts/check_prod_env.py` intentionally fails on example env | V |
 | Internal dashboard | README | `frontend/` static files, FastAPI mounts | V |
 | Docker/Compose deployment | README, docs | `Dockerfile`, `docker-compose*.yml`, `nginx.conf` exist | H (locally validated historically) |
-| Golden dataset benchmarks | docs/BENCHMARKS | `8 passed, 0 failed` with modest F1 thresholds (lowest 0.650) | V |
+| Golden dataset benchmarks | docs/BENCHMARKS | `7 passed, 1 skipped` (transient httpbin.org 503) with modest F1 thresholds (lowest 0.650) | V |
 
 ## Current Blockers
 
