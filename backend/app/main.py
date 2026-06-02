@@ -20,6 +20,7 @@ from app.config import settings
 from app.globals import CONFIG, jobs_store, recycle_bin_store
 from app.lifespan import (
     lifespan,
+    persist_single_wrapper,
     persist_state_wrapper,
     run_job_wrapper,
     schedule_background_task,
@@ -37,6 +38,7 @@ from app.routers.jobs import create_jobs_router
 from app.routers.operator import router as operator_router
 from app.routers.scraper import router as scraper_router
 from app.routers.system import router as system_router
+from app.services.job_runner import run_job
 from app.storage_interface import get_job_repository
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,12 @@ logger = logging.getLogger(__name__)
 # ─── Backward-compatible re-exports ─────────────────────────────────────
 # These are imported from app.main by tests and other modules.
 # Keep them here so existing imports keep working after refactoring.
+_persist_state_wrapper = persist_state_wrapper
+_run_job_wrapper = run_job_wrapper
+_schedule_background_task = schedule_background_task
+_persist_single_wrapper = persist_single_wrapper
+run_job = run_job
+
 __all__ = [
     "app",
     "lifespan",
@@ -51,6 +59,11 @@ __all__ = [
     "jobs_store",
     "recycle_bin_store",
     "CONFIG",
+    "_persist_state_wrapper",
+    "_run_job_wrapper",
+    "_schedule_background_task",
+    "_persist_single_wrapper",
+    "run_job",
 ]
 
 # ─── App Factory and Configuration ─────────────────────────────────────────
@@ -87,9 +100,9 @@ def configure_routes(app: FastAPI):
         create_jobs_router(
             jobs_store=jobs_store,
             recycle_bin_store=recycle_bin_store,
-            persist_state_fn=persist_state_wrapper,
-            schedule_task_fn=schedule_background_task,
-            run_job_coro_fn=run_job_wrapper,
+            persist_state_fn=lambda *args, **kwargs: _persist_state_wrapper(*args, **kwargs),
+            schedule_task_fn=lambda *args, **kwargs: _schedule_background_task(*args, **kwargs),
+            run_job_coro_fn=lambda *args, **kwargs: _run_job_wrapper(*args, **kwargs),
             config=CONFIG,
         )
     )

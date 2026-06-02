@@ -157,17 +157,22 @@ def persist_single_wrapper(job_id: str, critical: bool = False) -> None:
 
 async def run_job_wrapper(job_id: str):
     """Run a job with all standard options wired from CONFIG."""
+    import app.main as main_mod
+
+    persist_fn = getattr(main_mod, "_persist_state_wrapper", persist_state_wrapper)
+    persist_single_fn = getattr(main_mod, "_persist_single_wrapper", persist_single_wrapper)
+
     await run_job(
         job_id=job_id,
         jobs_store=jobs_store,
-        persist_state_fn=persist_state_wrapper,
+        persist_state_fn=persist_fn,
         max_discovery_urls=CONFIG["max_discovery_urls"],
         max_job_runtime_seconds=CONFIG["max_job_runtime_seconds"],
         per_url_scrape_timeout_seconds=CONFIG["per_url_timeout_seconds"],
         ai_structuring_timeout_seconds=CONFIG["ai_structuring_timeout_seconds"],
         insight_timeout_seconds=CONFIG["insight_timeout_seconds"],
-        persist_state_single_fn=lambda: persist_single_wrapper(job_id, critical=False),
-        persist_state_single_critical_fn=lambda: persist_single_wrapper(job_id, critical=True),
+        persist_state_single_fn=lambda: persist_single_fn(job_id, critical=False),
+        persist_state_single_critical_fn=lambda: persist_single_fn(job_id, critical=True),
     )
 
 
