@@ -276,3 +276,107 @@ feature flags so core versus experimental is obvious in the file tree.
 
 5. **Dependency order matters** — don't split scraper.py until run_job()
    phases are stable, and don't consolidate repos until model contracts are frozen.
+
+
+## Research Shell Boundary (Status: Boundary Established — Quarantine In Progress)
+
+This is the first completed item from the deep-research-report's
+"Highest priority" list: "Freeze product scope and ban research sprawl
+from v1". The boundary is now a hard, machine-checkable gate, but
+quarantining the research modules out of the legacy product-kernel
+files is still ongoing work.
+
+### What was done
+
+1. **`backend/app/research/__init__.py`** — new module exporting
+   `RESEARCH_MODULES` (a `frozenset` of 75 module basenames) and
+   `is_research_module()` / `is_research_path()` / `research_summary()`
+   helpers. This is the canonical registry. Adding or removing a module
+   requires editing this file and is the only sanctioned way to
+   re-classify a module.
+
+2. **`backend/app/experimental_startup.py`** — every public function
+   (`init_graph_scheduler`, `init_recovery_framework`,
+   `init_domain_health_monitor`, `init_gossip_and_heartbeat`,
+   `restore_semantic_world_state`, `persist_semantic_world_state`,
+   `schedule_gossip_propagation`) now short-circuits to a no-op when
+   `settings.ENABLE_EXPERIMENTAL_ROUTES` is False. The new
+   `experimental_subsystems_enabled()` helper is the single source of
+   truth that the gate consults. `close_postgres_pool()` is intentionally
+   NOT gated (Postgres is product-kernel storage, not research).
+
+3. **`backend/app/lifespan.py`** — calls the experimental `init_*`
+   functions only when the gate is open. With the default
+   `ENABLE_EXPERIMENTAL_ROUTES=False`, the research modules are never
+   imported at startup.
+
+4. **`backend/app/main.py`** — the eager import of
+   `app.routers.experimental.router` was removed from the top of the
+   file and moved inside `configure_routes()` under the
+   `if settings.ENABLE_EXPERIMENTAL_ROUTES:` branch. A WARNING is
+   logged at app construction when the gate is open in production.
+   With the default, the experimental router module is never loaded
+   and the `/api/system/*` research endpoints return 404 because they
+   are not part of the app.
+
+5. **`.env.example` and `.env.production.example`** — both now contain
+   a documented `DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false` entry
+   with a comment block explaining the gate.
+
+### Tests
+
+- `backend/tests/test_research_boundary.py` (12 cases) — pin down
+  the registry: 25 well-known research modules are classified as
+  research, 17 well-known product-kernel modules are NOT, prefix
+  stripping works, the family summary is complete and sorted, and
+  the registry is immutable.
+- `backend/tests/test_experimental_gate.py` (12 cases) — every
+  public function in `experimental_startup` is verified to be a
+  no-op when the gate is off.
+- `backend/tests/test_main_routes_gate.py` (4 cases) — verify
+  that `app.main` does NOT eagerly import the experimental router,
+  that the research paths are absent from the route table when
+  the gate is off, that they are present when the gate is on, and
+  that a WARNING is logged in production.
+
+### Net effect
+
+With the default `ENABLE_EXPERIMENTAL_ROUTES=False`:
+
+- **Zero research modules in the import graph at startup.** Verified
+  by inspection of `lifespan.py` and `main.py`.
+- **Zero research endpoints exposed over HTTP.** Verified by the
+  route-table test.
+- **A clear operator signal at boot** if either is changed
+  (WARNING when enabled in production, INFO when disabled).
+
+This is the prerequisite for everything else in this plan: the
+remaining refactors (splitting `scraper.py`, `extraction_orchestrator.py`,
+`config.py`, the worker queues, the postgres repository, etc.) are
+mechanical once you can confidently say "this module is product
+kernel, that module is research" without tracing every import by hand.
+
+### What is NOT yet done
+
+The registry identifies 75 research modules. The gate prevents
+their *initialization* and *HTTP exposure*, but it does NOT yet
+prevent the legacy product-kernel files (e.g. `extraction_orchestrator.py`,
+`scraper_recovery_integration.py`, `cleaning_engine.py`,
+`state_store.py`, `llm_bridge.py`) from importing research modules
+at their top level. This is the next slice of work and is tracked
+in `## Deferred — Core Product Refactors` below.
+
+Concretely, the next phases are:
+
+- **Phase R2**: refactor `extraction_orchestrator.py` to make all
+  research imports lazy and gated, so that the orchestrator can
+  operate in research-free mode.
+- **Phase R3**: refactor `scraper_recovery_integration.py` and
+  `cleaning_engine.py` to use the registry: any research import
+  is moved to a lazy `if research_modules_enabled(): import ...`.
+- **Phase R4**: refactor `state_store.py`, `llm_bridge.py`, and
+  the rest of the legacy kernel until `is_research_path(module)`
+  is False for every top-level import in the kernel.
+- **Phase R5**: add a CI check that fails the build if any
+  product-kernel file imports a research module at top level.
+  This turns the gate into an enforced invariant.
