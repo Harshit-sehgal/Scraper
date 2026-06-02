@@ -68,7 +68,9 @@ asyncio_default_fixture_loop_scope = "module"
 addopts = "-q"
 markers = [
     "integration: marks tests as integration/optional (live API calls). Skipped by default.",
-    "postgres: tests that require a running Postgres instance (via testcontainers). Skipped by default."
+    "postgres: tests that require a running Postgres instance (via testcontainers). Skipped by default.",
+    "browser: tests that require Playwright/browser runtime and local HTTP server binding. Skipped by default.",
+    "golden_dataset: tests that hit real websites for extraction validation. Skipped by default (use --run-golden-dataset)."
 ]
 
 [tool.coverage.run]
