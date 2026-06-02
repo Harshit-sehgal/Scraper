@@ -30,6 +30,35 @@ from app.topology_dynamics import (
     evolve_macro_continents,
     cross_scale_pressure_flow,
 )
+from app.topology_metrics import (
+    compute_aggregate_metrics,
+    compute_topology_entropy,
+    compute_macro_energy as _metrics_compute_macro_energy,
+    distill_crystalline_atoms as _metrics_distill,
+)
+from app.topology_persistence import (
+    replace_all_regions,
+    trim_topology,
+    filter_topology_regions,
+    prune_topology as _persistence_prune,
+    garbage_collect_topology as _persistence_gc,
+    topology_to_dict,
+    topology_from_dict,
+    merge_topology,
+    clear_topology,
+    clear_topology_regions,
+)
+from app.topology_clustering import (
+    detect_communities as _cluster_detect_communities,
+    shard_topology_regions,
+    update_schema_patterns as _cluster_update_schema,
+    decay_topological_laws as _cluster_decay_laws,
+    set_topological_law as _cluster_set_law,
+    add_impossible_neighborhood as _cluster_add_impossible,
+    clear_impossible_neighborhoods as _cluster_clear_impossible,
+    self_prune_regions,
+    induce_topological_laws as _cluster_induce_laws,
+)
 
 __all__ = [
     "TopologyState",
@@ -243,22 +272,8 @@ class TopologyState:
         self._record("restructure_topology", {"count": len(targets)})
 
     def shard_topology(self) -> Dict[str, List[str]]:
-        """Assign every region to a shard based on community membership (Phase 53)."""
-        communities = self._get_struct("communities")
-        role_to_shard = {}
-        for idx, community in enumerate(communities):
-            shard_id = f"shard_{idx}"
-            for role in community:
-                role_to_shard[role] = shard_id
-
-        shard_assignment: Dict[str, List[str]] = {}
-        for r in self._get_regions():
-            # Assign region to the shard of its first competing role
-            primary_role = r.competing_roles[0] if r.competing_roles else "_unidentified"
-            shard_id = role_to_shard.get(primary_role, "shard_default")
-            shard_assignment.setdefault(shard_id, []).append(r.region_id)
-
-        return shard_assignment
+        """Assign every region to a shard based on community membership (Phase 53). Delegates to topology_clustering."""
+        return shard_topology_regions(self)
 
     def _get_regions(self) -> List[FieldConflictRegion]:
         return self._staging["regions"] if self._staging is not None else self._regions
@@ -418,35 +433,8 @@ class TopologyState:
         self._record("record_anchor", {"pair": list(pair)})
 
     def distill_crystalline_atoms(self, integrity_threshold: float = 0.9, instability_threshold: float = 0.1) -> int:
-        """Move extremely stable regions into the permanent atom store (Phase 34)."""
-        import time
-
-        regs = self._get_regions()
-        atoms = self._get_struct("crystalline_atoms")
-
-        remaining = []
-        new_atoms_count = 0
-
-        for r in regs:
-            if r.integrity >= integrity_threshold and r.instability <= instability_threshold:
-                # Distill to atom
-                atom = {
-                    "token": r.token,
-                    "roles": list(r.competing_roles),
-                    "domain": r.domain,
-                    "timestamp": time.time(),
-                }
-                atoms.append(atom)
-                new_atoms_count += 1
-            else:
-                remaining.append(r)
-
-        if new_atoms_count > 0:
-            self._set_regions(remaining)
-            self._set_struct("crystalline_atoms", atoms)
-            self._record("distill_crystalline_atoms", {"count": new_atoms_count})
-
-        return new_atoms_count
+        """Distill stable regions into atoms (Phase 34). Delegates to topology_metrics."""
+        return _metrics_distill(self, integrity_threshold, instability_threshold)
 
     def get_cohesion_merge_success(self) -> Dict[Tuple[str, str], float]:
         return self._get_struct("merge_success")
@@ -488,74 +476,28 @@ class TopologyState:
         self._set_struct("split_success", struct)
 
     def detect_communities(self):
-        """Flood-fill communities from cohesion + field regions."""
-        graph: Dict[str, Set[str]] = {}
-        cohesion = self._get_struct("neighborhood_cohesion")
-        for (ra, rb), val in cohesion.items():
-            if val > 0.5:
-                graph.setdefault(ra, set()).add(rb)
-                graph.setdefault(rb, set()).add(ra)
-        for r in self._get_regions():
-            for i in range(len(r.competing_roles)):
-                for j in range(i + 1, len(r.competing_roles)):
-                    ra, rb = r.competing_roles[i], r.competing_roles[j]
-                    graph.setdefault(ra, set()).add(rb)
-                    graph.setdefault(rb, set()).add(ra)
-        if not graph:
-            from app.field_laws import ROLE_EXCLUSIVITY
-
-            for ra, rb in ROLE_EXCLUSIVITY:
-                graph.setdefault(ra, set()).add(rb)
-                graph.setdefault(rb, set()).add(ra)
-        seen = set()
-        communities = []
-        for node in graph:
-            if node in seen:
-                continue
-            component = set()
-            stack = [node]
-            while stack:
-                cur = stack.pop()
-                if cur in seen:
-                    continue
-                seen.add(cur)
-                component.add(cur)
-                for neighbor in graph.get(cur, set()):
-                    if neighbor not in seen:
-                        stack.append(neighbor)
-            if component:
-                communities.append(component)
-        self._set_struct("communities", communities)
+        """Flood-fill communities from cohesion + field regions. Delegates to topology_clustering."""
+        _cluster_detect_communities(self)
 
     def update_schema_patterns(self, exclusion_key: tuple, exclusion_val: float):
-        struct = self._get_struct("schema_patterns")
-        cur = struct.get(exclusion_key, 0.0)
-        struct[exclusion_key] = cur * 0.95 + exclusion_val * 0.05
-        self._set_struct("schema_patterns", struct)
+        """Update schema patterns with EMA. Delegates to topology_clustering."""
+        _cluster_update_schema(self, exclusion_key, exclusion_val)
 
     def decay_topological_laws(self):
-        struct = self._get_struct("topological_laws")
-        for key in list(struct.keys()):
-            struct[key] = _clamp_signed(struct[key] * 0.95)
-            if abs(struct[key]) <= 0.005:
-                del struct[key]
-        self._set_struct("topological_laws", struct)
+        """Apply exponential decay to topological laws. Delegates to topology_clustering."""
+        _cluster_decay_laws(self)
 
     def set_topological_law(self, pair: tuple, value: float):
-        laws = self._get_struct("topological_laws")
-        laws[tuple(sorted(pair))] = _clamp_signed(value)
-        self._set_struct("topological_laws", laws)
-        self._record("set_topological_law", {"pair": pair, "value": value})
+        """Set a topological law for a role pair. Delegates to topology_clustering."""
+        _cluster_set_law(self, pair, value)
 
     def add_impossible_neighborhood(self, item: Set[str]):
-        struct = self._get_struct("impossible_neighborhoods")
-        struct.append(set(item))
-        self._set_struct("impossible_neighborhoods", struct)
+        """Add an impossible neighborhood. Delegates to topology_clustering."""
+        _cluster_add_impossible(self, item)
 
     def clear_impossible_neighborhoods(self):
-        struct = self._get_struct("impossible_neighborhoods")
-        struct.clear()
-        self._set_struct("impossible_neighborhoods", struct)
+        """Clear impossible neighborhoods. Delegates to topology_clustering."""
+        _cluster_clear_impossible(self)
 
     # ─── Controlled Mutations — Region Lifecycle ───────────────────────
 
@@ -616,149 +558,41 @@ class TopologyState:
             return True
         return False
 
-    def replace_all(self, new_regions: List[FieldConflictRegion]):
+    def replace_all(self, new_regions: list):
         """Replace the entire regional manifold (Phase 50)."""
-        self._set_regions(list(new_regions))
-        if self._staging is not None:
-            self._staging["structural_change"] = True
-        self._record("replace_all_regions", {"count": len(new_regions)})
+        replace_all_regions(self, new_regions)
 
     def trim(self, max_size: int, keep_from_end: int = 0):
-        regs = self._get_regions()
-        if len(regs) > max_size:
-            if keep_from_end > 0:
-                regs = regs[-keep_from_end:]
-            else:
-                regs = regs[-max_size:]
-            self._set_regions(regs)
-            if self._staging is not None:
-                self._staging["structural_change"] = True
+        """Trim regions to max_size."""
+        trim_topology(self, max_size, keep_from_end)
 
     def filter_regions(self, predicate: Callable[[FieldConflictRegion], bool]):
-        regs = [r for r in self._get_regions() if predicate(r)]
-        self._set_regions(regs)
-        if self._staging is not None:
-            self._staging["structural_change"] = True
+        """Filter regions with a predicate."""
+        filter_topology_regions(self, predicate)
 
     def prune(self, min_instability: float = 0.02, min_energy: float = 0.5) -> int:
-        regs = self._get_regions()
-        before = len(regs)
-        regs = [r for r in regs if r.instability > min_instability or r.local_energy > min_energy]
-        self._set_regions(regs)
-        if len(regs) != before and self._staging is not None:
-            self._staging["structural_change"] = True
-        return before - len(regs)
+        """Prune regions below instability and energy thresholds."""
+        return _persistence_prune(self, min_instability, min_energy)
 
     def garbage_collect(self, max_idle: int = 10) -> int:
         """Resource-aware pruning of dead semantic regions (Phase 9)."""
-        regs = self._get_regions()
-        before = len(regs)
-        # Prune regions that have been idle for too many cycles
-        regs = [r for r in regs if r.idle_cycles < max_idle]
-        self._set_regions(regs)
-        if len(regs) != before and self._staging is not None:
-            self._staging["structural_change"] = True
-        return before - len(regs)
+        return _persistence_gc(self, max_idle)
 
     def self_prune(self, instability_threshold: float = 0.9, community_required: bool = True) -> int:
-        """Autonomous topology pruning (Phase 62).
-
-        Removes regions that:
-        1. Have very high instability (> threshold)
-        2. Are NOT part of any detected community (isolated noise)
-        """
-        regs = self._get_regions()
-        if not regs:
-            return 0
-
-        before = len(regs)
-        in_community = set().union(*self.global_communities)
-
-        new_regs = []
-        for r in regs:
-            # Keep if stable OR in community OR part of the schema
-            is_noise = r.instability > instability_threshold
-            has_community = any(role in in_community for role in r.competing_roles)
-
-            if is_noise and community_required and not has_community:
-                self._record("prune_dead_zone", {"region_id": r.region_id, "instability": r.instability})
-                self._structural_change = True
-                continue
-
-            new_regs.append(r)
-
-        self._set_regions(new_regs)
-        return before - len(new_regs)
+        """Autonomous topology pruning (Phase 62). Delegates to topology_clustering."""
+        return self_prune_regions(self, instability_threshold, community_required)
 
     def induce_topological_laws(self, min_success_rate: float = 0.8, min_attempts: int = 10):
-        """Autonomous law discovery (Phase 62).
-
-        Promotes frequently successful structural patterns into formal laws.
-        """
-        # 1. Analyze successful merges
-        for pair, success in self._cohesion_merge_success.items():
-            attempts = self._cohesion_merge_attempts.get(pair, 0)
-            if attempts >= min_attempts:
-                rate = success / attempts
-                if rate >= min_success_rate:
-                    # Induced affinity law
-                    current = self.topological_laws.get(pair, 0.0)
-                    self.set_topological_law(pair, max(current, 0.5 + (rate - 0.5) * 0.5))
-                    self._record("induce_law", {"pair": pair, "type": "affinity", "rate": rate})
-
-        # 2. Analyze successful splits
-        for pair, success in self._cohesion_split_success.items():
-            attempts = self._cohesion_split_attempts.get(pair, 0)
-            if attempts >= min_attempts:
-                rate = success / attempts
-                if rate >= min_success_rate:
-                    # Induced repulsion law
-                    current = self.topological_laws.get(pair, 0.0)
-                    self.set_topological_law(pair, min(current, -0.5 * rate))
-                    self._record("induce_law", {"pair": pair, "type": "repulsion", "rate": rate})
+        """Autonomous law discovery (Phase 62). Delegates to topology_clustering."""
+        _cluster_induce_laws(self, min_success_rate, min_attempts)
 
     def clear(self):
-        if self._staging is not None:
-            self._staging["regions"].clear()
-            self._staging["communities"].clear()
-            self._staging["schema_patterns"].clear()
-            self._staging["topological_laws"].clear()
-            self._staging["neighborhood_cohesion"].clear()
-            self._staging["impossible_neighborhoods"].clear()
-            self._staging["restructuring_queue"].clear()
-            self._staging["merge_success"].clear()
-            self._staging["merge_attempts"].clear()
-            self._staging["split_success"].clear()
-            self._staging["split_attempts"].clear()
-            self._staging["centrality"].clear()
-            self._staging["anchors"].clear()
-            self._staging["crystalline_atoms"].clear()
-            self._staging["meso_clusters"].clear()
-            self._staging["macro_continents"].clear()
-        else:
-            self._regions.clear()
-            self._communities.clear()
-            self._schema_patterns.clear()
-            self._topological_laws.clear()
-            self._neighborhood_cohesion.clear()
-            self._impossible_neighborhoods.clear()
-            self._restructuring_queue.clear()
-            self._cohesion_merge_success.clear()
-            self._cohesion_merge_attempts.clear()
-            self._cohesion_split_success.clear()
-            self._cohesion_split_attempts.clear()
-            self._centrality.clear()
-            self._anchors.clear()
-            self._crystalline_atoms.clear()
-            self._meso_clusters.clear()
-            self._macro_continents.clear()
+        """Clear all topology structures. Delegates to topology_persistence."""
+        clear_topology(self)
 
     def clear_regions(self):
-        if self._staging is not None:
-            self._staging["regions"].clear()
-        else:
-            self._regions.clear()
-        self._record("clear_regions", {})
+        """Clear only the regions list. Delegates to topology_persistence."""
+        clear_topology_regions(self)
 
     # ─── Controlled Mutations — Region Attributes ──────────────────────
 
@@ -1300,30 +1134,16 @@ class TopologyState:
         }
 
     def aggregate_metrics(self):
-        regs = self._get_regions()
-        if not regs:
-            return {}, {}, {}
-        n = len(regs)
-        avg_convergence = sum(r.local_convergence for r in regs) / n
-        avg_temp = sum(r.local_temperature for r in regs) / n
-        avg_energy = sum(r.local_energy for r in regs) / n
-        return {"convergence": avg_convergence, "temperature": avg_temp, "energy": avg_energy, "count": n}
+        """Aggregate region metrics. Delegates to topology_metrics."""
+        return compute_aggregate_metrics(self)
 
     def compute_entropy(self) -> float:
-        regs = self._get_regions()
-        if not regs:
-            return 0.0
-        return sum(r.instability for r in regs) / len(regs)
+        """Compute global topology entropy. Delegates to topology_metrics."""
+        return compute_topology_entropy(self)
 
     def compute_macro_energy(self, convergence: float) -> float:
-        regs = self._get_regions()
-        if not regs:
-            return 5.0
-        avg_energy = sum(r.local_energy for r in regs) / len(regs)
-        attractor_strength = 1.0 / (1.0 + 2.718 ** (-15 * (convergence - 0.6)))
-        attractor_pull = min(attractor_strength * convergence * 2.0, 2.0)
-        target_energy = max(0.0, avg_energy - attractor_pull)
-        return target_energy
+        """Compute target macro energy. Delegates to topology_metrics."""
+        return _metrics_compute_macro_energy(self, convergence)
 
     # ─── Multi-Scale Topology (Micro / Meso / Macro) ────────────────────
 
@@ -1359,170 +1179,16 @@ class TopologyState:
     # ─── Serialization ───────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
-        from dataclasses import asdict
-
-        return {
-            "regions": [asdict(r) for r in self._get_regions()],
-            "communities": [list(c) for c in self.global_communities],
-            "schema_patterns": {str(k): v for k, v in self.schema_patterns.items()},
-            "topological_laws": {str(k): v for k, v in self.topological_laws.items()},
-            "neighborhood_cohesion": {str(k): v for k, v in self.neighborhood_cohesion.items()},
-            "cohesion_merge_success": {str(k): v for k, v in self.get_cohesion_merge_success().items()},
-            "cohesion_merge_attempts": {str(k): v for k, v in self.get_cohesion_merge_attempts().items()},
-            "cohesion_split_success": {str(k): v for k, v in self.get_cohesion_split_success().items()},
-            "cohesion_split_attempts": {str(k): v for k, v in self.get_cohesion_split_attempts().items()},
-            "centrality": self.global_centrality,
-            "anchors": [list(a) for a in self.anchors],
-            "impossible_neighborhoods": [list(n) for n in self.impossible_neighborhoods],
-            "restructuring_queue": [list(r) for r in self.restructuring_queue],
-            "crystalline_atoms": list(self._get_struct("crystalline_atoms")),
-            "meso_clusters": list(self._get_struct("meso_clusters")),
-            "macro_continents": list(self._get_struct("macro_continents")),
-            "topology_epoch": self._topology_epoch,
-            "tombstones": list(self._tombstones),
-        }
+        """Serialize the full topology state. Delegates to topology_persistence."""
+        return topology_to_dict(self)
 
     def from_dict(self, data: dict):
-        self.clear()
-
-        # Identity and Epoch (Phase 60)
-        self._topology_epoch = data.get("topology_epoch", 1)
-        self._tombstones = set(data.get("tombstones", []))
-
-        # Regions
-        regions = []
-        for r_data in data.get("regions", []):
-            r = FieldConflictRegion(
-                competing_roles=r_data["competing_roles"],
-                token=r_data["token"],
-                instability=r_data["instability"],
-                region_id=r_data.get("region_id"),
-            )
-            for k, v in r_data.items():
-                if k not in ["competing_roles", "token", "instability", "region_id"]:
-                    setattr(r, k, v)
-            regions.append(r)
-        self._set_regions(regions)
-
-        # Communities
-        self._set_struct("communities", [set(c) for c in data.get("communities", [])])
-
-        # Pipe-separated-key dicts or tuple keys
-        for data_key, struct_key in [
-            ("schema_patterns", "schema_patterns"),
-            ("topological_laws", "topological_laws"),
-            ("neighborhood_cohesion", "neighborhood_cohesion"),
-            ("cohesion_merge_success", "merge_success"),
-            ("cohesion_merge_attempts", "merge_attempts"),
-            ("cohesion_split_success", "split_success"),
-            ("cohesion_split_attempts", "split_attempts"),
-        ]:
-            target = {}
-            for k, v in data.get(data_key, {}).items():
-                # Support both old pipe-separated format and new tuple format
-                if isinstance(k, str):
-                    if "|" in k:
-                        parts = k.split("|")
-                        if len(parts) == 2:
-                            target[tuple(parts)] = v
-                    else:
-                        # Assume it's repr of a tuple, convert back
-                        try:
-                            target[parse_topology_key(k)] = v
-                        except ValueError:
-                            target[tuple(k.split("|"))] = v
-                else:
-                    # Already a tuple / list
-                    target[tuple(k)] = v
-            self._set_struct(struct_key, target)
-
-        # Simple replacements
-        self._set_struct("centrality", dict(data.get("centrality", {})))
-        self._set_struct("impossible_neighborhoods", [set(n) for n in data.get("impossible_neighborhoods", [])])
-        self._set_struct("restructuring_queue", {tuple(r) for r in data.get("restructuring_queue", [])})
-        self._set_struct("anchors", {tuple(a) for a in data.get("anchors", []) if len(a) == 2})
-        self._set_struct("crystalline_atoms", list(data.get("crystalline_atoms", [])))
-        self._set_struct("meso_clusters", list(data.get("meso_clusters", [])))
-        self._set_struct("macro_continents", list(data.get("macro_continents", [])))
+        """Deserialize topology state. Delegates to topology_persistence."""
+        topology_from_dict(self, data)
 
     def merge(self, other_data: dict, alpha: float = 0.5):
-        """Merge remote topology state into local (Phase 32 / 60)."""
-        remote_epoch = other_data.get("topology_epoch", 1)
-        remote_tombstones = set(other_data.get("tombstones", []))
-
-        # Phase 60: Causal Reconciliation Heuristic
-        # 1. Update local tombstones (union)
-        self._tombstones.update(remote_tombstones)
-
-        # 2. Sync Epoch
-        if remote_epoch > self._topology_epoch:
-            self._topology_epoch = remote_epoch
-
-        # 3. Prune local regions that are tombstones in remote
-        if remote_epoch >= self._topology_epoch:
-            regs = self._get_regions()
-            new_regs = [r for r in regs if r.region_id not in remote_tombstones]
-            if len(new_regs) < len(regs):
-                self._set_regions(new_regs)
-                self._structural_change = True
-
-        remote_regions = other_data.get("regions", [])
-        local_ids = {r.region_id: r for r in self._get_regions()}
-
-        for r_data in remote_regions:
-            rid = r_data.get("region_id")
-            # Phase 60: Skip if region is a local tombstone
-            if rid in self._tombstones:
-                continue
-
-            if rid in local_ids:
-                # Merge existing region attributes (Phase 32)
-                l_reg = local_ids[rid]
-                l_reg.instability = l_reg.instability * (1.0 - alpha) + r_data["instability"] * alpha
-                l_reg.local_energy = l_reg.local_energy * (1.0 - alpha) + r_data.get("local_energy", 0.5) * alpha
-                l_reg.integrity = max(l_reg.integrity, r_data.get("integrity", 0.5))
-            else:
-                # Add new region from remote
-                r = FieldConflictRegion(
-                    competing_roles=r_data["competing_roles"],
-                    token=r_data["token"],
-                    instability=r_data["instability"],
-                    region_id=rid,
-                )
-                for k, v in r_data.items():
-                    if k not in ["competing_roles", "token", "instability", "region_id"]:
-                        setattr(r, k, v)
-                self.append_region(r)
-
-        # Merge topological laws (Max)
-        remote_laws = other_data.get("topological_laws", {})
-        for key_str, r_val in remote_laws.items():
-            # Support both old pipe-separated format and new tuple repr format
-            pair = None
-            if "|" in key_str:
-                # Old format: "a|b"
-                parts = key_str.split("|")
-                if len(parts) == 2:
-                    pair = tuple(parts)
-            else:
-                # New format: "('a', 'b')"
-                try:
-                    pair = parse_topology_key(key_str)
-                except ValueError:
-                    pass
-
-            if pair:
-                local = self.topological_laws.get(pair, 0.0)
-                merged = r_val if abs(r_val) > abs(local) else local
-                self.set_topological_law(pair, merged)
-
-        # Merge anchors
-        remote_anchors = other_data.get("anchors", [])
-        for a in remote_anchors:
-            if len(a) == 2:
-                self.record_anchor(tuple(a))
-
-        self._record("merge", {"remote_regions": len(remote_regions)})
+        """Merge remote topology state into local (Phase 32 / 60). Delegates to topology_persistence."""
+        merge_topology(self, other_data, alpha)
 
     # ─── Active Field Waves (Decentralized Propagation) ──────────────
 
