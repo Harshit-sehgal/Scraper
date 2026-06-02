@@ -118,9 +118,7 @@ def _job_to_row(job: Job) -> dict:
         "topic": job.topic or "",
         "intent": job.intent or "",
         "urls": json.dumps(job.urls or []),
-        "schema_fields": json.dumps(
-            [f.model_dump() if hasattr(f, "model_dump") else f for f in (job.schema_fields or [])]
-        ),
+        "schema_fields": json.dumps([f.model_dump() if hasattr(f, "model_dump") else f for f in (job.schema_fields or [])]),
         "filters": (
             json.dumps([f.model_dump() if hasattr(f, "model_dump") else f for f in (job.filters or [])])
             if hasattr(job, "filters")
@@ -147,9 +145,7 @@ def _job_to_row(job: Job) -> dict:
         "completed_at": job.completed_at if job.completed_at is not None else "",
         "min_record_score": job.min_record_score if job.min_record_score is not None else 0.35,
         "acquisition_mode": (
-            job.acquisition_mode.value
-            if hasattr(job.acquisition_mode, "value")
-            else str(job.acquisition_mode or "standard")
+            job.acquisition_mode.value if hasattr(job.acquisition_mode, "value") else str(job.acquisition_mode or "standard")
         ),
         "search_params_json": json.dumps(job.search_params if job.search_params is not None else {}),
         "location": job.location or "",
@@ -599,9 +595,7 @@ def get_storage_health() -> dict:
         schema_row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
         schema_version = schema_row[0] if schema_row and schema_row[0] is not None else 0
         jobs_ok = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone() is not None
-        recycle_ok = (
-            conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='recycle_bin'").fetchone() is not None
-        )
+        recycle_ok = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='recycle_bin'").fetchone() is not None
         conn.close()
 
         if schema_version == 0:

@@ -44,12 +44,25 @@ def _detect_search_form(html: str) -> dict:
     forms = soup.find_all("form")
 
     SEARCH_FIELD_NAMES: set[str] = {
-        "from", "to", "source", "target", "location", "place",
-        "city", "date", "query", "search", "q", "keyword",
+        "from",
+        "to",
+        "source",
+        "target",
+        "location",
+        "place",
+        "city",
+        "date",
+        "query",
+        "search",
+        "q",
+        "keyword",
     }
     SEARCH_PLACEHOLDER_PATTERNS: list[str] = [
-        r"from|to", r"location|place", r"date|when",
-        r"search|find", r"keyword|query",
+        r"from|to",
+        r"location|place",
+        r"date|when",
+        r"search|find",
+        r"keyword|query",
     ]
 
     best_form = None

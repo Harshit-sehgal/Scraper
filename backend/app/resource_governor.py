@@ -116,7 +116,7 @@ class ResourceGovernor:
             )
             # Retain only the limit bounds
             telemetry.clear()
-            for r in recent[-self.budgets.max_telemetry_records:]:
+            for r in recent[-self.budgets.max_telemetry_records :]:
                 data = dict(r)
                 url = data.pop("url", "unknown")
                 telemetry.record(url, **data)

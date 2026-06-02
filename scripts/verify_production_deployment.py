@@ -9,18 +9,19 @@ health metrics are valid, TLS limits are configured, and no defaults are leaked.
 Run on the target host:
     python3 scripts/verify_production_deployment.py
 """
-import os
-import sys
-import json
-import urllib.request
-import urllib.error
-import subprocess
 
+import json
+import os
+import subprocess
+import sys
+import urllib.error
+import urllib.request
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BACKEND_DIR = os.path.join(ROOT_DIR, "backend")
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
+
 
 def run_command(cmd: list[str]) -> tuple[int, str]:
     try:
@@ -42,6 +43,7 @@ def run_compose_ps() -> tuple[int, str, str]:
 
     return code, out, "none"
 
+
 def main():
     print("=" * 70)
     print("DataForge Production Deployment Verification Tool")
@@ -59,7 +61,7 @@ def main():
     prod_check_cmd = ["python3", "scripts/check_prod_env.py"]
     if os.path.exists(env_file):
         prod_check_cmd.extend(["--env-file", env_file])
-    
+
     # Run in process
     code, out = run_command(prod_check_cmd)
     if "Result: required production environment checks passed" in out or code == 0:
@@ -85,7 +87,7 @@ def main():
                     containers = json.loads(ps_out)
                 else:
                     containers = [json.loads(line) for line in ps_out.split("\n") if line]
-            
+
             if not containers:
                 print("  [FAIL] No running containers found in the production stack.")
             else:
@@ -97,7 +99,7 @@ def main():
                     print(f"  - Container: {name:25} State: {state:12} Health: {health}")
                     if "up" not in state.lower() and "running" not in state.lower():
                         unhealthy.append(name)
-                
+
                 if unhealthy:
                     print(f"  [FAIL] The following containers are not healthy: {', '.join(unhealthy)}")
                 else:
@@ -131,7 +133,7 @@ def main():
             print(f"  [FAIL] Connection failed to {url}: {e}")
             ingress_passed = False
             continue
-        
+
         if status == expected_code:
             print(f"  - Route: {url:40} Expected: {expected_code} Got: {status} [OK] ({desc})")
         else:
@@ -146,6 +148,7 @@ def main():
     # 4. Egress and SSRF Protections
     print("\n[4] SSRF and Egress Validation...")
     from app.url_safety import validate_public_http_url
+
     ssrf_targets = [
         ("http://127.0.0.1", False),
         ("http://169.254.169.254/latest/meta-data/", False),
@@ -159,7 +162,7 @@ def main():
             safe = True
         except ValueError:
             safe = False
-            
+
         if safe == expected:
             print(f"  - SSRF Boundary: {url:45} Expected Safe: {expected:5} Got: {safe:5} [OK]")
         else:
@@ -174,6 +177,7 @@ def main():
     print("\n" + "=" * 70)
     print("Verification Completed.")
     print("=" * 70)
+
 
 if __name__ == "__main__":
     main()

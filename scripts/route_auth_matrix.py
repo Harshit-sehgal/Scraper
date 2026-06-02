@@ -16,7 +16,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_ROOT = REPO_ROOT / "backend"
 if str(BACKEND_ROOT) not in sys.path:
@@ -124,9 +123,7 @@ def render_markdown(rows: list[RouteAuthRow]) -> str:
         "| --- | --- | --- | --- | --- |",
     ]
     for row in rows:
-        lines.append(
-            f"| `{row.method}` | `{row.path}` | {row.access} | {row.enforcement} | {row.notes} |"
-        )
+        lines.append(f"| `{row.method}` | `{row.path}` | {row.access} | {row.enforcement} | {row.notes} |")
     lines.append("")
     return "\n".join(lines)
 

@@ -12,6 +12,7 @@ def _cleanup_rate_limit_key(key: str) -> None:
     if backend == "postgres":
         try:
             from app.postgres_repository import _conn, _execute
+
             with _conn() as conn:
                 _execute(conn, "DELETE FROM rate_limits WHERE key = %s", (key,))
         except Exception:
@@ -19,6 +20,7 @@ def _cleanup_rate_limit_key(key: str) -> None:
     else:
         try:
             from app.job_store import _DB_LOCK, _get_connection
+
             with _DB_LOCK:
                 conn = _get_connection()
                 try:
@@ -33,6 +35,7 @@ def _cleanup_rate_limit_key(key: str) -> None:
 def _generate_test_key() -> str:
     """Generate a unique test key to avoid collisions with other tests."""
     import os
+
     return f"_test_sliding_window_{os.urandom(4).hex()}_"
 
 
@@ -73,6 +76,7 @@ def test_db_sliding_window_counter_sqlite():
         # Clean up test data from the correct backend
         _cleanup_rate_limit_key(test_key)
 
+
 def test_rate_limiter_middleware_db_backed_selection():
     """Verify that RateLimiterMiddleware selects the database-backed counter when configured."""
     from unittest.mock import patch
@@ -101,12 +105,14 @@ def test_db_sliding_window_counter_fallback():
     """Verify that DatabaseSlidingWindowCounter falls back to in-memory behavior on DB errors."""
     import os
     from unittest.mock import patch
+
     test_key = _generate_test_key()
 
     # Force postgres storage backend and mock database connection to fail
-    with patch.dict(os.environ, {"DATAFORGE_STORAGE_BACKEND": "postgres"}), \
-         patch("app.postgres_repository._conn", side_effect=Exception("Database connection failure")):
-
+    with (
+        patch.dict(os.environ, {"DATAFORGE_STORAGE_BACKEND": "postgres"}),
+        patch("app.postgres_repository._conn", side_effect=Exception("Database connection failure")),
+    ):
         counter = DatabaseSlidingWindowCounter(max_requests=2, window_seconds=2.0, key=test_key)
 
         # Verify it falls back to in-memory, checking limit functionality

@@ -386,9 +386,7 @@ async def discover_urls(
                     "expected_records": (
                         10
                         if source_type == "directory"
-                        or any(
-                            h in (r.get("title", "").lower() + " " + r.get("body", "").lower()) for h in LISTING_HINTS
-                        )
+                        or any(h in (r.get("title", "").lower() + " " + r.get("body", "").lower()) for h in LISTING_HINTS)
                         else 1
                     ),
                 }

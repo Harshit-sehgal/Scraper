@@ -179,9 +179,7 @@ async def discover_selectors(
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "You output valid JSON objects for CSS selector extraction. " "No markdown, no commentary."
-                    ),
+                    "content": ("You output valid JSON objects for CSS selector extraction. " "No markdown, no commentary."),
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -334,9 +332,7 @@ def _compute_ui_noise_score(elements: list, texts: list[str]) -> float:
     link_ratio = sum(1 for el in elements if el.name == "a") / max(n, 1)
     form_ratio = sum(1 for el in elements if el.name in ("input", "select", "button", "textarea")) / max(n, 1)
     short_text_ratio = sum(1 for t in texts if len(t) < 15) / max(n, 1)
-    price_or_date_ratio = sum(1 for t in texts if _re.search(r"[\$£€¥₹]\s*\d+|\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)) / max(
-        n, 1
-    )
+    price_or_date_ratio = sum(1 for t in texts if _re.search(r"[\$£€¥₹]\s*\d+|\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)) / max(n, 1)
     low_diversity = 1.0 if len(set(t[:20] for t in texts)) < max(n * 0.3, 2) else 0.0
     near_chrome = 0
     for el in elements:
@@ -480,9 +476,7 @@ def _fallback_parent_child_discovery(soup) -> list[dict]:
             continue
 
         data_signals = sum(
-            1
-            for t in non_empty
-            if _re.search(r"[\$£€¥₹]\s*\d", t) or _re.search(r"\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}", t)
+            1 for t in non_empty if _re.search(r"[\$£€¥₹]\s*\d", t) or _re.search(r"\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}", t)
         )
         if data_signals < 2:
             continue

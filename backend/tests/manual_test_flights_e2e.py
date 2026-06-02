@@ -31,6 +31,7 @@ def parse_price(price_str: str | None) -> float | None:
     if not price_str:
         return None
     import re
+
     cleaned = price_str.replace(",", "")
     match = re.search(r"[\d]+(?:\.[\d]+)?", cleaned)
     return float(match.group(0)) if match else None
@@ -41,6 +42,7 @@ def clean_airport(text: str | None) -> str | None:
     if not text:
         return None
     import re
+
     match = re.search(r"\b([A-Z]{3})\b", text.strip())
     return match.group(1) if match else text.strip()
 
@@ -48,9 +50,7 @@ def clean_airport(text: str | None) -> str | None:
 async def test_flights_scrape():
     import os
 
-    os.environ['DATAFORGE_STATE_FILE'] = str(
-        Path(__file__).resolve().parent.parent / 'data' / 'jobs_state_test.json'
-    )
+    os.environ["DATAFORGE_STATE_FILE"] = str(Path(__file__).resolve().parent.parent / "data" / "jobs_state_test.json")
 
     url = (
         "https://www.flightsnholidays.co.uk/flight-result.aspx"

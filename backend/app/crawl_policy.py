@@ -94,9 +94,7 @@ class CrawlPolicyEngine:
         # Cooldown check
         if time.time() < state.cooldown_until:
             remaining = int(state.cooldown_until - time.time())
-            logger.info(
-                "Domain %s in cooldown for %ds (%d consecutive failures)", domain, remaining, state.consecutive_failures
-            )
+            logger.info("Domain %s in cooldown for %ds (%d consecutive failures)", domain, remaining, state.consecutive_failures)
             return f"Domain {domain} in cooldown ({remaining}s remaining)"
 
         # Page budget check

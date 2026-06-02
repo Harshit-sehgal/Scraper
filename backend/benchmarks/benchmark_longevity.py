@@ -38,9 +38,12 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
             # Create token with some recurring consistency
             token_val = f"val_{role}_{i % 50}"
             token = SemanticToken(
-                raw=token_val, normalized=token_val,
-                span=Span(0, 5), position=0,
-                primary_type=ttype, type_distribution={ttype: 1.0}
+                raw=token_val,
+                normalized=token_val,
+                span=Span(0, 5),
+                position=0,
+                primary_type=ttype,
+                type_distribution={ttype: 1.0},
             )
             ws.capture_pre_allocation_field([token], roles)
             # Manifold drift - very small for longevity
@@ -73,8 +76,10 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
         if i % checkpoint_interval == 0 and i > 0:
             elapsed = time.time() - start_time
             report = ws._observability.get_governance_report(ws.capture_governance_snapshot())
-            print(f"  [{i}] Energy: {ws.metrics.global_energy:.2f}, Entropy: {ws.metrics.global_entropy:.2f}, "
-                  f"Diversity: {report['diversity']:.2f}, Elapsed: {elapsed:.1f}s")
+            print(
+                f"  [{i}] Energy: {ws.metrics.global_energy:.2f}, Entropy: {ws.metrics.global_entropy:.2f}, "
+                f"Diversity: {report['diversity']:.2f}, Elapsed: {elapsed:.1f}s"
+            )
 
     total_duration = time.time() - start_time
     final_report = ws._observability.get_governance_report(ws.capture_governance_snapshot())

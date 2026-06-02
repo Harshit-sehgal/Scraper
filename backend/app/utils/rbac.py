@@ -79,10 +79,13 @@ def require_role(allowed_roles: list[UserRole]):
     async def dependency(request: Request):
         role = get_current_role(request)
         if role not in allowed_roles:
-            raise HTTPException(status_code=403, detail=f"Permission denied. Required roles: {
+            raise HTTPException(
+                status_code=403,
+                detail=f"Permission denied. Required roles: {
                     [
                         r.value for r in allowed_roles]}. Your role: {
-                    role.value}.")
+                    role.value}.",
+            )
         return role
 
     return dependency

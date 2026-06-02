@@ -97,9 +97,7 @@ def calculate_extraction_accuracy(
     expected_schema = {k for r in expected for k in r.keys()}
     extracted_schema_fields = sum(len(_data_fields(r)) for r in extracted)
     conforming_schema_fields = sum(1 for r in extracted for k in _data_fields(r).keys() if k in expected_schema)
-    metrics.schema_conformity = (
-        conforming_schema_fields / extracted_schema_fields if extracted_schema_fields > 0 else 0.0
-    )
+    metrics.schema_conformity = conforming_schema_fields / extracted_schema_fields if extracted_schema_fields > 0 else 0.0
 
     # Per-field accuracy
     for k in field_totals:

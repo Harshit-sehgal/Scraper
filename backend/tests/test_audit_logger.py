@@ -37,6 +37,7 @@ def temp_log_dir():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Monkey-patch the module-level constants by overriding the path
         import app.audit_logger as al
+
         al.AUDIT_LOG_DIR = tmpdir
         al.AUDIT_LOG_FILE = "test_audit.log"
         # Force re-creation of logger with new path on next access
@@ -265,12 +266,14 @@ class TestLogFileIO:
 class TestLoggerSingleton:
     def test_logger_is_singleton(self):
         from app.audit_logger import _get_audit_logger
+
         logger1 = _get_audit_logger()
         logger2 = _get_audit_logger()
         assert logger1 is logger2
 
     def test_reset_clears_handlers(self):
         from app.audit_logger import _get_audit_logger
+
         logger = _get_audit_logger()
         assert len(logger.handlers) > 0
         old_handler = logger.handlers[0]

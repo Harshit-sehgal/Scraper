@@ -21,7 +21,6 @@ import sys
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
-
 REQUIRED_VARS = [
     "DATAFORGE_API_KEY",
     "DATAFORGE_CORS_ORIGINS",
@@ -72,9 +71,7 @@ PLACEHOLDER_FRAGMENTS = (
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Validate production environment variables for DataForge Scraper."
-    )
+    parser = argparse.ArgumentParser(description="Validate production environment variables for DataForge Scraper.")
     parser.add_argument(
         "--env-file",
         default=".env",
@@ -106,13 +103,7 @@ def load_env_file(path: Path) -> dict[str, str]:
 def load_effective_env(path: Path) -> dict[str, str]:
     """Load env-file values and overlay process environment variables."""
     env = load_env_file(path)
-    env.update(
-        {
-            key: value
-            for key, value in os.environ.items()
-            if key.startswith("DATAFORGE_") or key.startswith("GRAFANA_")
-        }
-    )
+    env.update({key: value for key, value in os.environ.items() if key.startswith("DATAFORGE_") or key.startswith("GRAFANA_")})
     return env
 
 
@@ -212,10 +203,7 @@ def check_cors_origins(value: str) -> bool:
 
     for origin in origins:
         if not isinstance(origin, str) or not origin.startswith(("http://", "https://")):
-            print(
-                f"  [FAIL]  CORS origin {origin!r} is invalid. "
-                "Must be a valid URL starting with http:// or https://."
-            )
+            print(f"  [FAIL]  CORS origin {origin!r} is invalid. " "Must be a valid URL starting with http:// or https://.")
             return False
 
     return True
@@ -224,10 +212,7 @@ def check_cors_origins(value: str) -> bool:
 def check_storage_backend(value: str) -> bool:
     """Validate DATAFORGE_STORAGE_BACKEND is 'postgres'."""
     if value.lower() != "postgres":
-        print(
-            f"  [FAIL]  DATAFORGE_STORAGE_BACKEND={value!r}. "
-            "Production requires 'postgres'."
-        )
+        print(f"  [FAIL]  DATAFORGE_STORAGE_BACKEND={value!r}. " "Production requires 'postgres'.")
         return False
     return True
 
@@ -235,10 +220,7 @@ def check_storage_backend(value: str) -> bool:
 def check_worker_queue(value: str) -> bool:
     """Validate DATAFORGE_WORKER_QUEUE is 'true'."""
     if value.lower() not in ("true", "1", "yes"):
-        print(
-            f"  [FAIL]  DATAFORGE_WORKER_QUEUE={value!r}. "
-            "Production requires 'true'."
-        )
+        print(f"  [FAIL]  DATAFORGE_WORKER_QUEUE={value!r}. " "Production requires 'true'.")
         return False
     return True
 
@@ -246,10 +228,7 @@ def check_worker_queue(value: str) -> bool:
 def check_queue_backend(value: str) -> bool:
     """Validate DATAFORGE_QUEUE_BACKEND is 'postgres'."""
     if value.lower() != "postgres":
-        print(
-            f"  [FAIL]  DATAFORGE_QUEUE_BACKEND={value!r}. "
-            "Production requires 'postgres'."
-        )
+        print(f"  [FAIL]  DATAFORGE_QUEUE_BACKEND={value!r}. " "Production requires 'postgres'.")
         return False
     return True
 
@@ -264,10 +243,7 @@ def check_grafana_password(value: str) -> bool:
         )
         return False
     if len(value) < 8:
-        print(
-            f"  [FAIL]  GRAFANA_PASSWORD is too short ({len(value)} chars). "
-            "Must be at least 8 characters."
-        )
+        print(f"  [FAIL]  GRAFANA_PASSWORD is too short ({len(value)} chars). " "Must be at least 8 characters.")
         return False
     return True
 
@@ -275,10 +251,7 @@ def check_grafana_password(value: str) -> bool:
 def check_database_url(value: str) -> bool:
     """Validate DATAFORGE_DATABASE_URL is a postgresql:// URL."""
     if not value.startswith(("postgresql://", "postgres://")):
-        print(
-            f"  [FAIL]  DATAFORGE_DATABASE_URL={value!r}. "
-            "Must be a postgresql:// or postgres:// URL."
-        )
+        print(f"  [FAIL]  DATAFORGE_DATABASE_URL={value!r}. " "Must be a postgresql:// or postgres:// URL.")
         return False
     try:
         parsed = urlsplit(value)
@@ -317,14 +290,9 @@ def _check_password_secret(name: str, value: str) -> bool:
         )
         return False
     if len(value) < 8:
-        print(
-            f"  [FAIL]  {name} is too short ({len(value)} chars). "
-            "Must be at least 8 characters."
-        )
+        print(f"  [FAIL]  {name} is too short ({len(value)} chars). " "Must be at least 8 characters.")
         return False
     return True
-
-
 
 
 def _check_api_key_not_default(name: str, value: str) -> bool:
@@ -341,14 +309,11 @@ def _check_api_key_not_default(name: str, value: str) -> bool:
         print(
             f"  [FAIL]  {name}={_mask_value(name, value)} "
             "is a known default/placeholder value. "
-            "Generate a strong random key with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+            'Generate a strong random key with: python3 -c "import secrets; print(secrets.token_hex(32))"'
         )
         return False
     if len(value) < 16:
-        print(
-            f"  [FAIL]  {name} is too short ({len(value)} chars). "
-            "Must be at least 16 characters."
-        )
+        print(f"  [FAIL]  {name} is too short ({len(value)} chars). " "Must be at least 16 characters.")
         return False
     return True
 
@@ -383,10 +348,7 @@ def check_distinct_api_keys(env: dict[str, str]) -> bool:
 def check_env(value: str) -> bool:
     """Validate DATAFORGE_ENV is set to 'production'."""
     if value.lower() != "production":
-        print(
-            f"  [FAIL]  DATAFORGE_ENV={value!r}. "
-            "Must be set to 'production'."
-        )
+        print(f"  [FAIL]  DATAFORGE_ENV={value!r}. " "Must be set to 'production'.")
         return False
     return True
 
@@ -398,6 +360,7 @@ def check_postgres_connection(db_url: str) -> bool:
     not just that the URL is formatted correctly.
     """
     import os
+
     if os.environ.get("DATAFORGE_SKIP_DB_CHECK", "").lower() in ("true", "1", "yes"):
         print("\n  [INFO]  Skipping Postgres connectivity test (DATAFORGE_SKIP_DB_CHECK is set).")
         return True
@@ -441,30 +404,43 @@ def main() -> int:
 
     # ── Required vars ────────────────────────────────────────────────
     checks = [
-        ("DATAFORGE_API_KEY", True, check_api_key,
-         "Generate with: python3 -c \"import secrets; print(secrets.token_hex(32))\""),
-        ("DATAFORGE_CORS_ORIGINS", True, check_cors_origins,
-         "Must be a JSON array of origins, e.g. [\"https://yourdomain.com\"]"),
-        ("DATAFORGE_DB_PASSWORD", True, check_db_password,
-         "Must match POSTGRES_PASSWORD in docker-compose.prod.yml"),
-        ("DATAFORGE_STORAGE_BACKEND", True, check_storage_backend,
-         "Must be 'postgres' for production"),
-        ("DATAFORGE_DATABASE_URL", True, check_database_url,
-         "Must be a postgresql:// URL matching docker-compose.prod.yml"),
-        ("DATAFORGE_WORKER_QUEUE", True, check_worker_queue,
-         "Must be 'true' for production"),
-        ("DATAFORGE_QUEUE_BACKEND", True, check_queue_backend,
-         "Must be 'postgres' for production — set DATAFORGE_QUEUE_BACKEND=postgres"),
-        ("DATAFORGE_METRICS_TOKEN", True, lambda v: _check_api_key_not_default("DATAFORGE_METRICS_TOKEN", v),
-         'Metrics scrape token for Prometheus. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"'),
-        ("DATAFORGE_ENV", True, check_env,
-         "Must be set to 'production'"),
-        ("DATAFORGE_OPERATOR_API_KEY", True, lambda v: _check_api_key_not_default("DATAFORGE_OPERATOR_API_KEY", v),
-         'Operator key for job/selector mutations. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"'),
-        ("DATAFORGE_ADMIN_API_KEY", True, lambda v: _check_api_key_not_default("DATAFORGE_ADMIN_API_KEY", v),
-         'Admin key for system-level operations. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"'),
-        ("GRAFANA_PASSWORD", True, check_grafana_password,
-         "Set a strong Grafana admin password (reject: admin, password, grafana, change-me)"),
+        ("DATAFORGE_API_KEY", True, check_api_key, 'Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"'),
+        ("DATAFORGE_CORS_ORIGINS", True, check_cors_origins, 'Must be a JSON array of origins, e.g. ["https://yourdomain.com"]'),
+        ("DATAFORGE_DB_PASSWORD", True, check_db_password, "Must match POSTGRES_PASSWORD in docker-compose.prod.yml"),
+        ("DATAFORGE_STORAGE_BACKEND", True, check_storage_backend, "Must be 'postgres' for production"),
+        ("DATAFORGE_DATABASE_URL", True, check_database_url, "Must be a postgresql:// URL matching docker-compose.prod.yml"),
+        ("DATAFORGE_WORKER_QUEUE", True, check_worker_queue, "Must be 'true' for production"),
+        (
+            "DATAFORGE_QUEUE_BACKEND",
+            True,
+            check_queue_backend,
+            "Must be 'postgres' for production — set DATAFORGE_QUEUE_BACKEND=postgres",
+        ),
+        (
+            "DATAFORGE_METRICS_TOKEN",
+            True,
+            lambda v: _check_api_key_not_default("DATAFORGE_METRICS_TOKEN", v),
+            'Metrics scrape token for Prometheus. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"',
+        ),
+        ("DATAFORGE_ENV", True, check_env, "Must be set to 'production'"),
+        (
+            "DATAFORGE_OPERATOR_API_KEY",
+            True,
+            lambda v: _check_api_key_not_default("DATAFORGE_OPERATOR_API_KEY", v),
+            'Operator key for job/selector mutations. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"',
+        ),
+        (
+            "DATAFORGE_ADMIN_API_KEY",
+            True,
+            lambda v: _check_api_key_not_default("DATAFORGE_ADMIN_API_KEY", v),
+            'Admin key for system-level operations. Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"',
+        ),
+        (
+            "GRAFANA_PASSWORD",
+            True,
+            check_grafana_password,
+            "Set a strong Grafana admin password (reject: admin, password, grafana, change-me)",
+        ),
     ]
 
     # ── Optional but recommended ─────────────────────────────────────────

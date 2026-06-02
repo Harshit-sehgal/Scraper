@@ -17,6 +17,7 @@ class TestTelemetryStateAdapter:
         """Reset module-level singletons before each test to avoid cross-test pollution."""
         import app.scrape_telemetry as st
         import app.telemetry_state as ts
+
         ts._telemetry_state = None
         st._collector = None
 
@@ -106,11 +107,13 @@ class TestGetTelemetryState:
     def setup_method(self):
         import app.scrape_telemetry as st
         import app.telemetry_state as ts
+
         ts._telemetry_state = None
         st._collector = None
 
     def test_returns_singleton(self):
         import app.telemetry_state as ts
+
         ts._telemetry_state = None
 
         first = get_telemetry_state()
@@ -119,6 +122,7 @@ class TestGetTelemetryState:
 
     def test_type(self):
         import app.telemetry_state as ts
+
         ts._telemetry_state = None
         instance = get_telemetry_state()
         assert isinstance(instance, TelemetryStateAdapter)

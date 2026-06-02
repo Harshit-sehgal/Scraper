@@ -351,9 +351,7 @@ class ObservabilityState:
         }
         return policy
 
-    def detect_runaway_attractors(
-        self, manifold_history: Dict[str, List[float]], threshold: float = 0.95
-    ) -> List[dict]:
+    def detect_runaway_attractors(self, manifold_history: Dict[str, List[float]], threshold: float = 0.95) -> List[dict]:
         """Identify roles that have become 'too stable' or dominant (Phase 48).
 
         Runaway attractors can freeze the field and prevent new learning.
@@ -571,9 +569,7 @@ class ObservabilityState:
         success_rate = 1.0
         if tx_history:
             degrads = [
-                t
-                for t in tx_list
-                if t.get("type") == "degradation" and t.get("details", {}).get("severity") == "critical"
+                t for t in tx_list if t.get("type") == "degradation" and t.get("details", {}).get("severity") == "critical"
             ]
             success_rate = max(0.0, 1.0 - (len(degrads) / (len(tx_history) + 1)))
 

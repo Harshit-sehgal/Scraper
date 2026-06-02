@@ -8,10 +8,12 @@ cross-origin requests and confirming strict CSP configuration.
 Usage:
     python3 scripts/test_cors.py --url http://localhost:18080/health --origin https://yourdomain.com
 """
-import sys
+
 import argparse
-import urllib.request
+import sys
 import urllib.error
+import urllib.request
+
 
 def test_cors_origin(url: str, origin: str) -> tuple[int, dict]:
     try:
@@ -24,6 +26,7 @@ def test_cors_origin(url: str, origin: str) -> tuple[int, dict]:
     except Exception as e:
         print(f"[ERROR] Connection to {url} failed: {e}")
         return -1, {}
+
 
 def main():
     parser = argparse.ArgumentParser(description="DataForge CORS/CSP Header Auditor")
@@ -40,7 +43,7 @@ def main():
     status, headers = test_cors_origin(args.url, args.origin)
     if status < 0:
         sys.exit(1)
-        
+
     allow_origin = headers.get("access-control-allow-origin")
     print(f"  Response Status: {status}")
     print(f"  Access-Control-Allow-Origin: {allow_origin}")
@@ -71,6 +74,7 @@ def main():
 
     print("\nValidation Complete.")
     print("=" * 70)
+
 
 if __name__ == "__main__":
     main()

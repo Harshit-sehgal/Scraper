@@ -110,14 +110,15 @@ class TestThreeWayAcquisition:
         url = "https://example.com/data"
         telemetry = AcquisitionTelemetryCollector()
 
-        with patch("app.html_utils.fetch_page_content") as mock_fetch, \
-                patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot, \
-                patch("app.page_profiler.detect_page_structure") as mock_structure, \
-                patch("app.page_profiler.detect_value_patterns") as mock_patterns, \
-                patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm, \
-                patch("httpx.AsyncClient") as mock_httpx_client, \
-                patch("app.selector_discovery.get_acquisition_telemetry", return_value=telemetry):
-
+        with (
+            patch("app.html_utils.fetch_page_content") as mock_fetch,
+            patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot,
+            patch("app.page_profiler.detect_page_structure") as mock_structure,
+            patch("app.page_profiler.detect_value_patterns") as mock_patterns,
+            patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm,
+            patch("httpx.AsyncClient") as mock_httpx_client,
+            patch("app.selector_discovery.get_acquisition_telemetry", return_value=telemetry),
+        ):
             mock_resp = MagicMock()
             mock_resp.url = url
             mock_resp.status_code = 200
@@ -181,23 +182,27 @@ class TestThreeWayAcquisition:
         homepage_url = "https://www.example.com/"
         telemetry = AcquisitionTelemetryCollector()
 
-        with patch("app.html_utils.fetch_page_content") as mock_fetch, \
-                patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot, \
-                patch("app.page_profiler.detect_page_structure") as mock_structure, \
-                patch("app.page_profiler.detect_value_patterns") as mock_patterns, \
-                patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm, \
-                patch("httpx.AsyncClient") as mock_httpx_client, \
-                patch("app.selector_discovery._detect_redirect", return_value={
+        with (
+            patch("app.html_utils.fetch_page_content") as mock_fetch,
+            patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot,
+            patch("app.page_profiler.detect_page_structure") as mock_structure,
+            patch("app.page_profiler.detect_value_patterns") as mock_patterns,
+            patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm,
+            patch("httpx.AsyncClient") as mock_httpx_client,
+            patch(
+                "app.selector_discovery._detect_redirect",
+                return_value={
                     "redirected": True,
                     "redirect_type": "session_expired",
                     "message": "URL redirected to homepage — the search session likely expired.",
                     "original_url": stale_url,
                     "final_url": homepage_url,
-                }), \
-                patch("app.url_safety.validate_public_http_url", return_value=None), \
-                patch("app.selector_discovery.get_acquisition_telemetry", return_value=telemetry), \
-                patch("app.selector_discovery.detect_session_params") as mock_session:
-
+                },
+            ),
+            patch("app.url_safety.validate_public_http_url", return_value=None),
+            patch("app.selector_discovery.get_acquisition_telemetry", return_value=telemetry),
+            patch("app.selector_discovery.detect_session_params") as mock_session,
+        ):
             mock_resp = MagicMock()
             mock_resp.url = homepage_url
             mock_resp.status_code = 200
@@ -263,25 +268,29 @@ class TestThreeWayAcquisition:
         fresh_url = "https://www.example.com/search?from=NYC&to=LHR&departdate=2026-06-15"
         telemetry = AcquisitionTelemetryCollector()
 
-        with patch("app.html_utils.fetch_page_content") as mock_fetch, \
-                patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot, \
-                patch("app.page_profiler.detect_page_structure") as mock_structure, \
-                patch("app.page_profiler.detect_value_patterns") as mock_patterns, \
-                patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm, \
-                patch("httpx.AsyncClient") as mock_httpx_client, \
-                patch("app.selector_discovery._try_form_search_recovery", new_callable=AsyncMock) as mock_recovery, \
-                patch("app.selector_discovery._detect_search_form") as mock_form_detect, \
-                patch("app.selector_discovery._detect_redirect", return_value={
+        with (
+            patch("app.html_utils.fetch_page_content") as mock_fetch,
+            patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot,
+            patch("app.page_profiler.detect_page_structure") as mock_structure,
+            patch("app.page_profiler.detect_value_patterns") as mock_patterns,
+            patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm,
+            patch("httpx.AsyncClient") as mock_httpx_client,
+            patch("app.selector_discovery._try_form_search_recovery", new_callable=AsyncMock) as mock_recovery,
+            patch("app.selector_discovery._detect_search_form") as mock_form_detect,
+            patch(
+                "app.selector_discovery._detect_redirect",
+                return_value={
                     "redirected": True,
                     "redirect_type": "session_expired",
                     "message": "URL redirected to homepage — the search session likely expired.",
                     "original_url": stale_url,
                     "final_url": "https://www.example.com/",
-                }), \
-                patch("app.url_safety.validate_public_http_url", return_value=None), \
-                patch("app.selector_discovery.get_acquisition_telemetry", return_value=telemetry), \
-                patch("app.selector_discovery.detect_session_params") as mock_session:
-
+                },
+            ),
+            patch("app.url_safety.validate_public_http_url", return_value=None),
+            patch("app.selector_discovery.get_acquisition_telemetry", return_value=telemetry),
+            patch("app.selector_discovery.detect_session_params") as mock_session,
+        ):
             mock_resp = MagicMock()
             mock_resp.url = "https://www.example.com/"
             mock_resp.status_code = 200

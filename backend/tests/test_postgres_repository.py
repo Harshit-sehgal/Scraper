@@ -96,6 +96,7 @@ class TestJobRepositoryFactory:
         sys.modules["app.postgres_repository"] = fake_mod
 
         from app.storage_interface import get_job_repository as gjr
+
         reset_repository()
 
         try:
@@ -215,6 +216,7 @@ class TestPostgresSerialization:
     def _import_postgres_module(self):
         try:
             from app.postgres_repository import _job_to_row, _row_to_job
+
             return _job_to_row, _row_to_job
         except ImportError:
             pytest.skip("psycopg2 not installed")
@@ -355,6 +357,7 @@ class TestPostgresSchemaRepair:
                 _build_create_recycle_bin_sql,
                 _ensure_required_tables,
             )
+
             return _ensure_required_tables, _build_create_jobs_sql, _build_create_recycle_bin_sql
         except ImportError:
             pytest.skip("psycopg2 not installed")
@@ -396,6 +399,7 @@ class TestPostgresSchemaRepair:
     def test_current_schema_version_is_2(self):
         try:
             from app.postgres_repository import _CURRENT_SCHEMA_VERSION
+
             assert _CURRENT_SCHEMA_VERSION >= 2
         except ImportError:
             pytest.skip("psycopg2 not installed")
@@ -435,6 +439,7 @@ class TestPostgresIntegration:
     def postgres_container(self):
         """Start a Postgres testcontainer or reuse a running one."""
         import socket
+
         use_running = False
         dsn = os.environ.get("DATAFORGE_DATABASE_URL")
         if dsn:
@@ -457,6 +462,7 @@ class TestPostgresIntegration:
                 os.environ.pop("PGPASSWORD", None)
         else:
             from testcontainers.postgres import PostgresContainer
+
             with PostgresContainer("postgres:16-alpine") as pg:
                 os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
                 os.environ["DATAFORGE_DATABASE_URL"] = pg.get_connection_url().replace("+psycopg2", "")
@@ -499,11 +505,14 @@ class TestPostgresIntegration:
 
         # Reset the module-level pool so the repo uses our container
         from app.postgres_repository import _close_pool
+
         _close_pool()
         from app.storage_interface import reset_repository
+
         reset_repository()
 
         from app.postgres_repository import PostgresJobRepository
+
         repo = PostgresJobRepository()
 
         # Trigger schema ensure + health check
@@ -517,6 +526,7 @@ class TestPostgresIntegration:
 
         # Verify we can insert into recycle_bin
         from app.models import Job, JobStatus
+
         recycled = Job(
             id="recycled-after-repair",
             name="Repair Test",
@@ -544,15 +554,19 @@ class TestPostgresIntegration:
             conn.close()
 
         from app.postgres_repository import _close_pool
+
         _close_pool()
         from app.storage_interface import reset_repository
+
         reset_repository()
 
         from app.postgres_repository import PostgresJobRepository
+
         repo = PostgresJobRepository()
 
         # Insert a job, then soft-delete it
         from app.models import Job, JobStatus
+
         job = Job(
             id="soft-delete-test",
             name="Will Be Deleted",

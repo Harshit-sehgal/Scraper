@@ -125,24 +125,20 @@ class AcquisitionLineage(BaseModel):
                 "respect rate limits and avoid anti-bot escalation."
             ),
             AcquisitionState.REDIRECTED: (
-                "The URL was redirected from the original to a new location. Data was "
-                "extracted from the final page."
+                "The URL was redirected from the original to a new location. Data was " "extracted from the final page."
             ),
             AcquisitionState.HOMEPAGE_REDIRECT: (
-                "The URL redirected to the homepage. The original page may have moved or the "
-                "session may have expired."
+                "The URL redirected to the homepage. The original page may have moved or the " "session may have expired."
             ),
             AcquisitionState.SESSION_EXPIRED: (
                 "The session for this URL has expired. The page redirected to a homepage or "
                 "landing page instead of showing results."
             ),
             AcquisitionState.RECOVERED: (
-                "The expired session was recovered by re-submitting the search form. Fresh "
-                "results are now available."
+                "The expired session was recovered by re-submitting the search form. Fresh " "results are now available."
             ),
             AcquisitionState.RECOVERY_FAILED: (
-                "The session expired and automatic recovery failed. Try providing search "
-                "parameters to re-fetch the data."
+                "The session expired and automatic recovery failed. Try providing search " "parameters to re-fetch the data."
             ),
             AcquisitionState.NO_SEARCH_FORM: (
                 "The session expired and no search form was found on the landing page to "
@@ -157,13 +153,10 @@ class AcquisitionLineage(BaseModel):
                 "be a login wall, cookie consent page, or require JavaScript rendering."
             ),
             AcquisitionState.ANTI_BOT_BLOCKED: (
-                "The page appears to be blocking automated access. Try again later or use a "
-                "different approach."
+                "The page appears to be blocking automated access. Try again later or use a " "different approach."
             ),
             AcquisitionState.PATH_CHANGED: "The URL path changed. Data was extracted from the new page.",
-            AcquisitionState.CROSS_DOMAIN: (
-                "The URL redirected to a different domain. The original site may have changed."
-            ),
+            AcquisitionState.CROSS_DOMAIN: ("The URL redirected to a different domain. The original site may have changed."),
         }
         return messages.get(self.state, "URL acquisition completed.")
 

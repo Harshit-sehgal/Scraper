@@ -25,8 +25,9 @@ def verify_experimental_enabled():
     if not settings.ENABLE_EXPERIMENTAL_ROUTES:
         raise HTTPException(
             status_code=404,
-            detail="Experimental / research routes are disabled in this environment. Set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable them."
+            detail="Experimental / research routes are disabled in this environment. Set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable them.",
         )
+
 
 router = APIRouter(dependencies=[Depends(verify_experimental_enabled)])
 
@@ -102,9 +103,7 @@ async def system_topology():
         "field_regions": view.all_region_dicts(),
         "topology_edges": view.get_topology_edges(),
         "edge_fields": [edge.__dict__ for edge in view.get_edge_fields()],
-        "role_compatibility": [
-            {"role": k[0], "type": k[1], "score": round(v, 3)} for k, v in ws.role_compatibility.items()
-        ],
+        "role_compatibility": [{"role": k[0], "type": k[1], "score": round(v, 3)} for k, v in ws.role_compatibility.items()],
         "drift_logs": {role: ws._observability.get_role_drift(role) for role in ws.get_manifold_roles()},
         "meso_clusters": ws.meso_clusters,
         "macro_continents": ws.macro_continents,
@@ -260,9 +259,7 @@ async def system_topology_history(limit: int = 20):
     journal = get_journal()
 
     history = []
-    structural_entries = [
-        e for e in journal._entries if e["type"] in ["restructure_topology", "merge_state", "add", "remove"]
-    ]
+    structural_entries = [e for e in journal._entries if e["type"] in ["restructure_topology", "merge_state", "add", "remove"]]
     target_entries = structural_entries[-limit:]
 
     for entry in target_entries:

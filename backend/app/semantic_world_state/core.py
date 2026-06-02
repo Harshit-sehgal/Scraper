@@ -557,12 +557,13 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                     self._manifold.set_manifold_vector(role, remote_vec)
                     self._energy.set_schema_instability(role, 0.3)
 
-            logger.info(f"FEDERATION: Merged {
+            logger.info(
+                f"FEDERATION: Merged {
                     len(remote_manifold) -
-                    filtered_count} roles. " f"Firewall filtered {filtered_count} roles.")
-            self.record_delta(
-                "global", "manifold_federation", {"remote_roles": len(remote_manifold), "filtered": filtered_count}
+                    filtered_count} roles. "
+                f"Firewall filtered {filtered_count} roles."
             )
+            self.record_delta("global", "manifold_federation", {"remote_roles": len(remote_manifold), "filtered": filtered_count})
 
     def export_topology_laws(self) -> dict:
         return {
@@ -1117,9 +1118,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                     self._manifold.set_manifold_vector(envelope_id, centroid)
                     self._manifold.anchor_role(envelope_id)
 
-                    logger.info(
-                        f"HIERARCHICAL SYNTHESIS: Distilled community {constituents} into Envelope [{envelope_id}]"
-                    )
+                    logger.info(f"HIERARCHICAL SYNTHESIS: Distilled community {constituents} into Envelope [{envelope_id}]")
 
     def merge_hierarchical_knowledge(self, other_abstraction: dict):
         remote_envelopes = other_abstraction.get("envelopes", {})
@@ -1243,9 +1242,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             diff["global_entropy"] = (self.metrics.global_entropy, other.metrics.global_entropy)
         added_roles = set(other.role_compatibility) - set(self.role_compatibility)
         if added_roles:
-            diff["added_role_compatibilities"] = {
-                str(k): v for k, v in other.role_compatibility.items() if k in added_roles
-            }
+            diff["added_role_compatibilities"] = {str(k): v for k, v in other.role_compatibility.items() if k in added_roles}
         changed_roles = {
             k
             for k in set(self.role_compatibility) & set(other.role_compatibility)

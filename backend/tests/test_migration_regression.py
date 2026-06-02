@@ -45,11 +45,11 @@ def test_recycle_bin_migration_preservation():
         # Seed v1 recycle_bin records
         conn.execute(
             "INSERT INTO recycle_bin (id, name, status, mode, topic, urls, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("old-job-1", "Old Scraper 1", "failed", "manual", "flights", "['http://old.com']", "2026-05-01T00:00:00")
+            ("old-job-1", "Old Scraper 1", "failed", "manual", "flights", "['http://old.com']", "2026-05-01T00:00:00"),
         )
         conn.execute(
             "INSERT INTO recycle_bin (id, name, status, mode, topic, urls, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("old-job-2", "Old Scraper 2", "completed", "auto", "hotels", "[]", "2026-05-02T00:00:00")
+            ("old-job-2", "Old Scraper 2", "completed", "auto", "hotels", "[]", "2026-05-02T00:00:00"),
         )
         conn.commit()
         conn.close()
@@ -110,7 +110,7 @@ def test_persist_state_single(monkeypatch):
             schema_fields=[],
             filters=[],
             progress_current=5,
-            progress_total=10
+            progress_total=10,
         )
 
         # Upsert single job row
@@ -142,8 +142,10 @@ def test_migrations_cached_per_db_path(monkeypatch):
     # Reset migration cache for the test
     reset_job_store_for_tests()
 
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp1, \
-            tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp2:
+    with (
+        tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp1,
+        tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp2,
+    ):
         db_path1 = Path(tmp1.name)
         db_path2 = Path(tmp2.name)
 
@@ -205,12 +207,7 @@ def test_progress_persistence_without_full_state_rewrite(monkeypatch):
     # Define minimal job and store
     job_id = "test-job-hot-updates"
     job = Job(
-        id=job_id,
-        name="Hot Update Test",
-        status=JobStatus.PENDING,
-        urls=["https://example.com"],
-        schema_fields=[],
-        filters=[]
+        id=job_id, name="Hot Update Test", status=JobStatus.PENDING, urls=["https://example.com"], schema_fields=[], filters=[]
     )
     jobs_store = {job_id: job}
 
@@ -229,18 +226,20 @@ def test_progress_persistence_without_full_state_rewrite(monkeypatch):
 
     # Let's run run_job with the mocks
     try:
-        asyncio.run(run_job(
-            job_id=job_id,
-            jobs_store=jobs_store,
-            persist_state_fn=mock_persist_state,
-            max_discovery_urls=5,
-            max_job_runtime_seconds=5,
-            per_url_scrape_timeout_seconds=5,
-            ai_structuring_timeout_seconds=5,
-            insight_timeout_seconds=5,
-            persist_state_single_fn=mock_persist_single,
-            persist_state_single_critical_fn=mock_persist_single,
-        ))
+        asyncio.run(
+            run_job(
+                job_id=job_id,
+                jobs_store=jobs_store,
+                persist_state_fn=mock_persist_state,
+                max_discovery_urls=5,
+                max_job_runtime_seconds=5,
+                per_url_scrape_timeout_seconds=5,
+                ai_structuring_timeout_seconds=5,
+                insight_timeout_seconds=5,
+                persist_state_single_fn=mock_persist_single,
+                persist_state_single_critical_fn=mock_persist_single,
+            )
+        )
     finally:
         reset_domain_runtime_policy()
 
@@ -362,7 +361,7 @@ def test_running_job_marked_failed_after_restart(monkeypatch):
             name="Running Scraper",
             status=JobStatus.RUNNING,
             urls=["https://example.com"],
-            schema_fields=[]
+            schema_fields=[],
         )
 
         jobs_store = {job_running.id: job_running}
@@ -445,15 +444,9 @@ def test_json_to_sqlite_migration_imports_existing_jobs(monkeypatch):
         # Write mock legacy JSON state
         legacy_data = {
             "jobs": [
-                {
-                    "id": "legacy-j1",
-                    "name": "Legacy 1",
-                    "status": "completed",
-                    "urls": ["https://legacy"],
-                    "schema_fields": []
-                }
+                {"id": "legacy-j1", "name": "Legacy 1", "status": "completed", "urls": ["https://legacy"], "schema_fields": []}
             ],
-            "recycle_bin": []
+            "recycle_bin": [],
         }
         json_path.write_text(json.dumps(legacy_data))
 
@@ -516,21 +509,23 @@ def test_same_domain_concurrency_respected(monkeypatch):
             "https://testdomain.com/3",
         ],
         schema_fields=[],
-        filters=[]
+        filters=[],
     )
 
     # Run the job
     try:
-        asyncio.run(run_job(
-            job_id=job.id,
-            jobs_store={job.id: job},
-            persist_state_fn=lambda: None,
-            max_discovery_urls=5,
-            max_job_runtime_seconds=5,
-            per_url_scrape_timeout_seconds=5,
-            ai_structuring_timeout_seconds=5,
-            insight_timeout_seconds=5,
-        ))
+        asyncio.run(
+            run_job(
+                job_id=job.id,
+                jobs_store={job.id: job},
+                persist_state_fn=lambda: None,
+                max_discovery_urls=5,
+                max_job_runtime_seconds=5,
+                per_url_scrape_timeout_seconds=5,
+                ai_structuring_timeout_seconds=5,
+                insight_timeout_seconds=5,
+            )
+        )
     finally:
         reset_domain_runtime_policy()
 
@@ -567,7 +562,7 @@ def test_sqlite_preserves_all_job_fields(monkeypatch):
             deduplicate_field="email",
             started_at="2026-05-25T12:00:00",
             results_on_disk=True,
-            results_file_path="/tmp/results.json.gz"
+            results_file_path="/tmp/results.json.gz",
         )
 
         save_state({job.id: job}, {})
@@ -613,7 +608,7 @@ def test_offloaded_results_survive_restart(monkeypatch):
             status=JobStatus.RUNNING,
             results_on_disk=True,
             results_file_path="/tmp/offloaded_records.json.gz",
-            results=[]
+            results=[],
         )
 
         save_state({job.id: job}, {})

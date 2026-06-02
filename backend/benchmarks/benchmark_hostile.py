@@ -149,6 +149,7 @@ async def malformed_dom():
     </body></html>
     """
 
+
 # ─── Benchmark Runner ───────────────────────────────────────────────────
 
 
@@ -209,6 +210,7 @@ async def run_benchmarks():
     print("\n" + "=" * 60)
     print(" BENCHMARKS COMPLETE")
     print("=" * 60 + "\n")
+
 
 if __name__ == "__main__":
     # Allow rapid requests to local server

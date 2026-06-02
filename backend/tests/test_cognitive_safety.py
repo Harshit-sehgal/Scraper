@@ -26,10 +26,7 @@ def test_ontological_firewall_high_entropy():
     ws.clear()
 
     # High entropy remote vector (all 0.5)
-    data = {
-        "manifold": {"uncertain_role": [0.5] * 16},
-        "version": "1.1"
-    }
+    data = {"manifold": {"uncertain_role": [0.5] * 16}, "version": "1.1"}
 
     # 2. Import
     ws.import_federated_manifold(data)
@@ -47,10 +44,7 @@ def test_ontological_firewall_contradiction():
     ws._energy.set_schema_instability("stable_role", 0.1)
 
     # Remote contradictory role (all 0.0)
-    data = {
-        "manifold": {"stable_role": [0.0] * 16},
-        "version": "1.1"
-    }
+    data = {"manifold": {"stable_role": [0.0] * 16}, "version": "1.1"}
 
     # 2. Import
     ws.import_federated_manifold(data)

@@ -171,9 +171,7 @@ def load_job_results_from_disk_safe(
                     # unreliable
                     break
     except (gzip.BadGzipFile, EOFError, OSError) as e:
-        warning = (
-            f"Results file for job {job_id} is truncated or corrupt: {e}. " f"Returned {len(results)} partial records."
-        )
+        warning = f"Results file for job {job_id} is truncated or corrupt: {e}. " f"Returned {len(results)} partial records."
         logger.warning("%s", warning)
     except Exception as e:
         warning = f"Failed to read results file for job {job_id}: {e}. " f"Returned {len(results)} partial records."

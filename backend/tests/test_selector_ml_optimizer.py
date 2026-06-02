@@ -401,7 +401,7 @@ class TestSelectorOptimizationEngine:
             selectors={
                 "title": ".product-title",
                 "price": ".product-price",
-            }
+            },
         )
         assert re_report["original_count"] == 2, "Optimization should still produce a report"
 
@@ -428,7 +428,7 @@ class TestSelectorOptimizationEngine:
             selectors={
                 "title": ".product-title",
                 "price": ".product-price",
-            }
+            },
         )
 
         assert report["original_count"] == 2

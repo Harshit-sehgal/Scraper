@@ -38,29 +38,35 @@ def _load_fixture(name: str) -> str:
 # ── Fixture-based extraction tests ───────────────────────────────────────
 
 
-@pytest.mark.parametrize("fixture_name,schema_fields,min_expected_records,required_fields", [
-    (
-        "messy_blog",
-        [_schema_field("title")],
-        1,
-        ["title"],
-    ),
-    (
-        "travel_site",
-        [_schema_field("name"), _schema_field("price", FieldType.CURRENCY)],
-        1,
-        ["name"],
-    ),
-    (
-        "legacy_directory",
-        [_schema_field("company"), _schema_field("email", FieldType.EMAIL)],
-        1,
-        ["company"],
-    ),
-])
+@pytest.mark.parametrize(
+    "fixture_name,schema_fields,min_expected_records,required_fields",
+    [
+        (
+            "messy_blog",
+            [_schema_field("title")],
+            1,
+            ["title"],
+        ),
+        (
+            "travel_site",
+            [_schema_field("name"), _schema_field("price", FieldType.CURRENCY)],
+            1,
+            ["name"],
+        ),
+        (
+            "legacy_directory",
+            [_schema_field("company"), _schema_field("email", FieldType.EMAIL)],
+            1,
+            ["company"],
+        ),
+    ],
+)
 @pytest.mark.asyncio
 async def test_fixture_extraction_yields_records(
-    fixture_name, schema_fields, min_expected_records, required_fields,
+    fixture_name,
+    schema_fields,
+    min_expected_records,
+    required_fields,
 ):
     """Verify that discovery-based extraction from static fixture HTML produces expected records."""
     html = _load_fixture(fixture_name)
@@ -69,6 +75,7 @@ async def test_fixture_extraction_yields_records(
 
     # Verify HTML is parseable
     from bs4 import BeautifulSoup
+
     soup = BeautifulSoup(html, "html.parser")
     page_text = soup.get_text()
     assert len(page_text.strip()) > 0, f"No text content in fixture: {fixture_name}"
@@ -86,28 +93,30 @@ async def test_fixture_extraction_yields_records(
         )
 
     assert len(records) >= min_expected_records, (
-        f"Expected at least {min_expected_records} records from {fixture_name}, "
-        f"got {len(records)}"
+        f"Expected at least {min_expected_records} records from {fixture_name}, " f"got {len(records)}"
     )
 
     # Check required fields are populated in at least one record
     for field_name in required_fields:
         assert any(
-            r.get(field_name) and str(r.get(field_name, "")).strip()
-            for r in records
+            r.get(field_name) and str(r.get(field_name, "")).strip() for r in records
         ), f"Required field '{field_name}' not found in any record from {fixture_name}"
 
 
 # ── False-success prevention tests ──────────────────────────────────────
 
 
-@pytest.mark.parametrize("fixture_name,expected_block_type", [
-    ("8f2aabc1ca59", "anti_bot_or_challenge"),
-    ("ce3c5249ec43", "empty_or_shell"),
-])
+@pytest.mark.parametrize(
+    "fixture_name,expected_block_type",
+    [
+        ("8f2aabc1ca59", "anti_bot_or_challenge"),
+        ("ce3c5249ec43", "empty_or_shell"),
+    ],
+)
 @pytest.mark.asyncio
 async def test_blocked_fixture_does_not_produce_false_records(
-    fixture_name, expected_block_type,
+    fixture_name,
+    expected_block_type,
 ):
     """Verify that anti-bot and empty pages are NOT treated as successful extractions."""
     html = _load_fixture(fixture_name)
@@ -117,6 +126,7 @@ async def test_blocked_fixture_does_not_produce_false_records(
     from app.empty_response_detector import detect_empty_response
     from app.zero_result_classifier import classify_zero_result
     from bs4 import BeautifulSoup
+
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup(["script", "style", "noscript", "svg", "link"]):
         tag.decompose()
@@ -127,7 +137,7 @@ async def test_blocked_fixture_does_not_produce_false_records(
     classification = classify_zero_result(
         acquisition_lineage={"state": "direct"},
         session_detection=None,
-        empty_check=empty_check.to_dict() if hasattr(empty_check, 'to_dict') else None,
+        empty_check=empty_check.to_dict() if hasattr(empty_check, "to_dict") else None,
         anti_bot_score=0.5,
         final_url=f"https://{fixture_name}.example.com",
         html=html,
@@ -141,28 +151,30 @@ async def test_blocked_fixture_does_not_produce_false_records(
         # The page should be classified as anti-bot or challenge
         failure_class = classification.failure_class or ""
         assert any(
-            kw in failure_class.lower()
-            for kw in ("anti_bot", "blocked", "challenge", "captcha", "empty")
+            kw in failure_class.lower() for kw in ("anti_bot", "blocked", "challenge", "captcha", "empty")
         ), f"Expected anti-bot/block classification, got: {failure_class}"
     elif expected_block_type == "empty_or_shell":
         # The page should be classified as empty or shell
         failure_class = classification.failure_class or ""
         assert any(
-            kw in failure_class.lower()
-            for kw in ("empty_response", "genuinely_empty", "js_render")
+            kw in failure_class.lower() for kw in ("empty_response", "genuinely_empty", "js_render")
         ), f"Expected empty/shell classification, got: {failure_class}"
 
 
 # ── Acquisition lineage tests ───────────────────────────────────────────
 
 
-@pytest.mark.parametrize("fixture_name,expected_state", [
-    ("messy_blog", "direct"),
-    ("travel_site", "direct"),
-])
+@pytest.mark.parametrize(
+    "fixture_name,expected_state",
+    [
+        ("messy_blog", "direct"),
+        ("travel_site", "direct"),
+    ],
+)
 def test_acquisition_lineage_is_truthful(fixture_name, expected_state):
     """Verify that acquisition lineage reports the correct state for fixture pages."""
     from app.acquisition_state import AcquisitionLineage, AcquisitionState
+
     expected = AcquisitionState(expected_state)
 
     lineage = AcquisitionLineage(

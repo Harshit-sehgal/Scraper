@@ -46,13 +46,15 @@ PIPELINE_HTML = """<!DOCTYPE html>
 </script>
 </body></html>"""
 
-PIPELINE_JSON = json.dumps({
-    "results": [
-        {"carrier": "E2E Pipeline Airways", "fare": 999},
-        {"carrier": "E2E Route Jet", "fare": 1200},
-    ],
-    "session_secret_token": "highly_sensitive_browser_token_should_not_leak"
-})
+PIPELINE_JSON = json.dumps(
+    {
+        "results": [
+            {"carrier": "E2E Pipeline Airways", "fare": 999},
+            {"carrier": "E2E Route Jet", "fare": 1200},
+        ],
+        "session_secret_token": "highly_sensitive_browser_token_should_not_leak",
+    }
+)
 
 
 class _E2EBrowserTestHandler(http.server.BaseHTTPRequestHandler):
@@ -88,18 +90,21 @@ def e2e_browser_server():
 
 # ── ASGI Client Wrapper ────────────────────────────────────────────────
 
+
 class LocalASGIClient:
     def __init__(self, app):
         self.app = app
 
     async def post(self, url: str, **kwargs):
         import httpx
+
         transport = httpx.ASGITransport(app=self.app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
             return await ac.request("POST", url, **kwargs)
 
 
 # ── E2E Test Flow ──────────────────────────────────────────────────────
+
 
 @pytest.mark.postgres
 @pytest.mark.asyncio
@@ -110,14 +115,17 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
     """
     # 1. Bypass local loopback URL validation for E2E testing
     from app import html_utils, url_safety
+
     monkeypatch.setattr(url_safety, "validate_public_http_url", lambda url: None)
     monkeypatch.setattr(html_utils, "_validate_url_safe", lambda url: None)
     from app.config import settings
+
     monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "127.0.0.1,localhost")
 
     # Mock LLM insights to avoid external API calls
     async def mock_generate_data_insight(results):
         return "Mock insight for E2E test."
+
     monkeypatch.setattr("app.scraper.generate_data_insight", mock_generate_data_insight)
 
     # Enable worker queue
@@ -125,6 +133,7 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
 
     # 2. Configure temp state databases
     from app.job_store import reset_job_store_for_tests
+
     db_file = tmp_path / "test_e2e_jobs.db"
     state_file = db_file.with_suffix(".json")
     monkeypatch.setenv("DATAFORGE_STATE_FILE", str(state_file))
@@ -133,6 +142,7 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
 
     reset_repository()
     from app.main import jobs_store, recycle_bin_store
+
     jobs_store.clear()
     recycle_bin_store.clear()
 
@@ -146,6 +156,7 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
     # 4. Submit Job via REST API
     target_url = f"{e2e_browser_server}/search/id/e2e_pipeline_token_xyz"
     from app.crawl_policy import get_crawl_policy
+
     crawl_policy = get_crawl_policy()
     crawl_policy.reset_domain(target_url)
     monkeypatch.setattr(crawl_policy, "_default_delay", 0.0)

@@ -6,6 +6,7 @@ from app.storage_interface import SQLiteJobRepository
 @pytest.fixture(autouse=True)
 def clean_job_store():
     from app.job_store import _DB_LOCK, _get_connection, reset_job_store_for_tests
+
     reset_job_store_for_tests()
     with _DB_LOCK:
         conn = _get_connection()
@@ -25,7 +26,7 @@ def test_sqlite_repository_atomic_move_and_restore():
         name="atomic-test-job",
         mode="manual",
         urls=["http://atomic.com"],
-        schema_fields=[{"name": "field", "field_type": "string"}]
+        schema_fields=[{"name": "field", "field_type": "string"}],
     )
     repo.save_single(job)
 
@@ -55,12 +56,7 @@ def test_sqlite_repository_atomic_move_and_restore():
 def test_sqlite_repository_atomic_hard_delete():
     repo = SQLiteJobRepository()
 
-    job = Job(
-        name="delete-test-job",
-        mode="manual",
-        urls=["http://delete.com"],
-        schema_fields=[]
-    )
+    job = Job(name="delete-test-job", mode="manual", urls=["http://delete.com"], schema_fields=[])
     repo.save_single(job)
 
     # Move to recycle bin
@@ -78,22 +74,12 @@ def test_sqlite_repository_clear_terminal_jobs():
     repo = SQLiteJobRepository()
 
     # Active job
-    job_active = Job(
-        name="active-job",
-        mode="manual",
-        urls=["http://active.com"],
-        schema_fields=[]
-    )
+    job_active = Job(name="active-job", mode="manual", urls=["http://active.com"], schema_fields=[])
     job_active.status = JobStatus.RUNNING
     repo.save_single(job_active)
 
     # Terminal job
-    job_terminal = Job(
-        name="terminal-job",
-        mode="manual",
-        urls=["http://terminal.com"],
-        schema_fields=[]
-    )
+    job_terminal = Job(name="terminal-job", mode="manual", urls=["http://terminal.com"], schema_fields=[])
     job_terminal.status = JobStatus.COMPLETED
     repo.save_single(job_terminal)
 

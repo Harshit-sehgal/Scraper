@@ -15,6 +15,7 @@ def test_event_cascade_has_subscribers():
 def test_event_cascade_responds_to_instability():
     """Pipeline must dispatch events that trigger the cascade."""
     from app.semantic_world_state import get_world_state
+
     ws = get_world_state()
     prev_len = len(ws.decision_history)
 

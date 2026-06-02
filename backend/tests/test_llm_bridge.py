@@ -46,17 +46,17 @@ class TestExtractJsonPayload:
         assert result == [{"a": 1}, {"b": 2}]
 
     def test_json_in_code_fence(self):
-        text = "```json\n{\"key\": \"value\"}\n```"
+        text = '```json\n{"key": "value"}\n```'
         result = _extract_json_payload(text)
         assert result == {"key": "value"}
 
     def test_code_fence_without_json_tag(self):
-        text = "```\n{\"answer\": 42}\n```"
+        text = '```\n{"answer": 42}\n```'
         result = _extract_json_payload(text)
         assert result == {"answer": 42}
 
     def test_embedded_object_in_text(self):
-        text = "Here is the result: {\"found\": true, \"count\": 5}. End."
+        text = 'Here is the result: {"found": true, "count": 5}. End.'
         result = _extract_json_payload(text)
         assert result == {"found": True, "count": 5}
 
@@ -119,26 +119,31 @@ class TestShouldRetryHttpError:
 
 class TestGroqModelCandidates:
     def test_defaults_when_no_env_vars(self):
-        with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "llama-3.3-70b-versatile"), \
-                patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant"):
+        with (
+            patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "llama-3.3-70b-versatile"),
+            patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant"),
+        ):
             models = _groq_model_candidates()
             assert models == ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 
     def test_uses_settings(self):
-        with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "mixtral-8x7b-32768"), \
-                patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama2-70b-4096"):
+        with (
+            patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "mixtral-8x7b-32768"),
+            patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama2-70b-4096"),
+        ):
             models = _groq_model_candidates()
             assert models == ["mixtral-8x7b-32768", "llama2-70b-4096"]
 
     def test_deduplicates_identical_models(self):
-        with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "llama-3.3-70b-versatile"), \
-                patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama-3.3-70b-versatile"):
+        with (
+            patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "llama-3.3-70b-versatile"),
+            patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama-3.3-70b-versatile"),
+        ):
             models = _groq_model_candidates()
             assert models == ["llama-3.3-70b-versatile"]  # Deduplicated
 
     def test_uses_defaults_on_none(self):
-        with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", ""), \
-                patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", ""):
+        with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", ""), patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", ""):
             models = _groq_model_candidates()
             # Empty strings resolve to defaults due to `or` operator
             assert models == ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
@@ -152,9 +157,7 @@ class TestRecordLlmDegradation:
         ws_mock = MagicMock()
         with patch("app.semantic_world_state.get_world_state", return_value=ws_mock):
             _record_llm_degradation("groq", "API timeout", severity="critical")
-            ws_mock.record_degradation.assert_called_once_with(
-                subsystem="groq", severity="critical", cause="API timeout"
-            )
+            ws_mock.record_degradation.assert_called_once_with(subsystem="groq", severity="critical", cause="API timeout")
 
     def test_handles_world_state_unavailable(self):
         with patch("app.semantic_world_state.get_world_state", side_effect=Exception("No WS")):
@@ -173,6 +176,7 @@ class TestCallCounting:
 
     def test_reset_works(self):
         from app.llm_bridge import _record_call
+
         _record_call()
         _record_call()
         assert get_llm_call_count() == 2
@@ -219,14 +223,10 @@ class TestCallOpenaiCompatibleJson:
     @pytest.mark.asyncio
     async def test_successful_call(self):
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"key": "value"}'}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": '{"key": "value"}'}}]}
 
         with patch("app.llm_bridge.httpx.AsyncClient", return_value=_MockAsyncClient([mock_response])):
-            result = await _call_openai_compatible_json(
-                "http://endpoint", {"model": "test"}, timeout=10
-            )
+            result = await _call_openai_compatible_json("http://endpoint", {"model": "test"}, timeout=10)
             assert result == {"key": "value"}
 
     @pytest.mark.asyncio
@@ -235,14 +235,10 @@ class TestCallOpenaiCompatibleJson:
 
         mock_fail = MagicMock(spec=httpx.Response)
         mock_fail.status_code = 500
-        mock_fail.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "Server error", request=MagicMock(), response=mock_fail
-        )
+        mock_fail.raise_for_status.side_effect = httpx.HTTPStatusError("Server error", request=MagicMock(), response=mock_fail)
 
         mock_success = MagicMock()
-        mock_success.json.return_value = {
-            "choices": [{"message": {"content": '{"ok": true}'}}]
-        }
+        mock_success.json.return_value = {"choices": [{"message": {"content": '{"ok": true}'}}]}
 
         mock_client.response_sequence = [mock_fail, mock_success]
 
@@ -259,17 +255,13 @@ class TestCallOpenaiCompatibleJson:
 
         mock_bad = MagicMock(spec=httpx.Response)
         mock_bad.status_code = 400
-        mock_bad.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "Bad request", request=MagicMock(), response=mock_bad
-        )
+        mock_bad.raise_for_status.side_effect = httpx.HTTPStatusError("Bad request", request=MagicMock(), response=mock_bad)
 
         mock_client.response_sequence = [mock_bad]
 
         with patch("app.llm_bridge.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(httpx.HTTPStatusError):
-                await _call_openai_compatible_json(
-                    "http://endpoint", {"model": "test"}, timeout=10, max_attempts=2
-                )
+                await _call_openai_compatible_json("http://endpoint", {"model": "test"}, timeout=10, max_attempts=2)
             assert mock_client.call_count == 1  # No retry on 400
 
 
@@ -277,27 +269,19 @@ class TestCallOpenaiCompatibleText:
     @pytest.mark.asyncio
     async def test_successful_call(self):
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "  Hello World  "}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "  Hello World  "}}]}
 
         with patch("app.llm_bridge.httpx.AsyncClient", return_value=_MockAsyncClient([mock_response])):
-            result = await _call_openai_compatible_text(
-                "http://endpoint", {"model": "test"}, timeout=10
-            )
+            result = await _call_openai_compatible_text("http://endpoint", {"model": "test"}, timeout=10)
             assert result == "Hello World"  # Stripped
 
     @pytest.mark.asyncio
     async def test_empty_content_returns_empty_string(self):
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": ""}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": ""}}]}
 
         with patch("app.llm_bridge.httpx.AsyncClient", return_value=_MockAsyncClient([mock_response])):
-            result = await _call_openai_compatible_text(
-                "http://endpoint", {"model": "test"}, timeout=10
-            )
+            result = await _call_openai_compatible_text("http://endpoint", {"model": "test"}, timeout=10)
             assert result == ""
 
 
@@ -309,10 +293,8 @@ class TestLlmJson:
     async def test_groq_success(self):
         with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}):
             with (
-                patch("app.llm_bridge._groq_model_candidates",
-                      return_value=["llama-3.3-70b-versatile"]),
-                patch("app.llm_bridge._call_openai_compatible_json",
-                      return_value={"result": "groq_ok"}) as mock_call,
+                patch("app.llm_bridge._groq_model_candidates", return_value=["llama-3.3-70b-versatile"]),
+                patch("app.llm_bridge._call_openai_compatible_json", return_value={"result": "groq_ok"}) as mock_call,
             ):
                 result = await llm_json([{"role": "user", "content": "hi"}])
                 assert result == {"result": "groq_ok"}
@@ -322,8 +304,7 @@ class TestLlmJson:
     async def test_groq_fails_then_pollinations(self):
         with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}):
             with (
-                patch("app.llm_bridge._groq_model_candidates",
-                      return_value=["llama-3.3-70b-versatile"]),
+                patch("app.llm_bridge._groq_model_candidates", return_value=["llama-3.3-70b-versatile"]),
                 patch("app.llm_bridge._call_openai_compatible_json") as mock_call,
                 patch("app.llm_bridge.settings.GROQ_API_ENDPOINT", "http://groq"),
                 patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
@@ -343,11 +324,9 @@ class TestLlmJson:
     async def test_all_providers_fail_returns_empty_dict(self):
         with (
             patch.dict(os.environ, {}, clear=True),  # No GROQ key
-            patch("app.llm_bridge._call_openai_compatible_json",
-                  side_effect=Exception("API error")),
+            patch("app.llm_bridge._call_openai_compatible_json", side_effect=Exception("API error")),
             patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
-            patch("app.llm_bridge.asyncio.to_thread",
-                  side_effect=Exception("g4f error")),
+            patch("app.llm_bridge.asyncio.to_thread", side_effect=Exception("g4f error")),
             patch("app.llm_bridge._record_llm_degradation"),
         ):
             result = await llm_json([{"role": "user", "content": "hi"}])
@@ -372,10 +351,8 @@ class TestLlmJsonFast:
     async def test_groq_success(self):
         with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}):
             with (
-                patch("app.llm_bridge._groq_model_candidates",
-                      return_value=["llama-3.3-70b-versatile"]),
-                patch("app.llm_bridge._call_openai_compatible_json",
-                      return_value={"ok": True}) as mock_call,
+                patch("app.llm_bridge._groq_model_candidates", return_value=["llama-3.3-70b-versatile"]),
+                patch("app.llm_bridge._call_openai_compatible_json", return_value={"ok": True}) as mock_call,
             ):
                 result = await llm_json_fast([{"role": "user", "content": "hi"}])
                 assert result == {"ok": True}
@@ -385,8 +362,7 @@ class TestLlmJsonFast:
     async def test_all_fail_returns_empty_dict(self):
         with (
             patch.dict(os.environ, {}, clear=True),
-            patch("app.llm_bridge._call_openai_compatible_json",
-                  side_effect=Exception("fail")),
+            patch("app.llm_bridge._call_openai_compatible_json", side_effect=Exception("fail")),
             patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
             patch("app.llm_bridge._record_llm_degradation"),
             patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),
@@ -400,10 +376,8 @@ class TestLlmText:
     async def test_groq_success(self):
         with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}):
             with (
-                patch("app.llm_bridge._groq_model_candidates",
-                      return_value=["llama-3.3-70b-versatile"]),
-                patch("app.llm_bridge._call_openai_compatible_text",
-                      return_value="Hello from Groq") as mock_call,
+                patch("app.llm_bridge._groq_model_candidates", return_value=["llama-3.3-70b-versatile"]),
+                patch("app.llm_bridge._call_openai_compatible_text", return_value="Hello from Groq") as mock_call,
             ):
                 result = await llm_text([{"role": "user", "content": "hi"}])
                 assert result == "Hello from Groq"
@@ -413,11 +387,9 @@ class TestLlmText:
     async def test_empty_response_when_all_fail(self):
         with (
             patch.dict(os.environ, {}, clear=True),
-            patch("app.llm_bridge._call_openai_compatible_text",
-                  side_effect=Exception("fail")),
+            patch("app.llm_bridge._call_openai_compatible_text", side_effect=Exception("fail")),
             patch("app.llm_bridge.settings.POLLINATIONS_API_ENDPOINT", "http://polli"),
-            patch("app.llm_bridge.asyncio.to_thread",
-                  side_effect=Exception("g4f fail")),
+            patch("app.llm_bridge.asyncio.to_thread", side_effect=Exception("g4f fail")),
             patch("app.llm_bridge._record_llm_degradation"),
             patch("app.llm_bridge.settings.LLM_ENABLE_PUBLIC_FALLBACKS", True),
         ):
@@ -437,6 +409,7 @@ class TestSubstratePluginManager:
 
         def handler(**kwargs):
             return "ok"
+
         mgr.register_handler("test_handler", handler)
         assert "test_handler" in mgr.get_available_tools()
 
@@ -445,6 +418,7 @@ class TestSubstratePluginManager:
 
         def handler(**kwargs):
             return f"processed {kwargs.get('x')}"
+
         mgr.register_handler("echo", handler)
         result = mgr.call_tool("echo", x=42)
         assert result == "processed 42"
@@ -459,6 +433,7 @@ class TestSubstratePluginManager:
 
         def handler(**kwargs):
             return "done"
+
         mgr.register_handler("h1", handler)
         mgr.call_tool("h1", foo="bar")
         assert len(mgr._execution_history) == 1
@@ -470,6 +445,7 @@ class TestSubstratePluginManager:
 
         def handler(**kwargs):
             raise ValueError("oops")
+
         mgr.register_handler("failing", handler)
         with pytest.raises(ValueError):
             mgr.call_tool("failing")
@@ -483,6 +459,7 @@ class TestSubstratePluginManager:
 
         def handler(**kwargs):
             return "should not reach"
+
         mgr.register_handler("blocked", handler)
 
         with patch("app.policy_engine.get_policy_engine") as mock_policy:

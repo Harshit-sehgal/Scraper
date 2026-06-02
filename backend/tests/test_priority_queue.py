@@ -1,4 +1,5 @@
 """Tests for the Transactional Priority Queue."""
+
 import time
 
 import pytest

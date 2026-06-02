@@ -371,9 +371,7 @@ async def analyze_url_for_fields(
     empty_check = (
         detect_empty_response(html)
         if config.detect_empty_responses
-        else EmptyResponseCheck(
-            is_empty=False, empty_type="", confidence=0.0, message="Empty response detection disabled"
-        )
+        else EmptyResponseCheck(is_empty=False, empty_type="", confidence=0.0, message="Empty response detection disabled")
     )
 
     # ── Step 7: Extract container values and build structured prompt ─
@@ -599,9 +597,7 @@ async def analyze_url_for_fields(
     # escalate to a more aggressive mode and retry.
     escalated_mode = None
     max_depth = config.max_retries
-    if _escalation_depth < max_depth and should_escalate(
-        mode_enum, acquisition_lineage.state.value, empty_check.is_empty
-    ):
+    if _escalation_depth < max_depth and should_escalate(mode_enum, acquisition_lineage.state.value, empty_check.is_empty):
         escalated_mode = escalate_mode(mode_enum)
         if escalated_mode != mode_enum:
             logger.info(

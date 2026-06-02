@@ -176,7 +176,7 @@ class AntiBotEngine:
             self._ua_history[domain] = []
         self._ua_history[domain].append(ua)
         # Keep last 5
-        self._ua_history[domain] = self._ua_history[domain][-settings.ANTIBOT_UA_HISTORY_SIZE:]
+        self._ua_history[domain] = self._ua_history[domain][-settings.ANTIBOT_UA_HISTORY_SIZE :]
 
         # Randomize additional headers to mimic real browsers
         is_chromium = "Chrome" in ua and "Firefox" not in ua
@@ -279,7 +279,7 @@ class AntiBotEngine:
             self._block_history[domain] = []
         self._block_history[domain].append(score)
         # Keep last 10 attempts
-        self._block_history[domain] = self._block_history[domain][-settings.ANTIBOT_BLOCK_HISTORY_SIZE:]
+        self._block_history[domain] = self._block_history[domain][-settings.ANTIBOT_BLOCK_HISTORY_SIZE :]
 
         # If score indicates hard block, record proxy failure
         if score > settings.ANTIBOT_HARD_BLOCK_THRESHOLD and self.proxy_manager.enabled:

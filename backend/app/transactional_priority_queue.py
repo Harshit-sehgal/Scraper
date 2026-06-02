@@ -164,9 +164,7 @@ class TransactionalPriorityQueue:
                         # Use lazy deletion: just mark as invalid (O(1) instead
                         # of O(n))
                         self._invalid_trace_ids.add(lowest.trace_id)
-                        self._priority_counts[lowest.priority] = max(
-                            0, self._priority_counts.get(lowest.priority, 0) - 1
-                        )
+                        self._priority_counts[lowest.priority] = max(0, self._priority_counts.get(lowest.priority, 0) - 1)
                         logger.warning(
                             "PRIORITY QUEUE EVICTED: label=%s priority=%.2f to make room for %s",
                             lowest.label,

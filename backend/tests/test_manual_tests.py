@@ -3,6 +3,7 @@ Automated validation of manual test scripts — E05 Integration.
 Ensures all manual tests compile, are syntactically valid, and
 expose zero top-level side effects (allowing clean imports).
 """
+
 from __future__ import annotations
 
 import importlib

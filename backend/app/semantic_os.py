@@ -149,9 +149,7 @@ class SemanticOS:
                     # Reward successful interpretation by pulling role toward
                     # action anchor
                     self.ws.blend_manifold_vector(role, target_vec, alpha=0.9, beta=0.1)
-                    logging.getLogger(__name__).info(
-                        f"FEEDBACK REINFORCED: Role [{role}] rewarded by Action [{action_id}]"
-                    )
+                    logging.getLogger(__name__).info(f"FEEDBACK REINFORCED: Role [{role}] rewarded by Action [{action_id}]")
 
     # ─── Hierarchical Synthesis (Phase 38) ───────────────────────────────
 

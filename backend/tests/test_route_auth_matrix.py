@@ -173,12 +173,14 @@ def client():
     services, which obscures the route-auth signal.
     """
     import os
+
     mp = pytest.MonkeyPatch()
     mp.setenv("DATAFORGE_STATE_FILE", "/tmp/test_auth_state.json")
     mp.setenv("DATAFORGE_SEMANTIC_STATE_PATH", "/tmp/test_auth_semantic.json")
 
     try:
         from app.main import app
+
         yield LocalASGIClient(app)
     except Exception as e:
         pytest.skip(f"Could not initialize app for auth tests: {e}")
@@ -201,9 +203,7 @@ def test_route_auth_no_key(client, method, path, min_role):
     response = client.request(method, path, headers=NO_AUTH)
     if response.status_code == 422:
         return  # Body validation failure is expected for POST without payload
-    assert response.status_code == expected, (
-        f"{method} {path} (no auth): expected {expected}, got {response.status_code}"
-    )
+    assert response.status_code == expected, f"{method} {path} (no auth): expected {expected}, got {response.status_code}"
 
 
 @pytest.mark.parametrize("method,path,min_role", ROUTE_MATRIX)
@@ -213,9 +213,7 @@ def test_route_auth_user_key(client, method, path, min_role):
     response = client.request(method, path, headers=USER_AUTH)
     if response.status_code == 422:
         return
-    assert response.status_code == expected, (
-        f"{method} {path} (user auth): expected {expected}, got {response.status_code}"
-    )
+    assert response.status_code == expected, f"{method} {path} (user auth): expected {expected}, got {response.status_code}"
 
 
 @pytest.mark.parametrize("method,path,min_role", ROUTE_MATRIX)
@@ -225,9 +223,7 @@ def test_route_auth_operator_key(client, method, path, min_role):
     response = client.request(method, path, headers=OPERATOR_AUTH)
     if response.status_code == 422:
         return
-    assert response.status_code == expected, (
-        f"{method} {path} (operator auth): expected {expected}, got {response.status_code}"
-    )
+    assert response.status_code == expected, f"{method} {path} (operator auth): expected {expected}, got {response.status_code}"
 
 
 @pytest.mark.parametrize("method,path,min_role", ROUTE_MATRIX)
@@ -237,9 +233,7 @@ def test_route_auth_admin_key(client, method, path, min_role):
     response = client.request(method, path, headers=ADMIN_AUTH)
     if response.status_code == 422:
         return
-    assert response.status_code == expected, (
-        f"{method} {path} (admin auth): expected {expected}, got {response.status_code}"
-    )
+    assert response.status_code == expected, f"{method} {path} (admin auth): expected {expected}, got {response.status_code}"
 
 
 # ── Specific auth scenarios ────────────────────────────────────────────
@@ -282,20 +276,17 @@ def test_admin_via_x_admin_key(client):
         json={"mode": "production"},
         headers={"X-Admin-Key": "test_admin_key"},
     )
-    assert response.status_code in (200, 422), (
-        f"Expected 200 or 422, got {response.status_code}: {response.text[:200]}"
-    )
+    assert response.status_code in (200, 422), f"Expected 200 or 422, got {response.status_code}: {response.text[:200]}"
 
 
 def test_no_keys_no_auth_required(client, monkeypatch):
     """When no API keys are configured, /api/* routes should not require auth."""
     from app.config import settings
+
     monkeypatch.setattr(settings, "API_KEY", "")
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "")
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "")
 
     response = client.get("/api/jobs")
     # Should work without auth when no keys configured
-    assert response.status_code in (200, 422), (
-        f"Expected 200 or 422 (no auth, no keys), got {response.status_code}"
-    )
+    assert response.status_code in (200, 422), f"Expected 200 or 422 (no auth, no keys), got {response.status_code}"

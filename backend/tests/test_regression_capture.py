@@ -337,8 +337,11 @@ class TestStatistics:
 
         for url, html, category in entries_data:
             capture_instance.maybe_capture(
-                url=url, html=html, failure_category=category,
-                failure_confidence=0.9, records_count=0,
+                url=url,
+                html=html,
+                failure_category=category,
+                failure_confidence=0.9,
+                records_count=0,
             )
 
         stats = capture_instance.get_statistics()
@@ -420,13 +423,19 @@ class TestReplayTestGeneration:
     def test_generate_all_replay_tests(self, capture_instance):
         """Generates tests for all captures without existing tests."""
         capture_instance.maybe_capture(
-            url="https://example.com/a", html="<html><body>A</body></html>",
-            failure_category="anti_bot_block", failure_confidence=0.9, records_count=0,
+            url="https://example.com/a",
+            html="<html><body>A</body></html>",
+            failure_category="anti_bot_block",
+            failure_confidence=0.9,
+            records_count=0,
             schema_fields=["name"],
         )
         capture_instance.maybe_capture(
-            url="https://other.com/b", html="<html><body>B</body></html>",
-            failure_category="hydration_failure", failure_confidence=0.9, records_count=0,
+            url="https://other.com/b",
+            html="<html><body>B</body></html>",
+            failure_category="hydration_failure",
+            failure_confidence=0.9,
+            records_count=0,
             schema_fields=["email"],
         )
 
@@ -569,13 +578,17 @@ class TestConcurrentCapture:
         html = "<html><body>Identical content</body></html>"
         entry1 = capture_instance.maybe_capture(
             url="https://domain-a.com/page",
-            html=html, failure_category="empty_page",
-            failure_confidence=0.9, records_count=0,
+            html=html,
+            failure_category="empty_page",
+            failure_confidence=0.9,
+            records_count=0,
         )
         entry2 = capture_instance.maybe_capture(
             url="https://domain-b.com/page",
-            html=html, failure_category="empty_page",
-            failure_confidence=0.9, records_count=0,
+            html=html,
+            failure_category="empty_page",
+            failure_confidence=0.9,
+            records_count=0,
         )
         assert entry1 is not None
         assert entry2 is None  # Duplicate HTML hash
@@ -585,8 +598,10 @@ class TestConcurrentCapture:
         html = "<html><body>Deterministic ID</body></html>"
         entry1 = capture_instance.maybe_capture(
             url="https://example.com/page1",
-            html=html, failure_category="anti_bot_block",
-            failure_confidence=0.9, records_count=0,
+            html=html,
+            failure_category="anti_bot_block",
+            failure_confidence=0.9,
+            records_count=0,
         )
         # Use a fresh capture instance to verify deterministic IDs
         assert entry1 is not None

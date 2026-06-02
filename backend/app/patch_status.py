@@ -32,9 +32,7 @@ def check_all_fixes() -> dict:
     path_ir = os.path.join(base_dir, "semantic_ir.py")
     with open(path_ir) as f:
         content_ir = f.read()
-    results["create_token source_field"] = (
-        "source_field=source," in content_ir or "source_field=primary_type" in content_ir
-    )
+    results["create_token source_field"] = "source_field=source," in content_ir or "source_field=primary_type" in content_ir
 
     # 3. schema_instability is in EnergyState (via energy_state.py)
     path_energy = os.path.join(base_dir, "energy_state.py")
@@ -61,9 +59,7 @@ def check_all_fixes() -> dict:
         if os.path.exists(path_ws):
             with open(path_ws) as f:
                 content_ws = f.read()
-    results["capture schema expansion"] = (
-        "ROLE_EXCLUSIVITY" in content_ws and "for ra, rb in ROLE_EXCLUSIVITY" in content_ws
-    )
+    results["capture schema expansion"] = "ROLE_EXCLUSIVITY" in content_ws and "for ra, rb in ROLE_EXCLUSIVITY" in content_ws
 
     # 6. Missing methods
     for method in [

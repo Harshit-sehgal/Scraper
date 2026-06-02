@@ -208,8 +208,7 @@ def warm_start_from_values(records: list, schema_fields: list):
             or (expected_type == SemanticType.TEXT)
             or (
                 st == SemanticType.CODE
-                and expected_type
-                in [SemanticType.LOCATION, SemanticType.PRICE, SemanticType.CODE, SemanticType.IDENTIFIER]
+                and expected_type in [SemanticType.LOCATION, SemanticType.PRICE, SemanticType.CODE, SemanticType.IDENTIFIER]
             )
         )
 
@@ -223,9 +222,7 @@ def warm_start_from_values(records: list, schema_fields: list):
             ws.blend_manifold_vector(f_name, target_vec, alpha=0.7, beta=0.3)
 
 
-def build_allocation_graph(
-    record: SemanticRecord, schema_roles: List[str], abstraction_gradient: float = 0.0
-) -> AllocationGraph:
+def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abstraction_gradient: float = 0.0) -> AllocationGraph:
     """Build an allocation graph from a record and desired schema roles with Hierarchical Synthesis (Phase 38)."""
     graph = AllocationGraph()
     from app.semantic_world_state import get_world_state
@@ -513,9 +510,7 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
                 break
 
         if conflicting:
-            field_conflicts.append(
-                {"role": role_name, "candidate": cand_key, "reason": conflict_reason, "score": score}
-            )
+            field_conflicts.append({"role": role_name, "candidate": cand_key, "reason": conflict_reason, "score": score})
             continue
 
         graph.roles[role_name].filled_by = cand_key

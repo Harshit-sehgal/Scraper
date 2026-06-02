@@ -34,9 +34,7 @@ def _extract_json_payload(text: str | None):
         try:
             return json.loads(candidate)
         except json.JSONDecodeError:
-            logging.getLogger(__name__).debug(
-                "_extract_json_payload: direct JSON parse failed (len=%d)", len(candidate)
-            )
+            logging.getLogger(__name__).debug("_extract_json_payload: direct JSON parse failed (len=%d)", len(candidate))
 
     match = re.search(r"\{[\s\S]*\}", raw)
     if match:
@@ -101,11 +99,7 @@ async def _call_openai_compatible_json(
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
             # Respect retry-after header for 429 rate limits
-            if (
-                isinstance(error, httpx.HTTPStatusError)
-                and error.response is not None
-                and error.response.status_code == 429
-            ):
+            if isinstance(error, httpx.HTTPStatusError) and error.response is not None and error.response.status_code == 429:
                 retry_after = error.response.headers.get("retry-after")
                 if retry_after:
                     try:
@@ -150,11 +144,7 @@ async def _call_openai_compatible_text(
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
             # Respect retry-after header for 429 rate limits
-            if (
-                isinstance(error, httpx.HTTPStatusError)
-                and error.response is not None
-                and error.response.status_code == 429
-            ):
+            if isinstance(error, httpx.HTTPStatusError) and error.response is not None and error.response.status_code == 429:
                 retry_after = error.response.headers.get("retry-after")
                 if retry_after:
                     try:
@@ -521,9 +511,7 @@ class SubstratePluginManager:
             # Actual execution
             result = handler(**kwargs)
 
-            self._execution_history.append(
-                {"handler": handler_name, "status": "success", "result_type": str(type(result))}
-            )
+            self._execution_history.append({"handler": handler_name, "status": "success", "result_type": str(type(result))})
             return result
 
         except Exception as e:

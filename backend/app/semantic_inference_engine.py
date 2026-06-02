@@ -188,9 +188,7 @@ class RoleEmbeddingEngine:
         # Core Entity Bias: seeds for structural types are anchored in the last
         # dimension
         is_core = (
-            1.0
-            if stype in [SemanticType.PRICE, SemanticType.DATE, SemanticType.LOCATION, SemanticType.ORGANIZATION]
-            else 0.5
+            1.0 if stype in [SemanticType.PRICE, SemanticType.DATE, SemanticType.LOCATION, SemanticType.ORGANIZATION] else 0.5
         )
         vec[-1] = is_core
 

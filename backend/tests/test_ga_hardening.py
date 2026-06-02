@@ -56,6 +56,7 @@ def test_job_results_disk_offload_and_retrieval(client, monkeypatch):
     # Mock ai_clean_and_align_records to return a subset
     async def fake_ai_clean_and_align(rows, *args, **kwargs):
         return rows[:1002], {}
+
     monkeypatch.setattr("app.routers.jobs.ai_clean_and_align_records", fake_ai_clean_and_align)
 
     reclean_r = client.post(f"/api/jobs/{job_id}/reclean")
@@ -142,12 +143,8 @@ def test_diagnostics_exporter_endpoint(client, monkeypatch):
         status=JobStatus.COMPLETED,
         urls=["https://example.com"],
         results=[
-            {
-                "email": "harshit.sehgal@gmail.com",
-                "phone": "+91 98765 43210",
-                "auth_header": "Bearer secret_jwt_token_12345"
-            }
-        ]
+            {"email": "harshit.sehgal@gmail.com", "phone": "+91 98765 43210", "auth_header": "Bearer secret_jwt_token_12345"}
+        ],
     )
     main_mod.jobs_store[pii_job_id] = job
 
@@ -159,7 +156,7 @@ def test_diagnostics_exporter_endpoint(client, monkeypatch):
                 "success_count": 10,
                 "failure_count": 1,
                 "first_seen": 1780000000.0,
-                "last_success": 1780000005.0
+                "last_success": 1780000005.0,
             }
         }
 
@@ -170,6 +167,7 @@ def test_diagnostics_exporter_endpoint(client, monkeypatch):
                 freshness_factor = 1.0
                 final_score = 0.9
                 reason = "Excellent"
+
             return FakeConfidence()
 
     monkeypatch.setattr("app.selector_memory.get_selector_memory", lambda: FakeSelectorMemory())
@@ -177,11 +175,7 @@ def test_diagnostics_exporter_endpoint(client, monkeypatch):
     # Setup world state/observability telemetry mock
     class FakeObservability:
         telemetry = [
-            {
-                "type": "scrape",
-                "timestamp": 1780000000.0,
-                "details": {"url": "https://example.com/user/harshit.sehgal@gmail.com"}
-            }
+            {"type": "scrape", "timestamp": 1780000000.0, "details": {"url": "https://example.com/user/harshit.sehgal@gmail.com"}}
         ]
 
     class FakeWorldState:
@@ -248,6 +242,7 @@ async def test_domain_escalation_webhook(monkeypatch):
 
         class FakeResponse:
             status_code = 200
+
         return FakeResponse()
 
     # We monkeypatch the _trigger_webhook inside app.domain_evolution_model

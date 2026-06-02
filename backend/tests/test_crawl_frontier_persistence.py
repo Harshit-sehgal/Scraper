@@ -116,6 +116,7 @@ async def test_frontier_persistence_across_restarts():
 @pytest.mark.asyncio
 async def test_domain_crawl_limit():
     from app.config import settings
+
     # Override settings limit for testing
     original_limit = settings.CRAWL_MAX_PAGES_PER_DOMAIN
     settings.CRAWL_MAX_PAGES_PER_DOMAIN = 2

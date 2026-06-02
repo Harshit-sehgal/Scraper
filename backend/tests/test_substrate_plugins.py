@@ -41,6 +41,7 @@ def test_plugin_policy_restriction():
 
     def mock_handler(role, token):
         return "ok"
+
     plugins.register_handler("p1", mock_handler)
 
     # Setup High Pressure

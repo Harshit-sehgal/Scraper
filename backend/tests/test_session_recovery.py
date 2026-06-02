@@ -166,23 +166,27 @@ class TestSessionRecoveryMetadata:
         stale_url = "https://www.example.com/search/results/abc123session456"
         fresh_url = "https://www.example.com/search?from=NYC&to=LHR&departdate=2026-06-15"
 
-        with patch("app.html_utils.fetch_page_content") as mock_fetch, \
-                patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot, \
-                patch("app.page_profiler.detect_page_structure") as mock_structure, \
-                patch("app.page_profiler.detect_value_patterns") as mock_patterns, \
-                patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm, \
-                patch("app.selector_discovery._try_form_search_recovery", new_callable=AsyncMock) as mock_recovery, \
-                patch("app.selector_discovery._detect_search_form") as mock_form_detect, \
-                patch("app.selector_discovery._detect_redirect", return_value={
+        with (
+            patch("app.html_utils.fetch_page_content") as mock_fetch,
+            patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot,
+            patch("app.page_profiler.detect_page_structure") as mock_structure,
+            patch("app.page_profiler.detect_value_patterns") as mock_patterns,
+            patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm,
+            patch("app.selector_discovery._try_form_search_recovery", new_callable=AsyncMock) as mock_recovery,
+            patch("app.selector_discovery._detect_search_form") as mock_form_detect,
+            patch(
+                "app.selector_discovery._detect_redirect",
+                return_value={
                     "redirected": True,
                     "redirect_type": "session_expired",
                     "message": "URL redirected to homepage — the search session likely expired.",
                     "original_url": stale_url,
                     "final_url": "https://www.example.com/",
-                }), \
-                patch("app.url_safety.validate_public_http_url", return_value=None), \
-                patch("httpx.AsyncClient") as mock_httpx_client:
-
+                },
+            ),
+            patch("app.url_safety.validate_public_http_url", return_value=None),
+            patch("httpx.AsyncClient") as mock_httpx_client,
+        ):
             from app.page_profiler import StructureProfile, ValuePatterns
             from app.selector_discovery import analyze_url_for_fields
 
@@ -281,22 +285,26 @@ class TestSessionRecoveryMetadata:
         even if a redirect and search form are detected."""
         stale_url = "https://www.example.com/search/results/abc123session456"
 
-        with patch("app.html_utils.fetch_page_content") as mock_fetch, \
-                patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot, \
-                patch("app.page_profiler.detect_page_structure") as mock_structure, \
-                patch("app.page_profiler.detect_value_patterns") as mock_patterns, \
-                patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm, \
-                patch("app.selector_discovery._detect_search_form") as mock_form_detect, \
-                patch("app.selector_discovery._detect_redirect", return_value={
+        with (
+            patch("app.html_utils.fetch_page_content") as mock_fetch,
+            patch("app.scrape_telemetry.detect_anti_bot") as mock_anti_bot,
+            patch("app.page_profiler.detect_page_structure") as mock_structure,
+            patch("app.page_profiler.detect_value_patterns") as mock_patterns,
+            patch("app.selector_discovery.llm_json", new_callable=AsyncMock) as mock_llm,
+            patch("app.selector_discovery._detect_search_form") as mock_form_detect,
+            patch(
+                "app.selector_discovery._detect_redirect",
+                return_value={
                     "redirected": True,
                     "redirect_type": "session_expired",
                     "message": "URL redirected to homepage — the search session likely expired.",
                     "original_url": stale_url,
                     "final_url": "https://www.example.com/",
-                }), \
-                patch("app.url_safety.validate_public_http_url", return_value=None), \
-                patch("httpx.AsyncClient") as mock_httpx_client:
-
+                },
+            ),
+            patch("app.url_safety.validate_public_http_url", return_value=None),
+            patch("httpx.AsyncClient") as mock_httpx_client,
+        ):
             from app.page_profiler import StructureProfile, ValuePatterns
             from app.selector_discovery import analyze_url_for_fields
 

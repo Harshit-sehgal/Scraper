@@ -17,6 +17,7 @@ def _require_psycopg2():
     """Skip test if psycopg2 is not installed."""
     try:
         import psycopg2 as _pg
+
         _ = _pg  # use import to suppress pyflakes
     except ImportError:
         pytest.skip("psycopg2 not installed")
@@ -36,6 +37,7 @@ def module_postgres_container():
     development fallback.
     """
     import socket
+
     use_running = False
     dsn = os.environ.get("DATAFORGE_DATABASE_URL")
     if dsn:
@@ -58,8 +60,9 @@ def module_postgres_container():
             os.environ.pop("DATAFORGE_QUEUE_BACKEND", None)
     else:
         from testcontainers.postgres import PostgresContainer
+
         with PostgresContainer("postgres:16-alpine") as pg:
-            database_url = pg.get_connection_url().replace('+psycopg2', '')
+            database_url = pg.get_connection_url().replace("+psycopg2", "")
             os.environ["DATAFORGE_DATABASE_URL"] = database_url
             os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
             os.environ["DATAFORGE_QUEUE_BACKEND"] = "postgres"
@@ -81,6 +84,7 @@ class TestPostgresQueueImports:
         """The worker_queue_postgres module imports without error."""
         _require_psycopg2()
         from app.worker_queue_postgres import PostgresWorkerQueue  # noqa: F811
+
         assert PostgresWorkerQueue is not None
 
     def test_factory_functions_available(self):
@@ -90,6 +94,7 @@ class TestPostgresQueueImports:
             get_postgres_worker_queue,
             reset_postgres_worker_queue,
         )
+
         assert callable(get_postgres_worker_queue)
         assert callable(reset_postgres_worker_queue)
 
@@ -107,6 +112,7 @@ class TestPostgresQueueImports:
         _require_psycopg2()
         from app.worker_queue import Priority, QueueTask, TaskStatus
         from app.worker_queue_postgres import PostgresWorkerQueue  # noqa: F811
+
         _ = PostgresWorkerQueue  # use import to suppress pyflakes
 
         assert Priority is not None
@@ -187,9 +193,7 @@ class TestPostgresQueueConstruction:
             "clear_completed_history",
         }
         for method in essential:
-            assert method in pg_methods, (
-                f"PostgresWorkerQueue missing method: {method}"
-            )
+            assert method in pg_methods, f"PostgresWorkerQueue missing method: {method}"
 
 
 # ───────────────────────────────────────────────────────────────────────
@@ -211,6 +215,7 @@ class TestWorkerQueueFactoryDispatch:
         queue = get_worker_queue()
         try:
             from app.worker_queue_postgres import PostgresWorkerQueue
+
             assert isinstance(queue, PostgresWorkerQueue)
         finally:
             reset_worker_queue()
@@ -238,6 +243,7 @@ class TestWorkerQueueFactoryDispatch:
         queue = get_worker_queue(backend="postgres")
         try:
             from app.worker_queue_postgres import PostgresWorkerQueue
+
             assert isinstance(queue, PostgresWorkerQueue)
         finally:
             reset_worker_queue()
@@ -311,9 +317,7 @@ class TestPostgresQueueIntegration:
 
         queue = PostgresWorkerQueue()
 
-        task_id = asyncio.run(
-            queue.enqueue("test_task", {"key": "value"}, priority=Priority.HIGH)
-        )
+        task_id = asyncio.run(queue.enqueue("test_task", {"key": "value"}, priority=Priority.HIGH))
         assert task_id is not None
 
         task = asyncio.run(queue.dequeue(timeout=5.0))
@@ -340,13 +344,9 @@ class TestPostgresQueueIntegration:
         queue = PostgresWorkerQueue()
 
         id_low = asyncio.run(queue.enqueue("low", {}, priority=Priority.LOW))
-        id_normal = asyncio.run(
-            queue.enqueue("normal", {}, priority=Priority.NORMAL)
-        )
+        id_normal = asyncio.run(queue.enqueue("normal", {}, priority=Priority.NORMAL))
         id_high = asyncio.run(queue.enqueue("high", {}, priority=Priority.HIGH))
-        id_critical = asyncio.run(
-            queue.enqueue("critical", {}, priority=Priority.CRITICAL)
-        )
+        id_critical = asyncio.run(queue.enqueue("critical", {}, priority=Priority.CRITICAL))
 
         t1 = asyncio.run(queue.dequeue(timeout=5.0))
         assert t1 is not None and t1.id == id_critical
@@ -464,9 +464,7 @@ class TestPostgresQueueIntegration:
 
         queue = PostgresWorkerQueue()
 
-        task_id = asyncio.run(
-            queue.enqueue("dl_test", {"key": "val"}, max_attempts=1)
-        )
+        task_id = asyncio.run(queue.enqueue("dl_test", {"key": "val"}, max_attempts=1))
         task = asyncio.run(queue.dequeue(timeout=5.0))
         assert task is not None
         asyncio.run(queue.fail(task_id, "Error", retry=True))
@@ -502,8 +500,7 @@ class TestPostgresQueueIntegration:
             try:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "UPDATE queue_tasks SET status = 'running', started_at = NOW() "
-                        "WHERE id = %s",
+                        "UPDATE queue_tasks SET status = 'running', started_at = NOW() " "WHERE id = %s",
                         (task_id,),
                     )
                 conn.commit()
@@ -541,6 +538,7 @@ class TestPostgresQueueIntegration:
             await queue.start()
 
             import time
+
             deadline = time.time() + 10
             while time.time() < deadline:
                 if task_id in results:
@@ -564,6 +562,7 @@ class TestPostgresQueueIntegration:
             await queue.start()
 
             import time
+
             deadline = time.time() + 10
             while time.time() < deadline:
                 status = queue.get_status()
@@ -576,6 +575,4 @@ class TestPostgresQueueIntegration:
 
         queue = asyncio.run(run())
         status = queue.get_status()
-        assert status["dead_letter"] >= 1, (
-            f"Expected dead_letter >=1, got {status}"
-        )
+        assert status["dead_letter"] >= 1, f"Expected dead_letter >=1, got {status}"

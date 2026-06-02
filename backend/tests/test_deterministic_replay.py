@@ -22,6 +22,7 @@ from app.semantic_world_state import get_world_state
 # HELPER: capture the most recent transaction entry
 # ═══════════════════════════════════════════════════════════════════
 
+
 def _capture_last_tx(ws):
     """Return the last transaction from the causality journal."""
     journal = ws.trace_causality(limit=50)
@@ -32,6 +33,7 @@ def _capture_last_tx(ws):
 # ═══════════════════════════════════════════════════════════════════
 # TEST GROUP 1: MULTI-SUBSYSTEM REPLAY STRESS TEST
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_full_multi_subsystem_replay():
     """Execute mutations across all 10 replayable subsystems, clear,
@@ -47,8 +49,7 @@ def test_full_multi_subsystem_replay():
         ws._energy.increment_records(5)
 
         # Topology
-        ws._topology.add(["role_a", "role_b"], "token_x",
-                         instability=0.3, integrity=0.7, domain="test")
+        ws._topology.add(["role_a", "role_b"], "token_x", instability=0.3, integrity=0.7, domain="test")
 
         # Instability
         ws._instability.set_exclusion(("role_a", "role_b"), 0.65)
@@ -70,23 +71,14 @@ def test_full_multi_subsystem_replay():
         ws._motif.reinforce(("name", "price"), current_record=5)
 
         # Intent
-        ws._intent.set_intent(
-            "intent_1", [0.2] * 16, strength=0.7, target_roles=["role_a"]
-        )
+        ws._intent.set_intent("intent_1", [0.2] * 16, strength=0.7, target_roles=["role_a"])
 
         # Action
-        ws._action.register_action(
-            "action_1", [0.3] * 16, "handler_fn", threshold=0.4
-        )
+        ws._action.register_action("action_1", [0.3] * 16, "handler_fn", threshold=0.4)
         ws._action.log_execution("action_1", success=True)
 
         # Abstraction
-        ws._abstraction.create_envelope(
-            "env_1",
-            ["role_a", "role_b"],
-            [0.5] * 16,
-            level=1
-        )
+        ws._abstraction.create_envelope("env_1", ["role_a", "role_b"], [0.5] * 16, level=1)
 
         # Observability
         ws._observability.emit_telemetry("test_event", {"key": "val"})
@@ -131,24 +123,20 @@ def test_full_multi_subsystem_replay():
     # Instability
     for key, val in pre_exclusions.items():
         restored = ws.learned_exclusions.get(key, 0.0)
-        assert abs(restored - val) < 0.001, \
-            f"Exclusion {key}: expected {val}, got {restored}"
+        assert abs(restored - val) < 0.001, f"Exclusion {key}: expected {val}, got {restored}"
 
     # Manifold
     restored_roles = set(ws.get_manifold_roles())
-    assert restored_roles == pre_manifold_roles, \
-        f"Manifold roles differ: {restored_roles} vs {pre_manifold_roles}"
+    assert restored_roles == pre_manifold_roles, f"Manifold roles differ: {restored_roles} vs {pre_manifold_roles}"
     for (role, type_str), val in pre_compat.items():
         restored = ws.get_compatibility(role, type_str)
-        assert abs(restored - val) < 0.001, \
-            f"Compatibility {(role, type_str)}: expected {val}, got {restored}"
+        assert abs(restored - val) < 0.001, f"Compatibility {(role, type_str)}: expected {val}, got {restored}"
     assert ws.role_anchors == pre_anchors
 
     # Transition
     for key, val in pre_trans_probs.items():
         restored = ws.get_transition_prob(*key)
-        assert abs(restored - val) < 0.001, \
-            f"Transition {key}: expected {val}, got {restored}"
+        assert abs(restored - val) < 0.001, f"Transition {key}: expected {val}, got {restored}"
     assert ws.transition_observations == pre_trans_obs
 
     # Motif
@@ -161,6 +149,7 @@ def test_full_multi_subsystem_replay():
 # ═══════════════════════════════════════════════════════════════════
 # TEST GROUP 2: REPLAY RESILIENCE
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_replay_empty_entries():
     """Replay a transaction with no entries must not crash."""
@@ -192,12 +181,7 @@ def test_replay_unknown_subsystem_skipped():
     ws = get_world_state()
     ws.clear()
 
-    tx = {
-        "label": "unknown_subsystem",
-        "entries": [
-            {"subsystem": "nonexistent", "action": "foo", "details": {}}
-        ]
-    }
+    tx = {"label": "unknown_subsystem", "entries": [{"subsystem": "nonexistent", "action": "foo", "details": {}}]}
     ws.replay_transaction(tx)
     # No crash = pass
 
@@ -207,13 +191,7 @@ def test_replay_unknown_method_skipped():
     ws = get_world_state()
     ws.clear()
 
-    tx = {
-        "label": "unknown_method",
-        "entries": [
-            {"subsystem": "energy", "action": "nonexistent_method",
-             "details": {}}
-        ]
-    }
+    tx = {"label": "unknown_method", "entries": [{"subsystem": "energy", "action": "nonexistent_method", "details": {}}]}
     ws.replay_transaction(tx)
     # No crash = pass
 
@@ -227,21 +205,17 @@ def test_replay_invalid_args_skipped():
         "label": "bad_args",
         "entries": [
             # Valid entry first
-            {"subsystem": "energy", "action": "set_energy",
-             "details": {"value": 7.5}},
+            {"subsystem": "energy", "action": "set_energy", "details": {"value": 7.5}},
             # Invalid — wrong arg name
-            {"subsystem": "energy", "action": "set_energy",
-             "details": {"wrong_arg": 999}},
+            {"subsystem": "energy", "action": "set_energy", "details": {"wrong_arg": 999}},
             # Valid entry after failure
-            {"subsystem": "energy", "action": "set_energy",
-             "details": {"value": 3.0}},
-        ]
+            {"subsystem": "energy", "action": "set_energy", "details": {"value": 3.0}},
+        ],
     }
     ws.replay_transaction(tx)
 
     # The first and last valid entries should have taken effect
-    assert abs(ws.metrics.global_energy - 3.0) < 0.001, \
-        f"Expected 3.0 from valid entries, got {ws.metrics.global_energy}"
+    assert abs(ws.metrics.global_energy - 3.0) < 0.001, f"Expected 3.0 from valid entries, got {ws.metrics.global_energy}"
 
 
 def test_replay_partial_failure_recovers():
@@ -252,18 +226,14 @@ def test_replay_partial_failure_recovers():
     tx = {
         "label": "partial_failure",
         "entries": [
-            {"subsystem": "energy", "action": "set_energy",
-             "details": {"value": 2.0}},
+            {"subsystem": "energy", "action": "set_energy", "details": {"value": 2.0}},
             # Will fail — no valid subsystem
             {"subsystem": "bogus", "action": "crash", "details": {}},
-            {"subsystem": "energy", "action": "set_entropy",
-             "details": {"value": 0.1}},
+            {"subsystem": "energy", "action": "set_entropy", "details": {"value": 0.1}},
             # Will fail — missing required args
-            {"subsystem": "manifold", "action": "set_manifold_vector",
-             "details": {}},
-            {"subsystem": "instability", "action": "set_exclusion",
-             "details": {"key": ("x", "y"), "value": 0.9}},
-        ]
+            {"subsystem": "manifold", "action": "set_manifold_vector", "details": {}},
+            {"subsystem": "instability", "action": "set_exclusion", "details": {"key": ("x", "y"), "value": 0.9}},
+        ],
     }
     ws.replay_transaction(tx)
 
@@ -277,6 +247,7 @@ def test_replay_partial_failure_recovers():
 # TEST GROUP 3: JOURNAL INTEGRITY
 # ═══════════════════════════════════════════════════════════════════
 
+
 def test_journal_entry_structure():
     """Every journal entry must have subsystem, action, and details fields."""
     ws = get_world_state()
@@ -289,15 +260,13 @@ def test_journal_entry_structure():
     tx = _capture_last_tx(ws)
 
     assert "entries" in tx, "Transaction must contain 'entries' list"
-    assert len(tx["entries"]) >= 2, \
-        f"Expected at least 2 entries, got {len(tx['entries'])}"
+    assert len(tx["entries"]) >= 2, f"Expected at least 2 entries, got {len(tx['entries'])}"
 
     for entry in tx["entries"]:
         assert "subsystem" in entry, f"Entry missing 'subsystem': {entry}"
         assert "action" in entry, f"Entry missing 'action': {entry}"
         assert "details" in entry, f"Entry missing 'details': {entry}"
-        assert isinstance(entry["details"], dict), \
-            f"Entry 'details' must be a dict, got {type(entry['details'])}"
+        assert isinstance(entry["details"], dict), f"Entry 'details' must be a dict, got {type(entry['details'])}"
 
 
 def test_all_replayable_subsystems_record():
@@ -308,33 +277,15 @@ def test_all_replayable_subsystems_record():
 
     subsystems = {
         "energy": lambda: ws._energy.set_energy(3.0),
-        "topology": lambda: ws._topology.add(
-            ["r1"], "t1", instability=0.5
-        ),
-        "instability": lambda: ws._instability.set_exclusion(
-            ("x", "y"), 0.5
-        ),
-        "manifold": lambda: ws._manifold.set_manifold_vector(
-            "m_role", [0.2] * 16
-        ),
-        "motif": lambda: ws._motif.reinforce(
-            ("m1", "m2"), current_record=10
-        ),
-        "transition": lambda: ws._transition.set_prob(
-            "type_a", "type_b", 0.5
-        ),
-        "intent": lambda: ws._intent.set_intent(
-            "i1", [0.5] * 16
-        ),
-        "action": lambda: ws._action.register_action(
-            "a1", [0.5] * 16, "handler"
-        ),
-        "abstraction": lambda: ws._abstraction.create_envelope(
-            "e1", ["r1"], [0.5] * 16, level=0
-        ),
-        "observability": lambda: ws._observability.emit_telemetry(
-            "evt", {"k": "v"}
-        ),
+        "topology": lambda: ws._topology.add(["r1"], "t1", instability=0.5),
+        "instability": lambda: ws._instability.set_exclusion(("x", "y"), 0.5),
+        "manifold": lambda: ws._manifold.set_manifold_vector("m_role", [0.2] * 16),
+        "motif": lambda: ws._motif.reinforce(("m1", "m2"), current_record=10),
+        "transition": lambda: ws._transition.set_prob("type_a", "type_b", 0.5),
+        "intent": lambda: ws._intent.set_intent("i1", [0.5] * 16),
+        "action": lambda: ws._action.register_action("a1", [0.5] * 16, "handler"),
+        "abstraction": lambda: ws._abstraction.create_envelope("e1", ["r1"], [0.5] * 16, level=0),
+        "observability": lambda: ws._observability.emit_telemetry("evt", {"k": "v"}),
         "history": lambda: ws._history.record_decision({"test": True}),
     }
 
@@ -346,8 +297,7 @@ def test_all_replayable_subsystems_record():
     recorded_subsystems = {e["subsystem"] for e in tx["entries"]}
 
     for name in subsystems:
-        assert name in recorded_subsystems, \
-            f"Subsystem '{name}' did not produce a journal entry"
+        assert name in recorded_subsystems, f"Subsystem '{name}' did not produce a journal entry"
 
 
 def test_journal_trace_id_propagation():
@@ -359,17 +309,16 @@ def test_journal_trace_id_propagation():
         ws._energy.set_energy(4.0)
 
     tx = _capture_last_tx(ws)
-    assert tx.get("trace_id") == "my_trace_abc", \
-        f"Expected trace_id='my_trace_abc', got {tx.get('trace_id')}"
+    assert tx.get("trace_id") == "my_trace_abc", f"Expected trace_id='my_trace_abc', got {tx.get('trace_id')}"
 
     for entry in tx.get("entries", []):
-        assert entry.get("trace_id") == "my_trace_abc", \
-            f"Entry missing trace_id: {entry}"
+        assert entry.get("trace_id") == "my_trace_abc", f"Entry missing trace_id: {entry}"
 
 
 # ═══════════════════════════════════════════════════════════════════
 # TEST GROUP 4: CUMULATIVE REPLAY — ORDERING GUARANTEES
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_cumulative_replay_multiple_transactions():
     """Execute 3 chained transactions, clear, replay all in order,
@@ -389,8 +338,7 @@ def test_cumulative_replay_multiple_transactions():
     with ws.transaction("phase_2", trace_id="replay_02"):
         ws._energy.set_energy(4.0)
         ws._energy.increment_records(3)
-        ws._topology.add(["phase_role", "other"], "phase_token",
-                         instability=0.2)
+        ws._topology.add(["phase_role", "other"], "phase_token", instability=0.2)
 
     tx2 = _capture_last_tx(ws)
 
@@ -424,27 +372,25 @@ def test_cumulative_replay_multiple_transactions():
     ws.replay_transaction(tx3)
 
     # Verify final state matches
-    assert abs(ws.metrics.global_energy - expected_energy) < 0.001, \
-        f"Energy: expected {expected_energy}, got {ws.metrics.global_energy}"
+    assert (
+        abs(ws.metrics.global_energy - expected_energy) < 0.001
+    ), f"Energy: expected {expected_energy}, got {ws.metrics.global_energy}"
     assert ws.metrics.total_records_processed == expected_records
     assert set(ws.get_manifold_roles()) == expected_roles
 
     for key, val in expected_exclusions.items():
         restored = ws.learned_exclusions.get(key, 0.0)
-        assert abs(restored - val) < 0.001, \
-            f"Exclusion {key}: expected {val}, got {restored}"
+        assert abs(restored - val) < 0.001, f"Exclusion {key}: expected {val}, got {restored}"
 
     assert ws._topology.region_count() == expected_region_count
 
     for (role, type_str), val in expected_compat.items():
         restored = ws.get_compatibility(role, type_str)
-        assert abs(restored - val) < 0.001, \
-            f"Compat {(role, type_str)}: expected {val}, got {restored}"
+        assert abs(restored - val) < 0.001, f"Compat {(role, type_str)}: expected {val}, got {restored}"
 
     for key, val in expected_probs.items():
         restored = ws.get_transition_prob(*key)
-        assert abs(restored - val) < 0.001, \
-            f"Transition {key}: expected {val}, got {restored}"
+        assert abs(restored - val) < 0.001, f"Transition {key}: expected {val}, got {restored}"
 
 
 def test_replay_idempotent():
@@ -469,13 +415,13 @@ def test_replay_idempotent():
     ws.replay_transaction(tx)
     state_after_two = ws.metrics.global_energy
 
-    assert abs(state_after_one - state_after_two) < 0.001, \
-        f"Replay not idempotent: {state_after_one} vs {state_after_two}"
+    assert abs(state_after_one - state_after_two) < 0.001, f"Replay not idempotent: {state_after_one} vs {state_after_two}"
 
 
 # ═══════════════════════════════════════════════════════════════════
 # TEST GROUP 5: DIRECT MUTATION RECORDING
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_direct_mutation_recorded_outside_transaction():
     """Mutations made outside a transaction must still appear in the
@@ -488,15 +434,13 @@ def test_direct_mutation_recorded_outside_transaction():
 
     journal = ws.trace_causality(limit=50)
     direct = [j for j in journal if j.get("label") == "direct_mutation"]
-    assert len(direct) >= 1, \
-        "Direct mutation should be recorded with 'direct_mutation' label"
+    assert len(direct) >= 1, "Direct mutation should be recorded with 'direct_mutation' label"
 
     # Verify the entry contains the mutation
     found = False
     for entry in direct:
         for e in entry.get("entries", []):
-            if (e.get("subsystem") == "energy" and
-                    e.get("action") == "set_energy"):
+            if e.get("subsystem") == "energy" and e.get("action") == "set_energy":
                 found = True
                 break
     assert found, "Direct set_energy should be in journal entries"
@@ -506,6 +450,7 @@ def test_direct_mutation_recorded_outside_transaction():
 # TEST GROUP 6: TOPOLOGY REPLAY — STRUCTURAL VERIFICATION
 # ═══════════════════════════════════════════════════════════════════
 
+
 def test_topology_add_replay_structural():
     """Replaying topology.add() must restore the correct number of
     regions with matching tokens and roles (ID-independent verification)."""
@@ -513,14 +458,8 @@ def test_topology_add_replay_structural():
     ws.clear()
 
     with ws.transaction("topo_add_test"):
-        ws._topology.add(
-            ["seller", "buyer"], "token_123",
-            instability=0.35, integrity=0.8, domain="ecommerce"
-        )
-        ws._topology.add(
-            ["origin", "destination"], "token_456",
-            instability=0.2, domain="travel"
-        )
+        ws._topology.add(["seller", "buyer"], "token_123", instability=0.35, integrity=0.8, domain="ecommerce")
+        ws._topology.add(["origin", "destination"], "token_456", instability=0.2, domain="travel")
 
     tx = _capture_last_tx(ws)
     pre_count = ws._topology.region_count()
@@ -529,13 +468,11 @@ def test_topology_add_replay_structural():
     assert ws._topology.region_count() == 0
 
     ws.replay_transaction(tx)
-    assert ws._topology.region_count() == pre_count, \
-        f"Expected {pre_count} regions, got {ws._topology.region_count()}"
+    assert ws._topology.region_count() == pre_count, f"Expected {pre_count} regions, got {ws._topology.region_count()}"
 
     view = ws._topology.get_view()
     tokens = sorted(view.get_all_tokens())
-    assert tokens == sorted(["token_123", "token_456"]), \
-        f"Tokens don't match: {tokens}"
+    assert tokens == sorted(["token_123", "token_456"]), f"Tokens don't match: {tokens}"
 
     # Check region attributes
     for t in ["token_123", "token_456"]:
@@ -560,13 +497,13 @@ def test_topological_law_replay():
     ws.replay_transaction(tx)
     restored = dict(ws.topological_laws)
 
-    assert restored == pre_laws, \
-        f"Topological laws mismatch: restored {restored}, expected {pre_laws}"
+    assert restored == pre_laws, f"Topological laws mismatch: restored {restored}, expected {pre_laws}"
 
 
 # ═══════════════════════════════════════════════════════════════════
 # TEST GROUP 7: TUPLE KEY HANDLING IN REPLAY
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_replay_instability_tuple_key_deserialization():
     """Tuple keys in instability entries must survive JSON serialization/
@@ -582,6 +519,7 @@ def test_replay_instability_tuple_key_deserialization():
 
     # Simulate JSON round-trip (converts tuple keys to lists)
     import json
+
     tx_json = json.dumps(tx)
     tx_loaded = json.loads(tx_json)
     # Reconstruct entries — tuples in details become lists after JSON
@@ -613,7 +551,7 @@ def test_long_horizon_replay_parity():
     original_metrics = {
         "energy": ws.metrics.global_energy,
         "entropy": ws.metrics.global_entropy,
-        "records": ws.metrics.total_records_processed
+        "records": ws.metrics.total_records_processed,
     }
     original_checksum = ws.get_manifold_checksum()
     full_journal = ws.trace_causality(limit=600)

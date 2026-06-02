@@ -83,39 +83,79 @@ def test_no_orphan_methods():
                 content = f.read()
             for method in list(methods):
                 # Check both method-call style .method() and property access .method
-                if f".{method}(" in content or f".{method}," in content or f".{method})" in content or f".{method}[" in content or f".{method} " in content:  # noqa: E501
+                if (
+                    f".{method}(" in content
+                    or f".{method}," in content
+                    or f".{method})" in content
+                    or f".{method}[" in content
+                    or f".{method} " in content
+                ):  # noqa: E501
                     called.add(method)
 
-    uncalled = methods - called - {
-        "topology_snapshots", "field_summary", "propagate_field_regions",
-        "mutation_diff", "local_view", "replay", "trace_field_evolution",
-        "diff_snapshots", "topology_density", "multi_scale_regions",
-        "trace_waves", "clear", "detect_communities",
-        "aggregate_from_regions", "redistribute_instability",
-        "apply_memory_decay", "induce_topological_laws",
-        "dream", "relax_topology",
-        "update_scale_coupling", "observe_field_perturbation",
-        "field_regions", "learned_exclusions",
-        "decay_field_regions", "meso_clusters",
-        "macro_continents", "compute_macro_continents",
-        "trace_causality", "replay_transaction",
-        "evolved_schema", "export_manifold", "import_federated_manifold",
-        "export_topology_laws", "import_federated_laws",
-        "get_cognitive_health",
-        "evaluate_topological_consistency", "merge_hierarchical_knowledge",
-        "synthesize_hierarchical_envelopes", "shard_substrate",
-        # TopologyState delegate properties (accessed as properties, not method calls)
-
-        "neighborhood_cohesion", "cohesion_merge_success",
-        "cohesion_merge_attempts", "cohesion_split_success",
-        "cohesion_split_attempts", "topological_laws",
-        "impossible_neighborhoods", "restructuring_queue",
-        "global_communities", "schema_patterns", "global_centrality",
-        # ManifoldState delegate properties (accessed as properties, not method calls)
-        "motif_stability", "motif_timestamps",
-        # New delegation properties (accessed as dot-property ending lines or via attribute chain)
-        "abstraction_envelopes", "active_intents", "manifold_dimension",
-    }
+    uncalled = (
+        methods
+        - called
+        - {
+            "topology_snapshots",
+            "field_summary",
+            "propagate_field_regions",
+            "mutation_diff",
+            "local_view",
+            "replay",
+            "trace_field_evolution",
+            "diff_snapshots",
+            "topology_density",
+            "multi_scale_regions",
+            "trace_waves",
+            "clear",
+            "detect_communities",
+            "aggregate_from_regions",
+            "redistribute_instability",
+            "apply_memory_decay",
+            "induce_topological_laws",
+            "dream",
+            "relax_topology",
+            "update_scale_coupling",
+            "observe_field_perturbation",
+            "field_regions",
+            "learned_exclusions",
+            "decay_field_regions",
+            "meso_clusters",
+            "macro_continents",
+            "compute_macro_continents",
+            "trace_causality",
+            "replay_transaction",
+            "evolved_schema",
+            "export_manifold",
+            "import_federated_manifold",
+            "export_topology_laws",
+            "import_federated_laws",
+            "get_cognitive_health",
+            "evaluate_topological_consistency",
+            "merge_hierarchical_knowledge",
+            "synthesize_hierarchical_envelopes",
+            "shard_substrate",
+            # TopologyState delegate properties (accessed as properties, not method calls)
+            "neighborhood_cohesion",
+            "cohesion_merge_success",
+            "cohesion_merge_attempts",
+            "cohesion_split_success",
+            "cohesion_split_attempts",
+            "topological_laws",
+            "impossible_neighborhoods",
+            "restructuring_queue",
+            "global_communities",
+            "schema_patterns",
+            "global_centrality",
+            # ManifoldState delegate properties (accessed as properties, not method calls)
+            "motif_stability",
+            "motif_timestamps",
+            # New delegation properties (accessed as dot-property ending lines or via attribute chain)
+            "abstraction_envelopes",
+            "active_intents",
+            "manifold_dimension",
+        }
+    )
     if "propagate_field_regions" in uncalled:
         uncalled.remove("propagate_field_regions")
     # topology_snapshots is a property accessor
@@ -126,8 +166,7 @@ def test_no_orphan_methods():
         uncalled.remove("field_summary")
 
     assert not uncalled, (
-        f"Uncalled public methods on SemanticWorldState: {uncalled}. "
-        "These may be dead code or indicate incomplete cleanup."
+        f"Uncalled public methods on SemanticWorldState: {uncalled}. " "These may be dead code or indicate incomplete cleanup."
     )
 
 
@@ -166,10 +205,7 @@ def test_event_subscribers_are_defined():
 
     # Every subscribed event type should be dispatched somewhere
     not_dispatched = subscribed - dispatched
-    assert not not_dispatched, (
-        f"Subscribed but never dispatched: {not_dispatched}. "
-        "Subscribers will never fire."
-    )
+    assert not not_dispatched, f"Subscribed but never dispatched: {not_dispatched}. " "Subscribers will never fire."
 
 
 def test_no_stale_pyc():
@@ -187,16 +223,17 @@ def test_no_stale_pyc():
                 if not os.path.exists(py_path):
                     pyc_files.append(os.path.join(root, f))
 
-    assert not pyc_files, (
-        f"Stale .pyc files: {pyc_files}. These will be loaded instead of current source."
-    )
+    assert not pyc_files, f"Stale .pyc files: {pyc_files}. These will be loaded instead of current source."
 
 
 def test_no_dead_imports():
     """Core modules should not import symbols that don't exist."""
     core_modules = [
-        "semantic_world_state", "semantic_pipeline", "graph_update_scheduler",
-        "semantic_allocation_engine", "semantic_inference_engine",
+        "semantic_world_state",
+        "semantic_pipeline",
+        "graph_update_scheduler",
+        "semantic_allocation_engine",
+        "semantic_inference_engine",
     ]
     for mod_name in core_modules:
         path = _app_path(f"app/{mod_name}.py")
@@ -249,6 +286,7 @@ def test_coupling_coefficient_exists():
     transition from heuristic coupling to thermodynamic coupling.
     """
     import importlib
+
     fl = importlib.import_module("app.field_laws")
     assert hasattr(fl, "COUPLING_COEFFICIENT"), "COUPLING_COEFFICIENT must be defined in field_laws.py"
     assert hasattr(fl, "FREE_ENERGY_CLAMP"), "FREE_ENERGY_CLAMP must be defined in field_laws.py"
@@ -264,6 +302,7 @@ def test_energy_conservation_tracking():
     the conservation law.
     """
     from app.energy_state import EnergyState
+
     es = EnergyState()
     assert hasattr(es, "energy_balance"), "EnergyState must have energy_balance property"
     assert hasattr(es, "record_energy_flow"), "EnergyState must have record_energy_flow method"

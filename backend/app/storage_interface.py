@@ -382,10 +382,7 @@ def reset_repository():
     """
     global _repository_instance
     if _repository_instance is not None:
-        if (
-            hasattr(_repository_instance, "__class__")
-            and "PostgresJobRepository" in type(_repository_instance).__name__
-        ):
+        if hasattr(_repository_instance, "__class__") and "PostgresJobRepository" in type(_repository_instance).__name__:
             try:
                 from app.postgres_repository import shutdown_postgres
 

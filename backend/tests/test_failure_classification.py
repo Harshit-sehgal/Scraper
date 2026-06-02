@@ -29,9 +29,11 @@ from app.failure_classification import (
 # Fixtures
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def mock_domain_intel():
     """Create a minimal mock domain intelligence object."""
+
     class MockIntel:
         def __init__(self):
             self.domain = "test.example.com"
@@ -59,6 +61,7 @@ def mock_domain_intel():
 # ═══════════════════════════════════════════════════════════════════════
 # Error Message Classification
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestErrorClassification:
     def test_classify_dns_failure(self):
@@ -111,6 +114,7 @@ class TestErrorClassification:
 # HTTP Status Code Classification
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestHttpStatusCodeClassification:
     def test_rate_limited_429(self):
         result = classify_failure(status_code=429)
@@ -157,6 +161,7 @@ class TestHttpStatusCodeClassification:
 # ═══════════════════════════════════════════════════════════════════════
 # HTML / DOM Signal Classification
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestHtmlClassification:
     def test_empty_page(self):
@@ -221,6 +226,7 @@ class TestHtmlClassification:
 # Extraction Result Classification
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestExtractionResultClassification:
     def test_no_records_from_memory(self):
         result = classify_failure(
@@ -282,6 +288,7 @@ class TestExtractionResultClassification:
 # Telemetry & Domain Intelligence Classification
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestTelemetryAndDomainClassification:
     def test_high_anti_bot_no_html(self):
         result = classify_failure(
@@ -318,21 +325,18 @@ class TestTelemetryAndDomainClassification:
 # Recovery Strategy Mapping
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestRecoveryStrategies:
     def test_all_categories_have_recovery_strategies(self):
         for category in FailureCategory:
-            assert category in RECOVERY_STRATEGIES, (
-                f"Missing recovery strategy for {category.value}"
-            )
+            assert category in RECOVERY_STRATEGIES, f"Missing recovery strategy for {category.value}"
 
     def test_all_recovery_strategies_have_required_keys(self):
         for category, strategy in RECOVERY_STRATEGIES.items():
             assert "strategy" in strategy, f"Missing 'strategy' for {category.value}"
             assert "params" in strategy, f"Missing 'params' for {category.value}"
             assert "description" in strategy, f"Missing 'description' for {category.value}"
-            assert isinstance(strategy["params"], dict), (
-                f"'params' must be dict for {category.value}"
-            )
+            assert isinstance(strategy["params"], dict), f"'params' must be dict for {category.value}"
 
     def test_unknown_fallback(self):
         result = classify_failure()
@@ -343,6 +347,7 @@ class TestRecoveryStrategies:
 # ═══════════════════════════════════════════════════════════════════════
 # Domain Intelligence Integration
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestDomainIntelligenceIntegration:
     def test_update_domain_with_failure(self, mock_domain_intel):
@@ -403,19 +408,14 @@ class TestDomainIntelligenceIntegration:
 # Detection Pattern Helpers
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestDetectionPatterns:
     def test_has_challenge_patterns_cloudflare(self):
-        assert _has_challenge_patterns(
-            "<html>cf-browser-verification widget</html>"
-        )
-        assert _has_challenge_patterns(
-            "<html>Checking your browser before accessing</html>"
-        )
+        assert _has_challenge_patterns("<html>cf-browser-verification widget</html>")
+        assert _has_challenge_patterns("<html>Checking your browser before accessing</html>")
 
     def test_has_challenge_patterns_datadome(self):
-        assert _has_challenge_patterns(
-            "<html>datadome security check</html>"
-        )
+        assert _has_challenge_patterns("<html>datadome security check</html>")
 
     def test_has_challenge_patterns_negative(self):
         assert not _has_challenge_patterns("<html>normal content</html>")
@@ -429,15 +429,11 @@ class TestDetectionPatterns:
 
     def test_is_malformed_dom_high_ratio(self):
         """DOM with very few closing tags."""
-        assert _is_malformed_dom(
-            "<div><span><a>lots<div>of open<a>tags<span>everywhere<div>"
-        )
+        assert _is_malformed_dom("<div><span><a>lots<div>of open<a>tags<span>everywhere<div>")
 
     def test_is_malformed_dom_low_ratio(self):
         """Well-formed DOM should not be classified as malformed."""
-        assert not _is_malformed_dom(
-            "<html><body><div><p>normal</p></div></body></html>"
-        )
+        assert not _is_malformed_dom("<html><body><div><p>normal</p></div></body></html>")
 
     def test_is_malformed_dom_no_html(self):
         assert not _is_malformed_dom("")

@@ -12,10 +12,7 @@ def test_unified_edge_field_combines_topology_forces():
         ws._topology.set_topological_law(("price", "date"), -0.8)
         ws._topology.add_impossible_neighborhood({"price", "date"})
 
-    edges = {
-        (edge.source, edge.target): edge
-        for edge in ws.get_topology_view().get_edge_fields()
-    }
+    edges = {(edge.source, edge.target): edge for edge in ws.get_topology_view().get_edge_fields()}
 
     route_edge = edges[("destination", "origin")]
     assert route_edge.semantics == "attractive"

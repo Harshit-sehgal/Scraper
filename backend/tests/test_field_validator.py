@@ -42,6 +42,7 @@ def test_orphan_region_detected():
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     from app.core_types import FieldConflictRegion
+
     orphan = FieldConflictRegion(competing_roles=[], token="orphan", instability=0.5)
     ws._topology.append_region(orphan)
     issues = validate_world_state(ws)
@@ -53,6 +54,7 @@ def test_nan_region_instability_detected():
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     from app.core_types import FieldConflictRegion
+
     # append_region clamps NaN, so we hack the internal object afterwards
     bad = FieldConflictRegion(competing_roles=["a"], token="bad", instability=0.5)
     ws._topology.append_region(bad)
@@ -67,6 +69,7 @@ def test_instability_out_of_bounds():
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     from app.core_types import FieldConflictRegion
+
     bad = FieldConflictRegion(competing_roles=["a"], token="bad", instability=0.5)
     ws._topology.append_region(bad)
     regions = ws._topology._get_regions()
@@ -79,6 +82,7 @@ def test_energy_out_of_bounds():
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     from app.core_types import FieldConflictRegion
+
     bad = FieldConflictRegion(competing_roles=["a"], token="bad", instability=0.5, local_energy=20.0)
     ws._topology.append_region(bad)
     issues = validate_world_state(ws)
@@ -107,6 +111,7 @@ def test_integrity_out_of_bounds():
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     from app.core_types import FieldConflictRegion
+
     bad = FieldConflictRegion(competing_roles=["a"], token="bad", instability=0.5, integrity=0.5)
     ws._topology.append_region(bad)
     regions = ws._topology._get_regions()
@@ -137,10 +142,10 @@ def test_region_count_exceeds_500():
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     from app.core_types import FieldConflictRegion
+
     # Bypass topology clamping and MVCC by hacking _regions directly
     ws._topology._regions = [
-        FieldConflictRegion(competing_roles=["a"], token=f"tok{i}", instability=0.5, integrity=0.5)
-        for i in range(501)
+        FieldConflictRegion(competing_roles=["a"], token=f"tok{i}", instability=0.5, integrity=0.5) for i in range(501)
     ]
     issues = validate_world_state(ws)
     assert any("field_regions" in i and "500" in i for i in issues)

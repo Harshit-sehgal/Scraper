@@ -27,6 +27,7 @@ def test_governance_guardrail_enforcement():
 
     # Temporarily lower the policy threshold for this test
     from app.policy_engine import get_policy_engine
+
     policy = get_policy_engine(ws=ws)
     old_threshold = policy.critical_entropy_threshold
     policy.critical_entropy_threshold = 0.4
@@ -53,6 +54,7 @@ def test_governance_guardrail_enforcement():
 def test_community_density_quota():
     """Verify that community density violations are detected."""
     from app.policy_engine import get_policy_engine
+
     ws = SemanticWorldState(node_id="quota_test")
     ws.clear()
     policy = get_policy_engine(ws=ws)

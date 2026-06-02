@@ -103,10 +103,13 @@ class TestLoadState:
     def test_load_valid_jobs(self):
         """Loads valid jobs from a state file."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump({
-                "jobs": [_make_job_json("job-1", "completed")],
-                "recycle_bin": [],
-            }, f)
+            json.dump(
+                {
+                    "jobs": [_make_job_json("job-1", "completed")],
+                    "recycle_bin": [],
+                },
+                f,
+            )
             fpath = f.name
 
         old = os.environ.get("DATAFORGE_STATE_FILE")
@@ -126,10 +129,13 @@ class TestLoadState:
     def test_load_with_recycle_bin(self):
         """Loads both jobs and recycle bin entries."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump({
-                "jobs": [],
-                "recycle_bin": [_make_job_json("deleted-job", "completed")],
-            }, f)
+            json.dump(
+                {
+                    "jobs": [],
+                    "recycle_bin": [_make_job_json("deleted-job", "completed")],
+                },
+                f,
+            )
             fpath = f.name
 
         old = os.environ.get("DATAFORGE_STATE_FILE")
@@ -148,14 +154,17 @@ class TestLoadState:
     def test_recovery_marks_in_progress_as_failed(self):
         """Jobs that were in progress during shutdown are marked FAILED on load."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump({
-                "jobs": [
-                    _make_job_json("pending-job", "pending"),
-                    _make_job_json("running-job", "running"),
-                    _make_job_json("completed-job", "completed"),
-                ],
-                "recycle_bin": [],
-            }, f)
+            json.dump(
+                {
+                    "jobs": [
+                        _make_job_json("pending-job", "pending"),
+                        _make_job_json("running-job", "running"),
+                        _make_job_json("completed-job", "completed"),
+                    ],
+                    "recycle_bin": [],
+                },
+                f,
+            )
             fpath = f.name
 
         old = os.environ.get("DATAFORGE_STATE_FILE")
@@ -194,13 +203,16 @@ class TestLoadState:
     def test_skip_invalid_job_entries(self):
         """Malformed job entries are skipped gracefully."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump({
-                "jobs": [
-                    {"id": "bad-job"},  # Missing required fields
-                    _make_job_json("good-job", "completed"),
-                ],
-                "recycle_bin": [],
-            }, f)
+            json.dump(
+                {
+                    "jobs": [
+                        {"id": "bad-job"},  # Missing required fields
+                        _make_job_json("good-job", "completed"),
+                    ],
+                    "recycle_bin": [],
+                },
+                f,
+            )
             fpath = f.name
 
         old = os.environ.get("DATAFORGE_STATE_FILE")
@@ -241,6 +253,7 @@ class TestSaveState:
 
                 # Wait for the background thread to write (up to 3s)
                 import time
+
                 for _ in range(30):
                     if os.path.exists(fpath):
                         break
@@ -277,6 +290,7 @@ class TestSaveState:
                 save_state({"roundtrip-job": job}, {})
 
                 import time
+
                 for _ in range(30):
                     if os.path.exists(fpath):
                         break
@@ -311,6 +325,7 @@ class TestSaveState:
                 save_state({}, {"deleted": deleted_job})
 
                 import time
+
                 for _ in range(30):
                     if os.path.exists(fpath):
                         break

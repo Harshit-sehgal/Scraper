@@ -22,6 +22,7 @@ def clean_state():
 
     # Re-setup scheduler subscription
     from app.graph_update_scheduler import get_scheduler
+
     get_scheduler()._setup_subscriptions()
 
 

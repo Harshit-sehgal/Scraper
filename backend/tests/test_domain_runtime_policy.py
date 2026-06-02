@@ -215,9 +215,7 @@ class TestDomainCooldownIntegration:
         for _ in range(3):
             policy.record_failure(url, failure_type="anti_bot_blocked")
         action = policy.recommended_action(url)
-        assert "authorized_access" in action, (
-            f"Expected authorized_access hint in recommended_action, got: {action}"
-        )
+        assert "authorized_access" in action, f"Expected authorized_access hint in recommended_action, got: {action}"
 
     def test_get_summary_includes_cooldown_remaining(self):
         """get_summary should report positive cooldown_remaining for cooling domains."""

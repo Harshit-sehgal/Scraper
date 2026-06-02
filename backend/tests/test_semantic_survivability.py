@@ -38,7 +38,7 @@ def simulate_event(ws: SemanticWorldState, role_name: str, token_type: SemanticT
             span=Span(0, 5),
             position=0,
             primary_type=token_type,
-            type_distribution={token_type: 1.0}
+            type_distribution={token_type: 1.0},
         )
         # Capture field (creates regions)
         ws.capture_pre_allocation_field([token], [role_name])

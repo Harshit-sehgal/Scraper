@@ -241,8 +241,7 @@ class TestTryProfileExtractionFound:
         """When profile matches, extract_with_profile should be called."""
         with (
             patch("app.selector_profiles.loader._match_domain") as mock_match,
-            patch("app.selector_profiles.loader.extract_with_profile",
-                  new_callable=AsyncMock) as mock_extract,
+            patch("app.selector_profiles.loader.extract_with_profile", new_callable=AsyncMock) as mock_extract,
         ):
             mock_match.return_value = {
                 "domain": "example.com",
@@ -252,6 +251,7 @@ class TestTryProfileExtractionFound:
             mock_extract.return_value = [{"name": "Item1"}]
 
             from app.selector_profiles.loader import try_profile_extraction
+
             result = await try_profile_extraction("https://example.com/page")
             assert result == [{"name": "Item1"}]
             mock_extract.assert_called_once()
@@ -260,13 +260,13 @@ class TestTryProfileExtractionFound:
         """The URL passed to extract_with_profile should be the original URL."""
         with (
             patch("app.selector_profiles.loader._match_domain") as mock_match,
-            patch("app.selector_profiles.loader.extract_with_profile",
-                  new_callable=AsyncMock) as mock_extract,
+            patch("app.selector_profiles.loader.extract_with_profile", new_callable=AsyncMock) as mock_extract,
         ):
             mock_match.return_value = {"domain": "example.com", "fields": {}}
             mock_extract.return_value = []
 
             from app.selector_profiles.loader import try_profile_extraction
+
             await try_profile_extraction("https://example.com/page", max_wait=30)
             mock_extract.assert_called_once_with(
                 "https://example.com/page",
@@ -302,9 +302,13 @@ def _make_pw_mocks(mock_playwright):
     return mock_factory, pw_ctx
 
 
-def _make_page_mock(evaluate_return=None, goto_side_effect=None,
-                    wait_for_selector_return=None, wait_for_selector_side_effect=None,
-                    container_count: int = 2):
+def _make_page_mock(
+    evaluate_return=None,
+    goto_side_effect=None,
+    wait_for_selector_return=None,
+    wait_for_selector_side_effect=None,
+    container_count: int = 2,
+):
     """Build a mock page with configurable async methods."""
     m = MagicMock()
     m.goto = AsyncMock(side_effect=goto_side_effect) if goto_side_effect else AsyncMock()
@@ -348,6 +352,7 @@ class TestExtractWithProfilePlaywright:
     async def test_missing_container_and_fields(self):
         """Already tested above — both missing container and fields returns []."""
         from app.selector_profiles.loader import extract_with_profile
+
         result = await extract_with_profile(
             "https://example.com",
             {"domain": "example.com"},
@@ -358,6 +363,7 @@ class TestExtractWithProfilePlaywright:
     async def test_max_wait_defaults_from_settings(self):
         """max_wait=None should use settings.PROFILE_MAX_WAIT."""
         from app.selector_profiles.loader import extract_with_profile
+
         profile = {"domain": "example.com", "item_container": "div.x", "fields": {"n": {"selector": ".n"}}}
 
         mock_page = _make_page_mock()
@@ -373,14 +379,13 @@ class TestExtractWithProfilePlaywright:
                 )
                 assert result == []
                 # Verify default was used from settings (15s → 15000ms)
-                mock_page.wait_for_selector.assert_called_once_with(
-                    "div.x", timeout=15000
-                )
+                mock_page.wait_for_selector.assert_called_once_with("div.x", timeout=15000)
 
     @pytest.mark.asyncio
     async def test_extract_with_playwright_success(self):
         """Full extraction flow with Playwright mocking returns post-processed records."""
         from app.selector_profiles.loader import extract_with_profile
+
         profile = {
             "domain": "example.com",
             "item_container": "div.card",
@@ -391,10 +396,12 @@ class TestExtractWithProfilePlaywright:
             },
         }
 
-        mock_page = _make_page_mock(evaluate_return=[
-            {"name": "Alpha", "price": "£238"},
-            {"name": "Beta", "price": "$99.50"},
-        ])
+        mock_page = _make_page_mock(
+            evaluate_return=[
+                {"name": "Alpha", "price": "£238"},
+                {"name": "Beta", "price": "$99.50"},
+            ]
+        )
         mock_pw = _make_browser_chain(mock_page)
         mock_factory, _pw_ctx = _make_pw_mocks(mock_pw)
 
@@ -422,6 +429,7 @@ class TestExtractWithProfilePlaywright:
     async def test_goto_timeout_fallback(self):
         """When networkidle times out, falls back to domcontentloaded."""
         from app.selector_profiles.loader import extract_with_profile
+
         profile = {
             "domain": "example.com",
             "item_container": "div.card",
@@ -454,6 +462,7 @@ class TestExtractWithProfilePlaywright:
     async def test_wait_for_selector_timeout_returns_empty(self):
         """When wait_for_selector times out, returns empty list."""
         from app.selector_profiles.loader import extract_with_profile
+
         profile = {
             "domain": "example.com",
             "item_container": "div.card",
@@ -481,6 +490,7 @@ class TestExtractWithProfilePlaywright:
     async def test_fatal_error_returns_empty(self):
         """When Playwright encounters an unexpected error, returns empty."""
         from app.selector_profiles.loader import extract_with_profile
+
         profile = {
             "domain": "example.com",
             "item_container": "div.card",
@@ -505,6 +515,7 @@ class TestExtractWithProfilePlaywright:
     async def test_route_filter_blocks_media(self):
         """Verify the route filter function blocks images/media/fonts."""
         from app.selector_profiles.loader import extract_with_profile
+
         profile = {
             "domain": "example.com",
             "item_container": "div.card",

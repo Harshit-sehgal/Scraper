@@ -16,14 +16,7 @@ def is_safe_ip(ip_str: str) -> bool:
     try:
         ip = ipaddress.ip_address(ip_str)
         # Check standard unsafe ranges:
-        if (
-            ip.is_private
-            or ip.is_loopback
-            or ip.is_link_local
-            or ip.is_multicast
-            or ip.is_reserved
-            or ip.is_unspecified
-        ):
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
             return False
         return True
     except ValueError:
@@ -73,7 +66,8 @@ def validate_public_http_url(url: str) -> None:
     if ip_literal is not None:
         if not is_safe_ip(str(ip_literal)):
             raise ValueError(
-                f"URL hostname '{hostname}' resolves to restricted IP {ip_literal} — rejected for security (SSRF protection).")
+                f"URL hostname '{hostname}' resolves to restricted IP {ip_literal} — rejected for security (SSRF protection)."
+            )
         return
 
     # 5. Reject internal TLDs (misconfiguration / SSRF trick)
@@ -89,7 +83,8 @@ def validate_public_http_url(url: str) -> None:
             ip = str(addr[4][0])
             if not is_safe_ip(ip):
                 raise ValueError(
-                    f"URL hostname '{hostname}' resolves to restricted IP {ip} — rejected for security (SSRF protection).")
+                    f"URL hostname '{hostname}' resolves to restricted IP {ip} — rejected for security (SSRF protection)."
+                )
     except (socket.gaierror, OSError) as e:
         is_production = settings.ENV.lower() in ("production", "staging")
         if is_production and not settings.SMOKE_TEST_MODE:

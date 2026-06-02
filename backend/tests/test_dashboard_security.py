@@ -16,7 +16,9 @@ def test_dashboard_security_headers(client):
 
     # Verify Content Security Policy is configured correctly in the app settings if served
     from app.config import settings
+
     assert settings.ENV in ("development", "production")
+
 
 def test_dashboard_unauthenticated_api_access(client):
     """Verify that unauthenticated API routes reject access with 401/403."""
@@ -25,6 +27,7 @@ def test_dashboard_unauthenticated_api_access(client):
     # Should require authentication when keys are configured
     # In permissive dev mode with empty keys, it returns 200. We verify that if keys are set, it blocks.
     assert resp.status_code in (200, 401, 403)
+
 
 def test_dashboard_static_assets_mime_types(client):
     """Verify that dashboard static assets exist and are accessible."""

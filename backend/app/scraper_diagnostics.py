@@ -60,9 +60,7 @@ class ScraperDiagnosticReport:
         }
 
 
-async def run_diagnostics(
-    url: str, schema_fields: list[SchemaField], min_record_score: float = 0.3
-) -> ScraperDiagnosticReport:
+async def run_diagnostics(url: str, schema_fields: list[SchemaField], min_record_score: float = 0.3) -> ScraperDiagnosticReport:
     """Run a deep diagnostic scrape for a URL."""
     report = ScraperDiagnosticReport(url)
 

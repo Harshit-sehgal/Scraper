@@ -43,8 +43,10 @@ class TestSuggestSchemaFromIntent:
 
     @pytest.mark.asyncio
     async def test_returns_schema_dict(self):
-        mock_schema = {"name": "Job", "fields": [
-            {"name": "title", "type": "string", "required": True, "description": "Product title"}]}
+        mock_schema = {
+            "name": "Job",
+            "fields": [{"name": "title", "type": "string", "required": True, "description": "Product title"}],
+        }
         with patch("app.insight_engine._llm_json", new_callable=AsyncMock, return_value=mock_schema):
             result = await suggest_schema_from_intent("scrape product details")
             assert result == mock_schema

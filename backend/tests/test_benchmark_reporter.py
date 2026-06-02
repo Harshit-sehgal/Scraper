@@ -44,7 +44,7 @@ def test_record_run():
         recall=0.90,
         fallback_rate=0.10,
         latency_ms=1200.0,
-        failed_selectors=["#price", ".rating"]
+        failed_selectors=["#price", ".rating"],
     )
 
     comparison = reporter.record_run(run)
@@ -61,14 +61,16 @@ def test_regression_alert_trigger():
 
     # Record strong historic runs
     for i in range(3):
-        reporter.record_run(BenchmarkRun(
-            run_id=f"hist-{i}",
-            timestamp=time.time() - 3600 * (3 - i),
-            precision=0.98,
-            recall=0.96,
-            fallback_rate=0.02,
-            latency_ms=800.0
-        ))
+        reporter.record_run(
+            BenchmarkRun(
+                run_id=f"hist-{i}",
+                timestamp=time.time() - 3600 * (3 - i),
+                precision=0.98,
+                recall=0.96,
+                fallback_rate=0.02,
+                latency_ms=800.0,
+            )
+        )
 
     # Record a degraded run
     degraded = BenchmarkRun(
@@ -77,7 +79,7 @@ def test_regression_alert_trigger():
         precision=0.90,  # 8% drop (regression threshold is 5%)
         recall=0.95,
         fallback_rate=0.15,
-        latency_ms=1500.0
+        latency_ms=1500.0,
     )
 
     comparison = reporter.record_run(degraded)
@@ -89,12 +91,7 @@ def test_regression_alert_trigger():
 def test_dashboard_generation():
     reporter = BenchmarkReporter()
     run = BenchmarkRun(
-        run_id="dashboard-run",
-        timestamp=time.time(),
-        precision=0.92,
-        recall=0.88,
-        fallback_rate=0.08,
-        latency_ms=950.0
+        run_id="dashboard-run", timestamp=time.time(), precision=0.92, recall=0.88, fallback_rate=0.08, latency_ms=950.0
     )
     reporter.record_run(run)
 

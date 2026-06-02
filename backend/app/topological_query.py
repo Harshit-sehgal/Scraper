@@ -74,9 +74,7 @@ class TopologicalQuery:
 
         if cmd == "STABLE":
             threshold = float(parts[1]) if len(parts) > 1 else 0.2
-            stable_roles = [
-                r for r in self.ws.get_manifold_roles() if self.ws.metrics.get_schema_instability(r) <= threshold
-            ]
+            stable_roles = [r for r in self.ws.get_manifold_roles() if self.ws.metrics.get_schema_instability(r) <= threshold]
             return {"type": "roles", "data": stable_roles}
 
         if cmd == "EXCLUSIONS":

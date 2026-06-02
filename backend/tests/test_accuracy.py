@@ -7,14 +7,11 @@ from app.benchmark_accuracy import calculate_extraction_accuracy
 
 
 def test_perfect_extraction_accuracy():
-    golden = [
-        {"name": "British Airways", "price": "£245.50"},
-        {"name": "Air France", "price": "£199.00"}
-    ]
+    golden = [{"name": "British Airways", "price": "£245.50"}, {"name": "Air France", "price": "£199.00"}]
 
     extracted = [
         {"name": "British Airways", "price": "£245.50", "record_score": 0.9},
-        {"name": "Air France", "price": "£199.00", "record_score": 0.85}
+        {"name": "Air France", "price": "£199.00", "record_score": 0.85},
     ]
 
     res = calculate_extraction_accuracy(extracted, golden, domain="travel")
@@ -29,16 +26,10 @@ def test_perfect_extraction_accuracy():
 
 
 def test_partial_extraction_accuracy():
-    golden = [
-        {"name": "Acme Corp", "city": "London", "phone": "12345"},
-        {"name": "Globex", "city": "NY", "phone": "67890"}
-    ]
+    golden = [{"name": "Acme Corp", "city": "London", "phone": "12345"}, {"name": "Globex", "city": "NY", "phone": "67890"}]
 
     # Missing phone for Globex, extra field 'country' for Acme
-    extracted = [
-        {"name": "Acme Corp", "city": "London", "phone": "12345", "country": "UK"},
-        {"name": "Globex", "city": "NY"}
-    ]
+    extracted = [{"name": "Acme Corp", "city": "London", "phone": "12345", "country": "UK"}, {"name": "Globex", "city": "NY"}]
 
     res = calculate_extraction_accuracy(extracted, golden, domain="directory")
 

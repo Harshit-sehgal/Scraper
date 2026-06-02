@@ -44,6 +44,7 @@ def _get_audit_logger() -> logging.Logger:
     if not _logger.handlers:
         try:
             from app.config import settings
+
             configured_log_dir = settings.AUDIT_LOG_DIR
         except Exception:
             configured_log_dir = ""
@@ -294,6 +295,7 @@ def get_audit_log_path() -> Path:
     """Get the current audit log file path."""
     try:
         from app.config import settings
+
         configured_log_dir = settings.AUDIT_LOG_DIR
     except Exception:
         configured_log_dir = ""

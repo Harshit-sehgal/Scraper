@@ -29,9 +29,7 @@ def test_topological_dreaming():
     ws.clear()
 
     # Create some tension: high instability basin
-    ws.capture_pre_allocation_field([
-        create_token("X", 0, 1, 0, SemanticType.PRICE)
-    ], ["name", "price"])
+    ws.capture_pre_allocation_field([create_token("X", 0, 1, 0, SemanticType.PRICE)], ["name", "price"])
 
     # Set initial high instability manually for testing
     r = next(ws._topology.iterate_regions())
@@ -89,9 +87,7 @@ def test_induce_constraints():
     ws.clear()
 
     # 1. Create a persistent conflict basin
-    ws.capture_pre_allocation_field([
-        create_token("X", 0, 1, 0, SemanticType.PRICE)
-    ], ["role_a", "role_b"])
+    ws.capture_pre_allocation_field([create_token("X", 0, 1, 0, SemanticType.PRICE)], ["role_a", "role_b"])
 
     assert len(ws.field_regions) > 0
     r = next(ws._topology.iterate_regions())
@@ -143,14 +139,7 @@ def test_manifold_merge_sovereignty():
 
     # 1. Local state: empty
     # 2. Remote state: learned 'price' manifold
-    remote_data = {
-        "role_manifold": {
-            "price": [0.9] * 16
-        },
-        "learned_exclusions": {
-            "origin|destination": 0.8
-        }
-    }
+    remote_data = {"role_manifold": {"price": [0.9] * 16}, "learned_exclusions": {"origin|destination": 0.8}}
 
     # Call the merge logic from the experimental router
     import asyncio

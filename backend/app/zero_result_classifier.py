@@ -133,10 +133,7 @@ def classify_zero_result(
     html_length = len(html)
 
     # Stage 1: Empty response from the detector
-    if (
-        empty_check.get("is_empty")
-        and empty_check.get("confidence", 0.0) >= settings.EMPTY_RESPONSE_CONFIDENCE_THRESHOLD
-    ):
+    if empty_check.get("is_empty") and empty_check.get("confidence", 0.0) >= settings.EMPTY_RESPONSE_CONFIDENCE_THRESHOLD:
         return _build("empty_response", empty_check.get("confidence", 0.5))
 
     # Stage 2: Anti-bot block

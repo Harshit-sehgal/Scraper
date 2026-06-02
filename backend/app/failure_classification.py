@@ -680,8 +680,10 @@ def translate_exception_to_friendly_message(error: Exception | str) -> str:
         )
 
     if "anti-bot" in err_text or "captcha" in err_text or "cloudflare" in err_text or "ddos" in err_text:
-        return ("🛡️ [Anti-Bot Defense Block] An active challenge or firewall (e.g. Cloudflare, Captcha, Access Denied) "
-                "was encountered. To protect our node reputation, we bypassed standard fallbacks and triggered proxy rotation.")
+        return (
+            "🛡️ [Anti-Bot Defense Block] An active challenge or firewall (e.g. Cloudflare, Captcha, Access Denied) "
+            "was encountered. To protect our node reputation, we bypassed standard fallbacks and triggered proxy rotation."
+        )
 
     if "crash" in err_text or "closed" in err_text:
         return (
@@ -689,4 +691,6 @@ def translate_exception_to_friendly_message(error: Exception | str) -> str:
             "DataForge has recycled the process container and restarted the scrape cycle cleanly."
         )
 
-    return f"❌ [Extraction Impediment] A system error occurred: {error}. Classifying root cause and scheduled for dynamic recovery."  # noqa: E501
+    return (
+        f"❌ [Extraction Impediment] A system error occurred: {error}. Classifying root cause and scheduled for dynamic recovery."  # noqa: E501
+    )

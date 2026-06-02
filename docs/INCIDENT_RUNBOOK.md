@@ -1,7 +1,7 @@
 # Incident Runbook
 
-**Last updated:** 2026-06-01  
-**Owner:** DevOps/SRE Team  
+**Last updated:** 2026-06-01
+**Owner:** DevOps/SRE Team
 **Escalation:** [Engineering Lead] → [VP Engineering]
 
 This runbook documents responses to common production incidents.

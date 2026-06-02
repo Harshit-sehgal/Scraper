@@ -57,19 +57,23 @@ PIPELINE_HTML = """<!DOCTYPE html>
 </script>
 </body></html>"""
 
-API_JSON = json.dumps({
-    "results": [
-        {"carrier": "Test Airways", "fare": 299, "currency": "USD"},
-        {"carrier": "Demo Airlines", "fare": 450, "currency": "USD"},
-    ]
-})
+API_JSON = json.dumps(
+    {
+        "results": [
+            {"carrier": "Test Airways", "fare": 299, "currency": "USD"},
+            {"carrier": "Demo Airlines", "fare": 450, "currency": "USD"},
+        ]
+    }
+)
 
-PIPELINE_JSON = json.dumps({
-    "results": [
-        {"carrier": "Pipeline Airways", "fare": 999},
-        {"carrier": "Route Jet", "fare": 1200},
-    ]
-})
+PIPELINE_JSON = json.dumps(
+    {
+        "results": [
+            {"carrier": "Pipeline Airways", "fare": 999},
+            {"carrier": "Route Jet", "fare": 1200},
+        ]
+    }
+)
 
 
 class _BrowserTestHandler(http.server.BaseHTTPRequestHandler):
@@ -118,6 +122,7 @@ def browser_server():
 async def test_playwright_loads_session_page(browser_server):
     """Playwright loads the session-bound search page successfully."""
     from playwright.async_api import async_playwright
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -133,6 +138,7 @@ async def test_playwright_loads_session_page(browser_server):
 async def test_playwright_captures_cookies(browser_server):
     """Playwright captures cookies set by the server."""
     from playwright.async_api import async_playwright
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -150,6 +156,7 @@ async def test_playwright_captures_cookies(browser_server):
 async def test_playwright_reads_local_storage(browser_server):
     """Playwright verifies localStorage is written by the page JS."""
     from playwright.async_api import async_playwright
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -166,6 +173,7 @@ async def test_playwright_reads_local_storage(browser_server):
 async def test_playwright_reads_session_storage(browser_server):
     """Playwright verifies sessionStorage is written by the page JS."""
     from playwright.async_api import async_playwright
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -182,6 +190,7 @@ async def test_playwright_reads_session_storage(browser_server):
 async def test_playwright_captures_network_response(browser_server):
     """Playwright captures the /api/results network JSON response."""
     from playwright.async_api import async_playwright
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -202,6 +211,7 @@ async def test_playwright_captures_network_response(browser_server):
         )
         await page.goto(f"{browser_server}/api/results", wait_until="domcontentloaded")
         import asyncio as _asyncio
+
         await _asyncio.sleep(0.5)
         await browser.close()
 
@@ -225,6 +235,7 @@ async def test_playwright_captures_network_response(browser_server):
 async def test_playwright_extraction_from_rendered_dom(browser_server):
     """Extraction works on Playwright-rendered HTML."""
     from playwright.async_api import async_playwright
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -236,6 +247,7 @@ async def test_playwright_extraction_from_rendered_dom(browser_server):
         await browser.close()
 
     from app.selector_engine import apply_selectors
+
     schema = [
         SchemaField(name="airline", field_type=FieldType.STRING),
         SchemaField(name="price", field_type=FieldType.CURRENCY),
@@ -255,6 +267,7 @@ async def test_playwright_extraction_from_rendered_dom(browser_server):
 async def test_playwright_secrets_not_in_extraction(browser_server):
     """Browser storage values do NOT leak into extraction output."""
     from playwright.async_api import async_playwright
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -266,6 +279,7 @@ async def test_playwright_secrets_not_in_extraction(browser_server):
         await browser.close()
 
     from app.selector_engine import apply_selectors
+
     schema = [SchemaField(name="airline", field_type=FieldType.STRING)]
     selectors = {"item_container": "div.card", "fields": {"airline": ".airline"}}
     result = apply_selectors(html, selectors, schema)
@@ -282,12 +296,9 @@ async def test_playwright_secrets_not_in_extraction(browser_server):
 async def test_playwright_url_detected_as_session_bound():
     """Long opaque token in /search/id/ path is detected as session-bound."""
     from app.session_url_detector import detect_session_params
-    result = detect_session_params(
-        "https://example.com/search/id/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
-    )
-    assert result.get("is_session_bound") is True, (
-        f"Expected session-bound, got: {result}"
-    )
+
+    result = detect_session_params("https://example.com/search/id/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6")
+    assert result.get("is_session_bound") is True, f"Expected session-bound, got: {result}"
 
 
 @pytest.mark.asyncio
@@ -340,11 +351,13 @@ async def test_playwright_pipeline_integration(browser_server, monkeypatch):
     """True pipeline E2E integration: weak DOM + naturally fetched strong JSON -> chooses network."""
     from app import html_utils, url_safety
     from app.browser_pool import BrowserPool
+
     monkeypatch.setattr(url_safety, "validate_public_http_url", lambda url: None)
     monkeypatch.setattr(html_utils, "_validate_url_safe", lambda url: None)
     pool = BrowserPool()
     monkeypatch.setattr(html_utils, "get_browser_pool", lambda: pool)
     from app.config import settings
+
     monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "127.0.0.1,localhost")
 
     from app.scraper import scrape_url_attempt

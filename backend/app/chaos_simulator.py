@@ -33,6 +33,7 @@ from app.chaos_scenarios import FailureMode, FailureScenarios
 def __getattr__(name):
     import app.chaos_metrics as _cm
     import app.chaos_scenarios as _cs
+
     _re_exports = {
         "SeverityLevel": _cs,
         "FailureScenario": _cs,
@@ -68,9 +69,7 @@ class ChaosSimulator:
         self.recovery_metrics: Dict[str, Dict[str, float]] = {}
         self.logger = logging.getLogger("chaos_simulator")
 
-    async def inject_failure(
-        self, failure_mode: FailureMode, duration: float = 10.0, intensity: float = 1.0
-    ) -> Dict[str, Any]:
+    async def inject_failure(self, failure_mode: FailureMode, duration: float = 10.0, intensity: float = 1.0) -> Dict[str, Any]:
         """
         Inject a failure into the system
 
@@ -128,6 +127,7 @@ class ChaosSimulator:
         """Check if system is healthy after failure"""
         try:
             from app.domain_health_alerts import get_domain_health_monitor
+
             monitor = get_domain_health_monitor()
             if self.system and hasattr(self.system, "current_url"):
                 url = self.system.current_url

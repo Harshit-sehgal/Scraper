@@ -60,8 +60,7 @@ def _get_database_url() -> str:
     if env == "development":
         return "postgresql://dataforge:dataforge@localhost:5432/dataforge"
     raise RuntimeError(
-        "DATAFORGE_DATABASE_URL is required in non-development environments. "
-        "Set it to a valid Postgres connection string."
+        "DATAFORGE_DATABASE_URL is required in non-development environments. " "Set it to a valid Postgres connection string."
     )
 
 
@@ -336,9 +335,7 @@ def _job_to_row(job: Job) -> dict:
         "topic": job.topic or "",
         "intent": job.intent or "",
         "urls": json.dumps(job.urls or []),
-        "schema_fields": json.dumps(
-            [f.model_dump() if hasattr(f, "model_dump") else f for f in (job.schema_fields or [])]
-        ),
+        "schema_fields": json.dumps([f.model_dump() if hasattr(f, "model_dump") else f for f in (job.schema_fields or [])]),
         "filters": (
             json.dumps([f.model_dump() if hasattr(f, "model_dump") else f for f in (job.filters or [])])
             if hasattr(job, "filters")
@@ -355,9 +352,7 @@ def _job_to_row(job: Job) -> dict:
         "analysis": job.analysis if job.analysis is not None else "",
         "discovered_urls": json.dumps(job.discovered_urls if hasattr(job, "discovered_urls") else []),
         "selectors_map": json.dumps(job.selectors_map if hasattr(job, "selectors_map") else {}),
-        "search_params": json.dumps(
-            job.search_params if hasattr(job, "search_params") and job.search_params is not None else {}
-        ),
+        "search_params": json.dumps(job.search_params if hasattr(job, "search_params") and job.search_params is not None else {}),
         "max_pages": job.max_pages if hasattr(job, "max_pages") else 0,
         "progress_current": job.progress_current or 0,
         "progress_total": job.progress_total or 0,
@@ -367,9 +362,7 @@ def _job_to_row(job: Job) -> dict:
         "completed_at": job.completed_at if job.completed_at is not None else "",
         "min_record_score": job.min_record_score if job.min_record_score is not None else 0.35,
         "acquisition_mode": (
-            job.acquisition_mode.value
-            if hasattr(job.acquisition_mode, "value")
-            else str(job.acquisition_mode or "standard")
+            job.acquisition_mode.value if hasattr(job.acquisition_mode, "value") else str(job.acquisition_mode or "standard")
         ),
         "location": job.location or "",
         "preferred_domain": job.preferred_domain or "",
@@ -717,7 +710,6 @@ class PostgresJobRepository(JobRepository):
                 conn,
                 "SELECT * FROM jobs WHERE status = ANY(%s) AND deleted_at IS NULL"
                 + (" AND completed_at < %s" if older_than else ""),  # nosec B608 — concatenation uses controlled boolean, not user input
-
                 (list(terminal_statuses), older_than) if older_than else (list(terminal_statuses),),
             )
             for row in rows:

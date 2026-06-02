@@ -253,9 +253,7 @@ def _group_by_spatial_proximity(blocks: list[VisibleTextBlock], boxes: list[dict
 
     has_repeat = _detect_repeated_patterns(cards)
     sig = _build_cluster_signature(cards) if has_repeat else ""
-    return CardGroupingResult(
-        cards=cards, card_count=len(cards), has_repeated_structure=has_repeat, cluster_signature=sig
-    )
+    return CardGroupingResult(cards=cards, card_count=len(cards), has_repeated_structure=has_repeat, cluster_signature=sig)
 
 
 def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResult:
@@ -521,11 +519,7 @@ def _extract_record_from_card(
         enumerate(schema_fields),
         key=lambda item: (
             _TYPED_PRIORITY.get(item[1].field_type if hasattr(item[1], "field_type") else None, 3),
-            (
-                0
-                if not any(w in (item[1].name or "").lower() for w in ("return", "arrival", "arrive", "dest", "to_"))
-                else 1
-            ),
+            (0 if not any(w in (item[1].name or "").lower() for w in ("return", "arrival", "arrive", "dest", "to_")) else 1),
         ),
     )
 
@@ -796,9 +790,7 @@ def _extract_card_field_stateful(
                 continue
             if ptype:
                 continue
-            if len(text) < 4 or any(
-                nav in text.lower() for nav in ["click", "sign", "login", "privacy", "terms", "copyright"]
-            ):
+            if len(text) < 4 or any(nav in text.lower() for nav in ["click", "sign", "login", "privacy", "terms", "copyright"]):
                 continue
             if re.match(r"^[A-Z][a-zA-Z\s\'-]+$", text) and len(text) <= 100:
                 used_snippet_indices.add(i)

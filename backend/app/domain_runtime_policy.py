@@ -215,9 +215,7 @@ class DomainRuntimePolicy:
         if entry.cooldown_until > time.monotonic():
             remaining = int(self.remaining_cooldown(url))
             if entry.recent_antibot_blocks > 0:
-                return (
-                    f"use_authorized_access_or_retry_later (domain in cooldown for {remaining}s after anti-bot blocks)"
-                )
+                return f"use_authorized_access_or_retry_later (domain in cooldown for {remaining}s after anti-bot blocks)"
             if entry.recent_rate_limits > 0:
                 return f"retry_later (domain rate-limited, cooldown {remaining}s)"
             return f"retry_later (domain in cooldown for {remaining}s)"

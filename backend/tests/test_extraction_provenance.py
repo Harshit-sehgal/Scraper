@@ -25,6 +25,7 @@ from app.extraction_provenance import (
 # FieldProvenance Tests
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestFieldProvenance:
     def test_default_construction(self):
         fp = FieldProvenance()
@@ -88,6 +89,7 @@ class TestFieldProvenance:
 # ExtractionProvenance Tests
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestExtractionProvenance:
     def test_default_construction(self):
         ep = ExtractionProvenance()
@@ -139,6 +141,7 @@ class TestExtractionProvenance:
 # ═══════════════════════════════════════════════════════════════════════
 # ProvenanceBuilder Tests
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestProvenanceBuilder:
     def test_build_empty(self):
@@ -215,13 +218,19 @@ class TestProvenanceBuilder:
     def test_add_field_provenance_updates_existing(self):
         builder = ProvenanceBuilder("https://example.com", "example.com")
         builder.add_field_provenance(
-            record_idx=0, field_name="name", value="Acme Corp",
-            method=ExtractionMethod.REGEX, confidence=0.5,
+            record_idx=0,
+            field_name="name",
+            value="Acme Corp",
+            method=ExtractionMethod.REGEX,
+            confidence=0.5,
         )
         # Update with better method
         builder.add_field_provenance(
-            record_idx=0, field_name="name", value="Acme Incorporated",
-            method=ExtractionMethod.DISCOVERY, confidence=0.95,
+            record_idx=0,
+            field_name="name",
+            value="Acme Incorporated",
+            method=ExtractionMethod.DISCOVERY,
+            confidence=0.95,
         )
         ep = builder.build()
         fp = ep.fields["record_0.name"]
@@ -247,6 +256,7 @@ class TestProvenanceBuilder:
 # ═══════════════════════════════════════════════════════════════════════
 # enrich_records_with_provenance Tests
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestEnrichRecordsWithProvenance:
     def test_enriches_records_with_provenance_metadata(self):
@@ -308,6 +318,7 @@ class TestEnrichRecordsWithProvenance:
 # ═══════════════════════════════════════════════════════════════════════
 # summarize_provenance Tests
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestSummarizeProvenance:
     def test_summarize_empty(self):

@@ -18,14 +18,17 @@ def test_pollinations_api():
             "https://text.pollinations.ai/openai",
             json={
                 "messages": [
-                    {"role": "system", "content": "You are a precise data extraction assistant. Output ONLY valid JSON array and nothing else."},  # noqa: E501
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a precise data extraction assistant. Output ONLY valid JSON array and nothing else.",
+                    },  # noqa: E501
+                    {"role": "user", "content": prompt},
                 ],
                 "model": "openai",
                 "temperature": 0.1,
-                "response_format": {"type": "json_object"}
+                "response_format": {"type": "json_object"},
             },
-            timeout=30
+            timeout=30,
         )
         print("Status code:", response.status_code)
 
@@ -35,7 +38,8 @@ def test_pollinations_api():
 
         # simple parse
         import re
-        match = re.search(r'\[.*\]', content, re.DOTALL)
+
+        match = re.search(r"\[.*\]", content, re.DOTALL)
         if match:
             parsed = json.loads(match.group(0))
         else:
@@ -44,8 +48,10 @@ def test_pollinations_api():
 
     except Exception as e:
         import logging
+
         logging.exception(e)
         print("Error:", e)
+
 
 if __name__ == "__main__":
     test_pollinations_api()

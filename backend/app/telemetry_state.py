@@ -62,9 +62,7 @@ class TelemetryStateAdapter:
         total_fetch_ms = sum(r.get("fetch_ms", 0.0) for r in recent)
         fallbacks = sum(1 for r in recent if r.get("fallback_triggered", False))
 
-        confidence_scores = [
-            r.get("confidence_map", {}).get("overall_avg", 0.0) for r in recent if r.get("confidence_map")
-        ]
+        confidence_scores = [r.get("confidence_map", {}).get("overall_avg", 0.0) for r in recent if r.get("confidence_map")]
         avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
 
         return {

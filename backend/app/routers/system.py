@@ -22,7 +22,10 @@ from pydantic import BaseModel, Field
 
 def get_job_repository():
     import app.main
+
     return app.main.get_job_repository()
+
+
 from app.globals import CONFIG, jobs_store, recycle_bin_store
 from app.selector_discovery import analyze_url_for_fields
 from app.url_safety import validate_public_http_url
@@ -30,23 +33,25 @@ from app.url_safety import validate_public_http_url
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["system"])
 
+
 class AcquisitionMode(str, Enum):
     STANDARD = "standard"
     AGGRESSIVE = "aggressive"
     DEEP_SCAN = "deep_scan"
 
+
 class URLPreviewRequest(BaseModel):
     url: str = Field(..., description="The URL to analyze for data extraction")
     search_params: dict[str, str] | None = Field(
-        default=None,
-        description="Optional search parameters to submit to the site's search form"
+        default=None, description="Optional search parameters to submit to the site's search form"
     )
     acquisition_mode: AcquisitionMode = Field(
-        default=AcquisitionMode.STANDARD,
-        description="Acquisition mode: standard, aggressive, or deep_scan"
+        default=AcquisitionMode.STANDARD, description="Acquisition mode: standard, aggressive, or deep_scan"
     )
 
+
 # ─── System / Storage Status ───────────────────────────────────────────
+
 
 @router.get("/api/system/storage/status")
 async def storage_status():
@@ -64,7 +69,9 @@ async def storage_status():
             "recycle_bin_count": health.get("recycle_bin_count", 0),
         }
     from app.job_store import get_storage_status
+
     return get_storage_status()
+
 
 @router.get("/api/system/status")
 async def system_status():
@@ -106,7 +113,9 @@ async def system_status():
         response["state_file"] = str(get_state_file_path())
     return response
 
+
 # ─── Diagnostics ZIP Export ─────────────────────────────────────────────
+
 
 @router.get("/api/system/diagnostics/export")
 async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN]))):
@@ -115,9 +124,24 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
     email_regex = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
     phone_regex = re.compile(r"\+?\b\d[\d\s()\-]{8,14}\d\b")
     sensitive_keys = {
-        "authorization", "auth", "api_key", "key", "password", "token", "secret",
-        "signature", "alert_webhook_url", "credential", "session", "cookie", "bearer",
-        "private", "client_secret", "api_secret", "access_key", "secret_key"
+        "authorization",
+        "auth",
+        "api_key",
+        "key",
+        "password",
+        "token",
+        "secret",
+        "signature",
+        "alert_webhook_url",
+        "credential",
+        "session",
+        "cookie",
+        "bearer",
+        "private",
+        "client_secret",
+        "api_secret",
+        "access_key",
+        "secret_key",
     }
 
     def sanitize_value(val, _depth=0, _max_depth=50):
@@ -184,6 +208,7 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
     selector_decay_snapshots = {}
     try:
         from app.selector_memory import get_selector_memory
+
         memory = get_selector_memory()
         if memory and hasattr(memory, "_memory"):
             for domain, entry in memory._memory.items():
@@ -210,6 +235,7 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
     telemetry_snapshots = []
     try:
         from app.semantic_world_state import get_world_state
+
         ws = get_world_state()
         if hasattr(ws, "_observability") and ws._observability:
             telemetry_snapshots = sanitize_value(ws._observability.telemetry)
@@ -229,12 +255,12 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
     headers = {"Content-Disposition": "attachment; filename=dataforge_diagnostics.zip"}
     return Response(zip_buffer.getvalue(), media_type="application/zip", headers=headers)
 
+
 # ─── URL Analyzer Endpoint ──────────────────────────────────────────────
 
+
 @router.post("/api/url/analyze")
-async def analyze_url(
-    req: URLPreviewRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
-):
+async def analyze_url(req: URLPreviewRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Analyze a URL and auto-detect what data fields can be extracted."""
     try:
         validate_public_http_url(req.url)
@@ -286,9 +312,11 @@ async def analyze_url(
 
     return result
 
+
 # ─── Prometheus /metrics ────────────────────────────────────────────────
 
 METRICS_COLLECTION_ERRORS = 0
+
 
 def _prometheus_label_text(labels: dict[str, str]) -> str:
     if not labels:
@@ -296,8 +324,10 @@ def _prometheus_label_text(labels: dict[str, str]) -> str:
     escaped = {key: str(value).replace("\\", "\\\\").replace('"', '\\"') for key, value in labels.items()}
     return "{" + ",".join(f'{key}="{value}"' for key, value in escaped.items()) + "}"
 
+
 def _basic_metric_line(name: str, value: float | int, labels: dict[str, str] | None = None) -> str:
     return f"{name}{_prometheus_label_text(labels or {})} {value}"
+
 
 def _render_basic_metrics_text() -> str:
     """Render a minimal Prometheus exposition if prometheus_client is unavailable."""
@@ -335,6 +365,7 @@ def _render_basic_metrics_text() -> str:
     queue_ok = 1
     try:
         from app.worker_queue import get_worker_queue
+
         q_status = get_worker_queue().get_status()
         lines.append(_basic_metric_line("dataforge_queue_pending", q_status.get("pending", 0)))
         lines.append(_basic_metric_line("dataforge_queue_running", q_status.get("running", 0)))
@@ -355,12 +386,8 @@ def _render_basic_metrics_text() -> str:
 
         health_latencies = get_health_check_latencies()
         if health_latencies:
-            lines.append(
-                _basic_metric_line("dataforge_backend_health_check_duration_seconds_count", len(health_latencies))
-            )
-            lines.append(
-                _basic_metric_line("dataforge_backend_health_check_duration_seconds_sum", sum(health_latencies))
-            )
+            lines.append(_basic_metric_line("dataforge_backend_health_check_duration_seconds_count", len(health_latencies)))
+            lines.append(_basic_metric_line("dataforge_backend_health_check_duration_seconds_sum", sum(health_latencies)))
 
     lines.append(_basic_metric_line("dataforge_metrics_collection_error_total", METRICS_COLLECTION_ERRORS))
 
@@ -374,6 +401,7 @@ def _render_basic_metrics_text() -> str:
     lines.append(_basic_metric_line("dataforge_requests_total", get_requests_total()))
 
     return "\n".join(lines) + "\n"
+
 
 @router.get("/metrics")
 async def metrics(request: Request):
@@ -449,6 +477,7 @@ async def metrics(request: Request):
     queue_ok = 1
     try:
         from app.worker_queue import get_worker_queue
+
         q = get_worker_queue()
         q_status = q.get_status()
         queue_pending = Gauge("dataforge_queue_pending", "Pending tasks in worker queue", registry=registry)
@@ -469,6 +498,7 @@ async def metrics(request: Request):
 
     # Worker failure counters
     from app.metrics_collector import get_worker_failures
+
     failures = get_worker_failures()
     if failures:
         failure_gauge = Gauge(
@@ -479,6 +509,7 @@ async def metrics(request: Request):
 
     # Request duration histogram
     from app.metrics_collector import get_health_check_latencies, get_request_latencies
+
     if settings.METRICS_ENABLE_HISTOGRAMS:
         req_latencies = get_request_latencies()
         if req_latencies:
@@ -514,6 +545,7 @@ async def metrics(request: Request):
 
     # Cumulative error counts
     from app.metrics_collector import get_errors, get_llm_calls, get_requests_total
+
     errors_dict = get_errors()
     errors_gauge = Gauge("dataforge_errors_total", "Cumulative error count by type", ["type"], registry=registry)
     for err_type, count in errors_dict.items():

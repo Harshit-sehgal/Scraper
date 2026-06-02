@@ -112,17 +112,22 @@ class DatabaseSlidingWindowCounter:
         if self._initialized:
             return
         from app.config import settings
+
         backend = settings.STORAGE_BACKEND
         if backend == "postgres":
             try:
                 from app.postgres_repository import _conn, _execute
+
                 with _conn() as conn:
-                    _execute(conn, """
+                    _execute(
+                        conn,
+                        """
                         CREATE TABLE IF NOT EXISTS rate_limits (
                             key VARCHAR(255) NOT NULL,
                             timestamp DOUBLE PRECISION NOT NULL
                         )
-                    """)
+                    """,
+                    )
                     _execute(conn, "CREATE INDEX IF NOT EXISTS idx_rate_limits_key_ts ON rate_limits(key, timestamp)")
                 self._initialized = True
             except Exception as e:
@@ -130,6 +135,7 @@ class DatabaseSlidingWindowCounter:
         else:
             try:
                 from app.job_store import _DB_LOCK, _get_connection
+
                 with _DB_LOCK:
                     conn = _get_connection()
                     try:
@@ -150,6 +156,7 @@ class DatabaseSlidingWindowCounter:
     def allow(self) -> bool:
         self._ensure_table()
         from app.config import settings
+
         backend = settings.STORAGE_BACKEND
         now = time.time()
         cutoff = now - self.window_seconds
@@ -157,6 +164,7 @@ class DatabaseSlidingWindowCounter:
         if backend == "postgres":
             try:
                 from app.postgres_repository import _conn, _execute, _fetch_one
+
                 with _conn() as conn:
                     # Prune old entries
                     _execute(conn, "DELETE FROM rate_limits WHERE key = %s AND timestamp <= %s", (self.key, cutoff))
@@ -174,6 +182,7 @@ class DatabaseSlidingWindowCounter:
         else:
             try:
                 from app.job_store import _DB_LOCK, _get_connection
+
                 with _DB_LOCK:
                     conn = _get_connection()
                     try:
@@ -197,6 +206,7 @@ class DatabaseSlidingWindowCounter:
     def remaining(self) -> int:
         self._ensure_table()
         from app.config import settings
+
         backend = settings.STORAGE_BACKEND
         now = time.time()
         cutoff = now - self.window_seconds
@@ -204,6 +214,7 @@ class DatabaseSlidingWindowCounter:
         if backend == "postgres":
             try:
                 from app.postgres_repository import _conn, _execute, _fetch_one
+
                 with _conn() as conn:
                     _execute(conn, "DELETE FROM rate_limits WHERE key = %s AND timestamp <= %s", (self.key, cutoff))
                     row = _fetch_one(conn, "SELECT COUNT(*) AS count FROM rate_limits WHERE key = %s", (self.key,))
@@ -214,6 +225,7 @@ class DatabaseSlidingWindowCounter:
         else:
             try:
                 from app.job_store import _DB_LOCK, _get_connection
+
                 with _DB_LOCK:
                     conn = _get_connection()
                     try:
@@ -229,12 +241,14 @@ class DatabaseSlidingWindowCounter:
     def reset_in(self) -> float:
         self._ensure_table()
         from app.config import settings
+
         backend = settings.STORAGE_BACKEND
         now = time.time()
 
         if backend == "postgres":
             try:
                 from app.postgres_repository import _conn, _fetch_one
+
                 with _conn() as conn:
                     row = _fetch_one(conn, "SELECT MIN(timestamp) AS min_ts FROM rate_limits WHERE key = %s", (self.key,))
                     min_ts = row["min_ts"] if row and row.get("min_ts") is not None else None
@@ -246,10 +260,13 @@ class DatabaseSlidingWindowCounter:
         else:
             try:
                 from app.job_store import _DB_LOCK, _get_connection
+
                 with _DB_LOCK:
                     conn = _get_connection()
                     try:
-                        row = conn.execute("SELECT MIN(timestamp) AS min_ts FROM rate_limits WHERE key = ?", (self.key,)).fetchone()
+                        row = conn.execute(
+                            "SELECT MIN(timestamp) AS min_ts FROM rate_limits WHERE key = ?", (self.key,)
+                        ).fetchone()
                         min_ts = row["min_ts"] if row and row[0] is not None else None
                         if min_ts is None:
                             return 0.0
@@ -448,6 +465,7 @@ class RateLimiterMiddleware:
         # Get or create counter
         if key not in self._counters:
             from app.config import settings
+
             if settings.RATE_LIMIT_DB_BACKED:
                 self._counters[key] = DatabaseSlidingWindowCounter(max_req, window_sec, key)
             else:

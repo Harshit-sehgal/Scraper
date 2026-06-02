@@ -80,7 +80,7 @@ class AcquisitionTelemetryCollector:
         )
         self._history.append(event)
         if len(self._history) > self._max_history:
-            self._history = self._history[-self._max_history:]
+            self._history = self._history[-self._max_history :]
 
         # Update counters
         self._state_counts[event.state] += 1

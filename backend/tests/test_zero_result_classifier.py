@@ -237,23 +237,30 @@ class TestConfidenceRange:
 class TestUserMessages:
     def test_all_failure_classes_have_messages(self):
         from app.zero_result_classifier import _MESSAGES
+
         for fc in VALID_FAILURE_CLASSES:
             msg = _MESSAGES[fc]
             assert isinstance(msg["user_message"], str) and len(msg["user_message"]) > 0
             assert isinstance(msg["operator_hint"], str) and len(msg["operator_hint"]) > 0
             assert isinstance(msg["recommended_action"], str) and len(msg["recommended_action"]) > 0
 
-    @pytest.mark.parametrize("kwargs,expected_class", [
-        ({"anti_bot_score": 0.90}, "anti_bot_block"),
-        ({"empty_check": {"is_empty": True, "confidence": 0.90}}, "empty_response"),
-        ({"visible_text": "Please login with password", "html": "x" * 200}, "auth_required"),
-        ({"session_detection": {"is_session_bound": True}, "detected_forms": [{"action": "/x"}]}, "session_bound_url"),
-        ({"session_detection": {"is_session_bound": True}, "detected_forms": []}, "search_replay_required"),
-        ({"html": "x" * 2000, "detected_containers": 0, "raw_candidate_count": 5}, "js_render_required"),
-        ({"html": "x" * 200, "detected_containers": 5, "raw_candidate_count": 0}, "selector_failure"),
-        ({"schema_fields": ["company_name"], "html": "x" * 500, "visible_text": "x"}, "schema_mismatch"),
-        ({"html": "x" * 500, "visible_text": "some text", "detected_containers": 1, "raw_candidate_count": 1}, "genuinely_empty"),
-    ])
+    @pytest.mark.parametrize(
+        "kwargs,expected_class",
+        [
+            ({"anti_bot_score": 0.90}, "anti_bot_block"),
+            ({"empty_check": {"is_empty": True, "confidence": 0.90}}, "empty_response"),
+            ({"visible_text": "Please login with password", "html": "x" * 200}, "auth_required"),
+            ({"session_detection": {"is_session_bound": True}, "detected_forms": [{"action": "/x"}]}, "session_bound_url"),
+            ({"session_detection": {"is_session_bound": True}, "detected_forms": []}, "search_replay_required"),
+            ({"html": "x" * 2000, "detected_containers": 0, "raw_candidate_count": 5}, "js_render_required"),
+            ({"html": "x" * 200, "detected_containers": 5, "raw_candidate_count": 0}, "selector_failure"),
+            ({"schema_fields": ["company_name"], "html": "x" * 500, "visible_text": "x"}, "schema_mismatch"),
+            (
+                {"html": "x" * 500, "visible_text": "some text", "detected_containers": 1, "raw_candidate_count": 1},
+                "genuinely_empty",
+            ),
+        ],
+    )
     def test_user_messages_are_non_empty(self, kwargs, expected_class):
         result = classify_zero_result(**kwargs)
         assert result.failure_class == expected_class

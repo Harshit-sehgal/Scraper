@@ -71,8 +71,9 @@ def pytest_configure(config):
                 password=password,
                 dbname=dbname,
                 host="127.0.0.1",
-                port=port
+                port=port,
             )
+
         PostgresContainer.get_connection_url = patched_get_connection_url
     except Exception:
         pass
@@ -80,12 +81,8 @@ def pytest_configure(config):
 
 def pytest_collection_modifyitems(config, items):
     skip_postgres = pytest.mark.skip(reason="need --run-postgres to run (Postgres integration tests)")
-    skip_golden = pytest.mark.skip(
-        reason="need --run-golden-dataset to run (network-dependent golden dataset validation)"
-    )
-    skip_browser = pytest.mark.skip(
-        reason="need --run-browser to run (requires Playwright and local socket binding)"
-    )
+    skip_golden = pytest.mark.skip(reason="need --run-golden-dataset to run (network-dependent golden dataset validation)")
+    skip_browser = pytest.mark.skip(reason="need --run-browser to run (requires Playwright and local socket binding)")
     for item in items:
         if "postgres" in item.keywords and not config.getoption("--run-postgres", default=False):
             item.add_marker(skip_postgres)
@@ -99,6 +96,7 @@ def pytest_sessionfinish(session, exitstatus):
     """Drain background state writes so pytest exits cleanly after direct module tests."""
     try:
         from app.state_store import flush_state_writes
+
         flush_state_writes()
     except Exception:
         pass
@@ -106,6 +104,7 @@ def pytest_sessionfinish(session, exitstatus):
     # Clean up test-generated sqlite files, logs, and locks to avoid workspace pollution
     try:
         from pathlib import Path
+
         root = Path(__file__).resolve().parents[2]
         backend_data = root / "backend" / "data"
         global_data = root / "data"
@@ -115,7 +114,11 @@ def pytest_sessionfinish(session, exitstatus):
         for p in [backend_data, global_data, logs_dir]:
             if p.exists():
                 for item in list(p.glob("**/*")):
-                    if item.is_file() and item.name != ".gitkeep" and item.suffix in [".db", ".db-journal", ".db-wal", ".db-shm", ".lock", ".log", ".json"]:
+                    if (
+                        item.is_file()
+                        and item.name != ".gitkeep"
+                        and item.suffix in [".db", ".db-journal", ".db-wal", ".db-shm", ".lock", ".log", ".json"]
+                    ):
                         # Ensure we do not delete golden dataset files
                         if "golden_dataset" not in str(item.resolve()):
                             try:
@@ -147,6 +150,7 @@ try:
     from app import main as main_mod  # noqa: E402
 except ImportError as e:
     import warnings
+
     warnings.warn(f"Could not import app.main (tests requiring the client fixture will fail): {e}", stacklevel=2)
     main_mod = None  # type: ignore[assignment]
 
@@ -155,12 +159,14 @@ except ImportError as e:
 def reset_semantic_world_state():
     try:
         from app.semantic_world_state import reset_world_state
+
         reset_world_state()
     except ImportError:
         pass
     yield
     try:
         from app.semantic_world_state import reset_world_state
+
         reset_world_state()
     except ImportError:
         pass
