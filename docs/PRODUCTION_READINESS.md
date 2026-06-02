@@ -14,7 +14,7 @@ This project is not public production-ready. Historical local Compose smoke evid
 | Compose startup | Validated locally | Backend, worker, Postgres, Nginx, Prometheus, and Grafana started and became healthy locally | Repeat in target environment |
 | Backend readiness | Validated locally | `/health` 200 and `/ready` 200 through Nginx on `127.0.0.1:18080` | Repeat behind target ingress |
 | Worker readiness | Validated locally | Worker container healthy; one deterministic smoke-page job completed with 4 records | Add multi-job and failure tests |
-| Postgres connectivity | Documented historically | Optional Postgres suite `1885 passed, 28 skipped` *(archived from prior refresh — not re-run in this session)*; Compose storage status OK; basic dump/restore found 7 public tables | Re-run postgres optional tests and add failover checks |
+| Postgres connectivity | Documented historically | Optional Postgres suite `1907 passed, 28 skipped` *(archived from prior refresh; not re-run in this session)*; Compose storage status OK; basic dump/restore found 7 public tables | Re-run postgres optional tests and add failover checks |
 | Queue behavior | Validated locally | Postgres queue tests passed; Compose worker smoke completed one job | Add concurrency and retry validation in Compose |
 | Nginx routing | Validated locally | `/docs`, `/redoc`, `/openapi.json`, and `/metrics` returned 404; `/app/`, `/health`, and `/ready` returned 200 | Repeat behind target ingress |
 | TLS | In progress | Nginx supports Let's Encrypt renewal; verify_production_deployment.py checks TLS blocks | Put behind real TLS termination |

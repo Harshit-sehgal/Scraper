@@ -19,7 +19,7 @@ Classification values: Core, Stable supporting, Experimental, Test-only, Depreca
 | `app.extractors/*` | Core | Extraction helpers | Imported by orchestrator/tests | Safe suite | Varies by site structure | Keep |
 | `app.schema_*`, `app.models` | Core | Job/schema/data models | Broad imports | Safe suite | Contract changes are high-impact | Keep |
 | `app.job_store`, `app.storage_interface` | Core | SQLite storage and backend factory | Used by app/tests | Safe suite | Local state artifacts if paths misconfigured | Keep |
-| `app.postgres_repository` | Core | Postgres storage backend | Optional tests | Postgres `1885 passed` and Compose smoke/basic dump-restore | Production migrations/failover unvalidated | Keep |
+| `app.postgres_repository` | Core | Postgres storage backend | Optional tests | Postgres `1907 passed, 28 skipped` (freshly run) and Compose smoke/basic dump-restore | Production migrations/failover unvalidated | Keep |
 | `app.worker_queue`, `app.worker_queue_postgres` | Core | Local/Postgres queue behavior | Worker scripts/tests | Safe, Postgres, and Compose smoke | Multi-job/failure behavior in target deployment unvalidated | Keep |
 | `app.utils.rbac` | Core supporting | API key roles and dependencies | Used by routes/main | Route-auth tests | Dev mode permissive without keys | Keep |
 | `app.url_safety` | Core supporting | SSRF-oriented URL checks | Used by scraper/API | Security tests | DNS/egress controls need deployment support | Keep |
