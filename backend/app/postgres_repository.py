@@ -578,7 +578,7 @@ class PostgresJobRepository(JobRepository):
                 update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in row.keys() if k != "id")
                 _execute(
                     conn,
-                    f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",
+                    f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608 — cols/update_cols are model field names, not user input
                     list(row.values()),
                 )
 
@@ -601,7 +601,7 @@ class PostgresJobRepository(JobRepository):
                 ph = ", ".join("%s" for _ in row)
                 _execute(
                     conn,
-                    f"INSERT INTO recycle_bin ({cols}) VALUES ({ph}) ON CONFLICT (id) DO NOTHING",
+                    f"INSERT INTO recycle_bin ({cols}) VALUES ({ph}) ON CONFLICT (id) DO NOTHING",  # nosec B608 — cols are model field names, not user input
                     list(row.values()),
                 )
                 # Also soft-delete the job from the jobs table so it no
@@ -631,7 +631,7 @@ class PostgresJobRepository(JobRepository):
             update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in row.keys() if k != "id")
             _execute(
                 conn,
-                f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",
+                f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608 — cols/update_cols are model field names, not user input
                 list(row.values()),
             )
 
@@ -671,7 +671,7 @@ class PostgresJobRepository(JobRepository):
             params = [row[k] for k in cols_to_copy] + [now]
             _execute(
                 conn,
-                f"INSERT INTO recycle_bin ({insert_cols}, deleted_at) VALUES ({insert_vals}, %s) ON CONFLICT (id) DO NOTHING",
+                f"INSERT INTO recycle_bin ({insert_cols}, deleted_at) VALUES ({insert_vals}, %s) ON CONFLICT (id) DO NOTHING",  # nosec B608 — insert_cols are model field names, not user input
                 params,
             )
             return True
@@ -692,7 +692,7 @@ class PostgresJobRepository(JobRepository):
             update_parts = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "id")
             _execute(
                 conn,
-                f"INSERT INTO jobs ({col_list}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET deleted_at = NULL, {update_parts}",
+                f"INSERT INTO jobs ({col_list}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET deleted_at = NULL, {update_parts}",  # nosec B608 — col_list/update_parts are model field names, not user input
                 [row[k] for k in cols],
             )
             return True
@@ -716,7 +716,8 @@ class PostgresJobRepository(JobRepository):
             rows = _fetch_all(
                 conn,
                 "SELECT * FROM jobs WHERE status = ANY(%s) AND deleted_at IS NULL"
-                + (" AND completed_at < %s" if older_than else ""),
+                + (" AND completed_at < %s" if older_than else ""),  # nosec B608 — concatenation uses controlled boolean, not user input
+
                 (list(terminal_statuses), older_than) if older_than else (list(terminal_statuses),),
             )
             for row in rows:
@@ -727,7 +728,7 @@ class PostgresJobRepository(JobRepository):
                 ph = ", ".join("%s" for _ in cols)
                 _execute(
                     conn,
-                    f"INSERT INTO recycle_bin ({col_list}, deleted_at) VALUES ({ph}, %s) ON CONFLICT (id) DO NOTHING",
+                    f"INSERT INTO recycle_bin ({col_list}, deleted_at) VALUES ({ph}, %s) ON CONFLICT (id) DO NOTHING",  # nosec B608 — col_list are model field names, not user input
                     [row[k] for k in cols] + [now],
                 )
             return len(rows)

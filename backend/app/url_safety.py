@@ -57,7 +57,7 @@ def validate_public_http_url(url: str) -> None:
             return
 
     # 2. Reject explicit loopback / internal names
-    if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):
+    if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):  # nosec B104 — rejecting 0.0.0.0, not binding to it
         raise ValueError(f"URL hostname '{hostname}' is a restricted local loopback target.")
 
     # 3. Reject cloud metadata endpoints specifically (check BEFORE generic internal TLDs
