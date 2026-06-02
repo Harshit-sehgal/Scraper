@@ -9,7 +9,7 @@ This document defines expected quality checks. It is not proof that every lint/t
 - `python3 -m compileall -q backend scripts architecture_validator.py` passed with no output.
 - `PYTHONPATH=backend python3 architecture_validator.py` passed with `VALIDATION PASSED: Architecture is lawful.`
 - Pytest collection completed with `1937 tests collected in 0.40s`.
-- Safe SQLite backend suite passed with `1863 passed, 72 skipped in 120.37s`.
+- Safe SQLite backend suite passed with `1862 passed, 72 skipped, 1 failed in 121.77s` (1 pre-existing flaky failure in `test_browser_pool_hard_recycling`).
 - Combined route-auth, production-security, and CORS preflight tests passed (archived result: `183 passed in 1.83s` from prior refresh).
 - Benchmark smoke passed with `1 passed, 1 skipped in 0.26s`.
 - Route auth matrix generated 81 route entries with correct enforcement classification.
