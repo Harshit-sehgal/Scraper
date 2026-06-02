@@ -4,7 +4,7 @@
 **Base commit inspected:** `0ee4772` on branch `truth-audit-working`
 **Branch for cleanup:** `truth-audit-cleanup`
 **Status:** Pre-production candidate — fresh validation covers syntax, architecture, test collection (1937), full SQLite backend tests (1862 passed, 72 skipped, 1 pre-existing flaky failure in `test_browser_pool_hard_recycling`), route auth (81 routes, 3 public), production env validator (intentionally fails placeholder check), benchmark smoke (1 passed, 1 skipped). Postgres integration, browser e2e, and golden dataset tests are documented historically from prior refresh (not re-run in this session). Docker image build and Compose stack operations are documented historically.
-**Maturity:** about 60–65% — local app and SQLite backend mostly pass (1 flaky failure), but browser, Postgres, golden dataset, production ingress, TLS, backup/restore, alerts, and sustained load remain unvalidated in the target environment
+**Maturity:** about 55–60% — SQLite backend suite passes (1 flaky failure). Postgres, browser, golden dataset, production ingress, TLS, backup/restore, alerts, and sustained load remain unvalidated in the target environment
 
 This file is the current truth source. It must be updated only from fresh code inspection and command output. Archived audit documents are historical context, not current evidence.
 
@@ -103,14 +103,6 @@ Each major claim is classified: Verified (V), Partially verified (P), Unverified
 | Internal dashboard | README | `frontend/` static files, FastAPI mounts | V |
 | Docker/Compose deployment | README, docs | `Dockerfile`, `docker-compose*.yml`, `nginx.conf` exist | H (locally validated historically) |
 | Golden dataset benchmarks | docs/BENCHMARKS | `8 passed` with modest F1 thresholds (lowest 0.650) | H (not freshly re-run) |
-| Production-ready | *nowhere claimed* | Gates in PRODUCTION_READINESS.md target-environment-unvalidated | B |
-| Universal scraper | *nowhere claimed* | LIMITATIONS.md explicitly denies this | B |
-| Anti-bot immune | *nowhere claimed* | LIMITATIONS.md explicitly denies this | B |
-| Fully autonomous | *nowhere claimed* | README explicitly denies this | B |
-| Fully self-healing | *nowhere claimed* | README, LIMITATIONS explicitly deny this | B |
-| Guaranteed extraction accuracy | *nowhere claimed* | LIMITATIONS.md explicitly denies this | B |
-| 100% accurate | *nowhere claimed* | BENCHMARKS.md explicitly denies this | B |
-| Fully benchmarked | *nowhere claimed* | BENCHMARKS.md explicitly denies this | B |
 
 ## Current Blockers
 
@@ -156,4 +148,4 @@ Do not claim production-ready, enterprise-grade, universal scraper, scrapes ever
 5. Add real benchmark tests with enforceable thresholds.
 6. Clean runtime artifacts before every commit.
 7. Run Postgres (`--run-postgres`) and browser (`--run-browser`) test suites in CI to validate those backends automatically.
-8. Investigate and fix the pre-existing flaky test failures in crawl_frontier persistence (disk I/O error on concurrent SQLite access) and rate_limiter tests (shared state collision).
+8. Investigate and fix `test_browser_pool_hard_recycling` flaky failure (test pollution from shared `BrowserPool` state). Also re-investigate the previously observed rate_limiter and crawl_frontier flaky tests under Postgres/browser suites.
