@@ -6,7 +6,6 @@ from app.data_utils import align_extracted_keys_to_schema
 from app.models import FieldType, SchemaField
 from app.selector_engine import apply_selectors, extract_raw_from_selectors
 
-
 SAMPLE_HTML = """
 <html><body>
 <div class="card">

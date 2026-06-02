@@ -9,12 +9,12 @@ Provides:
 
 from __future__ import annotations
 
+import logging
 import os
 import time
-import logging
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

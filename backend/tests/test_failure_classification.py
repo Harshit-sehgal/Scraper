@@ -14,18 +14,16 @@ Tests cover:
 from __future__ import annotations
 
 import pytest
-
 from app.failure_classification import (
+    RECOVERY_STRATEGIES,
     FailureCategory,
     FailureClassification,
+    _has_captcha_patterns,
+    _has_challenge_patterns,
+    _is_malformed_dom,
     classify_failure,
     update_domain_with_failure,
-    RECOVERY_STRATEGIES,
-    _has_challenge_patterns,
-    _has_captcha_patterns,
-    _is_malformed_dom,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # Fixtures

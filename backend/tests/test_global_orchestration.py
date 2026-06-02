@@ -1,4 +1,4 @@
-from app.semantic_world_state import get_world_state, SemanticWorldState
+from app.semantic_world_state import SemanticWorldState, get_world_state
 
 
 def test_cross_node_causality_trace():

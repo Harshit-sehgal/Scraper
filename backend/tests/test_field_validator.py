@@ -1,8 +1,8 @@
 """Test runtime field validation."""
 
 from app.field_validator import validate_world_state
-from app.semantic_world_state import get_world_state
 from app.semantic_persistence import clear_semantic_state
+from app.semantic_world_state import get_world_state
 
 
 def test_fresh_state_is_valid():

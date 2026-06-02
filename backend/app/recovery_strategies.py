@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, asdict, field
+from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Callable, Any, Optional
+from typing import Any, Callable, Optional
 
 from app.failure_classification import FailureCategory, FailureClassification
 

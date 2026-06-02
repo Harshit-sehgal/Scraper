@@ -18,12 +18,10 @@ import time
 from pathlib import Path
 
 import pytest
-
 from app.regression_capture import (
     RegressionCapture,
     get_regression_capture,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # Fixtures

@@ -8,6 +8,7 @@ No subsystem bypass — strengthens the ownership boundary.
 """
 
 from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING
 

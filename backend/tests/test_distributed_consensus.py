@@ -1,5 +1,5 @@
-from app.semantic_world_state import SemanticWorldState
 from app.semantic_os import SemanticOS
+from app.semantic_world_state import SemanticWorldState
 
 
 def test_causal_sync():

@@ -1,6 +1,7 @@
 import sqlite3
 import tempfile
 from pathlib import Path
+
 from app.job_store import _run_migrations, persist_state_single
 from app.models import Job, JobStatus
 
@@ -136,7 +137,7 @@ def test_persist_state_single(monkeypatch):
 def test_migrations_cached_per_db_path(monkeypatch):
     """Verify that migrations are correctly cached per database path when STATE_FILE_PATH changes."""
     from app.config import settings
-    from app.job_store import _get_connection, _MIGRATIONS_RUN_FOR, reset_job_store_for_tests
+    from app.job_store import _MIGRATIONS_RUN_FOR, _get_connection, reset_job_store_for_tests
 
     # Reset migration cache for the test
     reset_job_store_for_tests()
@@ -184,9 +185,10 @@ def test_migrations_cached_per_db_path(monkeypatch):
 def test_progress_persistence_without_full_state_rewrite(monkeypatch):
     """Verify that run_job uses single-row persistence instead of full state saves."""
     import asyncio
-    from app.services.job_runner import run_job
-    from app.models import Job, JobStatus
+
     from app.domain_runtime_policy import reset_domain_runtime_policy
+    from app.models import Job, JobStatus
+    from app.services.job_runner import run_job
 
     # Counter to verify which persistence functions were called
     full_state_writes = 0
@@ -252,8 +254,8 @@ def test_progress_persistence_without_full_state_rewrite(monkeypatch):
 
 def test_schema_invalidation_and_recreation(monkeypatch):
     """Verify that _get_connection correctly handles SQLite database recreation when cached."""
-    from app.job_store import _get_connection, reset_job_store_for_tests
     from app.config import settings
+    from app.job_store import _get_connection, reset_job_store_for_tests
 
     reset_job_store_for_tests()
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
@@ -285,9 +287,9 @@ def test_schema_invalidation_and_recreation(monkeypatch):
 
 def test_save_and_load_job_from_sqlite(monkeypatch):
     """Verify full serialization and deserialization cycle of all Job fields using save_state and load_state."""
-    from app.job_store import load_state, save_state, reset_job_store_for_tests
     from app.config import settings
-    from app.models import Job, JobStatus, ScrapeMode, SchemaField, FieldType
+    from app.job_store import load_state, reset_job_store_for_tests, save_state
+    from app.models import FieldType, Job, JobStatus, SchemaField, ScrapeMode
 
     reset_job_store_for_tests()
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
@@ -344,8 +346,8 @@ def test_save_and_load_job_from_sqlite(monkeypatch):
 
 def test_running_job_marked_failed_after_restart(monkeypatch):
     """Verify that jobs in PENDING/DISCOVERING/RUNNING state are transitioned to FAILED with a restart error when loaded on restart."""  # noqa: E501
-    from app.job_store import load_state, save_state, reset_job_store_for_tests
     from app.config import settings
+    from app.job_store import load_state, reset_job_store_for_tests, save_state
     from app.models import Job, JobStatus
 
     reset_job_store_for_tests()
@@ -382,8 +384,8 @@ def test_running_job_marked_failed_after_restart(monkeypatch):
 
 def test_persist_state_single_updates_only_one_job(monkeypatch):
     """Verify that persist_state_single only updates the single target job row and does not affect other jobs."""
-    from app.job_store import save_state, persist_state_single, reset_job_store_for_tests
     from app.config import settings
+    from app.job_store import persist_state_single, reset_job_store_for_tests, save_state
     from app.models import Job, JobStatus
 
     reset_job_store_for_tests()
@@ -427,8 +429,9 @@ def test_persist_state_single_updates_only_one_job(monkeypatch):
 def test_json_to_sqlite_migration_imports_existing_jobs(monkeypatch):
     """Verify that if a legacy JSON state file is present, it is successfully imported into a fresh SQLite database on load."""
     import json
-    from app.job_store import load_state, reset_job_store_for_tests
+
     from app.config import settings
+    from app.job_store import load_state, reset_job_store_for_tests
     from app.models import JobStatus
 
     reset_job_store_for_tests()
@@ -471,9 +474,10 @@ def test_json_to_sqlite_migration_imports_existing_jobs(monkeypatch):
 def test_same_domain_concurrency_respected(monkeypatch):
     """Verify that domain-level concurrency max_parallel limit is respected when scraping multiple same-domain URLs."""
     import asyncio
-    from app.services.job_runner import run_job
-    from app.models import Job, JobStatus
+
     from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
+    from app.models import Job, JobStatus
+    from app.services.job_runner import run_job
 
     # Configure the test domain to have max_parallel = 1
     reset_domain_runtime_policy()
@@ -537,8 +541,8 @@ def test_same_domain_concurrency_respected(monkeypatch):
 
 def test_sqlite_preserves_all_job_fields(monkeypatch):
     """Verify that all Job model fields (e.g. location, source_policy, results_on_disk, etc.) are fully preserved in SQLite."""
-    from app.job_store import load_state, save_state, reset_job_store_for_tests
     from app.config import settings
+    from app.job_store import load_state, reset_job_store_for_tests, save_state
     from app.models import Job, JobStatus, SourcePolicy
 
     reset_job_store_for_tests()
@@ -592,8 +596,8 @@ def test_sqlite_preserves_all_job_fields(monkeypatch):
 
 def test_offloaded_results_survive_restart(monkeypatch):
     """Verify that offloaded results settings survive reboot/recovery status transitions safely."""
-    from app.job_store import load_state, save_state, reset_job_store_for_tests
     from app.config import settings
+    from app.job_store import load_state, reset_job_store_for_tests, save_state
     from app.models import Job, JobStatus
 
     reset_job_store_for_tests()

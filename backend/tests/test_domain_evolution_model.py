@@ -10,6 +10,7 @@ Tests:
 """
 
 import time
+
 from app.domain_evolution_model import (
     DomainEvolutionModel,
     get_domain_evolution_model,

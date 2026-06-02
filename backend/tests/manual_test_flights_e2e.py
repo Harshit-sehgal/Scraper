@@ -11,11 +11,11 @@ scoring, dedup, and pipeline processing as the generic path — so they're
 fully compatible with the /app/ frontend and job system.
 """
 
-from app.models import SchemaField, FieldType
-from app.scraper import scrape_url
 import asyncio
 from pathlib import Path
 
+from app.models import FieldType, SchemaField
+from app.scraper import scrape_url
 
 FLIGHT_SCHEMA = [
     SchemaField(name="origin", field_type=FieldType.STRING, description="", required=True),

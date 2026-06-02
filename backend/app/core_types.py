@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 from typing import List
 
 from app.field_laws import (
-    MAX_INSTABILITY_FLUX,
     MAX_COUPLING_TRANSFER,
+    MAX_INSTABILITY_FLUX,
     PROPAGATION_DECAY_FLOOR,
     ROLE_EXCLUSIVITY,
 )

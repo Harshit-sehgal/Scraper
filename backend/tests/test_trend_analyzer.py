@@ -11,15 +11,14 @@ Tests cover:
 from __future__ import annotations
 
 import time
+
 import pytest
-
 from app.trend_analyzer import (
-    TrendAnalyzer,
-    EconomicTracker,
-    TrendReport,
     EconomicReport,
+    EconomicTracker,
+    TrendAnalyzer,
+    TrendReport,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # Fixtures

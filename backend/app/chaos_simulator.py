@@ -20,18 +20,19 @@ are in chaos_metrics.py.
 """
 
 import asyncio
+import logging
 import time
 from typing import Any, Dict, List, Optional
-import logging
 
 # Import symbols used directly in this file
 from app.chaos_scenarios import FailureMode, FailureScenarios
 
+
 # Backward-compatible re-exports via __getattr__ (for names not used directly in this file)
 # so pyflakes does not flag unused-import warnings.
 def __getattr__(name):
-    import app.chaos_scenarios as _cs
     import app.chaos_metrics as _cm
+    import app.chaos_scenarios as _cs
     _re_exports = {
         "SeverityLevel": _cs,
         "FailureScenario": _cs,
@@ -129,7 +130,7 @@ class ChaosSimulator:
             from app.domain_health_alerts import get_domain_health_monitor
             monitor = get_domain_health_monitor()
             if self.system and hasattr(self.system, "current_url"):
-                url = getattr(self.system, "current_url")
+                url = self.system.current_url
                 if url:
                     domain_health = monitor.get_domain_health(url)
                     if domain_health:

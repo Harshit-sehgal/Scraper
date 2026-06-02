@@ -1,7 +1,11 @@
-import socket
 import ipaddress
+import logging
+import socket
 from urllib.parse import urlparse
+
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def is_safe_ip(ip_str: str) -> bool:
@@ -78,11 +82,7 @@ def validate_public_http_url(url: str) -> None:
         if hostname_lower.endswith(tld):
             raise ValueError(f"URL hostname '{hostname}' uses internal TLD '{tld}' which is restricted for security.")
 
-    is_production = settings.ENV.lower() in ("production", "staging")
-    if not is_production or settings.SMOKE_TEST_MODE:
-        return
-
-    # 6. Try DNS resolution to check resolved IPs in production-like modes.
+    # 6. Try DNS resolution to check resolved IPs.
     try:
         addrs = socket.getaddrinfo(hostname, None)
         for addr in addrs:
@@ -90,7 +90,11 @@ def validate_public_http_url(url: str) -> None:
             if not is_safe_ip(ip):
                 raise ValueError(
                     f"URL hostname '{hostname}' resolves to restricted IP {ip} — rejected for security (SSRF protection).")
-    except (socket.gaierror, OSError):
-        raise ValueError(
-            f"URL hostname '{hostname}' could not be resolved (DNS failure) — rejected in production for security."
-        )
+    except (socket.gaierror, OSError) as e:
+        is_production = settings.ENV.lower() in ("production", "staging")
+        if is_production and not settings.SMOKE_TEST_MODE:
+            raise ValueError(
+                f"URL hostname '{hostname}' could not be resolved (DNS failure) — rejected in production for security."
+            )
+        else:
+            logger.warning("DNS resolution failed for hostname '%s': %s", hostname, e)

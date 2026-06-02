@@ -1,9 +1,10 @@
-from app.html_utils import _fetch_with_httpx
+import socket
+
 import httpx
 import pytest
-import socket
-from app.url_safety import validate_public_http_url, is_safe_ip
 from app.config import settings
+from app.html_utils import _fetch_with_httpx
+from app.url_safety import is_safe_ip, validate_public_http_url
 
 
 def test_is_safe_ip():
@@ -357,3 +358,18 @@ def test_smoke_mode_internal_tld_allowed(monkeypatch):
 
     # nginx is in allowed_internal_hosts, so it passes in smoke mode
     validate_public_http_url("http://nginx/smoke/records.html")
+
+
+def test_validate_resolved_private_ip_in_dev(monkeypatch):
+    """Hosts resolving to private IPs via DNS are rejected even in development mode."""
+    monkeypatch.setattr(settings, "ENV", "development")
+
+    def mock_getaddrinfo_unsafe(host, port, *args, **kwargs):
+        if host == "bad-dev-dns.com":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.5", 80))]
+        raise socket.gaierror(-2, "Name or service not known")
+
+    monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_unsafe)
+
+    with pytest.raises(ValueError, match="resolves to restricted IP"):
+        validate_public_http_url("http://bad-dev-dns.com")

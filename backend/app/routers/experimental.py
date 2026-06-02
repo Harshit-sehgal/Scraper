@@ -11,16 +11,24 @@ they do not cause startup failures if those modules are unavailable.
 
 from __future__ import annotations
 
-import time
 import secrets
-from fastapi import APIRouter, Depends, Request, HTTPException
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+import time
 
 from app.config import settings
 from app.utils.rbac import UserRole, require_role
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
-router = APIRouter()
+
+def verify_experimental_enabled():
+    if not settings.ENABLE_EXPERIMENTAL_ROUTES:
+        raise HTTPException(
+            status_code=404,
+            detail="Experimental / research routes are disabled in this environment. Set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable them."
+        )
+
+router = APIRouter(dependencies=[Depends(verify_experimental_enabled)])
 
 
 # ─── Request Models ────────────────────────────────────────────────────────
@@ -291,8 +299,8 @@ async def process_cognitive_tasks(budget_ms: float = 100.0, _role=Depends(requir
 @router.get("/api/system/agency")
 async def system_agency():
     """Returns the state of automated agency and tools."""
-    from app.semantic_world_state import get_world_state
     from app.llm_bridge import get_plugin_manager
+    from app.semantic_world_state import get_world_state
 
     ws = get_world_state()
     plugins = get_plugin_manager(ws=ws)
@@ -362,8 +370,8 @@ async def system_replay_events(start_idx: int = 0, end_idx: int = -1):
 @router.post("/api/system/refactor/compress")
 async def trigger_manifold_compression(_role=Depends(require_role([UserRole.ADMIN]))):
     """Trigger a manifold compression cycle."""
-    from app.semantic_world_state import get_world_state
     from app.llm_bridge import get_plugin_manager
+    from app.semantic_world_state import get_world_state
 
     plugins = get_plugin_manager(ws=get_world_state())
     result = plugins.call_tool("manifold_compressor")

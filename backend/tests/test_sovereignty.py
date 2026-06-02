@@ -1,6 +1,6 @@
-from app.semantic_world_state import get_world_state
+from app.semantic_allocation_engine import _get_role_engine, seed_role_engine
 from app.semantic_ir import SemanticType, create_token
-from app.semantic_allocation_engine import seed_role_engine, _get_role_engine
+from app.semantic_world_state import get_world_state
 
 
 def test_manifold_transfer():
@@ -153,9 +153,10 @@ def test_manifold_merge_sovereignty():
     }
 
     # Call the merge logic from the experimental router
-    from app.routers.experimental import merge_knowledge
-    from unittest.mock import MagicMock
     import asyncio
+    from unittest.mock import MagicMock
+
+    from app.routers.experimental import merge_knowledge
 
     mock_req = MagicMock()
     mock_req.headers = {}

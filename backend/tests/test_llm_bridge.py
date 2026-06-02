@@ -5,24 +5,30 @@ call counting, and the SubstratePluginManager.
 """
 
 from __future__ import annotations
-from app.llm_bridge import SubstratePluginManager, get_plugin_manager, reset_plugin_manager
-from app.llm_bridge import llm_json, llm_json_fast, llm_text
-from app.llm_bridge import _call_openai_compatible_json, _call_openai_compatible_text
-from app.llm_bridge import get_llm_call_count, reset_llm_call_count
-from app.llm_bridge import _record_llm_degradation
-from app.llm_bridge import _groq_model_candidates
-from app.llm_bridge import _should_retry_http_error
 
 import os
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import httpx
-
+import pytest
 
 # ─── _extract_json_payload ─────────────────────────────────────────────
-
-from app.llm_bridge import _extract_json_payload
+from app.llm_bridge import (
+    SubstratePluginManager,
+    _call_openai_compatible_json,
+    _call_openai_compatible_text,
+    _extract_json_payload,
+    _groq_model_candidates,
+    _record_llm_degradation,
+    _should_retry_http_error,
+    get_llm_call_count,
+    get_plugin_manager,
+    llm_json,
+    llm_json_fast,
+    llm_text,
+    reset_llm_call_count,
+    reset_plugin_manager,
+)
 
 
 class TestExtractJsonPayload:

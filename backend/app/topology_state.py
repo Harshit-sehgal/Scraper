@@ -4,61 +4,84 @@ Re-exports types / helpers from topology_state_types and TopologyView from
 topology_view for backward compatibility.
 """
 
-from typing import Any, Callable, Dict, List, Set, Tuple, Optional
-from app.core_types import FieldConflictRegion, MAX_COUPLING_TRANSFER
-from app.transaction_context import active_transaction
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-# Re-export public symbols from sub-modules for backward compatibility
-from app.topology_state_types import (
-    parse_topology_key,
-    ConflictError,
-    _clamp01,
-    _clamp_signed,
-    RegionSnapshot,
-    EdgeFieldSnapshot,
-    MesoClusterSnapshot,
-    MacroContinentSnapshot,
+from app.core_types import MAX_COUPLING_TRANSFER, FieldConflictRegion
+from app.topology_clustering import (
+    add_impossible_neighborhood as _cluster_add_impossible,
 )
-from app.topology_view import TopologyView
+from app.topology_clustering import (
+    clear_impossible_neighborhoods as _cluster_clear_impossible,
+)
+from app.topology_clustering import (
+    decay_topological_laws as _cluster_decay_laws,
+)
+from app.topology_clustering import (
+    detect_communities as _cluster_detect_communities,
+)
+from app.topology_clustering import (
+    induce_topological_laws as _cluster_induce_laws,
+)
+from app.topology_clustering import (
+    self_prune_regions,
+    shard_topology_regions,
+)
+from app.topology_clustering import (
+    set_topological_law as _cluster_set_law,
+)
+from app.topology_clustering import (
+    update_schema_patterns as _cluster_update_schema,
+)
 
 # Multi-scale topology dynamics (extracted for modularity)
 from app.topology_dynamics import (
-    compute_meso_clusters,
     compute_macro_continents,
     compute_macro_from_meso,
-    evolve_meso_clusters,
-    evolve_macro_continents,
+    compute_meso_clusters,
     cross_scale_pressure_flow,
+    evolve_macro_continents,
+    evolve_meso_clusters,
 )
 from app.topology_metrics import (
     compute_aggregate_metrics,
     compute_topology_entropy,
+)
+from app.topology_metrics import (
     compute_macro_energy as _metrics_compute_macro_energy,
+)
+from app.topology_metrics import (
     distill_crystalline_atoms as _metrics_distill,
 )
 from app.topology_persistence import (
-    replace_all_regions,
-    trim_topology,
-    filter_topology_regions,
-    prune_topology as _persistence_prune,
-    garbage_collect_topology as _persistence_gc,
-    topology_to_dict,
-    topology_from_dict,
-    merge_topology,
     clear_topology,
     clear_topology_regions,
+    filter_topology_regions,
+    merge_topology,
+    replace_all_regions,
+    topology_from_dict,
+    topology_to_dict,
+    trim_topology,
 )
-from app.topology_clustering import (
-    detect_communities as _cluster_detect_communities,
-    shard_topology_regions,
-    update_schema_patterns as _cluster_update_schema,
-    decay_topological_laws as _cluster_decay_laws,
-    set_topological_law as _cluster_set_law,
-    add_impossible_neighborhood as _cluster_add_impossible,
-    clear_impossible_neighborhoods as _cluster_clear_impossible,
-    self_prune_regions,
-    induce_topological_laws as _cluster_induce_laws,
+from app.topology_persistence import (
+    garbage_collect_topology as _persistence_gc,
 )
+from app.topology_persistence import (
+    prune_topology as _persistence_prune,
+)
+
+# Re-export public symbols from sub-modules for backward compatibility
+from app.topology_state_types import (
+    ConflictError,
+    EdgeFieldSnapshot,
+    MacroContinentSnapshot,
+    MesoClusterSnapshot,
+    RegionSnapshot,
+    _clamp01,
+    _clamp_signed,
+    parse_topology_key,
+)
+from app.topology_view import TopologyView
+from app.transaction_context import active_transaction
 
 __all__ = [
     "TopologyState",
@@ -717,9 +740,8 @@ class TopologyState:
         view = self.get_view()
         forces: Dict[Tuple[str, str], Dict[str, float | str]] = {}
         for edge in view.get_edge_fields():
-            # type: ignore[assignment]
             pair = tuple(sorted([edge.source, edge.target]))
-            forces[pair] = {  # type: ignore[arg-type, index]
+            forces[pair] = {  # type: ignore[index]
                 "affinity": edge.affinity,
                 "repulsion": edge.repulsion,
                 "pressure": edge.pressure,
@@ -841,7 +863,7 @@ class TopologyState:
             - through_edge_field: whether edge field data was available
         """
         forces = self._compute_edge_field_forces()
-        pair = tuple(sorted([role_a, role_b]))  # type: ignore[assignment]
+        pair = tuple(sorted([role_a, role_b]))
         force = forces.get(pair, {})  # type: ignore[arg-type]
 
         if not force:
@@ -918,7 +940,6 @@ class TopologyState:
             roles = r.competing_roles
             for i in range(len(roles)):
                 for j in range(i + 1, len(roles)):
-                    # type: ignore[assignment]
                     pair = tuple(sorted([roles[i], roles[j]]))
                     f = forces.get(pair)  # type: ignore[arg-type]
                     if f:
@@ -1071,7 +1092,6 @@ class TopologyState:
                 edge_conductance = 0.0
                 for ra in ri.competing_roles:
                     for rb in rj.competing_roles:
-                        # type: ignore[assignment]
                         pair = tuple(sorted([ra, rb]))
                         force = forces.get(pair)  # type: ignore[arg-type]
                         if force:
@@ -1231,7 +1251,7 @@ class TopologyState:
             max_route = 0.0
             for ra in source.competing_roles:
                 for rb in target.competing_roles:
-                    pair = tuple(sorted([ra, rb]))  # type: ignore[assignment]
+                    pair = tuple(sorted([ra, rb]))
                     f = forces.get(pair)  # type: ignore[arg-type]
                     if f:
                         max_route = max(max_route, f["route_strength"])
@@ -1279,7 +1299,7 @@ class TopologyState:
                     if received_intensity > 0.2:
                         # Schedule next wave hop via dispatcher to avoid deep
                         # recursion
-                        from app.graph_update_scheduler import get_scheduler, TaskPriority
+                        from app.graph_update_scheduler import TaskPriority, get_scheduler
 
                         get_scheduler().schedule(
                             f"wave_hop:{target.region_id}",

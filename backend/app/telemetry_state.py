@@ -5,7 +5,8 @@ Telemetry State Adapter — isolated state management for runtime performance me
 from __future__ import annotations
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
+
 from app.scrape_telemetry import get_scrape_telemetry
 
 logger = logging.getLogger(__name__)

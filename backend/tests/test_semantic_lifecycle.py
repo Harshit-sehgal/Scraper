@@ -10,10 +10,8 @@ Covers the hardening sprint:
 from __future__ import annotations
 
 import pytest
-
-from app.transaction_context import get_active_transaction
 from app.semantic_world_state.core import SemanticWorldState
-
+from app.transaction_context import get_active_transaction
 
 # ─── Test 1: reset_world_state does not leak subscribers ─────────────────
 
@@ -24,8 +22,8 @@ class TestResetWorldStateLifecycle:
     def test_reset_world_state_does_not_duplicate_field_wave_subscribers(self):
         """After reset_world_state(), a new world state should have exactly
         one subscriber (its own), not accumulate from the old instance."""
-        from app.semantic_world_state import reset_world_state, get_world_state
         from app.semantic_events import SemanticEventType
+        from app.semantic_world_state import get_world_state, reset_world_state
 
         # First get/create the initial world state
         ws1 = get_world_state()
@@ -199,7 +197,7 @@ class TestCloseIdempotency:
 
     def test_reset_world_state_with_close(self):
         """reset_world_state should handle close() cleanly."""
-        from app.semantic_world_state import reset_world_state, get_world_state
+        from app.semantic_world_state import get_world_state, reset_world_state
         ws1 = get_world_state()
         ws1.close()  # Close manually
         # reset_world_state should not error even if close was already called
@@ -376,7 +374,7 @@ class TestBestEffortRollback:
                         # Make the second subsystem fail
                         if name_ == list(state_attrs.keys())[1]:
                             raise RuntimeError(f"rollback failed for {name_}")
-                        return originals[name_]() if hasattr(originals[name_], '__call__') else None
+                        return originals[name_]() if callable(originals[name_]) else None
                     return tracked_rollback
                 obj.rollback = make_tracker(name)
 

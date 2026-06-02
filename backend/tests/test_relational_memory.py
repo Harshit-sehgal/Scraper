@@ -11,7 +11,7 @@ def test_relational_recall_stabilizes_new_basins():
     ws._synthesize_crystalline_record({"origin": token_val, "dest": "JFK"})
 
     # 2. Capture tokens including the known one
-    from app.semantic_ir import create_token, SemanticType
+    from app.semantic_ir import SemanticType, create_token
     tokens = [create_token(token_val, 0, 3, 0, SemanticType.LOCATION)]
     schema = ["origin", "destination"]
 

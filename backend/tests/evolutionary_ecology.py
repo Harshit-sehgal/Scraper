@@ -8,12 +8,13 @@ This suite performs a massive longevity run, tracking emergent ecological
 metrics: diversity, fragmentation, drift, and oscillation frequency.
 """
 
-import time
-import random
 import json
+import random
+import time
 from typing import List, Set
+
+from app.semantic_ir import SemanticToken, SemanticType, Span
 from app.semantic_world_state import SemanticWorldState
-from app.semantic_ir import SemanticType, SemanticToken, Span
 
 
 class EcologyAnalyzer:

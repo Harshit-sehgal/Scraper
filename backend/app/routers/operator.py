@@ -12,20 +12,18 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, Request, Depends
-from app.utils.rbac import UserRole, require_role
-from pydantic import BaseModel
-
+from app.browser_pool import get_browser_pool
+from app.degradation_predictor import get_degradation_predictor
+from app.domain_health_alerts import get_domain_health_monitor
 from app.scrape_telemetry import get_scrape_telemetry
-
+from app.trend_analyzer import TrendAnalyzer
+from app.utils.rbac import UserRole, require_role
 from app.visualization import (
     OperatorMode,
     get_governance_dashboard,
 )
-from app.degradation_predictor import get_degradation_predictor
-from app.domain_health_alerts import get_domain_health_monitor
-from app.browser_pool import get_browser_pool
-from app.trend_analyzer import TrendAnalyzer
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,5 @@
-from app.semantic_world_state import get_world_state
 from app.semantic_inference_engine import RoleEmbeddingEngine
+from app.semantic_world_state import get_world_state
 
 
 def test_cognitive_elasticity_rate_scaling():
@@ -96,7 +96,7 @@ def test_basin_pre_heating():
     ws = get_world_state()
     ws.clear()
 
-    from app.semantic_ir import create_token, SemanticType
+    from app.semantic_ir import SemanticType, create_token
 
     # 1. Setup manifold so that 'contact_role' is near SemanticType.PHONE
     # PHONE vector has 1.0 at index 4, 0.0 at index -2, and 0.5 at index -1

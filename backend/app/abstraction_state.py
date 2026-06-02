@@ -4,10 +4,10 @@ True ownership boundary: NO external code should mutate envelopes directly.
 All changes go through this state object, which supports transactions.
 """
 
-from typing import Dict, List, Optional, Callable
-from app.transaction_context import active_transaction
-
 import time
+from typing import Callable, Dict, List, Optional
+
+from app.transaction_context import active_transaction
 
 
 class AbstractionState:

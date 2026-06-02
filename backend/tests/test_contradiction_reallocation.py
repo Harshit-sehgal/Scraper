@@ -1,7 +1,7 @@
 """Test field-driven exclusion learning — verifies continuous field tension learning."""
 
-from app.semantic_world_state import get_world_state
 from app.semantic_ir import SemanticToken, SemanticType, Span
+from app.semantic_world_state import get_world_state
 
 
 def test_field_conflict_drives_exclusion_learning():

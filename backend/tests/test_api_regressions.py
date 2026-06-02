@@ -1,11 +1,11 @@
 import asyncio
-import pytest
 
+import pytest
 from app import main as main_mod
 from app.discovery import SOURCE_TRUST_SCORE, infer_source_metadata
 from app.models import FieldType, Job, JobStatus, SchemaField, ScrapeMode
-from app.utils.quality import build_quality_report
 from app.services.state import prune_history_stores
+from app.utils.quality import build_quality_report
 
 
 @pytest.fixture(autouse=True)

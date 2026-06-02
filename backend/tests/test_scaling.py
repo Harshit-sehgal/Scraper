@@ -4,8 +4,8 @@ Phase 66: Long-Horizon Scaling & Causal Pruning Tests
 LAW: Substrate must maintain causal integrity while skeletonizing history.
 """
 
-from app.semantic_world_state import SemanticWorldState
 from app.event_journal import get_journal
+from app.semantic_world_state import SemanticWorldState
 
 
 def test_hierarchical_causal_pruning():

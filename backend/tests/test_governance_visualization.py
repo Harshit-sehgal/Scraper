@@ -5,9 +5,10 @@ Unit Tests for Phase 90 System Governance & Visualization.
 from __future__ import annotations
 
 import os
+
 import pytest
-from app.visualization import SystemGovernorDashboard, OperatorMode, MAP_PATH
 from app.config import settings
+from app.visualization import MAP_PATH, OperatorMode, SystemGovernorDashboard
 
 
 @pytest.fixture(autouse=True)

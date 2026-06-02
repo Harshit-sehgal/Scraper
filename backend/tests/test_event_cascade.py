@@ -1,8 +1,8 @@
 """Test event cascade is operational — events dispatch to real subscribers."""
 
-from app.semantic_pipeline import run_pipeline
 from app.event_dispatcher import get_dispatcher
 from app.semantic_events import SemanticEventType
+from app.semantic_pipeline import run_pipeline
 
 
 def test_event_cascade_has_subscribers():

@@ -3,17 +3,14 @@ import io
 import json
 import zipfile
 from typing import Any, cast
-import pytest
 
+import pytest
 from app import main as main_mod
-from app.config import settings
-from app.models import FieldType, Job, JobStatus, SchemaField
-from app.utils.job_results_store import (
-    save_job_results_to_disk,
-    get_job_results_path
-)
 from app.browser_pool import BrowserPool
+from app.config import settings
 from app.domain_evolution_model import get_domain_evolution_model
+from app.models import FieldType, Job, JobStatus, SchemaField
+from app.utils.job_results_store import get_job_results_path, save_job_results_to_disk
 
 
 def test_job_results_disk_offload_and_retrieval(client, monkeypatch):

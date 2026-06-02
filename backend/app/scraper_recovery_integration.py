@@ -21,13 +21,13 @@ import logging
 import time
 from typing import Any, Dict, Optional
 
-from app.failure_classification import classify_failure, FailureCategory
-from app.config import settings
-from app.recovery_strategies import get_recovery_strategist, get_recovery_executor, AttemptContext
-from app.selector_memory import get_selector_memory
-from app.domain_intelligence import get_domain_intelligence
-from app.models import SchemaField
 from app.acquisition_state import AcquisitionLineage, AcquisitionState
+from app.config import settings
+from app.domain_intelligence import get_domain_intelligence
+from app.failure_classification import FailureCategory, classify_failure
+from app.models import SchemaField
+from app.recovery_strategies import AttemptContext, get_recovery_executor, get_recovery_strategist
+from app.selector_memory import get_selector_memory
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ async def scrape_url_with_recovery(
 
         try:
             # Chaos failure injection check
-            from app.chaos_simulator import get_chaos_simulator, FailureMode
+            from app.chaos_simulator import FailureMode, get_chaos_simulator
 
             chaos = get_chaos_simulator()
 

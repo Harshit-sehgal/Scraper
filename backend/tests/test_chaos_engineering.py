@@ -5,19 +5,19 @@ Verifies system resilience, automated failure classification, recovery planning,
 and execution SLAs under injected chaos failure scenarios.
 """
 
-from app.recovery_handlers import register_all_recovery_handlers
 import logging
-import pytest
 import time
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.chaos_simulator import get_chaos_simulator, FailureMode
+import pytest
+from app.chaos_simulator import FailureMode, get_chaos_simulator
 from app.failure_classification import FailureCategory
+from app.models import FieldType, SchemaField
+from app.recovery_handlers import register_all_recovery_handlers
 from app.recovery_strategies import RecoveryAction, RecoveryExecutor
-from app.scraper_recovery_integration import scrape_url_with_recovery
-from app.models import SchemaField, FieldType
-from app.selector_memory import get_selector_memory
 from app.scrape_telemetry import get_scrape_telemetry
+from app.scraper_recovery_integration import scrape_url_with_recovery
+from app.selector_memory import get_selector_memory
 
 logger = logging.getLogger(__name__)
 

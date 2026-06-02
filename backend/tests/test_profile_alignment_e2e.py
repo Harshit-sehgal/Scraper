@@ -7,13 +7,12 @@ CI skips these tests by default. Run manually with:
 from __future__ import annotations
 
 import os
-import pytest
 
+import pytest
 from app.data_utils import align_profile_keys_to_schema
 from app.models import FieldType, SchemaField
 from app.scraper import scrape_url
 from app.selector_profiles.loader import _load_all_profiles, match_profile_for_url, try_profile_extraction
-
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("RUN_LIVE_LLM_TESTS"),

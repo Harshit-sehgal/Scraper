@@ -1,6 +1,6 @@
 import pytest
-from app.semantic_world_state import get_world_state
 from app.llm_bridge import get_plugin_manager
+from app.semantic_world_state import get_world_state
 
 
 def test_native_role_merger():

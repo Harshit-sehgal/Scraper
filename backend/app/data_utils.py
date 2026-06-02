@@ -1,4 +1,5 @@
 from typing import Optional
+
 from app.models import SchemaField
 
 
@@ -289,9 +290,9 @@ def process_raw_records(
     user_intent: str = "",
 ) -> list[dict]:
     """Normalize, score, dedup, limit, and run pipeline on raw extracted records."""
-    from app.utils.quality import score_record_quality
-    from app.semantic_pipeline import run_pipeline
     from app.config import settings
+    from app.semantic_pipeline import run_pipeline
+    from app.utils.quality import score_record_quality
 
     # Align full selector output to the user schema (best match per field)
     aligned_records = align_extracted_keys_to_schema(

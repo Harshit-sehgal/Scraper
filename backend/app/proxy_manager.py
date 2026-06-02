@@ -11,8 +11,8 @@ Responsible for:
 from __future__ import annotations
 
 import logging
-from typing import Optional, List
 from collections import defaultdict
+from typing import List, Optional
 
 from app.config import settings
 

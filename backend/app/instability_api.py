@@ -5,8 +5,10 @@ High-entropy data sources are quarantined before they can affect stable basins.
 """
 
 from __future__ import annotations
-from typing import Dict, List, Optional, TYPE_CHECKING
+
 import logging
+from typing import TYPE_CHECKING, Dict, List, Optional
+
 from app.semantic_world_state import get_world_state
 
 if TYPE_CHECKING:

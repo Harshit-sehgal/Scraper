@@ -4,9 +4,10 @@ Semantic Event Dispatcher
 Synchronous / Asynchronous propagation of semantic signals.
 """
 
-import time
 import logging
+import time
 from typing import Callable, Dict, List
+
 from app.semantic_events import SemanticEvent, SemanticEventType
 
 

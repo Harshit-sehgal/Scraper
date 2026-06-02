@@ -10,9 +10,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Optional, Dict, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from playwright.async_api import async_playwright, Browser, BrowserContext
+from playwright.async_api import Browser, BrowserContext, async_playwright
 
 from app.config import settings
 
@@ -142,7 +142,6 @@ class BrowserPool:
                         logger.debug(f"[BrowserPool] Creating context for {domain} with proxy: {
                             proxy_config['server']}")
 
-            # type: ignore[arg-type]
             context = await self._browser.new_context(**context_options)
 
             # Register page tracking
@@ -264,6 +263,14 @@ class BrowserPool:
                 except Exception as e:
                     logger.debug("[BrowserPool] Failed to close browser during close(): %s", e)
                 self._browser = None
+
+            if self._cleanup_task and not self._cleanup_task.done():
+                self._cleanup_task.cancel()
+                try:
+                    await self._cleanup_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+                self._cleanup_task = None
 
             if self._playwright:
                 try:

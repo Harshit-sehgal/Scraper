@@ -4,15 +4,15 @@ Each invariant validates a specific property of the semantic field system.
 If any invariant fails, the architecture is not semantically coherent.
 """
 
-from app.semantic_world_state import get_world_state
-from app.semantic_pipeline import run_pipeline
-from app.semantic_allocation_engine import (
-    _adaptive_exclusion_threshold, _adaptive_runtime_exclusion_threshold,
-)
-from app.field_laws import ROLE_EXCLUSIVITY
 from app.event_dispatcher import get_dispatcher
+from app.field_laws import ROLE_EXCLUSIVITY
+from app.semantic_allocation_engine import (
+    _adaptive_exclusion_threshold,
+    _adaptive_runtime_exclusion_threshold,
+)
 from app.semantic_events import SemanticEventType
-
+from app.semantic_pipeline import run_pipeline
+from app.semantic_world_state import get_world_state
 
 # ─────────────────────────────────────────────────────────────
 # INVARIANT 1: Field pressure is always bounded [0, 1]
@@ -213,7 +213,7 @@ def test_exclusion_persistence_invariant():
     os.environ["SEMANTIC_STATE_PATH"] = tmp
 
     try:
-        from app.semantic_persistence import save_semantic_state, load_semantic_state
+        from app.semantic_persistence import load_semantic_state, save_semantic_state
         save_semantic_state()
         ws2 = get_world_state()
         ws2.clear()

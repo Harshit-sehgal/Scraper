@@ -18,8 +18,8 @@ import threading
 import time
 from typing import Callable, Optional
 
-from app.worker_queue import Priority, QueueTask
 from app.postgres_repository import _conn, _execute, _fetch_all, _fetch_one
+from app.worker_queue import Priority, QueueTask
 
 logger = logging.getLogger(__name__)
 

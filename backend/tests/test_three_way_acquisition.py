@@ -14,11 +14,9 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-from app.selector_discovery import analyze_url_for_fields
-from app.page_profiler import StructureProfile, ValuePatterns
 from app.acquisition_telemetry import AcquisitionTelemetryCollector
-
+from app.page_profiler import StructureProfile, ValuePatterns
+from app.selector_discovery import analyze_url_for_fields
 
 # ── HTML fixtures ──────────────────────────────────────────────────────
 

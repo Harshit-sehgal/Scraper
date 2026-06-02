@@ -7,8 +7,9 @@ without requiring live network or LLM calls.
 
 from pathlib import Path
 from typing import Any, cast
+
 from app.models import FieldType, SchemaField
-from app.selector_engine import extract_with_regex, apply_selectors
+from app.selector_engine import apply_selectors, extract_with_regex
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "pages"
 

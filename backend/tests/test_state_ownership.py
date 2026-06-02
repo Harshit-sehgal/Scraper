@@ -4,9 +4,9 @@ These tests demonstrate that TopologyState, EnergyState, and InstabilityState
 can function as a self-contained state management layer WITHOUT SemanticWorldState.
 """
 
-from app.topology_state import TopologyState
 from app.energy_state import EnergyState
 from app.instability_state import InstabilityState
+from app.topology_state import TopologyState
 
 
 def test_independent_topology():

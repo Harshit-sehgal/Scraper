@@ -9,8 +9,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
-from app.models import SchemaField, FieldType
+from app.models import FieldType, SchemaField
 from app.page_profiler import ValuePatterns
 from app.selector_discovery import (
     _analyze_page_data_type,

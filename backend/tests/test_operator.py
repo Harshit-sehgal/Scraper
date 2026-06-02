@@ -2,16 +2,13 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
-from unittest.mock import patch, MagicMock
-
-from fastapi import FastAPI
-
 from app.routers.operator import router as operator_router
 from app.visualization import OperatorMode
-
+from fastapi import FastAPI
 
 # ─────────────────────────────────────────────────────────────────────
 # Fixtures

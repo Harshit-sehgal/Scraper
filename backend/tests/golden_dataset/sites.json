@@ -13,7 +13,7 @@
       },
       "category": "ecommerce",
       "min_expected_records": 20,
-      "min_f1": 0.65,
+      "min_f1": 0.95,
       "timeout_seconds": 60,
       "notes": "Stable demo site. 50 books per page with consistent structure."
     },
@@ -44,8 +44,8 @@
         }
       },
       "category": "listing",
-      "min_expected_records": 50,
-      "min_f1": 0.65,
+      "min_expected_records": 250,
+      "min_f1": 0.95,
       "timeout_seconds": 60,
       "notes": "Stable educational scraping site."
     },

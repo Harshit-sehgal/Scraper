@@ -26,7 +26,7 @@ import time
 import uuid
 from enum import IntEnum, StrEnum
 from pathlib import Path
-from typing import Callable, Optional, Any
+from typing import Any, Callable, Optional
 
 from app.config import settings
 

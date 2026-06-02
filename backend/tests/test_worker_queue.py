@@ -306,7 +306,7 @@ class TestQueueTaskModel:
 
     def test_to_dict_from_dict_round_trip(self):
         """A QueueTask serialized to dict and back preserves all fields."""
-        from app.worker_queue import QueueTask, Priority, TaskStatus
+        from app.worker_queue import Priority, QueueTask, TaskStatus
 
         original = QueueTask(
             task_type="test",
@@ -330,7 +330,7 @@ class TestQueueTaskModel:
 
     def test_default_values(self):
         """QueueTask default values are sensible."""
-        from app.worker_queue import QueueTask, Priority, TaskStatus
+        from app.worker_queue import Priority, QueueTask, TaskStatus
 
         task = QueueTask(task_type="defaults")
         assert task.priority == Priority.NORMAL

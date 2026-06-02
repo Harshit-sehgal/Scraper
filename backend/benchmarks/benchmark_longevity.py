@@ -7,10 +7,11 @@ This suite performs a massive longevity run, tracking entropy economics,
 causal graph growth, and topology fragmentation.
 """
 
-import time
 import random
+import time
+
+from app.semantic_ir import SemanticToken, SemanticType, Span
 from app.semantic_world_state import SemanticWorldState
-from app.semantic_ir import SemanticType, SemanticToken, Span
 
 
 def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 0.5):

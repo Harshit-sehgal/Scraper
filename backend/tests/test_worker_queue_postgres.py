@@ -105,8 +105,8 @@ class TestPostgresQueueImports:
     def test_module_imports_priority_from_worker_queue(self):
         """Priority and QueueTask are imported from the base worker_queue module."""
         _require_psycopg2()
-        from app.worker_queue_postgres import PostgresWorkerQueue  # noqa: F811
         from app.worker_queue import Priority, QueueTask, TaskStatus
+        from app.worker_queue_postgres import PostgresWorkerQueue  # noqa: F811
         _ = PostgresWorkerQueue  # use import to suppress pyflakes
 
         assert Priority is not None
@@ -287,9 +287,9 @@ class TestPostgresQueueIntegration:
         would persist into the next. This fixture also resets the queue
         singletons so the next test gets a fresh ``PostgresWorkerQueue``.
         """
-        from app.worker_queue_postgres import reset_postgres_worker_queue
-        from app.worker_queue import reset_worker_queue
         from app.postgres_repository import _conn, _execute
+        from app.worker_queue import reset_worker_queue
+        from app.worker_queue_postgres import reset_postgres_worker_queue
 
         reset_postgres_worker_queue()
         reset_worker_queue()

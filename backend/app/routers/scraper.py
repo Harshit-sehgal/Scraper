@@ -8,17 +8,16 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Depends
-
-from app.config import settings
-from app.utils.rbac import UserRole, require_role
-from app.scrape_telemetry import get_scrape_telemetry
-from app.selector_memory import get_selector_memory
-from app.scraper_diagnostics import run_diagnostics
-from app.models import SchemaField
 from app.browser_pool import get_browser_pool
-from app.trend_analyzer import TrendAnalyzer, EconomicTracker
+from app.config import settings
+from app.models import SchemaField
 from app.regression_capture import get_regression_capture
+from app.scrape_telemetry import get_scrape_telemetry
+from app.scraper_diagnostics import run_diagnostics
+from app.selector_memory import get_selector_memory
+from app.trend_analyzer import EconomicTracker, TrendAnalyzer
+from app.utils.rbac import UserRole, require_role
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 router = APIRouter(prefix="/api/scraper", tags=["scraper"])
 logger = logging.getLogger(__name__)
@@ -687,7 +686,7 @@ async def record_strategy_attempt(
         - quality: Quality of extracted data [0, 1]
         - failure_reason: Optional failure category
     """
-    from app.strategy_evolution import get_strategy_evolution_engine, FetchStrategy
+    from app.strategy_evolution import FetchStrategy, get_strategy_evolution_engine
 
     engine = get_strategy_evolution_engine()
 

@@ -3,7 +3,6 @@
 import asyncio
 
 import httpx
-
 from app.main import app
 
 # Module-level in-memory job overrides —
@@ -102,8 +101,7 @@ class TestDomainPolicyEndpoint:
 
     def test_domain_policy_includes_domain_keys(self):
         """After recording failures, the endpoint should include that domain."""
-        from app.domain_runtime_policy import get_domain_runtime_policy
-        from app.domain_runtime_policy import reset_domain_runtime_policy
+        from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
         reset_domain_runtime_policy()
         policy = get_domain_runtime_policy()
         policy.record_failure("https://test-domain-policy.com/page")
@@ -113,8 +111,7 @@ class TestDomainPolicyEndpoint:
 
     def test_domain_policy_includes_recommended_action(self):
         """Each domain entry should include a recommended_action."""
-        from app.domain_runtime_policy import get_domain_runtime_policy
-        from app.domain_runtime_policy import reset_domain_runtime_policy
+        from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
         reset_domain_runtime_policy()
         policy = get_domain_runtime_policy()
         policy.record_failure("https://test-action.com/page")

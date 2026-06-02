@@ -11,7 +11,6 @@ import json
 import os
 
 import pytest
-
 from app.models import Job, JobStatus, ScrapeMode, SourcePolicy
 from app.storage_interface import (
     JobRepository,
@@ -19,7 +18,6 @@ from app.storage_interface import (
     get_job_repository,
     reset_repository,
 )
-
 
 # ----------------------------------------------------------------------
 # Fixtures
@@ -353,9 +351,9 @@ class TestPostgresSchemaRepair:
     def _import(self):
         try:
             from app.postgres_repository import (
-                _ensure_required_tables,
                 _build_create_jobs_sql,
                 _build_create_recycle_bin_sql,
+                _ensure_required_tables,
             )
             return _ensure_required_tables, _build_create_jobs_sql, _build_create_recycle_bin_sql
         except ImportError:

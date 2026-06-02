@@ -7,17 +7,17 @@ from urllib.parse import urlparse
 from app.config import settings
 from app.discovery import discover_urls, infer_source_metadata
 from app.filters import apply_location_radius, process_results
+from app.llm_bridge import get_llm_call_count, reset_llm_call_count
 from app.models import FieldType, JobStatus, ScrapeMode
-from app.scraper_recovery_integration import scrape_url_with_recovery
 from app.scraper import (
     ai_clean_and_align_records,
 )
-from app.semantic_pipeline import run_pipeline
+from app.scraper_recovery_integration import scrape_url_with_recovery
 from app.semantic_persistence import load_semantic_state, save_semantic_state
+from app.semantic_pipeline import run_pipeline
+from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
-from app.llm_bridge import get_llm_call_count, reset_llm_call_count
-from app.storage_interface import get_job_repository
 
 
 def _add_job_log(job, message: str, level: str = "info", persist_fn=None, persist_single_fn=None):
@@ -220,8 +220,8 @@ async def run_job(
                 return idx, [], False, {}
 
             # ── DomainRuntimePolicy check ─────────────────────────────────
-            from app.domain_runtime_policy import get_domain_runtime_policy
             from app.acquisition_state import AcquisitionLineage, AcquisitionState
+            from app.domain_runtime_policy import get_domain_runtime_policy
 
             policy = get_domain_runtime_policy()
 

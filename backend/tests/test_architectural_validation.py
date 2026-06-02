@@ -12,7 +12,8 @@ This test suite validates:
 
 import ast
 from pathlib import Path
-from typing import Set, Dict, List
+from typing import Dict, List, Set
+
 import pytest
 
 
@@ -111,7 +112,7 @@ class TestLayerBoundaries:
         self.validator = ArchitecturalValidator()
         # Layer ordering (layer index determines hierarchy)
         self.layer_order = ['Utility', 'Fetch', 'Crawl', 'Distributed', 'Telemetry', 'Memory', 'Extract', 'ML', 'Intelligence']
-        self.layer_index = {l: i for i, l in enumerate(self.layer_order)}
+        self.layer_index = {layer: i for i, layer in enumerate(self.layer_order)}
 
     def test_no_backward_dependencies(self):
         """FAIL: Lower layers should never import from higher layers"""
@@ -137,7 +138,7 @@ class TestLayerBoundaries:
 
     def test_utility_isolation(self):
         """PASS: Utility layer should not import from any other layer"""
-        utility_modules = [m for m, l in self.validator.layer_map.items() if l == 'Utility']
+        utility_modules = [m for m, layer in self.validator.layer_map.items() if layer == 'Utility']
         utility_imports_higher = []
 
         for util_module in utility_modules:
@@ -156,7 +157,7 @@ class TestLayerBoundaries:
         violations = []
 
         # Rule 1: Fetch layer only imports Utility
-        fetch_modules = [m for m, l in self.validator.layer_map.items() if l == 'Fetch']
+        fetch_modules = [m for m, layer in self.validator.layer_map.items() if layer == 'Fetch']
         for fetch_mod in fetch_modules:
             for imp in self.validator.get_imports(fetch_mod):
                 imp_layer = self.validator.get_layer(imp)
@@ -164,7 +165,7 @@ class TestLayerBoundaries:
                     violations.append(f"Fetch module {fetch_mod} imports {imp_layer}")
 
         # Rule 2: Crawl layer only imports Utility
-        crawl_modules = [m for m, l in self.validator.layer_map.items() if l == 'Crawl']
+        crawl_modules = [m for m, layer in self.validator.layer_map.items() if layer == 'Crawl']
         for crawl_mod in crawl_modules:
             for imp in self.validator.get_imports(crawl_mod):
                 imp_layer = self.validator.get_layer(imp)
@@ -172,7 +173,7 @@ class TestLayerBoundaries:
                     violations.append(f"Crawl module {crawl_mod} imports {imp_layer}")
 
         # Rule 3: Memory layer should primarily import Utility
-        memory_modules = [m for m, l in self.validator.layer_map.items() if l == 'Memory']
+        memory_modules = [m for m, layer in self.validator.layer_map.items() if layer == 'Memory']
         for mem_mod in memory_modules:
             for imp in self.validator.get_imports(mem_mod):
                 imp_layer = self.validator.get_layer(imp)
@@ -185,7 +186,7 @@ class TestLayerBoundaries:
 
     def test_extract_layer_dependencies(self):
         """Extract layer should primarily depend on Memory, not Intelligence"""
-        extract_modules = [m for m, l in self.validator.layer_map.items() if l == 'Extract']
+        extract_modules = [m for m, layer in self.validator.layer_map.items() if layer == 'Extract']
         intelligence_deps = []
 
         for extract_mod in extract_modules:
@@ -201,7 +202,7 @@ class TestLayerBoundaries:
 
     def test_intelligence_import_boundaries(self):
         """Intelligence layer can import from all lower layers"""
-        intelligence_modules = [m for m, l in self.validator.layer_map.items() if l == 'Intelligence']
+        intelligence_modules = [m for m, layer in self.validator.layer_map.items() if layer == 'Intelligence']
         invalid_imports = []
 
         for intel_mod in intelligence_modules:
@@ -248,8 +249,8 @@ class TestCircularDependencies:
     def test_no_cycles_in_foundation(self):
         """PASS: Foundation layers (Utility, Fetch, Crawl) should have no cycles"""
         foundation_modules = [
-            m for m, l in self.validator.layer_map.items()
-            if l in ['Utility', 'Fetch', 'Crawl']
+            m for m, layer in self.validator.layer_map.items()
+            if layer in ['Utility', 'Fetch', 'Crawl']
         ]
 
         cycles = []
@@ -324,7 +325,7 @@ class TestStateOwnership:
         intelligence_state_access = []
 
         # Intelligence should READ from memory, not WRITE state
-        intel_modules = [m for m, l in self.validator.layer_map.items() if l == 'Intelligence']
+        intel_modules = [m for m, layer in self.validator.layer_map.items() if layer == 'Intelligence']
 
         for intel_mod in intel_modules:
             imports = self.validator.get_imports(intel_mod)
@@ -363,7 +364,7 @@ class TestStateOwnership:
         # Pattern 3: Concurrent state access protected
 
         # This is mostly a code review item, but we can check for consistency
-        memory_modules = [m for m, l in self.validator.layer_map.items() if l == 'Memory']
+        memory_modules = [m for m, layer in self.validator.layer_map.items() if layer == 'Memory']
         assert len(memory_modules) >= 2, \
             f"Expected at least 2 Memory modules, found {len(memory_modules)}"
 
@@ -530,7 +531,7 @@ class TestIntegrationPoints:
     def test_plugin_interface_compliance(self):
         """Plugin modules should implement expected interfaces"""
         # ML modules should have standard inputs/outputs
-        ml_modules = [m for m, l in self.validator.layer_map.items() if l == 'ML']
+        ml_modules = [m for m, layer in self.validator.layer_map.items() if layer == 'ML']
 
         for ml_mod in ml_modules:
             # Check that ML modules don't have circular dependencies
@@ -540,7 +541,7 @@ class TestIntegrationPoints:
             for imp in imports:
                 if imp in dependents:
                     # Circular dependency detected
-                    assert False, f"ML module {ml_mod} has circular dependency with {imp}"
+                    raise AssertionError(f"ML module {ml_mod} has circular dependency with {imp}")
 
 
 # ============================================================================

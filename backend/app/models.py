@@ -9,7 +9,6 @@ import uuid
 from enum import Enum
 from typing import Optional
 
-
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 # Field names reserved for system / metadata use — cannot be used as schema field names

@@ -5,6 +5,7 @@ All tension changes go through this state object, which validates invariants.
 """
 
 from typing import Callable, Dict, Optional
+
 from app.transaction_context import active_transaction
 
 

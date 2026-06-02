@@ -5,14 +5,14 @@ field pressure, task priority, and real-time urgency.
 """
 
 import heapq
-import time
 import logging
+import time
 from collections import Counter
 from enum import IntEnum
-from typing import Dict, List, Optional, Callable, Any
+from typing import Any, Callable, Dict, List, Optional
 
-from app.semantic_events import SemanticEvent, SemanticEventType
 from app.event_dispatcher import get_dispatcher
+from app.semantic_events import SemanticEvent, SemanticEventType
 from app.semantic_world_state import get_world_state
 
 

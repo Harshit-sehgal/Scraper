@@ -4,12 +4,13 @@ LAW 15: External logic (Plugins) must be executed in a sandboxed context.
 All tool-calls must be traceable and governed by the Substrate Policy Engine.
 """
 
+import asyncio
 import json
 import logging
 import re
-import asyncio
+from typing import Any, Callable, Dict, List, Optional
+
 import httpx
-from typing import Dict, Any, List, Optional, Callable
 
 from app.config import settings
 
@@ -249,7 +250,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
 
             def _run_g4f_json():
                 try:
-                    from g4f.client import Client  # type: ignore
+                    from g4f.client import Client
                 except ImportError:
                     logging.warning("g4f not installed — skipping g4f JSON fallback")
                     return None
@@ -387,7 +388,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
 
             def _run_g4f_text():
                 try:
-                    from g4f.client import Client  # type: ignore[import-untyped]
+                    from g4f.client import Client
                 except ImportError:
                     logging.warning("g4f not installed — skipping g4f text fallback")
                     return None

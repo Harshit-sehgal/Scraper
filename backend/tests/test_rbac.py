@@ -4,9 +4,9 @@ Verifies that route guards correctly allow/reject requests based on configured k
 """
 
 import pytest
-
-from app.utils.rbac import UserRole, get_current_role
 from app.config import settings
+from app.utils.rbac import UserRole, get_current_role
+from fastapi import HTTPException
 
 
 def test_role_resolution_with_keys(monkeypatch):
@@ -43,7 +43,7 @@ def test_role_resolution_with_keys(monkeypatch):
 
     # 4. Unauthenticated
     req = MockRequest({"X-API-Key": "invalid-key"})
-    with pytest.raises(Exception):
+    with pytest.raises((HTTPException, Exception)):
         get_current_role(req)
 
 

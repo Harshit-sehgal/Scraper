@@ -9,7 +9,7 @@ to expire, rather than waiting for a redirect to discover the problem.
 from __future__ import annotations
 
 import re
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from app.config import settings
 

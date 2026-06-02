@@ -106,6 +106,7 @@ class DatabaseSlidingWindowCounter:
         self.window_seconds = window_seconds
         self.key = key
         self._initialized = False
+        self._fallback_counter = SlidingWindowCounter(max_requests, window_seconds)
 
     def _ensure_table(self) -> None:
         if self._initialized:
@@ -128,7 +129,7 @@ class DatabaseSlidingWindowCounter:
                 logger.warning("Failed to initialize Postgres rate limit table: %s", e)
         else:
             try:
-                from app.job_store import _get_connection, _DB_LOCK
+                from app.job_store import _DB_LOCK, _get_connection
                 with _DB_LOCK:
                     conn = _get_connection()
                     try:
@@ -169,10 +170,10 @@ class DatabaseSlidingWindowCounter:
                 return True
             except Exception as e:
                 logger.warning("Postgres rate limiter database error: %s. Falling back to in-memory behavior.", e)
-                return False
+                return self._fallback_counter.allow()
         else:
             try:
-                from app.job_store import _get_connection, _DB_LOCK
+                from app.job_store import _DB_LOCK, _get_connection
                 with _DB_LOCK:
                     conn = _get_connection()
                     try:
@@ -191,7 +192,7 @@ class DatabaseSlidingWindowCounter:
                 return True
             except Exception as e:
                 logger.warning("SQLite rate limiter database error: %s. Falling back to in-memory behavior.", e)
-                return False
+                return self._fallback_counter.allow()
 
     def remaining(self) -> int:
         self._ensure_table()
@@ -209,10 +210,10 @@ class DatabaseSlidingWindowCounter:
                     count = row["count"] if row else 0
                     return max(0, self.max_requests - count)
             except Exception:
-                return 0
+                return self._fallback_counter.remaining()
         else:
             try:
-                from app.job_store import _get_connection, _DB_LOCK
+                from app.job_store import _DB_LOCK, _get_connection
                 with _DB_LOCK:
                     conn = _get_connection()
                     try:
@@ -223,7 +224,7 @@ class DatabaseSlidingWindowCounter:
                     finally:
                         conn.close()
             except Exception:
-                return 0
+                return self._fallback_counter.remaining()
 
     def reset_in(self) -> float:
         self._ensure_table()
@@ -241,10 +242,10 @@ class DatabaseSlidingWindowCounter:
                         return 0.0
                     return max(0.0, self.window_seconds - (now - min_ts))
             except Exception:
-                return 0.0
+                return self._fallback_counter.reset_in()
         else:
             try:
-                from app.job_store import _get_connection, _DB_LOCK
+                from app.job_store import _DB_LOCK, _get_connection
                 with _DB_LOCK:
                     conn = _get_connection()
                     try:
@@ -256,7 +257,7 @@ class DatabaseSlidingWindowCounter:
                     finally:
                         conn.close()
             except Exception:
-                return 0.0
+                return self._fallback_counter.reset_in()
 
     def is_expired(self) -> bool:
         return False

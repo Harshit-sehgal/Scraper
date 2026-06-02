@@ -1,9 +1,10 @@
 """Tests for the Transactional Priority Queue."""
 import time
+
 import pytest
 from app.transactional_priority_queue import (
-    TransactionalPriorityQueue,
     PriorityLevel,
+    TransactionalPriorityQueue,
     reset_priority_queue,
 )
 

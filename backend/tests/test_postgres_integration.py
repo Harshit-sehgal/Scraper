@@ -11,11 +11,10 @@ Or to run all postgres-marked tests:
 """
 
 import os
-import pytest
 
+import pytest
 from app.models import Job, JobStatus, ScrapeMode, SourcePolicy
 from app.storage_interface import get_job_repository, reset_repository
-
 
 pytestmark = pytest.mark.postgres
 
@@ -64,7 +63,7 @@ def clean_db(postgres_container):
     Calls _ensure_schema() first so all tables exist before DELETE statements
     run — this prevents failures on fresh databases where tables don't exist yet.
     """
-    from app.postgres_repository import _conn, _execute, _ensure_schema
+    from app.postgres_repository import _conn, _ensure_schema, _execute
 
     reset_repository()
     _ensure_schema()
@@ -362,8 +361,7 @@ class TestPostgresSchemaRepairIntegration:
         Then: recycle_bin table is created, schema upgraded to version 2.
         """
         import psycopg2
-        from app.postgres_repository import _close_pool, _conn, _fetch_one
-        from app.postgres_repository import PostgresJobRepository
+        from app.postgres_repository import PostgresJobRepository, _close_pool, _conn, _fetch_one
         from app.storage_interface import reset_repository
 
         dsn = os.environ["DATAFORGE_DATABASE_URL"]
@@ -427,10 +425,9 @@ class TestPostgresSchemaRepairIntegration:
         When: save_single is called with an active job with the same ID.
         Then: The job becomes visible again (deleted_at = NULL).
         """
-        from app.postgres_repository import _close_pool
-        from app.postgres_repository import PostgresJobRepository
-        from app.storage_interface import reset_repository
         from app.models import Job, JobStatus
+        from app.postgres_repository import PostgresJobRepository, _close_pool
+        from app.storage_interface import reset_repository
 
         _close_pool()
         reset_repository()

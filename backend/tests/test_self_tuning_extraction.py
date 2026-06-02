@@ -11,11 +11,11 @@ Tests:
   - Report generation
 """
 
+from app.config import settings
 from app.self_tuning_extraction import (
     SelfTuningController,
     get_self_tuning_controller,
 )
-from app.config import settings
 
 
 class TestSelfTuningController:

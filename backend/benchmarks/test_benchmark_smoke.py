@@ -7,17 +7,18 @@ This file is not collected by pytest under the current pytest.ini. Results are
 network-dependent and should be treated as live smoke observations, not proof of
 universal extraction behavior.
 """
-from app.config import settings
-from app.scraper import scrape_url
-from app.models import FieldType, SchemaField
 import asyncio
 import json
 import logging
 import os
-import time
 import sys
-import pytest
+import time
 from dataclasses import dataclass, field
+
+import pytest
+from app.config import settings
+from app.models import FieldType, SchemaField
+from app.scraper import scrape_url
 
 # Ensure backend is on the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -734,10 +735,10 @@ async def test_live_benchmark_extraction():
 
     print("\nRunning live benchmark suite...")
     results = await run_all_tests()
-    
+
     # Enforce minimum thresholds on the live results
     successful_sites = [r for r in results if r.success and r.records > 0]
     print(f"\nLive Benchmark Summary: {len(successful_sites)}/{len(results)} sites extracted records successfully.")
-    
+
     # Verify that at least a basic set of sites succeeded
     assert len(successful_sites) >= 3, f"Live benchmark underperformed: only {len(successful_sites)} sites succeeded."

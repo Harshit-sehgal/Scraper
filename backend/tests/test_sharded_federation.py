@@ -5,10 +5,11 @@ Unit Tests for Phase 83 Multi-Shard Federation State Merging.
 from __future__ import annotations
 
 import time
+
 import pytest
-from app.semantic_world_state import get_world_state
-from app.federation_manager import FederationManager, ShardStateSnapshot
 from app.crawl_policy import get_crawl_policy
+from app.federation_manager import FederationManager, ShardStateSnapshot
+from app.semantic_world_state import get_world_state
 
 
 @pytest.fixture

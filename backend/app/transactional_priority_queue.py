@@ -13,12 +13,12 @@ preventing starvation of any priority class during sustained high load.
 Phase 47: Distributed Resilience — preventing transaction starvation.
 """
 
-import time
 import heapq
 import logging
 import threading
-from typing import Any, List, Optional
+import time
 from enum import IntEnum
+from typing import Any, List, Optional
 
 logger = logging.getLogger(__name__)
 

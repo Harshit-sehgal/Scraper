@@ -1,7 +1,7 @@
 import asyncio
 
-from app import scraper as scraper_mod
 from app import cleaning_engine as cleaning_mod
+from app import scraper as scraper_mod
 from app.models import FieldType, SchemaField
 
 

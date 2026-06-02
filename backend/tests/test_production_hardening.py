@@ -1,6 +1,7 @@
-import pytest
 import socket
 from pathlib import Path
+
+import pytest
 from app import main as main_mod
 from app.models import Job, JobStatus, ScrapeMode
 

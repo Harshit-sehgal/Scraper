@@ -125,10 +125,7 @@ def test_mutation_apis_have_rw_separation():
 
 def test_field_laws_are_accessible():
     """field_laws must export all law constants."""
-    from app.field_laws import (
-        PROPAGATION_DECAY_FLOOR, MAX_COUPLING_TRANSFER,
-        MAX_INSTABILITY_FLUX, MAX_ATTRACTOR_PULL
-    )
+    from app.field_laws import MAX_ATTRACTOR_PULL, MAX_COUPLING_TRANSFER, MAX_INSTABILITY_FLUX, PROPAGATION_DECAY_FLOOR
     assert PROPAGATION_DECAY_FLOOR == 0.3
     assert MAX_COUPLING_TRANSFER == 0.3
     assert MAX_INSTABILITY_FLUX == 0.2
@@ -149,8 +146,9 @@ def test_invariant_firewall_decorator():
 
 def test_core_types_are_shared():
     """core_types must provide FieldConflictRegion."""
-    from app.core_types import FieldConflictRegion
     import dataclasses
+
+    from app.core_types import FieldConflictRegion
     fcr = dataclasses.fields(FieldConflictRegion)
     fcr_names = {f.name for f in fcr}
     assert 'token' in fcr_names

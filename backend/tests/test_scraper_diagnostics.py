@@ -5,11 +5,11 @@ Tests ScraperDiagnosticReport and the run_diagnostics function.
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
+from app.models import FieldType, SchemaField
 from app.scraper_diagnostics import ScraperDiagnosticReport, run_diagnostics
-from app.models import SchemaField, FieldType
 
 
 class TestScraperDiagnosticReport:

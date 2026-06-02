@@ -23,10 +23,10 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, asdict, field
+from collections import deque
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Optional
-from collections import deque
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)

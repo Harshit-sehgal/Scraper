@@ -6,9 +6,9 @@ semantic streams (noise, contradictions, and recursive hallucinations).
 """
 
 import pytest
+from app.semantic_ir import SemanticType
 from app.semantic_pipeline import run_pipeline
 from app.semantic_world_state import get_world_state
-from app.semantic_ir import SemanticType
 
 
 @pytest.fixture
@@ -95,6 +95,7 @@ def test_oscillation_detection(ws):
 def test_massive_topology_scaling(ws):
     """Verify performance with 100 regions."""
     import time
+
     from app.semantic_ir import SemanticToken, Span
 
     start_time = time.time()

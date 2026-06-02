@@ -8,7 +8,8 @@ Owns:
 - transition_observations: int — total observations made
 """
 
-from typing import Callable, Dict, Tuple, Optional
+from typing import Callable, Dict, Optional, Tuple
+
 from app.transaction_context import active_transaction
 
 

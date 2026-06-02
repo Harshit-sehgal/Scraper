@@ -10,7 +10,6 @@ import json
 import os
 import tempfile
 from pathlib import Path
-
 from typing import Any
 
 from app.models import Job, JobStatus

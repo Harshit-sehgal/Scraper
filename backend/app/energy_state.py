@@ -12,9 +12,8 @@ _convergence, _temperature, _integrity, _smoothed_* smoothing caches.
 """
 
 import math
+from typing import Callable, Dict, Optional
 
-
-from typing import Callable, Optional, Dict
 from app.transaction_context import active_transaction
 
 

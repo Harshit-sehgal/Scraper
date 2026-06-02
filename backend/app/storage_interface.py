@@ -121,7 +121,7 @@ class SQLiteJobRepository(JobRepository):
 
     def is_cancel_requested(self, job_id: str) -> bool:
         """Check from SQLite whether a job has a pending cancellation request."""
-        from app.job_store import _get_connection, _DB_LOCK
+        from app.job_store import _DB_LOCK, _get_connection
 
         with _DB_LOCK:
             conn = _get_connection()
@@ -144,8 +144,9 @@ class SQLiteJobRepository(JobRepository):
     def save_world_state(self, payload: dict) -> None:
         """Save semantic world state to the SQLite world_state.json file atomically."""
         import json
-        import tempfile
         import os
+        import tempfile
+
         from app.job_store import _get_db_path
 
         ws_path = _get_db_path().parent / "world_state.json"
@@ -166,6 +167,7 @@ class SQLiteJobRepository(JobRepository):
     def load_world_state(self) -> Optional[dict]:
         """Load semantic world state from the SQLite world_state.json file."""
         import json
+
         from app.job_store import _get_db_path
 
         ws_path = _get_db_path().parent / "world_state.json"
@@ -178,7 +180,7 @@ class SQLiteJobRepository(JobRepository):
 
     def move_to_recycle_bin(self, job_id: str) -> bool:
         """Move a job to the recycle bin atomically in SQLite."""
-        from app.job_store import _get_connection, _DB_LOCK
+        from app.job_store import _DB_LOCK, _get_connection
 
         with _DB_LOCK:
             conn = _get_connection()
@@ -214,7 +216,7 @@ class SQLiteJobRepository(JobRepository):
 
     def restore_from_recycle_bin(self, job_id: str) -> bool:
         """Restore a job from the recycle bin back to active jobs atomically in SQLite."""
-        from app.job_store import _get_connection, _DB_LOCK
+        from app.job_store import _DB_LOCK, _get_connection
 
         with _DB_LOCK:
             conn = _get_connection()
@@ -250,7 +252,7 @@ class SQLiteJobRepository(JobRepository):
 
     def hard_delete(self, job_id: str) -> bool:
         """Permanently delete a job atomically in SQLite."""
-        from app.job_store import _get_connection, _DB_LOCK
+        from app.job_store import _DB_LOCK, _get_connection
 
         with _DB_LOCK:
             conn = _get_connection()
@@ -268,7 +270,7 @@ class SQLiteJobRepository(JobRepository):
 
     def clear_terminal_jobs(self, older_than: Optional[str] = None) -> int:
         """Remove terminal-status jobs atomically in SQLite and move them to recycle_bin."""
-        from app.job_store import _get_connection, _DB_LOCK
+        from app.job_store import _DB_LOCK, _get_connection
 
         terminal_statuses = ("completed", "failed", "canceled", "degraded", "empty_result")
         with _DB_LOCK:

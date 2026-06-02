@@ -60,8 +60,8 @@ class CrawlFrontier:
         self._load_from_db()
 
     def _init_db(self) -> None:
-        import sqlite3
         import os
+        import sqlite3
 
         os.makedirs(os.path.dirname(self._db_path), exist_ok=True)
         with sqlite3.connect(self._db_path) as conn:
@@ -88,8 +88,8 @@ class CrawlFrontier:
             conn.commit()
 
     def _load_from_db(self) -> None:
-        import sqlite3
         import heapq
+        import sqlite3
         from urllib.parse import urlparse
 
         try:

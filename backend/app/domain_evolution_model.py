@@ -22,9 +22,9 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, asdict, field
-from typing import Optional, Dict
 from collections import deque
+from dataclasses import asdict, dataclass, field
+from typing import Dict, Optional
 
 from app.selector_memory import get_selector_memory
 

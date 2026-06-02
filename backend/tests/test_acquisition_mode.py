@@ -1,8 +1,8 @@
 """Tests for acquisition mode and escalation logic."""
 
 from app.acquisition_mode import (
-    AcquisitionMode,
     AcquisitionConfig,
+    AcquisitionMode,
     escalate_mode,
     should_escalate,
 )

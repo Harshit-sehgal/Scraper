@@ -1,6 +1,6 @@
 """Tests for redirect detection and content quality assessment in URL Analyzer."""
 
-from app.selector_discovery import _detect_redirect, _assess_content_quality
+from app.selector_discovery import _assess_content_quality, _detect_redirect
 
 
 class TestDetectRedirect:

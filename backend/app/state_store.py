@@ -8,15 +8,14 @@ Storage safety features:
 - Reasonable retry for transient I / O errors
 """
 
+import atexit
+import concurrent.futures
 import datetime
 import json
 import logging
 import shutil
-import atexit
 from pathlib import Path
 from threading import Lock
-import concurrent.futures
-
 from typing import Optional
 
 from app.models import Job, JobStatus

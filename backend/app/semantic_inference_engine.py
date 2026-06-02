@@ -9,7 +9,7 @@ import concurrent.futures
 import logging
 import threading
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 from app.semantic_ir import (
     SemanticGraph,

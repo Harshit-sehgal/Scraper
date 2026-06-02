@@ -1,7 +1,7 @@
 import pytest
-from fastapi import FastAPI
 from app.config import settings
 from app.main import lifespan
+from fastapi import FastAPI
 
 
 @pytest.mark.asyncio

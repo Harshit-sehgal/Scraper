@@ -7,15 +7,13 @@ used to ensure LLM JSON responses conform to expected structures.
 from __future__ import annotations
 
 import pytest
-
 from app.llm_validator import (
+    llm_call_with_validation,
+    validate_insight_response,
     validate_llm_json,
     validate_llm_record_list,
-    llm_call_with_validation,
     validate_selector_response,
-    validate_insight_response,
 )
-
 
 # ─── validate_llm_json ──────────────────────────────────────────────
 

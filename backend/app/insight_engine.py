@@ -9,7 +9,8 @@ from __future__ import annotations
 import logging
 
 from app.config import settings
-from app.llm_bridge import llm_json as _llm_json, llm_text as _llm_text
+from app.llm_bridge import llm_json as _llm_json
+from app.llm_bridge import llm_text as _llm_text
 
 logger = logging.getLogger(__name__)
 

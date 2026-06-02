@@ -1,5 +1,5 @@
 from contextvars import ContextVar
-from typing import Optional, Any, Dict
+from typing import Any, Dict, Optional
 
 # Canonical transaction context for the semantic substrate
 # Maps state_object_id -> staging_dict

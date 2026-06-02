@@ -8,12 +8,13 @@ This suite runs 10k+ evolution cycles and analyzes the dynamical stability
 of the semantic substrate.
 """
 
-import time
 import random
+import time
+from typing import Dict, List
+
 import pytest
-from typing import List, Dict
+from app.semantic_ir import SemanticToken, SemanticType, Span
 from app.semantic_world_state import SemanticWorldState
-from app.semantic_ir import SemanticType, SemanticToken, Span
 
 
 class DynamicalAnalyzer:

@@ -6,14 +6,15 @@ from __future__ import annotations
 
 import os
 import tempfile
+
 import pytest
 from app.crawl_frontier import CrawlFrontier
 
 
 @pytest.fixture(autouse=True)
 def clean_db(monkeypatch):
-    from app.config import settings
     from app import crawl_policy
+    from app.config import settings
     from app.crawl_frontier import CrawlFrontier
 
     monkeypatch.setattr(settings, "CRAWL_RESPECT_ROBOTS", False)

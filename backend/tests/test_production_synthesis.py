@@ -1,6 +1,7 @@
 import os
-from app.semantic_world_state import get_world_state
+
 from app.checkpoint_manager import get_checkpoint_manager
+from app.semantic_world_state import get_world_state
 
 
 def test_exhaustive_replay_manifold():

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _SETTINGS_ENV_FILE = os.getenv("DATAFORGE_DOTENV_PATH", ".env").strip() or ".env"
@@ -671,6 +672,9 @@ class Settings(BaseSettings):
     def TEST_SELECTOR_DECAY_PERSISTENCE(self) -> bool:
         """Whether to persist selector decay snapshots during tests. Reads from TEST_SELECTOR_DECAY_PERSISTENCE env var dynamically."""
         return (os.environ.get("TEST_SELECTOR_DECAY_PERSISTENCE") or "").strip().lower() in ("true", "1", "yes")
+
+    ENABLE_EXPERIMENTAL_ROUTES: bool = False
+    """Enable experimental / research-only API routes."""
 
     # ─── Federation / Sharding ──────────────────────────────────────────────
     NODE_ID: str = "node-1"

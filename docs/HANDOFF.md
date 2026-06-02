@@ -7,19 +7,7 @@ DataForge Scraper is a pre-production FastAPI + Playwright extraction platform. 
 
 ## Current Verified Snapshot
 
-| Area | Result | Status |
-| --- | --- | --- |
-| Syntax | `compileall` passed with no output | Freshly verified |
-| Architecture | `VALIDATION PASSED: Architecture is lawful.` | Freshly verified |
-| Collection | `1937 tests collected in 0.40s` | Freshly verified |
-| Safe SQLite suite | `1862 passed, 73 skipped, 0 failed in 120.03s` | Freshly verified |
-| Benchmark smoke | `1 passed, 1 skipped in 0.26s` | Freshly verified |
-| Route auth matrix | 81 routes, 3 public, correct enforcement | Freshly verified |
-| Prod env validation | Intentionally fails placeholders | Freshly verified |
-| Postgres integration | `1907 passed, 28 skipped, 0 failed in 142.41s` | Freshly verified (Rate limit flaky collisions resolved via unique keys) |
-| Browser e2e suite | `10 passed, 0 failed in 10.11s` | Freshly verified e2e tests |
-| Golden live tests | `7 passed, 1 skipped in 42.74s` | Freshly verified (1 skipped due to external httpbin.org 503 error) |
-| Docker build & Compose | Documented historically | Not re-run in this session |
+For the latest verified snapshot, including exact test execution numbers, syntax compilation checks, architecture compliance validations, and docker/Compose environment statuses, see [PROJECT_STATUS.md](../PROJECT_STATUS.md).
 
 ## Most Important Remaining Work
 

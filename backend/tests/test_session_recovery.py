@@ -15,13 +15,11 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from app.selector_discovery import (
     _detect_redirect,
     _detect_search_form,
     _map_search_params_to_fields,
 )
-
 
 # ── HTML fixtures ──────────────────────────────────────────────────────
 
@@ -185,8 +183,8 @@ class TestSessionRecoveryMetadata:
                 patch("app.url_safety.validate_public_http_url", return_value=None), \
                 patch("httpx.AsyncClient") as mock_httpx_client:
 
-            from app.selector_discovery import analyze_url_for_fields
             from app.page_profiler import StructureProfile, ValuePatterns
+            from app.selector_discovery import analyze_url_for_fields
 
             # Mock the initial httpx redirect check: stale deep URL -> homepage.
             redirect_resp = MagicMock()
@@ -299,8 +297,8 @@ class TestSessionRecoveryMetadata:
                 patch("app.url_safety.validate_public_http_url", return_value=None), \
                 patch("httpx.AsyncClient") as mock_httpx_client:
 
-            from app.selector_discovery import analyze_url_for_fields
             from app.page_profiler import StructureProfile, ValuePatterns
+            from app.selector_discovery import analyze_url_for_fields
 
             # Mock the initial httpx redirect check: stale deep URL -> homepage.
             redirect_resp = MagicMock()

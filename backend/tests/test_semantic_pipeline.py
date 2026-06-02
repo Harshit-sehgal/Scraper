@@ -1,6 +1,7 @@
 """Tests for the core semantic pipeline and allocation engine."""
 
 from app.semantic_allocation_engine import _get_role_engine, allocate_semantic_roles
+from app.semantic_boundary_engine import group_adjacent_entities
 from app.semantic_inference_engine import (
     RoleEmbeddingEngine,
 )
@@ -11,16 +12,13 @@ from app.semantic_ir import (
     Span,
     create_token,
 )
+from app.semantic_mapper import detect_semantic_type, is_child_fragment
+from app.semantic_persistence import clear_semantic_state
 from app.semantic_pipeline import (
     filter_noise_records,
     run_pipeline,
     strip_metadata,
 )
-from app.semantic_mapper import detect_semantic_type, is_child_fragment
-from app.semantic_boundary_engine import group_adjacent_entities
-
-
-from app.semantic_persistence import clear_semantic_state
 
 
 def _clean_engine():

@@ -13,7 +13,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.utils.job_results_store import (
     delete_job_results_from_disk,
     get_job_results_path,

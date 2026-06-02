@@ -5,8 +5,9 @@ Unit Tests for Phase 85 Shared Geocoding Cache.
 from __future__ import annotations
 
 import os
+
 import pytest
-from app.geocode_cache import GeocodeCache, CACHE_DB_PATH
+from app.geocode_cache import CACHE_DB_PATH, GeocodeCache
 
 
 @pytest.fixture(autouse=True)

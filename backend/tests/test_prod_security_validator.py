@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+
 import pytest
 from app.utils.prod_security_validator import validate_production_credentials
 
