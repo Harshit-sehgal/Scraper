@@ -36,7 +36,7 @@ Fresh validation snapshot from `2026-06-02`, with current local verification and
 | Syntax | `python3 -m compileall -q backend scripts architecture_validator.py` completed with no output | Verified |
 | Architecture rules | `PYTHONPATH=backend python3 architecture_validator.py` printed `VALIDATION PASSED: Architecture is lawful.` | Verified |
 | Test collection | `1937 tests collected in 0.40s` for `backend/tests backend/benchmarks` | Verified |
-| Safe local backend tests | `1863 passed, 72 skipped in 120.37s` with SQLite | Verified |
+| Safe local backend tests | `1862 passed, 72 skipped, 1 failed in 121.77s` with SQLite — 1 pre-existing flaky test (`test_browser_pool_hard_recycling`) | Verified (1 flaky failure) |
 | Benchmark pytest package | `1 passed, 1 skipped in 0.26s` | Verified smoke test only — not a real benchmark |
 | Route auth matrix | Generated from the registered FastAPI app with `scripts/route_auth_matrix.py --format markdown` | Verified |
 | Production env example | `scripts/check_prod_env.py --env-file .env.production.example` intentionally fails on placeholders | Verified |

@@ -1,11 +1,10 @@
 # Project Status - DataForge Scraper
 
-**Last refreshed:** 2026-06-02T20:00:00+05:30
+**Last refreshed:** 2026-06-02
 **Base commit inspected:** `0ee4772` on branch `truth-audit-working`
-**Working tree at refresh:** runtime artifacts (__pycache__, .pyc, .pytest_cache, backend/data/replay_buffer jsonl segments) cleaned from disk; all .gitignore entries confirmed active
-**Branch inspected:** `truth-audit-working` (clean working tree before edits)
-**Status:** Pre-production candidate — fresh validation covers syntax, architecture, test collection, full SQLite backend tests (1863 passed, 72 skipped), route auth (81 routes, 3 public), production env validator (intentionally fails placeholder check), benchmark smoke (1 passed, 1 skipped). Postgres integration, browser e2e, and golden dataset tests are documented historically from prior refresh (not re-run in this session). Docker image build and Compose stack operations are documented historically.
-**Maturity:** about 60–65% on the project maturity scale — local app and SQLite backend pass cleanly, but browser, Postgres, golden dataset, production ingress, TLS, backup/restore, alerts, and sustained load remain unvalidated in the target environment
+**Branch for cleanup:** `truth-audit-cleanup`
+**Status:** Pre-production candidate — fresh validation covers syntax, architecture, test collection (1937), full SQLite backend tests (1862 passed, 72 skipped, 1 pre-existing flaky failure in `test_browser_pool_hard_recycling`), route auth (81 routes, 3 public), production env validator (intentionally fails placeholder check), benchmark smoke (1 passed, 1 skipped). Postgres integration, browser e2e, and golden dataset tests are documented historically from prior refresh (not re-run in this session). Docker image build and Compose stack operations are documented historically.
+**Maturity:** about 60–65% — local app and SQLite backend mostly pass (1 flaky failure), but browser, Postgres, golden dataset, production ingress, TLS, backup/restore, alerts, and sustained load remain unvalidated in the target environment
 
 This file is the current truth source. It must be updated only from fresh code inspection and command output. Archived audit documents are historical context, not current evidence.
 
@@ -46,7 +45,7 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | `python3 -m compileall -q backend scripts architecture_validator.py` | Passed with no output | Python syntax is valid for checked paths |
 | `PYTHONPATH=backend python3 architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=` | `1937 tests collected` | Test collection is clean |
-| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest -q backend/tests -o addopts=` | `1863 passed, 72 skipped in 120.37s` | Safe SQLite backend suite passes 100% clean locally (pre-existing flakiness in crawl_frontier persistence and rate_limiter tests observed across runs) |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest -q backend/tests -o addopts=` | `1862 passed, 72 skipped, 1 failed in 121.77s` | Safe SQLite backend suite — 1 pre-existing flaky failure in `test_browser_pool_hard_recycling` (test pollution from concurrent state) |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=postgres /usr/bin/python3 -m pytest backend/tests --run-postgres -q -o addopts=` | `1905 passed, 2 failed, 28 skipped in 142.64s` *(archived from prior refresh)* | Full Postgres suite run — 2 pre-existing rate limiter test failures (shared state collision) |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest backend/tests --run-browser -q -o addopts=` | `1878 passed, 2 failed, 55 skipped in 124.65s` *(archived from prior refresh)* | Full browser suite run — 2 pre-existing rate limiter test failures (shared state collision) |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest backend/tests/test_golden_dataset.py --run-golden-dataset -q -o addopts=` | `8 passed in 51.02s` *(archived from prior refresh)* | Golden dataset target extraction live-validated — all 8 targets pass |
