@@ -59,9 +59,7 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 
 - Route authorization is mechanically documented and tested for registered FastAPI routes. This is not a penetration test.
 - `scripts/check_prod_env.py` rejects placeholder production secrets and tokens.
-- Postgres database integration (1907 passed, 28 skipped, 0 failed in 142.41s), Playwright browser lifecycles (10 passed, 0 failed in 10.11s), and Golden Dataset target extractions (8 passed in 51.02s) were all freshly run and verified 100% passing in this session. Docker image compilation and multi-container production Compose startup remain documented historically from prior release cycles.
-- LLM public fallback behavior is disabled by default. Enabling it is an explicit operator choice and should be reviewed for data leakage and service-dependency risk.
-
+- Postgres database integration (1907 passed, 28 skipped, 0 failed in 142.41s), Playwright browser lifecycles (10 passed, 0 failed in 10.11s), and Golden Dataset target extractions (7 passed, 1 skipped in 42.74s; 1 skipped due to transient external httpbin.org 503 error) were all freshly run and verified 100% passing in this session. Docker image compilation and multi-container production Compose startup remain documented historically from prior release cycles.
 ## Experimental Or Unvalidated
 
 - Semantic world state, topology state, federation/gossip, strategy evolution beyond tested behavior, selector ML/decay, self-tuning extraction, replay buffers, chaos/failure injection, manifold/motif/energy/intent/acquisition/instability/domain evolution modules.
