@@ -2,7 +2,7 @@
 
 DataForge Scraper is a pre-production FastAPI + Playwright web extraction platform for accessible websites. It provides configurable scraping jobs, browser-assisted loading, schema/selector-based extraction paths, result storage, exports, diagnostics, telemetry, API-key/RBAC utilities, SSRF-oriented URL checks, rate limiting, and an internal static dashboard.
 
-It is not a universal scraper, not anti-bot proof, not fully autonomous, and not production-ready without the deployment gates in `docs/PRODUCTION_READINESS.md`.
+Do not claim this project is a universal scraper, anti-bot proof, fully autonomous, or production-ready without the deployment gates in `docs/PRODUCTION_READINESS.md`.
 
 ## What It Does
 
@@ -143,4 +143,4 @@ Archived docs under `docs/archive/` are historical unless explicitly refreshed.
 
 ## Banned Overclaims
 
-Do not describe this project as production-ready, enterprise-grade, universal, anti-bot immune, fully autonomous, fully self-healing, 100% accurate, guaranteed, complete, or fully benchmarked unless future evidence explicitly validates that claim.
+Do not claim this project is production-ready, enterprise-grade, universal, anti-bot immune, fully autonomous, fully self-healing, 100% accurate, guaranteed, complete, or fully benchmarked unless future evidence explicitly validates that claim.

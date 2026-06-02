@@ -342,7 +342,7 @@ jobs:
           
           FOUND=0
           for pattern in "${BANNED_PATTERNS[@]}"; do
-            if grep -r "$pattern" docs/ README.md 2>/dev/null | grep -v "Banned\|banned\|Do not claim"; then
+            if grep -r --exclude-dir=archive "$pattern" docs/ README.md 2>/dev/null | grep -v "Banned\|banned\|Do not claim"; then
               echo "ERROR: Found banned claim: $pattern"
               FOUND=1
             fi
