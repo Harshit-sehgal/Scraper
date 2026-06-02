@@ -98,9 +98,9 @@ jobs:
           2>&1 | tee /tmp/test_results.txt
           
           PASSED=$(grep "passed" /tmp/test_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
-          echo "SQLite tests passed: $PASSED"
+          echo "SQLite tests passed: ${PASSED:-0}"
           
-          if [ "$PASSED" -lt 1840 ]; then
+          if [ "${PASSED:-0}" -lt 1840 ]; then
             echo "FAILED: Expected ~1863 tests passed, got $PASSED"
             exit 1
           fi
@@ -136,9 +136,9 @@ jobs:
           2>&1 | tee /tmp/security_results.txt
           
           PASSED=$(grep "passed" /tmp/security_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
-          echo "Security tests passed: $PASSED"
+          echo "Security tests passed: ${PASSED:-0}"
           
-          if [ "$PASSED" -lt 170 ]; then
+          if [ "${PASSED:-0}" -lt 170 ]; then
             echo "FAILED: Expected ~178 security tests passed, got $PASSED"
             exit 1
           fi
@@ -219,9 +219,9 @@ jobs:
           
           PASSED=$(grep "passed" /tmp/postgres_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
           FAILED=$(grep "failed" /tmp/postgres_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
-          echo "Postgres tests: $PASSED passed, $FAILED failed"
+          echo "Postgres tests: ${PASSED:-0} passed, ${FAILED:-0} failed"
           
-          if [ "$FAILED" -gt 2 ]; then
+          if [ "${FAILED:-0}" -gt 2 ]; then
             echo "FAILED: Postgres tests have too many failures"
             exit 1
           fi
@@ -258,9 +258,9 @@ jobs:
           
           PASSED=$(grep "passed" /tmp/browser_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
           FAILED=$(grep "failed" /tmp/browser_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
-          echo "Browser tests: $PASSED passed, $FAILED failed"
+          echo "Browser tests: ${PASSED:-0} passed, ${FAILED:-0} failed"
           
-          if [ "$FAILED" -gt 0 ]; then
+          if [ "${FAILED:-0}" -gt 0 ]; then
             echo "FAILED: Browser e2e tests have failures"
             exit 1
           fi
@@ -293,9 +293,9 @@ jobs:
           
           PASSED=$(grep "passed" /tmp/golden_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
           FAILED=$(grep "failed" /tmp/golden_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
-          echo "Golden dataset tests: $PASSED passed, $FAILED failed"
+          echo "Golden dataset tests: ${PASSED:-0} passed, ${FAILED:-0} failed"
           
-          if [ "$FAILED" -gt 0 ]; then
+          if [ "${FAILED:-0}" -gt 0 ]; then
             echo "FAILED: Golden dataset tests have failures"
             exit 1
           fi
