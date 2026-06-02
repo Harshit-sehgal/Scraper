@@ -355,7 +355,7 @@ jobs:
       - name: Verify test counts are recent
         run: |
           # Check that docs were updated within last 7 days
-          LAST_UPDATE=$(git log -1 --format=%ai docs/TESTING.md docs/PROJECT_STATUS.md | head -1 | cut -d' ' -f1)
+          LAST_UPDATE=$(git log -1 --format=%ai docs/TESTING.md PROJECT_STATUS.md | head -1 | cut -d' ' -f1)
           TODAY=$(date +%Y-%m-%d)
           
           echo "Last doc update: $LAST_UPDATE"
