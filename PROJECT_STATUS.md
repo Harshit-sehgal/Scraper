@@ -46,7 +46,7 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | `PYTHONPATH=backend python3 architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass |
 | `python3 -m mypy backend/app --ignore-missing-imports` | `Success: no issues found in 158 source files` | Mypy static type checking passes 100% clean |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=` | `1937 tests collected` | Test collection is clean |
-| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest -q backend/tests -o addopts=` | `1863 passed, 72 skipped in 120.39s` | Safe SQLite backend suite — now 100% clean after fixing `test_browser_pool_hard_recycling` (was mocking `_get_rss_memory` too late) |
+| `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest -q backend/tests -o addopts=` | `1862 passed, 73 skipped in 120.03s` | Safe SQLite backend suite — 100% clean pass |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=postgres /usr/bin/python3 -m pytest backend/tests --run-postgres -q -o addopts=` | `1907 passed, 28 skipped, 0 failed in 142.41s` | Full Postgres suite run — 100% clean, rate-limiter flaky collisions resolved |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest backend/tests --run-browser -q -o addopts=` | `10 passed, 0 failed in 10.11s` | Playwright browser e2e tests run — 100% clean |
 | `PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite /usr/bin/python3 -m pytest backend/tests/test_golden_dataset.py --run-golden-dataset -q -o addopts=` | `7 passed, 1 skipped in 42.74s` | Golden dataset target extraction live-validated — 7 passed, 1 skipped due to transient external httpbin.org 503 error |
@@ -108,7 +108,7 @@ Each major claim is classified: Verified (V), Partially verified (P), Unverified
 ### Test suite flakiness
 - **`test_browser_pool_hard_recycling`** — **FIXED this session**. Root cause: `_get_rss_memory()` was not mocked before the first assertion, so process-level RSS >1GB caused `_should_recycle()` to return True from the RSS check. Fixed by mocking `_get_rss_memory` early (500MB baseline). Suite now passes 100%.
 - Previously documented flaky tests (rate limiter state collision, crawl_frontier disk I/O) were not re-run this refresh.
-- Full SQLite suite: **1863 passed, 72 skipped, 0 failed in 120.39s** (freshly validated 100% clean).
+- Full SQLite suite: **1862 passed, 73 skipped, 0 failed in 120.03s** (freshly validated 100% clean).
 
 ### Fresh optional suites validated
 - Postgres integration suite: `1907 passed, 28 skipped, 0 failed in 142.41s` (100% clean, rate-limiter flaky collisions resolved).

@@ -9,7 +9,7 @@ This document defines expected quality checks. It is not proof that every lint/t
 - `python3 -m compileall -q backend scripts architecture_validator.py` passed with no output.
 - `PYTHONPATH=backend python3 architecture_validator.py` passed with `VALIDATION PASSED: Architecture is lawful.`
 - Pytest collection completed with `1937 tests collected in 0.40s`.
-- Safe SQLite backend suite passed with `1863 passed, 72 skipped, 0 failed in 120.39s` (100% clean pass after fixing flaky `test_browser_pool_hard_recycling`).
+- Safe SQLite backend suite passed with `1862 passed, 73 skipped, 0 failed in 120.03s` (100% clean pass).
 - Postgres integration suite passed with `1907 passed, 28 skipped, 0 failed in 142.41s` (100% clean, rate-limiter flaky collisions resolved).
 - Playwright browser e2e suite passed with `10 passed, 0 failed in 10.11s` (100% clean).
 - Golden dataset live tests were verified with `7 passed, 1 skipped in 42.74s` (1 skipped due to external httpbin.org 503 error).

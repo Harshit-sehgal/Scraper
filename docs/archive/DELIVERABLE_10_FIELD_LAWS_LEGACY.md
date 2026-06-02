@@ -1,5 +1,14 @@
 # Deliverable 10: Field Laws — Formal Constraints & Validation
 
+<div style="border: 2px solid #d24646; background: #fef6f6; padding: 1rem 1.2rem; border-radius: 12px; margin-bottom: 1.5rem;">
+  <strong style="color: #972a2a; font-size: 0.95rem;">⚠ HISTORICAL DOCUMENT</strong><br>
+  <span style="color: #607069; font-size: 0.85rem;">
+    This archived deliverable was generated during a prior cleanup cycle. It is preserved for reference only.
+    Do not treat it as current evidence. Always consult <code>PROJECT_STATUS.md</code> for the current truth source.
+  </span>
+</div>
+
+
 **Purpose:** Document the physical/topological field constants, exclusivity constraints, and runtime validation rules that govern the semantic field behavior.  
 
 **Source files:**
