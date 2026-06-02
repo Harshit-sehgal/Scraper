@@ -1,6 +1,14 @@
 """
 Scraper Router — endpoints for scraper observability, memory, configuration,
 trend analysis, and economic tracking.
+
+Research-shell boundary
+-----------------------
+`app.trend_analyzer` is part of the research shell (see
+backend/app/research/__init__.py). The EconomicTracker and TrendAnalyzer
+classes are imported lazily inside the endpoint functions that use them
+so that the router module does not pull the research shell into the
+product kernel at startup.
 """
 
 from __future__ import annotations
@@ -15,7 +23,6 @@ from app.regression_capture import get_regression_capture
 from app.scrape_telemetry import get_scrape_telemetry
 from app.scraper_diagnostics import run_diagnostics
 from app.selector_memory import get_selector_memory
-from app.trend_analyzer import EconomicTracker, TrendAnalyzer
 from app.utils.rbac import UserRole, require_role
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -139,6 +146,8 @@ async def get_extraction_trends(window: int = Query(100, ge=10, le=500)):
     Returns:
         A TrendReport with domain-level trends, global metrics, and alerts.
     """
+    from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
+
     telemetry_history = get_scrape_telemetry().get_recent(window)
     analyzer = TrendAnalyzer(history_window=window)
     report = analyzer.analyze(telemetry_history)
@@ -189,6 +198,8 @@ async def get_domain_trend(
             status_code=404,
             detail=f"No telemetry data found for domain: {domain}",
         )
+
+    from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
 
     analyzer = TrendAnalyzer(history_window=window)
     trend = analyzer.analyze_domain(domain, domain_events)
@@ -299,6 +310,8 @@ async def get_extraction_economics(window: int = Query(200, ge=10, le=1000)):
     Provides cost breakdowns by domain and category (LLM, browser, network),
     with efficiency ratings.
     """
+    from app.trend_analyzer import EconomicTracker  # research-shell, lazy
+
     telemetry_history = get_scrape_telemetry().get_recent(window)
     tracker = EconomicTracker()
     report = tracker.analyze(telemetry_history)
