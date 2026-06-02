@@ -330,7 +330,7 @@ class RateLimiterMiddleware:
     ) -> None:
         self._global_max, self._global_window = _parse_rate_limit(global_limit)
         self._per_ip = per_ip
-        self._counters: dict[str, SlidingWindowCounter] = {}
+        self._counters: dict[str, SlidingWindowCounter | DatabaseSlidingWindowCounter] = {}
         self._last_cleanup = time.time()
         self._cleanup_interval = cleanup_interval  # seconds between TTL cleanups
 
