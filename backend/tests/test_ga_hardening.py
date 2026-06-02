@@ -88,7 +88,11 @@ async def test_browser_pool_hard_recycling(monkeypatch):
     monkeypatch.setattr(settings, "BROWSER_MAX_CUMULATIVE_FETCHES", 200)
     monkeypatch.setattr(settings, "BROWSER_MAX_RSS_MEMORY_MB", 1024)
 
-    # 1. Test cumulative page fetches limit BROWSER_MAX_CONTEXTS / 200 trigger recycling
+    # Mock _get_rss_memory to return a safe baseline so process-level memory
+    # does not cause spurious recycling signals during unrelated assertions.
+    monkeypatch.setattr(pool, "_get_rss_memory", lambda: 500 * 1024 * 1024)  # 500MB (< 1GB threshold)
+
+    # 1. Test cumulative page fetches limit triggers recycling at BROWSER_MAX_CUMULATIVE_FETCHES (=200)
     pool._cumulative_fetches = 199
     assert pool._should_recycle() is False
 
