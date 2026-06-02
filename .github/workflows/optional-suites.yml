@@ -1,0 +1,100 @@
+name: Optional Test Suites
+
+on:
+  schedule:
+    # Weekly: Sunday at 6 AM UTC — catches regressions in Postgres,
+    # browser, and live-extraction paths without adding CI runtime
+    # to every push.
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+    # Allow manual trigger from the GitHub Actions UI for ad-hoc validation.
+
+jobs:
+  postgres:
+    name: Postgres Integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATAFORGE_STORAGE_BACKEND: postgres
+      DATAFORGE_DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements-dev.txt
+          pip install psycopg2-binary
+      - name: Run Postgres tests
+        run: |
+          PYTHONPATH=backend \
+          DATAFORGE_DOTENV_PATH=/dev/null \
+          python3 -m pytest -q backend/tests --run-postgres -o addopts= \
+          --tb=short --timeout=300 2>&1 | tee /tmp/postgres_results.txt
+          PASSED=$(grep "passed" /tmp/postgres_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
+          FAILED=$(grep "failed" /tmp/postgres_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
+          echo "Postgres: $PASSED passed, $FAILED failed"
+          if [ "$FAILED" -gt 2 ]; then exit 1; fi
+
+  browser-e2e:
+    name: Browser E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r backend/requirements-dev.txt
+      - name: Install Playwright Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Run browser e2e tests
+        run: |
+          PYTHONPATH=backend \
+          DATAFORGE_DOTENV_PATH=/dev/null \
+          DATAFORGE_STORAGE_BACKEND=sqlite \
+          python3 -m pytest -q backend/tests --run-browser -o addopts= \
+          --tb=short --timeout=300 2>&1 | tee /tmp/browser_results.txt
+          PASSED=$(grep "passed" /tmp/browser_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
+          FAILED=$(grep "failed" /tmp/browser_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
+          echo "Browser: $PASSED passed, $FAILED failed"
+          if [ "$FAILED" -gt 0 ]; then exit 1; fi
+
+  golden-dataset:
+    name: Golden Dataset Live
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r backend/requirements-dev.txt
+      - name: Run golden dataset tests
+        run: |
+          PYTHONPATH=backend \
+          DATAFORGE_DOTENV_PATH=/dev/null \
+          DATAFORGE_STORAGE_BACKEND=sqlite \
+          python3 -m pytest -q backend/tests/test_golden_dataset.py --run-golden-dataset -o addopts= \
+          --tb=short --timeout=120 2>&1 | tee /tmp/golden_results.txt
+          PASSED=$(grep "passed" /tmp/golden_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
+          FAILED=$(grep "failed" /tmp/golden_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
+          echo "Golden dataset: $PASSED passed, $FAILED failed"
+          if [ "$FAILED" -gt 0 ]; then exit 1; fi
