@@ -8,7 +8,13 @@ lineage construction. Content analysis lives in content_quality.py.
 
 from __future__ import annotations
 
-from app.acquisition_state import AcquisitionLineage
+# ─── Imports boundary ──────────────────────────────────────────────────────
+#
+# `acquisition_state` is a research-shell module (see
+# backend/app/research/__init__.py). We import it lazily inside
+# `build_redirect_info` so that the product kernel can run with
+# ENABLE_EXPERIMENTAL_ROUTES=False without pulling in the research
+# shell at startup.
 
 # ─── Redirect Detection ────────────────────────────────────────────────
 
@@ -162,6 +168,12 @@ def build_redirect_info(
         dict with redirected, redirect_type, message, original_url, final_url
     """
     redirect_info = existing_redirect_info or _detect_redirect(original_url, final_url)
+
+    # Lazy import: AcquisitionLineage is part of the research shell
+    # (see backend/app/research/__init__.py). We import it inside the
+    # function so that the product kernel does not pull in the research
+    # shell at startup when ENABLE_EXPERIMENTAL_ROUTES=False.
+    from app.acquisition_state import AcquisitionLineage
 
     lineage = AcquisitionLineage.from_redirect_info(
         redirect_info=redirect_info,
