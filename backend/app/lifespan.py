@@ -49,18 +49,31 @@ async def lifespan(app: FastAPI):
 
         validate_production_credentials(settings)
 
-    # Initialize experimental subsystems (research-only)
+    # Initialize experimental subsystems (research-only).
+    # The functions in `experimental_startup` self-gate on
+    # `settings.ENABLE_EXPERIMENTAL_ROUTES`, but we still skip the
+    # imports / calls entirely when the flag is off to keep the
+    # import graph free of research modules at startup.
     from app.experimental_startup import (
+        experimental_subsystems_enabled,
         init_domain_health_monitor,
         init_gossip_and_heartbeat,
         init_graph_scheduler,
         init_recovery_framework,
     )
 
-    init_graph_scheduler()
-    init_recovery_framework()
-    init_domain_health_monitor()
-    gossip, heartbeat_mgr = init_gossip_and_heartbeat()
+    if experimental_subsystems_enabled():
+        logger.info("Experimental subsystems ENABLED — initializing research shell")
+        init_graph_scheduler()
+        init_recovery_framework()
+        init_domain_health_monitor()
+        gossip, heartbeat_mgr = init_gossip_and_heartbeat()
+    else:
+        logger.info(
+            "Experimental subsystems DISABLED — research shell will not initialize "
+            "(set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable)"
+        )
+        gossip, heartbeat_mgr = None, None
 
     # Runtime safety rails — driven by centralized config
     CONFIG.update(

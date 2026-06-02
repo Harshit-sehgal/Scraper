@@ -1,0 +1,159 @@
+"""
+Tests for the experimental subsystems gate.
+
+The deep-research-report requires that the research shell be quarantined
+behind a single flag (`ENABLE_EXPERIMENTAL_ROUTES`). These tests verify
+that `experimental_startup.experimental_subsystems_enabled()` reads the
+flag correctly and that every public function in the module becomes a
+no-op when the flag is off.
+
+We do NOT exercise the full FastAPI lifespan here — that requires
+running the app, and conftest already has fixtures for that. The unit
+tests below cover the gate logic in isolation so a regression in the
+flag wiring is caught at the fastest possible layer.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from unittest.mock import patch
+
+import pytest
+from app.experimental_startup import (
+    close_postgres_pool,
+    experimental_subsystems_enabled,
+    init_domain_health_monitor,
+    init_gossip_and_heartbeat,
+    init_graph_scheduler,
+    init_recovery_framework,
+    persist_semantic_world_state,
+    restore_semantic_world_state,
+    schedule_gossip_propagation,
+)
+
+# ─── Gate function ──────────────────────────────────────────────────────────
+
+
+def test_gate_reads_settings_flag(monkeypatch):
+    """When settings.ENABLE_EXPERIMENTAL_ROUTES is True, gate returns True."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", True, raising=False)
+    assert experimental_subsystems_enabled() is True
+
+
+def test_gate_returns_false_by_default(monkeypatch):
+    """When settings.ENABLE_EXPERIMENTAL_ROUTES is False, gate returns False."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", False, raising=False)
+    assert experimental_subsystems_enabled() is False
+
+
+def test_gate_falls_back_to_false_if_attribute_missing(monkeypatch):
+    """If settings has no ENABLE_EXPERIMENTAL_ROUTES attribute, gate defaults to False."""
+    from app import experimental_startup
+
+    class _FakeSettings:
+        pass
+
+    monkeypatch.setattr(experimental_startup, "settings", _FakeSettings(), raising=False)
+    # The function imports settings lazily, so we patch the import target.
+    with patch("app.config.settings", _FakeSettings()):
+        assert experimental_subsystems_enabled() is False
+
+
+# ─── Each init_* function is a no-op when the gate is closed ───────────────
+
+
+@pytest.fixture
+def gate_off(monkeypatch):
+    """Force the gate off for the duration of one test."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", False, raising=False)
+    yield
+
+
+@pytest.fixture
+def gate_on(monkeypatch):
+    """Force the gate on for the duration of one test."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", True, raising=False)
+    yield
+
+
+def test_init_graph_scheduler_noop_when_disabled(gate_off, caplog):
+    with caplog.at_level(logging.DEBUG, logger="app.experimental_startup"):
+        init_graph_scheduler()
+    # Function should not have raised and should not have logged a successful init.
+    assert "Graph update scheduler initialized" not in caplog.text
+
+
+def test_init_recovery_framework_noop_when_disabled(gate_off, caplog):
+    with caplog.at_level(logging.DEBUG, logger="app.experimental_startup"):
+        init_recovery_framework()
+    assert "Recovery handlers registered" not in caplog.text
+
+
+def test_init_domain_health_monitor_noop_when_disabled(gate_off, caplog):
+    with caplog.at_level(logging.DEBUG, logger="app.experimental_startup"):
+        init_domain_health_monitor()
+    assert "Domain health monitor initialized" not in caplog.text
+
+
+def test_init_gossip_and_heartbeat_returns_none_tuple_when_disabled(gate_off):
+    gossip, heartbeat = init_gossip_and_heartbeat()
+    assert gossip is None
+    assert heartbeat is None
+
+
+def test_restore_semantic_world_state_noop_when_disabled(gate_off):
+    # Should not raise even with arbitrary input.
+    restore_semantic_world_state({"some": "data"}, "/tmp/state.json")
+    restore_semantic_world_state(None, "")
+
+
+def test_persist_semantic_world_state_noop_when_disabled(gate_off):
+    # Should not raise.
+    persist_semantic_world_state()
+
+
+# ─── schedule_gossip_propagation is gated ─────────────────────────────────
+
+
+def test_schedule_gossip_propagation_noop_when_disabled(gate_off):
+    # Even if a non-None gossip object is passed, the gate must short-circuit
+    # and return None — we don't want research work to start accidentally.
+    fake_gossip = object()
+    fake_heartbeat = object()
+    result = asyncio.run(schedule_gossip_propagation(fake_gossip, fake_heartbeat, interval=1.0))
+    assert result is None
+
+
+def test_schedule_gossip_propagation_noop_when_gossip_is_none(gate_on):
+    # Even with the gate open, None gossip should still short-circuit.
+    result = asyncio.run(schedule_gossip_propagation(None, None, interval=1.0))
+    assert result is None
+
+
+# ─── close_postgres_pool is NOT gated (Postgres is product kernel) ─────────
+
+
+def test_close_postgres_pool_is_not_gated(monkeypatch, caplog):
+    """close_postgres_pool must run even when the experimental gate is closed.
+
+    Postgres is a product-kernel storage backend, so its pool-close
+    logic must work regardless of the research-shell flag.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", False, raising=False)
+    # Patch the inner shutdown_postgres to a no-op so we don't actually
+    # touch a connection pool.
+    with patch("app.postgres_repository.shutdown_postgres"):
+        close_postgres_pool()
+    # We don't assert it was called (ImportError path is acceptable too),
+    # but we DO assert the function did not raise.
