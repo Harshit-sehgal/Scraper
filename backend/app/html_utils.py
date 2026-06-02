@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import re
@@ -19,9 +21,12 @@ from app.browser_pool import get_browser_pool
 from app.config import settings
 from app.domain_intelligence import get_domain_intelligence
 from app.models import FieldType, SchemaField
-from app.semantic_segmentation import is_likely_noise_field, segment_single_text
-from app.strategy_evolution import FetchStrategy
 
+# Research-shell boundary:
+# `app.semantic_segmentation` and `app.strategy_evolution` are research
+# modules (see backend/app/research/__init__.py). They are imported
+# lazily inside the functions that use them so that `import app.html_utils`
+# does not pull the research shell into the product kernel at startup.
 # ─── SSRF / private-network IP validation ──────────────────────────────
 from app.url_safety import validate_public_http_url as _validate_url_safe
 
@@ -111,6 +116,8 @@ def _is_noise_name_value(text: str) -> bool:
 
 def _is_likely_noise_entity(text: str) -> bool:
     """Check if text is noise using semantic density analysis."""
+    from app.semantic_segmentation import is_likely_noise_field  # research-shell, lazy
+
     is_noise, _conf, _evidence = is_likely_noise_field("name", text)
     return is_noise
 
@@ -136,6 +143,8 @@ def _is_empty_value(value) -> bool:
 
 def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool:
     """Determine if a record is noise using semantic density and structural analysis."""
+    from app.semantic_segmentation import is_likely_noise_field, segment_single_text  # research-shell, lazy
+
     all_values = []
     for _key, value in record.items():
         if value and not _is_empty_value(value):
@@ -319,7 +328,7 @@ def _boost_contacts_with_page_html(
 
 async def fetch_page_content(
     url: str,
-    preferred_method: FetchStrategy | str = FetchStrategy.PLAYWRIGHT_FULL,
+    preferred_method: str | None = None,
     timeout_ms: int | None = None,
     hydration_wait_ms: int | None = None,
     skip_networkidle: bool = False,
@@ -331,7 +340,9 @@ async def fetch_page_content(
 
     Args:
         url: The URL to fetch.
-        preferred_method: The preferred fetch strategy.
+        preferred_method: The preferred fetch strategy as a string key
+            (e.g. "playwright_full", "httpx_basic"). Defaults to
+            "playwright_full" if None.
         timeout_ms: Override the Playwright navigation timeout (ms).
         hydration_wait_ms: Override the hydration wait / delay after load (ms).
         skip_networkidle: If True, use domcontentloaded instead of networkidle.
@@ -342,10 +353,14 @@ async def fetch_page_content(
     Returns:
         tuple of (html_content, js_render_delay_ms, method_used, retry_count)
     """
+    from app.strategy_evolution import FetchStrategy  # research-shell, lazy
+
     domain = urlparse(url).netloc.lower() or "default"
 
     # Normalize method to Enum
-    if isinstance(preferred_method, str):
+    if preferred_method is None or preferred_method == "":
+        strategy = FetchStrategy.PLAYWRIGHT_FULL
+    elif isinstance(preferred_method, str):
         try:
             strategy = FetchStrategy(preferred_method)
         except ValueError:
@@ -636,11 +651,20 @@ async def fetch_page_content(
 
 async def _fetch_with_httpx(
     url: str,
-    strategy: FetchStrategy = FetchStrategy.HTTPX_BASIC,
+    strategy: FetchStrategy | None = None,
     extra_headers: dict[str, str] | None = None,
     timeout_ms: int | None = None,
 ) -> tuple[str, float, str, int]:
     """Internal helper for httpx fetching with retries."""
+    from app.strategy_evolution import FetchStrategy  # research-shell, lazy
+
+    if strategy is None:
+        strategy = FetchStrategy.HTTPX_BASIC
+    elif isinstance(strategy, str):
+        try:
+            strategy = FetchStrategy(strategy)
+        except ValueError:
+            strategy = FetchStrategy.HTTPX_BASIC
     method_used = strategy.value
 
     # Use anti-bot stealth headers for smart / stealth strategies
