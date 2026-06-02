@@ -31,7 +31,11 @@ from app.middlewares import (
     latency_tracking_middleware,
     rate_limiter,
 )
-from app.routers.experimental import router as experimental_router
+
+# NOTE: app.routers.experimental is intentionally NOT imported at module
+# load time. It is imported lazily inside configure_routes() so that the
+# research router module (and its transitive research imports) is never
+# loaded at startup when ENABLE_EXPERIMENTAL_ROUTES is False.
 from app.routers.exports import create_exports_router
 from app.routers.health import router as health_router
 from app.routers.jobs import create_jobs_router
@@ -95,7 +99,14 @@ def configure_static(app: FastAPI):
 
 
 def configure_routes(app: FastAPI):
-    """Include API routers."""
+    """Include API routers.
+
+    The experimental / research router is conditionally mounted: it is
+    only included when `settings.ENABLE_EXPERIMENTAL_ROUTES` is True.
+    When False (the default), `/api/system/topology`, `/api/system/crystalline`,
+    and the other research endpoints return 404. This is the HTTP-level
+    complement to the import-time gate in `experimental_startup`.
+    """
     app.include_router(
         create_jobs_router(
             jobs_store=jobs_store,
@@ -109,9 +120,28 @@ def configure_routes(app: FastAPI):
     app.include_router(create_exports_router(jobs_store=jobs_store))
     app.include_router(scraper_router)
     app.include_router(operator_router)
-    app.include_router(experimental_router)
     app.include_router(system_router)
     app.include_router(health_router)
+
+    # Experimental / research routes — gated on the same flag that gates
+    # the import-time subsystem initialization. Including this router
+    # while subsystems are disabled would expose endpoints that lazily
+    # import research modules; both gates must agree.
+    if settings.ENABLE_EXPERIMENTAL_ROUTES:
+        if settings.ENV.lower() == "production":
+            logger.warning(
+                "EXPERIMENTAL ROUTES ENABLED IN PRODUCTION — " "research-only endpoints are exposed. This is not recommended."
+            )
+        # Lazy import: the experimental router module and its transitive
+        # research dependencies are only loaded when we are actually
+        # about to mount the router. This keeps the default-mode
+        # import graph free of research modules.
+        from app.routers.experimental import router as experimental_router
+
+        app.include_router(experimental_router)
+        logger.info("Experimental / research router mounted")
+    else:
+        logger.info("Experimental / research router NOT mounted " "(set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable)")
 
 
 def configure_exception_handlers(app: FastAPI):
