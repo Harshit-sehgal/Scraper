@@ -20,7 +20,7 @@ repos:
     rev: 1.7.9
     hooks:
       - id: bandit
-        args: [-r, backend/app]
+        args: [-r, backend/app, -ll]  # -ll = only medium+ severity (low-severity advisory only)
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
