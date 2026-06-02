@@ -1,7 +1,7 @@
 import json
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 from app import browser_network_capture
 
 

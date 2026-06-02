@@ -9,18 +9,18 @@ Tests the end-to-end recovery system including:
 - API endpoints for health and stats
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
 
-from app.recovery_strategies import (
-    RecoveryAction,
-    get_recovery_strategist,
-    get_recovery_executor,
-)
-from app.recovery_handlers import register_all_recovery_handlers
-from app.failure_classification import FailureCategory, FailureClassification
+import pytest
 from app.domain_health_alerts import (
     DomainHealthMonitor,
+)
+from app.failure_classification import FailureCategory, FailureClassification
+from app.recovery_handlers import register_all_recovery_handlers
+from app.recovery_strategies import (
+    RecoveryAction,
+    get_recovery_executor,
+    get_recovery_strategist,
 )
 from app.selector_memory import get_selector_memory
 

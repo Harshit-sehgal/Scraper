@@ -109,9 +109,14 @@ clean-all: clean ## Remove everything including production resources
 
 clean-local: ## Remove gitignored runtime artifacts (replay buffer, caches, logs)
 	rm -rf backend/data/replay_buffer/
+	rm -rf backend/data/benchmarks/
+	rm -rf backend/data/checkpoints/
+	rm -rf backend/data/governance/
+	rm -rf backend/data/results/
+	rm -rf backend/logs/
 	find . -type d -name __pycache__ -not -path './.git/*' -exec rm -rf {} + 2>/dev/null
 	find . -type f -name '*.pyc' -not -path './.git/*' -delete 2>/dev/null
-	@echo "Cleaned local runtime artifacts (replay buffer, caches, .pyc files)."
+	@echo "Cleaned local runtime artifacts (replay buffer, caches, logs, .pyc files)."
 
 # ─── Utility ────────────────────────────────────────────────────────────────
 

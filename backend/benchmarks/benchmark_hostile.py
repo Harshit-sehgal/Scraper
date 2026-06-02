@@ -14,13 +14,12 @@ import threading
 import time
 
 import uvicorn
+from app.config import settings
+from app.models import FieldType, SchemaField
+from app.scrape_telemetry import get_scrape_telemetry
+from app.scraper import scrape_url
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-
-from app.models import FieldType, SchemaField
-from app.scraper import scrape_url
-from app.scrape_telemetry import get_scrape_telemetry
-from app.config import settings
 
 # Disable excessive logging during benchmarks
 logging.getLogger("uvicorn").setLevel(logging.WARNING)

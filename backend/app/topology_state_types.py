@@ -8,8 +8,8 @@ This module owns the immutable read-model types and low-level helpers
 extracted from the larger topology_state module.
 """
 
-from dataclasses import dataclass
 import ast
+from dataclasses import dataclass
 
 
 def parse_topology_key(raw: str) -> tuple[str, str]:

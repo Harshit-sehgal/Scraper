@@ -18,10 +18,11 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from bs4 import BeautifulSoup, Tag
-from app.models import FieldType
-from app.html_utils import _valid_email, _valid_phone
 
+from bs4 import BeautifulSoup, Tag
+
+from app.html_utils import _valid_email, _valid_phone
+from app.models import FieldType
 from app.page_evidence_collector import (
     CandidateContainer,
     PageEvidence,

@@ -17,20 +17,7 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 
 ## Latest Results
 
-The following rows were freshly run in this session (2026-06-02). Results noted as *(archived)* were from the prior refresh (2026-06-01) and were not re-run.
-
-| Command | Result | Meaning |
-| --- | --- | --- |
-| `compileall` | Passed with no output | Syntax is valid for checked Python files |
-| `architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Architecture rules pass |
-| Pytest collection | `1937 tests collected in 0.40s` | Collection is clean |
-| Safe SQLite backend suite | `1862 passed, 73 skipped, 0 failed in 120.03s` | Default local backend tests — 100% clean pass |
-| Postgres local tests | `1907 passed, 28 skipped, 0 failed in 142.41s` | Verified Postgres integration suite (rate-limiter flaky collisions resolved) |
-| Playwright browser e2e | `10 passed, 0 failed in 10.11s` | Verified browser e2e suite |
-| Golden dataset live tests | `7 passed, 1 skipped in 42.74s` | Verified live target extraction; 1 skipped due to external httpbin.org 503 error |
-| Benchmark package | `1 passed, 1 skipped in 0.26s` | Benchmark smoke/config test passes only |
-| Route auth matrix | Generated from the registered FastAPI app with `scripts/route_auth_matrix.py --format markdown` | Route access documentation is current |
-| Production env example | `scripts/check_prod_env.py --env-file .env.production.example` fails intentionally on placeholders | Example env is not deployable as-is |
+For the latest verified test counts, test run statuses, and benchmark results across SQLite, Postgres, Playwright browser, and Golden Dataset live suites, see [PROJECT_STATUS.md](../PROJECT_STATUS.md).
 
 ## Optional Groups
 

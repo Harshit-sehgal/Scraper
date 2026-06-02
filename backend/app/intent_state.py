@@ -5,6 +5,7 @@ All changes go through this state object, which supports transactions.
 """
 
 from typing import Callable, Dict, List, Optional
+
 from app.transaction_context import active_transaction
 
 

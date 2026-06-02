@@ -1,6 +1,7 @@
 from typing import Optional
-from app.semantic_world_state.core import SemanticWorldState
+
 from app.core_types import FieldConflictRegion
+from app.semantic_world_state.core import SemanticWorldState
 
 __all__ = ["SemanticWorldState", "get_world_state", "reset_world_state", "FieldConflictRegion"]
 
@@ -25,11 +26,11 @@ def reset_world_state():
     # Also reset dependent singletons to avoid stale subscriptions / state
     from app.event_dispatcher import reset_dispatcher
     from app.graph_update_scheduler import reset_scheduler
-    from app.semantic_os import reset_semantic_os
     from app.instability_api import reset_immune_system
+    from app.llm_bridge import reset_plugin_manager
     from app.semantic_allocation_engine import reset_role_engine
     from app.semantic_boundary_engine import reset_boundary_engine
-    from app.llm_bridge import reset_plugin_manager
+    from app.semantic_os import reset_semantic_os
 
     reset_dispatcher()
     reset_scheduler()

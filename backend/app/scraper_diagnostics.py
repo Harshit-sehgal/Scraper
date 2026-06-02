@@ -11,16 +11,15 @@ Provides detailed breakdown of what happened during a scrape:
 
 from __future__ import annotations
 
-import time
 import logging
+import time
 
-
-from app.models import SchemaField
+from app.data_utils import process_raw_records
+from app.extraction_orchestrator import orchestrate_extraction
 from app.html_utils import fetch_page_content
+from app.models import SchemaField
 from app.scrape_telemetry import detect_anti_bot, estimate_dom_nodes
 from app.selector_memory import get_selector_memory
-from app.extraction_orchestrator import orchestrate_extraction
-from app.data_utils import process_raw_records
 
 logger = logging.getLogger(__name__)
 

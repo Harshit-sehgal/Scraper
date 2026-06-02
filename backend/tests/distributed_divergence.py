@@ -9,6 +9,7 @@ transactional mutation vs deterministic replay result in 0% divergence.
 """
 
 import random
+
 from app.semantic_world_state import SemanticWorldState
 
 

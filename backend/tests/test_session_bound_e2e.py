@@ -8,15 +8,15 @@ Tests verify:
 - Fake dynamic session-bound website: cookie + storage + network JSON
 """
 
-import urllib.parse
-import threading
 import http.server
 import json
 import os
-import pytest
-from app.models import Job, JobStatus, SchemaField, FieldType
-from app.zero_result_classifier import classify_zero_result
+import threading
+import urllib.parse
 
+import pytest
+from app.models import FieldType, Job, JobStatus, SchemaField
+from app.zero_result_classifier import classify_zero_result
 
 FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "fixtures/pages")
 

@@ -20,7 +20,6 @@ from app.data_utils import (
 )
 from app.models import FieldType, SchemaField
 
-
 # ─── Schema Fixtures ───────────────────────────────────────────────────────────
 
 STR_FIELD = SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)

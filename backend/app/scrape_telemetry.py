@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Optional
 
 from app.anti_bot_engine import get_anti_bot_engine

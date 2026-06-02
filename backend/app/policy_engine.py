@@ -5,8 +5,10 @@ No action may be triggered if it violates system thermodynamic stability.
 """
 
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Optional
 from weakref import WeakKeyDictionary
+
 from app.semantic_world_state import get_world_state
 
 if TYPE_CHECKING:

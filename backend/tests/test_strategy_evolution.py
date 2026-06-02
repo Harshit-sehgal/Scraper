@@ -10,10 +10,10 @@ Tests the autonomous fetch strategy selection and evolution system:
 """
 
 from app.strategy_evolution import (
-    FetchStrategy,
-    StrategyPerformance,
     DomainStrategyState,
+    FetchStrategy,
     StrategyEvolutionEngine,
+    StrategyPerformance,
     get_strategy_evolution_engine,
 )
 

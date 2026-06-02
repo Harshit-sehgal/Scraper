@@ -14,16 +14,17 @@ Layers:
 from __future__ import annotations
 
 import logging
+
 from app.config import settings
+from app.container_discovery import classify_container_failure, multi_pass_container_extraction
+from app.extraction_provenance import ExtractionMethod, ProvenanceBuilder
 from app.models import FieldType, SchemaField
-from app.selector_memory import get_selector_memory
+from app.network_extractor import extract_from_network
+from app.page_evidence_collector import collect_page_evidence
+from app.rendered_visible_text_extractor import extract_from_visible_blocks
 from app.selector_discovery import discover_selectors
 from app.selector_engine import apply_selectors, extract_with_regex
-from app.extraction_provenance import ProvenanceBuilder, ExtractionMethod
-from app.container_discovery import multi_pass_container_extraction, classify_container_failure
-from app.network_extractor import extract_from_network
-from app.rendered_visible_text_extractor import extract_from_visible_blocks
-from app.page_evidence_collector import collect_page_evidence
+from app.selector_memory import get_selector_memory
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +250,7 @@ async def orchestrate_extraction(
 
     # ── Gather network diagnostics ──
     import json
+
     from app.session_url_detector import detect_session_params
 
     session_detect = detect_session_params(url)
@@ -290,7 +292,7 @@ async def orchestrate_extraction(
             pass
 
     # Extract network results
-    from app.network_payload_extractor import extract_from_network_payloads, arbitrate_sources
+    from app.network_payload_extractor import arbitrate_sources, extract_from_network_payloads
 
     network_result = extract_from_network_payloads(bodies, schema_fields)
 

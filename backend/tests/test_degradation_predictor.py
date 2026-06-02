@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+
 from app.degradation_predictor import (
     DegradationPredictor,
     Prediction,
@@ -9,7 +10,6 @@ from app.degradation_predictor import (
     get_degradation_predictor,
 )
 from app.trend_analyzer import DomainTrend
-
 
 # ─────────────────────────────────────────────────────────────────────
 # Fixtures

@@ -8,8 +8,8 @@ from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from app.core_types import FieldConflictRegion
 from app.topology_state_types import (
-    RegionSnapshot,
     EdgeFieldSnapshot,
+    RegionSnapshot,
     _clamp01,
     _clamp_signed,
 )
@@ -139,15 +139,14 @@ class TopologyView:
             roles = sorted(set(region.competing_roles))
             for i, ra in enumerate(roles):
                 for rb in roles[i + 1:]:
-                    pair = tuple(sorted((ra, rb)))  # type: ignore[assignment]
+                    pair = tuple(sorted((ra, rb)))
                     pairs.add(pair)
                     region_instability.setdefault(pair, []).append(region.instability)  # type: ignore[arg-type]
 
         edges = []
         for source, target in sorted(pairs):
-            pair = tuple(sorted((source, target)))  # type: ignore[assignment]
-            cohesion = _clamp01(self._cohesion.get(pair, 0.0))  # type: ignore[arg-type]
-            # type: ignore[arg-type]
+            pair = tuple(sorted((source, target)))
+            cohesion = _clamp01(self._cohesion.get(pair, 0.0))
             law = _clamp_signed(self._laws.get(pair, 0.0))
             impossible = pair in impossible_pairs
             instabilities = region_instability.get(pair, [])  # type: ignore[arg-type]

@@ -1,6 +1,7 @@
 import time
-from app.semantic_world_state import get_world_state
+
 from app.semantic_os import get_semantic_os
+from app.semantic_world_state import get_world_state
 
 
 def test_priority_ordering():

@@ -22,9 +22,9 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, asdict
-from typing import Optional, Dict, List
+from dataclasses import asdict, dataclass
 from statistics import mean
+from typing import Dict, List, Optional
 
 from app.config import settings
 

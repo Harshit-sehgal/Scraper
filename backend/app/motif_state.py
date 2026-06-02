@@ -10,10 +10,11 @@ Owns:
 - motif_stability: Dict[Tuple[str, ...], float] — temporal stability score
 """
 
-import math
 import logging
+import math
 from collections import Counter
-from typing import Callable, Dict, Tuple, Optional
+from typing import Callable, Dict, Optional, Tuple
+
 from app.transaction_context import active_transaction
 
 

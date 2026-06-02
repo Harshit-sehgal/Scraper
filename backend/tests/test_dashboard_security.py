@@ -3,7 +3,7 @@ def test_dashboard_security_headers(client):
     # Test main dashboard route
     resp = client.get("/app/")
     assert resp.status_code == 200 or resp.status_code == 302, f"Expected 200 or 302, got {resp.status_code}"
-    
+
     # If it redirects, follow it
     if resp.status_code == 302:
         redirect_url = resp.headers.get("location")
@@ -13,7 +13,7 @@ def test_dashboard_security_headers(client):
     # Validate security headers served by uvicorn/FastAPI fallback
     # Note: Production headers are primarily injected by Nginx (verified by scripts/verify_production_deployment.py),
     # but the FastAPI backend should serve standard secure headers where possible.
-    
+
     # Verify Content Security Policy is configured correctly in the app settings if served
     from app.config import settings
     assert settings.ENV in ("development", "production")

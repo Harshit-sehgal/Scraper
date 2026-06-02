@@ -7,17 +7,17 @@ caller through TopologyState APIs.
 Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
 """
 
-from typing import Dict, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict
 
 if TYPE_CHECKING:
     from app.topology_state import TopologyState
 
 
-def compute_aggregate_metrics(state: "TopologyState") -> Tuple[Dict, Dict, Dict]:
+def compute_aggregate_metrics(state: "TopologyState") -> Dict:
     """Aggregate region metrics into summary dicts."""
     regs = state._get_regions()
     if not regs:
-        return {}, {}, {}
+        return {"convergence": 0.0, "temperature": 0.0, "energy": 0.0, "count": 0}
     n = len(regs)
     avg_convergence = sum(r.local_convergence for r in regs) / n
     avg_temp = sum(r.local_temperature for r in regs) / n

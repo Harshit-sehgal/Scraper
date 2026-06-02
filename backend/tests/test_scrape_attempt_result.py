@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import pytest
-
 from app.scraper import ScrapeAttemptResult, scrape_url_attempt
 from app.zero_result_classifier import ZeroResultClassification
-
 
 # ── Helper: Stub crawl policy that allows all ──────────────────────────
 

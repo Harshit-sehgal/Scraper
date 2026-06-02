@@ -6,11 +6,12 @@ across local edge-case fixtures.
 """
 
 import time
-import pytest
 from pathlib import Path
-from app.models import Job, JobStatus, SchemaField, FieldType
-from app.zero_result_classifier import classify_zero_result
+
+import pytest
 from app.empty_response_detector import detect_empty_response
+from app.models import FieldType, Job, JobStatus, SchemaField
+from app.zero_result_classifier import classify_zero_result
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "pages"
 

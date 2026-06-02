@@ -1,7 +1,7 @@
 """Tests for all 14 extracted modules — verify they work independently."""
 
 from app.semantic_persistence import clear_semantic_state
-from app.semantic_world_state import get_world_state, FieldConflictRegion
+from app.semantic_world_state import FieldConflictRegion, get_world_state
 
 
 def test_topology_state():
@@ -140,7 +140,7 @@ def test_observability():
 
 def test_field_laws():
     """field_laws: constants are accessible."""
-    from app.field_laws import PROPAGATION_DECAY_FLOOR, MAX_COUPLING_TRANSFER
+    from app.field_laws import MAX_COUPLING_TRANSFER, PROPAGATION_DECAY_FLOOR
     assert PROPAGATION_DECAY_FLOOR == 0.3
     assert MAX_COUPLING_TRANSFER == 0.3
     print("  field_laws.py: OK")
@@ -149,7 +149,7 @@ def test_field_laws():
 def test_persistence():
     ws = get_world_state()
     """persistence_state: serialize/deserialize round-trip."""
-    from app.persistence_state import world_state_to_dict, clear_world_state
+    from app.persistence_state import clear_world_state, world_state_to_dict
     clear_semantic_state(clear_file=False)
     ws.total_co_occurrences = 0  # HEAD needs this
     d = world_state_to_dict(ws)

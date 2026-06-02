@@ -1,7 +1,6 @@
 import builtins
 
 import pytest
-
 from app.discovery import DiscoveryDependencyError, get_ddgs_class
 
 

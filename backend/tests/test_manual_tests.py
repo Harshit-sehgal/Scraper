@@ -5,9 +5,10 @@ expose zero top-level side effects (allowing clean imports).
 """
 from __future__ import annotations
 
-import sys
 import importlib
+import sys
 from pathlib import Path
+
 import pytest
 
 MANUAL_TEST_FILES = [

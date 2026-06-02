@@ -8,8 +8,8 @@ statistical precision, recall, and conformity metrics.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Any
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 

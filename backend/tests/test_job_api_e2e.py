@@ -16,18 +16,18 @@ if str(_BACKEND_DIR) not in sys.path:
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from scripts.run_worker import scrape_job_handler
-from app.main import app as main_app
-from app.worker_queue import get_worker_queue, reset_worker_queue
-from app.storage_interface import get_job_repository, reset_repository
-from app.models import JobStatus
 import http.server
 import json
 import threading
 import urllib.parse
 
 import pytest
+from app.main import app as main_app
+from app.models import JobStatus
+from app.storage_interface import get_job_repository, reset_repository
+from app.worker_queue import get_worker_queue, reset_worker_queue
 
+from scripts.run_worker import scrape_job_handler
 
 pytest.importorskip("playwright")
 
@@ -109,7 +109,7 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
     runs the worker, and asserts the results have correct provenance and no leaked secrets.
     """
     # 1. Bypass local loopback URL validation for E2E testing
-    from app import url_safety, html_utils
+    from app import html_utils, url_safety
     monkeypatch.setattr(url_safety, "validate_public_http_url", lambda url: None)
     monkeypatch.setattr(html_utils, "_validate_url_safe", lambda url: None)
     from app.config import settings

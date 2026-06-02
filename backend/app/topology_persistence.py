@@ -6,7 +6,7 @@ serialization and lifecycle operations.
 Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
 """
 
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from app.topology_state import TopologyState
@@ -98,8 +98,8 @@ def topology_to_dict(state: "TopologyState") -> dict:
 
 def topology_from_dict(state: "TopologyState", data: dict) -> None:
     """Deserialize topology state from a dict."""
-    from app.topology_state_types import parse_topology_key
     from app.core_types import FieldConflictRegion
+    from app.topology_state_types import parse_topology_key
 
     state.clear()
 
@@ -166,8 +166,8 @@ def topology_from_dict(state: "TopologyState", data: dict) -> None:
 
 def merge_topology(state: "TopologyState", other_data: dict, alpha: float = 0.5) -> None:
     """Merge remote topology state into local (Phase 32 / 60)."""
-    from app.topology_state_types import parse_topology_key
     from app.core_types import FieldConflictRegion
+    from app.topology_state_types import parse_topology_key
 
     remote_epoch = other_data.get("topology_epoch", 1)
     remote_tombstones = set(other_data.get("tombstones", []))

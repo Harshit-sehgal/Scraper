@@ -9,15 +9,14 @@ Covers:
 import json
 
 import pytest
-
-from app.models import Job, JobStatus, ScrapeMode, SourcePolicy
 from app.job_store import (
     _job_to_row,
     _row_to_job,
     load_state,
-    save_state,
     reset_job_store_for_tests,
+    save_state,
 )
+from app.models import Job, JobStatus, ScrapeMode, SourcePolicy
 
 
 @pytest.fixture()

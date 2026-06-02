@@ -10,17 +10,15 @@ These tests use fixture HTML and mock data — no real browser or network calls.
 from __future__ import annotations
 
 import pytest
-
-from app.models import SchemaField, FieldType
 from app.extraction_orchestrator import (
     ExtractionResult,
-    _merge_composite_records,
-    _detect_field_swaps,
-    _check_type_compatibility,
     _align_selectors,
+    _check_type_compatibility,
+    _detect_field_swaps,
+    _merge_composite_records,
     orchestrate_extraction,
 )
-
+from app.models import FieldType, SchemaField
 
 # ═══════════════════════════════════════════════════════════════════════
 # Helpers

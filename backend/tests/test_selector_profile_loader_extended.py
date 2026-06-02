@@ -9,18 +9,17 @@ from __future__ import annotations
 
 import json
 import tempfile
-import pytest
 from pathlib import Path
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from app.selector_profiles.loader import (
+    _load_all_profiles,
+    _match_domain,
     _parse_currency,
     _postprocess_field,
     reload_profiles,
-    _match_domain,
-    _load_all_profiles,
 )
-
 
 # ─── Real JSON profile loading ─────────────────────────────────────────
 
@@ -415,7 +414,7 @@ class TestExtractWithProfilePlaywright:
             # Verify Playwright was called correctly
             mock_factory.assert_called_once()
             mock_pw.chromium.launch.assert_called_once()
-            mock_pw.chromium.launch.await_count == 1
+            assert mock_pw.chromium.launch.await_count == 1
             mock_page.goto.assert_called_once()
             mock_page.wait_for_selector.assert_called_once_with("div.card", timeout=10000)
 

@@ -5,7 +5,8 @@ Crawl State Adapter — isolated state management for the crawl layer.
 from __future__ import annotations
 
 import logging
-from typing import Optional, List
+from typing import List, Optional
+
 from app.crawl_frontier import get_crawl_frontier
 from app.crawl_policy import get_crawl_policy
 

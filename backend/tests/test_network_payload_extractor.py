@@ -1,16 +1,16 @@
 """Tests for network payload extraction and source arbitration."""
 
 import json
-import pytest
-from app.models import SchemaField, FieldType
-from app.network_payload_extractor import (
-    find_record_arrays,
-    score_record_array,
-    map_json_records_to_schema,
-    extract_from_network_payloads,
-    arbitrate_sources,
-)
 
+import pytest
+from app.models import FieldType, SchemaField
+from app.network_payload_extractor import (
+    arbitrate_sources,
+    extract_from_network_payloads,
+    find_record_arrays,
+    map_json_records_to_schema,
+    score_record_array,
+)
 
 FLIGHT_PAYLOAD = json.dumps({
     "results": [
@@ -488,8 +488,8 @@ class TestSourceArbitration:
 
     @pytest.mark.asyncio
     async def test_memory_downgraded_and_arbitration(self, monkeypatch):
-        from app.extraction_orchestrator import orchestrate_extraction
         from app.container_discovery import MultiPassResult
+        from app.extraction_orchestrator import orchestrate_extraction
 
         url = "https://example.com/search/id/opaque_session_token_123"
         html = "<html><body>Some content</body></html>"

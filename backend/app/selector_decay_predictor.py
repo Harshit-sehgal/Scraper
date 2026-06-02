@@ -20,11 +20,11 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, asdict, field
-from typing import List, Dict
 from collections import defaultdict
+from dataclasses import asdict, dataclass, field
+from typing import Dict, List
 
-from app.selector_memory import get_selector_memory, SelectorConfidenceScore
+from app.selector_memory import SelectorConfidenceScore, get_selector_memory
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +72,8 @@ class SelectorDecayPredictor:
         return str(Path(__file__).resolve().parent.parent / "data" / "selector_decay_snapshots.json")
 
     def _save(self) -> None:
-        import os
         import json
+        import os
 
         try:
             path = self._get_snapshots_path()
@@ -85,8 +85,8 @@ class SelectorDecayPredictor:
             logger.exception("Failed to persist selector decay snapshots: %s", e)
 
     def _load(self) -> None:
-        import os
         import json
+        import os
         import sys
 
         from app.config import settings

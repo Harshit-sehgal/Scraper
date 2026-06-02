@@ -10,13 +10,13 @@ Verifies:
 - Session-bound URL detection flags the URL correctly
 """
 
+import http.server
 import json
 import threading
-import http.server
 import urllib.parse
-import pytest
 
-from app.models import SchemaField, FieldType
+import pytest
+from app.models import FieldType, SchemaField
 
 pytestmark = pytest.mark.browser
 
@@ -293,8 +293,8 @@ async def test_playwright_url_detected_as_session_bound():
 @pytest.mark.asyncio
 async def test_playwright_network_capture_feeds_extractor(browser_server):
     """E2E proving actual network capture feeds the extractor."""
-    from playwright.async_api import async_playwright
     from app.network_payload_extractor import extract_from_network_payloads
+    from playwright.async_api import async_playwright
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -338,7 +338,7 @@ async def test_playwright_network_capture_feeds_extractor(browser_server):
 @pytest.mark.asyncio
 async def test_playwright_pipeline_integration(browser_server, monkeypatch):
     """True pipeline E2E integration: weak DOM + naturally fetched strong JSON -> chooses network."""
-    from app import url_safety, html_utils
+    from app import html_utils, url_safety
     from app.browser_pool import BrowserPool
     monkeypatch.setattr(url_safety, "validate_public_http_url", lambda url: None)
     monkeypatch.setattr(html_utils, "_validate_url_safe", lambda url: None)

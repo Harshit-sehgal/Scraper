@@ -12,9 +12,9 @@ Tests the ML-based selector quality prediction and optimization system:
 from app.selector_ml_optimizer import (
     SelectorFeatureExtractor,
     SelectorFeatures,
-    SelectorQualityPredictor,
-    SelectorPrediction,
     SelectorOptimizationEngine,
+    SelectorPrediction,
+    SelectorQualityPredictor,
     get_selector_optimizer,
 )
 

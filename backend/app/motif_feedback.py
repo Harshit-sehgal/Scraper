@@ -13,8 +13,8 @@ Responsible for:
 from __future__ import annotations
 
 import logging
-from typing import Any, Tuple, Dict, List, Optional
 from collections import Counter
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.models import SchemaField
 

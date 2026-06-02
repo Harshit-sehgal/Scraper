@@ -6,17 +6,16 @@ suppression — the core "semantic physics" of the system.
 
 from __future__ import annotations
 
-from app.semantic_ir import SemanticType
-from app.semantic_mapper import (
-    detect_semantic_type,
-    is_child_fragment,
-    _is_noise_value,
-    match_values_to_intent,
-    SEMANTIC_PATTERNS,
-)
 from app.intent_parser import IntentSchema
 from app.page_profiler import StructureProfile, ValuePatterns
-
+from app.semantic_ir import SemanticType
+from app.semantic_mapper import (
+    SEMANTIC_PATTERNS,
+    _is_noise_value,
+    detect_semantic_type,
+    is_child_fragment,
+    match_values_to_intent,
+)
 
 # ─── detect_semantic_type ──────────────────────────────────────────────
 

@@ -12,16 +12,14 @@ Tests cover:
 from __future__ import annotations
 
 import pytest
-
 from app.extraction_provenance import (
-    FieldProvenance,
-    ExtractionProvenance,
-    ProvenanceBuilder,
     ExtractionMethod,
+    ExtractionProvenance,
+    FieldProvenance,
+    ProvenanceBuilder,
     enrich_records_with_provenance,
     summarize_provenance,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # FieldProvenance Tests

@@ -9,7 +9,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from app.insight_engine import (
     generate_data_insight,
     suggest_schema_from_intent,

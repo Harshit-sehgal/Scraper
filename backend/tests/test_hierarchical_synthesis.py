@@ -1,6 +1,7 @@
 from typing import Any, cast
-from app.semantic_world_state import get_world_state
+
 from app.semantic_os import get_semantic_os
+from app.semantic_world_state import get_world_state
 
 
 def test_envelope_creation_and_persistence():
@@ -84,8 +85,8 @@ def test_autonomous_hierarchical_synthesis():
 
 
 def test_hierarchical_interpretation():
-    from app.semantic_ir import SemanticToken, SemanticRecord, SemanticType, Span
     from app.semantic_allocation_engine import allocate_semantic_roles
+    from app.semantic_ir import SemanticRecord, SemanticToken, SemanticType, Span
 
     ws = get_world_state()
     ws.clear()

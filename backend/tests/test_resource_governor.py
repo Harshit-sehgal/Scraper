@@ -5,7 +5,7 @@ Unit Tests for Phase 89 Resource Governance.
 from __future__ import annotations
 
 import pytest
-from app.resource_governor import ResourceGovernor, ResourceBudgets
+from app.resource_governor import ResourceBudgets, ResourceGovernor
 from app.scrape_telemetry import get_scrape_telemetry
 
 

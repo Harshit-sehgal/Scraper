@@ -4,9 +4,6 @@ import logging
 import threading
 from typing import Callable
 
-from fastapi import APIRouter, HTTPException, Query, Depends
-from app.utils.rbac import UserRole, require_role
-
 from app.config import settings
 from app.discovery import DiscoveryDependencyError, discover_urls, infer_source_metadata
 from app.filters import process_results
@@ -22,9 +19,11 @@ from app.scraper import (
     ai_clean_and_align_records,
     suggest_schema_from_intent,
 )
+from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
-from app.storage_interface import get_job_repository
+from app.utils.rbac import UserRole, require_role
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 
 def _save_job(job) -> None:
@@ -310,7 +309,7 @@ def create_jobs_router(
         # processing
         if settings.WORKER_QUEUE:
             try:
-                from app.worker_queue import get_worker_queue, Priority
+                from app.worker_queue import Priority, get_worker_queue
 
                 queue = get_worker_queue()
                 task_id = await queue.enqueue(

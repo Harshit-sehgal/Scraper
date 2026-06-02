@@ -6,7 +6,7 @@ management and topological pattern discovery.
 Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
 """
 
-from typing import Dict, List, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Set
 
 if TYPE_CHECKING:
     from app.topology_state import TopologyState

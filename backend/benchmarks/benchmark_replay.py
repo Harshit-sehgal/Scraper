@@ -7,8 +7,9 @@ This script executes 10k transactions, captures the journal, and measures
 the time to perfectly reconstruct the state via deterministic replay.
 """
 
-import time
 import random
+import time
+
 from app.semantic_world_state import SemanticWorldState
 
 

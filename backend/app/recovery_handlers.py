@@ -19,13 +19,13 @@ import asyncio
 import logging
 from typing import Any
 
+from app.domain_runtime_policy import get_domain_runtime_policy
+from app.proxy_manager import get_proxy_manager
 from app.recovery_strategies import (
     RecoveryAction,
     get_recovery_executor,
 )
-from app.proxy_manager import get_proxy_manager
 from app.selector_memory import get_selector_memory
-from app.domain_runtime_policy import get_domain_runtime_policy
 
 logger = logging.getLogger(__name__)
 

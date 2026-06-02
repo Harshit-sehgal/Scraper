@@ -18,7 +18,6 @@ subsystem entries.
 
 from app.semantic_world_state import get_world_state
 
-
 # ═══════════════════════════════════════════════════════════════════
 # HELPER: capture the most recent transaction entry
 # ═══════════════════════════════════════════════════════════════════

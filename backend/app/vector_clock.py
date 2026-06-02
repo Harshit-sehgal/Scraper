@@ -1,5 +1,5 @@
-from typing import Dict, Optional
 import copy
+from typing import Dict, Optional
 
 
 class VectorClock:

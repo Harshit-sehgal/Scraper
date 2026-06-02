@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import Counter
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Optional
 
 from app.acquisition_state import AcquisitionState

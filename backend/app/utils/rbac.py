@@ -3,9 +3,10 @@ Role-Based Access Control (RBAC) Module — DataForge Scraper.
 Enforces administrative, operator, and user privilege boundaries.
 """
 
-from enum import Enum
 import logging
 import secrets
+from enum import Enum
+
 from fastapi import HTTPException, Request
 
 logger = logging.getLogger(__name__)

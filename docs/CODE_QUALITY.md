@@ -4,20 +4,9 @@
 
 This document defines expected quality checks. It is not proof that every lint/type/coverage check currently passes. Only fresh command output should be used as evidence.
 
-## Current Verified Snapshot (freshly run in this session)
+## Current Verified Snapshot
 
-- `python3 -m compileall -q backend scripts architecture_validator.py` passed with no output.
-- `PYTHONPATH=backend python3 architecture_validator.py` passed with `VALIDATION PASSED: Architecture is lawful.`
-- Pytest collection completed with `1937 tests collected in 0.40s`.
-- Safe SQLite backend suite passed with `1862 passed, 73 skipped, 0 failed in 120.03s` (100% clean pass).
-- Postgres integration suite passed with `1907 passed, 28 skipped, 0 failed in 142.41s` (100% clean, rate-limiter flaky collisions resolved).
-- Playwright browser e2e suite passed with `10 passed, 0 failed in 10.11s` (100% clean).
-- Golden dataset live tests were verified with `7 passed, 1 skipped in 42.74s` (1 skipped due to external httpbin.org 503 error).
-- Combined route-auth, production-security, and CORS preflight tests passed (archived result: `183 passed in 1.83s` from prior refresh).
-- Benchmark smoke passed with `1 passed, 1 skipped in 0.26s`.
-- Route auth matrix generated 81 route entries with correct enforcement classification.
-- Production env placeholder rejection verified: `scripts/check_prod_env.py` intentionally fails on placeholder values.
-- Mypy static type checking passed with `Success: no issues found in 158 source files` (freshly verified).
+For the latest verified syntax, lint, type checking (mypy), and pytest collection/passing results across all test groups and environments, see [PROJECT_STATUS.md](../PROJECT_STATUS.md).
 
 ## Results from Prior Refresh (not re-run in this session)
 

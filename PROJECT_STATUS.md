@@ -45,7 +45,7 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | `python3 -m compileall -q backend scripts architecture_validator.py` | Passed with no output | Python syntax is valid for checked paths |
 | `PYTHONPATH=backend python3 architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass |
 | `python3 -m mypy backend/app --ignore-missing-imports` | `Success: no issues found in 158 source files` | Mypy static type checking passes 100% clean |
-| `pytest --collect-only` | `1914 tests collected` | Test collection is discoverable and clean |
+| `pytest --collect-only` | `2017 tests collected` | Test collection is discoverable and clean |
 | SQLite backend suite | `1841 passed, 72 skipped` | Safe SQLite backend functional test suite passes |
 | Postgres integration suite | `1885 passed, 28 skipped` | Postgres database models, repositories, and queues pass |
 | Playwright browser/local-server suite | `1858 passed, 55 skipped` | Playwright extraction flows and server checks pass |

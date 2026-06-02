@@ -5,9 +5,10 @@ LAW: Distributed semantic systems must handle concurrent evolution without
 global locking bottlenecks. MVCC ensures causality is preserved.
 """
 
-import pytest
 import threading
 import time
+
+import pytest
 from app.semantic_world_state import SemanticWorldState
 from app.topology_state import ConflictError
 

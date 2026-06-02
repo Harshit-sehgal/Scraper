@@ -18,6 +18,10 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, List, Set
 
+from app.event_dispatcher import get_dispatcher
+
+# Import scheduler singleton to wire event subscriptions at module load time
+from app.graph_update_scheduler import get_scheduler
 from app.semantic_allocation_engine import (
     _UNIVERSAL_ROOTS,
     _get_role_engine,
@@ -30,6 +34,7 @@ from app.semantic_boundary_engine import (
     group_adjacent_entities,
     record_motif_observation,
 )
+from app.semantic_events import SemanticEvent, SemanticEventType
 from app.semantic_ir import (
     SemanticRecord,
     SemanticToken,
@@ -38,11 +43,6 @@ from app.semantic_ir import (
 from app.semantic_mapper import detect_semantic_type, is_child_fragment
 from app.semantic_segmentation import StructuralMemoryTracker, expand_composite_records, sem_type_str
 from app.semantic_world_state import get_world_state
-from app.event_dispatcher import get_dispatcher
-from app.semantic_events import SemanticEvent, SemanticEventType
-
-# Import scheduler singleton to wire event subscriptions at module load time
-from app.graph_update_scheduler import get_scheduler
 
 get_scheduler()
 

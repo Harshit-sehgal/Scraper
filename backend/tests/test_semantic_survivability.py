@@ -8,12 +8,13 @@ This suite performs 10,000+ transaction simulations with chaos injection
 to detect emergent causality drift and attractor collapse.
 """
 
-import pytest
 import random
 import time
-from app.semantic_world_state import SemanticWorldState
-from app.semantic_ir import SemanticType, SemanticToken, Span
+
+import pytest
 from app.failure_injector import set_injection_probability
+from app.semantic_ir import SemanticToken, SemanticType, Span
+from app.semantic_world_state import SemanticWorldState
 
 
 @pytest.fixture

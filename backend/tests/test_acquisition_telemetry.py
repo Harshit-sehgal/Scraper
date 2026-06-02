@@ -1,7 +1,7 @@
 """Tests for acquisition telemetry collector."""
 
-from app.acquisition_telemetry import AcquisitionTelemetryCollector
 from app.acquisition_state import AcquisitionState
+from app.acquisition_telemetry import AcquisitionTelemetryCollector
 
 
 class TestAcquisitionTelemetryCollector:

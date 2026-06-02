@@ -82,10 +82,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.txt
-          pip install pyflakes mypy types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
+          pip install ruff mypy types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
 
-      - name: Run Pyflakes (Advisory)
-        run: python -m pyflakes backend/app backend/tests
+      - name: Run Ruff Lint (Advisory)
+        run: ruff check backend/app backend/tests
         continue-on-error: true
 
       - name: Run Mypy Typecheck (Advisory)

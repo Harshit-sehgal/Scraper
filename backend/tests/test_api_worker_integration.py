@@ -15,7 +15,6 @@ from pathlib import Path
 
 import httpx
 import pytest
-
 from app.models import Job, JobStatus
 from app.storage_interface import (
     SQLiteJobRepository,
@@ -172,8 +171,8 @@ class TestWorkerPicksQueuedJob:
 
         # Register a mock handler that simulates job completion
         async def mock_handler(task):
-            from app.services.job_runner import run_job
             from app.config import settings
+            from app.services.job_runner import run_job
             from app.storage_interface import get_job_repository
 
             job_id = task.payload.get("job_id")
@@ -315,8 +314,8 @@ class TestRealWorkerHandler:
         # ── Setup: enable worker queue, point SQLite at temp path ───────
         monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
 
-        from app.job_store import reset_job_store_for_tests
         from app.config import settings
+        from app.job_store import reset_job_store_for_tests
 
         db_file = tmp_path / "test_real_handler_jobs.db"
         state_file = db_file.with_suffix(".json")
@@ -328,7 +327,7 @@ class TestRealWorkerHandler:
         jobs_store.clear()
         recycle_bin_store.clear()
 
-        from app.worker_queue import reset_worker_queue, get_worker_queue
+        from app.worker_queue import get_worker_queue, reset_worker_queue
         reset_worker_queue()
         queue = get_worker_queue(db_path=tmp_path / "test_real_handler_queue.db")
         queue.register_handler("scrape_job", scrape_job_handler)
@@ -388,8 +387,9 @@ class TestRealWorkerHandler:
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
 
-        from scripts.run_worker import scrape_job_handler
         from app.worker_queue import QueueTask
+
+        from scripts.run_worker import scrape_job_handler
 
         # Create a task-like object without job_id
         task = QueueTask(
@@ -457,8 +457,8 @@ class TestWorkerPreservesRecycleBin:
 
     def test_recycle_bin_survives_multiple_save_cycles(self, tmp_path, monkeypatch):
         """Multiple save_all cycles should not lose recycle_bin entries."""
-        from app.job_store import reset_job_store_for_tests
         from app.config import settings
+        from app.job_store import reset_job_store_for_tests
 
         db_file = tmp_path / "test_jobs2.db"
         state_file = db_file.with_suffix(".json")

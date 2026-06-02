@@ -59,12 +59,12 @@ class DiscoveryDependencyError(RuntimeError):
 def get_ddgs_class():
     """Resolve the preferred DuckDuckGo search client lazily."""
     try:
-        from ddgs import DDGS  # type: ignore
+        from ddgs import DDGS
 
         return DDGS
     except ImportError:
         try:
-            from duckduckgo_search import DDGS  # type: ignore
+            from duckduckgo_search import DDGS
 
             return DDGS
         except ImportError as exc:

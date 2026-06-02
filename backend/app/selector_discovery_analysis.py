@@ -10,9 +10,11 @@ and URL-level concerns (redirects, recovery) live in sibling modules.
 from __future__ import annotations
 
 import logging
-from typing import Any
 from collections import Counter
+from typing import Any
+
 from bs4 import BeautifulSoup
+
 from app.config import settings
 from app.models import SchemaField
 from app.page_profiler import detect_page_structure, detect_value_patterns

@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import os
 import time
+
 import pytest
-from app.benchmark_reporter import BenchmarkReporter, BenchmarkRun, DB_PATH, DASHBOARD_PATH
+from app.benchmark_reporter import DASHBOARD_PATH, DB_PATH, BenchmarkReporter, BenchmarkRun
 
 
 @pytest.fixture(autouse=True)

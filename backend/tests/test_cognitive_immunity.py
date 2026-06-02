@@ -1,5 +1,5 @@
-from app.semantic_world_state import get_world_state
 from app.instability_api import get_immune_system
+from app.semantic_world_state import get_world_state
 
 
 def test_source_quarantine():

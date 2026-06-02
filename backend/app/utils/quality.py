@@ -1,8 +1,9 @@
-from typing import Any
 import re
 from statistics import mean
-from app.models import SchemaField, FieldType
+from typing import Any
+
 from app.config import settings
+from app.models import FieldType, SchemaField
 
 
 def clamp01(value: float) -> float:

@@ -6,9 +6,10 @@ Provides high-level orchestration, state governance, and topological search.
 """
 
 import logging
-from typing import Callable, List, Dict, Optional
-from app.semantic_world_state import get_world_state
+from typing import Callable, Dict, List, Optional
+
 from app.checkpoint_manager import get_checkpoint_manager
+from app.semantic_world_state import get_world_state
 
 
 class SemanticOS:

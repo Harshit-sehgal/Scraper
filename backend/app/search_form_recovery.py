@@ -10,8 +10,9 @@ quality in content_quality.py.
 
 from __future__ import annotations
 
-import re
 import logging
+import re
+
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
@@ -259,6 +260,7 @@ async def _try_form_search_recovery(
         - error: str | None
     """
     import httpx
+
     from app.url_safety import validate_public_http_url
 
     # Step 1: Detect the search form

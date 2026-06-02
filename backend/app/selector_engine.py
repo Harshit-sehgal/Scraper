@@ -1,16 +1,17 @@
-import re
 import logging
+import re
+
 from bs4 import BeautifulSoup
 
-from app.models import SchemaField, FieldType
+from app.config import settings
 from app.html_utils import (
+    _apply_page_level_contact_fallback,
     _compact_text,
+    _enrich_record_contacts,
     _extract_contacts_from_node,
     _sanitize_field_value,
-    _enrich_record_contacts,
-    _apply_page_level_contact_fallback,
 )
-from app.config import settings
+from app.models import FieldType, SchemaField
 
 logger = logging.getLogger(__name__)
 

@@ -1,13 +1,19 @@
 """Graph invariant validation — tests that semantic coherence properties hold."""
 
-from app.semantic_ir import (
-    ExclusionEdge, OwnershipEdge, SemanticGraph, SemanticRegion,
-    SemanticToken, SemanticType, Span, RegionType,
-)
-from app.semantic_world_state import get_world_state, SemanticWorldState
-from app.event_dispatcher import get_dispatcher
 import pytest
+from app.event_dispatcher import get_dispatcher
 from app.semantic_events import SemanticEvent, SemanticEventType
+from app.semantic_ir import (
+    ExclusionEdge,
+    OwnershipEdge,
+    RegionType,
+    SemanticGraph,
+    SemanticRegion,
+    SemanticToken,
+    SemanticType,
+    Span,
+)
+from app.semantic_world_state import SemanticWorldState, get_world_state
 
 
 def test_world_state_round_trip_preserves_structure():

@@ -5,7 +5,8 @@ No subsystem should call topology_state.add() directly — use TopologyAPI inste
 """
 
 import logging
-from typing import List, Set, Optional
+from typing import List, Optional, Set
+
 from app.core_types import FieldConflictRegion
 from app.topology_state import RegionSnapshot
 

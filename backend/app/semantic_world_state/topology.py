@@ -1,8 +1,9 @@
 # mypy: ignore-errors
 import logging
-from typing import Dict, List, Optional, Any
-from app.invariant_firewall import requires_invariants
+from typing import Any, Dict, List, Optional
+
 from app.core_types import FieldConflictRegion
+from app.invariant_firewall import requires_invariants
 
 logger = logging.getLogger(__name__)
 

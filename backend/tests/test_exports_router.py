@@ -12,10 +12,9 @@ from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from fastapi import FastAPI
-
-from app.models import Job, JobStatus, SchemaField, FieldType
+from app.models import FieldType, Job, JobStatus, SchemaField
 from app.routers.exports import create_exports_router
+from fastapi import FastAPI
 
 
 def _make_job(
@@ -537,8 +536,9 @@ class TestExcelWorksheetCreation:
     @pytest.mark.asyncio
     async def test_excel_ws_none_returns_500(self):
         """When openpyxl's Workbook().active is None, return 500."""
-        from httpx import ASGITransport, AsyncClient
         from unittest.mock import patch as mock_patch
+
+        from httpx import ASGITransport, AsyncClient
 
         jobs_store: dict[str, Job] = {}
         router = create_exports_router(jobs_store)

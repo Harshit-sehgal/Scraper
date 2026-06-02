@@ -1,19 +1,13 @@
-import re
-import logging
 import asyncio
-
+import logging
+import re
 import time
 from typing import Literal
 from urllib.parse import urlparse
-from bs4 import BeautifulSoup
-import httpx
 
-from app.config import settings
-from app.models import SchemaField, FieldType
-from app.semantic_segmentation import segment_single_text, is_likely_noise_field
-from app.browser_pool import get_browser_pool
-from app.domain_intelligence import get_domain_intelligence
-from app.strategy_evolution import FetchStrategy
+import httpx
+from bs4 import BeautifulSoup
+
 from app.browser_network_capture import (
     build_cookie_header,
     collect_browser_state,
@@ -21,6 +15,12 @@ from app.browser_network_capture import (
     store_browser_state,
     store_captures,
 )
+from app.browser_pool import get_browser_pool
+from app.config import settings
+from app.domain_intelligence import get_domain_intelligence
+from app.models import FieldType, SchemaField
+from app.semantic_segmentation import is_likely_noise_field, segment_single_text
+from app.strategy_evolution import FetchStrategy
 
 # ─── SSRF / private-network IP validation ──────────────────────────────
 from app.url_safety import validate_public_http_url as _validate_url_safe

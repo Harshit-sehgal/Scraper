@@ -13,58 +13,54 @@ from __future__ import annotations
 import logging
 import time
 from typing import Any, cast
+
 from bs4 import BeautifulSoup
-from app.config import settings
-from app.llm_bridge import llm_json, reset_llm_call_count
-from app.page_profiler import detect_page_structure, detect_value_patterns
-from app.session_url_detector import detect_session_params
+
+from app.acquisition_mode import AcquisitionConfig, AcquisitionMode, escalate_mode, should_escalate
 from app.acquisition_telemetry import get_acquisition_telemetry
-from app.empty_response_detector import detect_empty_response, EmptyResponseCheck
-from app.acquisition_mode import AcquisitionMode, AcquisitionConfig, should_escalate, escalate_mode
-from app.strategy_evolution import FetchStrategy
-
-from app.motif_feedback import MotifFeedbackEngine
-from app.html_utils import clean_html_for_selectors
-
-# ── Re-exports from sub-modules for backward compatibility ──────────────
-
-from app.selector_discovery_analysis import (
-    discover_selectors,
-    _analyze_page_data_type,
-    build_selector_prompt,
-    _discover_selectors_from_dom,
-    _compute_ui_noise_score,
-    _discover_direct_repeating_elements,
-    _fallback_parent_child_discovery,
-    _build_css_for_element,
-    _infer_field_selectors_from_container,
-)
-
-# ── Re-exports from refactored url-analysis sub-modules ───────────────
-
-from app.url_redirects import (
-    _detect_redirect,
-    build_redirect_info,
-)
-
+from app.config import settings
 from app.content_quality import (
     _assess_content_quality,
     _extract_container_text_values,
 )
-
-from app.url_value_classification import (
-    _classify_value,
-    _value_patterns_to_field_types,
-    build_url_analysis_prompt,
-    _rename_generic_fields,
-    _infer_field_name,
-)
-
+from app.empty_response_detector import EmptyResponseCheck, detect_empty_response
+from app.html_utils import clean_html_for_selectors
+from app.llm_bridge import llm_json, reset_llm_call_count
+from app.motif_feedback import MotifFeedbackEngine
+from app.page_profiler import detect_page_structure, detect_value_patterns
 from app.search_form_recovery import (
-    _detect_search_form,
     _build_absolute_url,
+    _detect_search_form,
     _map_search_params_to_fields,
     _try_form_search_recovery,
+)
+
+# ── Re-exports from sub-modules for backward compatibility ──────────────
+from app.selector_discovery_analysis import (
+    _analyze_page_data_type,
+    _build_css_for_element,
+    _compute_ui_noise_score,
+    _discover_direct_repeating_elements,
+    _discover_selectors_from_dom,
+    _fallback_parent_child_discovery,
+    _infer_field_selectors_from_container,
+    build_selector_prompt,
+    discover_selectors,
+)
+from app.session_url_detector import detect_session_params
+from app.strategy_evolution import FetchStrategy
+
+# ── Re-exports from refactored url-analysis sub-modules ───────────────
+from app.url_redirects import (
+    _detect_redirect,
+    build_redirect_info,
+)
+from app.url_value_classification import (
+    _classify_value,
+    _infer_field_name,
+    _rename_generic_fields,
+    _value_patterns_to_field_types,
+    build_url_analysis_prompt,
 )
 
 __all__ = [
@@ -141,9 +137,10 @@ async def analyze_url_for_fields(
         - suggested_fields: list of field suggestions
         - anti_bot_score: float
     """
+    import httpx
+
     from app.html_utils import fetch_page_content as _fetch_page_content
     from app.scrape_telemetry import detect_anti_bot
-    import httpx
 
     reset_llm_call_count()
     start_time = time.time()

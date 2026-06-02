@@ -12,8 +12,8 @@ ReplayBuffer integration: All journal entries are also persisted to the
 large-scale ReplayBuffer for streaming replay from persistent storage.
 """
 
-import time
 import logging
+import time
 from typing import Optional
 
 logger = logging.getLogger(__name__)

@@ -10,6 +10,7 @@ Tests:
 """
 
 import time
+
 from app.selector_decay_predictor import (
     SelectorDecayPredictor,
     get_selector_decay_predictor,

@@ -7,15 +7,13 @@ currency parsing, field post-processing, and profile cache management.
 from __future__ import annotations
 
 import pytest
-
 from app.selector_profiles.loader import (
+    _load_all_profiles,
+    _match_domain,
     _parse_currency,
     _postprocess_field,
     reload_profiles,
-    _match_domain,
-    _load_all_profiles,
 )
-
 
 # ─── _parse_currency ───────────────────────────────────────────────────
 

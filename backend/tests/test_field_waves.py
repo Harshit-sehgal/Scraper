@@ -2,11 +2,12 @@
 Test Decentralized Field Waves — Phase 71 Verification.
 """
 
-import pytest
 import asyncio
-from app.semantic_world_state import get_world_state, reset_world_state
-from app.semantic_events import SemanticEventType
+
+import pytest
 from app.event_dispatcher import get_dispatcher
+from app.semantic_events import SemanticEventType
+from app.semantic_world_state import get_world_state, reset_world_state
 
 
 @pytest.fixture(autouse=True)

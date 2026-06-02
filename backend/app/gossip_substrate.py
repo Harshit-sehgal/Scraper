@@ -10,11 +10,12 @@ Implements Push-Pull gossip with:
 """
 
 from __future__ import annotations
+
+import logging
 import random
 import time
-import logging
-from typing import Dict, Set, Any, Optional, Tuple, List, TYPE_CHECKING
 from collections import defaultdict
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 if TYPE_CHECKING:
     from app.heartbeat_manager import HeartbeatManager

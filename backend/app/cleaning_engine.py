@@ -10,12 +10,14 @@ Responsible for:
 
 from __future__ import annotations
 
-import logging
 import inspect
+import logging
 from typing import Any, List, Optional, Tuple
+
 from app.config import settings
 from app.data_utils import _prepare_records_for_ai, normalize_scraped_record
-from app.llm_bridge import llm_json as _llm_json, llm_json_fast as _llm_json_fast
+from app.llm_bridge import llm_json as _llm_json
+from app.llm_bridge import llm_json_fast as _llm_json_fast
 from app.models import SchemaField
 from app.utils.quality import score_record_quality
 

@@ -14,7 +14,8 @@ Owns:
 - total_co_occurrences: total co-occurrence observations
 """
 
-from typing import Any, Callable, Dict, List, Tuple, Set, Optional
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
 from app.transaction_context import active_transaction
 
 

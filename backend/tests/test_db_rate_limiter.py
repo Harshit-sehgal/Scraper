@@ -1,5 +1,6 @@
 import time
 from unittest.mock import MagicMock
+
 from app.rate_limiter import DatabaseSlidingWindowCounter, RateLimiterMiddleware
 
 
@@ -17,7 +18,7 @@ def _cleanup_rate_limit_key(key: str) -> None:
             pass
     else:
         try:
-            from app.job_store import _get_connection, _DB_LOCK
+            from app.job_store import _DB_LOCK, _get_connection
             with _DB_LOCK:
                 conn = _get_connection()
                 try:
@@ -75,22 +76,44 @@ def test_db_sliding_window_counter_sqlite():
 def test_rate_limiter_middleware_db_backed_selection():
     """Verify that RateLimiterMiddleware selects the database-backed counter when configured."""
     from unittest.mock import patch
-    
+
     middleware = RateLimiterMiddleware(global_limit="5 / minute", per_ip=True)
-    
+
     mock_request = MagicMock()
     mock_request.url.path = "/api/jobs"
     mock_request.client.host = "127.0.0.1"
     mock_request.headers = {}
-    
+
     # We patch settings.RATE_LIMIT_DB_BACKED to True
     with patch("app.config.settings.RATE_LIMIT_DB_BACKED", True):
         # Trigger the middleware key logic
         key = middleware._get_client_key("/api/jobs", "127.0.0.1")
         max_req, window_sec = middleware._get_limits_for_path("/api/jobs")
-        
+
         # Test lazy counter creation in dict
         if key not in middleware._counters:
             middleware._counters[key] = DatabaseSlidingWindowCounter(max_req, window_sec, key)
-            
+
         assert isinstance(middleware._counters[key], DatabaseSlidingWindowCounter)
+
+
+def test_db_sliding_window_counter_fallback():
+    """Verify that DatabaseSlidingWindowCounter falls back to in-memory behavior on DB errors."""
+    import os
+    from unittest.mock import patch
+    test_key = _generate_test_key()
+
+    # Force postgres storage backend and mock database connection to fail
+    with patch.dict(os.environ, {"DATAFORGE_STORAGE_BACKEND": "postgres"}), \
+         patch("app.postgres_repository._conn", side_effect=Exception("Database connection failure")):
+
+        counter = DatabaseSlidingWindowCounter(max_requests=2, window_seconds=2.0, key=test_key)
+
+        # Verify it falls back to in-memory, checking limit functionality
+        assert counter.remaining() == 2
+        assert counter.allow() is True
+        assert counter.remaining() == 1
+        assert counter.allow() is True
+        assert counter.remaining() == 0
+        assert counter.allow() is False
+        assert counter.reset_in() > 0.0

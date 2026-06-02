@@ -4,8 +4,8 @@ Phase 68: Active Semantic Governance & Policy Enforcement Tests
 LAW: All cognitive cycles must be bounded by governance policies.
 """
 
-from app.semantic_world_state import SemanticWorldState
 from app.graph_update_scheduler import GlobalCognitiveScheduler
+from app.semantic_world_state import SemanticWorldState
 
 
 def test_governance_guardrail_enforcement():

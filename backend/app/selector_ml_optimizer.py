@@ -21,11 +21,10 @@ LAW: Selectors are not created equal. ML learns which features predict quality.
 from __future__ import annotations
 
 import logging
-import time
-from dataclasses import dataclass, asdict
-from typing import Optional, List, Dict, Any
-
 import re
+import time
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -318,7 +317,6 @@ class SelectorQualityPredictor:
 
                 # Simple gradient update
                 adjustment = learning_rate * error * val
-                # type: ignore[assignment]
                 weight: float = self.feature_weights[feature_name]
                 self.feature_weights[feature_name] = weight + adjustment
 

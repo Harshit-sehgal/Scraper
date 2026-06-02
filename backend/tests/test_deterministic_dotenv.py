@@ -1,5 +1,5 @@
-import os
 import importlib
+import os
 
 
 def test_deterministic_dotenv_loading(tmp_path, monkeypatch):

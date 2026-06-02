@@ -1,19 +1,18 @@
 import logging
 import time
-from copy import deepcopy
 from collections import Counter
-from typing import Dict, List, Optional, Any, Set, Callable
 from contextlib import contextmanager
+from copy import deepcopy
+from typing import Any, Callable, Dict, List, Optional, Set
 
-from app.transaction_context import active_transaction
 from app.invariant_firewall import requires_invariants
-
-from app.semantic_world_state.locks import NonBlockingRLock
 from app.semantic_world_state.events import EventMixin
+from app.semantic_world_state.locks import NonBlockingRLock
 from app.semantic_world_state.memory import MemoryMixin
-from app.semantic_world_state.serialization import SerializationMixin
 from app.semantic_world_state.metrics import MetricsMixin
+from app.semantic_world_state.serialization import SerializationMixin
 from app.semantic_world_state.topology import TopologyMixin
+from app.transaction_context import active_transaction
 
 logger = logging.getLogger(__name__)
 
@@ -27,20 +26,21 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     """
 
     def __init__(self, node_id: Optional[str] = None):
-        from app.topology_state import TopologyState
+        import uuid
+
+        from app.abstraction_state import AbstractionState
+        from app.action_state import ActionState
         from app.energy_state import EnergyState
+        from app.graph_update_scheduler import GlobalCognitiveScheduler
+        from app.history_state import HistoryState
         from app.instability_state import InstabilityState
+        from app.intent_state import IntentState
         from app.manifold_state import ManifoldState
         from app.motif_state import MotifState
-        from app.transition_state import TransitionState
-        from app.history_state import HistoryState
-        from app.vector_clock import VectorClock
-        from app.intent_state import IntentState
-        from app.action_state import ActionState
-        from app.abstraction_state import AbstractionState
-        from app.graph_update_scheduler import GlobalCognitiveScheduler
         from app.observability import ObservabilityState
-        import uuid
+        from app.topology_state import TopologyState
+        from app.transition_state import TransitionState
+        from app.vector_clock import VectorClock
 
         self._node_id = node_id or str(uuid.uuid4())[:8]
         self._vector_clock = VectorClock(self._node_id)
@@ -60,8 +60,8 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
         # Isolated domain-specific state adapters (Phase 82 Decentralization)
         from app.crawl_state import get_crawl_state
-        from app.telemetry_state import get_telemetry_state
         from app.regression_state import get_regression_state
+        from app.telemetry_state import get_telemetry_state
 
         self.crawl = get_crawl_state()
         self.telemetry = get_telemetry_state()
@@ -256,7 +256,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                 expected_versions: Dict[str, int] = tx_ctx["base_versions"]
                 val_start = time.time()
 
-                from app.topology_state import TopologyState, ConflictError
+                from app.topology_state import ConflictError, TopologyState
 
                 try:
                     for s in states:
@@ -1024,8 +1024,8 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         if not active_actions:
             return 0
 
-        from app.policy_engine import get_policy_engine
         from app.llm_bridge import get_plugin_manager
+        from app.policy_engine import get_policy_engine
 
         policy = get_policy_engine(ws=self)
         plugins = get_plugin_manager(ws=self)

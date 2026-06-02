@@ -123,7 +123,7 @@ class CandidateIR:
 
     def as_token(self, source_field: str = "") -> "SemanticToken":
         """Convert this candidate to a SemanticToken for the IR layer."""
-        from app.semantic_ir import Span, SemanticToken
+        from app.semantic_ir import SemanticToken, Span
 
         return SemanticToken(
             raw=self.raw,

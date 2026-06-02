@@ -6,6 +6,7 @@ round-trips to ensure deterministic replay and distributed consistency.
 """
 
 import json
+
 from app.semantic_world_state import SemanticWorldState
 
 

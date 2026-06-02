@@ -1,5 +1,7 @@
 import asyncio
 import os
+
+os.environ["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "true"
 import sys
 from pathlib import Path
 
@@ -9,24 +11,33 @@ import pytest
 
 def pytest_addoption(parser):
     """Register optional external-service test flags."""
-    parser.addoption(
-        "--run-postgres",
-        action="store_true",
-        default=False,
-        help="Run tests marked with @pytest.mark.postgres (requires Docker + testcontainers).",
-    )
-    parser.addoption(
-        "--run-golden-dataset",
-        action="store_true",
-        default=False,
-        help="Run golden dataset tests against real websites (requires network).",
-    )
-    parser.addoption(
-        "--run-browser",
-        action="store_true",
-        default=False,
-        help="Run tests marked with @pytest.mark.browser (requires Playwright and local socket binding).",
-    )
+    try:
+        parser.addoption(
+            "--run-postgres",
+            action="store_true",
+            default=False,
+            help="Run tests marked with @pytest.mark.postgres (requires Docker + testcontainers).",
+        )
+    except ValueError:
+        pass
+    try:
+        parser.addoption(
+            "--run-golden-dataset",
+            action="store_true",
+            default=False,
+            help="Run golden dataset tests against real websites (requires network).",
+        )
+    except ValueError:
+        pass
+    try:
+        parser.addoption(
+            "--run-browser",
+            action="store_true",
+            default=False,
+            help="Run tests marked with @pytest.mark.browser (requires Playwright and local socket binding).",
+        )
+    except ValueError:
+        pass
 
 
 def pytest_configure(config):
@@ -136,7 +147,7 @@ try:
     from app import main as main_mod  # noqa: E402
 except ImportError as e:
     import warnings
-    warnings.warn(f"Could not import app.main (tests requiring the client fixture will fail): {e}")
+    warnings.warn(f"Could not import app.main (tests requiring the client fixture will fail): {e}", stacklevel=2)
     main_mod = None  # type: ignore[assignment]
 
 

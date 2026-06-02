@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Optional
 
 from playwright.async_api import async_playwright
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)

@@ -17,49 +17,51 @@ from __future__ import annotations
 import logging
 import time
 from typing import TYPE_CHECKING, Any
-from bs4 import BeautifulSoup
-
 from urllib.parse import urljoin, urlparse
 
-from app.config import settings
+from bs4 import BeautifulSoup
+
 from app.cleaning_engine import ai_clean_and_align_records
-from app.insight_engine import generate_data_insight, suggest_schema_from_intent, suggest_schema_from_intent_sync
-from app.html_utils import (
-    _is_empty_value,
-    fetch_page_content,
-    _boost_contacts_with_page_html,
-)
-from app.models import SchemaField
+from app.compound_record_assembler import assemble_compound_records
+from app.config import settings
+from app.crawl_frontier import get_crawl_frontier
+from app.crawl_policy import get_crawl_policy
 from app.data_utils import (
     _limit_source_records as _base_limit_source_records,
+)
+from app.data_utils import (
     process_raw_records,
 )
-from app.selector_profiles.loader import try_profile_extraction, match_profile_for_url
-from app.scrape_telemetry import (
-    get_scrape_telemetry,
-    detect_anti_bot,
-    estimate_dom_nodes,
-)
-from app.crawl_policy import get_crawl_policy
+from app.domain_evolution_model import get_domain_evolution_model
 from app.extraction_orchestrator import orchestrate_extraction
-from app.strategy_evolution import get_strategy_evolution_engine, FetchStrategy
-from app.failure_classification import (
-    classify_failure,
-    update_domain_with_failure,
-)
 from app.extraction_provenance import (
     ProvenanceBuilder,
     enrich_records_with_provenance,
 )
-from app.regression_capture import get_regression_capture
+from app.failure_classification import (
+    classify_failure,
+    update_domain_with_failure,
+)
+from app.html_utils import (
+    _boost_contacts_with_page_html,
+    _is_empty_value,
+    fetch_page_content,
+)
+from app.insight_engine import generate_data_insight, suggest_schema_from_intent, suggest_schema_from_intent_sync
+from app.models import SchemaField
 from app.motif_feedback import MotifFeedbackEngine
-from app.crawl_frontier import get_crawl_frontier
-from app.selector_decay_predictor import get_selector_decay_predictor
-from app.domain_evolution_model import get_domain_evolution_model
-from app.self_tuning_extraction import get_self_tuning_controller
-from app.zero_result_classifier import classify_zero_result
 from app.page_evidence_collector import collect_page_evidence
-from app.compound_record_assembler import assemble_compound_records
+from app.regression_capture import get_regression_capture
+from app.scrape_telemetry import (
+    detect_anti_bot,
+    estimate_dom_nodes,
+    get_scrape_telemetry,
+)
+from app.selector_decay_predictor import get_selector_decay_predictor
+from app.selector_profiles.loader import match_profile_for_url, try_profile_extraction
+from app.self_tuning_extraction import get_self_tuning_controller
+from app.strategy_evolution import FetchStrategy, get_strategy_evolution_engine
+from app.zero_result_classifier import classify_zero_result
 
 logger = logging.getLogger(__name__)
 
@@ -286,7 +288,7 @@ async def scrape_url(
 
     logger.info("Fetching: %s", url)
     telemetry = get_scrape_telemetry()
-    from app.llm_bridge import reset_llm_call_count, get_llm_call_count
+    from app.llm_bridge import get_llm_call_count, reset_llm_call_count
 
     reset_llm_call_count()
     start_time = time.time()
@@ -666,35 +668,41 @@ async def scrape_url(
     # ── Zero-Result Classification & Failure Classification ────────────
     zero_classification = None
     zero_result_failure_class = None
-    if not results:
-        # Check for session-bound URL signals
-        from app.session_url_detector import detect_session_params
+    # Check for session-bound URL signals and empty response indicators
+    from app.session_url_detector import detect_session_params
+    session_detection = detect_session_params(url) if url else None
+    from app.empty_response_detector import detect_empty_response
+    empty_check = detect_empty_response(html) if html else None
 
-        session_detection = detect_session_params(url) if url else None
-        from app.empty_response_detector import detect_empty_response
+    # Collect page evidence for zero-result classification
+    evidence = collect_page_evidence(html, url=url)
+    visible_text = page_text
 
-        empty_check = detect_empty_response(html) if html else None
+    # Classify the zero-result/failure state using the dedicated classifier
+    potential_zero_classification = classify_zero_result(
+        acquisition_lineage={"state": fetch_method},
+        session_detection=session_detection,
+        empty_check=empty_check.to_dict() if empty_check is not None and hasattr(empty_check, "to_dict") else None,
+        anti_bot_score=anti_bot,
+        final_url=url,
+        html=html,
+        visible_text=visible_text,
+        detected_forms=evidence.forms if evidence else None,
+        detected_containers=len(evidence.candidate_containers) if evidence else 0,
+        raw_candidate_count=len(evidence.candidate_containers) if evidence else 0,
+        schema_fields=[f.name for f in schema_fields],
+    )
 
-        # Collect page evidence for zero-result classification
-        evidence = collect_page_evidence(html, url=url)
-        # page_text was computed above; use it to strengthen zero-result
-        # classification
-        visible_text = page_text
+    is_failure_page = (
+        potential_zero_classification.failure_class in ("anti_bot_block", "auth_required", "empty_response")
+        if potential_zero_classification is not None
+        else False
+    )
 
-        # Classify the zero-result using the dedicated classifier
-        zero_classification = classify_zero_result(
-            acquisition_lineage={"state": fetch_method},
-            session_detection=session_detection,
-            empty_check=empty_check.to_dict() if empty_check is not None and hasattr(empty_check, "to_dict") else None,
-            anti_bot_score=anti_bot,
-            final_url=url,
-            html=html,
-            visible_text=visible_text,
-            detected_forms=evidence.forms if evidence else None,
-            detected_containers=len(evidence.candidate_containers) if evidence else 0,
-            raw_candidate_count=len(evidence.candidate_containers) if evidence else 0,
-            schema_fields=[f.name for f in schema_fields],
-        )
+    if not results or is_failure_page:
+        if is_failure_page:
+            results = []
+        zero_classification = potential_zero_classification
 
         # Classification may have been set in except block above, only classify
         # if not

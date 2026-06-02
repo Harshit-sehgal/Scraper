@@ -1,7 +1,6 @@
 """Regression tests for recovery flag and acquisition-lineage correctness."""
 
 import pytest
-
 from app.acquisition_state import AcquisitionLineage, AcquisitionState
 from app.models import FieldType, JobCreate, SchemaField
 from app.recovery_strategies import AttemptContext
@@ -239,12 +238,12 @@ def test_selectors_map_rejects_malformed_shapes():
         "selectors_map": {"item_container": 123, "fields": "not a dict"},
     }
 
-    with pytest.raises(Exception):
+    with pytest.raises((ValueError, Exception)):
         JobCreate.model_validate(payload)
 
 
 def test_schema_rejects_runtime_metadata_field_names():
-    with pytest.raises(Exception):
+    with pytest.raises((ValueError, Exception)):
         SchemaField(name="record_score", field_type=FieldType.FLOAT)
 
 

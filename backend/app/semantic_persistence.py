@@ -8,13 +8,13 @@ Unifies:
 3. Learning count (experience manifold)
 """
 
+import fcntl
 import json
 import logging
 import os
-import fcntl
 
-from app.semantic_world_state import get_world_state
 from app.config import settings
+from app.semantic_world_state import get_world_state
 
 _STATE_LOCK_PATH: str | None = None
 

@@ -11,12 +11,11 @@ Accuracy is measured as F1 score at the record level, with penalties for
 extra/missing records and extra/missing fields (matching benchmark accuracy).
 """
 
-import json
 import asyncio
+import json
 from pathlib import Path
 
 import pytest
-
 from app.models import FieldType, SchemaField
 
 GOLDEN_DATASET_DIR = Path(__file__).resolve().parent / "golden_dataset"

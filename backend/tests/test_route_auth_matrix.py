@@ -14,9 +14,10 @@ pydantic-settings reads env vars at construction time.  Once the module-level
 have no effect.  We must use monkeypatch.setattr() on the singleton.
 """
 
-import pytest
 import asyncio
+
 import httpx
+import pytest
 
 
 class LocalASGIClient:

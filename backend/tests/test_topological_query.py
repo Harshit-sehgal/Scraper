@@ -7,7 +7,6 @@ including TQL execution, near-role search, and stable anchor detection.
 from __future__ import annotations
 
 import pytest
-
 from app.semantic_persistence import clear_semantic_state
 from app.semantic_world_state import get_world_state
 from app.topological_query import TopologicalQuery, get_tql_engine

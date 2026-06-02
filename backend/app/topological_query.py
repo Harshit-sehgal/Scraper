@@ -1,7 +1,9 @@
 from __future__ import annotations
-from typing import List, Optional, TYPE_CHECKING
-from app.semantic_world_state import get_world_state
+
+from typing import TYPE_CHECKING, List, Optional
+
 from app.semantic_ir import SemanticType
+from app.semantic_world_state import get_world_state
 
 if TYPE_CHECKING:
     from app.semantic_world_state import SemanticWorldState

@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-
 # Ensure the script is importable
 _SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts"
 if str(_SCRIPT_PATH) not in sys.path:

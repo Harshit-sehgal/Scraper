@@ -8,9 +8,10 @@ depend on live websites. They assert:
   - Acquisition lineage truthfulness
 """
 
-import pytest
 from pathlib import Path
-from app.models import SchemaField, FieldType
+
+import pytest
+from app.models import FieldType, SchemaField
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "pages"
 assert FIXTURES_DIR.is_dir(), f"Fixture directory not found: {FIXTURES_DIR}"
@@ -113,9 +114,8 @@ async def test_blocked_fixture_does_not_produce_false_records(
     assert html, f"Empty fixture: {fixture_name}"
 
     # Classify the page using zero_result_classifier
-    from app.zero_result_classifier import classify_zero_result
     from app.empty_response_detector import detect_empty_response
-
+    from app.zero_result_classifier import classify_zero_result
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup(["script", "style", "noscript", "svg", "link"]):
