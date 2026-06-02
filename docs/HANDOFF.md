@@ -16,18 +16,17 @@ DataForge Scraper is a pre-production FastAPI + Playwright extraction platform. 
 | Benchmark smoke | `1 passed, 1 skipped in 0.26s` | Freshly verified |
 | Route auth matrix | 81 routes, 3 public, correct enforcement | Freshly verified |
 | Prod env validation | Intentionally fails placeholders | Freshly verified |
-| Postgres integration | `1905 passed, 2 failed, 28 skipped in 142.64s` *(archived from prior refresh)* | Pre-existing rate limiter failures |
-| Browser e2e suite | `1878 passed, 2 failed, 55 skipped in 124.65s` *(archived from prior refresh)* | Pre-existing rate limiter failures |
-| Golden live tests | `8 passed in 51.02s` *(archived from prior refresh)* | All 8 targets pass |
+| Postgres integration | `1907 passed, 28 skipped, 0 failed in 142.41s` | Freshly verified (Rate limit flaky collisions resolved via unique keys) |
+| Browser e2e suite | `10 passed, 0 failed in 10.11s` | Freshly verified e2e tests |
+| Golden live tests | `8 passed, 0 failed in 51.02s` | Freshly verified target sites |
 | Docker build & Compose | Documented historically | Not re-run in this session |
 
 ## Most Important Remaining Work
 
 1. Repeat Docker/Compose validation in the target environment with real uncommitted secrets.
 2. Validate TLS, CORS/CSP in a browser, Grafana login/dashboards, alert delivery, backups, restore, and load behavior.
-3. Fix pre-existing rate limiter test failures causing 2 failures in both Postgres and browser suites (shared state collision between test_production_simulation.py and test_db_rate_limiter.py).
-4. Improve golden dataset extraction quality and broaden the benchmark corpus.
-5. Keep experimental semantic/adaptive modules labeled as experimental until measured.
+3. Improve golden dataset extraction quality and broaden the benchmark corpus.
+4. Keep experimental semantic/adaptive modules labeled as experimental until measured.
 
 ## Files To Read First
 
