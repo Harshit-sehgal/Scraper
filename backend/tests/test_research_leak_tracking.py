@@ -14,6 +14,18 @@ This file documents BOTH:
    regression that introduces a NEW leak is caught by adding a single
    line to LEAKY_MODULES, and any future phase that fixes a leak
    removes the corresponding line.
+
+Test ordering note
+------------------
+This test file requires a fresh Python import graph to observe the
+transitive research imports. When run after other test files that
+import app modules, stale sys.modules entries can mask leaks. The
+_clean_import_app_main helper pops the full import chain (app.main
+→ lifespan → services → job_runner → scraper_recovery_integration →
+acquisition_state, etc.) before re-importing. This is intentional:
+the test is not testing "does pytest have stale caches?" — it is
+testing "does a fresh import of the production app pull in research
+modules?".
 """
 
 from __future__ import annotations
@@ -25,6 +37,46 @@ import pytest
 
 # ─── Helper: a clean import of app.main ─────────────────────────────────────
 
+# Modules that form the import chain from app.main to the known
+# research leaks. Every module in this list is popped before
+# re-importing app.main so the full transitive graph re-runs.
+# This is the single source of truth for which modules to evict.
+_IMPORT_CHAIN_MODULES: tuple[str, ...] = (
+    "app.main",
+    "app.lifespan",
+    "app.routers.experimental",
+    "app.routers.scraper",
+    "app.routers.operator",
+    "app.experimental_startup",
+    "app.url_redirects",
+    "app.services",
+    "app.services.job_runner",
+    "app.scraper_recovery_integration",
+    "app.extraction_orchestrator",
+    "app.scraper",
+    "app.selector_discovery",
+    "app.html_utils",
+    "app.core_types",
+    "app.observability",
+    "app.recovery_handlers",
+    "app.checkpoint_manager",
+    "app.acquisition_state",
+    "app.acquisition_telemetry",
+    "app.intent_parser",
+    "app.semantic_mapper",
+    "app.semantic_persistence",
+    "app.semantic_pipeline",
+    "app.semantic_world_state",
+    "app.strategy_evolution",
+    "app.degradation_predictor",
+    "app.domain_health_alerts",
+    "app.trend_analyzer",
+    "app.visualization",
+    "app.motif_feedback",
+    "app.domain_evolution_model",
+    "app.insight_engine",
+)
+
 
 def _clean_import_app_main():
     """Force a fresh import of app.main with the experimental gate off.
@@ -35,13 +87,9 @@ def _clean_import_app_main():
       1. Set the env var to "false" before the import.
       2. Patch the already-constructed settings singleton so the gate
          sees "false" even if it was constructed earlier with "true".
-      3. Drop the cached app.main and any research modules we want to
-         observe.
+      3. Drop every module in the import chain so the full transitive
+         graph re-runs from scratch.
       4. Re-import app.main so its top-level code re-runs.
-
-    Note: this works for *one* test in isolation. Subsequent tests in
-    the same session may see the cached import. The leak-tracking
-    tests are written defensively to tolerate this.
     """
     os.environ["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "false"
     # Patch the settings singleton. pydantic-settings reads env at
@@ -55,13 +103,10 @@ def _clean_import_app_main():
         # If app.config can't be imported yet, the re-import below will
         # construct it from the env var we just set.
         pass
-    # Drop the most important cached imports so the import re-runs.
-    for name in (
-        "app.main",
-        "app.lifespan",
-        "app.routers.experimental",
-        "app.experimental_startup",
-    ):
+    # Evict every module in the import chain. This is the key to making
+    # the test order-independent: we don't just pop app.main, we pop
+    # every intermediate module between app.main and the research leaks.
+    for name in _IMPORT_CHAIN_MODULES:
         sys.modules.pop(name, None)
     import app.main  # noqa: F401
 

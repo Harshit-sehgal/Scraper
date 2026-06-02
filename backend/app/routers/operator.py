@@ -6,6 +6,14 @@ Provides:
   - Operator mode switching (production / benchmark / forensic / stealth / low_cost)
   - Degradation predictions (what's about to fail)
   - System health overview endpoint
+
+Research-shell boundary
+-----------------------
+The endpoint handlers in this router use four research-shell modules:
+`app.degradation_predictor`, `app.domain_health_alerts`,
+`app.trend_analyzer`, and `app.visualization`. All four are imported
+lazily inside the endpoint functions that use them so that this router
+does not pull the research shell into the product kernel at startup.
 """
 
 from __future__ import annotations
@@ -13,15 +21,8 @@ from __future__ import annotations
 import logging
 
 from app.browser_pool import get_browser_pool
-from app.degradation_predictor import get_degradation_predictor
-from app.domain_health_alerts import get_domain_health_monitor
 from app.scrape_telemetry import get_scrape_telemetry
-from app.trend_analyzer import TrendAnalyzer
 from app.utils.rbac import UserRole, require_role
-from app.visualization import (
-    OperatorMode,
-    get_governance_dashboard,
-)
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
@@ -48,6 +49,8 @@ async def get_current_mode():
     Returns the active operator profile and the corresponding
     runtime settings that are currently applied.
     """
+    from app.visualization import OperatorMode, get_governance_dashboard  # research-shell, lazy
+
     dashboard = get_governance_dashboard()
     governance_summary = dashboard.get_governance_summary()
     return {
@@ -78,6 +81,8 @@ async def set_operator_mode(request: Request, body: ModeBody, _role: UserRole = 
     Args:
         body.mode: One of 'production', 'benchmark', 'forensic', 'stealth', 'low_cost'.
     """
+    from app.visualization import OperatorMode, get_governance_dashboard  # research-shell, lazy
+
     mode = body.mode
     try:
         target_mode = OperatorMode(mode.lower())
@@ -118,6 +123,9 @@ async def get_system_dashboard():
     - Telemetry stats (recent scrape success / failure counts)
     - Resource governor report (memory, queue, token spend)
     """
+    from app.domain_health_alerts import get_domain_health_monitor  # research-shell, lazy
+    from app.visualization import get_governance_dashboard  # research-shell, lazy
+
     dashboard = get_governance_dashboard()
     governance = dashboard.get_governance_summary()
 
@@ -184,6 +192,9 @@ async def get_degradation_predictions(
     Returns:
         A prediction report with per-domain predictions and system risk.
     """
+    from app.degradation_predictor import get_degradation_predictor  # research-shell, lazy
+    from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
+
     telemetry_history = get_scrape_telemetry().get_recent(window)
 
     if not telemetry_history:
@@ -236,6 +247,9 @@ async def get_domain_prediction(
     Returns:
         Predictions for the specified domain.
     """
+    from app.degradation_predictor import get_degradation_predictor  # research-shell, lazy
+    from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
+
     telemetry_history = get_scrape_telemetry().get_recent(window)
 
     # Filter to only this domain's events
@@ -280,6 +294,9 @@ async def get_operator_health_summary():
     Returns essential health indicators at a glance.
     Optimized for frequent polling by the frontend dashboard.
     """
+    from app.domain_health_alerts import get_domain_health_monitor  # research-shell, lazy
+    from app.visualization import get_governance_dashboard  # research-shell, lazy
+
     # Telemetry quick stats
     telemetry = get_scrape_telemetry()
     recent = telemetry.get_recent(20)
