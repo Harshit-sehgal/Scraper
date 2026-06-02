@@ -1,6 +1,6 @@
 import asyncio
 
-from app.scraper import generate_data_insight
+from app.insight_engine import generate_data_insight  # research-shell, lazy
 
 
 async def test():

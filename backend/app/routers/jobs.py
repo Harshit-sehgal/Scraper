@@ -15,9 +15,9 @@ from app.models import (
     SchemaSuggestionRequest,
     ScrapeMode,
 )
+from app.insight_engine import suggest_schema_from_intent  # research-shell, lazy
 from app.scraper import (
     ai_clean_and_align_records,
-    suggest_schema_from_intent,
 )
 from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
