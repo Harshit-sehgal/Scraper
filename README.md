@@ -29,6 +29,13 @@ Do not claim this project is a universal scraper, anti-bot proof, fully autonomo
 
 Status: pre-production candidate.
 
+| Gate | Status |
+|------|--------|
+| Ruff lint | ✅ 0 errors |
+| Mypy | ✅ 0 errors (166 files) |
+| Tests (SQLite) | ✅ 1970 passed, 73 skipped |
+| Compile | ✅ Clean |
+
 For the latest verified status, including exact compile results, collected/passed test counts (SQLite, Postgres, Playwright browser, and Golden Dataset live extraction), and other detailed validation evidence, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 ## Quick Start
