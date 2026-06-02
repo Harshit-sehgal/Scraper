@@ -5,6 +5,17 @@ worker flow, and verifies the final results utilize the network_payload source
 with safe, token-free provenance.
 """
 
+import sys
+from pathlib import Path
+
+# Ensure backend and scripts are in sys.path BEFORE any project imports
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_BACKEND_DIR = _PROJECT_ROOT / "backend"
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
 from scripts.run_worker import scrape_job_handler
 from app.main import app as main_app
 from app.worker_queue import get_worker_queue, reset_worker_queue
@@ -12,20 +23,10 @@ from app.storage_interface import get_job_repository, reset_repository
 from app.models import JobStatus
 import http.server
 import json
-import sys
 import threading
 import urllib.parse
-from pathlib import Path
 
 import pytest
-
-# Ensure backend and scripts are in sys.path
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-BACKEND_DIR = PROJECT_ROOT / "backend"
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 
 pytest.importorskip("playwright")

@@ -19,7 +19,6 @@ cd "$PROJECT_DIR"
 
 echo "Project dir: $PROJECT_DIR"
 echo "Python: $(python3 --version 2>&1 || true)"
-echo "Python: $(python --version 2>&1 || true)"
 
 PYTHON_EXE="python"
 if command -v python3 &>/dev/null; then
