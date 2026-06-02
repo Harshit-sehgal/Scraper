@@ -142,17 +142,42 @@ def test_app_main_does_not_load_experimental_router_when_gate_off():
 # mean someone fixed the leak and forgot to update this file.
 
 LEAKY_MODULES: tuple[str, ...] = (
-    # Imported by backend/app/extraction_orchestrator.py at module level
-    # for type hints and topology lookups. Phase R2 will move these
-    # behind lazy/gated imports.
-    "app.semantic_world_state",
-    "app.intent_parser",
+    # Imported by backend/app/scraper_recovery_integration.py at top
+    # level via `from app.acquisition_state import ...`. Phase R3 will
+    # move this behind a lazy/gated import.
     "app.acquisition_state",
-    # Imported by backend/app/scraper_recovery_integration.py and
-    # indirectly by several other kernel files. Phase R3 will move
-    # these behind lazy/gated imports.
+    # Imported by backend/app/selector_discovery.py at top level via
+    # `from app.strategy_evolution import FetchStrategy`. Phase R3 will
+    # move this behind a lazy/gated import.
     "app.strategy_evolution",
 )
+
+
+# ─── Phase R2 achievements: leaks that have been fixed ─────────────────────
+# These research modules are NO LONGER loaded at startup. The modules
+# are imported lazily inside the functions that use them. If a regression
+# reintroduces a top-level import, these tests will fail.
+
+FIXED_MODULES: tuple[str, ...] = (
+    "app.semantic_world_state",
+    "app.intent_parser",
+)
+
+
+@pytest.mark.parametrize("fixed_module", FIXED_MODULES)
+def test_fixed_research_leak_stays_absent(fixed_module):
+    """Verify that a previously-known leak remains absent at startup.
+
+    This test passes only if the module is NOT in sys.modules after a
+    clean import of app.main. If it fails, a regression has reintroduced
+    a top-level research import and should be investigated.
+    """
+    _clean_import_app_main()
+    assert fixed_module not in sys.modules, (
+        f"{fixed_module} is now loaded at startup again. A top-level "
+        f"research import was reintroduced. The Phase R2 fix (lazy import "
+        f"in services/job_runner.py) must be verified."
+    )
 
 
 @pytest.mark.parametrize("leaky_module", LEAKY_MODULES)

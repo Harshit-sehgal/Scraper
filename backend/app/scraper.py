@@ -32,7 +32,6 @@ from app.data_utils import (
 from app.data_utils import (
     process_raw_records,
 )
-from app.domain_evolution_model import get_domain_evolution_model
 from app.extraction_orchestrator import orchestrate_extraction
 from app.extraction_provenance import (
     ProvenanceBuilder,
@@ -47,9 +46,7 @@ from app.html_utils import (
     _is_empty_value,
     fetch_page_content,
 )
-from app.insight_engine import generate_data_insight, suggest_schema_from_intent, suggest_schema_from_intent_sync
 from app.models import SchemaField
-from app.motif_feedback import MotifFeedbackEngine
 from app.page_evidence_collector import collect_page_evidence
 from app.regression_capture import get_regression_capture
 from app.scrape_telemetry import (
@@ -60,7 +57,6 @@ from app.scrape_telemetry import (
 from app.selector_decay_predictor import get_selector_decay_predictor
 from app.selector_profiles.loader import match_profile_for_url, try_profile_extraction
 from app.self_tuning_extraction import get_self_tuning_controller
-from app.strategy_evolution import FetchStrategy, get_strategy_evolution_engine
 from app.zero_result_classifier import classify_zero_result
 
 logger = logging.getLogger(__name__)
@@ -396,6 +392,7 @@ async def scrape_url(
 
     # ── Generic extraction pipeline ────────────────────────────────
     from app.domain_intelligence import get_domain_intelligence
+    from app.strategy_evolution import FetchStrategy, get_strategy_evolution_engine  # research-shell, lazy
 
     intel = get_domain_intelligence().get_intelligence(url)
     strategy_engine = get_strategy_evolution_engine()
@@ -610,6 +607,7 @@ async def scrape_url(
     # into world_state for improved future selector discovery.
     new_motifs = []
     if results and world_state:
+        from app.motif_feedback import MotifFeedbackEngine  # research-shell, lazy
         feedback_engine = MotifFeedbackEngine()
         new_motifs = feedback_engine.extract_motifs_from_results(
             results, schema_fields, min_cooccurrence=settings.MOTIF_MIN_COOCCURRENCE
@@ -900,6 +898,8 @@ async def scrape_url(
 
     # 2. Domain Evolution Model: Track mutations and anti-bot changes
     try:
+        from app.domain_evolution_model import get_domain_evolution_model  # research-shell, lazy
+
         evolution_model = get_domain_evolution_model()
         if ext_result.method == "regex":
             # Regex fallback suggests selector drift → record mutation
