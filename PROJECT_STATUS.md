@@ -214,3 +214,50 @@ Do not claim production-ready, enterprise-grade, universal scraper, scrapes ever
 5. Add backup/restore, load, alert delivery, and recovery validation.
 6. Add real benchmark tests with enforceable thresholds.
 7. Clean runtime artifacts before every commit.
+## Next Actions
+
+1. Fix the job-level `if` conditional syntax error in `.github/workflows/validate-production.yml` by defining `SLACK_WEBHOOK` as a global workflow env variable rather than a job-level env variable, allowing it to be evaluated in `if:` conditions.
+2. Create a real uncommitted production `.env` for the target environment and rerun the production checks there.
+3. Improve golden dataset extraction quality, especially books and country listing.
+4. Add production-mode dashboard/CSP checks against a browser and real origin.
+5. Add backup/restore, load, alert delivery, and recovery validation.
+6. Add real benchmark tests with enforceable thresholds.
+7. Clean runtime artifacts before every commit.
+
+## Recent Boundary Work (Phase R1 — Research Shell Quarantine)
+
+The following work is the first completed slice of the deep-research-report's
+clean-room rebuild plan. It establishes the **research-shell boundary** so
+that the remaining refactors in `docs/REFACTOR_PLAN.md` can be done
+mechanically.
+
+| What | Where | Status |
+| --- | --- | --- |
+| Canonical research-module registry (75 modules, 11 families) | `backend/app/research/__init__.py` | Done |
+| Import-time gate on `experimental_startup.*` | `backend/app/experimental_startup.py`, `backend/app/lifespan.py` | Done |
+| HTTP-level gate on experimental router mount | `backend/app/main.py` | Done |
+| Documented `DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES` env var | `.env.example`, `.env.production.example` | Done |
+| Tests: registry contract (12 cases) | `backend/tests/test_research_boundary.py` | Done |
+| Tests: experimental startup gate (12 cases) | `backend/tests/test_experimental_gate.py` | Done |
+| Tests: main.py router mount gate (4 cases) | `backend/tests/test_main_routes_gate.py` | Done |
+| Refactor plan updated | `docs/REFACTOR_PLAN.md` | Done |
+
+### Net effect (default `ENABLE_EXPERIMENTAL_ROUTES=False`)
+
+- **Zero research modules in the import graph at startup.** Verified by
+  `lifespan.py` only calling the experimental `init_*` functions when the
+  gate is open, and `main.py` only importing `app.routers.experimental`
+  when the gate is open.
+- **Zero research endpoints exposed over HTTP.** Verified by
+  `test_main_routes_gate.py`.
+- **A clear operator signal at boot** if either is changed (WARNING when
+  enabled in production, INFO when disabled).
+
+### What remains (Phase R2–R5)
+
+The gate prevents initialization and HTTP exposure but does NOT yet
+prevent the legacy product-kernel files (`extraction_orchestrator.py`,
+`scraper_recovery_integration.py`, `cleaning_engine.py`, `state_store.py`,
+`llm_bridge.py`) from importing research modules at their top level.
+The next phases (R2–R5) are tracked in `docs/REFACTOR_PLAN.md` and will
+turn the gate into an enforced CI invariant.
