@@ -3,7 +3,7 @@
 **Last refreshed:** 2026-06-02
 **Allowed statuses:** Not started, In progress, Validated, Failed, Unknown
 
-This project is not public production-ready. Historical local Compose smoke evidence exists in the repository, but target deployment with real secrets, TLS, sustained load, alert delivery, failover, and operational runbooks is not validated in this cleanup refresh.
+This project is not public deployment ready. Do not claim this project is production-ready. Historical local Compose smoke evidence exists in the repository, but target deployment with real secrets, TLS, sustained load, alert delivery, failover, and operational runbooks is not validated in this cleanup refresh.
 
 | Gate | Status | Evidence | Next action |
 | --- | --- | --- | --- |
@@ -35,4 +35,4 @@ This project is not public production-ready. Historical local Compose smoke evid
 
 ## Release Rule
 
-Do not call the project production-ready until every required gate is `Validated` in the target deployment environment.
+Do not claim the project is production-ready until every required gate is Validated in the target deployment environment.
