@@ -24,7 +24,7 @@ The following rows were freshly run in this session (2026-06-02). Results noted 
 | `compileall` | Passed with no output | Syntax is valid for checked Python files |
 | `architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Architecture rules pass |
 | Pytest collection | `1937 tests collected in 0.40s` | Collection is clean |
-| Safe SQLite backend suite | `1862 passed, 72 skipped, 1 failed in 121.77s` | Default local backend tests — 1 pre-existing flaky failure (`test_browser_pool_hard_recycling`) |
+| Safe SQLite backend suite | `1863 passed, 72 skipped, 0 failed in 121.06s` | Default local backend tests — 100% clean pass after fixing flaky `test_browser_pool_hard_recycling` |
 | Postgres local tests | `1905 passed, 2 failed, 28 skipped in 142.64s` *(archived from prior refresh)* | Full Postgres suite — 2 pre-existing rate limiter test failures (shared state collision) |
 | Playwright browser e2e | `1878 passed, 2 failed, 55 skipped in 124.65s` *(archived from prior refresh)* | Full browser suite — 2 pre-existing rate limiter test failures (shared state collision) |
 | Golden dataset live tests | `8 passed in 51.02s` *(archived from prior refresh)* | Target sites extracted under modest F1 thresholds (lowest 0.650) |

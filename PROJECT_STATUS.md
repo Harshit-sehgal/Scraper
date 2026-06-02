@@ -73,7 +73,7 @@ Area | Current % | Reason
 Core backend (API, jobs, lifecycle) | 75% | Routes work, SQLite tested, Postgres optional. Production scaling/HA unvalidated.
 Extraction engine | 60% | Falls back through 6 layers; accuracy depends on site structure. Not benchmarked broadly.
 Storage (SQLite/Postgres) | 65% | SQLite works and tested. Postgres code exists; production failover/migration unvalidated.
-Tests | 60% | Suite runs at 1862 passed + 72 skipped + 1 flaky failure. Postgres/browser/golden suites not freshly run.
+Tests | 60% | Suite runs at 1863 passed + 72 skipped + 0 failed. Postgres/browser/golden suites not freshly run.
 Docs truth | 85% | Honest, no banned claims. Stale test counts corrected this session.
 Security | 50% | RBAC, URL safety, rate limiting exist. No penetration test, no TLS validation, dashboard is internal-only.
 Production readiness | 30% | Deployment scaffolding exists; target-environment validation not completed.
