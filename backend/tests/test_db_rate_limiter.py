@@ -29,14 +29,21 @@ def _cleanup_rate_limit_key(key: str) -> None:
             pass
 
 
+def _generate_test_key() -> str:
+    """Generate a unique test key to avoid collisions with other tests."""
+    import os
+    return f"_test_sliding_window_{os.urandom(4).hex()}_"
+
+
 def test_db_sliding_window_counter_sqlite():
     """Verify that DatabaseSlidingWindowCounter behaves correctly using SQLite storage.
 
-    Uses a unique key prefix to avoid colliding with other tests that share
-    the same rate_limits table. Cleans up test data on completion from the
+    Uses a randomly generated unique key to avoid colliding with other tests that share
+    the same rate_limits table. Cleans up test data before and after from the
     active backend (SQLite or Postgres).
     """
-    test_key = "_test_sliding_window_sqlite_"
+    test_key = _generate_test_key()
+    _cleanup_rate_limit_key(test_key)
     counter = DatabaseSlidingWindowCounter(max_requests=3, window_seconds=2.0, key=test_key)
 
     try:
