@@ -12,8 +12,19 @@ Modules managed here:
 - heartbeat_manager — peer liveness tracking (experimental)
 - semantic_world_state — semantic field state (experimental)
 
-All imports are lazy so that missing experimental modules do not prevent
-the core app from starting.
+Boundary contract
+-----------------
+Every public function in this module is a NO-OP when the
+`ENABLE_EXPERIMENTAL_ROUTES` setting is false. This is the import-time
+gate that quarantines the research shell from the product kernel.
+
+Callers (lifespan, shutdown) MUST call `experimental_subsystems_enabled()`
+once to confirm the gate is open before depending on the return values
+of `init_gossip_and_heartbeat()` and `schedule_gossip_propagation()`,
+both of which return None / (None, None) when disabled.
+
+All imports remain lazy so that missing experimental modules do not
+prevent the core app from starting in either case.
 """
 
 from __future__ import annotations
@@ -25,8 +36,27 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def experimental_subsystems_enabled() -> bool:
+    """Return True iff the research subsystems should be initialized.
+
+    Reads `settings.ENABLE_EXPERIMENTAL_ROUTES` on every call so the
+    gate is always fresh. Defaults to False; operators must explicitly
+    opt-in via the DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES env var.
+    """
+    try:
+        from app.config import settings
+
+        return bool(getattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", False))
+    except Exception as e:  # pragma: no cover - defensive only
+        logger.warning("Could not read ENABLE_EXPERIMENTAL_ROUTES: %s", e)
+        return False
+
+
 def init_graph_scheduler() -> None:
     """Initialize the event cascade scheduler (safe: lazy-created, no circular imports)."""
+    if not experimental_subsystems_enabled():
+        logger.debug("init_graph_scheduler: skipped (experimental subsystems disabled)")
+        return
     try:
         from app.graph_update_scheduler import get_scheduler
 
@@ -38,6 +68,9 @@ def init_graph_scheduler() -> None:
 
 def init_recovery_framework() -> None:
     """Register all recovery handlers for extraction failure scenarios."""
+    if not experimental_subsystems_enabled():
+        logger.debug("init_recovery_framework: skipped (experimental subsystems disabled)")
+        return
     try:
         from app.recovery_handlers import register_all_recovery_handlers
 
@@ -49,6 +82,9 @@ def init_recovery_framework() -> None:
 
 def init_domain_health_monitor() -> None:
     """Initialize the per-domain health monitoring subsystem."""
+    if not experimental_subsystems_enabled():
+        logger.debug("init_domain_health_monitor: skipped (experimental subsystems disabled)")
+        return
     try:
         from app.domain_health_alerts import get_domain_health_monitor
 
@@ -63,8 +99,11 @@ def init_gossip_and_heartbeat() -> tuple[Any, Any]:
 
     Returns:
         Tuple of (gossip_substrate, heartbeat_manager), or (None, None) if
-        initialization fails.
+        initialization fails OR if experimental subsystems are disabled.
     """
+    if not experimental_subsystems_enabled():
+        logger.debug("init_gossip_and_heartbeat: skipped (experimental subsystems disabled)")
+        return None, None
     gossip = None
     heartbeat_mgr = None
     try:
@@ -85,6 +124,8 @@ def init_gossip_and_heartbeat() -> tuple[Any, Any]:
 
 def restore_semantic_world_state(world_state_data: dict | None, state_file_path: str = "") -> None:
     """Restore semantic world state from persisted data."""
+    if not experimental_subsystems_enabled():
+        return
     if not world_state_data:
         return
     try:
@@ -98,6 +139,8 @@ def restore_semantic_world_state(world_state_data: dict | None, state_file_path:
 
 def persist_semantic_world_state() -> None:
     """Persist semantic world state to repository on shutdown."""
+    if not experimental_subsystems_enabled():
+        return
     try:
         from app.storage_interface import get_job_repository
 
@@ -116,7 +159,13 @@ def persist_semantic_world_state() -> None:
 
 
 def close_postgres_pool() -> None:
-    """Close the Postgres connection pool if active."""
+    """Close the Postgres connection pool if active.
+
+    This function is intentionally NOT gated by the experimental flag —
+    Postgres is a product-kernel storage backend, and its connection
+    pool must be closed cleanly regardless of whether experimental
+    subsystems are running.
+    """
     try:
         from app.postgres_repository import shutdown_postgres
 
@@ -130,8 +179,11 @@ def close_postgres_pool() -> None:
 async def schedule_gossip_propagation(gossip: Any, heartbeat_mgr: Any, interval: float = 60.0) -> asyncio.Task | None:
     """Schedule periodic gossip state propagation as a background task.
 
-    Returns the task handle, or None if gossip is not initialized.
+    Returns the task handle, or None if gossip is not initialized OR if
+    experimental subsystems are disabled.
     """
+    if not experimental_subsystems_enabled():
+        return None
     if gossip is None:
         return None
 
