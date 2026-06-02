@@ -1,4 +1,5 @@
 """Tests for the Snapshot Desync Detector."""
+
 import pytest
 from app.snapshot_desync_detector import SnapshotDesyncDetector, reset_desync_detector
 
@@ -8,34 +9,38 @@ def reset():
     reset_desync_detector()
 
 
-def make_snapshot(node_id="node_a", clock=None, topology=None, manifold=None,
-                  energy=None, instability=None, history=None):
+def make_snapshot(node_id="node_a", clock=None, topology=None, manifold=None, energy=None, instability=None, history=None):
     """Helper to create a minimal world state snapshot."""
     return {
         "node_id": node_id,
         "clock": clock or {node_id: 10},
-        "topology": topology or {
+        "topology": topology
+        or {
             "regions": [{"region_id": "r1", "competing_roles": ["a", "b"], "instability": 0.5}],
             "topological_laws": {},
             "neighborhood_cohesion": {},
             "communities": [],
             "topology_epoch": 1,
         },
-        "manifold": manifold or {
+        "manifold": manifold
+        or {
             "role_manifold": {"role_a": [0.5] * 16},
             "role_compatibility": {},
         },
-        "energy": energy or {
+        "energy": energy
+        or {
             "global_energy": 5.0,
             "global_entropy": 0.5,
             "convergence_score": 0.6,
             "field_pressure": 0.3,
             "stability_debt": 0.1,
         },
-        "instability": instability or {
+        "instability": instability
+        or {
             "exclusions": {},
         },
-        "history": history or {
+        "history": history
+        or {
             "transaction_journal": [],
             "topology_snapshots": [],
             "field_activation_count": 0,
@@ -70,9 +75,7 @@ class TestSnapshotDesyncDetector:
         snap_a = make_snapshot(clock={"node_a": 10, "node_b": 5}, node_id="node_a")
         snap_b = make_snapshot(clock={"node_a": 5, "node_b": 10}, node_id="node_b")
         # Add actual divergence
-        snap_b["topology"]["regions"] = [
-            {"region_id": "r2", "competing_roles": ["c", "d"], "instability": 0.8}
-        ]
+        snap_b["topology"]["regions"] = [{"region_id": "r2", "competing_roles": ["c", "d"], "instability": 0.8}]
         snap_b["topology"]["topological_laws"] = {"c|d": -0.5}
         detector = SnapshotDesyncDetector()
         report = detector.compare(snap_a, snap_b, "node_a", "node_b")

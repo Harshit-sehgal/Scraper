@@ -49,8 +49,7 @@ class TestResetWorldStateLifecycle:
         # so the total count may include the scheduler too. We ensure
         # that ws2 appears exactly once (not 0, not 2+).
         ws2_occurrences = sum(
-            1 for cb in dispatcher.subscribers.get(SemanticEventType.FIELD_WAVE, [])
-            if getattr(cb, "__self__", None) is ws2
+            1 for cb in dispatcher.subscribers.get(SemanticEventType.FIELD_WAVE, []) if getattr(cb, "__self__", None) is ws2
         )
         assert ws2_occurrences == 1, (
             f"ws2's handler appeared {ws2_occurrences} times instead of 1. "
@@ -122,9 +121,7 @@ class TestTransactionContextExceptionSafety:
                 with ws.transaction("test_begin_fail"):
                     pass  # Should not reach here
             # After the exception, the context var must be None
-            assert get_active_transaction() is None, (
-                "Transaction context was not reset after begin_transaction failure"
-            )
+            assert get_active_transaction() is None, "Transaction context was not reset after begin_transaction failure"
         finally:
             ws._manifold.begin_transaction = original_begin
 
@@ -138,6 +135,7 @@ class TestBackwardCompatibility:
     def test_import_semantic_world_state_from_package(self):
         """Direct import from the old module path should still work."""
         from app.semantic_world_state import SemanticWorldState
+
         ws = SemanticWorldState()
         assert ws is not None
         assert hasattr(ws, "transaction")
@@ -146,6 +144,7 @@ class TestBackwardCompatibility:
     def test_import_get_world_state(self):
         """get_world_state should be importable and returns a valid instance."""
         from app.semantic_world_state import get_world_state
+
         ws = get_world_state()
         assert ws is not None
         assert hasattr(ws, "get_cognitive_health")
@@ -153,12 +152,14 @@ class TestBackwardCompatibility:
     def test_import_reset_world_state(self):
         """reset_world_state should be importable and callable without error."""
         from app.semantic_world_state import reset_world_state
+
         # Should not raise
         reset_world_state()
 
     def test_get_world_state_returns_working_instance(self):
         """The world state returned by get_world_state should be functional."""
         from app.semantic_world_state import get_world_state
+
         ws = get_world_state()
         # Basic operations should work
         health = ws.get_cognitive_health()
@@ -198,6 +199,7 @@ class TestCloseIdempotency:
     def test_reset_world_state_with_close(self):
         """reset_world_state should handle close() cleanly."""
         from app.semantic_world_state import get_world_state, reset_world_state
+
         ws1 = get_world_state()
         ws1.close()  # Close manually
         # reset_world_state should not error even if close was already called
@@ -211,8 +213,8 @@ class TestCloseIdempotency:
         ws = SemanticWorldState()
         ws.close()
         # close() only unsubscribes, doesn't clear state
-        assert hasattr(ws, 'transaction')
-        assert hasattr(ws, 'get_cognitive_health')
+        assert hasattr(ws, "transaction")
+        assert hasattr(ws, "get_cognitive_health")
 
 
 # ─── Test 5: Best-effort rollback behavior ──────────────────────────────
@@ -243,9 +245,7 @@ class TestBestEffortRollback:
             ws._manifold.rollback = original_rollback
 
         # After the exception, the context var must still be reset
-        assert get_active_transaction() is None, (
-            "Transaction context was not reset despite rollback error"
-        )
+        assert get_active_transaction() is None, "Transaction context was not reset despite rollback error"
 
     def test_best_effort_all_rollbacks_fail(self):
         """If ALL subsystem rollbacks fail, the original exception is still re-raised."""
@@ -254,27 +254,29 @@ class TestBestEffortRollback:
         # Save originals
         originals = {}
         state_attrs = {
-            'topology': ws._topology,
-            'energy': ws._energy,
-            'instability': ws._instability,
-            'manifold': ws._manifold,
-            'motif': ws._motif,
-            'transition': ws._transition,
-            'intent': ws._intent,
-            'action': ws._action,
-            'abstraction': ws._abstraction,
-            'observability': ws._observability,
-            'history': ws._history,
+            "topology": ws._topology,
+            "energy": ws._energy,
+            "instability": ws._instability,
+            "manifold": ws._manifold,
+            "motif": ws._motif,
+            "transition": ws._transition,
+            "intent": ws._intent,
+            "action": ws._action,
+            "abstraction": ws._abstraction,
+            "observability": ws._observability,
+            "history": ws._history,
         }
 
         for name, obj in state_attrs.items():
-            if hasattr(obj, 'rollback'):
+            if hasattr(obj, "rollback"):
                 originals[name] = obj.rollback
 
                 def make_failing(name_):
                     def failing():
                         raise RuntimeError(f"rollback failed for {name_}")
+
                     return failing
+
                 obj.rollback = make_failing(name)
 
         try:
@@ -310,9 +312,7 @@ class TestBestEffortRollback:
                 with ws.transaction("test_commit_fail"):
                     pass  # Body succeeds, commit fails
             # Context must be reset
-            assert get_active_transaction() is None, (
-                "Transaction context was not reset after commit failure"
-            )
+            assert get_active_transaction() is None, "Transaction context was not reset after commit failure"
             assert commit_called, "commit() should have been called"
         finally:
             ws._manifold.commit = original_commit
@@ -357,15 +357,15 @@ class TestBestEffortRollback:
         rollback_called: dict[str, bool] = {}
         originals = {}
         state_attrs = {
-            'topology': ws._topology,
-            'energy': ws._energy,
-            'manifold': ws._manifold,
-            'motif': ws._motif,
-            'history': ws._history,
+            "topology": ws._topology,
+            "energy": ws._energy,
+            "manifold": ws._manifold,
+            "motif": ws._motif,
+            "history": ws._history,
         }
 
         for name, obj in state_attrs.items():
-            if hasattr(obj, 'rollback'):
+            if hasattr(obj, "rollback"):
                 originals[name] = obj.rollback
 
                 def make_tracker(name_):
@@ -375,7 +375,9 @@ class TestBestEffortRollback:
                         if name_ == list(state_attrs.keys())[1]:
                             raise RuntimeError(f"rollback failed for {name_}")
                         return originals[name_]() if callable(originals[name_]) else None
+
                     return tracked_rollback
+
                 obj.rollback = make_tracker(name)
 
         try:
@@ -389,9 +391,7 @@ class TestBestEffortRollback:
 
         # All subsystems should have had rollback attempted
         for name in state_attrs:
-            assert rollback_called.get(name, False), (
-                f"rollback not attempted for {name}"
-            )
+            assert rollback_called.get(name, False), f"rollback not attempted for {name}"
         assert get_active_transaction() is None
 
 
@@ -406,6 +406,7 @@ class TestMetricsProtocol:
         """All attributes required by the Protocol must exist on the
         EnergyState object that ws.metrics points to."""
         from app.semantic_world_state import get_world_state
+
         ws = get_world_state()
         metrics = ws.metrics
 

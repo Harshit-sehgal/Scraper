@@ -41,9 +41,7 @@ def test_pipeline_garbage_filtered():
 
 
 def test_pipeline_navigation_filtered():
-    res = run_pipeline(
-        [{"text": "Home About Contact info@example.com"}], ["name", "phone"]
-    )
+    res = run_pipeline([{"text": "Home About Contact info@example.com"}], ["name", "phone"])
     # Navigation records still produce degraded field output (graceful degradation).
     assert len(res) == 0, "HEAD filters navigation records"
 
@@ -117,9 +115,8 @@ def test_job_allocation():
     assert len(res) > 0
     r = res[0]
     assert r["company"] == "Google"
-    has_digit = any(r.get(f) and any(c.isdigit() for c in str(r.get(f)))
-                    for f in ["salary", "experience"])
-    fields_str = {f: r.get(f) for f in ['company', 'salary', 'currency', 'experience']}
+    has_digit = any(r.get(f) and any(c.isdigit() for c in str(r.get(f))) for f in ["salary", "experience"])
+    fields_str = {f: r.get(f) for f in ["company", "salary", "currency", "experience"]}
     assert has_digit, f"No fields have digits: {fields_str}"
 
 
@@ -148,12 +145,22 @@ def test_alloc_empty_schema():
 
 def test_alloc_simple():
     tokens = [
-        SemanticToken(raw="Lufthansa", normalized="Lufthansa", span=Span(0, 9), position=0,
-                      primary_type=SemanticType.ORGANIZATION,
-                      type_distribution={SemanticType.ORGANIZATION: 0.85}),
-        SemanticToken(raw="238", normalized="238", span=Span(10, 13), position=1,
-                      primary_type=SemanticType.PRICE,
-                      type_distribution={SemanticType.PRICE: 0.85}),
+        SemanticToken(
+            raw="Lufthansa",
+            normalized="Lufthansa",
+            span=Span(0, 9),
+            position=0,
+            primary_type=SemanticType.ORGANIZATION,
+            type_distribution={SemanticType.ORGANIZATION: 0.85},
+        ),
+        SemanticToken(
+            raw="238",
+            normalized="238",
+            span=Span(10, 13),
+            position=1,
+            primary_type=SemanticType.PRICE,
+            type_distribution={SemanticType.PRICE: 0.85},
+        ),
     ]
     result, graph = allocate_semantic_roles(SemanticRecord(tokens=tokens), ["name", "price"])
     assert graph.roles["price"].filled_by == "238"
@@ -165,12 +172,10 @@ def test_role_engine_learns():
     reng = RoleEmbeddingEngine()
     price_start = reng.get_compatibility("price", SemanticType.PRICE)
     reng.learn_from_allocation("price", SemanticType.PRICE, "238", success=True, delta=0.3)
-    assert reng.get_compatibility("price", SemanticType.PRICE) > price_start, \
-        "Compatibility should rise on successful learning"
+    assert reng.get_compatibility("price", SemanticType.PRICE) > price_start, "Compatibility should rise on successful learning"
     name_start = reng.get_compatibility("name", SemanticType.PRICE)
     reng.learn_from_allocation("name", SemanticType.PRICE, "238", success=False, delta=0.3)
-    assert reng.get_compatibility("name", SemanticType.PRICE) <= name_start, \
-        "Compatibility should not rise on failed learning"
+    assert reng.get_compatibility("name", SemanticType.PRICE) <= name_start, "Compatibility should not rise on failed learning"
 
 
 def test_role_engine_certainty():
@@ -322,14 +327,15 @@ def test_pipeline_mixed_types():
 def test_boundary_engine_merge():
     _clean_engine()
     from app.semantic_boundary_engine import score_boundary
+
     for ta, tb, va, vb, exp in [
-        ('org', 'org', 'Prestige', 'Group', True),
-        ('org', 'org', 'Honda', 'Civic', False),
-        ('org', 'org', 'British', 'Corporation', True),
-        ('number', 'code', '3', 'BHK', True),
-        ('org', 'org', 'Music', 'Festival', False),
-        ('org', 'number', 'Honda', '2020', False),
-        ('org', 'org', 'The', 'Italian', True),
+        ("org", "org", "Prestige", "Group", True),
+        ("org", "org", "Honda", "Civic", False),
+        ("org", "org", "British", "Corporation", True),
+        ("number", "code", "3", "BHK", True),
+        ("org", "org", "Music", "Festival", False),
+        ("org", "number", "Honda", "2020", False),
+        ("org", "org", "The", "Italian", True),
     ]:
         assert score_boundary(ta, tb, va, vb) == exp, f"{va}+{vb}"
 
@@ -337,74 +343,81 @@ def test_boundary_engine_merge():
 def test_boundary_engine_scores():
     _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
+
     e = get_boundary_engine()
-    s = e.score_pair('org', 'org', 'Prestige', 'Group', 0, 1)
+    s = e.score_pair("org", "org", "Prestige", "Group", 0, 1)
     assert s.cohesion > 0.7
-    s2 = e.score_pair('org', 'org', 'Honda', 'Civic', 0, 1)
+    s2 = e.score_pair("org", "org", "Honda", "Civic", 0, 1)
     assert s2.separation > 0.6
 
 
 def test_boundary_engine_history():
     _clean_engine()
     from app.semantic_boundary_engine import MergeDecision, get_boundary_engine
+
     e = get_boundary_engine()
     n = len(e.decision_history)
-    e.record_decision(MergeDecision('org', 'org', 'X', 'Y', True, 0.9, True))
+    e.record_decision(MergeDecision("org", "org", "X", "Y", True, 0.9, True))
     assert len(e.decision_history) == n + 1
 
 
 def test_cohesion_model_records():
     _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
+
     e = get_boundary_engine()
     m = e.cohesion_model
-    assert m.merge_success_rate('org', 'org') == 0.5
-    m.record('org', 'org', True, True)
-    m.record('org', 'org', True, True)
-    assert m.merge_success_rate('org', 'org') == 1.0
+    assert m.merge_success_rate("org", "org") == 0.5
+    m.record("org", "org", True, True)
+    m.record("org", "org", True, True)
+    assert m.merge_success_rate("org", "org") == 1.0
 
 
 def test_cohesion_model_bias():
     _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
+
     e = get_boundary_engine()
     m = e.cohesion_model
-    assert m.get_cohesion_bias('price', 'price') == 0.0
-    m.record('price', 'price', False, True)
-    m.record('price', 'price', False, True)
-    assert m.get_cohesion_bias('price', 'price') < 0
+    assert m.get_cohesion_bias("price", "price") == 0.0
+    m.record("price", "price", False, True)
+    m.record("price", "price", False, True)
+    assert m.get_cohesion_bias("price", "price") < 0
 
 
 def test_transition_detector_bootstrap():
     _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
+
     e = get_boundary_engine()
     t = e.transition_detector
     # Bootstrap transitions should have high probability
-    assert t.score_transition('organization', 'price').probability > 0.6
-    assert t.score_transition('organization', 'location').probability > 0.6
-    assert t.score_transition('location', 'price').probability > 0.6
+    assert t.score_transition("organization", "price").probability > 0.6
+    assert t.score_transition("organization", "location").probability > 0.6
+    assert t.score_transition("location", "price").probability > 0.6
     # number + code transition should be low (they merge)
-    assert t.score_transition('number', 'code').probability < 0.5
+    assert t.score_transition("number", "code").probability < 0.5
 
 
 def test_transition_detector_learns():
     _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
+
     e = get_boundary_engine()
     t = e.transition_detector
     # Initially test: org+org transitions have moderate probability
-    before = t.score_transition('org', 'org').probability
+    before = t.score_transition("org", "org").probability
     # Observe successful role boundary (not merged, successful)
-    t.observe_transition('org', 'org', is_role_boundary=True)
-    t.observe_transition('org', 'org', is_role_boundary=True)
-    after = t.score_transition('org', 'org').probability
+    t.observe_transition("org", "org", is_role_boundary=True)
+    t.observe_transition("org", "org", is_role_boundary=True)
+    after = t.score_transition("org", "org").probability
     assert after > before  # Probability should increase
 
 
 def test_transition_detector_high_list():
     _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
+
     e = get_boundary_engine()
     t = e.transition_detector
     high = t.get_high_transition_types()

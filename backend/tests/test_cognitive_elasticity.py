@@ -46,6 +46,7 @@ def test_manifold_dimensionality_induction():
 
     # 4. Verify engines pick up new dimension
     from app.semantic_ir import SemanticType
+
     reng = RoleEmbeddingEngine()
     assert reng.dimension == 32
     type_vec = reng._get_type_vector(SemanticType.PRICE)

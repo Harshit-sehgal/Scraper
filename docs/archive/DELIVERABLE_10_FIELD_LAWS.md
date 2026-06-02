@@ -9,7 +9,7 @@
 </div>
 
 
-**Purpose:** Document the physical/topological field constants, exclusivity constraints, and runtime validation rules that govern the semantic field behavior.  
+**Purpose:** Document the physical/topological field constants, exclusivity constraints, and runtime validation rules that govern the semantic field behavior.
 
 **Source files:**
 - `backend/app/field_laws.py` — Foundational constants (zero upward dependencies)

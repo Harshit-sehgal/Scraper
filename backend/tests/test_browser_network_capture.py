@@ -15,6 +15,7 @@ async def test_live_network_capture_limits():
 
     def fake_on(event, callback):
         on_calls[event] = callback
+
     page.on = fake_on
 
     captured = await browser_network_capture.setup_network_capture(page)
@@ -49,6 +50,7 @@ async def test_live_network_capture_byte_limit():
 
     def fake_on(event, callback):
         on_calls[event] = callback
+
     page.on = fake_on
 
     captured = await browser_network_capture.setup_network_capture(page)
@@ -76,36 +78,40 @@ async def test_live_network_capture_byte_limit():
 async def test_browser_state_capture_redacts_session_storage_values():
     page = MagicMock()
     context = MagicMock()
-    context.cookies = AsyncMock(return_value=[
-        {
-            "name": "session_id",
-            "value": "cookie-secret-value",
-            "domain": "example.com",
-            "path": "/",
-            "expires": -1,
-            "httpOnly": True,
-            "secure": True,
-            "sameSite": "Lax",
-        },
-        {
-            "name": "prefs",
-            "value": "light",
-            "domain": "example.com",
-            "path": "/",
-        },
-    ])
+    context.cookies = AsyncMock(
+        return_value=[
+            {
+                "name": "session_id",
+                "value": "cookie-secret-value",
+                "domain": "example.com",
+                "path": "/",
+                "expires": -1,
+                "httpOnly": True,
+                "secure": True,
+                "sameSite": "Lax",
+            },
+            {
+                "name": "prefs",
+                "value": "light",
+                "domain": "example.com",
+                "path": "/",
+            },
+        ]
+    )
     page.context = context
-    page.evaluate = AsyncMock(return_value={
-        "localStorage": {
-            "searchId": "local-secret-search-id",
-            "theme": "dark",
-        },
-        "sessionStorage": {
-            "activeSessionToken": "session-storage-secret-token",
-        },
-        "indexedDbDatabases": [{"name": "search-cache", "version": 1}],
-        "cacheStorageKeys": ["runtime-cache-v1"],
-    })
+    page.evaluate = AsyncMock(
+        return_value={
+            "localStorage": {
+                "searchId": "local-secret-search-id",
+                "theme": "dark",
+            },
+            "sessionStorage": {
+                "activeSessionToken": "session-storage-secret-token",
+            },
+            "indexedDbDatabases": [{"name": "search-cache", "version": 1}],
+            "cacheStorageKeys": ["runtime-cache-v1"],
+        }
+    )
 
     state = await browser_network_capture.collect_browser_state(page)
     serialized = json.dumps(state)
@@ -122,9 +128,11 @@ async def test_browser_state_capture_redacts_session_storage_values():
 
 
 def test_build_cookie_header_uses_raw_cookie_values_for_in_memory_reuse():
-    header = browser_network_capture.build_cookie_header([
-        {"name": "session_id", "value": "abc123"},
-        {"name": "empty", "value": ""},
-        {"name": "", "value": "ignored"},
-    ])
+    header = browser_network_capture.build_cookie_header(
+        [
+            {"name": "session_id", "value": "abc123"},
+            {"name": "empty", "value": ""},
+            {"name": "", "value": "ignored"},
+        ]
+    )
     assert header == "session_id=abc123"

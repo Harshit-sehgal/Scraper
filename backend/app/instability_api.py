@@ -87,9 +87,7 @@ class ImmunityLayer:
         # 3. Adversarial Pressure Detection (Phase 42)
         # Check if this source is repeatedly causing high energy spikes
         if self.ws.metrics.global_energy > 5.0 and trust < 0.6:
-            logging.getLogger(__name__).warning(
-                f"IMMUNITY: Quarantining source [{source}] for contributing to field fever."
-            )
+            logging.getLogger(__name__).warning(f"IMMUNITY: Quarantining source [{source}] for contributing to field fever.")
             self.quarantine_source(source, penalty=0.2)
             return False
 

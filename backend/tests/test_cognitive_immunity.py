@@ -10,10 +10,7 @@ def test_source_quarantine():
     source = "malicious-site.com"
 
     # 1. Perturb from unknown source (allowed)
-    ws.observe_field_perturbation({
-        "source_url": source,
-        "_allocation_conflicts": [{"role": "r1", "candidate": "t1"}]
-    }, [])
+    ws.observe_field_perturbation({"source_url": source, "_allocation_conflicts": [{"role": "r1", "candidate": "t1"}]}, [])
 
     # Verify exclusion was updated
     # ... Wait, observe_field_perturbation updates exclusions based on ROLE_EXCLUSIVITY

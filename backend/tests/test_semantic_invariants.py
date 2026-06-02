@@ -18,6 +18,7 @@ from app.semantic_world_state import get_world_state
 # INVARIANT 1: Field pressure is always bounded [0, 1]
 # ─────────────────────────────────────────────────────────────
 
+
 def test_field_pressure_bounds():
     ws = get_world_state()
     ws.clear()
@@ -32,6 +33,7 @@ def test_field_pressure_bounds():
 # ─────────────────────────────────────────────────────────────
 # INVARIANT 2: Field pressure drops as the system stabilizes
 # ─────────────────────────────────────────────────────────────
+
 
 def test_field_pressure_decreases_with_stabilization():
     ws = get_world_state()
@@ -50,6 +52,7 @@ def test_field_pressure_decreases_with_stabilization():
 # INVARIANT 3: Adaptive thresholds stay within domain bounds
 # ─────────────────────────────────────────────────────────────
 
+
 def test_adaptive_threshold_bounds():
     ws = get_world_state()
     ws.clear()
@@ -65,6 +68,7 @@ def test_adaptive_threshold_bounds():
 #              energy tracked, re-allocation resolved
 # ─────────────────────────────────────────────────────────────
 
+
 def test_contradiction_pipeline_invariant():
     ws = get_world_state()
     ws.clear()
@@ -78,13 +82,13 @@ def test_contradiction_pipeline_invariant():
     # continuous signal of contested roles.
     assert r.get("_allocation_conflicts"), "Allocation conflicts must be captured"
     assert len(ws.field_regions) > 0, "Field regions must capture pre-allocation tension"
-    assert ws.learned_exclusions.get(("source", "target"), 0) > 0, \
-        "Learned exclusions must be reinforced from field tension"
+    assert ws.learned_exclusions.get(("source", "target"), 0) > 0, "Learned exclusions must be reinforced from field tension"
 
 
 # ─────────────────────────────────────────────────────────────
 # INVARIANT 5: No false contradictions for distinct values
 # ─────────────────────────────────────────────────────────────
+
 
 def test_no_false_contradiction_invariant():
     ws = get_world_state()
@@ -105,6 +109,7 @@ def test_no_false_contradiction_invariant():
 #              (no duplicates, no orphans)
 # ─────────────────────────────────────────────────────────────
 
+
 def test_event_cascade_invariant():
     d = get_dispatcher()
     for et in [SemanticEventType.TOPOLOGY_SHIFT, SemanticEventType.UNCERTAINTY_SPIKE]:
@@ -116,6 +121,7 @@ def test_event_cascade_invariant():
 # INVARIANT 7: Cascade works regardless of import order
 # ─────────────────────────────────────────────────────────────
 
+
 def test_import_order_independence_invariant():
     """Verified at the module level — direct import must produce cascade."""
     # This test verifies that importing event_dispatcher directly (not through
@@ -124,6 +130,7 @@ def test_import_order_independence_invariant():
     # (it's already imported by this test file through get_scheduler import).
     from app.event_dispatcher import get_dispatcher as gd
     from app.semantic_events import SemanticEventType as SET
+
     d = gd()
     subs = len(d.subscribers.get(SET.TOPOLOGY_SHIFT, []))
     assert subs >= 1, f"Direct dispatcher must have >=1 subscriber, has {subs}"
@@ -133,6 +140,7 @@ def test_import_order_independence_invariant():
 # INVARIANT 8: Contradiction learning — learned exclusions decay
 #              without reinforcement and strengthen with recurrence
 # ─────────────────────────────────────────────────────────────
+
 
 def test_topology_evolution_invariant():
     ws = get_world_state()
@@ -148,8 +156,9 @@ def test_topology_evolution_invariant():
     # Record 2: no contradiction → decay (pipeline dynamics may cause minor fluctuations)
     run_pipeline([{"source": "TOK2", "target": "TOK3"}], schema)
     after_decay = ws.learned_exclusions.get(key, 0.0)
-    assert after_decay < after_first + \
-        0.005, f"Exclusion should not significantly increase without reinforcement ({after_decay} > {after_first + 0.005})"
+    assert (
+        after_decay < after_first + 0.005
+    ), f"Exclusion should not significantly increase without reinforcement ({after_decay} > {after_first + 0.005})"
 
     # Record 3: contradiction again → reinforce
     run_pipeline([{"source": "TOK4", "target": "TOK4"}], schema)
@@ -160,6 +169,7 @@ def test_topology_evolution_invariant():
 # ─────────────────────────────────────────────────────────────
 # INVARIANT 9: Topology replay — snapshots capture evolution
 # ─────────────────────────────────────────────────────────────
+
 
 def test_topology_replay_invariant():
     ws = get_world_state()
@@ -187,6 +197,7 @@ def test_topology_replay_invariant():
 #               (lower energy → lower field pressure)
 # ─────────────────────────────────────────────────────────────
 
+
 def test_pressure_energy_causality_invariant():
     ws = get_world_state()
     ws.clear()
@@ -201,9 +212,11 @@ def test_pressure_energy_causality_invariant():
 # INVARIANT 11: Learned exclusions persist through save/load
 # ─────────────────────────────────────────────────────────────
 
+
 def test_exclusion_persistence_invariant():
     import os
     import tempfile
+
     ws = get_world_state()
     ws.clear()
     ws._instability.set_exclusion(("a", "b"), 0.75)
@@ -214,6 +227,7 @@ def test_exclusion_persistence_invariant():
 
     try:
         from app.semantic_persistence import load_semantic_state, save_semantic_state
+
         save_semantic_state()
         ws2 = get_world_state()
         ws2.clear()
@@ -235,6 +249,7 @@ def test_exclusion_persistence_invariant():
 #               (semantic memory as gravity)
 # ─────────────────────────────────────────────────────────────
 
+
 def test_memory_gravity_invariant():
     ws = get_world_state()
     ws.clear()
@@ -254,6 +269,7 @@ def test_memory_gravity_invariant():
 # INVARIANT 13: Learned exclusion topology must be bounded [0, 1]
 # ─────────────────────────────────────────────────────────────
 
+
 def test_exclusion_bounds_invariant():
     """Learned exclusions produced by the system must stay bounded [0, 1]."""
     ws = get_world_state()
@@ -270,6 +286,7 @@ def test_exclusion_bounds_invariant():
 #               (no duplicate unordered pairs)
 # ─────────────────────────────────────────────────────────────
 
+
 def test_role_exclusivity_consistency_invariant():
     seen = set()
     for pair in ROLE_EXCLUSIVITY:
@@ -281,6 +298,7 @@ def test_role_exclusivity_consistency_invariant():
 # ─────────────────────────────────────────────────────────────
 # INVARIANT 15: Uncertainty is bounded [0, 1] after pipeline
 # ─────────────────────────────────────────────────────────────
+
 
 def test_uncertainty_bounds_invariant():
     ws = get_world_state()
@@ -294,6 +312,7 @@ def test_uncertainty_bounds_invariant():
 # INVARIANT 16: Field pressure includes contradiction density
 # ─────────────────────────────────────────────────────────────
 
+
 def test_field_pressure_includes_contradictions():
     ws = get_world_state()
     ws.clear()
@@ -303,13 +322,15 @@ def test_field_pressure_includes_contradictions():
     # Maintain entropy baseline to isolate contradiction effect
     ws._energy.set_entropy(0.5)
     p_after = ws.metrics.field_pressure
-    assert p_after > p_before or abs(p_after - p_before) < 0.001, \
-        "Field pressure must increase or stay same with more contradictions"
+    assert (
+        p_after > p_before or abs(p_after - p_before) < 0.001
+    ), "Field pressure must increase or stay same with more contradictions"
 
 
 # ─────────────────────────────────────────────────────────────
 # INVARIANT 17: Propagation wave tracing returns wave entries
 # ─────────────────────────────────────────────────────────────
+
 
 def test_propagation_wave_tracing():
     ws = get_world_state()
@@ -327,6 +348,7 @@ def test_propagation_wave_tracing():
 # ─────────────────────────────────────────────────────────────
 # INVARIANT 18: Field pressure unifies all pressure dimensions
 # ─────────────────────────────────────────────────────────────
+
 
 def test_field_pressure_unifies_dimensions():
     ws = get_world_state()
@@ -346,9 +368,11 @@ def test_field_pressure_unifies_dimensions():
 # INVARIANT 19: Topology causality — field pressure alters exclusion memory
 # ─────────────────────────────────────────────────────────────
 
+
 def test_topology_causality_invariant():
     """Higher field pressure must produce tighter exclusion thresholds."""
     from app.semantic_allocation_engine import _adaptive_exclusion_threshold
+
     ws = get_world_state()
     ws.clear()
 
@@ -363,33 +387,37 @@ def test_topology_causality_invariant():
     ws._energy.set_entropy(0.9)
     t_high = _adaptive_exclusion_threshold()
 
-    assert t_high >= t_low or abs(t_high - t_low) < 0.01, \
-        f"Higher field pressure must raise exclusion threshold ({t_high} >= {t_low})"
+    assert (
+        t_high >= t_low or abs(t_high - t_low) < 0.01
+    ), f"Higher field pressure must raise exclusion threshold ({t_high} >= {t_low})"
 
 
 # ─────────────────────────────────────────────────────────────
 # INVARIANT 20: Semantic gravity — stable motifs reduce exclusion
 # ─────────────────────────────────────────────────────────────
 
+
 def test_semantic_gravity_invariant():
     """Stable motifs should reduce exclusion pressure between roles."""
     ws = get_world_state()
     ws.clear()
-    ws._manifold.set_compatibility('name', 'price', 0.1)
-    ws._manifold.set_compatibility('price', 'price', 0.9)
+    ws._manifold.set_compatibility("name", "price", 0.1)
+    ws._manifold.set_compatibility("price", "price", 0.9)
     ws._energy.increment_records(100)
-    e_before = ws.get_derived_exclusion('name', 'price')
+    e_before = ws.get_derived_exclusion("name", "price")
     # Add a stable motif — stability > 0.5 should PULL exclusion down
-    ws._motif._motif_counts[('organization', 'price')] = 500  # high count = stable
-    ws._motif._motif_timestamps[('organization', 'price')] = 95
-    e_after = ws.get_derived_exclusion('name', 'price')
-    assert e_after <= e_before or abs(e_after - e_before) < 0.001, \
-        f"Stable motifs should reduce or maintain exclusion ({e_after} <= {e_before})"
+    ws._motif._motif_counts[("organization", "price")] = 500  # high count = stable
+    ws._motif._motif_timestamps[("organization", "price")] = 95
+    e_after = ws.get_derived_exclusion("name", "price")
+    assert (
+        e_after <= e_before or abs(e_after - e_before) < 0.001
+    ), f"Stable motifs should reduce or maintain exclusion ({e_after} <= {e_before})"
 
 
 # ─────────────────────────────────────────────────────────────
 # INVARIANT 21: Field equilibrium — field_pressure stabilizes over time
 # ─────────────────────────────────────────────────────────────
+
 
 def test_field_equilibrium_invariant():
     """Processing more records without contradictions should lower field pressure."""
@@ -401,13 +429,13 @@ def test_field_equilibrium_invariant():
     for _ in range(10):
         run_pipeline([{"company": "Stable Co", "cost": "200"}], schema)
     p2 = ws.metrics.field_pressure
-    assert p2 <= p1 or abs(p2 - p1) < 0.1, \
-        f"Stable processing should reduce field pressure ({p2} <= {p1})"
+    assert p2 <= p1 or abs(p2 - p1) < 0.1, f"Stable processing should reduce field pressure ({p2} <= {p1})"
 
 
 # ─────────────────────────────────────────────────────────────
 # INVARIANT 22: Topology restructuring — contradictions grow exclusion edges
 # ─────────────────────────────────────────────────────────────
+
 
 def test_topology_restructuring_invariant():
     """Repeated contradictions must increase learned exclusions."""
@@ -418,13 +446,13 @@ def test_topology_restructuring_invariant():
     for _ in range(3):
         run_pipeline([{"source": "TOK1", "target": "TOK1"}], schema)
     after = len(ws.learned_exclusions)
-    assert after >= before, \
-        f"Contradictions must increase or maintain exclusion count ({after} >= {before})"
+    assert after >= before, f"Contradictions must increase or maintain exclusion count ({after} >= {before})"
 
 
 # ─────────────────────────────────────────────────────────────
 # INVARIANT 23: Propagation conservation — field propagation must create exclusions
 # ─────────────────────────────────────────────────────────────
+
 
 def test_propagation_conservation_invariant():
     """Field propagation must spread instability to neighboring roles."""
@@ -435,5 +463,4 @@ def test_propagation_conservation_invariant():
     before = len(ws.learned_exclusions)
     run_pipeline([{"start": "VAL1", "end": "VAL1", "source": "VAL2", "target": "VAL2"}], schema)
     after = len(ws.learned_exclusions)
-    assert after >= before, \
-        f"Propagation must create or maintain exclusions ({after} >= {before})"
+    assert after >= before, f"Propagation must create or maintain exclusions ({after} >= {before})"

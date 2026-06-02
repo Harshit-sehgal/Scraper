@@ -17,6 +17,7 @@ import pytest
 def _setup_log_dir():
     """Redirect audit logs to a temp directory for test isolation."""
     import app.audit_logger as al
+
     original_dir = al.AUDIT_LOG_DIR
     original_file = al.AUDIT_LOG_FILE
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -33,6 +34,7 @@ def _setup_log_dir():
 def _setup_settings(monkeypatch):
     """Configure API keys for middleware tests."""
     from app.config import settings
+
     monkeypatch.setattr(settings, "API_KEY", "test_user_key")
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "test_operator_key")
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "test_admin_key")
@@ -44,6 +46,7 @@ def client(monkeypatch):
     """Create a LocalASGIClient for the app (matching conftest.py pattern)."""
     # Isolate state files via settings
     from app.config import settings
+
     monkeypatch.setattr(settings, "STATE_FILE_PATH", "/tmp/test_audit_e2e_state.json")
 
     from app.main import app
@@ -185,10 +188,7 @@ class TestAuthSuccessLogging:
         events = _read_audit_log(_setup_log_dir)
         success_events = [e for e in events if e["outcome"] == "success"]
         # Filter for operator role events
-        operator_events = [
-            e for e in success_events
-            if e.get("details", {}).get("role") == "operator"
-        ]
+        operator_events = [e for e in success_events if e.get("details", {}).get("role") == "operator"]
         assert len(operator_events) >= 1
 
 

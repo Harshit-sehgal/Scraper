@@ -480,11 +480,7 @@ def _extract_record_from_element(
         key=lambda item: (
             _TYPED_PRIORITY.get(item[1].field_type if hasattr(item[1], "field_type") else None, 3),
             # Within same priority, fields with "use_last" semantics go second
-            (
-                0
-                if not any(w in (item[1].name or "").lower() for w in ("return", "arrival", "arrive", "dest", "to_"))
-                else 1
-            ),
+            (0 if not any(w in (item[1].name or "").lower() for w in ("return", "arrival", "arrive", "dest", "to_")) else 1),
         ),
     )
 
@@ -694,9 +690,7 @@ def _extract_field_value_stateful(
             if i not in used_snippet_indices:
                 # Skip noise snippets
                 lower = snippet.lower()
-                if any(
-                    nav in lower for nav in ["click", "sign", "login", "subscribe", "privacy", "terms", "copyright"]
-                ):
+                if any(nav in lower for nav in ["click", "sign", "login", "subscribe", "privacy", "terms", "copyright"]):
                     used_snippet_indices.add(i)
                     continue
                 if len(snippet) >= 3:

@@ -603,9 +603,7 @@ async def scrape_url(
     if results:
         avg_score = sum(r.get("record_score", 0.0) for r in results) / len(results)
 
-    strategy_engine.record_fetch_attempt(
-        intel.domain, recommended_strategy, success=True, time_ms=fetch_ms, quality=avg_score
-    )
+    strategy_engine.record_fetch_attempt(intel.domain, recommended_strategy, success=True, time_ms=fetch_ms, quality=avg_score)
 
     # ── Autonomous Adaptation: Close Motif Feedback Loop ──────────
     # Extract field co-occurrence motifs from results and feed back
@@ -659,9 +657,7 @@ async def scrape_url(
             frontier = get_crawl_frontier()
             added = await frontier.add_discovered_links(discovered_links, url, source_depth=0)
             if added > 0:
-                logger.debug(
-                    "[Scraper] Added %d/%d discovered links to frontier from %s", added, len(discovered_links), url
-                )
+                logger.debug("[Scraper] Added %d/%d discovered links to frontier from %s", added, len(discovered_links), url)
     except Exception as e:
         logger.debug("[Scraper] Link discovery skipped for %s: %s", url, e)
 
@@ -670,8 +666,10 @@ async def scrape_url(
     zero_result_failure_class = None
     # Check for session-bound URL signals and empty response indicators
     from app.session_url_detector import detect_session_params
+
     session_detection = detect_session_params(url) if url else None
     from app.empty_response_detector import detect_empty_response
+
     empty_check = detect_empty_response(html) if html else None
 
     # Collect page evidence for zero-result classification
@@ -784,13 +782,8 @@ async def scrape_url(
     # ── Post-Extraction Processing ────────────────────────────────
 
     # Global page-level contact boosting
-    contact_counts = sum(
-        1 for r in results if not _is_empty_value(r.get("email")) or not _is_empty_value(r.get("phone"))
-    )
-    if (
-        len(results) > settings.CONTACT_BOOST_MIN_RECORDS
-        and contact_counts / len(results) < settings.CONTACT_BOOST_THRESHOLD
-    ):
+    contact_counts = sum(1 for r in results if not _is_empty_value(r.get("email")) or not _is_empty_value(r.get("phone")))
+    if len(results) > settings.CONTACT_BOOST_MIN_RECORDS and contact_counts / len(results) < settings.CONTACT_BOOST_THRESHOLD:
         results = _boost_contacts_with_page_html(results, html, schema_fields)
 
     records_before_scoring = len(results)

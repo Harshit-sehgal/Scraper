@@ -49,19 +49,22 @@ async def scrape_threebest():
 
                     # Extract phone number via regex
                     import re
-                    phone = re.search(r'\+91[\s\-]?\d{4,5}[\s\-]?\d{4,5}|\b\d{10}\b', desc_text)
+
+                    phone = re.search(r"\+91[\s\-]?\d{4,5}[\s\-]?\d{4,5}|\b\d{10}\b", desc_text)
                     phone_str = phone.group(0) if phone else "Not Found"
 
                     # Extract typical rating (e.g. 4.9/5)
-                    rating = re.search(r'\d\.\d\s?(?:Star|/5|Stars)?', desc_text)
+                    rating = re.search(r"\d\.\d\s?(?:Star|/5|Stars)?", desc_text)
                     rating_str = rating.group(0) if rating else "Not Found"
 
-                    businesses.append({
-                        "company_name": text,
-                        "phone": phone_str.strip(),
-                        "address_or_location": "Chennai",  # generic
-                        "rating": rating_str.strip()
-                    })
+                    businesses.append(
+                        {
+                            "company_name": text,
+                            "phone": phone_str.strip(),
+                            "address_or_location": "Chennai",  # generic
+                            "rating": rating_str.strip(),
+                        }
+                    )
 
         await browser.close()
 
@@ -78,11 +81,14 @@ async def scrape_threebest():
 
         print(f"Extracted {len(unique_designers)} verified designers.")
 
-        with open("/home/harshit/Documents/Work/Money/scraper/chennai_interior_designers.csv", "w", newline="", encoding="utf-8") as f:  # noqa: E501
+        with open(
+            "/home/harshit/Documents/Work/Money/scraper/chennai_interior_designers.csv", "w", newline="", encoding="utf-8"
+        ) as f:  # noqa: E501
             writer = csv.DictWriter(f, fieldnames=["company_name", "phone", "address_or_location", "rating"])
             writer.writeheader()
             writer.writerows(unique_designers)
         print("Saved to CSV.")
+
 
 if __name__ == "__main__":
     asyncio.run(scrape_threebest())

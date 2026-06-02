@@ -127,9 +127,7 @@ def create_jobs_router(
             return recycle_bin_store.pop(job_id)
 
     @router.post("/api/discover")
-    async def discover(
-        req: DiscoveryRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
-    ):
+    async def discover(req: DiscoveryRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         """Auto-discover best URLs to scrape for a topic."""
         try:
             results = await discover_urls(
@@ -238,9 +236,7 @@ def create_jobs_router(
         }
 
     @router.post("/api/jobs/{job_id}/backfill-metadata")
-    async def backfill_job_metadata(
-        job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
-    ):
+    async def backfill_job_metadata(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         """Explicitly backfill source metadata for manual-mode job results."""
         job = _get_job(job_id)
 
@@ -274,9 +270,7 @@ def create_jobs_router(
         return {"message": "Metadata backfilled successfully", "updated": updated}
 
     @router.post("/api/jobs")
-    async def create_job(
-        job_data: JobCreate, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
-    ):
+    async def create_job(job_data: JobCreate, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
         urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
 
@@ -332,9 +326,7 @@ def create_jobs_router(
                         repo = get_job_repository()
                         repo.hard_delete(job.id)
                     except Exception:
-                        logging.getLogger(__name__).warning(
-                            "Failed to hard-delete job %s after enqueue failure", job.id
-                        )
+                        logging.getLogger(__name__).warning("Failed to hard-delete job %s after enqueue failure", job.id)
                     raise HTTPException(
                         status_code=503,
                         detail=(

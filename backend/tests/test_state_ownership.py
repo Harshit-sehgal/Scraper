@@ -12,8 +12,8 @@ from app.topology_state import TopologyState
 def test_independent_topology():
     """TopologyState works entirely independently."""
     ts = TopologyState()
-    r = ts.add(['origin', 'destination'], 'LAX', instability=0.5)
-    ts.add(['origin', 'destination'], 'JFK', instability=0.3)
+    r = ts.add(["origin", "destination"], "LAX", instability=0.5)
+    ts.add(["origin", "destination"], "JFK", instability=0.3)
     assert ts.region_count() == 2
     assert len(ts.neighbors_of(r)) == 1
     # Prune weak
@@ -35,7 +35,7 @@ def test_independent_energy():
     es.set_energy(15.0)
     assert es.global_energy == 10.0  # clamped
 
-    es.set_energy(float('nan'))
+    es.set_energy(float("nan"))
     assert es.global_energy == 10.0  # NaN rejected
 
     # Entropy bounds
@@ -52,12 +52,12 @@ def test_independent_energy():
 def test_independent_instability():
     """InstabilityState works entirely independently."""
     ist = InstabilityState()
-    ist.add_exclusion('origin', 'destination', 0.8)
-    assert ist.get_exclusion('origin', 'destination') == 0.8
+    ist.add_exclusion("origin", "destination", 0.8)
+    assert ist.get_exclusion("origin", "destination") == 0.8
     assert ist.exclusion_count() == 1
 
     ist.decay(rate=0.5)
-    assert ist.get_exclusion('origin', 'destination') < 0.8
+    assert ist.get_exclusion("origin", "destination") < 0.8
 
     ist.clear()
     assert ist.exclusion_count() == 0
@@ -70,7 +70,7 @@ def test_combined_ownership():
     ist = InstabilityState()
 
     # Create a region
-    region = ts.add(['origin', 'destination'], 'LAX', instability=0.5)
+    region = ts.add(["origin", "destination"], "LAX", instability=0.5)
     assert region.instability == 0.5
 
     # Track energy
@@ -78,8 +78,8 @@ def test_combined_ownership():
     assert es.global_energy == 5.0
 
     # Track exclusion
-    ist.add_exclusion('origin', 'destination', 0.3)
-    assert ist.get_exclusion('origin', 'destination') == 0.3
+    ist.add_exclusion("origin", "destination", 0.3)
+    assert ist.get_exclusion("origin", "destination") == 0.3
 
     # All independent
     assert ts.region_count() == 1
@@ -94,7 +94,7 @@ def test_owner_encapsulation():
 
     # Direct mutation of the internal list IS possible via `.regions` property
     # (Python can't fully prevent this), but the API provides controlled methods
-    r = ts.add(['a', 'b'], 'X', instability=0.5)
+    r = ts.add(["a", "b"], "X", instability=0.5)
     assert r.instability == 0.5
 
     # Direct mutation of energy state is similarly possible

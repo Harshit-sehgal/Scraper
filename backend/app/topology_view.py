@@ -138,7 +138,7 @@ class TopologyView:
         for region in self._regions:
             roles = sorted(set(region.competing_roles))
             for i, ra in enumerate(roles):
-                for rb in roles[i + 1:]:
+                for rb in roles[i + 1 :]:
                     pair = tuple(sorted((ra, rb)))
                     pairs.add(pair)
                     region_instability.setdefault(pair, []).append(region.instability)  # type: ignore[arg-type]

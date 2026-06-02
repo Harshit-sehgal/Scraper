@@ -58,9 +58,7 @@ async def get_current_mode():
 
 
 @router.post("/mode")
-async def set_operator_mode(
-    request: Request, body: ModeBody, _role: UserRole = Depends(require_role([UserRole.ADMIN]))
-):
+async def set_operator_mode(request: Request, body: ModeBody, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
     """Switch the system to a different operator mode.
 
     Dynamically adjusts runtime settings (timeout, settle delay,

@@ -33,6 +33,7 @@ def test_cross_node_causality_trace():
 
 def test_substrate_heartbeat_alignment():
     from app.heartbeat_manager import get_heartbeat_manager
+
     hm = get_heartbeat_manager()
     hm.node_registry.clear()
 

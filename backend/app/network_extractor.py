@@ -339,9 +339,7 @@ def _extract_hotel_fields(item: dict) -> dict:
         "description": item.get("description", "") or "",
         "address": _extract_address(item),
         "rating": (
-            item.get("aggregateRating", {}).get("ratingValue", "")
-            if isinstance(item.get("aggregateRating"), dict)
-            else ""
+            item.get("aggregateRating", {}).get("ratingValue", "") if isinstance(item.get("aggregateRating"), dict) else ""
         ),
         "price_range": item.get("priceRange", "") or "",
         "telephone": item.get("telephone", "") or "",
@@ -356,9 +354,7 @@ def _extract_restaurant_fields(item: dict) -> dict:
         "description": item.get("description", "") or "",
         "address": _extract_address(item),
         "rating": (
-            item.get("aggregateRating", {}).get("ratingValue", "")
-            if isinstance(item.get("aggregateRating"), dict)
-            else ""
+            item.get("aggregateRating", {}).get("ratingValue", "") if isinstance(item.get("aggregateRating"), dict) else ""
         ),
         "price_range": item.get("priceRange", "") or "",
         "telephone": item.get("telephone", "") or "",
@@ -372,17 +368,11 @@ def _extract_job_fields(item: dict) -> dict:
         "title": item.get("title", "") or item.get("name", "") or "",
         "description": item.get("description", "") or "",
         "company": (
-            item.get("hiringOrganization", {}).get("name", "")
-            if isinstance(item.get("hiringOrganization"), dict)
-            else ""
+            item.get("hiringOrganization", {}).get("name", "") if isinstance(item.get("hiringOrganization"), dict) else ""
         ),
-        "location": _extract_address(
-            item.get("jobLocation", {}) if isinstance(item.get("jobLocation"), dict) else item
-        ),
+        "location": _extract_address(item.get("jobLocation", {}) if isinstance(item.get("jobLocation"), dict) else item),
         "salary": (
-            item.get("baseSalary", {}).get("value", {}).get("value", "")
-            if isinstance(item.get("baseSalary"), dict)
-            else ""
+            item.get("baseSalary", {}).get("value", {}).get("value", "") if isinstance(item.get("baseSalary"), dict) else ""
         ),
         "employment_type": item.get("employmentType", "") or "",
         "url": item.get("url", "") or "",
@@ -411,9 +401,7 @@ def _extract_business_fields(item: dict) -> dict:
         "email": item.get("email", "") or "",
         "url": item.get("url", "") or item.get("sameAs", "") or "",
         "rating": (
-            item.get("aggregateRating", {}).get("ratingValue", "")
-            if isinstance(item.get("aggregateRating"), dict)
-            else ""
+            item.get("aggregateRating", {}).get("ratingValue", "") if isinstance(item.get("aggregateRating"), dict) else ""
         ),
     }
 
@@ -447,9 +435,7 @@ def _extract_book_fields(item: dict) -> dict:
         "isbn": item.get("isbn", "") or "",
         "description": item.get("description", "") or "",
         "rating": (
-            item.get("aggregateRating", {}).get("ratingValue", "")
-            if isinstance(item.get("aggregateRating"), dict)
-            else ""
+            item.get("aggregateRating", {}).get("ratingValue", "") if isinstance(item.get("aggregateRating"), dict) else ""
         ),
         "price": _extract_price_from_offers(item),
         "url": item.get("url", "") or "",
@@ -462,9 +448,7 @@ def _extract_movie_fields(item: dict) -> dict:
         "description": item.get("description", "") or item.get("abstract", "") or "",
         "director": item.get("director", {}).get("name", "") if isinstance(item.get("director"), dict) else "",
         "rating": (
-            item.get("aggregateRating", {}).get("ratingValue", "")
-            if isinstance(item.get("aggregateRating"), dict)
-            else ""
+            item.get("aggregateRating", {}).get("ratingValue", "") if isinstance(item.get("aggregateRating"), dict) else ""
         ),
         "date_published": item.get("datePublished", "") or "",
         "image": item.get("image", "") or "",
@@ -476,9 +460,7 @@ def _extract_app_fields(item: dict) -> dict:
         "name": item.get("name", "") or "",
         "description": item.get("description", "") or item.get("abstract", "") or "",
         "rating": (
-            item.get("aggregateRating", {}).get("ratingValue", "")
-            if isinstance(item.get("aggregateRating"), dict)
-            else ""
+            item.get("aggregateRating", {}).get("ratingValue", "") if isinstance(item.get("aggregateRating"), dict) else ""
         ),
         "price": item.get("offers", {}).get("price", "") if isinstance(item.get("offers"), dict) else "",
         "url": item.get("url", "") or item.get("sameAs", "") or "",

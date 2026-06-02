@@ -57,9 +57,7 @@ def test_rbac_endpoint_guards(client, monkeypatch):
     # --- 1. Test create job route (Requires Admin or Operator) ---
     # Try as User (Should fail with 403)
     resp = client.post(
-        "/api/jobs",
-        json={"name": "rbac-test", "urls": ["https://example.com"]},
-        headers={"X-API-Key": "user-secret"}
+        "/api/jobs", json={"name": "rbac-test", "urls": ["https://example.com"]}, headers={"X-API-Key": "user-secret"}
     )
     assert resp.status_code == 403
     assert "Permission denied" in resp.json()["detail"]
@@ -67,35 +65,23 @@ def test_rbac_endpoint_guards(client, monkeypatch):
     # Try as Operator (Should pass validation and reach the next level)
     # Note: it might fail with other validation errors like missing schema fields, but it shouldn't fail with RBAC 403
     resp = client.post(
-        "/api/jobs",
-        json={"name": "rbac-test", "urls": ["https://example.com"]},
-        headers={"X-API-Key": "operator-secret"}
+        "/api/jobs", json={"name": "rbac-test", "urls": ["https://example.com"]}, headers={"X-API-Key": "operator-secret"}
     )
     assert resp.status_code != 403
 
     # Try as Admin (Should pass RBAC check)
     resp = client.post(
-        "/api/jobs",
-        json={"name": "rbac-test", "urls": ["https://example.com"]},
-        headers={"X-API-Key": "admin-secret"}
+        "/api/jobs", json={"name": "rbac-test", "urls": ["https://example.com"]}, headers={"X-API-Key": "admin-secret"}
     )
     assert resp.status_code != 403
 
     # --- 2. Test operator mode switcher (Requires Admin only) ---
     # Try as Operator (Should fail with 403)
-    resp = client.post(
-        "/api/operator/mode",
-        json={"mode": "production"},
-        headers={"X-API-Key": "operator-secret"}
-    )
+    resp = client.post("/api/operator/mode", json={"mode": "production"}, headers={"X-API-Key": "operator-secret"})
     assert resp.status_code == 403
 
     # Try as Admin (Should pass RBAC check, returns 200/400 instead of 403)
-    resp = client.post(
-        "/api/operator/mode",
-        json={"mode": "production"},
-        headers={"X-API-Key": "admin-secret"}
-    )
+    resp = client.post("/api/operator/mode", json={"mode": "production"}, headers={"X-API-Key": "admin-secret"})
     assert resp.status_code in (200, 400)
 
 

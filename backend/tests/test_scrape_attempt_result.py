@@ -378,14 +378,18 @@ async def test_scrape_url_attempt_zero_result_with_html(monkeypatch):
     monkeypatch.setattr(scraper, "collect_page_evidence", lambda *a, **kw: FakeEvidence())
     monkeypatch.setattr(scraper, "detect_anti_bot", lambda html: 0.05)
     monkeypatch.setattr(scraper, "estimate_dom_nodes", lambda html: 10)
-    monkeypatch.setattr(scraper, "classify_zero_result", lambda **kw: ZeroResultClassification(
-        zero_result=True,
-        failure_class="empty_shell",
-        confidence=0.75,
-        recommended_action="try_alternate_source",
-        user_message="No data containers found.",
-        operator_hint="DOM parsed but empty.",
-    ))
+    monkeypatch.setattr(
+        scraper,
+        "classify_zero_result",
+        lambda **kw: ZeroResultClassification(
+            zero_result=True,
+            failure_class="empty_shell",
+            confidence=0.75,
+            recommended_action="try_alternate_source",
+            user_message="No data containers found.",
+            operator_hint="DOM parsed but empty.",
+        ),
+    )
     monkeypatch.setattr(scraper, "classify_failure", lambda **kw: None)
 
     def fake_process(records, schema_fields, min_record_score, **kw):
@@ -420,9 +424,7 @@ def test_warnings_defaults_to_empty_list():
 
 def test_warnings_explicitly_provided():
     """Warnings are preserved when explicitly provided."""
-    sar = ScrapeAttemptResult(
-        [], html="<html></html>", warnings=["timeout", "retry"]
-    )
+    sar = ScrapeAttemptResult([], html="<html></html>", warnings=["timeout", "retry"])
     assert sar.warnings == ["timeout", "retry"]
 
 

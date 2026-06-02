@@ -37,9 +37,7 @@ class TestWorkerQueueBasic:
 
         queue, _ = _make_queue(tmp_path)
 
-        task_id = asyncio.run(
-            queue.enqueue("test_task", {"key": "value"}, priority=Priority.HIGH)
-        )
+        task_id = asyncio.run(queue.enqueue("test_task", {"key": "value"}, priority=Priority.HIGH))
         assert task_id is not None
 
         task = asyncio.run(queue.dequeue(timeout=1.0))
@@ -113,13 +111,9 @@ class TestWorkerQueuePriority:
 
         # Enqueue in reverse priority order
         id_low = asyncio.run(queue.enqueue("low", {}, priority=Priority.LOW))
-        id_normal = asyncio.run(
-            queue.enqueue("normal", {}, priority=Priority.NORMAL)
-        )
+        id_normal = asyncio.run(queue.enqueue("normal", {}, priority=Priority.NORMAL))
         id_high = asyncio.run(queue.enqueue("high", {}, priority=Priority.HIGH))
-        id_critical = asyncio.run(
-            queue.enqueue("critical", {}, priority=Priority.CRITICAL)
-        )
+        id_critical = asyncio.run(queue.enqueue("critical", {}, priority=Priority.CRITICAL))
 
         # Should dequeue in priority order
         t1 = asyncio.run(queue.dequeue(timeout=1.0))
@@ -234,10 +228,8 @@ class TestWorkerQueueStartupRecovery:
 
         # Verify the task was recovered to pending
         status = queue2.get_status()
-        assert status["running"] == 0, \
-            f"Expected 0 running tasks after recovery, got {status['running']}"
-        assert status["pending"] >= 1, \
-            f"Expected >=1 pending tasks after recovery, got {status['pending']}"
+        assert status["running"] == 0, f"Expected 0 running tasks after recovery, got {status['running']}"
+        assert status["pending"] >= 1, f"Expected >=1 pending tasks after recovery, got {status['pending']}"
 
         # Verify the recovered task can be dequeued
         recovered = asyncio.run(queue2.dequeue(timeout=1.0))
@@ -279,9 +271,7 @@ class TestWorkerQueueObservability:
         """Dead letter queue entries are retrievable."""
         queue, _ = _make_queue(tmp_path)
 
-        task_id = asyncio.run(
-            queue.enqueue("dl_test", {"key": "val"}, max_attempts=1)
-        )
+        task_id = asyncio.run(queue.enqueue("dl_test", {"key": "val"}, max_attempts=1))
         task = asyncio.run(queue.dequeue(timeout=1.0))
         assert task is not None
         asyncio.run(queue.fail(task_id, "Error", retry=True))

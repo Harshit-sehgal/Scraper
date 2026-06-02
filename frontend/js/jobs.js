@@ -297,5 +297,3 @@ function renderJobs(jobs) {
         `;
     }).join('');
 }
-
-

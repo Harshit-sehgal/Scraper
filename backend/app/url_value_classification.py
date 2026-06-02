@@ -104,126 +104,160 @@ def _value_patterns_to_field_types(patterns) -> list[dict]:
     """
     suggestions = []
     if patterns.currencies:
-        suggestions.append({
-            "type": "currency",
-            "confidence": 0.9,
-            "example": patterns.currencies[0],
-            "description": "Monetary values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "currency",
+                "confidence": 0.9,
+                "example": patterns.currencies[0],
+                "description": "Monetary values detected on page",
+            }
+        )
     if patterns.dates:
-        suggestions.append({
-            "type": "date",
-            "confidence": 0.9,
-            "example": patterns.dates[0],
-            "description": "Date values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "date",
+                "confidence": 0.9,
+                "example": patterns.dates[0],
+                "description": "Date values detected on page",
+            }
+        )
     if patterns.times:
-        suggestions.append({
-            "type": "time",
-            "confidence": 0.75,
-            "example": patterns.times[0],
-            "description": "Time values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "time",
+                "confidence": 0.75,
+                "example": patterns.times[0],
+                "description": "Time values detected on page",
+            }
+        )
     if patterns.ratings:
-        suggestions.append({
-            "type": "rating",
-            "confidence": 0.85,
-            "example": patterns.ratings[0],
-            "description": "Rating or score values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "rating",
+                "confidence": 0.85,
+                "example": patterns.ratings[0],
+                "description": "Rating or score values detected on page",
+            }
+        )
     if patterns.emails:
-        suggestions.append({
-            "type": "email",
-            "confidence": 0.95,
-            "example": patterns.emails[0],
-            "description": "Email addresses detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "email",
+                "confidence": 0.95,
+                "example": patterns.emails[0],
+                "description": "Email addresses detected on page",
+            }
+        )
     if patterns.phones:
-        suggestions.append({
-            "type": "phone",
-            "confidence": 0.9,
-            "example": patterns.phones[0],
-            "description": "Phone numbers detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "phone",
+                "confidence": 0.9,
+                "example": patterns.phones[0],
+                "description": "Phone numbers detected on page",
+            }
+        )
     codes_3letter = getattr(patterns, "codes_3letter", []) or []
     airport_codes = getattr(patterns, "airport_codes", []) or []
     if codes_3letter or airport_codes:
-        suggestions.append({
-            "type": "code",
-            "confidence": 0.75,
-            "example": (airport_codes or codes_3letter)[0],
-            "description": "Short codes (3-letter) detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "code",
+                "confidence": 0.75,
+                "example": (airport_codes or codes_3letter)[0],
+                "description": "Short codes (3-letter) detected on page",
+            }
+        )
     if patterns.durations:
-        suggestions.append({
-            "type": "string",
-            "confidence": 0.8,
-            "example": patterns.durations[0],
-            "description": "Duration values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "string",
+                "confidence": 0.8,
+                "example": patterns.durations[0],
+                "description": "Duration values detected on page",
+            }
+        )
     if patterns.urls:
-        suggestions.append({
-            "type": "url",
-            "confidence": 0.85,
-            "example": patterns.urls[0],
-            "description": "URL / website values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "url",
+                "confidence": 0.85,
+                "example": patterns.urls[0],
+                "description": "URL / website values detected on page",
+            }
+        )
     if patterns.weights:
-        suggestions.append({
-            "type": "string",
-            "confidence": 0.8,
-            "example": patterns.weights[0],
-            "description": "Weight values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "string",
+                "confidence": 0.8,
+                "example": patterns.weights[0],
+                "description": "Weight values detected on page",
+            }
+        )
     if patterns.percentages:
-        suggestions.append({
-            "type": "percentage",
-            "confidence": 0.8,
-            "example": patterns.percentages[0],
-            "description": "Percentage values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "percentage",
+                "confidence": 0.8,
+                "example": patterns.percentages[0],
+                "description": "Percentage values detected on page",
+            }
+        )
     if patterns.booleans:
-        suggestions.append({
-            "type": "boolean",
-            "confidence": 0.85,
-            "example": patterns.booleans[0],
-            "description": "Boolean / status values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "boolean",
+                "confidence": 0.85,
+                "example": patterns.booleans[0],
+                "description": "Boolean / status values detected on page",
+            }
+        )
     if patterns.dimensions:
-        suggestions.append({
-            "type": "string",
-            "confidence": 0.75,
-            "example": patterns.dimensions[0],
-            "description": "Dimension / size values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "string",
+                "confidence": 0.75,
+                "example": patterns.dimensions[0],
+                "description": "Dimension / size values detected on page",
+            }
+        )
     if patterns.quantities:
-        suggestions.append({
-            "type": "string",
-            "confidence": 0.75,
-            "example": patterns.quantities[0],
-            "description": "Quantity / pack size values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "string",
+                "confidence": 0.75,
+                "example": patterns.quantities[0],
+                "description": "Quantity / pack size values detected on page",
+            }
+        )
     if patterns.product_codes:
-        suggestions.append({
-            "type": "code",
-            "confidence": 0.8,
-            "example": patterns.product_codes[0],
-            "description": "Product / SKU codes detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "code",
+                "confidence": 0.8,
+                "example": patterns.product_codes[0],
+                "description": "Product / SKU codes detected on page",
+            }
+        )
     if patterns.units:
-        suggestions.append({
-            "type": "string",
-            "confidence": 0.75,
-            "example": patterns.units[0],
-            "description": "Unit type indicators detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "string",
+                "confidence": 0.75,
+                "example": patterns.units[0],
+                "description": "Unit type indicators detected on page",
+            }
+        )
     if patterns.address_fragments:
-        suggestions.append({
-            "type": "location",
-            "confidence": 0.8,
-            "example": patterns.address_fragments[0],
-            "description": "Address / location values detected on page",
-        })
+        suggestions.append(
+            {
+                "type": "location",
+                "confidence": 0.8,
+                "example": patterns.address_fragments[0],
+                "description": "Address / location values detected on page",
+            }
+        )
     return suggestions
 
 

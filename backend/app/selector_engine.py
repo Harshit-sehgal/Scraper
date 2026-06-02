@@ -565,9 +565,7 @@ def apply_selectors(
             results.append(record)
 
     if return_field_quality:
-        avg_field_quality = {
-            name: (sum(scores) / len(scores)) if scores else 0.0 for name, scores in field_quality_map.items()
-        }
+        avg_field_quality = {name: (sum(scores) / len(scores)) if scores else 0.0 for name, scores in field_quality_map.items()}
         return results, avg_field_quality
 
     return results
@@ -691,9 +689,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.CODE:
-                code_node = container.find(
-                    True, class_=re.compile(r"sku|product-code|barcode|isbn|model-number|part", re.I)
-                )
+                code_node = container.find(True, class_=re.compile(r"sku|product-code|barcode|isbn|model-number|part", re.I))
                 if code_node:
                     val = code_node.get_text()
                 else:
@@ -760,11 +756,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                     candidate = (
                         heading.get("alt")
                         if heading and heading.name == "img"
-                        else (
-                            heading.get_text(" ", strip=True)
-                            if heading
-                            else text[: settings.SELECTOR_HEADING_FALLBACK_LEN]
-                        )
+                        else (heading.get_text(" ", strip=True) if heading else text[: settings.SELECTOR_HEADING_FALLBACK_LEN])
                     )
                     val = _sanitize_field_value(field, candidate)
                 else:

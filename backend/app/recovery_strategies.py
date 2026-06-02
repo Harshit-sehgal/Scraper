@@ -353,7 +353,7 @@ class RecoveryStrategist:
         # Escalate if we've already attempted the primary action
         if attempt_number > 1 and attempt_number <= len(path["escalation"]) + 1:
             primary_action = path["escalation"][attempt_number - 2]
-            secondary_actions = path["escalation"][attempt_number - 1:]
+            secondary_actions = path["escalation"][attempt_number - 1 :]
         else:
             primary_action = path["primary"]
             secondary_actions = path["escalation"][: min(2, len(path["escalation"]))]

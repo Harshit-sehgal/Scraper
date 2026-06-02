@@ -34,8 +34,8 @@ logger = logging.getLogger("worker")
 
 async def scrape_job_handler(task) -> dict:
     """Handler for 'scrape_job' tasks — executes a full job."""
-    from app.services.job_runner import run_job
     from app.config import settings
+    from app.services.job_runner import run_job
     from app.storage_interface import get_job_repository
 
     job_id = task.payload.get("job_id")
@@ -77,7 +77,7 @@ async def main():
     parser.add_argument("--once", action="store_true", help="Process one task then exit")
     args = parser.parse_args()
 
-    from app.worker_queue import get_worker_queue, Priority
+    from app.worker_queue import Priority, get_worker_queue
 
     queue = get_worker_queue()
     queue._max_concurrency = args.workers
@@ -100,7 +100,8 @@ async def main():
     await queue.start()
     logger.info(
         "Worker ready: %d max concurrency, polling every %.1fs",
-        queue._max_concurrency, queue._poll_interval,
+        queue._max_concurrency,
+        queue._poll_interval,
     )
 
     if args.once:
@@ -123,7 +124,9 @@ async def main():
                 ts = task_state.get("status", "")
                 if ts in terminal_task_statuses:
                     logger.info(
-                        "Task %s reached terminal state: %s", task_id, ts,
+                        "Task %s reached terminal state: %s",
+                        task_id,
+                        ts,
                     )
                     break
                 logger.debug("Task %s status: %s", task_id, ts)

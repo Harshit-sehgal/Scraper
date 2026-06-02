@@ -78,6 +78,7 @@ def test_validate_public_http_url_dns_resolution(monkeypatch):
     # Mock socket.getaddrinfo to raise gaierror for unresolvable domain
     def mock_getaddrinfo_fail(host, port, *args, **kwargs):
         raise socket.gaierror(-2, "Name or service not known")
+
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_fail)
 
     with pytest.raises(ValueError, match="could not be resolved"):
@@ -94,6 +95,7 @@ def test_validate_public_http_url_allowlist(monkeypatch):
 
     def mock_getaddrinfo_fail(host, port, *args, **kwargs):
         raise socket.gaierror(-2, "Name or service not known")
+
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_fail)
 
     # Let's mock settings.ENV to "production" so it triggers DNS fail-closed for internal hosts
@@ -108,6 +110,7 @@ def test_validate_public_http_url_allowlist(monkeypatch):
     # Now it should bypass validation and return successfully!
     validate_public_http_url("http://nginx/smoke/records.html")
     validate_public_http_url("https://smoke-host/index.html")
+
 
 # ── IPv6 private range tests ────────────────────────────────────────────
 
@@ -194,6 +197,7 @@ def test_validate_unresolved_host_in_dev(monkeypatch):
 
     def mock_getaddrinfo_fail(host, port, *args, **kwargs):
         raise socket.gaierror(-2, "Name or service not known")
+
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_fail)
 
     # Should not raise in development
@@ -209,6 +213,7 @@ def test_validate_resolved_private_ip_via_dns_ipv6(monkeypatch):
         return [
             (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("fc00::1", 80, 0, 0)),
         ]
+
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_v6)
 
     with pytest.raises(ValueError, match="resolves to restricted IP"):
@@ -218,6 +223,7 @@ def test_validate_resolved_private_ip_via_dns_ipv6(monkeypatch):
         return [
             (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("fe80::1", 80, 0, 0)),
         ]
+
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_v6_linklocal)
 
     with pytest.raises(ValueError, match="resolves to restricted IP"):
@@ -237,6 +243,7 @@ def test_validate_resolved_private_ip_via_dns_decimal_ip(monkeypatch):
         if host == "2130706433":
             return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 80))]
         raise socket.gaierror(-2, "Name or service not known")
+
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_decimal)
 
     with pytest.raises(ValueError, match="restricted IP"):
@@ -247,6 +254,7 @@ def test_validate_resolved_private_ip_via_dns_decimal_ip(monkeypatch):
         if host == "0x7f000001":
             return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 80))]
         raise socket.gaierror(-2, "Name or service not known")
+
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_hex)
 
     with pytest.raises(ValueError, match="restricted IP"):
@@ -288,14 +296,9 @@ async def test_fetch_redirect_to_private_ip(monkeypatch):
                 url="http://public-site.com/start-url",
                 status_code=302,
                 headers={"location": "http://127.0.0.1"},
-                is_redirect=True
+                is_redirect=True,
             )
-        return MockResponse(
-            url="http://127.0.0.1",
-            status_code=200,
-            headers={},
-            is_redirect=False
-        )
+        return MockResponse(url="http://127.0.0.1", status_code=200, headers={}, is_redirect=False)
 
     monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
 
@@ -306,6 +309,7 @@ async def test_fetch_redirect_to_private_ip(monkeypatch):
 @pytest.mark.asyncio
 async def test_fetch_redirect_to_cloud_metadata(monkeypatch):
     """Redirect to 169.254.169.254 (cloud metadata) is caught."""
+
     class MockResponse:
         def __init__(self, url, status_code, headers, is_redirect=False):
             self.url = httpx.URL(url)
@@ -322,14 +326,9 @@ async def test_fetch_redirect_to_cloud_metadata(monkeypatch):
                 url="http://public-site.com/start",
                 status_code=302,
                 headers={"location": "http://169.254.169.254/latest/meta-data/"},
-                is_redirect=True
+                is_redirect=True,
             )
-        return MockResponse(
-            url="http://169.254.169.254/latest/meta-data/",
-            status_code=200,
-            headers={},
-            is_redirect=False
-        )
+        return MockResponse(url="http://169.254.169.254/latest/meta-data/", status_code=200, headers={}, is_redirect=False)
 
     monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
 
@@ -338,6 +337,7 @@ async def test_fetch_redirect_to_cloud_metadata(monkeypatch):
 
 
 # ── Smoke mode allowlist extras ─────────────────────────────────────────
+
 
 def test_smoke_mode_internal_tld_allowed(monkeypatch):
     """Internal TLDs are still rejected even in smoke mode (separate from ALLOWED_INTERNAL_HOSTS)."""
@@ -354,6 +354,7 @@ def test_smoke_mode_internal_tld_allowed(monkeypatch):
         if host == "nginx":
             return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("172.18.0.10", 80))]
         raise socket.gaierror(-2, "Name or service not known")
+
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_nginx)
 
     # nginx is in allowed_internal_hosts, so it passes in smoke mode

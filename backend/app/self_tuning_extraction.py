@@ -216,17 +216,11 @@ class SelfTuningController:
                     round(mean(p.fetch_timeout_s for p in self._parameters.values()), 1) if self._parameters else 0.0
                 ),
                 "avg_delay_s": (
-                    round(mean(p.delay_between_requests_s for p in self._parameters.values()), 1)
-                    if self._parameters
-                    else 0.0
+                    round(mean(p.delay_between_requests_s for p in self._parameters.values()), 1) if self._parameters else 0.0
                 ),
-                "avg_retries": (
-                    round(mean(p.max_retries for p in self._parameters.values()), 1) if self._parameters else 0.0
-                ),
+                "avg_retries": (round(mean(p.max_retries for p in self._parameters.values()), 1) if self._parameters else 0.0),
                 "avg_confidence_threshold": (
-                    round(mean(p.min_confidence_threshold for p in self._parameters.values()), 3)
-                    if self._parameters
-                    else 0.0
+                    round(mean(p.min_confidence_threshold for p in self._parameters.values()), 3) if self._parameters else 0.0
                 ),
             },
         }

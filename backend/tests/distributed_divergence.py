@@ -41,6 +41,7 @@ def test_distributed_divergence(event_count: int = 1000):
     for tx in journal:
         # Simulate cross-node transfer (JSON serialization)
         import json
+
         tx_wire = json.loads(json.dumps(tx))
         ws_b.replay_transaction(tx_wire)
 

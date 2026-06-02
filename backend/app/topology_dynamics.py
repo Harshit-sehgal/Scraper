@@ -64,8 +64,7 @@ def compute_meso_clusters(state: "TopologyState") -> None:
         avg_convergence = sum(r.local_convergence for r in cluster_regions) / len(cluster_regions)
         avg_pressure = sum(r.semantic_pressure for r in cluster_regions) / len(cluster_regions)
         shared_roles = (
-            list(set.intersection(*[set(r.competing_roles) for r in cluster_regions]))
-            if len(cluster_regions) > 0 else []
+            list(set.intersection(*[set(r.competing_roles) for r in cluster_regions])) if len(cluster_regions) > 0 else []
         )
         all_roles = list(set.union(*[set(r.competing_roles) for r in cluster_regions]))
         tokens = list(set(r.token for r in cluster_regions))
@@ -73,7 +72,11 @@ def compute_meso_clusters(state: "TopologyState") -> None:
         prev = prev_map.get(rid_tuple, {})
 
         instabilities = [r.instability for r in cluster_regions]
-        entropy = sum(abs(i - sum(instabilities) / len(instabilities)) for i in instabilities) / len(instabilities) if len(instabilities) > 1 else 0.0
+        entropy = (
+            sum(abs(i - sum(instabilities) / len(instabilities)) for i in instabilities) / len(instabilities)
+            if len(instabilities) > 1
+            else 0.0
+        )
 
         prev_instability = prev.get("avg_instability", avg_instability)
         drift = abs(avg_instability - prev_instability)
@@ -102,29 +105,28 @@ def compute_meso_clusters(state: "TopologyState") -> None:
             interaction_policy = prev_policy
 
         role_hash = sum(hash(r) for r in all_roles) if all_roles else 0
-        centroid = (
-            (role_hash / 1e10 % 1.0, sum(hash(r) * 7 for r in all_roles) / 1e10 % 1.0)
-            if all_roles else (0.0, 0.0)
-        )
+        centroid = (role_hash / 1e10 % 1.0, sum(hash(r) * 7 for r in all_roles) / 1e10 % 1.0) if all_roles else (0.0, 0.0)
         cluster_id = prev.get("cluster_id", f"meso_{uuid.uuid4().hex[:8]}")
 
-        clusters.append({
-            "cluster_id": cluster_id,
-            "size": len(cluster_regions),
-            "region_ids": [r.region_id for r in cluster_regions],
-            "tokens": tokens,
-            "shared_roles": shared_roles,
-            "all_roles": all_roles,
-            "avg_instability": round(avg_instability, 3),
-            "avg_convergence": round(avg_convergence, 3),
-            "avg_pressure": round(avg_pressure, 3),
-            "entropy": round(entropy, 3),
-            "drift": round(drift, 3),
-            "stability": round(stability, 3),
-            "boundary_strength": round(boundary_strength, 3),
-            "interaction_policy": interaction_policy,
-            "centroid": centroid,
-        })
+        clusters.append(
+            {
+                "cluster_id": cluster_id,
+                "size": len(cluster_regions),
+                "region_ids": [r.region_id for r in cluster_regions],
+                "tokens": tokens,
+                "shared_roles": shared_roles,
+                "all_roles": all_roles,
+                "avg_instability": round(avg_instability, 3),
+                "avg_convergence": round(avg_convergence, 3),
+                "avg_pressure": round(avg_pressure, 3),
+                "entropy": round(entropy, 3),
+                "drift": round(drift, 3),
+                "stability": round(stability, 3),
+                "boundary_strength": round(boundary_strength, 3),
+                "interaction_policy": interaction_policy,
+                "centroid": centroid,
+            }
+        )
 
     state._set_struct("meso_clusters", clusters)
     state._record("compute_meso_clusters", {"count": len(clusters)})
@@ -200,22 +202,28 @@ def compute_macro_continents(state: "TopologyState") -> None:
             diversity_pressure = 0.0
 
         centroids = [c.get("centroid", (0.0, 0.0)) for c in continent_clusters]
-        centroid = (sum(c[0] for c in centroids) / len(centroids), sum(c[1] for c in centroids) / len(centroids)) if centroids else (0.0, 0.0)
+        centroid = (
+            (sum(c[0] for c in centroids) / len(centroids), sum(c[1] for c in centroids) / len(centroids))
+            if centroids
+            else (0.0, 0.0)
+        )
         continent_id = prev.get("continent_id", f"macro_{uuid.uuid4().hex[:8]}")
 
-        continents.append({
-            "continent_id": continent_id,
-            "size": total_regions,
-            "meso_cluster_ids": list(all_meso_ids),
-            "all_roles": all_roles,
-            "pressure": round(pressure, 3),
-            "entropy": round(entropy, 3),
-            "stability": round(stability, 3),
-            "convergence": round(convergence, 3),
-            "guidance_strength": round(guidance_strength, 3),
-            "diversity_pressure": round(diversity_pressure, 3),
-            "centroid": centroid,
-        })
+        continents.append(
+            {
+                "continent_id": continent_id,
+                "size": total_regions,
+                "meso_cluster_ids": list(all_meso_ids),
+                "all_roles": all_roles,
+                "pressure": round(pressure, 3),
+                "entropy": round(entropy, 3),
+                "stability": round(stability, 3),
+                "convergence": round(convergence, 3),
+                "guidance_strength": round(guidance_strength, 3),
+                "diversity_pressure": round(diversity_pressure, 3),
+                "centroid": centroid,
+            }
+        )
 
     state._set_struct("macro_continents", continents)
     state._record("compute_macro_continents", {"count": len(continents)})
@@ -231,7 +239,13 @@ def compute_macro_from_meso(state: "TopologyState") -> dict:
     if not clusters:
         regs = state._get_regions()
         if not regs:
-            return {"avg_convergence": 0.5, "avg_instability": 0.5, "fragmentation": 0.0, "cluster_diversity": 0.0, "macro_pressure": 0.3}
+            return {
+                "avg_convergence": 0.5,
+                "avg_instability": 0.5,
+                "fragmentation": 0.0,
+                "cluster_diversity": 0.0,
+                "macro_pressure": 0.3,
+            }
         return {
             "avg_convergence": sum(r.local_convergence for r in regs) / len(regs),
             "avg_instability": sum(r.instability for r in regs) / len(regs),
@@ -242,14 +256,22 @@ def compute_macro_from_meso(state: "TopologyState") -> dict:
 
     total_size = sum(c["size"] for c in clusters)
     if total_size == 0:
-        return {"avg_convergence": 0.5, "avg_instability": 0.5, "fragmentation": 0.0, "cluster_diversity": 0.0, "macro_pressure": 0.3}
+        return {
+            "avg_convergence": 0.5,
+            "avg_instability": 0.5,
+            "fragmentation": 0.0,
+            "cluster_diversity": 0.0,
+            "macro_pressure": 0.3,
+        }
 
     weighted_convergence = sum(c["avg_convergence"] * c["size"] for c in clusters) / total_size
     weighted_instability = sum(c["avg_instability"] * c["size"] for c in clusters) / total_size
     weighted_pressure = sum(c["avg_pressure"] * c["size"] for c in clusters) / total_size
     fragmentation = len(clusters) / max(total_size, 1)
     mean_inst = weighted_instability
-    diversity = (sum((c["avg_instability"] - mean_inst) ** 2 for c in clusters) / len(clusters)) ** 0.5 if len(clusters) > 1 else 0.0
+    diversity = (
+        (sum((c["avg_instability"] - mean_inst) ** 2 for c in clusters) / len(clusters)) ** 0.5 if len(clusters) > 1 else 0.0
+    )
 
     return {
         "avg_convergence": round(weighted_convergence, 3),
@@ -413,7 +435,10 @@ def cross_scale_pressure_flow(state: "TopologyState") -> None:
         compute_meso_clusters(state)
 
     state._last_pressure_flow_time = now
-    state._record("cross_scale_pressure_flow", {
-        "meso_feedback": meso_affected,
-        "macro_guidance": macro_affected,
-    })
+    state._record(
+        "cross_scale_pressure_flow",
+        {
+            "meso_feedback": meso_affected,
+            "macro_guidance": macro_affected,
+        },
+    )

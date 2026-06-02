@@ -17,6 +17,7 @@ def mock_ai_clean_and_align(monkeypatch):
             "input_records": len(records),
             "output_records": len(records),
         }
+
     monkeypatch.setattr("app.services.job_runner.ai_clean_and_align_records", fake_ai_clean_and_align)
 
 
@@ -262,7 +263,7 @@ def test_prune_history_stores_keeps_active_and_recent_terminal(monkeypatch):
         main_mod.jobs_store,
         main_mod.recycle_bin_store,
         main_mod.CONFIG["max_job_history"],
-        main_mod.CONFIG["max_recycle_bin_history"]
+        main_mod.CONFIG["max_recycle_bin_history"],
     )
 
     assert set(main_mod.jobs_store.keys()) == {"active-running", "active-pending", "term-new"}
@@ -690,8 +691,11 @@ def test_cancel_check_before_all_done_avoids_race(monkeypatch):
     # catch this edge case and cancel — that's inherent async behavior.
     # Either outcome (COMPLETED or CANCELED) is acceptable; the key is that
     # the watcher itself doesn't spuriously cancel via the loop.
-    assert finished.status in {JobStatus.COMPLETED, JobStatus.EMPTY_RESULT, JobStatus.CANCELED}, \
-        f"Expected COMPLETED, EMPTY_RESULT, or CANCELED, got {finished.status}"
+    assert finished.status in {
+        JobStatus.COMPLETED,
+        JobStatus.EMPTY_RESULT,
+        JobStatus.CANCELED,
+    }, f"Expected COMPLETED, EMPTY_RESULT, or CANCELED, got {finished.status}"
 
 
 def test_delete_active_job_returns_409(client):

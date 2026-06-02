@@ -72,10 +72,11 @@ class TestAssessContentQuality:
     """Tests for _assess_content_quality — landing page vs data page detection."""
 
     def test_good_quality_with_many_cards(self):
-        html = "<html><body>" + "".join(
-            f'<div class="result-card">New York → London £{i}50 - Flight {i} results</div>'
-            for i in range(10)
-        ) + "</body></html>"
+        html = (
+            "<html><body>"
+            + "".join(f'<div class="result-card">New York → London £{i}50 - Flight {i} results</div>' for i in range(10))
+            + "</body></html>"
+        )
 
         class MockProfile:
             container_selector = "div.result-card"
@@ -120,10 +121,11 @@ class TestAssessContentQuality:
         assert "quality" in result
 
     def test_profile_container_used(self):
-        html = "<html><body>" + "".join(
-            f'<div class="flight-box">Flight to New York City - £{i}50 one-way ticket</div>'
-            for i in range(5)
-        ) + "</body></html>"
+        html = (
+            "<html><body>"
+            + "".join(f'<div class="flight-box">Flight to New York City - £{i}50 one-way ticket</div>' for i in range(5))
+            + "</body></html>"
+        )
 
         class MockProfile:
             container_selector = "div.flight-box"

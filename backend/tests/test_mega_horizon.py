@@ -87,10 +87,12 @@ def test_mega_horizon_simulation(ws):
             ws.set_manifold_vector(role, [random.random() for _ in range(16)])
             # Region formation
             token = SemanticToken(
-                raw=f"val_{i}", normalized=f"val_{i}",
-                span=Span(0, 5), position=0,
+                raw=f"val_{i}",
+                normalized=f"val_{i}",
+                span=Span(0, 5),
+                position=0,
                 primary_type=ttype,
-                type_distribution={ttype: 1.0}
+                type_distribution={ttype: 1.0},
             )
             ws.capture_pre_allocation_field([token], roles)
 
@@ -129,8 +131,12 @@ def test_attractor_runaway_vulnerability(ws):
         with ws.transaction("dominance"):
             ws.set_manifold_vector("dominant_role", [0.9] * 16)
             token = SemanticToken(
-                raw="heavy", normalized="heavy", span=Span(0, 5), position=0,
-                primary_type=SemanticType.PRICE, type_distribution={SemanticType.PRICE: 1.0}
+                raw="heavy",
+                normalized="heavy",
+                span=Span(0, 5),
+                position=0,
+                primary_type=SemanticType.PRICE,
+                type_distribution={SemanticType.PRICE: 1.0},
             )
             ws.capture_pre_allocation_field([token], ["dominant_role"])
 
@@ -179,10 +185,12 @@ def test_topology_scaling_benchmark(ws):
     with ws.transaction("scaling_load"):
         for i in range(500):
             token = SemanticToken(
-                raw=f"val_{i}", normalized=f"val_{i}",
-                span=Span(0, 5), position=0,
+                raw=f"val_{i}",
+                normalized=f"val_{i}",
+                span=Span(0, 5),
+                position=0,
                 primary_type=SemanticType.NUMBER,
-                type_distribution={SemanticType.NUMBER: 1.0}
+                type_distribution={SemanticType.NUMBER: 1.0},
             )
             # Creating complex coupling by using overlapping roles
             ws.capture_pre_allocation_field([token], [roles[i % 5], roles[(i + 1) % 5]])

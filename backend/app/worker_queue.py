@@ -470,9 +470,7 @@ class WorkerQueue:
                         else:
                             backoff = float(min(2 ** (attempts - 1) * 30, 3600))
 
-                        retry_at = (datetime.datetime.now() + datetime.timedelta(seconds=backoff)).strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        )
+                        retry_at = (datetime.datetime.now() + datetime.timedelta(seconds=backoff)).strftime("%Y-%m-%d %H:%M:%S")
                         conn.execute(
                             "UPDATE tasks SET status = ?, last_error = ?, scheduled_at = ? WHERE id = ?",
                             (TaskStatus.PENDING, error, retry_at, task_id),

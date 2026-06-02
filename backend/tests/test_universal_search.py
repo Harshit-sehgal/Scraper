@@ -1,4 +1,3 @@
-
 from app.semantic_world_state import get_world_state
 
 
@@ -37,17 +36,14 @@ def test_manifold_sharding():
     # 1. Seed roles that both match PRICE type
     from app.semantic_allocation_engine import seed_role_engine
     from app.semantic_ir import SemanticType, create_token
+
     seed_role_engine(["price", "cost"])
 
     # Domain A: Hotel
-    ws.capture_pre_allocation_field([
-        create_token("$100", 0, 4, 0, SemanticType.PRICE)
-    ], ["price", "cost"], domain="hotels")
+    ws.capture_pre_allocation_field([create_token("$100", 0, 4, 0, SemanticType.PRICE)], ["price", "cost"], domain="hotels")
 
     # Domain B: Product
-    ws.capture_pre_allocation_field([
-        create_token("$200", 0, 4, 0, SemanticType.PRICE)
-    ], ["price", "cost"], domain="products")
+    ws.capture_pre_allocation_field([create_token("$200", 0, 4, 0, SemanticType.PRICE)], ["price", "cost"], domain="products")
 
     # Ensure they are in basins
     assert len(ws.field_regions) == 2
@@ -91,13 +87,12 @@ def test_topological_law_bias():
     # 2. Allocate a record where name and price are physically close
     # Text: "ITEM_X is $100"
     from app.semantic_ir import SemanticType, create_token
-    tokens = [
-        create_token("ITEM_X", 0, 6, 0, SemanticType.TEXT),
-        create_token("$100", 10, 14, 10, SemanticType.PRICE)
-    ]
+
+    tokens = [create_token("ITEM_X", 0, 6, 0, SemanticType.TEXT), create_token("$100", 10, 14, 10, SemanticType.PRICE)]
 
     # Seed roles
     from app.semantic_allocation_engine import SemanticRecord, allocate_semantic_roles, seed_role_engine
+
     seed_role_engine(["name", "price"])
 
     record = SemanticRecord(tokens=tokens)

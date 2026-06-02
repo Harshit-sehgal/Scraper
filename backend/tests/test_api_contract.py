@@ -25,9 +25,7 @@ class TestSchemaFieldContract:
         assert field.description == ""  # Default
 
     def test_schema_field_optional_description(self):
-        field = SchemaField(
-            name="price", field_type=FieldType.CURRENCY, description="The price in USD", required=False
-        )
+        field = SchemaField(name="price", field_type=FieldType.CURRENCY, description="The price in USD", required=False)
         assert field.description == "The price in USD"
         assert field.required is False
 
@@ -142,8 +140,14 @@ class TestJobStatusContract:
 
     def test_all_statuses(self):
         expected_statuses = [
-            "pending", "discovering", "running", "completed",
-            "degraded", "empty_result", "canceled", "failed",
+            "pending",
+            "discovering",
+            "running",
+            "completed",
+            "degraded",
+            "empty_result",
+            "canceled",
+            "failed",
         ]
         for status in expected_statuses:
             assert JobStatus(status) is not None
@@ -155,9 +159,21 @@ class TestFieldTypeContract:
 
     def test_all_field_types(self):
         expected = [
-            "string", "integer", "float", "boolean", "email", "url",
-            "phone", "location", "date", "list_string", "currency",
-            "percentage", "code", "rating", "number",
+            "string",
+            "integer",
+            "float",
+            "boolean",
+            "email",
+            "url",
+            "phone",
+            "location",
+            "date",
+            "list_string",
+            "currency",
+            "percentage",
+            "code",
+            "rating",
+            "number",
         ]
         for ft in expected:
             assert FieldType(ft) is not None
@@ -189,13 +205,17 @@ class TestExportShapeContract:
         app = FastAPI()
         app.include_router(router)
         jobs_store["test"] = Job(
-            id="test", name="test", status=JobStatus.COMPLETED,
+            id="test",
+            name="test",
+            status=JobStatus.COMPLETED,
             results=[{"name": "Alice"}],
             urls=["https://example.com"],
         )
         from httpx import ASGITransport, AsyncClient
+
         transport = ASGITransport(app=app)
         import asyncio
+
         async def _test():
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.get("/api/jobs/test/export/csv")
@@ -203,6 +223,7 @@ class TestExportShapeContract:
                 assert resp.headers.get("content-type", "").startswith("text/csv")
                 assert "attachment" in resp.headers.get("content-disposition", "").lower()
                 assert ".csv" in resp.headers.get("content-disposition", "")
+
         asyncio.run(_test())
 
     def test_json_response_body_is_array(self):
@@ -212,13 +233,17 @@ class TestExportShapeContract:
         app = FastAPI()
         app.include_router(router)
         jobs_store["test"] = Job(
-            id="test", name="test", status=JobStatus.COMPLETED,
+            id="test",
+            name="test",
+            status=JobStatus.COMPLETED,
             results=[{"name": "Alice"}, {"name": "Bob"}],
             urls=["https://example.com"],
         )
         from httpx import ASGITransport, AsyncClient
+
         transport = ASGITransport(app=app)
         import asyncio
+
         async def _test():
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.get("/api/jobs/test/export/json")
@@ -228,6 +253,7 @@ class TestExportShapeContract:
                 assert len(data) == 2
                 assert data[0]["name"] == "Alice"
                 assert data[1]["name"] == "Bob"
+
         asyncio.run(_test())
 
     def test_json_strips_system_fields(self):
@@ -237,13 +263,17 @@ class TestExportShapeContract:
         app = FastAPI()
         app.include_router(router)
         jobs_store["test"] = Job(
-            id="test", name="test", status=JobStatus.COMPLETED,
+            id="test",
+            name="test",
+            status=JobStatus.COMPLETED,
             results=[{"name": "Alice", "_provenance": "extractor_v1", "score": 95}],
             urls=["https://example.com"],
         )
         from httpx import ASGITransport, AsyncClient
+
         transport = ASGITransport(app=app)
         import asyncio
+
         async def _test():
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.get("/api/jobs/test/export/json")
@@ -251,6 +281,7 @@ class TestExportShapeContract:
                 assert "_provenance" not in data[0]
                 assert data[0]["name"] == "Alice"
                 assert data[0]["score"] == 95
+
         asyncio.run(_test())
 
     def test_excel_content_type_header(self):
@@ -260,19 +291,24 @@ class TestExportShapeContract:
         app = FastAPI()
         app.include_router(router)
         jobs_store["test"] = Job(
-            id="test", name="test", status=JobStatus.COMPLETED,
+            id="test",
+            name="test",
+            status=JobStatus.COMPLETED,
             results=[{"name": "Alice"}],
             urls=["https://example.com"],
         )
         from httpx import ASGITransport, AsyncClient
+
         transport = ASGITransport(app=app)
         import asyncio
+
         async def _test():
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.get("/api/jobs/test/export/excel")
                 assert resp.status_code == 200
                 assert "spreadsheetml" in resp.headers.get("content-type", "")
                 assert resp.content[:2] == b"PK"
+
         asyncio.run(_test())
 
     def test_missing_job_returns_404(self):
@@ -282,8 +318,10 @@ class TestExportShapeContract:
         app = FastAPI()
         app.include_router(router)
         from httpx import ASGITransport, AsyncClient
+
         transport = ASGITransport(app=app)
         import asyncio
+
         async def _test():
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.get("/api/jobs/nonexistent/export/csv")
@@ -292,4 +330,5 @@ class TestExportShapeContract:
                 assert resp2.status_code == 404
                 resp3 = await c.get("/api/jobs/nonexistent/export/excel")
                 assert resp3.status_code == 404
+
         asyncio.run(_test())

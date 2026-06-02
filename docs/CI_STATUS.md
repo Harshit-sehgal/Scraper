@@ -1,9 +1,9 @@
 # GitHub Actions CI/CD Status Report
 
-**Repository:** [Harshit-sehgal/Scraper](https://github.com/Harshit-sehgal/Scraper)  
-**Last Updated:** 2026-06-02  
-**Commit Inspected:** `08e7bf688d6d6262193d19f7a7713edc07ebfaec` (HEAD of `main`)  
-**Target Truth Commit:** `3d1c2600ded60b2f347334e99c7dfd031bef1205`  
+**Repository:** [Harshit-sehgal/Scraper](https://github.com/Harshit-sehgal/Scraper)
+**Last Updated:** 2026-06-02
+**Commit Inspected:** `08e7bf688d6d6262193d19f7a7713edc07ebfaec` (HEAD of `main`)
+**Target Truth Commit:** `3d1c2600ded60b2f347334e99c7dfd031bef1205`
 
 ---
 
@@ -46,7 +46,7 @@
         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
     ```
     Referring to `env.SLACK_WEBHOOK` at the job-level `if` statement was illegal because it was defined inside the `notify-on-failure` job.
-*   **Applied Fix**: 
+*   **Applied Fix**:
     1. Added global workflow environment block:
        ```yaml
        env:

@@ -7,6 +7,7 @@ This file is not collected by pytest under the current pytest.ini. Results are
 network-dependent and should be treated as live smoke observations, not proof of
 universal extraction behavior.
 """
+
 import asyncio
 import json
 import logging
@@ -368,6 +369,7 @@ class SiteResult:
     anti_bot_score: float = 0.0
     warnings: list[str] = field(default_factory=list)
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Test Runner
 # ─────────────────────────────────────────────────────────────────────────────
@@ -419,6 +421,7 @@ async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:
 
         # Fetch telemetry
         from app.scrape_telemetry import get_scrape_telemetry
+
         telemetry = get_scrape_telemetry()
         recent = telemetry.get_recent(10)
         t_data = next((t for t in recent if t.get("url") == site.url), {})
@@ -509,6 +512,7 @@ async def run_all_tests():
 # Report Generator
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def print_report(results: list[SiteResult]):
     """Print a detailed markdown report of all test results."""
     total = len(results)
@@ -544,7 +548,8 @@ def print_report(results: list[SiteResult]):
             fields_str += f" +{len(r.fields_found) - 4}"
 
         print(
-            f"| {i} | {r.name} | {r.category} | {r.records} | {r.extraction_method[:12]} | {r.quality:.2f} | {fields_str[:40]} | {r.fetch_time_ms / 1000:.1f} | {notes[:45]} |")  # noqa: E501
+            f"| {i} | {r.name} | {r.category} | {r.records} | {r.extraction_method[:12]} | {r.quality:.2f} | {fields_str[:40]} | {r.fetch_time_ms / 1000:.1f} | {notes[:45]} |"
+        )  # noqa: E501
 
     # Detailed per-site results
     print("\n\n## Per-Site Details\n")
@@ -556,7 +561,7 @@ def print_report(results: list[SiteResult]):
         print(f"- **Records:** {r.records}")
         print(f"- **Extraction method:** `{r.extraction_method}`")
         print(f"- **Avg quality:** {r.quality}")
-        fields_display = ', '.join(r.fields_found) if r.fields_found else '*none*'
+        fields_display = ", ".join(r.fields_found) if r.fields_found else "*none*"
         print(f"- **Fields found:** {fields_display}")
         print(f"- **Fetch time:** {r.fetch_time_ms / 1000:.1f}s")
         print(f"- **DOM nodes:** {r.dom_nodes}")
@@ -582,10 +587,7 @@ def print_report(results: list[SiteResult]):
     print("|----------|--------|")
 
     # 1. No false success for 0 records
-    zero_but_success = [
-        r for r in results
-        if r.records == 0 and r.extraction_method not in ("", "unknown") and not r.error
-    ]
+    zero_but_success = [r for r in results if r.records == 0 and r.extraction_method not in ("", "unknown") and not r.error]
     zero_ok = len(zero_but_success) == 0
     ok_mark = chr(0x2705) if zero_ok else chr(0x26A0)
     print(f"| No false success for 0 records | {ok_mark} |")
@@ -600,11 +602,11 @@ def print_report(results: list[SiteResult]):
 
     # 4. Zero-result properly classified when applicable
     zero_with_class = [r for r in results if r.records == 0 and r.warnings]
-    zrc_mark = chr(0x2705) if zero_with_class else chr(0x25CB) + ' (no zero results to classify)'
+    zrc_mark = chr(0x2705) if zero_with_class else chr(0x25CB) + " (no zero results to classify)"
     print(f"| Zero-result classification present | {zrc_mark} |")
 
     # Overall verdict
-    verdict = chr(0x2705) + ' PASS' if with_records >= 5 else chr(0x274C) + ' FAIL'
+    verdict = chr(0x2705) + " PASS" if with_records >= 5 else chr(0x274C) + " FAIL"
     print(f"\n**Verdict:** {verdict} - {with_records}/{total} sites produced data, {total_records} total records.")
 
 
@@ -633,7 +635,7 @@ def save_report(results: list[SiteResult], path: str = "smoke_test_report.json")
                 "sample": r.sample,
             }
             for r in results
-        ]
+        ],
     }
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
@@ -643,6 +645,7 @@ def save_report(results: list[SiteResult], path: str = "smoke_test_report.json")
 def compare_with_previous(results: list[SiteResult], history_dir: str = "smoke_test_history"):
     """Compare current results with the most recent previous run, print trends."""
     import glob as _glob
+
     os.makedirs(history_dir, exist_ok=True)
 
     history_files = sorted(_glob.glob(f"{history_dir}/smoke_*.json"), reverse=True)
@@ -706,6 +709,7 @@ def save_to_history(results: list[SiteResult], history_dir: str = "smoke_test_hi
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def main():
     print("Running 15-site smoke test (this will take several minutes)...")
     results = await run_all_tests()
@@ -730,6 +734,7 @@ def test_benchmark_smoke_configuration_is_importable():
 async def test_live_benchmark_extraction():
     """Run live benchmark extraction across all defined sites if enabled by env var."""
     import os
+
     if os.environ.get("DATAFORGE_RUN_LIVE_BENCHMARKS") != "true":
         pytest.skip("need DATAFORGE_RUN_LIVE_BENCHMARKS=true to run live benchmarks")
 

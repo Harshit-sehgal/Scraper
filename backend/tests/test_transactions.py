@@ -75,6 +75,7 @@ def test_topology_transaction_rollback():
     ws.clear()
 
     from app.core_types import FieldConflictRegion
+
     region = FieldConflictRegion(competing_roles=["role_a"], token="test", instability=0.5)
     ws._topology.append_region(region)
     rid = region.region_id
@@ -117,12 +118,14 @@ def test_failure_injection_rollback():
     initial_energy = ws.metrics.global_energy
 
     from app.failure_injector import set_injection_probability
+
     set_injection_probability(1.0)  # Guarantee failure
 
     try:
         with ws.transaction("guaranteed_fail"):
             ws._energy.set_energy(2.0)
             from app.failure_injector import get_injector
+
             get_injector().inject("test_point")
     except RuntimeError:
         pass

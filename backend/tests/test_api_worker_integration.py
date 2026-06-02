@@ -49,6 +49,7 @@ def reset_state():
     """Reset repository and in-memory stores between tests."""
     reset_repository()
     from app.main import jobs_store, recycle_bin_store
+
     jobs_store.clear()
     recycle_bin_store.clear()
     yield
@@ -60,15 +61,15 @@ def reset_state():
 @pytest.fixture()
 def client(monkeypatch):
     """Create a test client with mocked run_job and background scheduling."""
+
     # Mock run_job to keep jobs in pending state
     async def fake_run_job(job_id: str):
         await asyncio.sleep(0.01)
 
     from app import main as main_mod
+
     monkeypatch.setattr(main_mod, "run_job", fake_run_job)
-    monkeypatch.setattr(
-        main_mod, "_schedule_background_task", lambda coro: None
-    )
+    monkeypatch.setattr(main_mod, "_schedule_background_task", lambda coro: None)
     yield LocalASGIClient(main_mod.app)
 
 
@@ -76,6 +77,7 @@ def client(monkeypatch):
 def tmp_queue_db(tmp_path):
     """Provide a temporary worker queue database path and reset singleton."""
     from app.worker_queue import reset_worker_queue
+
     reset_worker_queue()
     db_path = tmp_path / "worker_queue.db"
     yield db_path
@@ -91,9 +93,7 @@ def tmp_queue_db(tmp_path):
 class TestApiEnqueuesJob:
     """Verify that the API enqueues a job to the worker queue when enabled."""
 
-    def test_job_is_enqueued_when_worker_queue_enabled(
-        self, client, tmp_queue_db, monkeypatch
-    ):
+    def test_job_is_enqueued_when_worker_queue_enabled(self, client, tmp_queue_db, monkeypatch):
         """When DATAFORGE_WORKER_QUEUE=true, creating a job should enqueue it."""
         monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
 
@@ -123,9 +123,7 @@ class TestApiEnqueuesJob:
         task_ids = [t["id"] for t in next_tasks]
         assert job_id in task_ids, f"Job {job_id} not found in queued tasks: {task_ids}"
 
-    def test_job_is_not_enqueued_when_worker_queue_disabled(
-        self, client, tmp_queue_db, monkeypatch
-    ):
+    def test_job_is_not_enqueued_when_worker_queue_disabled(self, client, tmp_queue_db, monkeypatch):
         """When DATAFORGE_WORKER_QUEUE is not set, job should not be enqueued."""
         monkeypatch.delenv("DATAFORGE_WORKER_QUEUE", raising=False)
 
@@ -144,9 +142,7 @@ class TestApiEnqueuesJob:
         assert response.status_code == 200
 
         status = queue.get_status()
-        assert status["pending"] == 0, (
-            f"Expected 0 pending tasks with worker queue disabled, got {status['pending']}"
-        )
+        assert status["pending"] == 0, f"Expected 0 pending tasks with worker queue disabled, got {status['pending']}"
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -158,9 +154,7 @@ class TestApiEnqueuesJob:
 class TestWorkerPicksQueuedJob:
     """Verify that the worker dequeue and job execution flow works correctly."""
 
-    def test_worker_picks_queued_job_and_updates_repo(
-        self, client, tmp_queue_db, monkeypatch
-    ):
+    def test_worker_picks_queued_job_and_updates_repo(self, client, tmp_queue_db, monkeypatch):
         """Worker should dequeue a job, process it, and update the repository."""
         from app.worker_queue import get_worker_queue, reset_worker_queue
 
@@ -192,12 +186,8 @@ class TestWorkerPicksQueuedJob:
                 per_url_scrape_timeout_seconds=settings.PER_URL_TIMEOUT_SECONDS,
                 ai_structuring_timeout_seconds=settings.AI_STRUCTURING_TIMEOUT_SECONDS,
                 insight_timeout_seconds=settings.INSIGHT_TIMEOUT_SECONDS,
-                persist_state_single_fn=lambda: repo.save_single(
-                    jobs_store[job_id]
-                ),
-                persist_state_single_critical_fn=lambda: repo.save_single(
-                    jobs_store[job_id]
-                ),
+                persist_state_single_fn=lambda: repo.save_single(jobs_store[job_id]),
+                persist_state_single_critical_fn=lambda: repo.save_single(jobs_store[job_id]),
             )
             return {
                 "job_id": job_id,
@@ -226,6 +216,7 @@ class TestWorkerPicksQueuedJob:
 
         # Mark task as running (dequeue already does this), then execute
         from app.worker_queue import TaskStatus
+
         assert task.status == TaskStatus.RUNNING
 
         # Execute - simulate worker
@@ -257,9 +248,7 @@ class TestWorkerPicksQueuedJob:
 class TestRealWorkerHandler:
     """Tests using the actual scripts.run_worker.scrape_job_handler."""
 
-    def test_real_worker_handler_executes_via_api(
-        self, tmp_path, monkeypatch
-    ):
+    def test_real_worker_handler_executes_via_api(self, tmp_path, monkeypatch):
         """
         End-to-end test using the real scrape_job_handler from scripts/run_worker.
 
@@ -273,6 +262,7 @@ class TestRealWorkerHandler:
         """
         # ── Ensure project root is on path for scripts.run_worker import ─
         import sys
+
         project_root = str(Path(__file__).resolve().parents[2])
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
@@ -281,9 +271,14 @@ class TestRealWorkerHandler:
 
         # ── Mock scraped records ─────────────────────────────────────────
         async def mock_scrape_url_with_recovery(
-            url, schema_fields, min_record_score=0.35,
-            user_intent="", world_state=None, max_recovery_attempts=3,
-            selectors_map=None, search_params=None,
+            url,
+            schema_fields,
+            min_record_score=0.35,
+            user_intent="",
+            world_state=None,
+            max_recovery_attempts=3,
+            selectors_map=None,
+            search_params=None,
         ):
             sample_records = [
                 {
@@ -324,15 +319,18 @@ class TestRealWorkerHandler:
         reset_job_store_for_tests()
 
         from app.main import jobs_store, recycle_bin_store
+
         jobs_store.clear()
         recycle_bin_store.clear()
 
         from app.worker_queue import get_worker_queue, reset_worker_queue
+
         reset_worker_queue()
         queue = get_worker_queue(db_path=tmp_path / "test_real_handler_queue.db")
         queue.register_handler("scrape_job", scrape_job_handler)
 
         from app.main import app as main_app
+
         client = LocalASGIClient(main_app)
 
         # ── Step 1: Create job via API ──────────────────────────────────
@@ -361,17 +359,17 @@ class TestRealWorkerHandler:
         result = asyncio.run(scrape_job_handler(task))
         assert result is not None
         assert result["job_id"] == job_id
-        assert result["status"] in ("completed", "degraded"), (
-            f"Expected terminal status, got {result['status']}"
-        )
+        assert result["status"] in ("completed", "degraded"), f"Expected terminal status, got {result['status']}"
 
         # ── Step 5: Verify repository has updated job ───────────────────
         from app.storage_interface import get_job_repository
+
         repo = get_job_repository()
         loaded_jobs, loaded_recycle, _ = repo.load_all()
         assert job_id in loaded_jobs, f"Job {job_id} should be in repository"
         assert loaded_jobs[job_id].status in (
-            JobStatus.COMPLETED, JobStatus.DEGRADED
+            JobStatus.COMPLETED,
+            JobStatus.DEGRADED,
         ), f"Expected terminal status, got {loaded_jobs[job_id].status}"
 
         # Cleanup
@@ -383,6 +381,7 @@ class TestRealWorkerHandler:
     def test_real_worker_handler_missing_job_id_raises_error(self):
         """When task has no job_id, the real handler should raise ValueError."""
         import sys
+
         project_root = str(Path(__file__).resolve().parents[2])
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
@@ -415,6 +414,7 @@ class TestWorkerPreservesRecycleBin:
         state_file = db_file.with_suffix(".json")
         monkeypatch.setenv("DATAFORGE_STATE_FILE", str(state_file))
         from app.config import settings
+
         monkeypatch.setattr(settings, "STATE_FILE_PATH", str(state_file))
         reset_job_store_for_tests()
 
@@ -496,8 +496,6 @@ class TestWorkerPreservesRecycleBin:
         # Verify all recycle bin entries survive
         _, final_recycle, _ = repo.load_all()
         for i in range(3):
-            assert f"recycled-{i}" in final_recycle, (
-                f"recycled-{i} missing after {cycle} save cycles"
-            )
+            assert f"recycled-{i}" in final_recycle, f"recycled-{i} missing after {cycle} save cycles"
 
         reset_job_store_for_tests()

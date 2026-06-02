@@ -114,8 +114,7 @@ class BenchmarkReporter:
         if precision_drift < -0.05 or recall_drift < -0.05:
             status = "regression"
             message = (
-                f"ALERT: Regression detected! Precision drift: {precision_drift:+.2%}, "
-                f"Recall drift: {recall_drift:+.2%}"
+                f"ALERT: Regression detected! Precision drift: {precision_drift:+.2%}, " f"Recall drift: {recall_drift:+.2%}"
             )
             logger.warning("[Reporter] %s", message)
 

@@ -149,7 +149,7 @@ def test_rejoin_transaction_delta_replays(clean_world_state):
             "action": "record_failure",
             "timestamp": 12.0,
             "payload": {"domain": "bad-site.org", "fail_type": "anti_bot_block"},
-        }
+        },
     ]
 
     report = federation.replay_deltas(deltas)

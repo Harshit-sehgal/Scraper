@@ -85,13 +85,7 @@ def test_selector_application_precision():
     ]
 
     # Simulate an LLM-generated selector map
-    selectors = {
-        "item_container": "div.flight-card",
-        "fields": {
-            "airline": "span.name",
-            "price": "span.amount"
-        }
-    }
+    selectors = {"item_container": "div.flight-card", "fields": {"airline": "span.name", "price": "span.amount"}}
 
     results = cast("list[dict[str, Any]]", apply_selectors(html, selectors, fields))
 

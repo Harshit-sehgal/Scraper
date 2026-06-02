@@ -9,9 +9,9 @@ async def test():
         {"book_title": "Tipping the Velvet", "price": "£53.74", "rating": "One"},
         {"book_title": "Soumission", "price": "£50.10", "rating": "One"},
     ]
-    print('Testing Insight Generation...')
+    print("Testing Insight Generation...")
     insight = await generate_data_insight(records)
-    print(f'\n=== Insight ===\n{insight}')
+    print(f"\n=== Insight ===\n{insight}")
 
 
 if __name__ == "__main__":

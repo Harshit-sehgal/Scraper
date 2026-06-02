@@ -58,7 +58,7 @@ def test_all_subsystems_symmetry():
         "intent": ws._intent,
         "action": ws._action,
         "abstraction": ws._abstraction,
-        "observability": ws._observability
+        "observability": ws._observability,
     }
 
     all_ok = True

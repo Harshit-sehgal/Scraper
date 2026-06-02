@@ -144,10 +144,12 @@ def create_exports_router(jobs_store: dict):
             return StreamingResponse(
                 _stream_csv_from_disk(),
                 media_type="text/csv",
-                headers={"Content-Disposition": f'attachment; filename="{
+                headers={
+                    "Content-Disposition": f'attachment; filename="{
                         safe_export_filename(
                             job.name,
-                            "csv")}"'},
+                            "csv")}"'
+                },
             )
 
         # In-memory results (small dataset)
@@ -168,10 +170,12 @@ def create_exports_router(jobs_store: dict):
         return Response(
             content=output.getvalue(),
             media_type="text/csv",
-            headers={"Content-Disposition": f'attachment; filename="{
+            headers={
+                "Content-Disposition": f'attachment; filename="{
                     safe_export_filename(
                         job.name,
-                        "csv")}"'},
+                        "csv")}"'
+            },
         )
 
     @router.get("/api/jobs/{job_id}/export/json")
@@ -226,10 +230,12 @@ def create_exports_router(jobs_store: dict):
             return StreamingResponse(
                 _stream_json_from_disk(),
                 media_type="application/json",
-                headers={"Content-Disposition": f'attachment; filename="{
+                headers={
+                    "Content-Disposition": f'attachment; filename="{
                         safe_export_filename(
                             job.name,
-                            "json")}"'},
+                            "json")}"'
+                },
             )
 
         # In-memory results
@@ -241,10 +247,12 @@ def create_exports_router(jobs_store: dict):
         return Response(
             content=json_content,
             media_type="application/json",
-            headers={"Content-Disposition": f'attachment; filename="{
+            headers={
+                "Content-Disposition": f'attachment; filename="{
                     safe_export_filename(
                         job.name,
-                        "json")}"'},
+                        "json")}"'
+            },
         )
 
     @router.get("/api/jobs/{job_id}/export/excel")
@@ -302,10 +310,12 @@ def create_exports_router(jobs_store: dict):
         return Response(
             content=output.getvalue(),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f'attachment; filename="{
+            headers={
+                "Content-Disposition": f'attachment; filename="{
                     safe_export_filename(
                         job.name,
-                        "xlsx")}"'},
+                        "xlsx")}"'
+            },
         )
 
     return router

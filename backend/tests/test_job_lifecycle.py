@@ -20,6 +20,7 @@ from app.models import JobStatus
 # Helpers
 # ──────────────────────────────────────────────────────────────────────
 
+
 def _create_job_in_store(client, name: str = "lifecycle-test") -> str:
     """POST a fresh manual-mode job and return its ID."""
     payload = {
@@ -36,6 +37,7 @@ def _create_job_in_store(client, name: str = "lifecycle-test") -> str:
 # ──────────────────────────────────────────────────────────────────────
 # Double-cancel guard
 # ──────────────────────────────────────────────────────────────────────
+
 
 def test_double_cancel_terminal_job_returns_early(client, monkeypatch):
     """Canceling a job that is already in a terminal status returns 'already in terminal'."""
@@ -98,6 +100,7 @@ def test_cancel_pending_job_auto_cancels(client, monkeypatch):
 # Delete (move to recycle bin) lifecycle
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_delete_terminal_job_moves_to_recycle_bin(client, monkeypatch):
     """Deleting a terminal-status job moves it to the recycle bin."""
     from app import main as main_mod
@@ -130,6 +133,7 @@ def test_cancel_nonexistent_job_returns_404(client):
 # ──────────────────────────────────────────────────────────────────────
 # Restore from recycle bin
 # ──────────────────────────────────────────────────────────────────────
+
 
 def test_restore_job_from_recycle_bin(client, monkeypatch):
     """Restoring a job from recycle bin puts it back in active jobs."""
@@ -201,6 +205,7 @@ def test_restore_and_re_delete_round_trip(client, monkeypatch):
 # Hard delete from recycle bin
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_hard_delete_removes_permanently(client, monkeypatch):
     """Hard deleting from recycle bin removes the job permanently."""
     from app import main as main_mod
@@ -262,6 +267,7 @@ def test_hard_delete_cleans_disk_results(client, monkeypatch, tmp_path):
 # Enqueue failure rollback
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_enqueue_failure_rollback_in_production(client, monkeypatch):
     """When enqueue fails in production mode, the job is cleaned up from store and repository.
 
@@ -271,6 +277,7 @@ def test_enqueue_failure_rollback_in_production(client, monkeypatch):
     NOTE: This test uses DATAFORGE_WORKER_QUEUE which requires Postgres. Mark it accordingly.
     """
     import pytest
+
     pytest.skip("Requires DATAFORGE_WORKER_QUEUE and Postgres infrastructure")
 
     from app.config import settings
@@ -317,11 +324,7 @@ def test_enqueue_failure_rollback_in_production(client, monkeypatch):
         "urls": ["https://example.com"],
         "schema_fields": [{"name": "company_name", "field_type": "string"}],
     }
-    resp = client.post(
-        "/api/jobs",
-        json=payload,
-        headers={"X-API-Key": "test-key"}
-    )
+    resp = client.post("/api/jobs", json=payload, headers={"X-API-Key": "test-key"})
     assert resp.status_code == 503, f"Expected 503, got {resp.status_code}: {resp.text}"
     assert "Failed to enqueue" in resp.json()["detail"]
 

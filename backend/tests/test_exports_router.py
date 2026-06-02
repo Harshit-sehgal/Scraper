@@ -47,6 +47,7 @@ def app() -> FastAPI:
 @pytest_asyncio.fixture
 async def client(app: FastAPI):
     from httpx import ASGITransport, AsyncClient
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as c:
         yield c
@@ -348,12 +349,15 @@ class TestExportResultsOnDisk:
             {"city": "London", "temp": "15"},
             {"city": "Paris", "temp": "18"},
         ]
-        with patch(
-            "app.utils.job_results_store.load_paginated_job_results_from_disk",
-            return_value=(mock_on_disk_data, 2),
-        ), patch(
-            "app.utils.job_results_store.load_job_results_from_disk_safe",
-            return_value=(mock_on_disk_data, None),
+        with (
+            patch(
+                "app.utils.job_results_store.load_paginated_job_results_from_disk",
+                return_value=(mock_on_disk_data, 2),
+            ),
+            patch(
+                "app.utils.job_results_store.load_job_results_from_disk_safe",
+                return_value=(mock_on_disk_data, None),
+            ),
         ):
             jobs_store: dict[str, Job] = {}
             router = create_exports_router(jobs_store)
@@ -461,7 +465,7 @@ class TestStreamingExportWithLargeDataset:
 
         def _paginated_loader(job_id, limit=500, offset=0, file_path=None):
             total = len(large_data)
-            page = large_data[offset:offset + limit]
+            page = large_data[offset : offset + limit]
             return page, total
 
         jobs_store: dict[str, Job] = {}
@@ -499,7 +503,7 @@ class TestStreamingExportWithLargeDataset:
 
         def _paginated_loader(job_id, limit=500, offset=0, file_path=None):
             total = len(large_data)
-            page = large_data[offset:offset + limit]
+            page = large_data[offset : offset + limit]
             return page, total
 
         jobs_store: dict[str, Job] = {}

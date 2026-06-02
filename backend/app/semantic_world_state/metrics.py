@@ -77,9 +77,7 @@ class MetricsMixin:
         # High fragmentation, energy, or topology-native entropy increases pressure.
         # High certainty decreases pressure
         entropy_pressure = self.metrics.global_entropy * 0.15
-        pressure = (health["system_energy"] / 10.0 + health["fragmentation"] + entropy_pressure) - health[
-            "certainty"
-        ] * 0.5
+        pressure = (health["system_energy"] / 10.0 + health["fragmentation"] + entropy_pressure) - health["certainty"] * 0.5
         return max(0.1, min(2.0, pressure))
 
     def evaluate_topological_consistency(self) -> dict:

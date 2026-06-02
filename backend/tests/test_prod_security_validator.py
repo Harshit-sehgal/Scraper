@@ -143,9 +143,7 @@ def test_validator_fails_on_generated_placeholder_db_password_in_production(monk
         operator_api_key="strong_key_operator_12345",
         admin_api_key="strong_key_admin_12345",
         storage_backend="postgres",
-        database_url=(
-            "postgresql://postgres:CHANGE_ME_GENERATE_STRONG_DB_PASSWORD@localhost:5432/db"
-        ),
+        database_url=("postgresql://postgres:CHANGE_ME_GENERATE_STRONG_DB_PASSWORD@localhost:5432/db"),
     )
     with pytest.raises(ValueError, match="password is set to a weak/placeholder value"):
         validate_production_credentials(settings)

@@ -70,7 +70,7 @@ def test_pressure_preemption():
 
     # Force the scheduler to pre-empt at this pressure level for the test
     # (The default is 1.8, but we'll use the current pressure + a bit less)
-    original_threshold = sos.ws._scheduler._preemption_threshold if hasattr(sos.ws._scheduler, '_preemption_threshold') else 1.8
+    original_threshold = sos.ws._scheduler._preemption_threshold if hasattr(sos.ws._scheduler, "_preemption_threshold") else 1.8
     sos.ws._scheduler._preemption_threshold = pressure - 0.1
 
     try:

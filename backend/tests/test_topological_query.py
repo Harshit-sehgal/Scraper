@@ -28,6 +28,7 @@ def seeded_ws():
     ws.clear()
 
     from app.core_types import FieldConflictRegion
+
     r1 = FieldConflictRegion(competing_roles=["origin", "destination"], token="LAX", instability=0.3, local_energy=5.0)
     r2 = FieldConflictRegion(competing_roles=["origin", "destination"], token="JFK", instability=0.5, local_energy=3.0)
     r3 = FieldConflictRegion(competing_roles=["origin", "destination"], token="ORD", instability=0.7, local_energy=1.0)
@@ -75,6 +76,7 @@ class TestFindRolesNear:
 
     def test_find_roles_near_type_returns_list(self, seeded_ws):
         from app.semantic_ir import SemanticType
+
         tq = TopologicalQuery(ws=seeded_ws)
         result = tq.find_roles_near_type(SemanticType.LOCATION, radius=5.0)
         assert isinstance(result, list)

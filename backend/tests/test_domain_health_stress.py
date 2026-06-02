@@ -201,11 +201,7 @@ class TestDomainHealthStress:
         # Record different failure types
         for idx, category in enumerate(categories):
             for i in range(10):
-                monitor.record_attempt(
-                    f"{domain}page{idx * 10 + i}",
-                    success=False,
-                    failure_category=category
-                )
+                monitor.record_attempt(f"{domain}page{idx * 10 + i}", success=False, failure_category=category)
 
         health = monitor.get_domain_health(f"{domain}any")
         assert health is not None

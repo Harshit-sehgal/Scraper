@@ -72,15 +72,17 @@ async def lifespan(app: FastAPI):
     gossip, heartbeat_mgr = init_gossip_and_heartbeat()
 
     # Runtime safety rails — driven by centralized config
-    CONFIG.update({
-        "max_discovery_urls": settings.MAX_DISCOVERY_URLS,
-        "per_url_timeout_seconds": settings.PER_URL_TIMEOUT_SECONDS,
-        "max_job_runtime_seconds": settings.MAX_JOB_RUNTIME_SECONDS,
-        "ai_structuring_timeout_seconds": settings.AI_STRUCTURING_TIMEOUT_SECONDS,
-        "insight_timeout_seconds": settings.INSIGHT_TIMEOUT_SECONDS,
-        "max_job_history": settings.MAX_JOB_HISTORY,
-        "max_recycle_bin_history": settings.MAX_RECYCLE_BIN_HISTORY,
-    })
+    CONFIG.update(
+        {
+            "max_discovery_urls": settings.MAX_DISCOVERY_URLS,
+            "per_url_timeout_seconds": settings.PER_URL_TIMEOUT_SECONDS,
+            "max_job_runtime_seconds": settings.MAX_JOB_RUNTIME_SECONDS,
+            "ai_structuring_timeout_seconds": settings.AI_STRUCTURING_TIMEOUT_SECONDS,
+            "insight_timeout_seconds": settings.INSIGHT_TIMEOUT_SECONDS,
+            "max_job_history": settings.MAX_JOB_HISTORY,
+            "max_recycle_bin_history": settings.MAX_RECYCLE_BIN_HISTORY,
+        }
+    )
 
     # Resolve the repository lazily
     global job_repo
@@ -95,6 +97,7 @@ async def lifespan(app: FastAPI):
 
     # Restore semantic world state
     from app.experimental_startup import restore_semantic_world_state
+
     restore_semantic_world_state(world_state_data, str(get_state_file_path()))
 
     # Schedule periodic gossip propagation
@@ -116,6 +119,7 @@ async def lifespan(app: FastAPI):
 
     # Persist semantic world state
     from app.experimental_startup import persist_semantic_world_state
+
     persist_semantic_world_state()
 
     # Flush any pending background state writes
@@ -128,6 +132,7 @@ async def lifespan(app: FastAPI):
 
     # Close Postgres connection pool
     from app.experimental_startup import close_postgres_pool
+
     close_postgres_pool()
 
 

@@ -163,9 +163,7 @@ class JobCreate(BaseModel):
     topic: str = Field("", description="Topic for auto-discovery")
     location: str = Field("", description="Location focus for auto-discovery")
     preferred_domain: str = Field("", description="Preferred domain for auto-discovery")
-    source_policy: SourcePolicy = Field(
-        SourcePolicy.ALL_SOURCES, description="Controls which source types are included"
-    )
+    source_policy: SourcePolicy = Field(SourcePolicy.ALL_SOURCES, description="Controls which source types are included")
     max_per_domain: int = Field(4, ge=1, le=25, description="Maximum discovered URLs per domain")
     origin_location: str = Field("", description="Center location for distance optimization")
     max_distance_km: Optional[float] = Field(None, ge=0, description="Keep records within this radius in km")
@@ -179,12 +177,8 @@ class JobCreate(BaseModel):
     deduplicate_field: str = Field("", description="Field to use for deduplication")
     # Selectors map from URL analysis (item_container + field selectors)
     selectors_map: dict = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
-    search_params: dict[str, str] | None = Field(
-        default=None, description="Search parameters for session-bound URL recovery"
-    )
-    min_record_score: float = Field(
-        0.35, ge=0.0, le=1.0, description="Minimum quality score required per extracted record"
-    )
+    search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
+    min_record_score: float = Field(0.35, ge=0.0, le=1.0, description="Minimum quality score required per extracted record")
 
     @model_validator(mode="after")
     def validate_mode_requirements(self):
@@ -279,9 +273,7 @@ class Job(BaseModel):
     min_record_score: float = 0.35
     # Selectors map from URL analysis (pre-discovered CSS selectors)
     selectors_map: dict = Field(default_factory=dict, description="Pre-discovered CSS selectors map from URL analysis")
-    search_params: dict[str, str] | None = Field(
-        default=None, description="Search parameters for session-bound URL recovery"
-    )
+    search_params: dict[str, str] | None = Field(default=None, description="Search parameters for session-bound URL recovery")
     cancel_requested: bool = False
     status: JobStatus = JobStatus.PENDING
     created_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
@@ -302,6 +294,4 @@ class Job(BaseModel):
     results_on_disk: bool = Field(default=False, description="Whether results are stored in a compressed disk file")
     results_file_path: Optional[str] = Field(default=None, description="Path to the compressed results file")
     warnings: list[str] = Field(default_factory=list, description="Job warning logs and anomaly reports")
-    acquisition_mode: str = Field(
-        default="standard", description="Acquisition mode: standard, aggressive, or deep_scan"
-    )
+    acquisition_mode: str = Field(default="standard", description="Acquisition mode: standard, aggressive, or deep_scan")

@@ -24,6 +24,7 @@ from app.trend_analyzer import (
 # Fixtures
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def _make_telemetry(**overrides) -> dict:
     """Create a telemetry dict with sensible defaults."""
     base = {
@@ -128,6 +129,7 @@ def _multi_domain_history() -> list[dict]:
 # TrendAnalyzer Tests
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestTrendAnalyzerEmpty:
     """Tests with empty or minimal telemetry."""
 
@@ -214,28 +216,25 @@ class TestTrendAnalyzerHealthScores:
         """Domain with mixed performance should get intermediate score."""
         analyzer = TrendAnalyzer()
         # 5 good events then 5 bad events
-        history = (
-            [  # Good first half
-                _make_telemetry(
-                    url="https://mixed.example.com/page",
-                    selector_hit_rate=0.9,
-                    records_final=15,
-                    fetch_ms=1000,
-                )
-                for _ in range(5)
-            ]
-            + [  # Bad second half
-                _make_telemetry(
-                    url="https://mixed.example.com/page",
-                    selector_hit_rate=0.2,
-                    records_final=0,
-                    fetch_ms=5000,
-                    error="timeout",
-                    failure_category="timeout",
-                )
-                for _ in range(5)
-            ]
-        )
+        history = [  # Good first half
+            _make_telemetry(
+                url="https://mixed.example.com/page",
+                selector_hit_rate=0.9,
+                records_final=15,
+                fetch_ms=1000,
+            )
+            for _ in range(5)
+        ] + [  # Bad second half
+            _make_telemetry(
+                url="https://mixed.example.com/page",
+                selector_hit_rate=0.2,
+                records_final=0,
+                fetch_ms=5000,
+                error="timeout",
+                failure_category="timeout",
+            )
+            for _ in range(5)
+        ]
         report = analyzer.analyze(history)
         trend = report.domain_trends["mixed.example.com"]
         # 50% failure rate + degrading trend = medium-low score
@@ -370,19 +369,27 @@ class TestTrendAnalyzerMetrics:
         events = [
             _make_telemetry(
                 url="https://cats.example.com/page",
-                failure_category="timeout", records_final=0, error="timeout",
+                failure_category="timeout",
+                records_final=0,
+                error="timeout",
             ),
             _make_telemetry(
                 url="https://cats.example.com/page",
-                failure_category="timeout", records_final=0, error="timeout",
+                failure_category="timeout",
+                records_final=0,
+                error="timeout",
             ),
             _make_telemetry(
                 url="https://cats.example.com/page",
-                failure_category="anti_bot_block", records_final=0, error="blocked",
+                failure_category="anti_bot_block",
+                records_final=0,
+                error="blocked",
             ),
             _make_telemetry(
                 url="https://cats.example.com/page",
-                failure_category=None, records_final=5, error=None,
+                failure_category=None,
+                records_final=5,
+                error=None,
             ),
         ]
         report = analyzer.analyze(events)
@@ -403,10 +410,7 @@ class TestTrendAnalyzerAlerts:
         # The domain has degrading trends but health_score may be above 40
         # (so it won't be in degrading_domains). But it should still
         # trigger medium alerts (selector decay, anti-bot intensification).
-        bad_alerts = [
-            a for a in report.alerts
-            if "bad.example.com" in a["domain"]
-        ]
+        bad_alerts = [a for a in report.alerts if "bad.example.com" in a["domain"]]
         assert len(bad_alerts) >= 1
 
     def test_no_alerts_for_healthy(self):
@@ -430,10 +434,7 @@ class TestTrendAnalyzerAlerts:
             for i in range(10)
         ]
         report = analyzer.analyze(events)
-        decay_alerts = [
-            a for a in report.alerts
-            if "selector decay" in a["message"].lower()
-        ]
+        decay_alerts = [a for a in report.alerts if "selector decay" in a["message"].lower()]
         assert len(decay_alerts) >= 1
 
     def test_anti_bot_alert(self):
@@ -447,10 +448,7 @@ class TestTrendAnalyzerAlerts:
             for i in range(10)
         ]
         report = analyzer.analyze(events)
-        bot_alerts = [
-            a for a in report.alerts
-            if "anti-bot" in a["message"].lower()
-        ]
+        bot_alerts = [a for a in report.alerts if "anti-bot" in a["message"].lower()]
         assert len(bot_alerts) >= 1
 
 
@@ -485,8 +483,7 @@ class TestTrendAnalyzerCategorization:
         history = _multi_domain_history()
         report = analyzer.analyze(history)
         all_domains = set()
-        for lst in [report.improving_domains, report.stable_domains,
-                    report.degrading_domains, report.unseen_domains]:
+        for lst in [report.improving_domains, report.stable_domains, report.degrading_domains, report.unseen_domains]:
             for d in lst:
                 assert d not in all_domains, f"{d} appears in multiple lists"
                 all_domains.add(d)
@@ -495,6 +492,7 @@ class TestTrendAnalyzerCategorization:
 # ═══════════════════════════════════════════════════════════════════════
 # EconomicTracker Tests
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestEconomicTrackerEmpty:
     """Tests with empty or minimal telemetry."""

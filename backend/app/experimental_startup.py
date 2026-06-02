@@ -29,6 +29,7 @@ def init_graph_scheduler() -> None:
     """Initialize the event cascade scheduler (safe: lazy-created, no circular imports)."""
     try:
         from app.graph_update_scheduler import get_scheduler
+
         get_scheduler()
         logger.debug("Graph update scheduler initialized")
     except Exception as e:
@@ -39,6 +40,7 @@ def init_recovery_framework() -> None:
     """Register all recovery handlers for extraction failure scenarios."""
     try:
         from app.recovery_handlers import register_all_recovery_handlers
+
         register_all_recovery_handlers()
         logger.debug("Recovery handlers registered")
     except Exception as e:
@@ -49,6 +51,7 @@ def init_domain_health_monitor() -> None:
     """Initialize the per-domain health monitoring subsystem."""
     try:
         from app.domain_health_alerts import get_domain_health_monitor
+
         get_domain_health_monitor()
         logger.debug("Domain health monitor initialized")
     except Exception as e:
@@ -86,6 +89,7 @@ def restore_semantic_world_state(world_state_data: dict | None, state_file_path:
         return
     try:
         from app.semantic_world_state import get_world_state
+
         get_world_state().from_dict(world_state_data)
         logger.info("Restored semantic world state from %s", state_file_path)
     except Exception as e:
@@ -96,9 +100,11 @@ def persist_semantic_world_state() -> None:
     """Persist semantic world state to repository on shutdown."""
     try:
         from app.storage_interface import get_job_repository
+
         repo = get_job_repository()
         if hasattr(repo, "save_world_state"):
             from app.semantic_world_state import get_world_state
+
             ws = get_world_state()
             try:
                 repo.save_world_state(ws.to_dict())
@@ -113,6 +119,7 @@ def close_postgres_pool() -> None:
     """Close the Postgres connection pool if active."""
     try:
         from app.postgres_repository import shutdown_postgres
+
         shutdown_postgres()
     except ImportError:
         logger.debug("Postgres support is not installed; no Postgres pool to close")

@@ -271,25 +271,31 @@ class TestValidateSelectorResponse:
         assert "item_container" in (error or "")
 
     def test_non_string_item_container(self):
-        is_valid, error = validate_selector_response({
-            "item_container": 42,
-            "fields": {},
-        })
+        is_valid, error = validate_selector_response(
+            {
+                "item_container": 42,
+                "fields": {},
+            }
+        )
         assert is_valid is False
         assert "must be a string" in (error or "")
 
     def test_non_dict_fields(self):
-        is_valid, error = validate_selector_response({
-            "item_container": "div",
-            "fields": "not a dict",
-        })
+        is_valid, error = validate_selector_response(
+            {
+                "item_container": "div",
+                "fields": "not a dict",
+            }
+        )
         assert is_valid is False
 
     def test_non_string_field_selector(self):
-        is_valid, error = validate_selector_response({
-            "item_container": "div",
-            "fields": {"name": 123},
-        })
+        is_valid, error = validate_selector_response(
+            {
+                "item_container": "div",
+                "fields": {"name": 123},
+            }
+        )
         assert is_valid is False
         assert "must be a string" in (error or "")
 

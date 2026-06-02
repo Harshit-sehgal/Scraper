@@ -23,6 +23,7 @@ pytestmark = pytest.mark.postgres
 def postgres_container():
     """Start a Postgres container or reuse a running one."""
     import socket
+
     use_running = False
     dsn = os.environ.get("DATAFORGE_DATABASE_URL")
     if dsn:
@@ -45,8 +46,9 @@ def postgres_container():
             os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
     else:
         from testcontainers.postgres import PostgresContainer
+
         with PostgresContainer("postgres:16-alpine") as pg:
-            database_url = pg.get_connection_url().replace('+psycopg2', '')
+            database_url = pg.get_connection_url().replace("+psycopg2", "")
             os.environ["DATAFORGE_DATABASE_URL"] = database_url
             os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
             reset_repository()
@@ -406,6 +408,7 @@ class TestPostgresSchemaRepairIntegration:
 
         # Verify we can insert into recycle_bin after repair
         from app.models import Job, JobStatus
+
         recycled = Job(
             id="recycled-after-v1-repair",
             name="V1 Repair Test",

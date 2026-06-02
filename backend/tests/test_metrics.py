@@ -45,6 +45,7 @@ def test_metrics_endpoint_content(client):
 def test_metrics_worker_failure_counters(client, monkeypatch):
     """Worker failure counters should be exported when failures exist."""
     from app.metrics_collector import record_worker_failure, reset_for_testing
+
     reset_for_testing()
 
     # Simulate worker failures
@@ -66,6 +67,7 @@ def test_metrics_worker_failure_counters(client, monkeypatch):
 def test_metrics_request_latency_tracking(client, monkeypatch):
     """After making an API request, the latency histogram should capture it."""
     from app.metrics_collector import reset_for_testing
+
     reset_for_testing()
 
     # Make a request to an API endpoint to trigger latency tracking
@@ -84,6 +86,7 @@ def test_metrics_request_latency_tracking(client, monkeypatch):
 def test_metrics_health_check_latency(client, monkeypatch):
     """Health check latency should be recorded when /ready is called."""
     from app.metrics_collector import reset_for_testing
+
     reset_for_testing()
 
     r = client.get("/ready")

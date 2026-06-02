@@ -18,6 +18,7 @@ def test_deterministic_dotenv_loading(tmp_path, monkeypatch):
     assert test_key not in os.environ
 
     import app
+
     importlib.reload(app)
 
     assert os.environ.get(test_key) == test_val

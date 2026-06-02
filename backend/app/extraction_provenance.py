@@ -118,9 +118,7 @@ class ExtractionProvenance:
 
     def to_dict(self) -> dict:
         result = asdict(self)
-        result["fields"] = {
-            k: v.to_dict() if isinstance(v, FieldProvenance) else v for k, v in result["fields"].items()
-        }
+        result["fields"] = {k: v.to_dict() if isinstance(v, FieldProvenance) else v for k, v in result["fields"].items()}
         return result
 
 

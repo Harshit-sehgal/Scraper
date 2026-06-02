@@ -7,26 +7,26 @@ Usage:
 Prints session-bound detection, network captures, source arbitration, and security checks.
 """
 
+import asyncio
 import json
 import sys
-import asyncio
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parent.parent / "backend"
 sys.path.insert(0, str(BACKEND))
 
-from app.session_url_detector import detect_session_params
-from app.models import SchemaField, FieldType
+from app.models import FieldType, SchemaField
 from app.network_payload_extractor import (
-    find_record_arrays,
-    extract_from_network_payloads,
-    arbitrate_sources,
-    _sanitize_payload,
     _is_candidate_secret_heavy,
+    _sanitize_payload,
+    arbitrate_sources,
+    extract_from_network_payloads,
+    find_record_arrays,
     score_record_array,
 )
 from app.page_evidence_collector import collect_page_evidence
 from app.selector_engine import apply_selectors
+from app.session_url_detector import detect_session_params
 
 
 async def fetch_and_capture(url: str) -> tuple[str, list[dict], dict]:
@@ -64,10 +64,7 @@ async def fetch_and_capture(url: str) -> tuple[str, list[dict], dict]:
         try:
             await page.goto(url, wait_until="networkidle", timeout=30000)
             html = await page.content()
-            state["cookies"] = [
-                {"name": c["name"], "domain": c.get("domain", "")}
-                for c in await context.cookies()
-            ]
+            state["cookies"] = [{"name": c["name"], "domain": c.get("domain", "")} for c in await context.cookies()]
             state["localStorage"] = await page.evaluate("() => ({...localStorage})")
             state["sessionStorage"] = await page.evaluate("() => ({...sessionStorage})")
             state["title"] = await page.title()
@@ -81,15 +78,9 @@ async def fetch_and_capture(url: str) -> tuple[str, list[dict], dict]:
 
 def check_secret_leakage(records: list[dict], field_map: any) -> bool:
     """Check if raw secrets leak into serialized output."""
-    data_to_serialize = {
-        "records": records,
-        "field_map": {k: v.__dict__ for k, v in field_map.items()} if field_map else {}
-    }
+    data_to_serialize = {"records": records, "field_map": {k: v.__dict__ for k, v in field_map.items()} if field_map else {}}
     serialized = json.dumps(data_to_serialize).lower()
-    secret_patterns = (
-        "bearer", "csrf", "session_id", "api_key", "password",
-        "secret", "token", "jwt", "cookie"
-    )
+    secret_patterns = ("bearer", "csrf", "session_id", "api_key", "password", "secret", "token", "jwt", "cookie")
     for pattern in secret_patterns:
         if pattern in serialized:
             return True
@@ -111,7 +102,9 @@ async def smoke(url: str, fields_str: str = None):
         schema_fields = []
         for name in field_names:
             name_lower = name.lower()
-            if any(syn in name_lower for syn in ("price", "fare", "cost", "total", "amount", "fee", "rate", "value", "sum", "charge")):
+            if any(
+                syn in name_lower for syn in ("price", "fare", "cost", "total", "amount", "fee", "rate", "value", "sum", "charge")
+            ):
                 f_type = FieldType.CURRENCY
             elif any(syn in name_lower for syn in ("date", "day", "time", "schedule")):
                 f_type = FieldType.DATE
@@ -137,12 +130,9 @@ async def smoke(url: str, fields_str: str = None):
             sanitized_records = _sanitize_payload(c.records)
             c.records = sanitized_records
             score = score_record_array(c, schema_fields)
-            candidates_list.append({
-                "path": c.path,
-                "record_count": len(sanitized_records),
-                "score": round(score, 1),
-                "is_secret_heavy": is_secret
-            })
+            candidates_list.append(
+                {"path": c.path, "record_count": len(sanitized_records), "score": round(score, 1), "is_secret_heavy": is_secret}
+            )
 
     # 3. Extract from Network Payloads
     net_result = extract_from_network_payloads(payloads, schema_fields)
@@ -174,8 +164,7 @@ async def smoke(url: str, fields_str: str = None):
     # Calculate coverage
     if winning_source == "dom":
         coverage = sum(
-            1 for r in winning_records[:20] for f in schema_fields
-            if r.get(f.name) is not None and str(r.get(f.name, "")).strip()
+            1 for r in winning_records[:20] for f in schema_fields if r.get(f.name) is not None and str(r.get(f.name, "")).strip()
         ) / max(len(winning_records[:20]) * len(schema_fields), 1)
     else:
         coverage = net_result.field_coverage if net_result else 0.0
@@ -191,7 +180,7 @@ async def smoke(url: str, fields_str: str = None):
     print(f"winning_source: {winning_source}")
     print(f"record_count: {len(winning_records)}")
     print(f"field_coverage: {coverage:.2f}")
-    
+
     provenance_paths = {k: v.mapped_from for k, v in field_map.items()} if field_map else {}
     print(f"provenance_paths: {json.dumps(provenance_paths)}")
     print(f"raw_secrets_persisted: {str(secrets_leaked).lower()}")

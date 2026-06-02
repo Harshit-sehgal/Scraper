@@ -63,9 +63,7 @@ def _dedupe_records(records: list[dict], schema_fields: list[SchemaField]) -> li
     return unique
 
 
-def _limit_source_records(
-    records: list[dict], schema_fields: list[SchemaField], max_records: Optional[int] = None
-) -> list[dict]:
+def _limit_source_records(records: list[dict], schema_fields: list[SchemaField], max_records: Optional[int] = None) -> list[dict]:
     """Limit the number of records from a single source, prioritizing those with contacts."""
     if max_records is None:
         from app.config import settings
@@ -308,9 +306,7 @@ def process_raw_records(
         norm["record_score"] = score_record_quality(norm, schema_fields)
         results.append(norm)
 
-    results = [
-        r for r in results if r.get("record_score", 0.0) >= (min_record_score * settings.RECORD_ACCEPTANCE_FACTOR)
-    ]
+    results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * settings.RECORD_ACCEPTANCE_FACTOR)]
     results = _dedupe_records(results, schema_fields)
     results = _limit_source_records(results, schema_fields)
     avg_score = sum(r.get("record_score", 0) for r in results) / max(len(results), 1)

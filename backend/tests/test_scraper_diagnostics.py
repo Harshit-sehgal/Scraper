@@ -74,6 +74,7 @@ class TestScraperDiagnosticReport:
     def test_to_dict_latency_ms_is_positive(self):
         report = ScraperDiagnosticReport("http://example.com")
         import time
+
         time.sleep(0.001)
         d = report.to_dict()
         assert d["latency_ms"] > 0

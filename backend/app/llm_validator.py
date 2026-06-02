@@ -68,19 +68,21 @@ def validate_llm_json(
                     if not isinstance(raw[key], expected):
                         expected_name = getattr(expected, "__name__", str(expected))
                         return False, (
-                            f"Key '{key}' expected type {expected_name}, "
-                            f"got {type(raw[key]).__name__}: {str(raw[key])[:100]}"
+                            f"Key '{key}' expected type {expected_name}, " f"got {type(raw[key]).__name__}: {str(raw[key])[:100]}"
                         )
 
     if expected_type is list and isinstance(raw, list):
         if list_item_type and raw:
             for i, item in enumerate(raw):
                 if not isinstance(item, list_item_type):
-                    return False, (f"List item {i} expected type {
-                        list_item_type.__name__}, " f"got {
+                    return False, (
+                        f"List item {i} expected type {
+                        list_item_type.__name__}, "
+                        f"got {
                         type(item).__name__}: {
                         str(item)[
-                            :100]}")
+                            :100]}"
+                    )
 
     return True, None
 
@@ -235,19 +237,28 @@ def validate_selector_response(raw: Any) -> tuple[bool, str | None]:
         return False, "Missing required key 'item_container'"
 
     if not isinstance(d["item_container"], str):
-        return False, f"'item_container' must be a string, got {
+        return (
+            False,
+            f"'item_container' must be a string, got {
             type(
-                d['item_container']).__name__}"
+                d['item_container']).__name__}",
+        )
 
     if "fields" in d and d["fields"] is not None:
         fields = d["fields"]
         if not isinstance(fields, dict):
-            return False, f"'fields' must be a dict, got {
-                type(fields).__name__}"
+            return (
+                False,
+                f"'fields' must be a dict, got {
+                type(fields).__name__}",
+            )
         for field_name, selector in fields.items():
             if not isinstance(selector, str):
-                return False, f"Field '{field_name}' selector must be a string, got {
-                    type(selector).__name__}"
+                return (
+                    False,
+                    f"Field '{field_name}' selector must be a string, got {
+                    type(selector).__name__}",
+                )
 
     return True, None
 

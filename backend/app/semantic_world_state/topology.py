@@ -65,9 +65,7 @@ class TopologyMixin:
             )
 
     @requires_invariants
-    def capture_pre_allocation_field(
-        self, tokens: list, schema_fields: list, is_noise: bool = False, domain: str = ""
-    ) -> int:
+    def capture_pre_allocation_field(self, tokens: list, schema_fields: list, is_noise: bool = False, domain: str = "") -> int:
         """Capture pre-allocation conflict topology from tokens with Relational Recall (Phase 31)."""
         with self.transaction("pre_allocation_capture"):
             from app.failure_injector import get_injector
@@ -347,9 +345,7 @@ class TopologyMixin:
                 logger.warning("COGNITIVE HEALTH ALERT: Critical Energy Level Detected")
 
             if health["certainty"] < 0.1:
-                self._observability.emit_telemetry(
-                    "health_alert", {"reason": "manifold_collapse", "value": health["certainty"]}
-                )
+                self._observability.emit_telemetry("health_alert", {"reason": "manifold_collapse", "value": health["certainty"]})
                 logger.warning("COGNITIVE HEALTH ALERT: Manifold Resolution Collapse")
 
             for role in self._manifold.role_anchors:
@@ -366,9 +362,7 @@ class TopologyMixin:
                     self._manifold.set_manifold_vector(role, seed_vec)
                     self._energy.set_schema_instability(role, 0.5)
 
-                    self._observability.emit_telemetry(
-                        "immune_recovery", {"role": role, "reason": "high_instability_anchor"}
-                    )
+                    self._observability.emit_telemetry("immune_recovery", {"role": role, "reason": "high_instability_anchor"})
                     logger.info(f"IMMUNE RESPONSE: Recovered corrupted anchor role [{role}]")
 
             if macro_pressure > 0.8 or self.metrics.stability_debt > 1.0:
@@ -647,10 +641,7 @@ class TopologyMixin:
             if fc.get("candidate"):
                 contested_tokens_in_conflicts.add(fc["candidate"])
         edge_field_routes = sum(
-            1
-            for fc in alloc_conflicts
-            for ra, rb in ROLE_EXCLUSIVITY
-            if fc.get("role", "") in (ra, rb) and fc.get("candidate")
+            1 for fc in alloc_conflicts for ra, rb in ROLE_EXCLUSIVITY if fc.get("role", "") in (ra, rb) and fc.get("candidate")
         )
 
         self._observability.emit_telemetry(
@@ -666,8 +657,7 @@ class TopologyMixin:
         contradiction_pressure = (len(alloc_conflicts) + edge_field_routes) / max(len(ROLE_EXCLUSIVITY), 1)
         if contradiction_pressure > 0.3 and self.metrics.field_pressure > 0.5:
             logger.info(
-                "CONTRADICTION PRESSURE TRIGGER: %.3f contradiction pressure, "
-                "forcing topology restructuring on node [%s]",
+                "CONTRADICTION PRESSURE TRIGGER: %.3f contradiction pressure, " "forcing topology restructuring on node [%s]",
                 contradiction_pressure,
                 self.node_id,
             )

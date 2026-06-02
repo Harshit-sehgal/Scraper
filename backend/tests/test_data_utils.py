@@ -34,6 +34,7 @@ FULL_SCHEMA = [STR_FIELD, INT_FIELD, FLOAT_FIELD, EMAIL_FIELD, PHONE_FIELD]
 
 # ─── normalize_scraped_record ─────────────────────────────────────────────────
 
+
 class TestNormalizeScrapedRecord:
     """Tests for normalize_scraped_record()."""
 
@@ -65,6 +66,7 @@ class TestNormalizeScrapedRecord:
 
 # ─── _validate_extracted_data ─────────────────────────────────────────────────
 
+
 class TestValidateExtractedData:
     """Tests for _validate_extracted_data()."""
 
@@ -82,6 +84,7 @@ class TestValidateExtractedData:
 
 
 # ─── _dedupe_records ──────────────────────────────────────────────────────────
+
 
 class TestDedupeRecords:
     """Tests for _dedupe_records()."""
@@ -106,16 +109,9 @@ class TestDedupeRecords:
     def test_fallback_to_all_fields(self):
         """When no name/company/title fields, use all fields as identity."""
         schema = [
-            SchemaField(
-                name="code",
-                field_type=FieldType.STRING,
-                description="",
-                required=False),
-            SchemaField(
-                name="price",
-                field_type=FieldType.FLOAT,
-                description="",
-                required=False)]
+            SchemaField(name="code", field_type=FieldType.STRING, description="", required=False),
+            SchemaField(name="price", field_type=FieldType.FLOAT, description="", required=False),
+        ]
         records = [
             {"code": "A1", "price": "10"},
             {"code": "A1", "price": "10"},
@@ -126,6 +122,7 @@ class TestDedupeRecords:
 
 
 # ─── _limit_source_records ────────────────────────────────────────────────────
+
 
 class TestLimitSourceRecords:
     """Tests for _limit_source_records()."""
@@ -160,6 +157,7 @@ class TestLimitSourceRecords:
 
 # ─── _trim_prompt_value ───────────────────────────────────────────────────────
 
+
 class TestTrimPromptValue:
     """Tests for _trim_prompt_value()."""
 
@@ -181,6 +179,7 @@ class TestTrimPromptValue:
 
 
 # ─── _prepare_records_for_ai ──────────────────────────────────────────────────
+
 
 class TestPrepareRecordsForAi:
     """Tests for _prepare_records_for_ai()."""
@@ -207,6 +206,7 @@ class TestPrepareRecordsForAi:
 
 # ─── process_raw_records ──────────────────────────────────────────────────────
 
+
 class TestProcessRawRecords:
     """Tests for process_raw_records()."""
 
@@ -230,11 +230,13 @@ class TestProcessRawRecords:
 
 # ─── align_profile_keys_to_schema ─────────────────────────────────────────────
 
+
 class TestAlignProfileKeysToSchema:
     """Tests for align_profile_keys_to_schema()."""
 
     def test_exact_matches_preserved(self):
         from app.data_utils import align_profile_keys_to_schema
+
         records = [{"name": "Acme", "price": "100"}]
         schema = [
             SchemaField(name="name", field_type=FieldType.STRING, description="", required=False),
@@ -246,6 +248,7 @@ class TestAlignProfileKeysToSchema:
 
     def test_fuzzy_substring_mapping(self):
         from app.data_utils import align_profile_keys_to_schema
+
         records = [{"origin": "LON", "destination": "PAR"}]
         schema = [
             SchemaField(name="origin_airport", field_type=FieldType.STRING, description="", required=False),
@@ -257,6 +260,7 @@ class TestAlignProfileKeysToSchema:
 
     def test_synonym_group_mapping(self):
         from app.data_utils import align_profile_keys_to_schema
+
         records = [{"fee": "250"}]
         schema = [
             SchemaField(name="ticket_price", field_type=FieldType.CURRENCY, description="", required=False),
@@ -279,14 +283,21 @@ class TestAlignProfileKeysToSchema:
             "stops": {"selector": ".stops", "type": "text"},
         }
         sample_values = {
-            "airline": "Sample Air", "origin": "AAA", "destination": "BBB",
-            "date": "01-01-2026", "return_date": "02-01-2026", "price": "100", "stops": "Direct",
+            "airline": "Sample Air",
+            "origin": "AAA",
+            "destination": "BBB",
+            "date": "01-01-2026",
+            "return_date": "02-01-2026",
+            "price": "100",
+            "stops": "Direct",
         }
         record = {key: sample_values.get(key, f"sample_{key}") for key in profile_fields}
         schema = [
             SchemaField(name="airlines_name", field_type=FieldType.STRING, description="Name of the airline", required=False),
             SchemaField(name="origin_airport", field_type=FieldType.STRING, description="Airport of origin", required=False),
-            SchemaField(name="destination_airport", field_type=FieldType.STRING, description="Airport of destination", required=False),  # noqa: E501
+            SchemaField(
+                name="destination_airport", field_type=FieldType.STRING, description="Airport of destination", required=False
+            ),  # noqa: E501
             SchemaField(name="prices", field_type=FieldType.CURRENCY, description="Price of the flight", required=False),
             SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure", required=False),
             SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival", required=False),
@@ -303,24 +314,23 @@ class TestAlignProfileKeysToSchema:
 
     def test_return_date_maps_to_arrival_date(self):
         from app.data_utils import align_profile_keys_to_schema
+
         records = [{"return_date": "01-06-2026", "date": "30-05-2026"}]
         schema = [
             SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure", required=False),
             SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival", required=False),
         ]
         aligned = align_profile_keys_to_schema(
-            records, schema, profile_fields={
-                "return_date": {
-                    "type": "text"}, "date": {
-                    "type": "text"}})
+            records, schema, profile_fields={"return_date": {"type": "text"}, "date": {"type": "text"}}
+        )
         assert aligned[0]["departure_date"] == "30-05-2026"
         assert aligned[0]["arrival_date"] == "01-06-2026"
 
     def test_intent_boost_mapping(self):
         from app.data_utils import align_extracted_keys_to_schema
+
         records = [{"fee": "250"}]
-        schema = [
-            SchemaField(name="ticket_price", field_type=FieldType.CURRENCY, description="", required=False)]
+        schema = [SchemaField(name="ticket_price", field_type=FieldType.CURRENCY, description="", required=False)]
         aligned = align_extracted_keys_to_schema(
             records,
             schema,
@@ -330,6 +340,7 @@ class TestAlignProfileKeysToSchema:
 
     def test_stops_not_mapped_to_arrival_date(self):
         from app.data_utils import align_profile_keys_to_schema
+
         records = [{"stops": "1 Stop", "date": "30-05-2026"}]
         schema = [
             SchemaField(name="departure_date", field_type=FieldType.DATE, description="", required=False),

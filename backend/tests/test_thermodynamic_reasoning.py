@@ -33,8 +33,7 @@ def test_topological_inference_community_pull():
     output = res[0]
 
     # At least one role should be assigned
-    assert output.get("origin") or output.get("destination"), \
-        "At least one role should be assigned"
+    assert output.get("origin") or output.get("destination"), "At least one role should be assigned"
 
     # Check community was formed
     ws2 = get_world_state()

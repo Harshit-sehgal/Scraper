@@ -99,8 +99,7 @@ class Settings(BaseSettings):
     GEOCODER_TIMEOUT: int = 10
     """Timeout for reverse geocoding lookups."""
     USER_AGENT: str = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     )
     GEOCODER_USER_AGENT: str = "DataForge-Scraper/2.0 (geocoder)"
     """User-agent for geocoding services."""
@@ -282,7 +281,6 @@ class Settings(BaseSettings):
     """Rate limit for discovery endpoint."""
     RATE_LIMIT_DB_BACKED: bool = False
     """Enable shared, database-backed rate limiting for multi-process environments."""
-
 
     # ─── Crawl Policy (operational governance) ─────────────────────────────
     CRAWL_MAX_TOTAL_CONCURRENCY: int = 10

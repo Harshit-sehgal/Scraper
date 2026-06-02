@@ -36,6 +36,7 @@ API_BASE = os.getenv("DATAFORGE_API_BASE", "http://127.0.0.1:8000")
 
 # ─── Utilities ─────────────────────────────────────────────────────────────
 
+
 def _fmt(val: float, decimals: int = 3) -> str:
     return f"{val:.{decimals}f}"
 
@@ -56,8 +57,12 @@ def _color(val: float, low: float, high: float, green: str = "", red: str = "") 
 
 def _status_icon(status: str) -> str:
     return {
-        "completed": "✅", "failed": "❌", "canceled": "⏹️",
-        "running": "🔄", "discovering": "🔍", "pending": "⏳",
+        "completed": "✅",
+        "failed": "❌",
+        "canceled": "⏹️",
+        "running": "🔄",
+        "discovering": "🔍",
+        "pending": "⏳",
     }.get(status, "❓")
 
 
@@ -73,6 +78,7 @@ def _print_section(title: str):
 
 
 # ─── API Calls ─────────────────────────────────────────────────────────────
+
 
 def api_get(path: str, timeout: int = 10) -> Optional[dict]:
     try:
@@ -108,6 +114,7 @@ def api_post(path: str, data: dict, timeout: int = 30) -> Optional[dict]:
 
 # ─── Check: Health ─────────────────────────────────────────────────────────
 
+
 def check_health():
     """Check server status, job counts, and runtime config."""
     _print_header("SYSTEM HEALTH CHECK")
@@ -120,10 +127,12 @@ def check_health():
     print(f"  Server Status:     {icon} {status.upper()}")
 
     jobs = data.get("jobs", {})
-    print(f"  Jobs:              {jobs.get('total', 0)} total, "
-          f"{jobs.get('active', 0)} active, "
-          f"{jobs.get('completed', 0)} completed, "
-          f"{jobs.get('failed', 0)} failed")
+    print(
+        f"  Jobs:              {jobs.get('total', 0)} total, "
+        f"{jobs.get('active', 0)} active, "
+        f"{jobs.get('completed', 0)} completed, "
+        f"{jobs.get('failed', 0)} failed"
+    )
 
     config = data.get("runtime_limits", {})
     _print_section("Runtime Limits")
@@ -149,6 +158,7 @@ def check_health():
 
 # ─── Check: Topology ───────────────────────────────────────────────────────
 
+
 def check_topology(detailed: bool = False):
     """Show semantic field topology state."""
     _print_header("SEMANTIC FIELD TOPOLOGY")
@@ -157,12 +167,12 @@ def check_topology(detailed: bool = False):
         return
 
     metrics = data.get("metrics", {})
-    print(f"\n  Field Pressure:      {_fmt(metrics.get('field_pressure', 0))}  "
-          f"{_bar(metrics.get('field_pressure', 0) / 2)}")
-    print(f"  Global Energy:       {_fmt(metrics.get('global_energy', 0))}  "
-          f"{_bar(metrics.get('global_energy', 0) / 10)}")
-    print(f"  Energy Balance:      {_fmt(metrics.get('energy_balance', 0), 4)}  "
-          f"{'✅ CONSERVED' if abs(metrics.get('energy_balance', 0)) < 0.01 else '⚠️  DRIFT'}")
+    print(f"\n  Field Pressure:      {_fmt(metrics.get('field_pressure', 0))}  " f"{_bar(metrics.get('field_pressure', 0) / 2)}")
+    print(f"  Global Energy:       {_fmt(metrics.get('global_energy', 0))}  " f"{_bar(metrics.get('global_energy', 0) / 10)}")
+    print(
+        f"  Energy Balance:      {_fmt(metrics.get('energy_balance', 0), 4)}  "
+        f"{'✅ CONSERVED' if abs(metrics.get('energy_balance', 0)) < 0.01 else '⚠️  DRIFT'}"
+    )
     print(f"  Semantic Temp:       {_fmt(metrics.get('semantic_temperature', 0))}")
     print(f"  Global Entropy:      {_fmt(metrics.get('global_entropy', 0))}")
     print(f"  Integrity Score:     {_fmt(metrics.get('integrity_score', 0))}")
@@ -199,11 +209,13 @@ def check_topology(detailed: bool = False):
         _print_section("Edge Fields (top repulsive)")
         sorted_edges = sorted(edge_fields, key=lambda e: e.get("repulsion", 0), reverse=True)
         for e in sorted_edges[:5]:
-            print(f"  {e.get('source', '?')} ↔ {e.get('target', '?')}  "
-                  f"affinity={_fmt(e.get('affinity', 0))} "
-                  f"repulsion={_fmt(e.get('repulsion', 0))} "
-                  f"pressure={_fmt(e.get('pressure', 0))} "
-                  f"[{e.get('semantics', '?')}]")
+            print(
+                f"  {e.get('source', '?')} ↔ {e.get('target', '?')}  "
+                f"affinity={_fmt(e.get('affinity', 0))} "
+                f"repulsion={_fmt(e.get('repulsion', 0))} "
+                f"pressure={_fmt(e.get('pressure', 0))} "
+                f"[{e.get('semantics', '?')}]"
+            )
 
     if detailed and role_compat:
         _print_section("Role Compatibility")
@@ -212,6 +224,7 @@ def check_topology(detailed: bool = False):
 
 
 # ─── Check: Observability ──────────────────────────────────────────────────
+
 
 def check_observability():
     """Show observability state, health index, and telemetry."""
@@ -232,8 +245,10 @@ def check_observability():
         print(f"  Diversity:           {_fmt(metrics.get('diversity', 0))}")
         print(f"  Tension:             {_fmt(metrics.get('tension', 0))}")
         print(f"  Reliability:         {_fmt(metrics.get('reliability', 0))}")
-        print(f"  Monoculture Risk:    {_fmt(metrics.get('monoculture_risk', 0))}  "
-              f"{'⚠️ HIGH' if metrics.get('monoculture_risk', 0) > 0.5 else 'OK'}")
+        print(
+            f"  Monoculture Risk:    {_fmt(metrics.get('monoculture_risk', 0))}  "
+            f"{'⚠️ HIGH' if metrics.get('monoculture_risk', 0) > 0.5 else 'OK'}"
+        )
 
     hierarchy = data.get("hierarchy", {})
     envelopes = hierarchy.get("envelopes", [])
@@ -263,6 +278,7 @@ def check_observability():
 
 # ─── Check: Scheduler Step ─────────────────────────────────────────────────
 
+
 def trigger_scheduler_step(budget_ms: float = 100.0):
     """Manually trigger the cognitive scheduler."""
     _print_header("COGNITIVE SCHEDULER")
@@ -274,6 +290,7 @@ def trigger_scheduler_step(budget_ms: float = 100.0):
 
 
 # ─── Create and Monitor a Test Job ─────────────────────────────────────────
+
 
 def run_test_job(mode: str = "manual"):
     """Create a test scraping job and monitor its progress."""
@@ -386,6 +403,7 @@ def run_test_job(mode: str = "manual"):
 
 # ─── List Jobs ─────────────────────────────────────────────────────────────
 
+
 def list_jobs(limit: int = 10):
     """List recent scraping jobs."""
     _print_header("RECENT JOBS")
@@ -394,10 +412,12 @@ def list_jobs(limit: int = 10):
         return
 
     jobs = data.get("jobs", {})
-    print(f"  Total: {jobs.get('total', 0)}  |  "
-          f"Active: {jobs.get('active', 0)}  |  "
-          f"Completed: {jobs.get('completed', 0)}  |  "
-          f"Failed: {jobs.get('failed', 0)}")
+    print(
+        f"  Total: {jobs.get('total', 0)}  |  "
+        f"Active: {jobs.get('active', 0)}  |  "
+        f"Completed: {jobs.get('completed', 0)}  |  "
+        f"Failed: {jobs.get('failed', 0)}"
+    )
 
     # Get individual jobs from the API
     data = api_get("/api/system/status")
@@ -408,6 +428,7 @@ def list_jobs(limit: int = 10):
 
 
 # ─── Crystalline Records ───────────────────────────────────────────────────
+
 
 def check_crystalline():
     """Show synthesized knowledge records."""
@@ -429,13 +450,17 @@ def check_crystalline():
 
 # ─── Full Test Suite Runner ────────────────────────────────────────────────
 
+
 def run_test_suite():
     """Run pytest and report results."""
     _print_header("TEST SUITE")
     import subprocess
+
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "backend/tests/", "-v", "--tb=short", "-x"],
-        capture_output=True, text=True, cwd="backend/.."
+        capture_output=True,
+        text=True,
+        cwd="backend/..",
     )
     print(result.stdout[-2000:])
     if result.returncode == 0:
@@ -446,6 +471,7 @@ def run_test_suite():
 
 
 # ─── All Checks ────────────────────────────────────────────────────────────
+
 
 def run_all():
     """Run a comprehensive system check."""
@@ -475,6 +501,7 @@ def run_all():
 
 # ─── Interactive Menu ──────────────────────────────────────────────────────
 
+
 def interactive_menu():
     """Show an interactive menu for manual testing."""
     while True:
@@ -502,9 +529,7 @@ def interactive_menu():
             "1": ("Health Check", lambda: (check_health(), True)),
             "2": ("Topology", lambda: (check_topology(detailed=True), True)),
             "3": ("Observability", lambda: (check_observability(), True)),
-            "4": ("Trigger Scheduler",
-                  lambda: (trigger_scheduler_step(
-                      float(input("  Budget (ms) [100]: ") or "100")), True)),
+            "4": ("Trigger Scheduler", lambda: (trigger_scheduler_step(float(input("  Budget (ms) [100]: ") or "100")), True)),
             "5": ("Test Job (Manual)", lambda: (run_test_job("manual"), True)),
             "6": ("Test Job (Auto)", lambda: (run_test_job("auto"), True)),
             "7": ("Crystalline Records", lambda: (check_crystalline(), True)),
@@ -525,6 +550,7 @@ def interactive_menu():
 
 # ─── Main ──────────────────────────────────────────────────────────────────
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="DataForge Studio — Manual Test CLI",
@@ -539,10 +565,10 @@ Examples:
         """,
     )
     parser.add_argument(
-        "command", nargs="?",
-        choices=["health", "topology", "observability", "scheduler",
-                 "test-job", "test-job-auto", "crystalline", "tests", "all"],
-        help="Command to run (omit for interactive menu)"
+        "command",
+        nargs="?",
+        choices=["health", "topology", "observability", "scheduler", "test-job", "test-job-auto", "crystalline", "tests", "all"],
+        help="Command to run (omit for interactive menu)",
     )
 
     args = parser.parse_args()

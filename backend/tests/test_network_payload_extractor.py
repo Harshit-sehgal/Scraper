@@ -12,35 +12,41 @@ from app.network_payload_extractor import (
     score_record_array,
 )
 
-FLIGHT_PAYLOAD = json.dumps({
-    "results": [
-        {"carrier": "IndiGo", "fare": 4500, "depart": "10:30", "arrive": "12:45"},
-        {"carrier": "Vistara", "fare": 6100, "depart": "12:00", "arrive": "14:30"},
-        {"carrier": "SpiceJet", "fare": 3800, "depart": "08:15", "arrive": "10:00"},
-    ],
-    "meta": {"total": 3, "page": 1},
-})
+FLIGHT_PAYLOAD = json.dumps(
+    {
+        "results": [
+            {"carrier": "IndiGo", "fare": 4500, "depart": "10:30", "arrive": "12:45"},
+            {"carrier": "Vistara", "fare": 6100, "depart": "12:00", "arrive": "14:30"},
+            {"carrier": "SpiceJet", "fare": 3800, "depart": "08:15", "arrive": "10:00"},
+        ],
+        "meta": {"total": 3, "page": 1},
+    }
+)
 
-NESTED_PAYLOAD = json.dumps({
-    "data": {
-        "searchResults": {
-            "flights": [
-                {"airlineName": "Delta", "price": {"total": "$500"}, "stops": 0},
-                {"airlineName": "United", "price": {"total": "$620"}, "stops": 1},
-            ]
+NESTED_PAYLOAD = json.dumps(
+    {
+        "data": {
+            "searchResults": {
+                "flights": [
+                    {"airlineName": "Delta", "price": {"total": "$500"}, "stops": 0},
+                    {"airlineName": "United", "price": {"total": "$620"}, "stops": 1},
+                ]
+            }
         }
     }
-})
+)
 
-MIXED_PAYLOAD = json.dumps({
-    "tags": ["cheap", "direct"],
-    "filters": [{"name": "stops", "values": [0, 1, 2]}],
-    "items": [
-        {"name": "Product A", "price": "$10"},
-        {"name": "Product B", "price": "$20"},
-        {"name": "Product C", "price": "$30"},
-    ]
-})
+MIXED_PAYLOAD = json.dumps(
+    {
+        "tags": ["cheap", "direct"],
+        "filters": [{"name": "stops", "values": [0, 1, 2]}],
+        "items": [
+            {"name": "Product A", "price": "$10"},
+            {"name": "Product B", "price": "$20"},
+            {"name": "Product C", "price": "$30"},
+        ],
+    }
+)
 
 
 class TestFindRecordArrays:
@@ -150,9 +156,12 @@ class TestExtractFromNetworkPayloads:
         assert result.score > 30
 
     def test_returns_none_for_empty_payloads(self):
-        result = extract_from_network_payloads([], [
-            SchemaField(name="x", field_type=FieldType.STRING, required=False),
-        ])
+        result = extract_from_network_payloads(
+            [],
+            [
+                SchemaField(name="x", field_type=FieldType.STRING, required=False),
+            ],
+        )
         assert result is None
 
     def test_returns_none_for_low_scoring_payload(self):
@@ -183,7 +192,8 @@ class TestSourceArbitration:
             {"airline": "DemoJet", "price": "$200"},
         ]
         net_result = extract_from_network_payloads(
-            [json.dumps({"results": [{"x": 1}]})], schema,
+            [json.dumps({"results": [{"x": 1}]})],
+            schema,
         )
         records, source, _ = arbitrate_sources(dom_records, 80, net_result, schema)
         assert source == "dom"
@@ -211,7 +221,8 @@ class TestSourceArbitration:
         ]
         # Weak network data
         net_result = extract_from_network_payloads(
-            [json.dumps({"results": [{"carrier": "Indigo"}]})], schema,
+            [json.dumps({"results": [{"carrier": "Indigo"}]})],
+            schema,
         )
 
         # Strong DOM data
@@ -231,7 +242,8 @@ class TestSourceArbitration:
         ]
         # Both DOM and network have very low quality data
         net_result = extract_from_network_payloads(
-            [json.dumps({"results": [{"x": 1, "y": 2}]})], schema,
+            [json.dumps({"results": [{"x": 1, "y": 2}]})],
+            schema,
         )
         dom_records = [{"airline": "BadDOM"}]
 
@@ -241,16 +253,18 @@ class TestSourceArbitration:
         assert records == dom_records
 
     def test_graphql_shape_unwrapping(self):
-        graphql_payload = json.dumps({
-            "data": {
-                "flights": {
-                    "edges": [
-                        {"node": {"carrier": "AirIndia", "fare": 3200}},
-                        {"node": {"carrier": "GoAir", "fare": 2900}},
-                    ]
+        graphql_payload = json.dumps(
+            {
+                "data": {
+                    "flights": {
+                        "edges": [
+                            {"node": {"carrier": "AirIndia", "fare": 3200}},
+                            {"node": {"carrier": "GoAir", "fare": 2900}},
+                        ]
+                    }
                 }
             }
-        })
+        )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -262,16 +276,18 @@ class TestSourceArbitration:
         assert result.records[1].get("price") == 2900
 
     def test_nextjs_props_handling(self):
-        nextjs_payload = json.dumps({
-            "props": {
-                "pageProps": {
-                    "results": [
-                        {"carrier": "Delta", "fare": "$500"},
-                        {"carrier": "United", "fare": "$600"},
-                    ]
+        nextjs_payload = json.dumps(
+            {
+                "props": {
+                    "pageProps": {
+                        "results": [
+                            {"carrier": "Delta", "fare": "$500"},
+                            {"carrier": "United", "fare": "$600"},
+                        ]
+                    }
                 }
             }
-        })
+        )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -282,12 +298,14 @@ class TestSourceArbitration:
         assert result.records[0].get("airline") == "Delta"
 
     def test_nested_value_extraction(self):
-        nested_val_payload = json.dumps({
-            "results": [
-                {"carrier": {"name": "Lufthansa"}, "fare": {"total": "$700"}},
-                {"carrier": {"name": "Emirates"}, "fare": {"total": "$950"}},
-            ]
-        })
+        nested_val_payload = json.dumps(
+            {
+                "results": [
+                    {"carrier": {"name": "Lufthansa"}, "fare": {"total": "$700"}},
+                    {"carrier": {"name": "Emirates"}, "fare": {"total": "$950"}},
+                ]
+            }
+        )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -309,10 +327,12 @@ class TestSourceArbitration:
             assert "cookie" not in fm.mapped_from.lower()
 
     def test_root_array_payload_extraction(self):
-        root_array_payload = json.dumps([
-            {"carrier": "British Airways", "fare": 310, "depart": "11:00"},
-            {"carrier": "Lufthansa", "fare": 420, "depart": "15:30"},
-        ])
+        root_array_payload = json.dumps(
+            [
+                {"carrier": "British Airways", "fare": 310, "depart": "11:00"},
+                {"carrier": "Lufthansa", "fare": 420, "depart": "15:30"},
+            ]
+        )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -324,11 +344,13 @@ class TestSourceArbitration:
         assert result.records[1].get("price") == 420
 
     def test_irrelevant_arrays_ignored(self):
-        payload = json.dumps({
-            "status": "success",
-            "metadata": {"user_id": 123},
-            "tags": ["tag1", "tag2", "tag3"],  # Primitive array, ignored
-        })
+        payload = json.dumps(
+            {
+                "status": "success",
+                "metadata": {"user_id": 123},
+                "tags": ["tag1", "tag2", "tag3"],  # Primitive array, ignored
+            }
+        )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
         ]
@@ -336,15 +358,17 @@ class TestSourceArbitration:
         assert result is None
 
     def test_secret_heavy_payloads_not_ignored_but_sanitized(self):
-        payload = json.dumps({
-            "session_id": "sess_12345",
-            "auth_token": "bearer_token_abc_xyz_789",
-            "client_secret": "sec_99999",
-            "results": [
-                {"carrier": "IndiGo", "fare": 4500},
-                {"carrier": "Vistara", "fare": 6100},
-            ]
-        })
+        payload = json.dumps(
+            {
+                "session_id": "sess_12345",
+                "auth_token": "bearer_token_abc_xyz_789",
+                "client_secret": "sec_99999",
+                "results": [
+                    {"carrier": "IndiGo", "fare": 4500},
+                    {"carrier": "Vistara", "fare": 6100},
+                ],
+            }
+        )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -355,12 +379,14 @@ class TestSourceArbitration:
         assert result.records[0].get("airline") == "IndiGo"
 
     def test_candidate_array_secret_heavy_ignored(self):
-        payload = json.dumps({
-            "tokens": [
-                {"session_id": "sess_1", "cookie": "abc", "token": "t1"},
-                {"session_id": "sess_2", "cookie": "def", "token": "t2"},
-            ]
-        })
+        payload = json.dumps(
+            {
+                "tokens": [
+                    {"session_id": "sess_1", "cookie": "abc", "token": "t1"},
+                    {"session_id": "sess_2", "cookie": "def", "token": "t2"},
+                ]
+            }
+        )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
         ]
@@ -368,14 +394,16 @@ class TestSourceArbitration:
         assert result is None
 
     def test_provenance_exact_path(self):
-        nested_payload = json.dumps({
-            "data": {
-                "flights": [
-                    {"airlineName": "Qatar", "fareCost": 900},
-                    {"airlineName": "Emirates", "fareCost": 950},
-                ]
+        nested_payload = json.dumps(
+            {
+                "data": {
+                    "flights": [
+                        {"airlineName": "Qatar", "fareCost": 900},
+                        {"airlineName": "Emirates", "fareCost": 950},
+                    ]
+                }
             }
-        })
+        )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -392,9 +420,7 @@ class TestSourceArbitration:
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
         ]
-        net_result = extract_from_network_payloads(
-            [json.dumps({"results": [{"x": 1}]})], schema
-        )
+        net_result = extract_from_network_payloads([json.dumps({"results": [{"x": 1}]})], schema)
         dom_records = [
             {"airline": "Air India", "price": "$300"},
             {"airline": "Singapore Air", "price": "$750"},
@@ -409,9 +435,7 @@ class TestSourceArbitration:
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
         ]
         unrelated_records = [{"id": i, "timestamp": 123456789} for i in range(50)]
-        net_result = extract_from_network_payloads(
-            [json.dumps({"results": unrelated_records})], schema
-        )
+        net_result = extract_from_network_payloads([json.dumps({"results": unrelated_records})], schema)
         dom_records = [
             {"airline": "Qatar Airways", "price": "$800"},
             {"airline": "Air France", "price": "$950"},
@@ -421,15 +445,17 @@ class TestSourceArbitration:
         assert len(records) == 2
 
     def test_mixed_safe_results_secret_metadata_extracts_safe_records(self):
-        payload = json.dumps({
-            "session_id": "sess_deadbeef",
-            "auth_token": "bearer_jwt_token_here",
-            "client_secret": "my-secret-key-12345",
-            "results": [
-                {"carrier": "Lufthansa", "fare": 400},
-                {"carrier": "KLM", "fare": 450},
-            ]
-        })
+        payload = json.dumps(
+            {
+                "session_id": "sess_deadbeef",
+                "auth_token": "bearer_jwt_token_here",
+                "client_secret": "my-secret-key-12345",
+                "results": [
+                    {"carrier": "Lufthansa", "fare": 400},
+                    {"carrier": "KLM", "fare": 450},
+                ],
+            }
+        )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -446,12 +472,14 @@ class TestSourceArbitration:
                 assert "client_secret" not in k
 
     def test_provenance_nested_suffix(self):
-        payload = json.dumps({
-            "results": [
-                {"carrier": "Delta", "price": {"total": "$500"}},
-                {"carrier": "United", "price": {"total": "$600"}},
-            ]
-        })
+        payload = json.dumps(
+            {
+                "results": [
+                    {"carrier": "Delta", "price": {"total": "$500"}},
+                    {"carrier": "United", "price": {"total": "$600"}},
+                ]
+            }
+        )
         schema = [
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
         ]
@@ -462,24 +490,21 @@ class TestSourceArbitration:
 
     def test_invalid_airport_code_rejected_and_warnings(self):
         from app.utils.quality import post_extract_validate_records
+
         schema = [
             SchemaField(name="origin_airport_code", field_type=FieldType.STRING, required=True),
             SchemaField(name="destination_airport_code", field_type=FieldType.STRING, required=False),
         ]
 
         # 1. Required field invalid -> Discards record
-        records1 = [
-            {"origin_airport_code": "Guatemala City aerial view", "destination_airport_code": "JFK"}
-        ]
+        records1 = [{"origin_airport_code": "Guatemala City aerial view", "destination_airport_code": "JFK"}]
         warnings = []
         res1 = post_extract_validate_records(records1, schema, warnings=warnings)
         assert len(res1) == 0
         assert "Airport-code fields failed semantic validation" in warnings
 
         # 2. Optional field invalid -> Sets to None
-        records2 = [
-            {"origin_airport_code": "MIA", "destination_airport_code": "New York City"}
-        ]
+        records2 = [{"origin_airport_code": "MIA", "destination_airport_code": "New York City"}]
         warnings = []
         res2 = post_extract_validate_records(records2, schema, warnings=warnings)
         assert len(res2) == 1
@@ -500,15 +525,13 @@ class TestSourceArbitration:
 
         # Mock selector memory to return empty selectors
         from app.selector_memory import get_selector_memory
+
         memory = get_selector_memory()
         monkeypatch.setattr(
             memory,
             "get_selectors",
-            lambda u: {
-                "item_container": "div",
-                "fields": {
-                    "origin_airport_code": "",
-                    "destination_airport_code": ""}})
+            lambda u: {"item_container": "div", "fields": {"origin_airport_code": "", "destination_airport_code": ""}},
+        )
 
         # Mock apply_selectors to return bad data that will be rejected by semantic validator, dropping average score to 0.0 < 0.8
         def mock_apply_selectors(html, selectors, schema_fields, **kwargs):

@@ -111,7 +111,7 @@ class EventJournal:
             # Further compress historical structural events if they exceed 10%
             if len(to_retain) > self._max // 10:
                 # Keep only the most recent structural transitions from history
-                to_retain = to_retain[-(self._max // 10):]
+                to_retain = to_retain[-(self._max // 10) :]
 
             self._entries = to_retain + recent
 

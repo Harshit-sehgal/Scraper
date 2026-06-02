@@ -29,11 +29,13 @@ def _make_fields(pairs: list[tuple[str, FieldType]]) -> list[SchemaField]:
     return [SchemaField(name=name, field_type=ft) for name, ft in pairs]
 
 
-BASIC_SCHEMA = _make_fields([
-    ("company_name", FieldType.STRING),
-    ("email", FieldType.EMAIL),
-    ("phone", FieldType.PHONE),
-])
+BASIC_SCHEMA = _make_fields(
+    [
+        ("company_name", FieldType.STRING),
+        ("email", FieldType.EMAIL),
+        ("phone", FieldType.PHONE),
+    ]
+)
 
 SIMPLE_HTML = """
 <html><body>
@@ -72,8 +74,10 @@ class TestExtractionResult:
         selectors = {"item_container": "div.item"}
         diag = ["test diagnostic"]
         result = ExtractionResult(
-            [{"name": "Test"}], "discovery",
-            selector_success=True, selectors=selectors,
+            [{"name": "Test"}],
+            "discovery",
+            selector_success=True,
+            selectors=selectors,
             network_diagnostics=diag,
         )
         assert result.selector_success is True
@@ -298,12 +302,16 @@ class TestOrchestrationCascade:
         """Different min_record_score values affect gate threshold behavior."""
         fields = _make_fields([("name", FieldType.STRING)])
         result_low = await orchestrate_extraction(
-            url="https://example.com", html="<p>test</p>",
-            schema_fields=fields, min_record_score=0.1,
+            url="https://example.com",
+            html="<p>test</p>",
+            schema_fields=fields,
+            min_record_score=0.1,
         )
         result_high = await orchestrate_extraction(
-            url="https://example.com", html="<p>test</p>",
-            schema_fields=fields, min_record_score=0.9,
+            url="https://example.com",
+            html="<p>test</p>",
+            schema_fields=fields,
+            min_record_score=0.9,
         )
         # Both should run without errors and return ExtractionResult
         assert isinstance(result_low, ExtractionResult)

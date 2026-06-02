@@ -158,7 +158,7 @@ class SelectorDecayPredictor:
         recent_window = snapshots[-10:] if len(snapshots) >= 10 else snapshots
         if len(recent_window) >= 2:
             older_avg = sum(s[1] for s in recent_window[: len(recent_window) // 2]) / max(1, len(recent_window) // 2)
-            newer_avg = sum(s[1] for s in recent_window[len(recent_window) // 2:]) / max(
+            newer_avg = sum(s[1] for s in recent_window[len(recent_window) // 2 :]) / max(
                 1, len(recent_window) - len(recent_window) // 2
             )
             # Positive velocity = confidence dropping

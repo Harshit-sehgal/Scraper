@@ -89,6 +89,7 @@ class TestSaveJobResultsToDisk:
 
     def test_error_cleans_up_temp_file(self, mock_state_path: Path) -> None:
         """When gzip write fails, the temp file should be cleaned up."""
+
         class FailingWriter:
             def __enter__(self_):
                 return self_
@@ -210,7 +211,7 @@ class TestLoadJobResultsFromDiskSafe:
 
         with gzip.open(path, "wt", encoding="utf-8") as f:
             f.write('{"valid": 1}\n')
-            f.write('NOT JSON\n')
+            f.write("NOT JSON\n")
             f.write('{"valid": 3}\n')
 
         records, warning = load_job_results_from_disk_safe("corrupt_json")

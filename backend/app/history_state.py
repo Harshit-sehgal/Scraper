@@ -317,7 +317,7 @@ class HistoryState:
         tj = self._get_val("transaction_journal")
         tj.append(tx)
         if len(tj) > capacity:
-            tj = tj[-(capacity // 2):]
+            tj = tj[-(capacity // 2) :]
         self._set_val("transaction_journal", tj)
         # Phase 57 / 58: DO NOT call self._record here!
         # Causal journaling already captures this; recording the recording

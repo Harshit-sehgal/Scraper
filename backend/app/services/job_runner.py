@@ -60,8 +60,12 @@ async def run_job(
     # when available, while preserving persist_state_fn for full-store saves.
     persist_job_state_fn = persist_state_single_fn or persist_state_fn
 
-    _add_job_log(job, f"Initializing job: {
-            job.name}", persist_fn=persist_job_state_fn)
+    _add_job_log(
+        job,
+        f"Initializing job: {
+            job.name}",
+        persist_fn=persist_job_state_fn,
+    )
 
     all_raw_results: list[dict] = []
     urls_with_records = 0
@@ -322,9 +326,7 @@ async def run_job(
                             record["source_url"] = url
                             inferred = infer_source_metadata(url=url)
                             record["source_type"] = str(inferred.get("source_type") or "unknown")
-                            record["source_trust_score"] = round(
-                                safe_score(inferred.get("source_trust_score") or 0.4), 3
-                            )
+                            record["source_trust_score"] = round(safe_score(inferred.get("source_trust_score") or 0.4), 3)
 
                         # Attach acquisition lineage to each record so it's
                         # exposed in job results via the API
@@ -391,9 +393,7 @@ async def run_job(
             await asyncio.sleep(0.25)
 
         scraped_raw = await asyncio.gather(*scrape_tasks, return_exceptions=True)
-        scraped: list[tuple[int, list[dict], bool, dict]] = [
-            r for r in scraped_raw if isinstance(r, tuple) and len(r) == 4
-        ]
+        scraped: list[tuple[int, list[dict], bool, dict]] = [r for r in scraped_raw if isinstance(r, tuple) and len(r) == 4]
 
         for idx, results, success, meta in sorted(scraped, key=lambda x: x[0]):
             if job.cancel_requested or _cancel_requested_from_db():
@@ -415,9 +415,7 @@ async def run_job(
                         ai_source_prediction["sources_with_ai_structuring"] += 1
 
         run_global_ai_structuring = (
-            bool(all_raw_results)
-            and bool(job.schema_fields)
-            and ai_source_prediction.get("sources_with_ai_structuring", 0) == 0
+            bool(all_raw_results) and bool(job.schema_fields) and ai_source_prediction.get("sources_with_ai_structuring", 0) == 0
         )
 
         if run_global_ai_structuring and all_raw_results:
@@ -438,8 +436,12 @@ async def run_job(
             return
 
         if run_global_ai_structuring:
-            _add_job_log(job, f"Running global AI structuring on {
-                    len(all_raw_results)} records...", persist_fn=persist_job_state_fn)
+            _add_job_log(
+                job,
+                f"Running global AI structuring on {
+                    len(all_raw_results)} records...",
+                persist_fn=persist_job_state_fn,
+            )
             logging.info("Job %s: AI structuring %d scraped rows...", job_id, len(all_raw_results))
             try:
                 reset_llm_call_count()
@@ -461,13 +463,10 @@ async def run_job(
 
                 if ai_structuring_report.get("capped_records", 0) > 0:
                     warnings.append(
-                        "AI structuring processed a capped subset of rows; "
-                        "remaining rows used deterministic cleaning."
+                        "AI structuring processed a capped subset of rows; " "remaining rows used deterministic cleaning."
                     )
                 if ai_structuring_report.get("model_fallback_mode"):
-                    warnings.append(
-                        "AI structuring switched to deterministic fallback after repeated model timeouts / errors."
-                    )
+                    warnings.append("AI structuring switched to deterministic fallback after repeated model timeouts / errors.")
                 _add_job_log(job, "AI structuring complete")
             except asyncio.TimeoutError:
                 warnings.append(
@@ -555,9 +554,7 @@ async def run_job(
             ai_source_prediction=ai_source_prediction,
             ai_structuring_report=ai_structuring_report,
             warnings=warnings,
-            acquisition_lineages=[
-                m.get("acquisition_lineage", {}) for _, _, _, m in scraped if m.get("acquisition_lineage")
-            ],
+            acquisition_lineages=[m.get("acquisition_lineage", {}) for _, _, _, m in scraped if m.get("acquisition_lineage")],
         )
 
         job.results = normalize_job_results(filtered_results, job.schema_fields)
@@ -583,9 +580,7 @@ async def run_job(
                 return
 
             job.status = JobStatus.RUNNING
-            _add_job_log(
-                job, f"Generating AI insights for {len(job.results)} records...", persist_fn=persist_job_state_fn
-            )
+            _add_job_log(job, f"Generating AI insights for {len(job.results)} records...", persist_fn=persist_job_state_fn)
             logging.info("Job %s: Generating AI insights over %d records...", job_id, len(job.results))
             try:
                 from app.scraper import generate_data_insight
@@ -627,8 +622,11 @@ async def run_job(
                 job.results_on_disk = True
                 job.results_file_path = file_path
                 job.results = []
-                _add_job_log(job, f"Job results bounded and offloaded to disk due to size (>{
-                        settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD} records).")
+                _add_job_log(
+                    job,
+                    f"Job results bounded and offloaded to disk due to size (>{
+                        settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD} records).",
+                )
             except Exception as e:
                 logging.exception("Job %s: Failed to offload results to disk: %s", job_id, e)
                 _add_job_log(job, f"Failed to offload results to disk: {e}", level="warning")
@@ -675,9 +673,7 @@ async def run_job(
             if persist_state_single_critical_fn:
                 persist_state_single_critical_fn()
 
-        logging.info(
-            "Job %s: Completed (%s): %d total, %d after filtering", job_id, job.status.value, total, filtered_count
-        )
+        logging.info("Job %s: Completed (%s): %d total, %d after filtering", job_id, job.status.value, total, filtered_count)
 
     except Exception as e:
         logging.exception(e)

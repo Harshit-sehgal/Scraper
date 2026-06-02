@@ -22,9 +22,7 @@ SESSION_PARAM_PATTERNS: list[re.Pattern] = [
     # Authentication tokens
     re.compile(r"^(token|tok|auth|csrf|xsrf|_token|_csrf|csrf_token|csrfmiddlewaretoken)$", re.I),
     # Tracking / analytics parameters
-    re.compile(
-        r"^(utm_[a-z]+|fbclid|gclid|gclsrc|dclid|msclkid|mc_eid|mc_cid|_ga|_gl|_hsenc|hssc|hsCtaTracking)$", re.I
-    ),
+    re.compile(r"^(utm_[a-z]+|fbclid|gclid|gclsrc|dclid|msclkid|mc_eid|mc_cid|_ga|_gl|_hsenc|hssc|hsCtaTracking)$", re.I),
     # Cache-busting / timestamp parameters
     re.compile(r"^(_|cache|nocache|nocache|rand|random|r|t|ts|timestamp|_t|_ts|v|ver|version)$", re.I),
     # OAuth / SSO state parameters
@@ -126,8 +124,13 @@ def detect_session_params(url: str) -> dict:
         for pattern in SESSION_PARAM_PATTERNS:
             if pattern.match(param_lower):
                 ephemeral_params.append(param_name)
-                details.append((param_name, f"param name matches pattern: {
-                    pattern.pattern}"))
+                details.append(
+                    (
+                        param_name,
+                        f"param name matches pattern: {
+                    pattern.pattern}",
+                    )
+                )
                 confidence_score = max(confidence_score, settings.SESSION_PARAM_NAME_CONFIDENCE)
                 name_matched = True
                 break
@@ -140,8 +143,13 @@ def detect_session_params(url: str) -> dict:
             for pattern in SESSION_VALUE_PATTERNS:
                 if pattern.match(value):
                     ephemeral_params.append(param_name)
-                    details.append((param_name, f"value matches session token pattern: {
-                        pattern.pattern}"))
+                    details.append(
+                        (
+                            param_name,
+                            f"value matches session token pattern: {
+                        pattern.pattern}",
+                        )
+                    )
                     confidence_score = max(confidence_score, settings.SESSION_PARAM_VALUE_CONFIDENCE)
                     break
 
@@ -179,9 +187,7 @@ def detect_session_params(url: str) -> dict:
     # Build canonical URL (with ephemeral params removed)
     canonical_params = {k: v for k, v in params.items() if k not in ephemeral_params}
     canonical_query = urlencode(canonical_params, doseq=True)
-    canonical_path_segments = [
-        segment for idx, segment in enumerate(path_segments) if idx not in ephemeral_path_indexes
-    ]
+    canonical_path_segments = [segment for idx, segment in enumerate(path_segments) if idx not in ephemeral_path_indexes]
     canonical_path = "/" + "/".join(canonical_path_segments) if canonical_path_segments else parsed.path
     if parsed.path.endswith("/") and not canonical_path.endswith("/"):
         canonical_path += "/"
@@ -202,8 +208,7 @@ def detect_session_params(url: str) -> dict:
         confidence_score = min(confidence_score, settings.SESSION_NO_EPHEMERAL_MAX_CONFIDENCE)
 
     return {
-        "is_session_bound": len(ephemeral_params) > 0
-        or confidence_score >= settings.SESSION_BOUND_CONFIDENCE_THRESHOLD,
+        "is_session_bound": len(ephemeral_params) > 0 or confidence_score >= settings.SESSION_BOUND_CONFIDENCE_THRESHOLD,
         "ephemeral_params": ephemeral_params,
         "canonical_url": canonical_url,
         "confidence": round(confidence_score, 2),

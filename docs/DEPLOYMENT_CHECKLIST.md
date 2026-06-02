@@ -1,6 +1,6 @@
 # Deployment Checklist
 
-**Last updated:** 2026-06-01  
+**Last updated:** 2026-06-01
 **Status:** Pre-production candidate validation steps
 
 Use this checklist to validate DataForge Scraper in your target environment before public production deployment.
@@ -9,8 +9,8 @@ Use this checklist to validate DataForge Scraper in your target environment befo
 
 ## Phase 1: Secrets & Configuration (Week 0, before any infrastructure)
 
-**Timeline:** 1–2 hours  
-**Owner:** Security/DevOps  
+**Timeline:** 1–2 hours
+**Owner:** Security/DevOps
 **Risk:** If skipped, placeholder secrets will be deployed to production
 
 ### Step 1.1: Generate Production Secrets
@@ -54,8 +54,8 @@ export DATAFORGE_BACKUP_DIR=/var/lib/dataforge/backups
 
 ## Phase 2: Infrastructure Setup (Week 0–1)
 
-**Timeline:** 4–8 hours  
-**Owner:** DevOps/SRE  
+**Timeline:** 4–8 hours
+**Owner:** DevOps/SRE
 **Risk:** If skipped, stack won't start or will be exposed
 
 ### Step 2.1: TLS Certificate
@@ -186,8 +186,8 @@ curl http://localhost:3000/api/health
 
 ## Phase 3: Application Startup (Week 1)
 
-**Timeline:** 1–2 hours  
-**Owner:** DevOps/Backend  
+**Timeline:** 1–2 hours
+**Owner:** DevOps/Backend
 **Risk:** If skipped, API won't serve requests
 
 ### Step 3.1: Build & Deploy Image
@@ -259,8 +259,8 @@ curl -i http://localhost:8000/diagnostics
 
 ## Phase 4: Route & Security Verification (Week 1)
 
-**Timeline:** 2–3 hours  
-**Owner:** Security/QA  
+**Timeline:** 2–3 hours
+**Owner:** Security/QA
 **Risk:** If skipped, public routes may leak docs/metrics
 
 ### Step 4.1: Route Exposure Check
@@ -344,8 +344,8 @@ curl -i https://your-domain.com/api/jobs
 
 ## Phase 5: Operational Validation (Week 1–2)
 
-**Timeline:** 4–6 hours across multiple days  
-**Owner:** QA/SRE  
+**Timeline:** 4–6 hours across multiple days
+**Owner:** QA/SRE
 **Risk:** If skipped, failures in production will be unmanaged
 
 ### Step 5.1: Single-Job Smoke Test
@@ -489,8 +489,8 @@ ls -la /var/log/dataforge/
 
 ## Phase 6: Production Hardening (Week 2–3)
 
-**Timeline:** 8–16 hours  
-**Owner:** Security/DevOps  
+**Timeline:** 8–16 hours
+**Owner:** Security/DevOps
 **Risk:** If skipped, production will lack resilience and observability
 
 ### Step 6.1: Failure Scenarios
@@ -591,8 +591,8 @@ pkill stress-ng
 
 ## Phase 7: Documentation & Runbooks (Week 3)
 
-**Timeline:** 2–4 hours  
-**Owner:** DevOps/Operations  
+**Timeline:** 2–4 hours
+**Owner:** DevOps/Operations
 **Risk:** If skipped, incident response will be ad-hoc
 
 ### Step 7.1: Create/Validate Incident Runbooks

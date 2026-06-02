@@ -6,17 +6,21 @@ This script dynamically generates a production environment file with strong,
 unique, randomly generated cryptographic keys and passwords, preventing default
 placeholders from leaking into deployment.
 """
+
 import os
 import secrets
 import sys
 
 TARGET_FILE = ".env.production"
 
+
 def generate_strong_secret(length: int = 32) -> str:
     return secrets.token_hex(length)
 
+
 def generate_strong_password(length: int = 16) -> str:
     return secrets.token_urlsafe(length)
+
 
 def main():
     print("=" * 60)
@@ -26,7 +30,7 @@ def main():
     if os.path.exists(TARGET_FILE):
         print(f"[WARNING] '{TARGET_FILE}' already exists on disk.")
         choice = input("Do you want to overwrite it with new generated secrets? (y/N): ").strip().lower()
-        if choice != 'y':
+        if choice != "y":
             print("Aborted. No changes were made.")
             sys.exit(0)
 
@@ -84,6 +88,7 @@ GRAFANA_PASSWORD={grafana_password}
     print("2. Run the environment validator to verify your newly generated configuration:")
     print(f"   python3 scripts/check_prod_env.py --env-file {TARGET_FILE}")
     print("=" * 60)
+
 
 if __name__ == "__main__":
     main()

@@ -80,7 +80,7 @@ async def test_deterministic_benchmark_run():
         classification = classify_zero_result(
             acquisition_lineage={"state": "direct"},
             session_detection=None,
-            empty_check=empty_check.to_dict() if hasattr(empty_check, 'to_dict') else None,
+            empty_check=empty_check.to_dict() if hasattr(empty_check, "to_dict") else None,
             anti_bot_score=0.9 if expected_type == "anti_bot" else 0.1,
             final_url=f"https://{fname}.example.com",
             html=html,

@@ -114,6 +114,7 @@ class TestRateLimiting:
     def _cleanup_rate_limit_keys(self, *keys: str) -> None:
         """Delete rate_limits entries for the given keys to prevent shared state collision."""
         from app.job_store import _DB_LOCK, _get_connection
+
         try:
             with _DB_LOCK:
                 conn = _get_connection()
@@ -135,11 +136,7 @@ class TestRateLimiting:
 
         try:
             # Create counter with max 5 requests per 10 seconds
-            limiter = DatabaseSlidingWindowCounter(
-                max_requests=5,
-                window_seconds=10,
-                key=test_key
-            )
+            limiter = DatabaseSlidingWindowCounter(max_requests=5, window_seconds=10, key=test_key)
 
             # First 5 requests should succeed
             for i in range(5):
@@ -160,16 +157,8 @@ class TestRateLimiting:
         self._cleanup_rate_limit_keys(key1, key2)
 
         try:
-            limiter1 = DatabaseSlidingWindowCounter(
-                max_requests=2,
-                window_seconds=10,
-                key=key1
-            )
-            limiter2 = DatabaseSlidingWindowCounter(
-                max_requests=2,
-                window_seconds=10,
-                key=key2
-            )
+            limiter1 = DatabaseSlidingWindowCounter(max_requests=2, window_seconds=10, key=key1)
+            limiter2 = DatabaseSlidingWindowCounter(max_requests=2, window_seconds=10, key=key2)
 
             # Use up limit for key1
             assert limiter1.allow() is True
@@ -288,9 +277,7 @@ class TestBackupRestoreConsistency:
             status=JobStatus.COMPLETED,
             urls=["https://example.com"],
             schema_fields=[],
-            results=[
-                {"name": "John", "email": "john@example.com", "phone": "555-1234"}
-            ],
+            results=[{"name": "John", "email": "john@example.com", "phone": "555-1234"}],
         )
 
         save_state({job.id: job}, {})
@@ -387,11 +374,7 @@ class TestAuthAndRBAC:
         from app.models import FieldType, SchemaField
 
         # Verify SchemaField model works
-        field = SchemaField(
-            name="email",
-            field_type=FieldType.EMAIL,
-            required=True
-        )
+        field = SchemaField(name="email", field_type=FieldType.EMAIL, required=True)
 
         assert field.name == "email"
         assert field.field_type == FieldType.EMAIL

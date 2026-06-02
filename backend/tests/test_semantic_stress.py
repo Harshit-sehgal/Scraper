@@ -25,15 +25,12 @@ def test_contradictory_bombardment(ws):
     # Use roles that are in ROLE_EXCLUSIVITY to ensure regions are created
     schema = ["price", "cost"]
 
-    batch1 = [
-        {"price": "$100", "cost": "$80", "other": "Product A"},
-        {"price": "$200", "cost": "$150", "other": "Product B"}
-    ]
+    batch1 = [{"price": "$100", "cost": "$80", "other": "Product A"}, {"price": "$200", "cost": "$150", "other": "Product B"}]
 
     # Contradiction: Swap them or use values that create tension
     batch2 = [
         {"price": "2026-05-17", "cost": "2026-05-18", "other": "Contradictory C"},
-        {"price": "Chennai", "cost": "Bangalore", "other": "Contradictory D"}
+        {"price": "Chennai", "cost": "Bangalore", "other": "Contradictory D"},
     ]
 
     print("\n--- Phase 1: Stable Knowledge Acquisition ---")
@@ -70,8 +67,7 @@ def test_recursive_hallucination_chain(ws):
         if not results:
             break
         # Create a new record from the result
-        data = [{"entity_name": results[0].get("entity_name", "Alpha"),
-                 "price": results[0].get("price", "$10")}]
+        data = [{"entity_name": results[0].get("entity_name", "Alpha"), "price": results[0].get("price", "$10")}]
 
     # Should not crash and should remain stable
     assert ws.metrics.global_entropy < 1.0
@@ -103,10 +99,12 @@ def test_massive_topology_scaling(ws):
     with ws.transaction("scaling_test"):
         for i in range(100):
             token = SemanticToken(
-                raw=f"val_{i}", normalized=f"val_{i}",
-                span=Span(0, 5), position=0,
+                raw=f"val_{i}",
+                normalized=f"val_{i}",
+                span=Span(0, 5),
+                position=0,
                 primary_type=SemanticType.NUMBER,
-                type_distribution={SemanticType.NUMBER: 1.0}
+                type_distribution={SemanticType.NUMBER: 1.0},
             )
             # Use 'price' and 'cost' to trigger ROLE_EXCLUSIVITY regions
             ws.capture_pre_allocation_field([token], ["price", "cost"])

@@ -20,9 +20,7 @@ def test_ai_clean_and_align_records_recovers_after_fast_empty(monkeypatch):
         lambda *args, **kwargs: {"records": [{"company_name": "Acme Interiors", "phone": "+91 90000 11111"}]},
     )
 
-    output, report = asyncio.run(
-        scraper_mod.ai_clean_and_align_records(records, schema_fields=schema, min_record_score=0.0)
-    )
+    output, report = asyncio.run(scraper_mod.ai_clean_and_align_records(records, schema_fields=schema, min_record_score=0.0))
 
     assert report["ai_chunks"] == 1
     assert report["fallback_chunks"] == 0
@@ -40,14 +38,13 @@ def test_ai_clean_and_align_records_honors_consecutive_failure_threshold(monkeyp
 
     # Patch settings on the config module rather than module-level constants
     from app.config import settings
+
     monkeypatch.setattr(settings, "AI_STRUCTURING_CHUNK_SIZE", 1)
     monkeypatch.setattr(settings, "AI_STRUCTURING_MAX_CONSECUTIVE_MODEL_FAILURES", 2)
     monkeypatch.setattr(cleaning_mod, "_llm_json_fast", lambda *args, **kwargs: {})
     monkeypatch.setattr(cleaning_mod, "_llm_json", lambda *args, **kwargs: {})
 
-    output, report = asyncio.run(
-        scraper_mod.ai_clean_and_align_records(records, schema_fields=schema, min_record_score=0.0)
-    )
+    output, report = asyncio.run(scraper_mod.ai_clean_and_align_records(records, schema_fields=schema, min_record_score=0.0))
 
     assert len(output) == 3
     assert report["fallback_chunks"] == 3
@@ -57,6 +54,7 @@ def test_ai_clean_and_align_records_honors_consecutive_failure_threshold(monkeyp
 def test_llm_json_fast_uses_groq_fallback_model(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     from app.config import settings
+
     monkeypatch.setattr(settings, "GROQ_DEFAULT_MODEL", "primary-model")
     monkeypatch.setattr(settings, "GROQ_FALLBACK_MODEL", "fallback-model")
 
@@ -72,13 +70,16 @@ def test_llm_json_fast_uses_groq_fallback_model(monkeypatch):
         return {}
 
     import app.llm_bridge
+
     monkeypatch.setattr(app.llm_bridge, "_call_openai_compatible_json", fake_openai_json)
 
-    out = asyncio.run(app.llm_bridge.llm_json_fast(
-        messages=[{"role": "user", "content": "test"}],
-        temperature=0.0,
-        timeout=3,
-    ))
+    out = asyncio.run(
+        app.llm_bridge.llm_json_fast(
+            messages=[{"role": "user", "content": "test"}],
+            temperature=0.0,
+            timeout=3,
+        )
+    )
 
     assert out == {"records": [{"company_name": "Fallback Row"}]}
     assert calls[:2] == ["primary-model", "fallback-model"]

@@ -1,4 +1,5 @@
 """Tests for the DegradationPredictor."""
+
 from __future__ import annotations
 
 import time
@@ -189,16 +190,24 @@ class TestPredictionReport:
         r.domains_analyzed = 2
         r.predictions = [
             Prediction(
-                domain="a.com", risk_level="high", confidence=0.8,
+                domain="a.com",
+                risk_level="high",
+                confidence=0.8,
                 predicted_failure_type="selector_decay",
-                health_score_current=30.0, health_score_trend="declining",
-                evidence=[], recommended_actions=[],
+                health_score_current=30.0,
+                health_score_trend="declining",
+                evidence=[],
+                recommended_actions=[],
             ),
             Prediction(
-                domain="b.com", risk_level="low", confidence=0.6,
+                domain="b.com",
+                risk_level="low",
+                confidence=0.6,
                 predicted_failure_type="general_degradation",
-                health_score_current=75.0, health_score_trend="stable",
-                evidence=[], recommended_actions=[],
+                health_score_current=75.0,
+                health_score_trend="stable",
+                evidence=[],
+                recommended_actions=[],
             ),
         ]
         r.critical_risk_count = 0
@@ -248,9 +257,7 @@ class TestDegradationPredictor:
         assert len(report.predictions) >= 1, "Degrading domain should generate predictions"
         # At least one should be medium, high, or critical
         severities = {p.risk_level for p in report.predictions}
-        assert severities & {"medium", "high", "critical"}, (
-            f"Expected at least medium severity, got {severities}"
-        )
+        assert severities & {"medium", "high", "critical"}, f"Expected at least medium severity, got {severities}"
 
     def test_predict_critical_domain_generates_high_risk(self):
         predictor = DegradationPredictor()
@@ -260,9 +267,7 @@ class TestDegradationPredictor:
         assert report.domains_analyzed == 1
         assert len(report.predictions) >= 2
         high_or_critical = [p for p in report.predictions if p.risk_level in ("high", "critical")]
-        assert len(high_or_critical) >= 1, (
-            f"Expected at least 1 high/critical prediction, got {len(high_or_critical)}"
-        )
+        assert len(high_or_critical) >= 1, f"Expected at least 1 high/critical prediction, got {len(high_or_critical)}"
         # Check cascade risk detection for high-volume critical domain
         has_cascade = any(p.cascade_risk for p in report.predictions)
         assert has_cascade, "High-volume critical domain should have cascade risk"
@@ -303,10 +308,7 @@ class TestDegradationPredictor:
         trends = {"slow.com": _latency_creep_trend()}
         report = predictor.predict([], trends)
 
-        timeout_preds = [
-            p for p in report.predictions
-            if p.predicted_failure_type == "timeout_death_spiral"
-        ]
+        timeout_preds = [p for p in report.predictions if p.predicted_failure_type == "timeout_death_spiral"]
         assert len(timeout_preds) >= 1, "High latency with degrading trend should warn of timeout death spiral"
 
     def test_predict_zero_result_drift(self):
@@ -314,10 +316,7 @@ class TestDegradationPredictor:
         trends = {"empty.com": _zero_result_trend()}
         report = predictor.predict([], trends)
 
-        zero_preds = [
-            p for p in report.predictions
-            if p.predicted_failure_type == "zero_result_drift"
-        ]
+        zero_preds = [p for p in report.predictions if p.predicted_failure_type == "zero_result_drift"]
         assert len(zero_preds) >= 1, "Very low quality with enough samples should predict zero result drift"
 
     def test_predict_sustained_failure_rate(self):
@@ -331,10 +330,7 @@ class TestDegradationPredictor:
         trends = {"failing.com": trend}
         report = predictor.predict([], trends)
 
-        failure_preds = [
-            p for p in report.predictions
-            if p.predicted_failure_type == "sustained_failure_rate"
-        ]
+        failure_preds = [p for p in report.predictions if p.predicted_failure_type == "sustained_failure_rate"]
         assert len(failure_preds) >= 1, "High failure rate should generate sustained failure prediction"
         assert failure_preds[0].risk_level in ("high", "critical")
 
@@ -371,9 +367,7 @@ class TestDegradationPredictor:
         # High-sample predictions should have higher average confidence
         avg_low = report_low.average_confidence
         avg_high = report_high.average_confidence
-        assert avg_high >= avg_low, (
-            f"Expected higher confidence with more samples ({avg_high} >= {avg_low})"
-        )
+        assert avg_high >= avg_low, f"Expected higher confidence with more samples ({avg_high} >= {avg_low})"
 
     def test_systemic_risk_computation(self):
         predictor = DegradationPredictor()
@@ -419,8 +413,7 @@ class TestDegradationPredictor:
             current = severity_order.get(report.top_risks[i]["risk_level"], 99)
             next_ = severity_order.get(report.top_risks[i + 1]["risk_level"], 99)
             assert current <= next_, (
-                f"Top risks not sorted: {report.top_risks[i]['risk_level']} "
-                f"before {report.top_risks[i + 1]['risk_level']}"
+                f"Top risks not sorted: {report.top_risks[i]['risk_level']} " f"before {report.top_risks[i + 1]['risk_level']}"
             )
 
     def test_multi_domain_prediction(self):
@@ -436,8 +429,7 @@ class TestDegradationPredictor:
         healthy_preds = [p for p in report.predictions if p.domain == "healthy.com"]
         degrading_preds = [p for p in report.predictions if p.domain == "degrading.com"]
         assert len(degrading_preds) >= len(healthy_preds), (
-            f"Degrading domain ({len(degrading_preds)}) should have >= predictions "
-            f"than healthy ({len(healthy_preds)})"
+            f"Degrading domain ({len(degrading_preds)}) should have >= predictions " f"than healthy ({len(healthy_preds)})"
         )
 
     def test_health_trend_determination(self):
@@ -497,12 +489,9 @@ class TestDegradationPredictor:
 
         for p in report.predictions:
             assert len(p.recommended_actions) >= 1, (
-                f"Prediction for {p.domain} ({p.predicted_failure_type}) "
-                f"should have at least 1 recommended action"
+                f"Prediction for {p.domain} ({p.predicted_failure_type}) " f"should have at least 1 recommended action"
             )
-            assert len(p.evidence) >= 1, (
-                f"Prediction for {p.domain} should have at least 1 evidence item"
-            )
+            assert len(p.evidence) >= 1, f"Prediction for {p.domain} should have at least 1 evidence item"
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -516,21 +505,25 @@ class TestDegradationPredictorIntegration:
         events = []
         # 8 healthy events
         for i in range(8):
-            events.append(_make_telemetry_event(
-                url="https://healthy.com/page",
-                success=True,
-                quality_score=0.85,
-                latency_ms=1000,
-            ))
+            events.append(
+                _make_telemetry_event(
+                    url="https://healthy.com/page",
+                    success=True,
+                    quality_score=0.85,
+                    latency_ms=1000,
+                )
+            )
         # 12 degrading events
         for i in range(12):
-            events.append(_make_telemetry_event(
-                url="https://degrading.com/page",
-                success=(i < 6),
-                quality_score=0.4 if i >= 6 else 0.7,
-                latency_ms=5000 if i >= 6 else 2000,
-                anti_bot_score=0.5 if i >= 6 else 0.1,
-            ))
+            events.append(
+                _make_telemetry_event(
+                    url="https://degrading.com/page",
+                    success=(i < 6),
+                    quality_score=0.4 if i >= 6 else 0.7,
+                    latency_ms=5000 if i >= 6 else 2000,
+                    anti_bot_score=0.5 if i >= 6 else 0.1,
+                )
+            )
 
         predictor = DegradationPredictor(history_window=50)
         report = predictor.predict(events)

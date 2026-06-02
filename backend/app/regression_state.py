@@ -20,9 +20,7 @@ class RegressionStateAdapter:
         # Maps domain -> failure count per category
         self._counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
-    def record_failure(
-        self, domain: str, failure_type: str, severity: str = "medium", context: Optional[dict] = None
-    ) -> None:
+    def record_failure(self, domain: str, failure_type: str, severity: str = "medium", context: Optional[dict] = None) -> None:
         """Record and log a new classified regression / failure event."""
         import time
 
@@ -39,9 +37,7 @@ class RegressionStateAdapter:
         if len(self._history[domain]) > 100:
             self._history[domain].pop(0)
 
-        logger.debug(
-            "[RegressionState] Archived failure for domain %s: %s (severity: %s)", domain, failure_type, severity
-        )
+        logger.debug("[RegressionState] Archived failure for domain %s: %s (severity: %s)", domain, failure_type, severity)
 
     def get_failure_history(self, domain: str) -> list[dict[str, Any]]:
         """Retrieve failure history list for a target domain."""

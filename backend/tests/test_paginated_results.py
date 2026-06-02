@@ -10,12 +10,9 @@ def seed_job_with_results():
         name="test-paginated-job",
         mode="manual",
         urls=["http://example.com/item"],
-        schema_fields=[{"name": "title", "field_type": "string"}]
+        schema_fields=[{"name": "title", "field_type": "string"}],
     )
-    job.results = [
-        {"title": f"Result {i}", "source_url": "http://example.com/item", "source_type": "unknown"}
-        for i in range(15)
-    ]
+    job.results = [{"title": f"Result {i}", "source_url": "http://example.com/item", "source_type": "unknown"} for i in range(15)]
     job.status = JobStatus.COMPLETED
     jobs_store[job.id] = job
 

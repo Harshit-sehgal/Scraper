@@ -37,6 +37,7 @@ def isolated_db(tmp_path, monkeypatch):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_job(**kwargs) -> Job:
     defaults = dict(name="test-job", urls=["https://example.com"])
     defaults.update(kwargs)
@@ -114,6 +115,7 @@ def _assert_job_field_parity(restored: Job, expected: Job) -> None:
 # test_sqlite_preserves_job_warnings
 # ---------------------------------------------------------------------------
 
+
 def test_sqlite_preserves_job_warnings_empty(isolated_db):
     """A job with no warnings attribute round-trips to an empty list in the row."""
     job = _make_job()
@@ -151,6 +153,7 @@ def test_sqlite_warnings_via_db(isolated_db):
 # ---------------------------------------------------------------------------
 # test_sqlite_preserves_acquisition_mode
 # ---------------------------------------------------------------------------
+
 
 def test_sqlite_preserves_acquisition_mode_default(isolated_db):
     """A job with no acquisition_mode attribute defaults to 'standard' in the row."""
@@ -203,6 +206,7 @@ def test_sqlite_acquisition_mode_not_overwritten_on_save(isolated_db):
 # test_sqlite_full_job_field_parity
 # ---------------------------------------------------------------------------
 
+
 def test_sqlite_full_job_field_parity(isolated_db):
     """Every important Job field survives a _job_to_row → _row_to_job round-trip."""
     job = _make_parity_job()
@@ -228,6 +232,7 @@ def test_sqlite_full_job_field_parity_via_db(isolated_db):
 # test_restart_recovery_persisted_to_db  (item 6)
 # ---------------------------------------------------------------------------
 
+
 def test_restart_recovery_writes_failed_status_to_db(isolated_db, monkeypatch):
     """load_state() must write FAILED back to SQLite, not just return it in-memory.
 
@@ -246,6 +251,7 @@ def test_restart_recovery_writes_failed_status_to_db(isolated_db, monkeypatch):
 
     # Now read the DB row directly — must also be FAILED, not RUNNING
     from app.job_store import _get_db_path
+
     conn = _sqlite3.connect(str(_get_db_path()))
     row = conn.execute("SELECT status FROM jobs WHERE id = ?", (job.id,)).fetchone()
     conn.close()

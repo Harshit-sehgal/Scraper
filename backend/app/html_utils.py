@@ -476,9 +476,7 @@ async def fetch_page_content(
             if hydration_wait_ms is not None:
                 settle_timeout = hydration_wait_ms / 1000.0
             else:
-                settle_timeout = (
-                    intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
-                )
+                settle_timeout = intel.hydration_delay_ms / 1000.0 if intel.hydration_delay_ms > 0 else settings.PAGE_SETTLE_DELAY
             settle_timeout = max(settle_timeout, 3.0)
 
             min_wait_ms = 2500
@@ -518,9 +516,7 @@ async def fetch_page_content(
             # Scroll handling — use recovery scroll_attempts if provided
             if strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
                 _scroll_attempts = 0
-                max_scrolls = (
-                    scroll_attempts if scroll_attempts is not None else getattr(settings, "MAX_SCROLL_ATTEMPTS", 3)
-                )
+                max_scrolls = scroll_attempts if scroll_attempts is not None else getattr(settings, "MAX_SCROLL_ATTEMPTS", 3)
                 last_height = await page.evaluate("document.body.scrollHeight")
                 while _scroll_attempts < max_scrolls:
                     await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -791,10 +787,7 @@ def _valid_phone(text: str) -> str | None:
     for c in candidates:
         c_norm = _compact_text(c).strip("- ,")
         digits = re.sub(r"\D", "", c_norm)
-        if (
-            len(digits) < settings.CONTACT_VALID_PHONE_MIN_DIGITS
-            or len(digits) > settings.CONTACT_VALID_PHONE_MAX_DIGITS
-        ):
+        if len(digits) < settings.CONTACT_VALID_PHONE_MIN_DIGITS or len(digits) > settings.CONTACT_VALID_PHONE_MAX_DIGITS:
             continue
         if c_norm not in seen:
             seen.add(c_norm)

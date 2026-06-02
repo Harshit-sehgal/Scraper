@@ -193,9 +193,7 @@ class ManifoldState:
 
         manifold[role] = vec
         self._set_struct("role_manifold", manifold)
-        self._record(
-            "apply_force_to_manifold", {"role": role, "deltas": deltas, "clamp": clamp, "displacement": displacement}
-        )
+        self._record("apply_force_to_manifold", {"role": role, "deltas": deltas, "clamp": clamp, "displacement": displacement})
 
     def compute_similarity(self, role_a: str, role_b: str) -> float:
         """Geometric similarity between two roles in the manifold."""
@@ -537,9 +535,7 @@ class ManifoldState:
             if self.has_manifold_role(role):
                 # Arbitration heuristic: more stable nodes have higher weight
                 l_inst = (
-                    self.__dict__.get("_energy_ref", {}).get_schema_instability(role)
-                    if hasattr(self, "_energy_ref")
-                    else 0.5
+                    self.__dict__.get("_energy_ref", {}).get_schema_instability(role) if hasattr(self, "_energy_ref") else 0.5
                 )
                 r_inst = remote_inst.get(role, 0.5)
 

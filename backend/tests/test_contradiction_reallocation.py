@@ -18,10 +18,7 @@ def test_field_conflict_drives_exclusion_learning():
         ],
     }
 
-    tokens = [
-        SemanticToken(raw="LAX", normalized="lax", primary_type=SemanticType.LOCATION,
-                      span=Span(0, 3), position=0)
-    ]
+    tokens = [SemanticToken(raw="LAX", normalized="lax", primary_type=SemanticType.LOCATION, span=Span(0, 3), position=0)]
 
     ws.observe_field_perturbation(output, tokens)
 
@@ -41,10 +38,8 @@ def test_no_field_conflict_does_not_reinforce():
 
     output = {"source": "JFK", "target": "LAX"}
     tokens = [
-        SemanticToken(raw="JFK", normalized="jfk", primary_type=SemanticType.LOCATION,
-                      span=Span(0, 3), position=0),
-        SemanticToken(raw="LAX", normalized="lax", primary_type=SemanticType.LOCATION,
-                      span=Span(4, 7), position=1)
+        SemanticToken(raw="JFK", normalized="jfk", primary_type=SemanticType.LOCATION, span=Span(0, 3), position=0),
+        SemanticToken(raw="LAX", normalized="lax", primary_type=SemanticType.LOCATION, span=Span(4, 7), position=1),
     ]
 
     # Observe clean record
@@ -125,12 +120,8 @@ def test_contradiction_pressure_triggers_restructuring():
     }
 
     tokens = [
-        SemanticToken(raw="LAX", normalized="lax",
-                      primary_type=SemanticType.LOCATION,
-                      span=Span(0, 3), position=0),
-        SemanticToken(raw="100", normalized="100",
-                      primary_type=SemanticType.NUMBER,
-                      span=Span(4, 7), position=1),
+        SemanticToken(raw="LAX", normalized="lax", primary_type=SemanticType.LOCATION, span=Span(0, 3), position=0),
+        SemanticToken(raw="100", normalized="100", primary_type=SemanticType.NUMBER, span=Span(4, 7), position=1),
     ]
 
     try:
@@ -170,9 +161,7 @@ def test_contradiction_pressure_low_does_not_restructure():
     }
 
     tokens = [
-        SemanticToken(raw="JFK", normalized="jfk",
-                      primary_type=SemanticType.LOCATION,
-                      span=Span(0, 3), position=0),
+        SemanticToken(raw="JFK", normalized="jfk", primary_type=SemanticType.LOCATION, span=Span(0, 3), position=0),
     ]
 
     try:

@@ -74,10 +74,7 @@ def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path):
 
     matrix = _load_module().build_matrix()
     unsafe = [
-        row for row in matrix
-        if row.path.startswith("/api/")
-        and row.method not in {"GET"}
-        and row.access == "authenticated-user"
+        row for row in matrix if row.path.startswith("/api/") and row.method not in {"GET"} and row.access == "authenticated-user"
     ]
 
     assert unsafe == []

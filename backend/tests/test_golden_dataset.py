@@ -62,12 +62,17 @@ def compute_f1(
     Returns dict with precision, recall, f1, and detail counts.
     """
     if not expected:
-        return {"precision": 1.0, "recall": 1.0, "f1": 1.0,
-                "true_positives": 0, "false_positives": 0, "false_negatives": 0}
+        return {"precision": 1.0, "recall": 1.0, "f1": 1.0, "true_positives": 0, "false_positives": 0, "false_negatives": 0}
 
     if not extracted:
-        return {"precision": 0.0, "recall": 0.0, "f1": 0.0,
-                "true_positives": 0, "false_positives": 0, "false_negatives": len(expected)}
+        return {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "true_positives": 0,
+            "false_positives": 0,
+            "false_negatives": len(expected),
+        }
 
     key_fields = key_fields or ["title"]
 
@@ -111,7 +116,7 @@ def compute_f1(
         "false_negatives": false_negatives,
         "extracted_count": len(extracted),
         "expected_count": len(expected),
-    }# ── Tests ─────────────────────────────────────────────────────────────────
+    }  # ── Tests ─────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.golden_dataset
@@ -174,9 +179,19 @@ async def test_golden_dataset_site(site_def, monkeypatch):
     except Exception as e:
         err_msg = str(e).lower()
         transient_indicators = [
-            "dns", "connection refused", "timeout", "network",
-            "unreachable", "503", "502", "504", "500", "temporarily unavailable",
-            "service unavailable", "bad gateway", "gateway timeout"
+            "dns",
+            "connection refused",
+            "timeout",
+            "network",
+            "unreachable",
+            "503",
+            "502",
+            "504",
+            "500",
+            "temporarily unavailable",
+            "service unavailable",
+            "bad gateway",
+            "gateway timeout",
         ]
         if any(indicator in err_msg for indicator in transient_indicators):
             pytest.skip(f"Skipping {site_id} due to transient network/server issue: {e}")
@@ -196,25 +211,25 @@ async def test_golden_dataset_site(site_def, monkeypatch):
     if is_transient_error_page:
         pytest.skip(f"Skipping {site_id} because the target page returned a transient server error (e.g., 503/502).")
 
-    assert len(results) >= min_expected, (
-        f"{site_id}: expected at least {min_expected} records, got {len(results)}"
-    )
+    assert len(results) >= min_expected, f"{site_id}: expected at least {min_expected} records, got {len(results)}"
 
     # Compare with expected output if available
     if expected:
         key_fields = list(fields_def.keys())[:2]  # First 2 fields as key
         f1_result = compute_f1(results, expected, key_fields=key_fields)
         # Log but don't fail — golden dataset thresholds are being refined
-        print(f"\n  [{site_id}] F1={f1_result['f1']:.3f} "
-              f"(precision={f1_result['precision']:.3f}, "
-              f"recall={f1_result['recall']:.3f}, "
-              f"extracted={f1_result['extracted_count']}, "
-              f"expected={f1_result['expected_count']})")
+        print(
+            f"\n  [{site_id}] F1={f1_result['f1']:.3f} "
+            f"(precision={f1_result['precision']:.3f}, "
+            f"recall={f1_result['recall']:.3f}, "
+            f"extracted={f1_result['extracted_count']}, "
+            f"expected={f1_result['expected_count']})"
+        )
         min_f1 = site_def.get("min_f1")
         assert min_f1 is not None, f"{site_id}: expected output exists but min_f1 is not configured"
-        assert f1_result["f1"] >= float(min_f1), (
-            f"{site_id}: F1 {f1_result['f1']:.3f} is below configured threshold {float(min_f1):.3f}"
-        )
+        assert f1_result["f1"] >= float(
+            min_f1
+        ), f"{site_id}: F1 {f1_result['f1']:.3f} is below configured threshold {float(min_f1):.3f}"
     else:
         print(f"\n  [{site_id}] {len(results)} records extracted (no expected output file)")
 
@@ -234,17 +249,11 @@ def test_golden_dataset_expected_files():
     for site in sites:
         expected = load_expected(site["id"])
         if expected is not None:
-            assert isinstance(expected, list), (
-                f"Expected output for {site['id']} should be a JSON array"
-            )
-            assert len(expected) > 0, (
-                f"Expected output for {site['id']} is empty"
-            )
+            assert isinstance(expected, list), f"Expected output for {site['id']} should be a JSON array"
+            assert len(expected) > 0, f"Expected output for {site['id']} is empty"
             # Validate record structure
             for i, record in enumerate(expected):
-                assert isinstance(record, dict), (
-                    f"Record {i} in {site['id']} expected output should be a dict"
-                )
+                assert isinstance(record, dict), f"Record {i} in {site['id']} expected output should be a dict"
 
 
 @pytest.mark.golden_dataset

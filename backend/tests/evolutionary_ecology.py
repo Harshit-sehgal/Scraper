@@ -61,7 +61,7 @@ class EcologyAnalyzer:
             "avg_fragmentation": round(avg_frag, 3),
             "avg_entropy": round(avg_ent, 3),
             "oscillation_events": self.oscillation_counts,
-            "duration_sec": round(time.time() - self.start_time, 2)
+            "duration_sec": round(time.time() - self.start_time, 2),
         }
 
 
@@ -94,9 +94,12 @@ def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.
 
             token_val = f"token_{role}_{i % 20}"
             token = SemanticToken(
-                raw=token_val, normalized=token_val,
-                span=Span(0, 5), position=0,
-                primary_type=ttype, type_distribution={ttype: 1.0}
+                raw=token_val,
+                normalized=token_val,
+                span=Span(0, 5),
+                position=0,
+                primary_type=ttype,
+                type_distribution={ttype: 1.0},
             )
             ws.capture_pre_allocation_field([token], roles)
             ws.apply_force_to_manifold(role, [random.uniform(-0.01, 0.01) for _ in range(16)])
@@ -121,8 +124,10 @@ def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.
 
         if i % (cycles // 10) == 0 and i > 0:
             stats = analyzer.summarize()
-            print(f"  [{i}] Diversity: {stats['avg_diversity']:.2f}, Frag: {stats['avg_fragmentation']:.2f}, "
-                  f"Oscillations: {stats['oscillation_events']}")
+            print(
+                f"  [{i}] Diversity: {stats['avg_diversity']:.2f}, Frag: {stats['avg_fragmentation']:.2f}, "
+                f"Oscillations: {stats['oscillation_events']}"
+            )
 
     print("\n--- Initiating Stabilization Phase (2000 cycles, no new signals) ---")
     for i in range(2000):

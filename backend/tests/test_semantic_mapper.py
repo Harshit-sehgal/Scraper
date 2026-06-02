@@ -195,9 +195,15 @@ class TestSemanticPatterns:
         """Every SemanticType should have at least one pattern defined."""
         patternless_types = []
         for stype in (
-            SemanticType.PRICE, SemanticType.DATE, SemanticType.EMAIL,
-            SemanticType.PHONE, SemanticType.RATING, SemanticType.URL,
-            SemanticType.IDENTIFIER, SemanticType.DURATION, SemanticType.CODE,
+            SemanticType.PRICE,
+            SemanticType.DATE,
+            SemanticType.EMAIL,
+            SemanticType.PHONE,
+            SemanticType.RATING,
+            SemanticType.URL,
+            SemanticType.IDENTIFIER,
+            SemanticType.DURATION,
+            SemanticType.CODE,
         ):
             if stype not in SEMANTIC_PATTERNS or not SEMANTIC_PATTERNS[stype]:
                 patternless_types.append(stype)
@@ -225,9 +231,7 @@ class TestMatchValuesToIntent:
         profile = self.make_empty_profile()
 
         records = [{"col1": "£238", "col2": "British Airways"}]
-        mappings = match_values_to_intent(
-            records, schema, profile, ValuePatterns()
-        )
+        mappings = match_values_to_intent(records, schema, profile, ValuePatterns())
 
         assert len(mappings) == 1
         mapping = mappings[0]
@@ -239,9 +243,7 @@ class TestMatchValuesToIntent:
         profile = self.make_empty_profile()
 
         records = [{"col1": "2026-05-22", "col2": "Lufthansa"}]
-        mappings = match_values_to_intent(
-            records, schema, profile, ValuePatterns()
-        )
+        mappings = match_values_to_intent(records, schema, profile, ValuePatterns())
 
         assert len(mappings) == 1
         assert mappings[0].mapped_fields.get("date") == "2026-05-22"
@@ -252,9 +254,7 @@ class TestMatchValuesToIntent:
         profile = self.make_empty_profile()
 
         records = [{"col1": "British Airways"}]
-        mappings = match_values_to_intent(
-            records, schema, profile, ValuePatterns()
-        )
+        mappings = match_values_to_intent(records, schema, profile, ValuePatterns())
 
         assert len(mappings) == 1
         mapping = mappings[0]

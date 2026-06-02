@@ -158,8 +158,7 @@ class TestSelectorDecayPredictor:
         """Test recommendations for critical risk level."""
         predictor = SelectorDecayPredictor()
         recs = predictor._generate_recommendations(
-            "example.com", "critical", 0.85, 0.3,
-            type("obj", (object,), {"age_factor": 0.3})()
+            "example.com", "critical", 0.85, 0.3, type("obj", (object,), {"age_factor": 0.3})()
         )
         assert any("URGENT" in r for r in recs)
         assert any("Re-discover" in r or "re-discover" in r for r in recs)
@@ -168,8 +167,7 @@ class TestSelectorDecayPredictor:
         """Test recommendations for stable risk level."""
         predictor = SelectorDecayPredictor()
         recs = predictor._generate_recommendations(
-            "example.com", "stable", 0.1, 0.0,
-            type("obj", (object,), {"age_factor": 0.9})()
+            "example.com", "stable", 0.1, 0.0, type("obj", (object,), {"age_factor": 0.9})()
         )
         assert any("stable" in r for r in recs)
         assert not any("URGENT" in r for r in recs)
@@ -187,6 +185,7 @@ class TestSelectorDecayPredictorGlobal:
     def test_snapshot_persistence(self, monkeypatch):
         """Test that confidence snapshots are persisted to JSON and successfully reloaded."""
         import os
+
         monkeypatch.setenv("TEST_SELECTOR_DECAY_PERSISTENCE", "1")
         predictor = SelectorDecayPredictor()
         predictor._confidence_snapshots.clear()

@@ -49,6 +49,7 @@ def test_attractor_skeletonization():
         # Force high certainty (variance = 0)
 
     from app.semantic_inference_engine import RoleEmbeddingEngine
+
     engine = RoleEmbeddingEngine()
     engine.ws = ws  # Force the test world state
 
@@ -58,6 +59,7 @@ def test_attractor_skeletonization():
     # 2. Attempt low-strength learning (should be skipped by Phase 66)
     c0 = ws.learning_count
     from app.semantic_ir import SemanticType
+
     engine.learn_from_allocation("role_a", SemanticType.TEXT, "data", success=True, delta=0.01)
 
     assert ws.learning_count == c0  # Learning skipped due to saturation

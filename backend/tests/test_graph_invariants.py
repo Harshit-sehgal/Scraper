@@ -88,7 +88,10 @@ def test_ownership_edge_no_self_ownership():
 def test_semantic_token_confidence_bounds():
     """Invariant: SemanticToken confidence values must be bounded [0, 1]."""
     tok = SemanticToken(
-        raw="test", normalized="test", span=Span(0, 4), position=0,
+        raw="test",
+        normalized="test",
+        span=Span(0, 4),
+        position=0,
         primary_type=SemanticType.TEXT,
     )
     assert len(tok.embedding) == 16
@@ -101,12 +104,14 @@ def test_event_dispatcher_dispatch_does_not_raise():
     dispatcher = get_dispatcher()
     for event_type in SemanticEventType:
         try:
-            dispatcher.dispatch(SemanticEvent(
-                event_type=event_type,
-                source="test",
-                payload={"test": True},
-                instability_delta=0.5,
-            ))
+            dispatcher.dispatch(
+                SemanticEvent(
+                    event_type=event_type,
+                    source="test",
+                    payload={"test": True},
+                    instability_delta=0.5,
+                )
+            )
         except Exception as e:
             pytest.fail(f"Dispatch of {event_type.value} raised: {e}")
 
@@ -114,12 +119,13 @@ def test_event_dispatcher_dispatch_does_not_raise():
 def test_owner_cannot_own_self_in_graph():
     """Invariant: Self-ownership must be rejected by graph construction."""
     g = SemanticGraph(regions=[])
-    g.ownership_edges.append(
-        OwnershipEdge(owner_region_id=5, owned_region_id=5, ownership_type="owns", confidence=1.0)
-    )
+    g.ownership_edges.append(OwnershipEdge(owner_region_id=5, owned_region_id=5, ownership_type="owns", confidence=1.0))
     region_a = SemanticRegion(
-        region_id=5, region_type=RegionType.MIXED,
-        tokens=[], start_position=0, end_position=1,
+        region_id=5,
+        region_type=RegionType.MIXED,
+        tokens=[],
+        start_position=0,
+        end_position=1,
     )
     g.regions = [region_a]
 
@@ -133,10 +139,15 @@ def test_graph_register_region_preserves_invariants():
     g = SemanticGraph(regions=[])
     ids = [0, 1, 2]
     for rid in ids:
-        g.regions.append(SemanticRegion(
-            region_id=rid, region_type=RegionType.UNKNOWN,
-            tokens=[], start_position=0, end_position=1,
-        ))
+        g.regions.append(
+            SemanticRegion(
+                region_id=rid,
+                region_type=RegionType.UNKNOWN,
+                tokens=[],
+                start_position=0,
+                end_position=1,
+            )
+        )
     # Verify no duplicate IDs
     all_ids = [r.region_id for r in g.regions]
     assert len(all_ids) == len(set(all_ids))

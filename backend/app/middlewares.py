@@ -59,15 +59,10 @@ async def body_size_middleware(request: Request, call_next):
 
 
 async def api_key_middleware(request: Request, call_next):
-
-    if (
-        settings.API_KEY or settings.ADMIN_API_KEY or getattr(settings, "OPERATOR_API_KEY", "")
-    ) and request.url.path.startswith("/api/"):
-        if (
-            request.method == "OPTIONS"
-            and request.headers.get("Origin")
-            and request.headers.get("Access-Control-Request-Method")
-        ):
+    if (settings.API_KEY or settings.ADMIN_API_KEY or getattr(settings, "OPERATOR_API_KEY", "")) and request.url.path.startswith(
+        "/api/"
+    ):
+        if request.method == "OPTIONS" and request.headers.get("Origin") and request.headers.get("Access-Control-Request-Method"):
             return await call_next(request)
         is_docs_path = "/docs" in request.url.path or "/openapi" in request.url.path
         if not is_docs_path or settings.ENV.lower() == "production":

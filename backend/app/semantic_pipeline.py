@@ -239,7 +239,7 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
         # 2. Motif Density
         for size in range(2, min(len(types) + 1, 4)):
             for start in range(len(types) - size + 1):
-                motif = tuple(types[start: start + size])
+                motif = tuple(types[start : start + size])
                 density_score += be.motif_learner.stability(motif) * 0.5
 
         # 3. Core Entity Centrality
@@ -268,18 +268,14 @@ def filter_noise_records(records: List[dict]) -> List[dict]:
                 state.increment_records()
                 filtered.append(record)
             else:
-                logging.getLogger(__name__).debug(
-                    "Filtered: core_count=1 but low relative density %f", normalized_density
-                )
+                logging.getLogger(__name__).debug("Filtered: core_count=1 but low relative density %f", normalized_density)
         else:
             logging.getLogger(__name__).debug("Filtered: core_count=0, density %f", normalized_density)
 
     return filtered
 
 
-def detect_role_swap_warnings(
-    output: dict, schema_fields: list, detect_type_fn: Callable, universal_roots: Any
-) -> list:
+def detect_role_swap_warnings(output: dict, schema_fields: list, detect_type_fn: Callable, universal_roots: Any) -> list:
     """Detect potential role swap warnings from allocation output."""
     from app.semantic_segmentation import sem_type_str
 
@@ -505,7 +501,7 @@ def run_pipeline(
             if tokens:
                 for size in range(2, min(len(type_sequence) + 1, 4)):
                     for start in range(len(type_sequence) - size + 1):
-                        motif = tuple(type_sequence[start: start + size])
+                        motif = tuple(type_sequence[start : start + size])
                         stability = state.get_motif_stability(motif)
                         if stability > 0.01:
                             for role_name in schema_fields:

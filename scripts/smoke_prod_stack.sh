@@ -258,7 +258,7 @@ if [ -n "$JOB_ID" ]; then
         JOB_STATUS=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" \
             "$SMOKE_BASE_URL/api/jobs/$JOB_ID" 2>/dev/null || echo '{"status":"unreachable"}')
         STATUS_VALUE=$(echo "$JOB_STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))" 2>/dev/null || echo "unknown")
-        
+
         if echo "$STATUS_VALUE" | grep -qE "$TERMINAL_STATUSES"; then
             echo -e "  $PASS  Job reached terminal status: $STATUS_VALUE"
             JOB_REACHED_TERMINAL=true
@@ -282,7 +282,7 @@ if [ -n "$JOB_ID" ]; then
         RESULTS_RESPONSE=$(curl -s -H "X-API-Key: $DATAFORGE_API_KEY" \
             "$SMOKE_BASE_URL/api/jobs/$JOB_ID/results" 2>/dev/null || echo '{"results":[]}')
         RECORD_COUNT=$(echo "$RESULTS_RESPONSE" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('results', [])))" 2>/dev/null || echo "0")
-        
+
         if [ "$RECORD_COUNT" -ge 2 ]; then
             echo -e "  $PASS  Extraction works end-to-end! Extracted $RECORD_COUNT records (expected >= 2)"
         else

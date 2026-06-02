@@ -87,9 +87,9 @@ def test_ci_prometheus_check_matches_production_mount_layout():
     workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "ci.yml"
     content = workflow.read_text()
 
-    assert '$PWD/prometheus.yml:/etc/prometheus/prometheus.yml:ro' in content
-    assert '$PWD/prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro' in content
-    assert '$PWD:/etc/prometheus:ro' not in content
+    assert "$PWD/prometheus.yml:/etc/prometheus/prometheus.yml:ro" in content
+    assert "$PWD/prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro" in content
+    assert "$PWD:/etc/prometheus:ro" not in content
 
 
 def test_ci_does_not_install_optional_g4f_by_default():
@@ -166,16 +166,15 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch):
     def mock_persist_state(**kwargs):
         nonlocal persist_called
         persist_called = True
+
     monkeypatch.setattr("app.services.state.persist_state", mock_persist_state)
 
     # Mock infer_source_metadata to return a mock inferred dict
     from app import discovery
+
     monkeypatch.setattr(
-        discovery,
-        "infer_source_metadata",
-        lambda url: {
-            "source_type": "inferred_type",
-            "source_trust_score": 0.85})
+        discovery, "infer_source_metadata", lambda url: {"source_type": "inferred_type", "source_trust_score": 0.85}
+    )
 
     # Seed a job with unknown source_type
     job_id = "test_backfill_job"
@@ -206,6 +205,7 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch):
 def test_create_job_enqueue_failure_cleanup(client, monkeypatch):
     """Verify that if enqueue fails in production, the job is removed from memory and repository (not left orphaned)."""
     from app.config import settings
+
     monkeypatch.setattr(settings, "ENV", "production")
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "test-key")
     monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
@@ -214,6 +214,7 @@ def test_create_job_enqueue_failure_cleanup(client, monkeypatch):
     class FailingQueue:
         async def enqueue(self, *args, **kwargs):
             raise Exception("Queue is dead")
+
     monkeypatch.setattr("app.worker_queue.get_worker_queue", lambda: FailingQueue())
 
     payload = {
@@ -223,11 +224,7 @@ def test_create_job_enqueue_failure_cleanup(client, monkeypatch):
         "schema_fields": [{"name": "company_name", "field_type": "string", "required": True}],
     }
 
-    resp = client.post(
-        "/api/jobs",
-        json=payload,
-        headers={"X-API-Key": "test-key"}
-    )
+    resp = client.post("/api/jobs", json=payload, headers={"X-API-Key": "test-key"})
     assert resp.status_code == 503
     assert "Failed to enqueue job" in resp.json()["detail"]
 
@@ -238,6 +235,7 @@ def test_create_job_enqueue_failure_cleanup(client, monkeypatch):
 def test_auto_discovery_url_filtering(client, monkeypatch):
     """Verify that auto-discovered URLs are filtered against SSRF protections in both API and Job runner contexts."""
     from app.config import settings
+
     monkeypatch.setattr(settings, "ENV", "production")
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "test-operator-key")
 
@@ -247,18 +245,13 @@ def test_auto_discovery_url_filtering(client, monkeypatch):
             {"url": "https://example.com/safe-item"},
             {"url": "http://127.0.0.1/unsafe-loopback"},
             {"url": "http://nginx/unsafe-internal"},
-            {"url": "https://google.com/safe-google"}
+            {"url": "https://google.com/safe-google"},
         ]
 
     monkeypatch.setattr("app.routers.jobs.discover_urls", mock_discover)
 
     # Verify discover API endpoint filters out loopback & internal targets
-    payload = {
-        "topic": "test",
-        "domain": "example.com",
-        "num_results": 5,
-        "schema_field_names": ["title"]
-    }
+    payload = {"topic": "test", "domain": "example.com", "num_results": 5, "schema_field_names": ["title"]}
     resp = client.post(
         "/api/discover",
         json=payload,
@@ -288,9 +281,7 @@ async def test_search_form_recovery_ssrf_blocking(monkeypatch):
     """
 
     res = await _try_form_search_recovery(
-        landing_page_html=landing_page_html,
-        landing_page_url="https://example.com",
-        search_params={"q": "test-search"}
+        landing_page_html=landing_page_html, landing_page_url="https://example.com", search_params={"q": "test-search"}
     )
 
     assert res["success"] is False
@@ -301,6 +292,7 @@ def test_backend_cors_origins_enforcement(client, monkeypatch):
     """Verify that backend CORS rejects/allows origins based on settings.CORS_ORIGINS."""
     from app import main as main_mod
     from app.config import settings
+
     # Set production-like API auth and CORS settings. Preflight requests must
     # still be answered by CORSMiddleware without requiring an API key.
     monkeypatch.setattr(settings, "API_KEY", "testkey")
@@ -345,12 +337,13 @@ def test_backend_cors_origins_enforcement(client, monkeypatch):
 def test_body_size_limit_normal_payload(client, monkeypatch):
     """Verify that a normal payload under 5MB passes the body-size limit middleware."""
     from app.config import settings
+
     monkeypatch.setattr(settings, "API_KEY", "testkey")
 
     resp = client.post(
         "/api/jobs",
         json={"name": "test-size", "mode": "manual", "urls": ["https://example.com"]},
-        headers={"X-API-Key": "testkey"}
+        headers={"X-API-Key": "testkey"},
     )
     assert resp.status_code != 413
 
@@ -358,15 +351,14 @@ def test_body_size_limit_normal_payload(client, monkeypatch):
 def test_body_size_limit_oversized_payload(client, monkeypatch):
     """Verify that an oversized payload (> 5MB) with Content-Length is rejected with 413."""
     from app.config import settings
+
     monkeypatch.setattr(settings, "API_KEY", "testkey")
 
     # 6MB of data
     large_data = "a" * (6 * 1024 * 1024)
 
     resp = client.post(
-        "/api/jobs",
-        content=large_data.encode("utf-8"),
-        headers={"X-API-Key": "testkey", "Content-Type": "application/json"}
+        "/api/jobs", content=large_data.encode("utf-8"), headers={"X-API-Key": "testkey", "Content-Type": "application/json"}
     )
     assert resp.status_code == 413
     assert "too large" in resp.json()["detail"]
@@ -375,6 +367,7 @@ def test_body_size_limit_oversized_payload(client, monkeypatch):
 def test_body_size_limit_chunked_normal(client, monkeypatch):
     """Verify that chunked/streaming requests under 5MB are accepted."""
     from app.config import settings
+
     monkeypatch.setattr(settings, "API_KEY", "testkey")
 
     async def chunk_generator():
@@ -383,9 +376,7 @@ def test_body_size_limit_chunked_normal(client, monkeypatch):
         yield b'"urls": ["https://example.com"]}'
 
     resp = client.post(
-        "/api/jobs",
-        content=chunk_generator(),
-        headers={"X-API-Key": "testkey", "Content-Type": "application/json"}
+        "/api/jobs", content=chunk_generator(), headers={"X-API-Key": "testkey", "Content-Type": "application/json"}
     )
     assert resp.status_code != 413
 
@@ -393,6 +384,7 @@ def test_body_size_limit_chunked_normal(client, monkeypatch):
 def test_body_size_limit_chunked_oversized(client, monkeypatch):
     """Verify that chunked/streaming requests without Content-Length exceeding 5MB are rejected with 413."""
     from app.config import settings
+
     monkeypatch.setattr(settings, "API_KEY", "testkey")
 
     # A generator yielding 6MB in chunks
@@ -402,9 +394,7 @@ def test_body_size_limit_chunked_oversized(client, monkeypatch):
             yield chunk
 
     resp = client.post(
-        "/api/jobs",
-        content=chunk_generator(),
-        headers={"X-API-Key": "testkey", "Content-Type": "application/octet-stream"}
+        "/api/jobs", content=chunk_generator(), headers={"X-API-Key": "testkey", "Content-Type": "application/octet-stream"}
     )
     assert resp.status_code == 413
     assert "too large" in resp.json()["detail"]

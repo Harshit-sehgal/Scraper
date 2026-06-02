@@ -197,9 +197,7 @@ async def scrape_url_with_recovery(
                 user_message=user_message,
                 recommended_next_action=recommend or _recommended_action_for_state(state),
                 recovery_method=(
-                    ", ".join(recovery_stats["recovery_actions_taken"])
-                    if recovery_stats["recovery_actions_taken"]
-                    else None
+                    ", ".join(recovery_stats["recovery_actions_taken"]) if recovery_stats["recovery_actions_taken"] else None
                 ),
             )
             recovery_stats["acquisition_lineage"] = lineage.to_dict()

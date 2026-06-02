@@ -77,6 +77,7 @@ def test_nested_transaction_causality():
 
 def test_semantic_os_gateway():
     from app.semantic_os import get_semantic_os
+
     sos = get_semantic_os()
     sos.reset_engine()
 

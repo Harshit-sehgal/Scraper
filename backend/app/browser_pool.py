@@ -294,15 +294,11 @@ class BrowserPool:
 
     def _should_recycle(self) -> bool:
         if self._cumulative_fetches >= settings.BROWSER_MAX_CUMULATIVE_FETCHES:
-            logger.info(
-                "[BrowserPool] Cumulative fetches (%d) reached limit. Recycling required.", self._cumulative_fetches
-            )
+            logger.info("[BrowserPool] Cumulative fetches (%d) reached limit. Recycling required.", self._cumulative_fetches)
             return True
         rss = self._get_rss_memory()
         if rss > settings.BROWSER_MAX_RSS_MEMORY_MB * 1024 * 1024:
-            logger.info(
-                "[BrowserPool] Process RSS memory (%.2f MB) exceeded limit. Recycling required.", rss / (1024 * 1024)
-            )
+            logger.info("[BrowserPool] Process RSS memory (%.2f MB) exceeded limit. Recycling required.", rss / (1024 * 1024))
             return True
         return False
 
@@ -314,9 +310,7 @@ class BrowserPool:
         self._recycle_event.clear()
 
         while self._active_fetches > 0:
-            logger.info(
-                "[BrowserPool] Waiting for %d active fetches to drain before recycling...", self._active_fetches
-            )
+            logger.info("[BrowserPool] Waiting for %d active fetches to drain before recycling...", self._active_fetches)
             await asyncio.sleep(settings.BROWSER_DRAIN_POLL_INTERVAL)
 
         logger.info("[BrowserPool] Active fetches drained to 0. Performing hard browser process recycle.")

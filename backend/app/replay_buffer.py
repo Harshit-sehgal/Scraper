@@ -413,7 +413,7 @@ class ReplayBuffer:
             sorted_segs = sorted(self._segments)
             try:
                 idx = sorted_segs.index(current_seg)
-                return sorted_segs[idx + 1:]
+                return sorted_segs[idx + 1 :]
             except ValueError:
                 return []
 

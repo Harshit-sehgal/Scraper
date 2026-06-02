@@ -45,6 +45,7 @@ class TestHealthEndpoint:
     def test_health_is_fast(self):
         """/health should respond quickly (lightweight check)."""
         import time
+
         start = time.monotonic()
         for _ in range(10):
             client.get("/health")
@@ -102,6 +103,7 @@ class TestDomainPolicyEndpoint:
     def test_domain_policy_includes_domain_keys(self):
         """After recording failures, the endpoint should include that domain."""
         from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
+
         reset_domain_runtime_policy()
         policy = get_domain_runtime_policy()
         policy.record_failure("https://test-domain-policy.com/page")
@@ -112,6 +114,7 @@ class TestDomainPolicyEndpoint:
     def test_domain_policy_includes_recommended_action(self):
         """Each domain entry should include a recommended_action."""
         from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
+
         reset_domain_runtime_policy()
         policy = get_domain_runtime_policy()
         policy.record_failure("https://test-action.com/page")
@@ -124,8 +127,10 @@ class TestDomainPolicyEndpoint:
     def test_domain_policy_fields(self):
         """Each domain entry should have the expected fields."""
         from app.domain_runtime_policy import reset_domain_runtime_policy
+
         reset_domain_runtime_policy()
         from app.domain_runtime_policy import get_domain_runtime_policy
+
         policy = get_domain_runtime_policy()
         policy.record_failure("https://test-fields.com/page")
         policy.record_success("https://test-fields-ok.com/page")
@@ -223,9 +228,7 @@ class TestReadyWithMockedPostgres:
     def test_ready_reports_postgres_backend(self, monkeypatch):
         """/ready should report postgres backend when Postgres repository is active."""
         mock_repo = self._make_mock_postgres_repo(healthy=True)
-        monkeypatch.setattr(
-            "app.main.get_job_repository", lambda: mock_repo
-        )
+        monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
 
         response = client.get("/ready")
         assert response.status_code == 200
@@ -238,9 +241,7 @@ class TestReadyWithMockedPostgres:
     def test_ready_returns_503_when_postgres_unhealthy(self, monkeypatch):
         """/ready should return 503 when Postgres repository is unhealthy."""
         mock_repo = self._make_mock_postgres_repo(healthy=False)
-        monkeypatch.setattr(
-            "app.main.get_job_repository", lambda: mock_repo
-        )
+        monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
 
         response = client.get("/ready")
         assert response.status_code == 503
@@ -251,9 +252,7 @@ class TestReadyWithMockedPostgres:
     def test_storage_status_reports_postgres_counts(self, monkeypatch):
         """/api/system/storage/status should report postgres backend with counts."""
         mock_repo = self._make_mock_postgres_repo(healthy=True)
-        monkeypatch.setattr(
-            "app.main.get_job_repository", lambda: mock_repo
-        )
+        monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
 
         response = client.get("/api/system/storage/status")
         assert response.status_code == 200
@@ -267,9 +266,7 @@ class TestReadyWithMockedPostgres:
     def test_storage_status_reports_postgres_unhealthy(self, monkeypatch):
         """/api/system/storage/status should report postgres as not ok when unhealthy."""
         mock_repo = self._make_mock_postgres_repo(healthy=False)
-        monkeypatch.setattr(
-            "app.main.get_job_repository", lambda: mock_repo
-        )
+        monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
 
         response = client.get("/api/system/storage/status")
         assert response.status_code == 200

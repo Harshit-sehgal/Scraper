@@ -230,7 +230,7 @@ class MotifLearner:
         # Record all n-grams of length 2 - 4 as motifs
         for size in range(2, min(len(types) + 1, 5)):
             for start in range(len(types) - size + 1):
-                motif = tuple(types[start: start + size])
+                motif = tuple(types[start : start + size])
                 ws.reinforce_motif(motif)
 
     def stability(self, motif: Tuple[str, ...]) -> float:
@@ -255,9 +255,7 @@ class SemanticBoundaryEngine:
     def decision_history(self) -> list:
         return get_world_state().decision_history
 
-    def score_pair(
-        self, type_a: str, type_b: str, value_a: str, value_b: str, position_a: int, position_b: int
-    ) -> BoundaryScore:
+    def score_pair(self, type_a: str, type_b: str, value_a: str, value_b: str, position_a: int, position_b: int) -> BoundaryScore:
         """Score an adjacent token pair for cohesion vs separation."""
         score = BoundaryScore()
 
@@ -339,9 +337,7 @@ class SemanticBoundaryEngine:
         """Import learned memory from persistence."""
         get_world_state().from_dict(state)
 
-    def decide_merge(
-        self, type_a: str, type_b: str, value_a: str, value_b: str, position_a: int, position_b: int
-    ) -> bool:
+    def decide_merge(self, type_a: str, type_b: str, value_a: str, value_b: str, position_a: int, position_b: int) -> bool:
         score = self.score_pair(type_a, type_b, value_a, value_b, position_a, position_b)
         return score.should_merge()
 

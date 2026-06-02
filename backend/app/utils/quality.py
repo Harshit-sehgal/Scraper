@@ -28,8 +28,7 @@ def compute_source_breakdown(results: list[dict]) -> dict:
 
     total = len(results)
     return {
-        domain: {"count": count, "percentage": round(count / total, 3) if total > 0 else 0.0}
-        for domain, count in counts.items()
+        domain: {"count": count, "percentage": round(count / total, 3) if total > 0 else 0.0} for domain, count in counts.items()
     }
 
 
@@ -121,9 +120,7 @@ def _value_quality(field: SchemaField, value) -> float:
         if any(c in text for c in "$£€¥₹"):
             score += 0.2
     elif field.field_type == FieldType.RATING:
-        if any(c.isdigit() for c in text) or any(
-            w in text.lower() for w in ["one", "two", "three", "four", "five", "star"]
-        ):
+        if any(c.isdigit() for c in text) or any(w in text.lower() for w in ["one", "two", "three", "four", "five", "star"]):
             score += 0.5
     elif field.field_type == FieldType.NUMBER:
         if re.match(r"^-?\d+(\.\d+)?$", text):
@@ -216,9 +213,7 @@ def build_quality_report(
     source_trust_scores = [safe_score(r.get("source_trust_score", 0.4)) for r in final_results if isinstance(r, dict)]
     avg_source_trust = round(mean(source_trust_scores), 3) if source_trust_scores else 0.4
 
-    coverage_ratio = (
-        round((len(final_results) / len(raw_results)), 3) if raw_results else (1.0 if final_results else 0.0)
-    )
+    coverage_ratio = round((len(final_results) / len(raw_results)), 3) if raw_results else (1.0 if final_results else 0.0)
     mismatch_count = int((type_integrity_report or {}).get("total_type_mismatches") or 0)
     mismatch_ratio = mismatch_count / max(1, len(final_results))
 
@@ -248,9 +243,7 @@ def build_quality_report(
         "direct": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") == "direct"),
         "recovered": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") == "recovered"),
         "session_expired": sum(
-            1
-            for lin in (acquisition_lineages or [])
-            if "session" in lin.get("state", "") or "recovery" in lin.get("state", "")
+            1 for lin in (acquisition_lineages or []) if "session" in lin.get("state", "") or "recovery" in lin.get("state", "")
         ),
         "anti_bot_blocked": sum(1 for lin in (acquisition_lineages or []) if lin.get("state") == "anti_bot_blocked"),
         "empty_response": sum(

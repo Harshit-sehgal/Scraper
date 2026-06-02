@@ -3,9 +3,7 @@ from app.models import SourcePolicy
 
 
 def test_looks_noisy_url_blocks_configured_dead_domain():
-    assert _looks_noisy_url(
-        "https://quickfinds.org/listing/top-10-interior-design-company-in-chennai"
-    ) is True
+    assert _looks_noisy_url("https://quickfinds.org/listing/top-10-interior-design-company-in-chennai") is True
 
 
 def test_contact_field_bias_prefers_directory_sources():

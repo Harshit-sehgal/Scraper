@@ -64,6 +64,7 @@ def test_anchors_resist_melting():
 
 def test_local_reservoir_burst():
     from app.core_types import FieldConflictRegion
+
     region = FieldConflictRegion(competing_roles=["a", "b"], token="X", instability=0.8)
     region.local_convergence = 0.2
 

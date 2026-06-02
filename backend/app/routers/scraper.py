@@ -734,9 +734,7 @@ async def get_all_strategies_report():
 
 
 @router.post("/strategy/evolve/{domain}")
-async def evolve_domain_strategy(
-    domain: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
-):
+async def evolve_domain_strategy(domain: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
     """Manually trigger strategy evolution for a domain.
 
     Useful when current strategy is degraded.

@@ -8,11 +8,14 @@ precise performance latency percentiles, and verifies load capacity.
 Usage:
     python3 scripts/run_load_test.py --url http://localhost:8000/health --concurrency 50 --requests 500
 """
-import sys
-import time
+
 import argparse
 import asyncio
+import sys
+import time
+
 import httpx
+
 
 async def send_request(client: httpx.AsyncClient, url: str) -> float:
     start = time.time()
@@ -24,6 +27,7 @@ async def send_request(client: httpx.AsyncClient, url: str) -> float:
     elapsed = time.time() - start
     return elapsed if status == 200 else -1.0
 
+
 async def worker(url: str, num_requests: int, queue: asyncio.Queue, results: list):
     async with httpx.AsyncClient() as client:
         while True:
@@ -31,10 +35,11 @@ async def worker(url: str, num_requests: int, queue: asyncio.Queue, results: lis
                 _ = queue.get_nowait()
             except asyncio.QueueEmpty:
                 break
-            
+
             latency = await send_request(client, url)
             results.append(latency)
             queue.task_done()
+
 
 async def run_load_test(url: str, concurrency: int, total_requests: int):
     print("=" * 70)
@@ -51,10 +56,7 @@ async def run_load_test(url: str, concurrency: int, total_requests: int):
     start_time = time.time()
 
     # Start workers
-    workers = [
-        asyncio.create_task(worker(url, total_requests, queue, results))
-        for _ in range(concurrency)
-    ]
+    workers = [asyncio.create_task(worker(url, total_requests, queue, results)) for _ in range(concurrency)]
 
     await queue.join()
 
@@ -63,7 +65,7 @@ async def run_load_test(url: str, concurrency: int, total_requests: int):
         w.cancel()
 
     total_elapsed = time.time() - start_time
-    
+
     # Process results
     latencies = [r * 1000 for r in results if r >= 0.0]  # to ms
     failures = len(results) - len(latencies)
@@ -74,7 +76,7 @@ async def run_load_test(url: str, concurrency: int, total_requests: int):
 
     latencies.sort()
     count = len(latencies)
-    
+
     avg_latency = sum(latencies) / count
     p50 = latencies[int(count * 0.50)]
     p90 = latencies[int(count * 0.90)]
@@ -107,20 +109,22 @@ async def run_load_test(url: str, concurrency: int, total_requests: int):
         print("  [OK] Load test validation threshold passed successfully.")
         sys.exit(0)
 
+
 def main():
     parser = argparse.ArgumentParser(description="DataForge Scraper Load Test Utility")
     parser.add_argument("--url", default="http://localhost:8000/health", help="Target URL to load test")
     parser.add_argument("--concurrency", type=int, default=30, help="Number of concurrent workers")
     parser.add_argument("--requests", type=int, default=300, help="Total requests to dispatch")
-    
+
     args = parser.parse_args()
-    
+
     # Run async loop
     try:
         asyncio.run(run_load_test(args.url, args.concurrency, args.requests))
     except KeyboardInterrupt:
         print("\nTest interrupted.")
         sys.exit(130)
+
 
 if __name__ == "__main__":
     main()

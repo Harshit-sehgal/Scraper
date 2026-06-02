@@ -101,8 +101,7 @@ def validate_production_credentials(settings) -> None:
             )
         if _is_weak_or_placeholder(val):
             raise ValueError(
-                f"Production check failed: {name} is set to a weak/placeholder value. "
-                f"Please generate a strong random key."
+                f"Production check failed: {name} is set to a weak/placeholder value. " f"Please generate a strong random key."
             )
         if len(val) < 16:
             raise ValueError(
@@ -119,8 +118,7 @@ def validate_production_credentials(settings) -> None:
         db_url = settings.DATABASE_URL
         if not db_url:
             raise ValueError(
-                "Production check failed: STORAGE_BACKEND is set to postgres but "
-                "DATAFORGE_DATABASE_URL is not configured."
+                "Production check failed: STORAGE_BACKEND is set to postgres but " "DATAFORGE_DATABASE_URL is not configured."
             )
 
         try:
@@ -133,7 +131,7 @@ def validate_production_credentials(settings) -> None:
             raise ValueError(
                 "Production check failed: DATAFORGE_DATABASE_URL does not contain a password. "
                 "A strong database password is required."
-        )
+            )
 
         password = password.strip()
         if _is_weak_or_placeholder(password):

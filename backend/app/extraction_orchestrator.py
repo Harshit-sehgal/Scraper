@@ -335,10 +335,7 @@ async def orchestrate_extraction(
         )
 
         dom_cov = sum(
-            1
-            for r in dom_records[:20]
-            for f in schema_fields
-            if r.get(f.name) is not None and str(r.get(f.name, "")).strip()
+            1 for r in dom_records[:20] for f in schema_fields if r.get(f.name) is not None and str(r.get(f.name, "")).strip()
         ) / max(len(dom_records[:20]) * len(schema_fields), 1)
         net_cov = network_result.field_coverage
         net_score = network_result.score
@@ -481,9 +478,7 @@ async def orchestrate_extraction(
                     ExtractionResult(provided_results, "discovery", selector_success=True, selectors=provided_selectors)
                 )
             else:
-                logger.info(
-                    "[Orchestrator] Provided selectors LOW QUALITY (avg score: %.2f), falling through", avg_score
-                )
+                logger.info("[Orchestrator] Provided selectors LOW QUALITY (avg score: %.2f), falling through", avg_score)
                 if provenance_builder:
                     provenance_builder.add_fallback_step("provided_selectors_low_quality")
         else:
@@ -505,9 +500,7 @@ async def orchestrate_extraction(
     )
     remembered_selectors = None if skip_memory else memory.get_selectors(url)
     if force_container_discovery:
-        logger.info(
-            "[Orchestrator] Recovery requested force_container_discovery — skipping selectors, memory, and LLM discovery"
-        )
+        logger.info("[Orchestrator] Recovery requested force_container_discovery — skipping selectors, memory, and LLM discovery")
         if provenance_builder:
             provenance_builder.add_fallback_step("force_container_discovery")
     elif provided_selectors and provided_selectors.get("force_llm_discovery"):
@@ -861,9 +854,7 @@ def _check_type_compatibility(field_type: FieldType, values: list) -> float:
         return bool_match / len(str_vals)
 
     if field_type == FieldType.DATE:
-        date_match = sum(
-            1 for v in str_vals if re.search(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4}", v)
-        )
+        date_match = sum(1 for v in str_vals if re.search(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4}", v))
         return date_match / len(str_vals)
 
     # STRING, LIST_STRING, CODE, RATING, LOCATION, NUMBER — generic types,

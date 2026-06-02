@@ -85,6 +85,7 @@ def test_manifold_solidification_adversarial():
     # Role vector must remain near PRICE despite noise
     from app.semantic_allocation_engine import _get_role_engine
     from app.semantic_ir import SemanticType
+
     reng = _get_role_engine()
     compat = reng.get_compatibility("price", SemanticType.PRICE)
     assert compat > 0.8  # Still highly compatible with PRICE despite noise

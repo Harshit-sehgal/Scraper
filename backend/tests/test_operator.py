@@ -1,4 +1,5 @@
 """Tests for the operator router: mode switching, dashboard, predictions."""
+
 from __future__ import annotations
 
 import asyncio
@@ -170,9 +171,7 @@ class TestDashboard:
             # Mock telemetry
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = [
-                {"fallback_triggered": False} if i < 15
-                else {"fallback_triggered": True}
-                for i in range(20)
+                {"fallback_triggered": False} if i < 15 else {"fallback_triggered": True} for i in range(20)
             ]
             mock_telemetry.return_value = telemetry_instance
 
@@ -217,17 +216,12 @@ class TestPredictionEndpoints:
         ):
             # Telemetry with data
             telemetry_instance = MagicMock()
-            telemetry_instance.get_recent.return_value = [
-                {"url": "https://example.com/page", "success": True}
-                for _ in range(10)
-            ]
+            telemetry_instance.get_recent.return_value = [{"url": "https://example.com/page", "success": True} for _ in range(10)]
             mock_telemetry.return_value = telemetry_instance
 
             # Mock TrendAnalyzer
             mock_analyzer = MagicMock()
-            mock_analyzer.analyze.return_value = MagicMock(
-                domain_trends={"example.com": {"health_score": 80.0}}
-            )
+            mock_analyzer.analyze.return_value = MagicMock(domain_trends={"example.com": {"health_score": 80.0}})
             mock_analyzer_cls.return_value = mock_analyzer
 
             # Mock predictor
@@ -255,16 +249,11 @@ class TestPredictionEndpoints:
             patch("app.routers.operator.TrendAnalyzer") as mock_analyzer_cls,
         ):
             telemetry_instance = MagicMock()
-            telemetry_instance.get_recent.return_value = [
-                {"url": "https://example.com/page", "success": True}
-                for _ in range(10)
-            ]
+            telemetry_instance.get_recent.return_value = [{"url": "https://example.com/page", "success": True} for _ in range(10)]
             mock_telemetry.return_value = telemetry_instance
 
             mock_analyzer = MagicMock()
-            mock_analyzer.analyze.return_value = MagicMock(
-                domain_trends={"example.com": {"health_score": 80.0}}
-            )
+            mock_analyzer.analyze.return_value = MagicMock(domain_trends={"example.com": {"health_score": 80.0}})
             mock_analyzer_cls.return_value = mock_analyzer
 
             predictor_instance = MagicMock()
@@ -289,9 +278,7 @@ class TestPredictionEndpoints:
     def test_get_domain_prediction_not_found(self, client):
         with patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry:
             telemetry_instance = MagicMock()
-            telemetry_instance.get_recent.return_value = [
-                {"url": "https://other.com/page", "success": True}
-            ]
+            telemetry_instance.get_recent.return_value = [{"url": "https://other.com/page", "success": True}]
             mock_telemetry.return_value = telemetry_instance
 
             resp = client.get("/api/operator/predictions/unknown.com")
@@ -312,9 +299,7 @@ class TestHealthSummary:
             patch("app.routers.operator.get_governance_dashboard") as mock_dash,
         ):
             telemetry_instance = MagicMock()
-            telemetry_instance.get_recent.return_value = [
-                {"fallback_triggered": False} for _ in range(20)
-            ]
+            telemetry_instance.get_recent.return_value = [{"fallback_triggered": False} for _ in range(20)]
             mock_telemetry.return_value = telemetry_instance
 
             pool_instance = MagicMock()
@@ -348,8 +333,7 @@ class TestHealthSummary:
         ):
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = [
-                {"fallback_triggered": False} if i < 10 else {"fallback_triggered": True}
-                for i in range(20)
+                {"fallback_triggered": False} if i < 10 else {"fallback_triggered": True} for i in range(20)
             ]
             mock_telemetry.return_value = telemetry_instance
 

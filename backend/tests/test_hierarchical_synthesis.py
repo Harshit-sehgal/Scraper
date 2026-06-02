@@ -101,10 +101,12 @@ def test_hierarchical_interpretation():
     ws._abstraction.create_envelope("contact_group", ["phone", "email"], centroid)
 
     # 2. Interpreting with abstraction_gradient=0 (passive abstraction)
-    record = SemanticRecord(tokens=[
-        SemanticToken("555-0100", "5550100", Span(0, 8), 0, [0.5] * 16, SemanticType.PHONE),
-        SemanticToken("test@example.com", "test@example.com", Span(10, 25), 1, [0.5] * 16, SemanticType.TEXT)
-    ])
+    record = SemanticRecord(
+        tokens=[
+            SemanticToken("555-0100", "5550100", Span(0, 8), 0, [0.5] * 16, SemanticType.PHONE),
+            SemanticToken("test@example.com", "test@example.com", Span(10, 25), 1, [0.5] * 16, SemanticType.TEXT),
+        ]
+    )
 
     # Interpret only the envelope
     rec, graph = allocate_semantic_roles(record, ["contact_group"], abstraction_gradient=0.0)
@@ -155,7 +157,7 @@ def test_cross_domain_knowledge_synthesis():
             "remote_env": {
                 "constituents": ["r2"],
                 "manifold_vec": [0.51] * 16,  # very close
-                "level": 1
+                "level": 1,
             }
         }
     }

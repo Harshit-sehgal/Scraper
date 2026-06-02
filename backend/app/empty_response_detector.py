@@ -186,16 +186,12 @@ def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseChe
         elif best_type == "redirect_meta":
             suggestions.append("Page uses meta-refresh redirect — follow the redirect target URL")
         elif best_type == "minimal":
-            suggestions.append(
-                "Page has very little content — URL may be incorrect or page may need different parameters"
-            )
+            suggestions.append("Page has very little content — URL may be incorrect or page may need different parameters")
 
         return EmptyResponseCheck(
             is_empty=is_empty,
             empty_type=best_type,
-            confidence=round(
-                best_conf,
-                2),
+            confidence=round(best_conf, 2),
             message=f"Page appears to be a {best_type} with {text_length} chars of visible text and {data_signals} data signals",
             text_length=text_length,
             data_signals=data_signals,

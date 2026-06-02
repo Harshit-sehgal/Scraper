@@ -208,8 +208,7 @@ class TrendAnalyzer:
                         "severity": "medium",
                         "domain": domain,
                         "message": (
-                            f"Anti-bot pressure increasing on {domain} — "
-                            f"may need proxy rotation or reduced frequency"
+                            f"Anti-bot pressure increasing on {domain} — " f"may need proxy rotation or reduced frequency"
                         ),
                         "health_score": trend.health_score,
                     }

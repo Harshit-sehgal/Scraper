@@ -243,6 +243,7 @@ class TestSelectorMemoryCleanup:
         # Create a healthy selector
         domain = "healthy-domain.com"
         import time
+
         now = time.time()
         selector_memory._memory[domain] = {
             "selectors": {"css": ".product"},
@@ -265,6 +266,7 @@ class TestSelectorMemoryCleanup:
 
         # Create multiple selectors with varying confidence
         import time
+
         now = time.time()
 
         for i in range(3):
@@ -293,7 +295,7 @@ class TestRecoveryHandlers:
         from app.recovery_handlers import handle_rotate_proxy
 
         # Mock proxy manager
-        with patch('app.recovery_handlers.get_proxy_manager') as mock_pm:
+        with patch("app.recovery_handlers.get_proxy_manager") as mock_pm:
             mock_mgr = MagicMock()
             mock_mgr.enabled = True
             mock_mgr.current_proxy = "http://proxy1:8080"
@@ -312,6 +314,7 @@ class TestRecoveryHandlers:
         context: dict = {}
 
         import time
+
         start = time.time()
         result = await handle_backoff_and_slow(params, context)
         elapsed = (time.time() - start) * 1000
