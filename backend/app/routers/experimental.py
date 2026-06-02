@@ -70,7 +70,7 @@ def _require_admin_key(request: Request):
 
 @router.get("/api/system/topology")
 async def system_topology():
-    """Exposes the raw state of the semantic cognition substrate."""
+    """Exposes the raw state of the experimental semantic world model."""
     from app.semantic_world_state import get_world_state
 
     ws = get_world_state()
