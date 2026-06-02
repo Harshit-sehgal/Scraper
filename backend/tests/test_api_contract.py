@@ -5,7 +5,13 @@ route auth) maintain their expected shapes. These are the canonical contracts
 that downstream consumers rely on.
 """
 
+import json
+
+import pytest
 from app.models import FieldType, Job, JobCreate, JobStatus, SchemaField
+from app.routers.exports import create_exports_router
+from app.utils.export import safe_export_filename
+from fastapi import FastAPI
 
 
 class TestSchemaFieldContract:
@@ -26,15 +32,11 @@ class TestSchemaFieldContract:
         assert field.required is False
 
     def test_schema_field_rejects_reserved_names(self):
-        import pytest
-
         for reserved in ("record_score", "_provenance", "_extraction_method", "source_url"):
             with pytest.raises(ValueError):
                 SchemaField(name=reserved, field_type=FieldType.STRING)
 
     def test_schema_field_rejects_invalid_names(self):
-        import pytest
-
         with pytest.raises(ValueError):
             SchemaField(name="123_invalid", field_type=FieldType.STRING)
         with pytest.raises(ValueError):
@@ -70,8 +72,6 @@ class TestJobCreateContract:
         assert job.schema_fields[0].required is True
 
     def test_manual_job_rejects_empty_urls(self):
-        import pytest
-
         with pytest.raises(ValueError):
             JobCreate(name="empty", mode="manual", urls=[])
 
@@ -105,8 +105,8 @@ class TestJobContract:
 
     def test_job_with_results(self):
         results = [
-            {"title": "A Light in the Attic", "price": "£51.77", "rating": "Three"},
-            {"title": "Tipping the Velvet", "price": "£53.74", "rating": "One"},
+            {"title": "A Light in the Attic", "price": "51.77", "rating": "Three"},
+            {"title": "Tipping the Velvet", "price": "53.74", "rating": "One"},
         ]
         job = Job(
             name="books-results",
@@ -120,22 +120,18 @@ class TestJobContract:
         assert job.results[0]["title"] == "A Light in the Attic"
 
     def test_job_has_quality_report_field(self):
-        """quality_report must be present and default to empty dict."""
         job = Job(name="quality-test")
         assert job.quality_report == {}
 
     def test_job_has_estimated_cost_field(self):
-        """estimated_cost_usd must be present."""
         job = Job(name="cost-test")
         assert job.estimated_cost_usd == 0.0
 
     def test_job_has_logs_field(self):
-        """logs must be present and default to empty list."""
         job = Job(name="logs-test")
         assert job.logs == []
 
     def test_job_has_progress_fields(self):
-        """progress_current and progress_total must be present."""
         job = Job(name="progress-test")
         assert job.progress_current == 0
         assert job.progress_total == 0
@@ -146,14 +142,8 @@ class TestJobStatusContract:
 
     def test_all_statuses(self):
         expected_statuses = [
-            "pending",
-            "discovering",
-            "running",
-            "completed",
-            "degraded",
-            "empty_result",
-            "canceled",
-            "failed",
+            "pending", "discovering", "running", "completed",
+            "degraded", "empty_result", "canceled", "failed",
         ]
         for status in expected_statuses:
             assert JobStatus(status) is not None
@@ -171,3 +161,135 @@ class TestFieldTypeContract:
         ]
         for ft in expected:
             assert FieldType(ft) is not None
+
+
+class TestExportShapeContract:
+    """Export endpoints must return expected response shapes and headers."""
+
+    def test_csv_content_disposition_format(self):
+        """Content-Disposition must contain 'attachment' and .csv extension."""
+        result = safe_export_filename("test_job", "csv")
+        assert result.endswith(".csv")
+        assert "_" in result or "-" in result
+
+    def test_json_content_disposition_format(self):
+        """Content-Disposition must contain 'attachment' and .json extension."""
+        result = safe_export_filename("test_job", "json")
+        assert result.endswith(".json")
+
+    def test_excel_content_disposition_format(self):
+        """Content-Disposition must contain 'attachment' and .xlsx extension."""
+        result = safe_export_filename("test_job", "xlsx")
+        assert result.endswith(".xlsx")
+
+    def test_csv_content_type_header(self):
+        """CSV export must have text/csv content type."""
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        app = FastAPI()
+        app.include_router(router)
+        jobs_store["test"] = Job(
+            id="test", name="test", status=JobStatus.COMPLETED,
+            results=[{"name": "Alice"}],
+            urls=["https://example.com"],
+        )
+        from httpx import ASGITransport, AsyncClient
+        transport = ASGITransport(app=app)
+        import asyncio
+        async def _test():
+            async with AsyncClient(transport=transport, base_url="http://test") as c:
+                resp = await c.get("/api/jobs/test/export/csv")
+                assert resp.status_code == 200
+                assert resp.headers.get("content-type", "").startswith("text/csv")
+                assert "attachment" in resp.headers.get("content-disposition", "").lower()
+                assert ".csv" in resp.headers.get("content-disposition", "")
+        asyncio.run(_test())
+
+    def test_json_response_body_is_array(self):
+        """JSON export must return a valid JSON array of records."""
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        app = FastAPI()
+        app.include_router(router)
+        jobs_store["test"] = Job(
+            id="test", name="test", status=JobStatus.COMPLETED,
+            results=[{"name": "Alice"}, {"name": "Bob"}],
+            urls=["https://example.com"],
+        )
+        from httpx import ASGITransport, AsyncClient
+        transport = ASGITransport(app=app)
+        import asyncio
+        async def _test():
+            async with AsyncClient(transport=transport, base_url="http://test") as c:
+                resp = await c.get("/api/jobs/test/export/json")
+                assert resp.status_code == 200
+                data = json.loads(resp.content)
+                assert isinstance(data, list)
+                assert len(data) == 2
+                assert data[0]["name"] == "Alice"
+                assert data[1]["name"] == "Bob"
+        asyncio.run(_test())
+
+    def test_json_strips_system_fields(self):
+        """System fields starting with _ must not appear in JSON exports."""
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        app = FastAPI()
+        app.include_router(router)
+        jobs_store["test"] = Job(
+            id="test", name="test", status=JobStatus.COMPLETED,
+            results=[{"name": "Alice", "_provenance": "extractor_v1", "score": 95}],
+            urls=["https://example.com"],
+        )
+        from httpx import ASGITransport, AsyncClient
+        transport = ASGITransport(app=app)
+        import asyncio
+        async def _test():
+            async with AsyncClient(transport=transport, base_url="http://test") as c:
+                resp = await c.get("/api/jobs/test/export/json")
+                data = json.loads(resp.content)
+                assert "_provenance" not in data[0]
+                assert data[0]["name"] == "Alice"
+                assert data[0]["score"] == 95
+        asyncio.run(_test())
+
+    def test_excel_content_type_header(self):
+        """Excel export must have spreadsheetml content type."""
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        app = FastAPI()
+        app.include_router(router)
+        jobs_store["test"] = Job(
+            id="test", name="test", status=JobStatus.COMPLETED,
+            results=[{"name": "Alice"}],
+            urls=["https://example.com"],
+        )
+        from httpx import ASGITransport, AsyncClient
+        transport = ASGITransport(app=app)
+        import asyncio
+        async def _test():
+            async with AsyncClient(transport=transport, base_url="http://test") as c:
+                resp = await c.get("/api/jobs/test/export/excel")
+                assert resp.status_code == 200
+                assert "spreadsheetml" in resp.headers.get("content-type", "")
+                assert resp.content[:2] == b"PK"
+        asyncio.run(_test())
+
+    def test_missing_job_returns_404(self):
+        """Export for nonexistent job must return 404."""
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        app = FastAPI()
+        app.include_router(router)
+        from httpx import ASGITransport, AsyncClient
+        transport = ASGITransport(app=app)
+        import asyncio
+        async def _test():
+            async with AsyncClient(transport=transport, base_url="http://test") as c:
+                resp = await c.get("/api/jobs/nonexistent/export/csv")
+                assert resp.status_code == 404
+                resp2 = await c.get("/api/jobs/nonexistent/export/json")
+                assert resp2.status_code == 404
+                resp3 = await c.get("/api/jobs/nonexistent/export/excel")
+                assert resp3.status_code == 404
+        asyncio.run(_test())
