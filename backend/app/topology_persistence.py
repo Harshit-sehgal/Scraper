@@ -6,11 +6,11 @@ serialization and lifecycle operations.
 Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
 """
 
-from typing import Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.topology_state import TopologyState
-    from app.core_types import FieldConflictRegion
+    # FieldConflictRegion is imported at function level to avoid redefinition warnings
 
 
 # ─── Bulk Region Lifecycle ──────────────────────────────────────────────
