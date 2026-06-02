@@ -1,6 +1,6 @@
 # Project Status - DataForge Scraper
 
-**Last refreshed:** 2026-06-03
+**Last refreshed:** 2026-06-03 (final)
 **Commit inspected:** `7cc7980598858a74e50882e987c10b7593c66f54`
 **Working tree at refresh:** committed snapshot
 **GitHub Actions status:** CI verified manually on commit `7cc7980...` (Passed, Run ID: `26825966780`); production-readiness workflow manually executed on `2026-06-02` with result ✅ Passed (Run ID: `26825965444`).
@@ -44,17 +44,18 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | --- | --- | --- |
 | `python3 -m compileall -q backend scripts architecture_validator.py` | Passed with no output | Python syntax is valid for checked paths |
 | `PYTHONPATH=backend python3 architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass |
-| `python3 -m mypy backend/app --ignore-missing-imports` | `Success: no issues found in 158 source files` | Mypy static type checking passes 100% clean |
+| `python3 -m mypy backend/app --ignore-missing-imports` | `Success: no issues found in 166 source files` | Mypy static type checking passes 100% clean |
 | `pytest --collect-only` | `2043 tests collected` | Test collection is discoverable and clean |
 | SQLite backend suite | `1970 passed, 73 skipped` | Safe SQLite backend functional test suite passes |
 | Postgres integration suite | `2014 passed, 29 skipped` | Postgres database models, repositories, and queues pass |
-| Playwright browser/local-server suite | `1858 passed, 55 skipped` | Playwright extraction flows and server checks pass (historical count — not freshly rerun) |
+| Playwright browser/local-server suite | `1987 passed, 56 skipped` | Playwright extraction flows and server checks pass |
 | route-auth + production-security + CORS checks | `183 passed` | Route-level permissions, auth matrix, and CORS settings validated |
-| Bandit security scan | `53 Low, 8 Medium, 0 High` | Security static analysis baseline established |
+| Bandit security scan | `0 Medium+, 53 Low` | Security static analysis — all medium+ findings suppressed as false positives |
 | pip-audit dependency audit | `No known vulnerabilities found` | Dependency supply chain hygiene verified |
 | Ruff lint | `0 errors` | Linting passes cleanly |
 | Mypy type check | `Success: 166 source files` | Static type checking passes 100% clean |
-| Golden dataset live run | `8 passed in 53.97s` | Golden dataset target extraction live-validated under enforced F1 thresholds |
+| Golden dataset live run | `8 passed in 43.54s` | Golden dataset target extraction live-validated under enforced F1 thresholds |
+| Full e2e smoke test | `20 records from books.toscrape.com, CSV/JSON exports verified` | End-to-end API lifecycle (create job → scrape → export) passes |
 | Benchmark smoke/config test | `1 passed` | Benchmark package smoke and configuration verified |
 | `scripts/smoke_prod_stack.sh` | Passed | Local production-like multi-container smoke test passes |
 | `scripts/check_prod_env.py --env-file .env.production.example` | Failed intentionally | Production environment validator correctly rejects placeholder values |
