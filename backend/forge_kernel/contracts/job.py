@@ -156,6 +156,8 @@ class Job(BaseModel):
     error: Optional[str] = None
     results: list[dict] = Field(default_factory=list)
     analysis: Optional[str] = None
+    results_on_disk: bool = False
+    results_file_path: Optional[str] = None
     quality_report: dict = Field(default_factory=dict)
     estimated_cost_usd: float = 0.0
     total_llm_calls: int = 0
