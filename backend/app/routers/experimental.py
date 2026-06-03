@@ -25,7 +25,10 @@ def verify_experimental_enabled():
     if not settings.ENABLE_EXPERIMENTAL_ROUTES:
         raise HTTPException(
             status_code=404,
-            detail="Experimental / research routes are disabled in this environment. Set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable them.",
+            detail=(
+                "Experimental / research routes are disabled in this environment. "
+                "Set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable them."
+            ),
         )
 
 

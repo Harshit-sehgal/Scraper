@@ -51,6 +51,10 @@ class JobRepository(ABC):
         """Atomically upsert or save a single job's status, progress, or logs."""
         pass
 
+    def health_check(self) -> dict:
+        """Check repository health. Returns a dict with 'ok' key and backend info."""
+        return {"ok": True, "backend": self.__class__.__name__}
+
     # ─── Individual repository operations (avoid full-state rewrites) ────
 
     def is_cancel_requested(self, job_id: str) -> bool:

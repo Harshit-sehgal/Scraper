@@ -14,24 +14,22 @@ import zipfile
 from enum import Enum
 
 from app.config import settings
+from app.globals import CONFIG, jobs_store, recycle_bin_store
+from app.selector_discovery import analyze_url_for_fields
+from app.url_safety import validate_public_http_url
 from app.utils.rbac import UserRole, require_role
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
+router = APIRouter(tags=["system"])
 
 
 def get_job_repository():
     import app.main
 
     return app.main.get_job_repository()
-
-
-from app.globals import CONFIG, jobs_store, recycle_bin_store
-from app.selector_discovery import analyze_url_for_fields
-from app.url_safety import validate_public_http_url
-
-logger = logging.getLogger(__name__)
-router = APIRouter(tags=["system"])
 
 
 class AcquisitionMode(str, Enum):
@@ -57,10 +55,10 @@ class URLPreviewRequest(BaseModel):
 async def storage_status():
     """Detailed storage backend status."""
     repo = get_job_repository()
-    if hasattr(repo, "health_check"):
+    if getattr(repo, "backend", "") == "postgres":
         health = repo.health_check()
         return {
-            "backend": "postgres",
+            "backend": getattr(repo, "backend", "postgres"),
             "ok": health.get("ok", False),
             "error": health.get("error"),
             "schema_version": health.get("schema_version", 0),

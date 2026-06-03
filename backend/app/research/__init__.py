@@ -183,7 +183,7 @@ _EXTRA_RESEARCH_MODULES: FrozenSet[str] = frozenset(
 RESEARCH_MODULES = RESEARCH_MODULES | _EXTRA_RESEARCH_MODULES
 
 
-def is_research_module(name: str) -> bool:
+def is_research_module(name: str | None) -> bool:
     """Return True if `name` is a research/experimental module.
 
     `name` may be a bare module basename (e.g. `"semantic_world_state"`)
@@ -199,7 +199,7 @@ def is_research_module(name: str) -> bool:
     return is_research_path(name)
 
 
-def is_research_path(qualified_name: str) -> bool:
+def is_research_path(qualified_name: str | None) -> bool:
     """Return True if a fully-qualified module name is part of the research shell.
 
     Examples:

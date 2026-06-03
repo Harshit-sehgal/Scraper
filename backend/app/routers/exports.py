@@ -4,6 +4,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 
+from app.config import settings
 from app.utils.export import safe_export_filename
 from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
@@ -60,9 +61,6 @@ def _safe_cell(value):
     if isinstance(value, str) and value.startswith(_DANGEROUS_PREFIXES):
         return "'" + value
     return value
-
-
-from app.config import settings
 
 
 def create_exports_router(jobs_store: dict):
