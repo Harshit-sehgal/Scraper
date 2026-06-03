@@ -10,6 +10,7 @@ Prints session-bound detection, network captures, source arbitration, and securi
 import asyncio
 import json
 import sys
+import typing
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parent.parent / "backend"
@@ -39,7 +40,7 @@ async def fetch_and_capture(url: str) -> tuple[str, list[dict], dict]:
 
     html = ""
     captured_payloads = []
-    state = {}
+    state: dict[str, typing.Any] = {}
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -76,7 +77,7 @@ async def fetch_and_capture(url: str) -> tuple[str, list[dict], dict]:
     return html, captured_payloads, state
 
 
-def check_secret_leakage(records: list[dict], field_map: any) -> bool:
+def check_secret_leakage(records: list[dict], field_map: typing.Any) -> bool:
     """Check if raw secrets leak into serialized output."""
     data_to_serialize = {"records": records, "field_map": {k: v.__dict__ for k, v in field_map.items()} if field_map else {}}
     serialized = json.dumps(data_to_serialize).lower()
@@ -87,7 +88,7 @@ def check_secret_leakage(records: list[dict], field_map: any) -> bool:
     return False
 
 
-async def smoke(url: str, fields_str: str = None):
+async def smoke(url: str, fields_str: str | None = None):
     # 1. Session detection
     session = detect_session_params(url)
     session_bound = session.get("is_session_bound", False)
@@ -138,7 +139,7 @@ async def smoke(url: str, fields_str: str = None):
     net_result = extract_from_network_payloads(payloads, schema_fields)
 
     # 4. Extract from DOM (using container discovery / default fallback step)
-    dom_records = []
+    dom_records: list[dict] = []
     dom_score = 0.0
     if html:
         evidence = collect_page_evidence(html, url=url)
