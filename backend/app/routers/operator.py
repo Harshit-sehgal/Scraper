@@ -31,6 +31,43 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/operator", tags=["operator"])
 
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.degradation_predictor import get_degradation_predictor
+    from app.domain_health_alerts import get_domain_health_monitor
+    from app.trend_analyzer import TrendAnalyzer
+    from app.visualization import get_governance_dashboard
+else:
+    # --- Dynamic delegation to research-shell modules to keep imports lazy but mockable ---
+    def get_governance_dashboard(*args, **kwargs):
+        from app.visualization import get_governance_dashboard as impl
+
+        return impl(*args, **kwargs)
+
+    def get_domain_health_monitor(*args, **kwargs):
+        from app.domain_health_alerts import get_domain_health_monitor as impl
+
+        return impl(*args, **kwargs)
+
+    def get_degradation_predictor(*args, **kwargs):
+        from app.degradation_predictor import get_degradation_predictor as impl
+
+        return impl(*args, **kwargs)
+
+    class TrendAnalyzer:
+        def __new__(cls, *args, **kwargs):
+            from app.trend_analyzer import TrendAnalyzer as impl
+
+            return impl(*args, **kwargs)
+
+        @classmethod
+        def extract_domain(cls, *args, **kwargs):
+            from app.trend_analyzer import TrendAnalyzer as impl
+
+            return impl.extract_domain(*args, **kwargs)
+
+
 class ModeBody(BaseModel):
     """Request body for switching operator modes."""
 
@@ -49,7 +86,7 @@ async def get_current_mode():
     Returns the active operator profile and the corresponding
     runtime settings that are currently applied.
     """
-    from app.visualization import OperatorMode, get_governance_dashboard  # research-shell, lazy
+    from app.visualization import OperatorMode  # research-shell, lazy
 
     dashboard = get_governance_dashboard()
     governance_summary = dashboard.get_governance_summary()
@@ -81,7 +118,7 @@ async def set_operator_mode(request: Request, body: ModeBody, _role: UserRole = 
     Args:
         body.mode: One of 'production', 'benchmark', 'forensic', 'stealth', 'low_cost'.
     """
-    from app.visualization import OperatorMode, get_governance_dashboard  # research-shell, lazy
+    from app.visualization import OperatorMode  # research-shell, lazy
 
     mode = body.mode
     try:
@@ -123,9 +160,6 @@ async def get_system_dashboard():
     - Telemetry stats (recent scrape success / failure counts)
     - Resource governor report (memory, queue, token spend)
     """
-    from app.domain_health_alerts import get_domain_health_monitor  # research-shell, lazy
-    from app.visualization import get_governance_dashboard  # research-shell, lazy
-
     dashboard = get_governance_dashboard()
     governance = dashboard.get_governance_summary()
 
@@ -192,9 +226,6 @@ async def get_degradation_predictions(
     Returns:
         A prediction report with per-domain predictions and system risk.
     """
-    from app.degradation_predictor import get_degradation_predictor  # research-shell, lazy
-    from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
-
     telemetry_history = get_scrape_telemetry().get_recent(window)
 
     if not telemetry_history:
@@ -247,9 +278,6 @@ async def get_domain_prediction(
     Returns:
         Predictions for the specified domain.
     """
-    from app.degradation_predictor import get_degradation_predictor  # research-shell, lazy
-    from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
-
     telemetry_history = get_scrape_telemetry().get_recent(window)
 
     # Filter to only this domain's events
@@ -294,9 +322,6 @@ async def get_operator_health_summary():
     Returns essential health indicators at a glance.
     Optimized for frequent polling by the frontend dashboard.
     """
-    from app.domain_health_alerts import get_domain_health_monitor  # research-shell, lazy
-    from app.visualization import get_governance_dashboard  # research-shell, lazy
-
     # Telemetry quick stats
     telemetry = get_scrape_telemetry()
     recent = telemetry.get_recent(20)

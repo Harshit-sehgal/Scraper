@@ -9,7 +9,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 from weakref import WeakKeyDictionary
 
-from app.semantic_world_state import get_world_state
+
+def get_world_state() -> "SemanticWorldState":
+    import app.semantic_world_state
+
+    return app.semantic_world_state.get_world_state()
+
 
 if TYPE_CHECKING:
     from app.semantic_world_state import SemanticWorldState
@@ -19,7 +24,7 @@ class SubstratePolicy:
     """Governs when and how automated actions and structural changes occur."""
 
     def __init__(self, ws: Optional[SemanticWorldState] = None):
-        self.ws = ws or get_world_state()
+        self.ws: SemanticWorldState = ws or get_world_state()
         # Phase 68: Operational Guardrails
         self.max_community_density = 15  # Max roles per cluster
         self.critical_entropy_threshold = 0.8

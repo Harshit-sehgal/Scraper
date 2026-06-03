@@ -14,7 +14,6 @@ import logging
 import os
 
 from app.config import settings
-from app.semantic_world_state import get_world_state
 
 _STATE_LOCK_PATH: str | None = None
 
@@ -57,7 +56,9 @@ def load_semantic_state():
     try:
         with open(path, "r") as f:
             full_state = json.load(f)
-        ws = get_world_state()
+        import app.semantic_world_state
+
+        ws = app.semantic_world_state.get_world_state()
         ws.from_dict(full_state)
         logging.getLogger(__name__).info("Loaded unified semantic state from %s", path)
     except Exception as e:
@@ -70,7 +71,9 @@ def save_semantic_state():
     path = get_canonical_cache_path()
     lock_fd = _acquire_lock()
     try:
-        ws = get_world_state()
+        import app.semantic_world_state
+
+        ws = app.semantic_world_state.get_world_state()
         full_state = ws.to_dict()
         full_state["version"] = "3.0"
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -91,7 +94,9 @@ def clear_semantic_state(clear_file: bool = True):
             os.remove(path)
 
     # Reset unified world state
-    get_world_state().clear()
+    import app.semantic_world_state
+
+    app.semantic_world_state.get_world_state().clear()
 
     # Ensure bootstrap values are re-applied if needed (the engines' __init__ handles this if they are re-instantiated,
     # but since they might be singletons, we should be careful. Actually RoleTransitionDetector re-applies it in __init__
@@ -99,4 +104,4 @@ def clear_semantic_state(clear_file: bool = True):
     # manually re-apply.)
     from app.semantic_boundary_engine import _BOOTSTRAP_TRANSITIONS
 
-    get_world_state().update_seed_transition(_BOOTSTRAP_TRANSITIONS)
+    app.semantic_world_state.get_world_state().update_seed_transition(_BOOTSTRAP_TRANSITIONS)

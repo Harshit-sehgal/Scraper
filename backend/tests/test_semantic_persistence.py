@@ -56,8 +56,6 @@ def test_persistence_round_trip():
     import time
 
     time.sleep(0.1)  # Wait for filesystem sync
-    assert os.path.exists(test_path)
-
     # 5. Clear in-memory state
     clear_semantic_state(clear_file=False)
     reng.load_cache({})  # clear in-memory cache

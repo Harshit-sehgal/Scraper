@@ -12,6 +12,7 @@ kernel's startup import graph. This file pins the new contract:
 
 from __future__ import annotations
 
+import importlib
 import sys
 
 import pytest
@@ -43,7 +44,7 @@ def test_url_redirects_does_not_load_acquisition_state_at_import(clean_url_redir
 
     This is the contract that the Phase R2 quarantine established.
     """
-    import app.url_redirects  # noqa: F401
+    importlib.import_module("app.url_redirects")
 
     assert "app.acquisition_state" not in sys.modules, (
         "app.url_redirects eagerly imported app.acquisition_state at "

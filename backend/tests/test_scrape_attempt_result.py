@@ -3,7 +3,28 @@
 from __future__ import annotations
 
 import pytest
-from app.scraper import ScrapeAttemptResult, scrape_url_attempt
+
+
+class LazyClassMeta(type):
+    def __instancecheck__(cls, instance):
+        import app.scraper
+
+        return isinstance(instance, app.scraper.ScrapeAttemptResult)
+
+
+class ScrapeAttemptResult(metaclass=LazyClassMeta):
+    def __new__(cls, *args, **kwargs):
+        import app.scraper
+
+        return app.scraper.ScrapeAttemptResult(*args, **kwargs)
+
+
+async def scrape_url_attempt(*args, **kwargs):
+    import app.scraper
+
+    return await app.scraper.scrape_url_attempt(*args, **kwargs)
+
+
 from app.zero_result_classifier import ZeroResultClassification
 
 # ── Helper: Stub crawl policy that allows all ──────────────────────────

@@ -13,7 +13,12 @@ from typing import Any, Callable, Dict, List, Optional
 
 from app.event_dispatcher import get_dispatcher
 from app.semantic_events import SemanticEvent, SemanticEventType
-from app.semantic_world_state import get_world_state
+
+
+def get_world_state():
+    import app.semantic_world_state
+
+    return app.semantic_world_state.get_world_state()
 
 
 class TaskPriority(IntEnum):

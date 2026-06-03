@@ -30,6 +30,7 @@ modules?".
 
 from __future__ import annotations
 
+import importlib
 import os
 import sys
 
@@ -108,7 +109,7 @@ def _clean_import_app_main():
     # every intermediate module between app.main and the research leaks.
     for name in _IMPORT_CHAIN_MODULES:
         sys.modules.pop(name, None)
-    import app.main  # noqa: F401
+    importlib.import_module("app.main")
 
 
 # ─── Phase R1 achievement tests ─────────────────────────────────────────────
@@ -141,16 +142,7 @@ def test_app_main_does_not_load_experimental_router_when_gate_off():
 # import. The test fails if the module is NOT loaded, which would
 # mean someone fixed the leak and forgot to update this file.
 
-LEAKY_MODULES: tuple[str, ...] = (
-    # Imported by backend/app/scraper_recovery_integration.py at top
-    # level via `from app.acquisition_state import ...`. Phase R3 will
-    # move this behind a lazy/gated import.
-    "app.acquisition_state",
-    # Imported by backend/app/selector_discovery.py at top level via
-    # `from app.strategy_evolution import FetchStrategy`. Phase R3 will
-    # move this behind a lazy/gated import.
-    "app.strategy_evolution",
-)
+LEAKY_MODULES: tuple[str, ...] = ()
 
 
 # ─── Phase R2 achievements: leaks that have been fixed ─────────────────────
@@ -161,6 +153,8 @@ LEAKY_MODULES: tuple[str, ...] = (
 FIXED_MODULES: tuple[str, ...] = (
     "app.semantic_world_state",
     "app.intent_parser",
+    "app.acquisition_state",
+    "app.strategy_evolution",
 )
 
 

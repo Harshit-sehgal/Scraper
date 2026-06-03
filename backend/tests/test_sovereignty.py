@@ -1,6 +1,51 @@
-from app.semantic_allocation_engine import _get_role_engine, seed_role_engine
-from app.semantic_ir import SemanticType, create_token
-from app.semantic_world_state import get_world_state
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def reset_sovereignty_state():
+    import app.semantic_allocation_engine
+    import app.semantic_world_state
+
+    app.semantic_world_state.reset_world_state()
+    app.semantic_allocation_engine.reset_role_engine()
+    yield
+    app.semantic_world_state.reset_world_state()
+    app.semantic_allocation_engine.reset_role_engine()
+
+
+def _get_role_engine(*args, **kwargs):
+    import app.semantic_allocation_engine
+
+    return app.semantic_allocation_engine._get_role_engine(*args, **kwargs)
+
+
+def seed_role_engine(*args, **kwargs):
+    import app.semantic_allocation_engine
+
+    return app.semantic_allocation_engine.seed_role_engine(*args, **kwargs)
+
+
+class LazyEnumMeta(type):
+    def __getattr__(cls, name):
+        import app.semantic_ir
+
+        return getattr(app.semantic_ir.SemanticType, name)
+
+
+class SemanticType(metaclass=LazyEnumMeta):
+    pass
+
+
+def create_token(*args, **kwargs):
+    import app.semantic_ir
+
+    return app.semantic_ir.create_token(*args, **kwargs)
+
+
+def get_world_state(*args, **kwargs):
+    import app.semantic_world_state
+
+    return app.semantic_world_state.get_world_state(*args, **kwargs)
 
 
 def test_manifold_transfer():

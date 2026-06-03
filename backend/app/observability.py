@@ -681,10 +681,10 @@ class ObservabilityState:
 def field_summary(ws: SemanticWorldState) -> dict:
     """Return a summary of the field's current energetic state."""
     return {
-        "energy": ws.metrics.global_energy,  # type: ignore
-        "entropy": ws.metrics.global_entropy,  # type: ignore
-        "temperature": ws.metrics.semantic_temperature,  # type: ignore
-        "integrity": ws.metrics.integrity_score,  # type: ignore
+        "energy": ws.metrics.global_energy,
+        "entropy": ws.metrics.global_entropy,
+        "temperature": ws.metrics.semantic_temperature,
+        "integrity": ws.metrics.integrity_score,
     }
 
 

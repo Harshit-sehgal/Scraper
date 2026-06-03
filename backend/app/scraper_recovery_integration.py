@@ -19,20 +19,57 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from app.acquisition_state import AcquisitionLineage, AcquisitionState
 from app.config import settings
 from app.domain_intelligence import get_domain_intelligence
 from app.failure_classification import FailureCategory, classify_failure
 from app.models import SchemaField
-from app.recovery_strategies import AttemptContext, get_recovery_executor, get_recovery_strategist
 from app.selector_memory import get_selector_memory
+
+if TYPE_CHECKING:
+    from app.acquisition_state import AcquisitionLineage, AcquisitionState
+    from app.recovery_strategies import AttemptContext, get_recovery_executor, get_recovery_strategist
+else:
+    # --- Dynamic delegation to research-shell modules to keep imports lazy but mockable ---
+    class LazyEnumMeta(type):
+        def __getattr__(cls, name):
+            from app.acquisition_state import AcquisitionState as impl
+
+            return getattr(impl, name)
+
+    class AcquisitionState(metaclass=LazyEnumMeta):
+        pass
+
+    class AcquisitionLineage:
+        def __new__(cls, *args, **kwargs):
+            from app.acquisition_state import AcquisitionLineage as impl
+
+            return impl(*args, **kwargs)
+
+    class AttemptContext:
+        def __new__(cls, *args, **kwargs):
+            from app.recovery_strategies import AttemptContext as impl
+
+            return impl(*args, **kwargs)
+
+    def get_recovery_executor(*args, **kwargs):
+        from app.recovery_strategies import get_recovery_executor as impl
+
+        return impl(*args, **kwargs)
+
+    def get_recovery_strategist(*args, **kwargs):
+        from app.recovery_strategies import get_recovery_strategist as impl
+
+        return impl(*args, **kwargs)
+
 
 logger = logging.getLogger(__name__)
 
 
 def _recommended_action_for_state(state: AcquisitionState) -> str:
+    # Local imports removed for module-level wrappers
+
     if state == AcquisitionState.SESSION_EXPIRED:
         return "provide_search_params"
     if state == AcquisitionState.ANTI_BOT_BLOCKED:
@@ -43,6 +80,8 @@ def _recommended_action_for_state(state: AcquisitionState) -> str:
 
 
 def _acquisition_state_for_failure(failure_category: str | None) -> AcquisitionState:
+    # Local imports removed for module-level wrappers
+
     category = (failure_category or "").lower()
     if any(key in category for key in ("anti_bot", "captcha", "banned", "rate_limited")):
         return AcquisitionState.ANTI_BOT_BLOCKED

@@ -4,15 +4,67 @@ Each invariant validates a specific property of the semantic field system.
 If any invariant fails, the architecture is not semantically coherent.
 """
 
-from app.event_dispatcher import get_dispatcher
-from app.field_laws import ROLE_EXCLUSIVITY
-from app.semantic_allocation_engine import (
-    _adaptive_exclusion_threshold,
-    _adaptive_runtime_exclusion_threshold,
-)
-from app.semantic_events import SemanticEventType
-from app.semantic_pipeline import run_pipeline
-from app.semantic_world_state import get_world_state
+
+def get_dispatcher(*args, **kwargs):
+    import app.event_dispatcher
+
+    return app.event_dispatcher.get_dispatcher(*args, **kwargs)
+
+
+class LazyRoleExclusivity:
+    def __iter__(self):
+        import app.field_laws
+
+        return iter(app.field_laws.ROLE_EXCLUSIVITY)
+
+    def __getitem__(self, item):
+        import app.field_laws
+
+        return app.field_laws.ROLE_EXCLUSIVITY[item]
+
+    def __len__(self):
+        import app.field_laws
+
+        return len(app.field_laws.ROLE_EXCLUSIVITY)
+
+
+ROLE_EXCLUSIVITY = LazyRoleExclusivity()
+
+
+def _adaptive_exclusion_threshold(*args, **kwargs):
+    import app.semantic_allocation_engine
+
+    return app.semantic_allocation_engine._adaptive_exclusion_threshold(*args, **kwargs)
+
+
+def _adaptive_runtime_exclusion_threshold(*args, **kwargs):
+    import app.semantic_allocation_engine
+
+    return app.semantic_allocation_engine._adaptive_runtime_exclusion_threshold(*args, **kwargs)
+
+
+class LazyEnumMeta(type):
+    def __getattr__(cls, name):
+        import app.semantic_events
+
+        return getattr(app.semantic_events.SemanticEventType, name)
+
+
+class SemanticEventType(metaclass=LazyEnumMeta):
+    pass
+
+
+def run_pipeline(*args, **kwargs):
+    import app.semantic_pipeline
+
+    return app.semantic_pipeline.run_pipeline(*args, **kwargs)
+
+
+def get_world_state(*args, **kwargs):
+    import app.semantic_world_state
+
+    return app.semantic_world_state.get_world_state(*args, **kwargs)
+
 
 # ─────────────────────────────────────────────────────────────
 # INVARIANT 1: Field pressure is always bounded [0, 1]

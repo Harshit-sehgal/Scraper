@@ -9,7 +9,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Dict, List, Optional
 
-from app.semantic_world_state import get_world_state
+
+def get_world_state() -> "SemanticWorldState":
+    import app.semantic_world_state
+
+    return app.semantic_world_state.get_world_state()
+
 
 if TYPE_CHECKING:
     from app.semantic_world_state import SemanticWorldState
@@ -19,7 +24,7 @@ class InstabilityAPI:
     """Hardened interface for controlled exclusion and tension mutations."""
 
     def __init__(self, ws: Optional[SemanticWorldState] = None):
-        self.ws = ws or get_world_state()
+        self.ws: SemanticWorldState = ws or get_world_state()
 
     # ─── Query Operations ────────────────────────────────────────────────
 

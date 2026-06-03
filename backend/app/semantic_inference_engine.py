@@ -23,12 +23,24 @@ class RoleEmbeddingEngine:
     """Learns role embeddings from global field dynamics and stable motifs."""
 
     def __init__(self):
-        self.ws = get_world_state()
+        self._ws = None
         # Ephemeral force buffer for manifold relaxation
         self.force_buffer: Dict[str, List[float]] = {}
         # Thread-safety lock for shared manifold_copy mutations across shards
         self._relax_lock = threading.Lock()
         self._seed_baseline_manifold()
+
+    @property
+    def ws(self):
+        if self._ws is not None:
+            return self._ws
+        import app.semantic_world_state
+
+        return app.semantic_world_state.get_world_state()
+
+    @ws.setter
+    def ws(self, value):
+        self._ws = value
 
     def _seed_baseline_manifold(self):
         if self.manifold:

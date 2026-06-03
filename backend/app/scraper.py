@@ -46,6 +46,7 @@ from app.html_utils import (
     _is_empty_value,
     fetch_page_content,
 )
+from app.insight_engine import generate_data_insight, suggest_schema_from_intent, suggest_schema_from_intent_sync
 from app.models import SchemaField
 from app.page_evidence_collector import collect_page_evidence
 from app.regression_capture import get_regression_capture
@@ -608,6 +609,7 @@ async def scrape_url(
     new_motifs = []
     if results and world_state:
         from app.motif_feedback import MotifFeedbackEngine  # research-shell, lazy
+
         feedback_engine = MotifFeedbackEngine()
         new_motifs = feedback_engine.extract_motifs_from_results(
             results, schema_fields, min_cooccurrence=settings.MOTIF_MIN_COOCCURRENCE
