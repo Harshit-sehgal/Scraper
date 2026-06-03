@@ -56,7 +56,7 @@ class JobRepository(ABC):
 
 
 # Lazy import of repository resolver to avoid circular imports
-_repository_instance = None
+_repository_instance: JobRepository | None = None
 
 
 def get_job_repository() -> "JobRepository":

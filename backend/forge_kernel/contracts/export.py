@@ -13,7 +13,7 @@ class ExportArtifact(BaseModel):
     """Describes a completed export artifact."""
 
     format: str = Field(..., description="'csv', 'json', or 'xlsx'")
-    path: str = Field("", description="File path if stored on disk")
+    path: str = Field(default="", description="File path if stored on disk")
     row_count: int = 0
-    generated_at: str = Field("", description="ISO timestamp")
+    generated_at: str = Field(default="", description="ISO timestamp")
     byte_size: Optional[int] = None

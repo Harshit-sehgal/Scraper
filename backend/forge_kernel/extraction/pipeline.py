@@ -92,44 +92,56 @@ class ExtractionPipeline:
                     )
                 )
 
-            extracted, provenances = await orchestrate_extraction(
+            from app.extraction_provenance import ProvenanceBuilder, enrich_records_with_provenance
+
+            provenance_builder = ProvenanceBuilder(url)
+            warnings_list: list[str] = []
+
+            ext_result = await orchestrate_extraction(
                 url=url,
                 html=fetch_result.html,
                 schema_fields=schema_objects,
-                final_url=fetch_result.final_url,
-                page_headers=fetch_result.headers,
-                selectors_map=selectors_map or {},
-                page_profiler_data={},
-                anti_bot_score=fetch_result.anti_bot_score,
-                browser_network_captures=None,
+                min_record_score=min_record_score,
+                provenance_builder=provenance_builder,
+                provided_selectors=selectors_map or {},
+                warnings=warnings_list,
             )
             duration = (time.monotonic() - start) * 1000
 
+            # Build final provenance
+            provenance_builder.set_records_count(len(ext_result.records))
+            provenance_builder.set_extraction_method(ext_result.method)
+            provenance_builder.set_memory_hit(ext_result.method == "memory")
+            if ext_result.method == "regex":
+                provenance_builder.add_fallback_step("regex")
+
+            provenance_obj = provenance_builder.build()
+
+            # Enrich records with provenance
+            enriched_records = enrich_records_with_provenance(ext_result.records, provenance_obj)
+
             # Convert to ResultRecords
-            records = []
-            for idx, rec in enumerate(extracted):
+            records: list[ResultRecord] = []
+            now = datetime.now(timezone.utc).isoformat()
+            for rec in enriched_records:
                 rec["source_url"] = url
-                rec["scraped_at"] = datetime.now(timezone.utc).isoformat()
-                provenance = provenances[idx] if idx < len(provenances) else {}
+                rec["scraped_at"] = now
                 score = self._compute_score(rec, schema_fields)
+                rec_prov = rec.get("_provenance", {})
                 records.append(
                     ResultRecord(
                         data={
                             k: v
                             for k, v in rec.items()
-                            if k not in ("source_url", "scraped_at", "record_score", "_acquisition_lineage")
+                            if k not in ("source_url", "scraped_at", "record_score", "_provenance", "_acquisition_lineage")
                         },
                         source_url=url,
-                        extraction_method=provenance.get("method", "selector"),
-                        provenance=provenance,
+                        extraction_method=ext_result.method,
+                        provenance=rec_prov,
                         record_score=score,
-                        scraped_at=records[-1].scraped_at if records else datetime.now(timezone.utc).isoformat(),
+                        scraped_at=now,
                     )
                 )
-            # Fix scraped_at
-            now = datetime.now(timezone.utc).isoformat()
-            for r in records:
-                r.scraped_at = now
 
             self._attempts.append(
                 ExtractionAttempt(
