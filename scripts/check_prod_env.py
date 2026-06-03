@@ -444,7 +444,9 @@ def main() -> int:
     ]
 
     # ── Optional but recommended ─────────────────────────────────────────
-    recommended = []
+    import typing
+
+    recommended: list[tuple[str, bool, typing.Any, str]] = []
 
     for name, required, validator, hint in recommended:
         passed = check_var(env, name, required=required, validator=validator, hint=hint)

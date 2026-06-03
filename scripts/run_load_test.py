@@ -48,11 +48,11 @@ async def run_load_test(url: str, concurrency: int, total_requests: int):
     print("=" * 70)
 
     # Initialize task queue
-    queue = asyncio.Queue()
+    queue: asyncio.Queue[None] = asyncio.Queue()
     for _ in range(total_requests):
         queue.put_nowait(None)
 
-    results = []
+    results: list[float] = []
     start_time = time.time()
 
     # Start workers

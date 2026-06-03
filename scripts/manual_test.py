@@ -296,8 +296,10 @@ def run_test_job(mode: str = "manual"):
     """Create a test scraping job and monitor its progress."""
     _print_header(f"TEST JOB — {mode.upper()} MODE")
 
+    import typing
+
     if mode == "manual":
-        payload = {
+        payload: dict[str, typing.Any] = {
             "name": f"Manual Test ({datetime.now().strftime('%H:%M:%S')})",
             "mode": "manual",
             "intent": "Get interior designers",
