@@ -76,6 +76,8 @@ _IMPORT_CHAIN_MODULES: tuple[str, ...] = (
     "app.motif_feedback",
     "app.domain_evolution_model",
     "app.insight_engine",
+    "app.selector_decay_predictor",
+    "app.self_tuning_extraction",
 )
 
 
@@ -155,6 +157,9 @@ FIXED_MODULES: tuple[str, ...] = (
     "app.intent_parser",
     "app.acquisition_state",
     "app.strategy_evolution",
+    "app.insight_engine",
+    "app.selector_decay_predictor",
+    "app.self_tuning_extraction",
 )
 
 

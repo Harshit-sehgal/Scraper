@@ -15,7 +15,6 @@ from app.models import (
     SchemaSuggestionRequest,
     ScrapeMode,
 )
-from app.insight_engine import suggest_schema_from_intent  # research-shell, lazy
 from app.scraper import (
     ai_clean_and_align_records,
 )
@@ -161,6 +160,8 @@ def create_jobs_router(
         req: SchemaSuggestionRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
     ):
         """Infer topic + schema fields from plain-language user intent."""
+        from app.insight_engine import suggest_schema_from_intent  # research-shell, lazy
+
         suggestion = await suggest_schema_from_intent(req.intent, max_fields=req.max_fields)
         return suggestion
 
