@@ -30,7 +30,7 @@ from app.selector_engine import apply_selectors
 from app.session_url_detector import detect_session_params
 
 
-async def fetch_and_capture(url: str) -> tuple[str, list[dict], dict]:
+async def fetch_and_capture(url: str) -> tuple[str, list[str | dict], dict]:
     """Fetch URL and capture HTML, network JSON payloads, and cookies/session keys."""
     try:
         from playwright.async_api import async_playwright
@@ -39,7 +39,7 @@ async def fetch_and_capture(url: str) -> tuple[str, list[dict], dict]:
         sys.exit(1)
 
     html = ""
-    captured_payloads = []
+    captured_payloads: list[str | dict] = []
     state: dict[str, typing.Any] = {}
 
     async with async_playwright() as p:
@@ -113,12 +113,12 @@ async def smoke(url: str, fields_str: str | None = None):
                 f_type = FieldType.NUMBER
             else:
                 f_type = FieldType.STRING
-            schema_fields.append(SchemaField(name=name, field_type=f_type, required=False))
+            schema_fields.append(SchemaField(name=name, field_type=f_type, required=False, description=""))
     else:
         schema_fields = [
-            SchemaField(name="name", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
-            SchemaField(name="description", field_type=FieldType.STRING, required=False),
+            SchemaField(name="name", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
+            SchemaField(name="description", field_type=FieldType.STRING, required=False, description=""),
         ]
 
     # Find record arrays found in network payloads, printing their candidate paths and details
