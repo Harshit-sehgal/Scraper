@@ -1,4 +1,5 @@
 # mypy: ignore-errors
+# type: ignore
 import logging
 from typing import Any
 

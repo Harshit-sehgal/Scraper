@@ -81,14 +81,14 @@ def test_schema_field_validation() -> None:
 
     # Invalid names (should raise ValueError)
     with pytest.raises(ValueError, match="must be snake_case"):
-        SchemaField(name="Company-Name", field_type=FieldType.STRING)
+        SchemaField(name="Company-Name", field_type=FieldType.STRING, description="", required=False)
 
     with pytest.raises(ValueError, match="must be snake_case"):
-        SchemaField(name="1company", field_type=FieldType.STRING)
+        SchemaField(name="1company", field_type=FieldType.STRING, description="", required=False)
 
     # Reserved names (should raise ValueError)
     with pytest.raises(ValueError, match="reserved for system use"):
-        SchemaField(name="source_url", field_type=FieldType.STRING)
+        SchemaField(name="source_url", field_type=FieldType.STRING, description="", required=False)
 
 
 def test_job_model() -> None:
@@ -96,7 +96,7 @@ def test_job_model() -> None:
         name="test_job",
         mode=ScrapeMode.MANUAL,
         urls=["https://example.com"],
-        schema_fields=[SchemaField(name="title", field_type=FieldType.STRING)],
+        schema_fields=[SchemaField(name="title", field_type=FieldType.STRING, description="", required=False)],
     )
     assert job.status == JobStatus.PENDING
     assert len(job.id) > 10
@@ -118,7 +118,7 @@ def test_job_service_lifecycle() -> None:
         name="service_test_job",
         mode=ScrapeMode.MANUAL,
         urls=["https://example.com"],
-        schema_fields=[SchemaField(name="name", field_type=FieldType.STRING)],
+        schema_fields=[SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)],
     )
 
     with patch("forge_kernel.services.job_service.JobService._persist") as mock_persist:

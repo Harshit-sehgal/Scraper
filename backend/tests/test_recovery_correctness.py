@@ -39,7 +39,7 @@ async def test_attempt_context_does_not_skip_profiles_by_default(monkeypatch) ->
 
     results = await scraper.scrape_url(
         "https://example.com/list",
-        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True, description="")],
         attempt_ctx=AttemptContext(),
     )
 
@@ -74,7 +74,7 @@ async def test_force_llm_discovery_skips_profiles_and_passes_recovery_flags(monk
     ctx = AttemptContext(force_llm_discovery=True, bypass_selector_memory=True, force_container_discovery=True)
     await scraper.scrape_url(
         "https://example.com/list",
-        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True, description="")],
         attempt_ctx=ctx,
     )
 
@@ -126,7 +126,7 @@ async def test_failed_lineage_uses_computed_anti_bot_state(monkeypatch) -> None:
 
     _results, stats = await recovery.scrape_url_with_recovery(
         "https://blocked.example/list",
-        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True, description="")],
         max_recovery_attempts=1,
     )
 
@@ -153,7 +153,7 @@ async def test_skip_url_stops_recovery_loop(monkeypatch) -> None:
 
     _results, stats = await recovery.scrape_url_with_recovery(
         "https://example.com/empty",
-        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True, description="")],
         max_recovery_attempts=3,
     )
 
@@ -220,7 +220,7 @@ async def test_force_container_discovery_skips_llm_and_memory(monkeypatch) -> No
     result = await orchestrator.orchestrate_extraction(
         "https://example.com/list",
         "<html><body><div class='card'>Container Studio</div></body></html>",
-        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True, description="")],
         min_record_score=0.35,
         provided_selectors={"force_container_discovery": True},
     )
@@ -244,7 +244,7 @@ def test_selectors_map_rejects_malformed_shapes() -> None:
 
 def test_schema_rejects_runtime_metadata_field_names() -> None:
     with pytest.raises((ValueError, Exception)):
-        SchemaField(name="record_score", field_type=FieldType.FLOAT)
+        SchemaField(name="record_score", field_type=FieldType.FLOAT, description="", required=False)
 
 
 @pytest.mark.asyncio
@@ -269,7 +269,7 @@ async def test_crawl_policy_active_counter_never_leaks_on_fetch_failure(monkeypa
     # Call scrape_url (should handle error and return [])
     results = await scraper.scrape_url(
         "https://example.com/fail-fetch",
-        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True, description="")],
     )
 
     assert results == []
@@ -300,7 +300,7 @@ async def test_scrape_attempt_result_exposes_html_and_telemetry(monkeypatch) -> 
 
     results = await scraper.scrape_url(
         "https://unique-subclass.example.com/test-result-subclass",
-        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True)],
+        [SchemaField(name="company_name", field_type=FieldType.STRING, required=True, description="")],
     )
 
     # Assert result is indeed a list subclass with extra metadata

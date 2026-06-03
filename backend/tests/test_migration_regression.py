@@ -305,7 +305,7 @@ def test_save_and_load_job_from_sqlite(monkeypatch) -> None:
             topic="flights",
             intent="find cheap flights",
             urls=["https://example.com/flights"],
-            schema_fields=[SchemaField(name="price", field_type=FieldType.CURRENCY)],
+            schema_fields=[SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False)],
             results=[{"price": "$200"}],
             total_records=1,
             filtered_records=1,

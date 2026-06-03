@@ -20,7 +20,8 @@ try:
     import openpyxl
 
     HAS_OPENPYXL = True
-except ImportError:
+except ImportError:  # pragma: no cover - optional dependency
+    openpyxl = None
     HAS_OPENPYXL = False
 
 
@@ -48,13 +49,11 @@ class ExportService:
 
     def to_xlsx(self, records: list[dict[str, Any]], field_names: Optional[list[str]] = None) -> Optional[bytes]:
         """Convert records to XLSX bytes. Returns None if openpyxl is not installed."""
-        if not HAS_OPENPYXL:
-            logger.warning("openpyxl not installed, cannot generate XLSX")
+        if not HAS_OPENPYXL or openpyxl is None:
             return None
-
         wb = openpyxl.Workbook()
         ws = wb.active
-        if not ws:
+        if ws is None:
             wb.create_sheet()
             ws = wb.active
 
@@ -66,11 +65,12 @@ class ExportService:
             field_names = list(records[0].keys())
 
         # Header row
-        ws.append(field_names)
+        if ws is not None:
+            ws.append(field_names)
 
-        # Data rows
-        for rec in records:
-            ws.append([rec.get(f, "") for f in field_names])
+            # Data rows
+            for rec in records:
+                ws.append([rec.get(f, "") for f in field_names])
 
         output = io.BytesIO()
         wb.save(output)

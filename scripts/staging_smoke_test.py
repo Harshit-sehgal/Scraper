@@ -16,14 +16,14 @@ temp_db_file = Path(temp_db_dir) / "staging_jobs_state.db"
 os.environ["STATE_FILE_PATH"] = str(temp_state_file)
 
 # Set settings environment variable if it overrides
-from app.config import settings
+from app.config import settings  # noqa: E402
 
 settings.STATE_FILE_PATH = str(temp_state_file)
 
-from app.job_store import _get_connection, load_state, reset_job_store_for_tests
-from app.main import app
-from app.models import JobStatus
-from fastapi.testclient import TestClient
+from app.job_store import _get_connection, load_state, reset_job_store_for_tests  # noqa: E402
+from app.main import app  # noqa: E402
+from app.models import JobStatus  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
 client = TestClient(app)
 

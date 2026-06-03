@@ -7,24 +7,29 @@ from __future__ import annotations
 import os
 
 import pytest
-from app.geocode_cache import CACHE_DB_PATH, GeocodeCache
+from app.geocode_cache import CACHE_DB_PATH, GeocodeCache, reset_geocode_cache
+
+
+def _clean_cache_db_files() -> None:
+    """Remove the geocode cache DB file along with any WAL / SHM journal files."""
+    base = CACHE_DB_PATH
+    for suffix in ["", "-wal", "-shm", "-journal"]:
+        path = base + suffix
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
 
 
 @pytest.fixture(autouse=True)
 def clean_cache_env():
-    # Remove existing files if any
-    if os.path.exists(CACHE_DB_PATH):
-        try:
-            os.remove(CACHE_DB_PATH)
-        except Exception:
-            pass
+    # Remove existing files if any (including WAL / SHM journal files)
+    _clean_cache_db_files()
+    reset_geocode_cache()
     yield
     # Cleanup files after test run
-    if os.path.exists(CACHE_DB_PATH):
-        try:
-            os.remove(CACHE_DB_PATH)
-        except Exception:
-            pass
+    _clean_cache_db_files()
+    reset_geocode_cache()
 
 
 def test_geocode_cache_initialization() -> None:

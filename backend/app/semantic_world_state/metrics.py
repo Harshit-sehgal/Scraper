@@ -1,4 +1,5 @@
 # mypy: ignore-errors
+# type: ignore
 import logging
 
 logger = logging.getLogger(__name__)

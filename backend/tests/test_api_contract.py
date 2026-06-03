@@ -18,7 +18,7 @@ class TestSchemaFieldContract:
     """SchemaField must maintain its expected shape."""
 
     def test_valid_schema_field(self) -> None:
-        field = SchemaField(name="company_name", field_type=FieldType.STRING)
+        field = SchemaField(name="company_name", field_type=FieldType.STRING, description="")
         assert field.name == "company_name"
         assert field.field_type == FieldType.STRING
         assert field.required is True  # Default
@@ -32,15 +32,15 @@ class TestSchemaFieldContract:
     def test_schema_field_rejects_reserved_names(self) -> None:
         for reserved in ("record_score", "_provenance", "_extraction_method", "source_url"):
             with pytest.raises(ValueError):
-                SchemaField(name=reserved, field_type=FieldType.STRING)
+                SchemaField(name=reserved, field_type=FieldType.STRING, description="", required=False)
 
     def test_schema_field_rejects_invalid_names(self) -> None:
         with pytest.raises(ValueError):
-            SchemaField(name="123_invalid", field_type=FieldType.STRING)
+            SchemaField(name="123_invalid", field_type=FieldType.STRING, description="", required=False)
         with pytest.raises(ValueError):
-            SchemaField(name="_", field_type=FieldType.STRING)
+            SchemaField(name="_", field_type=FieldType.STRING, description="", required=False)
         with pytest.raises(ValueError):
-            SchemaField(name="1start_with_number", field_type=FieldType.STRING)
+            SchemaField(name="1start_with_number", field_type=FieldType.STRING, description="", required=False)
 
 
 class TestJobCreateContract:

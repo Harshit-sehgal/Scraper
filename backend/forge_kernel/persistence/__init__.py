@@ -104,7 +104,8 @@ def job_to_row(job: Job) -> dict[str, Any]:
     d["results"] = json.dumps(job.results)
     d["logs"] = json.dumps([log.model_dump() for log in job.logs])
     d["quality_report"] = json.dumps(job.quality_report)
-    d["discovered_urls"] = json.dumps(job.discovered_urls) if hasattr(job, "discovered_urls") else "[]"
+    discovered = job.discovered_urls if hasattr(job, "discovered_urls") else []
+    d["discovered_urls"] = json.dumps(discovered)
     d["selectors_map"] = json.dumps(job.selectors_map) if job.selectors_map else "{}"
     d["search_params"] = json.dumps(job.search_params) if job.search_params else "{}"
     d["warnings"] = json.dumps(job.warnings) if job.warnings else "[]"

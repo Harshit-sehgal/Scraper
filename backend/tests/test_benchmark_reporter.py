@@ -11,23 +11,29 @@ import pytest
 from app.benchmark_reporter import DASHBOARD_PATH, DB_PATH, BenchmarkReporter, BenchmarkRun
 
 
+def _clean_benchmark_db_files() -> None:
+    """Remove benchmark DB and dashboard files along with any WAL / SHM journal files."""
+    for path in [DB_PATH, DASHBOARD_PATH]:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+    # Also clean up WAL / SHM journal files for DB_PATH
+    base = DB_PATH
+    for suffix in ["-wal", "-shm", "-journal"]:
+        try:
+            os.remove(base + suffix)
+        except FileNotFoundError:
+            pass
+
+
 @pytest.fixture(autouse=True)
 def clean_benchmark_env():
-    # Remove existing files if any
-    for path in [DB_PATH, DASHBOARD_PATH]:
-        if os.path.exists(path):
-            try:
-                os.remove(path)
-            except Exception:
-                pass
+    # Remove existing files if any (including WAL / SHM journal files)
+    _clean_benchmark_db_files()
     yield
     # Cleanup files after test run
-    for path in [DB_PATH, DASHBOARD_PATH]:
-        if os.path.exists(path):
-            try:
-                os.remove(path)
-            except Exception:
-                pass
+    _clean_benchmark_db_files()
 
 
 def test_db_initialization() -> None:

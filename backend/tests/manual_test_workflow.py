@@ -1,4 +1,5 @@
 import time
+from typing import Any
 
 import requests
 
@@ -7,7 +8,7 @@ API = "http://localhost:8000"
 
 def main():
     print("1. Creating a dummy job to test delete and recycle bin...")
-    payload = {
+    payload: Any = {
         "name": "Recycle Bin Test Job",
         "mode": "manual",
         "urls": ["https://example.com"],
@@ -46,7 +47,7 @@ def main():
     print("\n--- RECYCLE BIN TEST PASSED ---")
 
     print("\n7. Executing 100-page DDGS Auto Discovery!")
-    payload2 = {
+    payload2: Any = {
         "name": "100-Page DDG Crawler: Chennai Designers",
         "mode": "auto",
         "urls": [],

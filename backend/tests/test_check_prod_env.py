@@ -35,7 +35,7 @@ class TestCheckProdEnvCore:
 
     def _import_module(self):
         """Import the check_prod_env module dynamically."""
-        import importlib
+        import importlib.util
 
         spec = importlib.util.spec_from_file_location(
             "check_prod_env",
@@ -114,7 +114,7 @@ class TestCheckProdEnvValidators:
     """Specific validator function tests."""
 
     def _import_module(self):
-        import importlib
+        import importlib.util
 
         spec = importlib.util.spec_from_file_location(
             "check_prod_env",
@@ -296,7 +296,7 @@ class TestCheckProdEnvIntegration:
     """Integration tests exercising the full main() flow."""
 
     def _import_module(self):
-        import importlib
+        import importlib.util
 
         spec = importlib.util.spec_from_file_location(
             "check_prod_env",

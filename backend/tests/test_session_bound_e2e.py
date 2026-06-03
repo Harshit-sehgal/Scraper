@@ -137,8 +137,8 @@ class TestSecretsNotPersisted:
             }
         ]
         schema = [
-            SchemaField(name="name", field_type=FieldType.STRING),
-            SchemaField(name="price", field_type=FieldType.CURRENCY),
+            SchemaField(name="name", field_type=FieldType.STRING, description="", required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
         ]
         aligned = align_extracted_keys_to_schema(records, schema)
         assert len(aligned) == 1
@@ -239,8 +239,8 @@ class TestFieldMappingConfidence:
 
         html = "<div class='c'><span class='n'>Test</span><span class='p'>$10</span></div>"
         schema = [
-            SchemaField(name="name", field_type=FieldType.STRING),
-            SchemaField(name="price", field_type=FieldType.CURRENCY),
+            SchemaField(name="name", field_type=FieldType.STRING, description="", required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
         ]
         selectors = {"item_container": "div.c", "fields": {"name": ".n", "price": ".p"}}
         result = apply_selectors(html, selectors, schema)
@@ -350,8 +350,8 @@ class TestFakeDynamicSessionBoundWebsite:
         from app.selector_engine import apply_selectors
 
         schema = [
-            SchemaField(name="name", field_type=FieldType.STRING),
-            SchemaField(name="price", field_type=FieldType.CURRENCY),
+            SchemaField(name="name", field_type=FieldType.STRING, description="", required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
         ]
         selectors = {
             "item_container": "div.card",
@@ -375,7 +375,7 @@ class TestFakeDynamicSessionBoundWebsite:
         """Fake session HTML has localStorage/cookie but extraction strips them."""
         from app.selector_engine import apply_selectors
 
-        schema = [SchemaField(name="name", field_type=FieldType.STRING)]
+        schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]
         selectors = {"item_container": "div.card", "fields": {"name": ".name"}}
         result = apply_selectors(FAKE_SESSION_HTML, selectors, schema)
         records = result if isinstance(result, list) else result[0]
@@ -529,8 +529,8 @@ class TestLocalSessionBoundServer:
         from app.selector_engine import apply_selectors
 
         schema = [
-            SchemaField(name="name", field_type=FieldType.STRING),
-            SchemaField(name="price", field_type=FieldType.CURRENCY),
+            SchemaField(name="name", field_type=FieldType.STRING, description="", required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
         ]
         selectors = {
             "item_container": "div.card",
@@ -569,7 +569,7 @@ class TestLocalSessionBoundServer:
         html = urllib.request.urlopen(f"{self.base_url}/search/id/test12345abcde").read().decode()
         from app.selector_engine import apply_selectors
 
-        schema = [SchemaField(name="name", field_type=FieldType.STRING)]
+        schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]
         selectors = {"item_container": "div.card", "fields": {"name": ".name"}}
         result = apply_selectors(html, selectors, schema)
         records = result if isinstance(result, list) else result[0]

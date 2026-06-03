@@ -36,7 +36,7 @@ async def scrape_threebest():
         soup.get_text(separator="\n").split("\n")
 
         # A more dynamic fallback: iterate strong headers
-        businesses = []
+        extracted_businesses: list[dict[str, str]] = []
         h2s = soup.find_all("h2")
         h3s = soup.find_all("h3")
         headers = h2s + h3s
@@ -57,7 +57,7 @@ async def scrape_threebest():
                     rating = re.search(r"\d\.\d\s?(?:Star|/5|Stars)?", desc_text)
                     rating_str = rating.group(0) if rating else "Not Found"
 
-                    businesses.append(
+                    extracted_businesses.append(
                         {
                             "company_name": text,
                             "phone": phone_str.strip(),
@@ -69,7 +69,7 @@ async def scrape_threebest():
         await browser.close()
 
         # The above logic might be noisy, let's keep only items with a matched phone number or rating
-        valid_businesses = [b for b in businesses if b["phone"] != "Not Found" or b["rating"] != "Not Found"]
+        valid_businesses = [b for b in extracted_businesses if b["phone"] != "Not Found" or b["rating"] != "Not Found"]
 
         # Deduplicate
         seen = set()

@@ -1,4 +1,5 @@
 # mypy: ignore-errors
+# type: ignore
 import time
 
 from app.invariant_firewall import requires_invariants

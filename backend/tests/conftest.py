@@ -118,7 +118,10 @@ def pytest_sessionfinish(session, exitstatus):
                     if (
                         item.is_file()
                         and item.name != ".gitkeep"
-                        and item.suffix in [".db", ".db-journal", ".db-wal", ".db-shm", ".lock", ".log", ".json"]
+                        and any(
+                            item.suffix == sfx or str(item.name).endswith(sfx)
+                            for sfx in [".db", ".db-journal", ".db-wal", ".db-shm", ".lock", ".log", ".json"]
+                        )
                     ):
                         # Ensure we do not delete golden dataset files
                         if "golden_dataset" not in str(item.resolve()):

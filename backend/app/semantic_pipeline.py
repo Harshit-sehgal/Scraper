@@ -394,6 +394,7 @@ def run_pipeline(
                 if t.raw in original_positions:
                     t.position = original_positions[t.raw]
 
+            type_sequence: list[str] = []
             if tokens:
                 type_sequence = [t.primary_type.value for t in tokens]
                 record_motif_observation(type_sequence)
