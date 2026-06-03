@@ -462,22 +462,22 @@ class TestDegradationPredictor:
         assert "declining" in bad_health_trends or report_bad.predictions
 
         # Test _determine_health_trend directly
-        class DecliningFakeTrend:
-            quality_trend = "degrading"
-            fetch_latency_trend = "degrading"
-            anti_bot_trend = "degrading"
-            selector_decay_accelerating = True
-
-        result = predictor._determine_health_trend(DecliningFakeTrend())
+        declining_trend = _make_domain_trend(
+            quality_trend="degrading",
+            fetch_latency_trend="degrading",
+            anti_bot_trend="degrading",
+            selector_decay_accelerating=True,
+        )
+        result = predictor._determine_health_trend(declining_trend)
         assert result == "declining", f"Expected declining, got {result}"
 
-        class ImprovingFakeTrend:
-            quality_trend = "improving"
-            fetch_latency_trend = "improving"
-            anti_bot_trend = "stable"
-            selector_decay_accelerating = False
-
-        result = predictor._determine_health_trend(ImprovingFakeTrend())
+        improving_trend = _make_domain_trend(
+            quality_trend="improving",
+            fetch_latency_trend="improving",
+            anti_bot_trend="stable",
+            selector_decay_accelerating=False,
+        )
+        result = predictor._determine_health_trend(improving_trend)
         assert result == "improving", f"Expected improving, got {result}"
 
     def test_multi_predictions_use_recommended_actions(self) -> None:

@@ -30,7 +30,7 @@ class ScrapeAttemptResult(list, metaclass=LazyClassMeta):
     recommended_next_action: str
     warnings: list[str]
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> "ScrapeAttemptResult":  # noqa: F821
+    def __new__(cls, *args: Any, **kwargs: Any) -> Any:
         import app.scraper
 
         return app.scraper.ScrapeAttemptResult(*args, **kwargs)
@@ -38,10 +38,10 @@ class ScrapeAttemptResult(list, metaclass=LazyClassMeta):
     def to_telemetry_dict(self) -> dict:
         import app.scraper
 
-        return app.scraper.ScrapeAttemptResult().to_telemetry_dict()
+        return app.scraper.ScrapeAttemptResult([]).to_telemetry_dict()
 
 
-async def scrape_url_attempt(*args: Any, **kwargs: Any) -> "ScrapeAttemptResult":  # noqa: F821
+async def scrape_url_attempt(*args: Any, **kwargs: Any) -> Any:
     import app.scraper
 
     return await app.scraper.scrape_url_attempt(*args, **kwargs)

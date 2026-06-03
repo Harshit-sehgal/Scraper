@@ -62,8 +62,12 @@ class _SemanticMetricsProtocol(Protocol):
 
     _smoothed_structural: float
     _smoothed_runtime: float
-    semantic_temperature: float
-    integrity_score: float
+
+    @property
+    def semantic_temperature(self) -> float: ...
+
+    @property
+    def integrity_score(self) -> float: ...
 
 
 def _adaptive_exclusion_threshold() -> float:

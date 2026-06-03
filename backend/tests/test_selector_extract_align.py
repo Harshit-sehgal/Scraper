@@ -71,7 +71,7 @@ class TestExtractAllThenAlign:
         assert "stops" not in aligned[0]
 
     def test_apply_selectors_end_to_end(self) -> None:
-        results: list[dict[str, Any]] = apply_selectors(SAMPLE_HTML, SELECTORS, USER_SCHEMA)
+        results: Any = apply_selectors(SAMPLE_HTML, SELECTORS, USER_SCHEMA)
         assert len(results) == 2
         assert results[0]["airlines_name"] == "Acme Air"
         assert results[0]["arrival_date"] == "02-01-2026"
