@@ -127,8 +127,7 @@ def detect_session_params(url: str) -> dict:
                 details.append(
                     (
                         param_name,
-                        f"param name matches pattern: {
-                    pattern.pattern}",
+                        f"param name matches pattern: {pattern.pattern}",
                     )
                 )
                 confidence_score = max(confidence_score, settings.SESSION_PARAM_NAME_CONFIDENCE)
@@ -146,8 +145,7 @@ def detect_session_params(url: str) -> dict:
                     details.append(
                         (
                             param_name,
-                            f"value matches session token pattern: {
-                        pattern.pattern}",
+                            f"value matches session token pattern: {pattern.pattern}",
                         )
                     )
                     confidence_score = max(confidence_score, settings.SESSION_PARAM_VALUE_CONFIDENCE)

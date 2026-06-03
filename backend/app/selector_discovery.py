@@ -249,11 +249,9 @@ async def analyze_url_for_fields(
                 original_url=url,
                 final_url=final_url,
                 state=AcquisitionState.DIRECT,
-                message=f"Failed to fetch URL: {
-                    str(e)}",
+                message=f"Failed to fetch URL: {str(e)}",
             ).model_dump(mode="json"),
-            "user_message": f"Failed to fetch the URL: {
-                str(e)}",
+            "user_message": f"Failed to fetch the URL: {str(e)}",
             "session_detection": session_detection,
             "canonical_url": session_detection.get("canonical_url", url),
             "content_quality": None,
@@ -266,8 +264,7 @@ async def analyze_url_for_fields(
             },
             "search_form": None,
             "search_recovery": None,
-            "error": f"Failed to fetch URL: {
-                str(e)}",
+            "error": f"Failed to fetch URL: {str(e)}",
             "page_structure": "unknown",
             "structure_confidence": 0.0,
             "estimated_record_count": 0,
@@ -361,8 +358,7 @@ async def analyze_url_for_fields(
         # to guide the user on what params are available
         if redirect_info.get("redirected") and search_form.get("detected"):
             logger.info(
-                "[URLAnalyzer] Redirected URL with search form detected — "
-                "provide search_params to attempt recovery. Fields: %s",
+                "[URLAnalyzer] Redirected URL with search form detected — provide search_params to attempt recovery. Fields: %s",
                 [f["name"] or f["id"] for f in (search_form.get("search_fields") or []) if isinstance(f, dict)],
             )
 
@@ -415,8 +411,7 @@ async def analyze_url_for_fields(
                 {
                     "role": "system",
                     "content": (
-                        "You output valid JSON objects for data schema design. "
-                        "No markdown, no commentary. Return ONLY the JSON."
+                        "You output valid JSON objects for data schema design. No markdown, no commentary. Return ONLY the JSON."
                     ),
                 },
                 {"role": "user", "content": prompt},
@@ -520,13 +515,9 @@ async def analyze_url_for_fields(
     # Log with redirect / quality / recovery context
     quality_warning = ""
     if redirect_info.get("redirected"):
-        quality_warning = f" [REDIRECTED: {
-            redirect_info.get(
-                'redirect_type', 'unknown')}]"
+        quality_warning = f" [REDIRECTED: {redirect_info.get('redirect_type', 'unknown')}]"
     if content_quality.get("quality") != "good":
-        quality_warning += f" [QUALITY: {
-            content_quality.get(
-                'quality', 'unknown')}]"
+        quality_warning += f" [QUALITY: {content_quality.get('quality', 'unknown')}]"
     if search_recovery and search_recovery.get("success"):
         quality_warning += " [RECOVERED via search form]"
     logger.info(

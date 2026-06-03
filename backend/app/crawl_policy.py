@@ -86,8 +86,7 @@ class CrawlPolicyEngine:
 
         # Global concurrency check
         if self._global_active_fetches >= self._max_global_concurrency:
-            return f"Global concurrency limit reached ({
-                self._max_global_concurrency})"
+            return f"Global concurrency limit reached ({self._max_global_concurrency})"
 
         state = self._get_state(domain)
 
@@ -99,13 +98,11 @@ class CrawlPolicyEngine:
 
         # Page budget check
         if state.total_fetches >= self._max_pages_per_domain:
-            return f"Domain {domain} reached page budget ({
-                self._max_pages_per_domain})"
+            return f"Domain {domain} reached page budget ({self._max_pages_per_domain})"
 
         # Concurrency budget check
         if state.active_fetches >= self._max_concurrency:
-            return f"Domain {domain} at max concurrency ({
-                self._max_concurrency})"
+            return f"Domain {domain} at max concurrency ({self._max_concurrency})"
 
         # Delay check
         elapsed = time.time() - state.last_fetch_time
@@ -133,11 +130,9 @@ class CrawlPolicyEngine:
 
             # Re-check under lock — another task may have taken the slot
             if state.active_fetches >= self._max_concurrency:
-                return f"Domain {domain} at max concurrency ({
-                    self._max_concurrency})"
+                return f"Domain {domain} at max concurrency ({self._max_concurrency})"
             if self._global_active_fetches >= self._max_global_concurrency:
-                return f"Global concurrency limit reached ({
-                    self._max_global_concurrency})"
+                return f"Global concurrency limit reached ({self._max_global_concurrency})"
 
             state.active_fetches += 1
             self._global_active_fetches += 1

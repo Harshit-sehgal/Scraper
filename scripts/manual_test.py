@@ -167,8 +167,8 @@ def check_topology(detailed: bool = False):
         return
 
     metrics = data.get("metrics", {})
-    print(f"\n  Field Pressure:      {_fmt(metrics.get('field_pressure', 0))}  " f"{_bar(metrics.get('field_pressure', 0) / 2)}")
-    print(f"  Global Energy:       {_fmt(metrics.get('global_energy', 0))}  " f"{_bar(metrics.get('global_energy', 0) / 10)}")
+    print(f"\n  Field Pressure:      {_fmt(metrics.get('field_pressure', 0))}  {_bar(metrics.get('field_pressure', 0) / 2)}")
+    print(f"  Global Energy:       {_fmt(metrics.get('global_energy', 0))}  {_bar(metrics.get('global_energy', 0) / 10)}")
     print(
         f"  Energy Balance:      {_fmt(metrics.get('energy_balance', 0), 4)}  "
         f"{'✅ CONSERVED' if abs(metrics.get('energy_balance', 0)) < 0.01 else '⚠️  DRIFT'}"

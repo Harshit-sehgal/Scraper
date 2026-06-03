@@ -80,9 +80,9 @@ def test_experimental_routes_not_mounted_when_gate_off(monkeypatch):
         "/api/system/crystalline",
         "/api/system/merge/knowledge",
     ):
-        assert experimental_path not in paths, (
-            f"Experimental route {experimental_path} was mounted despite " f"ENABLE_EXPERIMENTAL_ROUTES=False."
-        )
+        assert (
+            experimental_path not in paths
+        ), f"Experimental route {experimental_path} was mounted despite ENABLE_EXPERIMENTAL_ROUTES=False."
 
 
 def test_experimental_routes_mounted_when_gate_on(monkeypatch):
@@ -123,6 +123,6 @@ def test_production_warning_when_experimental_enabled_in_prod(monkeypatch, caplo
     with caplog.at_level(logging.WARNING, logger="app.main"):
         configure_routes(test_app)
 
-    assert "EXPERIMENTAL ROUTES ENABLED IN PRODUCTION" in caplog.text, (
-        "Production-mode warning was not logged when experimental routes " "were enabled. This is a required safety signal."
-    )
+    assert (
+        "EXPERIMENTAL ROUTES ENABLED IN PRODUCTION" in caplog.text
+    ), "Production-mode warning was not logged when experimental routes were enabled. This is a required safety signal."

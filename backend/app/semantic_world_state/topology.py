@@ -657,7 +657,7 @@ class TopologyMixin:
         contradiction_pressure = (len(alloc_conflicts) + edge_field_routes) / max(len(ROLE_EXCLUSIVITY), 1)
         if contradiction_pressure > 0.3 and self.metrics.field_pressure > 0.5:
             logger.info(
-                "CONTRADICTION PRESSURE TRIGGER: %.3f contradiction pressure, " "forcing topology restructuring on node [%s]",
+                "CONTRADICTION PRESSURE TRIGGER: %.3f contradiction pressure, forcing topology restructuring on node [%s]",
                 contradiction_pressure,
                 self.node_id,
             )

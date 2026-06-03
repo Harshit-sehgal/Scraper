@@ -195,7 +195,7 @@ class TrendAnalyzer:
                     {
                         "severity": "medium",
                         "domain": domain,
-                        "message": (f"Selector decay accelerating on {domain} — " f"consider forced rediscovery"),
+                        "message": (f"Selector decay accelerating on {domain} — consider forced rediscovery"),
                         "health_score": trend.health_score,
                     }
                 )
@@ -207,9 +207,7 @@ class TrendAnalyzer:
                     {
                         "severity": "medium",
                         "domain": domain,
-                        "message": (
-                            f"Anti-bot pressure increasing on {domain} — " f"may need proxy rotation or reduced frequency"
-                        ),
+                        "message": (f"Anti-bot pressure increasing on {domain} — may need proxy rotation or reduced frequency"),
                         "health_score": trend.health_score,
                     }
                 )

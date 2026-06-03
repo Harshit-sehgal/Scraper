@@ -202,8 +202,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         # Initialize child's vector clock as a descendant of parent
         child._vector_clock.update(self._vector_clock.get_clock())
 
-        logger.info(f"SUBSTRATE BRANCHED: [{
-                self.node_id}] -> [{child_id}] (Label: {label})")
+        logger.info(f"SUBSTRATE BRANCHED: [{self.node_id}] -> [{child_id}] (Label: {label})")
         return child
 
     # ─── Transaction Manager (MVCC & Thread Safety) ──────────────────────
@@ -565,10 +564,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                     self._energy.set_schema_instability(role, 0.3)
 
             logger.info(
-                f"FEDERATION: Merged {
-                    len(remote_manifold) -
-                    filtered_count} roles. "
-                f"Firewall filtered {filtered_count} roles."
+                f"FEDERATION: Merged {len(remote_manifold) - filtered_count} roles. Firewall filtered {filtered_count} roles."
             )
             self.record_delta("global", "manifold_federation", {"remote_roles": len(remote_manifold), "filtered": filtered_count})
 
@@ -590,8 +586,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                     new_val = local_val * 0.7 + remote_val * 0.3
                     self._topology.set_topological_law(pair, new_val)
 
-            logger.info(f"FEDERATION: Merged {
-                    len(remote_laws)} topological laws.")
+            logger.info(f"FEDERATION: Merged {len(remote_laws)} topological laws.")
             self.record_delta("global", "federated_laws", {"remote_laws": len(remote_laws)})
 
     # ─── Cognitive Health Summary ────────────────────────────────────────
@@ -1058,8 +1053,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                             dist = sum((a - b) ** 2 for a, b in zip(role_vec, target_vec)) ** 0.5
 
                             if dist < threshold:
-                                logger.info(f"AGENCY TRIGGERED: Role [{role}] activated Action [{aid}] (Dist: {
-                                        dist:.4f})")
+                                logger.info(f"AGENCY TRIGGERED: Role [{role}] activated Action [{aid}] (Dist: {dist:.4f})")
 
                                 success = True
                                 tool_result = None
@@ -1152,8 +1146,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                         )
                         self._manifold.set_manifold_vector(lid, new_vec)
 
-                        logger.info(f"HIERARCHICAL MERGE: Merged remote concept {rid} into local [{lid}] (Dist: {
-                                dist:.4f})")
+                        logger.info(f"HIERARCHICAL MERGE: Merged remote concept {rid} into local [{lid}] (Dist: {dist:.4f})")
                         merged = True
                         break
 

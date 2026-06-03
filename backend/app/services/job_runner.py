@@ -84,8 +84,7 @@ async def run_job(
 
     _add_job_log(
         job,
-        f"Initializing job: {
-            job.name}",
+        f"Initializing job: {job.name}",
         persist_fn=persist_job_state_fn,
     )
 
@@ -270,8 +269,7 @@ async def run_job(
                     recovery_method="domain_runtime_policy",
                     anti_bot_score=0.0,
                     data_evidence_score=0.0,
-                    user_message=f"Domain '{domain_key}' in cooldown for {
-                        cooldown_remaining:.0f}s — {rec_action}",
+                    user_message=f"Domain '{domain_key}' in cooldown for {cooldown_remaining:.0f}s — {rec_action}",
                     recommended_next_action=rec_action,
                 )
                 url_meta = {
@@ -462,8 +460,7 @@ async def run_job(
         if run_global_ai_structuring:
             _add_job_log(
                 job,
-                f"Running global AI structuring on {
-                    len(all_raw_results)} records...",
+                f"Running global AI structuring on {len(all_raw_results)} records...",
                 persist_fn=persist_job_state_fn,
             )
             logging.info("Job %s: AI structuring %d scraped rows...", job_id, len(all_raw_results))
@@ -487,15 +484,14 @@ async def run_job(
 
                 if ai_structuring_report.get("capped_records", 0) > 0:
                     warnings.append(
-                        "AI structuring processed a capped subset of rows; " "remaining rows used deterministic cleaning."
+                        "AI structuring processed a capped subset of rows; remaining rows used deterministic cleaning."
                     )
                 if ai_structuring_report.get("model_fallback_mode"):
                     warnings.append("AI structuring switched to deterministic fallback after repeated model timeouts / errors.")
                 _add_job_log(job, "AI structuring complete")
             except asyncio.TimeoutError:
                 warnings.append(
-                    f"AI structuring timed out after {ai_structuring_timeout_seconds}s; "
-                    "continuing with deterministic processing."
+                    f"AI structuring timed out after {ai_structuring_timeout_seconds}s; continuing with deterministic processing."
                 )
                 _add_job_log(job, "AI structuring timed out, using fallback", level="warning")
                 logging.warning("Job %s: AI structuring timed out", job_id)
@@ -649,7 +645,8 @@ async def run_job(
                 _add_job_log(
                     job,
                     f"Job results bounded and offloaded to disk due to size (>{
-                        settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD} records).",
+                        settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD
+                    } records).",
                 )
             except Exception as e:
                 logging.exception("Job %s: Failed to offload results to disk: %s", job_id, e)

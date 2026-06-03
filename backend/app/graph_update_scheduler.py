@@ -181,12 +181,7 @@ class GraphUpdateScheduler:
         ie.relax_manifold()
         pressure_after = ws.metrics.field_pressure
 
-        ws.snapshot(
-            label=f"global_relaxation_agitation_{
-            round(
-                    self._total_wave_intensity,
-                    2)}"
-        )
+        ws.snapshot(label=f"global_relaxation_agitation_{round(self._total_wave_intensity, 2)}")
 
         self.dispatcher.dispatch(
             SemanticEvent(

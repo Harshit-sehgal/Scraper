@@ -448,8 +448,9 @@ def create_jobs_router(
             )
         except asyncio.TimeoutError:
             cleaned_rows = working_rows
-            reclean_warnings.append(f"AI re-clean timed out after {
-                    config['ai_structuring_timeout_seconds']}s; used deterministic post-processing.")
+            reclean_warnings.append(
+                f"AI re-clean timed out after {config['ai_structuring_timeout_seconds']}s; used deterministic post-processing."
+            )
         except Exception as e:
             logging.exception(e)
             cleaned_rows = working_rows

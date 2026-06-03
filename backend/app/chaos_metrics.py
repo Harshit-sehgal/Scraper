@@ -87,10 +87,10 @@ SUMMARY:
   Pass Rate: {passed / total * 100:.1f}%
 
 SCENARIOS BY SEVERITY:
-  Critical: {sum(1 for r in self.results if 'critical' in r.get('severity', '').lower())}
-  High: {sum(1 for r in self.results if 'high' in r.get('severity', '').lower())}
-  Medium: {sum(1 for r in self.results if 'medium' in r.get('severity', '').lower())}
-  Low: {sum(1 for r in self.results if 'low' in r.get('severity', '').lower())}
+  Critical: {sum(1 for r in self.results if "critical" in r.get("severity", "").lower())}
+  High: {sum(1 for r in self.results if "high" in r.get("severity", "").lower())}
+  Medium: {sum(1 for r in self.results if "medium" in r.get("severity", "").lower())}
+  Low: {sum(1 for r in self.results if "low" in r.get("severity", "").lower())}
 
 DETAILED RESULTS:
 """

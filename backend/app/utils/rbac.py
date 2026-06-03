@@ -81,10 +81,7 @@ def require_role(allowed_roles: list[UserRole]):
         if role not in allowed_roles:
             raise HTTPException(
                 status_code=403,
-                detail=f"Permission denied. Required roles: {
-                    [
-                        r.value for r in allowed_roles]}. Your role: {
-                    role.value}.",
+                detail=f"Permission denied. Required roles: {[r.value for r in allowed_roles]}. Your role: {role.value}.",
             )
         return role
 

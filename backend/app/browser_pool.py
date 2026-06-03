@@ -83,8 +83,7 @@ class BrowserPool:
             # Check for existing context
             # We key by (domain, strategy) to allow different strategies for
             # same domain
-            context_key = f"{domain}:{
-                strategy.value if strategy else 'default'}"
+            context_key = f"{domain}:{strategy.value if strategy else 'default'}"
             context = self._contexts.get(context_key)
             if context:
                 use_count = self._context_use_count.get(context_key, 0)
@@ -139,8 +138,7 @@ class BrowserPool:
                     proxy_config = proxy_mgr.get_proxy_for_playwright()
                     if proxy_config:
                         context_options["proxy"] = proxy_config
-                        logger.debug(f"[BrowserPool] Creating context for {domain} with proxy: {
-                            proxy_config['server']}")
+                        logger.debug(f"[BrowserPool] Creating context for {domain} with proxy: {proxy_config['server']}")
 
             context = await self._browser.new_context(**context_options)
 

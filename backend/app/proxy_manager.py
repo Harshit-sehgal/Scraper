@@ -68,8 +68,7 @@ class ProxyManager:
 
         # Rotate if threshold exceeded
         if self._failure_counts[proxy] >= settings.PROXY_ROTATION_FAILURE_THRESHOLD:
-            logger.warning(f"Proxy {proxy} reached {
-                self._failure_counts[proxy]} failures, rotating")
+            logger.warning(f"Proxy {proxy} reached {self._failure_counts[proxy]} failures, rotating")
             self.rotate(domain=domain)
             self._failure_counts[proxy] = 0
 

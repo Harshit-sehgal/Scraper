@@ -33,8 +33,7 @@ def validate_public_http_url(url: str) -> None:
 
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"}:
-        raise ValueError(f"URL scheme '{
-            parsed.scheme}' is not supported. Only http and https are allowed.")
+        raise ValueError(f"URL scheme '{parsed.scheme}' is not supported. Only http and https are allowed.")
 
     hostname = parsed.hostname
     if not hostname:

@@ -94,7 +94,7 @@ class SchemaField(BaseModel):
     def validate_name(cls, v: str) -> str:
         v = v.strip().lower()
         if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", v):
-            raise ValueError("Field name must be snake_case, start with a letter, " "and be at most 64 characters")
+            raise ValueError("Field name must be snake_case, start with a letter, and be at most 64 characters")
         if v in RESERVED_FIELD_NAMES:
             raise ValueError(f"Field name '{v}' is reserved for system use")
         return v

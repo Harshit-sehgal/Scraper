@@ -232,8 +232,7 @@ class TopologyState:
                     # Find live region
                     live = next((r for r in self._regions if r.region_id == rid), None)
                     if live and live.version != expected:
-                        raise ConflictError(f"MVCC CONFLICT: Region [{rid}] version {
-                            live.version} != expected {expected}")
+                        raise ConflictError(f"MVCC CONFLICT: Region [{rid}] version {live.version} != expected {expected}")
 
             # 2. Increment versions for all modified regions
             for rid in self._modified_regions:

@@ -113,9 +113,7 @@ class BenchmarkReporter:
 
         if precision_drift < -0.05 or recall_drift < -0.05:
             status = "regression"
-            message = (
-                f"ALERT: Regression detected! Precision drift: {precision_drift:+.2%}, " f"Recall drift: {recall_drift:+.2%}"
-            )
+            message = f"ALERT: Regression detected! Precision drift: {precision_drift:+.2%}, Recall drift: {recall_drift:+.2%}"
             logger.warning("[Reporter] %s", message)
 
         return {
@@ -180,18 +178,15 @@ class BenchmarkReporter:
             # Add simple visual progress indicators
             f.write("\n## 2. Dynamic Performance Indicators\n\n")
             latest = history[0]
-            f.write(f"- **Latest Extraction Success (Precision)**: `{'█' *
-                                                                     int(latest.precision *
-                                                                         20)}{'░' *
-                                                                              (20 -
-                                                                               int(latest.precision *
-                                                                                   20))}` ({latest.precision:.2%})\n")
-            f.write(f"- **Latest Capture Rate (Recall)**: `{'█' *
-                                                            int(latest.recall *
-                                                                20)}{'░' *
-                                                                     (20 -
-                                                                      int(latest.recall *
-                                                                          20))}` ({latest.recall:.2%})\n")
+            f.write(
+                f"- **Latest Extraction Success (Precision)**: `{'█' * int(latest.precision * 20)}{
+                    '░' * (20 - int(latest.precision * 20))
+                }` ({latest.precision:.2%})\n"
+            )
+            f.write(
+                f"- **Latest Capture Rate (Recall)**: `{'█' * int(latest.recall * 20)}{'░' * (20 - int(latest.recall * 20))}` ({
+                    latest.recall:.2%})\n"
+            )
             f.write(f"- **Latest Fallback Rate**: `{latest.fallback_rate:.2%}`\n")
             f.write(f"- **Latest Average Scrape Latency**: `{latest.latency_ms:.0f}ms`\n\n")
 
