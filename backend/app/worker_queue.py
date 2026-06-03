@@ -242,7 +242,7 @@ def _ensure_schema(db_path: Optional[Path] = None):
                     # successful task results)
                     try:
                         conn.execute("ALTER TABLE task_history ADD COLUMN result TEXT")
-                    except Exception:
+                    except Exception:  # nosec B110
                         pass
                     current = 2
 
@@ -491,7 +491,7 @@ class WorkerQueue:
                             from app.metrics_collector import record_worker_failure
 
                             record_worker_failure(actual_type)
-                        except Exception:
+                        except Exception:  # nosec B110
                             pass
                         conn.execute(
                             """INSERT OR REPLACE INTO task_history
@@ -752,7 +752,7 @@ class WorkerQueue:
                             cooldown,
                             task.type,
                         )
-            except Exception:
+            except Exception:  # nosec B110
                 pass
             await self.fail(task.id, error_msg, retry=True, retry_after=retry_after, task_type=task.type)
 

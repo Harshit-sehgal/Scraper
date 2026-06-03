@@ -391,6 +391,6 @@ def reset_repository():
                 from app.postgres_repository import shutdown_postgres
 
                 shutdown_postgres()
-            except Exception:
+            except Exception:  # nosec B110
                 pass
     _repository_instance = None

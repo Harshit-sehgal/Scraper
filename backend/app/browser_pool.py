@@ -215,7 +215,7 @@ class BrowserPool:
         """Return a randomized browser user agent."""
         import random
 
-        return random.choice(settings.STEALTH_UA_POOL.split(","))
+        return random.choice(settings.STEALTH_UA_POOL.split(","))  # nosec B311
 
     async def check_health(self) -> bool:
         """Perform a basic health check on the browser instance."""

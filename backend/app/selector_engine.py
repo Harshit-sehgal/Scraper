@@ -1,5 +1,6 @@
 import logging
 import re
+from typing import Any
 
 from bs4 import BeautifulSoup
 
@@ -19,16 +20,20 @@ logger = logging.getLogger(__name__)
 def _detect_table_headers(html: str) -> list[dict]:
     """Detect table / grid headers from HTML to understand column semantics."""
     soup = BeautifulSoup(html, "html.parser")
-    headers_info = []
+    headers_info: list[dict[str, Any]] = []
 
     for th in soup.find_all(["th", "thead"]):
         text = _compact_text(th.get_text())
         if text:
+            cls_val = th.get("class")
+            cls_str = " ".join(cls_val) if isinstance(cls_val, list) else (str(cls_val) if cls_val else "")
+            id_val = th.get("id", "") or ""
+            id_str = id_val[0] if isinstance(id_val, list) else str(id_val)
             headers_info.append(
                 {
                     "text": text,
-                    "class": " ".join(th.get("class", [])),
-                    "id": th.get("id", ""),
+                    "class": cls_str,
+                    "id": id_str,
                 }
             )
 
@@ -617,8 +622,10 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
             continue
         # Skip containers that look like noise: ads, newsletters, signup forms,
         # sidebars
-        classes = " ".join(container.get("class", []))
-        id_attr = container.get("id", "")
+        cls_val = container.get("class")
+        classes = " ".join(cls_val) if isinstance(cls_val, list) else (str(cls_val) if cls_val else "")
+        id_val = container.get("id", "") or ""
+        id_attr = id_val[0] if isinstance(id_val, list) else str(id_val)
         noise_text = text.lower()
         if re.search(
             r"subscribe|newsletter|sign.?up|advertisement|ad[-_]?banner|sidebar|sponsored|cookie",
@@ -640,13 +647,15 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
 
             elif ft == FieldType.EMAIL:
                 link = container.find("a", href=re.compile(r"mailto:", re.I))
-                href = link.get("href") if link else None
+                href_val = link.get("href") if link else None
+                href = href_val[0] if isinstance(href_val, list) else str(href_val) if href_val else None
                 val = href.split("mailto:", 1)[1].split("?")[0] if href else text
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.PHONE:
                 link = container.find("a", href=re.compile(r"tel:", re.I))
-                href = link.get("href") if link else None
+                href_val = link.get("href") if link else None
+                href = href_val[0] if isinstance(href_val, list) else str(href_val) if href_val else None
                 val = href.split("tel:", 1)[1].split("?")[0] if href else text
                 val = _sanitize_field_value(field, val)
 
@@ -733,8 +742,11 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                     # Strategy 2: Look for img alt text (e.g. company logo)
                     if not heading:
                         img = container.find("img", alt=True)
-                        if img and img.get("alt", "").strip() and len(img["alt"].strip()) > 2:
-                            heading = img
+                        if img:
+                            alt_val = img.get("alt")
+                            alt_str = alt_val[0] if isinstance(alt_val, list) else str(alt_val) if alt_val else ""
+                            if alt_str.strip() and len(alt_str.strip()) > 2:
+                                heading = img
 
                     # Strategy 3: Look for elements with identifying class
                     # patterns

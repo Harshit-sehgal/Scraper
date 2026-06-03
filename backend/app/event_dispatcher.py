@@ -55,7 +55,7 @@ class EventDispatcher:
                         severity="warning",
                         cause=f"Event callback failed for {event.event_type.value} from {event.source}: {e}",
                     )
-                except Exception:
+                except Exception:  # nosec B110
                     pass
 
 

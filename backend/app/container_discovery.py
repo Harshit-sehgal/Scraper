@@ -446,10 +446,10 @@ def _extract_record_from_element(
 
     # Get all text-node-level snippets
     text_snippets = []
-    for t in element.find_all(string=True):
-        t = t.strip()
-        if t and len(t) > 1:
-            text_snippets.append(t)
+    for t_element in element.find_all(string=True):
+        t_str = t_element.strip()
+        if t_str and len(t_str) > 1:
+            text_snippets.append(t_str)
 
     # Collect all pattern matches with positions first (pass 1)
     matches_by_type = _collect_all_pattern_matches(full_text)

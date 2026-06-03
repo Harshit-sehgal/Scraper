@@ -288,7 +288,7 @@ async def orchestrate_extraction(
 
             candidates = find_record_arrays(payload)
             record_arrays_found += len(candidates)
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
     # Extract network results

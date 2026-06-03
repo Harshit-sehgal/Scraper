@@ -65,12 +65,6 @@ plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = [
-    "app.page_evidence_collector",
-    "app.content_quality",
-    "app.search_form_recovery",
-    "app.container_discovery",
-    "app.selector_engine",
-    "app.scraper",
     "app.semantic_world_state.core",
     "app.semantic_world_state.events",
     "app.semantic_world_state.memory",
@@ -78,24 +72,13 @@ module = [
     "app.semantic_world_state.serialization",
     "app.semantic_world_state.topology",
     "app.semantic_world_state.locks",
-    "backend.app.page_evidence_collector",
-    "backend.app.content_quality",
-    "backend.app.search_form_recovery",
-    "backend.app.container_discovery",
-    "backend.app.selector_engine",
-    "backend.app.scraper",
     "backend.app.semantic_world_state.core",
     "backend.app.semantic_world_state.events",
     "backend.app.semantic_world_state.memory",
     "backend.app.semantic_world_state.metrics",
     "backend.app.semantic_world_state.serialization",
     "backend.app.semantic_world_state.topology",
-    "backend.app.semantic_world_state.locks",
-    "backend.tests.manual_test_workflow",
-    "backend.tests.manual_test_chennai",
-    "backend.tests.manual_run_manual_test",
-    "backend.tests.manual_test_extract",
-    "backend.tests.manual_test_threebestrated"
+    "backend.app.semantic_world_state.locks"
 ]
 ignore_errors = true
 

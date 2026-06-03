@@ -405,7 +405,7 @@ class TopologyMixin:
 
                 for role in reng.manifold.keys():
                     if role not in anchored_roles:
-                        noise = [random.uniform(-0.1, 0.1) for _ in range(16)]
+                        noise = [random.uniform(-0.1, 0.1) for _ in range(16)]  # nosec B311
                         self._manifold.apply_force_to_manifold(role, noise)
             except Exception as e:
                 logger.warning("Manifold perturbation failed: %s", e)
@@ -491,7 +491,7 @@ class TopologyMixin:
             "local_compatibilities": len(local_compat),
         }
 
-    def trace_field_evolution(self, token: str = "") -> dict:
+    def trace_field_evolution(self, token: str = "") -> dict:  # nosec B107
         view = self._topology.get_view()
         chain = {
             "regions": view.region_count(),

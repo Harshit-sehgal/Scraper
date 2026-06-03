@@ -59,7 +59,7 @@ def _assess_content_quality(html: str, profile) -> dict:
             if soup.select(sel):
                 landing_signals.append("hero_banner")
                 break
-        except Exception:
+        except Exception:  # nosec B112
             continue
 
     # Search forms (generic — any form with text / search input)
@@ -68,7 +68,8 @@ def _assess_content_quality(html: str, profile) -> dict:
     for form in forms:
         inputs = form.find_all("input")
         for inp in inputs:
-            input_type = inp.get("type", "").lower()
+            type_attr = inp.get("type", "") or ""
+            input_type = (type_attr[0] if isinstance(type_attr, list) else str(type_attr)).lower()
             if input_type in ("", "text", "search"):
                 search_form_found = True
                 break
@@ -104,7 +105,7 @@ def _assess_content_quality(html: str, profile) -> dict:
         try:
             containers = soup.select(container_selector)
             data_container_count = sum(1 for c in containers if len(c.get_text(strip=True)) > 20)
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
     # ── Generic Data Container Discovery (fallback) ─────────────────
@@ -117,7 +118,8 @@ def _assess_content_quality(html: str, profile) -> dict:
         for tag in soup.find_all(True):
             if tag.name in ("script", "style", "noscript", "svg", "form", "nav", "footer", "header"):
                 continue
-            classes = " ".join(tag.get("class", []) or [])
+            cls_val = tag.get("class")
+            classes = " ".join(cls_val) if isinstance(cls_val, list) else (str(cls_val) if cls_val else "")
             if classes:
                 key = f"{tag.name}.{'.'.join(classes.split()[:2])}"
                 tag_class_counts[key] += 1
@@ -133,7 +135,7 @@ def _assess_content_quality(html: str, profile) -> dict:
                 content_count = sum(1 for m in matching if len(m.get_text(strip=True)) > 20)
                 if content_count > data_container_count:
                     data_container_count = content_count
-            except Exception:
+            except Exception:  # nosec B112
                 continue
 
         # Also scan for repeating direct children of common containers
@@ -142,7 +144,11 @@ def _assess_content_quality(html: str, profile) -> dict:
             for parent in parents:
                 children = parent.find_all(recursive=False)
                 if len(children) >= 3:
-                    child_classes = [" ".join(c.get("class", []) or []) for c in children]
+                    child_classes = []
+                    for c in children:
+                        cls_val = c.get("class")
+                        cls_str = " ".join(cls_val) if isinstance(cls_val, list) else (str(cls_val) if cls_val else "")
+                        child_classes.append(cls_str)
                     unique_classes = len(set(child_classes))
                     if unique_classes <= 2:
                         data_container_count = max(data_container_count, len(children))

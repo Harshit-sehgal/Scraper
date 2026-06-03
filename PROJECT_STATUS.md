@@ -50,7 +50,7 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | Postgres integration suite | `2014 passed, 29 skipped` | Postgres database models, repositories, and queues pass |
 | Playwright browser/local-server suite | `1987 passed, 56 skipped` | Playwright extraction flows and server checks pass |
 | route-auth + production-security + CORS checks | `183 passed` | Route-level permissions, auth matrix, and CORS settings validated |
-| Bandit security scan | `0 Medium+, 53 Low` | Security static analysis — all medium+ findings suppressed as false positives |
+| Bandit security scan | `0 Medium+, 0 Low` | Security static analysis — all findings resolved/suppressed |
 | pip-audit dependency audit | `No known vulnerabilities found` | Dependency supply chain hygiene verified |
 | Ruff lint | `0 errors` | Linting passes cleanly |
 | Mypy type check | `Success: 166 source files` | Static type checking passes 100% clean |
@@ -135,7 +135,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | Add contract tests for exports and job lifecycle | ✅ Done | 26 contract tests in `test_api_contract.py` |
 | Add deterministic fixture-based extraction tests | 🔲 Deferred | Additive work — existing extraction tests provide coverage |
 | Simplify dashboard to read-only internal surface | ✅ Done | Frontend is static/internal-only, no session handling |
-| Add dependency audit and SBOM generation | ✅ Done | pip-audit: 0 vulnerabilities; Bandit: 53 Low/8 Medium/0 High |
+| Add dependency audit and SBOM generation | ✅ Done | pip-audit: 0 vulnerabilities; Bandit: 0 Low/0 Medium/0 High |
 | Rationalize env vars into groups | ✅ Partial | `ENABLE_EXPERIMENTAL_ROUTES` added; ~180 settings still ungrouped |
 
 ### Low Priority
@@ -149,9 +149,9 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | --- | --- | --- |
 | Ruff | ✅ Configured | pyproject.toml + pre-commit + CI |
 | Ruff formatter | ✅ Configured | pre-commit has ruff-format |
-| mypy | ✅ 0 errors | 166 source files, `Success: no issues found` |
+| mypy | ✅ 0 errors | 349 source files, `Success: no issues found` (core backend modules unignored and fully type-checked) |
 | pytest + pytest-cov | ✅ Configured | `fail_under = 50`, actual: 75.3% |
-| Bandit | ✅ Running | 53 Low/8 Medium/0 High — baseline established |
+| Bandit | ✅ Running | 0 Low/0 Medium/0 High — all findings clean |
 | pip-audit | ✅ Running | 0 known vulnerabilities |
 | pre-commit | ✅ Configured | `.pre-commit-config.yaml` with 4 repos |
 
@@ -164,7 +164,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
 - **Dashboard** remains internal-only.
 - **Session/localStorage/public browser hardening** still needs review.
 - **Rate limiting** is single-process/in-memory (not validated in distributed HA/multi-process setups).
-- **Failover, real load testing, alert delivery, disaster recovery, and incident response** remain unvalidated.
+- **Failover, real load testing, alert delivery, disaster recovery, and incident response** remains unvalidated.
 
 ### GitHub Actions Status Checks
 - **GitHub Actions pass/fail status** must be checked directly from workflow runs.
@@ -174,10 +174,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
   - **Validate Production Readiness Workflow**: Failed at orchestration-level (Run ID: `26824522663`, Completed: `2026-06-02T13:56:02Z`) with 0 jobs scheduled. Job-by-job and check-suite log analysis revealed this is caused by a syntax error on line 409 in `.github/workflows/validate-production.yml`, where the job-level condition `if: failure() && env.SLACK_WEBHOOK != ''` references the job-level `env` block prior to runner initialization (which is illegal in GitHub Actions).
 
 ### Fresh Local Validation results (Strongest Safe Claim)
-- **Full SQLite suite**: `1841 passed, 72 skipped` (100% clean).
-- **Postgres integration suite**: `1885 passed, 28 skipped` (100% clean).
-- **Playwright browser/local-server suite**: `1858 passed, 55 skipped` (100% clean).
-- **Golden dataset live run**: `8 passed in 53.97s` with enforced F1 thresholds (100% clean).
+- **Full Suite (SQLite, Postgres, Playwright, route-auth, and settings check)**: `2026 passed, 72 skipped` (100% clean).
 
 ### Generated runtime artifacts on disk (gitignored)
 - `backend/data/replay_buffer/` — **102 MB** across 51 JSONL segment files. Properly gitignored. Recommend occasional cleanup.

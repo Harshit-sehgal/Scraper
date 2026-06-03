@@ -29,7 +29,7 @@ def get_current_role(request: Request) -> UserRole:
     api_key_header = request.headers.get("X-API-Key", "")
     auth_header = request.headers.get("Authorization", "")
 
-    provided_token = ""
+    provided_token = ""  # nosec B105
     if auth_header.startswith("Bearer "):
         provided_token = auth_header[7:]
 

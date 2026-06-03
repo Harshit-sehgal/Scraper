@@ -169,7 +169,7 @@ class AntiBotEngine:
         available = [ua for ua in ua_pool if ua not in used_uas]
         if not available:
             available = ua_pool
-        ua = random.choice(available)
+        ua = random.choice(available)  # nosec B311
 
         # Update history
         if domain not in self._ua_history:
@@ -214,18 +214,18 @@ class AntiBotEngine:
             extra_headers.pop("Sec-Ch-Ua-Platform", None)
 
         # Viewport randomization (with reasonable ranges)
-        viewport_width = random.choice([int(x) for x in settings.STEALTH_VIEWPORT_WIDTHS.split(",")])
-        viewport_height = random.choice([int(x) for x in settings.STEALTH_VIEWPORT_HEIGHTS.split(",")])
+        viewport_width = random.choice([int(x) for x in settings.STEALTH_VIEWPORT_WIDTHS.split(",")])  # nosec B311
+        viewport_height = random.choice([int(x) for x in settings.STEALTH_VIEWPORT_HEIGHTS.split(",")])  # nosec B311
 
         profile = {
             "user_agent": ua,
             "extra_headers": extra_headers,
             "viewport": {"width": viewport_width, "height": viewport_height},
             "cookie_string": self._cookies.get(domain, ""),
-            "timezone": random.choice(settings.STEALTH_TIMEZONE_POOL.split(",")),
+            "timezone": random.choice(settings.STEALTH_TIMEZONE_POOL.split(",")),  # nosec B311
             "locale": settings.STEALTH_DEFAULT_LOCALE,
             "platform": "Win32" if "Windows" in ua else ("MacIntel" if "Mac" in ua else "Linux x86_64"),
-            "device_scale_factor": random.choice([float(x) for x in settings.STEALTH_DEVICE_SCALE_FACTORS.split(",")]),
+            "device_scale_factor": random.choice([float(x) for x in settings.STEALTH_DEVICE_SCALE_FACTORS.split(",")]),  # nosec B311
         }
         return profile
 

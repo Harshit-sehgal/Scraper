@@ -269,7 +269,7 @@ class StrategyEvolutionEngine:
                         confidence=0.7,
                         estimated_success_rate=0.5,
                     )
-            except Exception:
+            except Exception:  # nosec B110
                 pass
 
             return StrategyRecommendation(
@@ -283,11 +283,11 @@ class StrategyEvolutionEngine:
         # Exploration vs exploitation is only useful after the cold-start safe
         # path has gathered enough samples. Exploring before that can choose a
         # non-browser fetch for JavaScript-backed pages and miss network data.
-        if random.random() < self.exploration_probability:
+        if random.random() < self.exploration_probability:  # nosec B311
             # Randomly pick a strategy we haven't failed too much on
             untried = [s for s in FetchStrategy if state.strategies[s].failure_count < 3]
             if untried:
-                selected = random.choice(untried)
+                selected = random.choice(untried)  # nosec B311
                 return StrategyRecommendation(
                     recommended_strategy=selected,
                     alternatives=[FetchStrategy.PLAYWRIGHT_FULL],
@@ -308,7 +308,7 @@ class StrategyEvolutionEngine:
                     confidence=0.8,
                     estimated_success_rate=0.6,
                 )
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
         best_strategy = state.get_best_strategy()

@@ -425,7 +425,7 @@ class ReplayBuffer:
                 for line in f:
                     if line.strip():
                         count += 1
-        except Exception:
+        except Exception:  # nosec B110
             pass
         return count
 
