@@ -80,15 +80,15 @@ class ExportService:
     async def export(self, fmt: str, records: list[dict], field_names: Optional[list[str]] = None) -> ExportArtifact:
         """Generate an export in the specified format."""
         if fmt == "csv":
-            content = self.to_csv(records, field_names)
+            self.to_csv(records, field_names)
             return ExportArtifact(format="csv", row_count=len(records), generated_at="")
         elif fmt == "json":
-            content = self.to_json(records)
+            self.to_json(records)
             return ExportArtifact(format="json", row_count=len(records), generated_at="")
         elif fmt == "xlsx":
-            content = self.to_xlsx(records, field_names)
-            if content is None:
+            xlsx_content = self.to_xlsx(records, field_names)
+            if xlsx_content is None:
                 raise ValueError("XLSX export requires openpyxl: pip install openpyxl")
-            return ExportArtifact(format="xlsx", row_count=len(records), generated_at="", byte_size=len(content))
+            return ExportArtifact(format="xlsx", row_count=len(records), generated_at="", byte_size=len(xlsx_content))
         else:
             raise ValueError(f"Unsupported export format: {fmt}")

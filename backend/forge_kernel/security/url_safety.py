@@ -44,7 +44,7 @@ def validate_public_http_url(url: str) -> None:
 
     # Allowlist override for integration tests
     sec = settings.security
-    if sec.SMOKE_TEST_MODE or sec.ENV.lower() in ("test", "ci"):
+    if settings.ops.SMOKE_TEST_MODE or sec.ENV.lower() in ("test", "ci"):
         allowed = [h.strip().lower() for h in sec.ALLOWED_INTERNAL_HOSTS.split(",") if h.strip()]
         if hostname_lower in allowed:
             return
