@@ -28,7 +28,7 @@ def clean_gov_env():
             pass
 
 
-def test_operator_mode_adjustments():
+def test_operator_mode_adjustments() -> None:
     dashboard = SystemGovernorDashboard(mode=OperatorMode.PRODUCTION)
     assert settings.PLAYWRIGHT_TIMEOUT == 30000
 
@@ -43,7 +43,7 @@ def test_operator_mode_adjustments():
     assert adjustments_lc["stealth"] is False
 
 
-def test_system_map_generation():
+def test_system_map_generation() -> None:
     dashboard = SystemGovernorDashboard(mode=OperatorMode.PRODUCTION)
 
     # Generate map
@@ -58,7 +58,7 @@ def test_system_map_generation():
     assert "CrawlFrontier" in content
 
 
-def test_governance_summary():
+def test_governance_summary() -> None:
     dashboard = SystemGovernorDashboard(mode=OperatorMode.PRODUCTION)
     summary = dashboard.get_governance_summary()
 

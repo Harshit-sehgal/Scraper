@@ -1,7 +1,7 @@
 from app.semantic_world_state import get_world_state
 
 
-def test_topological_search():
+def test_topological_search() -> None:
     """System should find relevant records based on manifold proximity."""
     ws = get_world_state()
     ws.clear()
@@ -28,7 +28,7 @@ def test_topological_search():
     assert "Beta-Resort" in results[0]["name"]
 
 
-def test_manifold_sharding():
+def test_manifold_sharding() -> None:
     """Basins in different domains should not couple."""
     ws = get_world_state()
     ws.clear()
@@ -57,7 +57,7 @@ def test_manifold_sharding():
     assert hot == 0
 
 
-def test_autonomous_law_induction():
+def test_autonomous_law_induction() -> None:
     """System should learn proximity laws from cohesion."""
     ws = get_world_state()
     ws.clear()
@@ -75,7 +75,7 @@ def test_autonomous_law_induction():
     assert ws.topological_laws.get(key, 0.0) > 0.0
 
 
-def test_topological_law_bias():
+def test_topological_law_bias() -> None:
     """Learned proximity laws should bias future allocations."""
     ws = get_world_state()
     ws.clear()

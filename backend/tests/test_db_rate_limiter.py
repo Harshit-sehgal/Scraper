@@ -39,7 +39,7 @@ def _generate_test_key() -> str:
     return f"_test_sliding_window_{os.urandom(4).hex()}_"
 
 
-def test_db_sliding_window_counter_sqlite():
+def test_db_sliding_window_counter_sqlite() -> None:
     """Verify that DatabaseSlidingWindowCounter behaves correctly using SQLite storage.
 
     Uses a randomly generated unique key to avoid colliding with other tests that share
@@ -77,7 +77,7 @@ def test_db_sliding_window_counter_sqlite():
         _cleanup_rate_limit_key(test_key)
 
 
-def test_rate_limiter_middleware_db_backed_selection():
+def test_rate_limiter_middleware_db_backed_selection() -> None:
     """Verify that RateLimiterMiddleware selects the database-backed counter when configured."""
     from unittest.mock import patch
 
@@ -101,7 +101,7 @@ def test_rate_limiter_middleware_db_backed_selection():
         assert isinstance(middleware._counters[key], DatabaseSlidingWindowCounter)
 
 
-def test_db_sliding_window_counter_fallback():
+def test_db_sliding_window_counter_fallback() -> None:
     """Verify that DatabaseSlidingWindowCounter falls back to in-memory behavior on DB errors."""
     import os
     from unittest.mock import patch

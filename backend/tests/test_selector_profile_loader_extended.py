@@ -31,7 +31,7 @@ class TestRealProfileLoading:
     def teardown_method(self):
         reload_profiles()
 
-    def test_load_from_temp_profile_dir(self):
+    def test_load_from_temp_profile_dir(self) -> None:
         """Load profiles from a temporary directory with real JSON files."""
         with tempfile.TemporaryDirectory() as tmpdir:
             profile = {
@@ -52,7 +52,7 @@ class TestRealProfileLoading:
                 assert profiles["test-site.com"]["domain"] == "test-site.com"
                 assert profiles["test-site.com"]["fields"]["name"]["selector"] == ".title"
 
-    def test_load_skips_missing_domain(self):
+    def test_load_skips_missing_domain(self) -> None:
         """Profile without 'domain' field should be skipped."""
         with tempfile.TemporaryDirectory() as tmpdir:
             bad_profile = {
@@ -69,7 +69,7 @@ class TestRealProfileLoading:
                 # The bad profile should be skipped (no 'domain' key)
                 assert len(profiles) == 0
 
-    def test_load_handles_invalid_json(self):
+    def test_load_handles_invalid_json(self) -> None:
         """Invalid JSON file should be logged and skipped."""
         with tempfile.TemporaryDirectory() as tmpdir:
             with open(Path(tmpdir) / "corrupt.json", "w") as f:
@@ -80,7 +80,7 @@ class TestRealProfileLoading:
                 profiles = _load_all_profiles()
                 assert len(profiles) == 0
 
-    def test_load_profiles_dir_not_found(self):
+    def test_load_profiles_dir_not_found(self) -> None:
         """When profiles dir does not exist, returns empty cache (lines 71-72)."""
         with patch("app.selector_profiles.loader._PROFILES_DIR", Path("/tmp/nonexistent_profiles_dir_xyz")):
             reload_profiles()
@@ -88,7 +88,7 @@ class TestRealProfileLoading:
             assert len(profiles) == 0
             assert isinstance(profiles, dict)
 
-    def test_load_multiple_profiles(self):
+    def test_load_multiple_profiles(self) -> None:
         """Multiple valid JSON files all get loaded."""
         with tempfile.TemporaryDirectory() as tmpdir:
             for i, domain in enumerate(["site-a.com", "site-b.com", "site-c.com"]):
@@ -114,7 +114,7 @@ class TestMatchDomainWithProfiles:
     def teardown_method(self):
         reload_profiles()
 
-    def test_match_exact_domain(self):
+    def test_match_exact_domain(self) -> None:
         """Exact domain match returns the profile."""
         with tempfile.TemporaryDirectory() as tmpdir:
             profile = {"domain": "example.com", "fields": {"n": {"selector": ".n"}}}
@@ -127,7 +127,7 @@ class TestMatchDomainWithProfiles:
                 assert result is not None
                 assert result["domain"] == "example.com"
 
-    def test_match_subdomain(self):
+    def test_match_subdomain(self) -> None:
         """Subdomain match works (domain in hostname)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             profile = {"domain": "example.com", "fields": {"n": {"selector": ".n"}}}
@@ -140,7 +140,7 @@ class TestMatchDomainWithProfiles:
                 assert result is not None
                 assert result["domain"] == "example.com"
 
-    def test_no_match(self):
+    def test_no_match(self) -> None:
         """URL not matching any domain returns None."""
         with tempfile.TemporaryDirectory() as tmpdir:
             profile = {"domain": "example.com", "fields": {"n": {"selector": ".n"}}}
@@ -152,7 +152,7 @@ class TestMatchDomainWithProfiles:
                 result = _match_domain("https://other-site.com/page")
                 assert result is None
 
-    def test_match_invalid_url(self):
+    def test_match_invalid_url(self) -> None:
         """Invalid URL returns None (urlparse gives empty hostname)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             profile = {"domain": "example.com", "fields": {"n": {"selector": ".n"}}}
@@ -169,7 +169,7 @@ class TestMatchDomainWithProfiles:
 
 
 class TestReloadProfiles:
-    def test_reload_clears_and_reloads(self):
+    def test_reload_clears_and_reloads(self) -> None:
         """reload_profiles clears the cache and reloads fresh."""
         profiles = _load_all_profiles()
         # After reload, a new call should get a fresh dict
@@ -182,26 +182,26 @@ class TestReloadProfiles:
 
 
 class TestParseCurrencyEdgeCases:
-    def test_string_with_only_letters_no_digits(self):
+    def test_string_with_only_letters_no_digits(self) -> None:
         """Non-numeric string after symbol stripping returns None."""
         assert _parse_currency("FREE") is None
         assert _parse_currency("N/A") is None
         assert _parse_currency("Contact for price") is None
 
-    def test_string_with_text_and_trailing_digits(self):
+    def test_string_with_text_and_trailing_digits(self) -> None:
         """Text with embedded digits extracts the number."""
         assert _parse_currency("Price is 99 only") == "99"
         assert _parse_currency("Total: 49.95 USD") == "49.95"
 
-    def test_string_with_leading_zeros(self):
+    def test_string_with_leading_zeros(self) -> None:
         assert _parse_currency("$0.99") == "0.99"
         assert _parse_currency("AED 00500") == "00500"
 
-    def test_string_trailing_text(self):
+    def test_string_trailing_text(self) -> None:
         """Numbers followed by text after symbol."""
         assert _parse_currency("$199 USD") == "199"
 
-    def test_string_only_symbols(self):
+    def test_string_only_symbols(self) -> None:
         """Only currency symbols, no digits."""
         assert _parse_currency("£££") is None
         assert _parse_currency("$$") is None
@@ -211,22 +211,22 @@ class TestParseCurrencyEdgeCases:
 
 
 class TestPostprocessFieldExtended:
-    def test_number_type_exception_path(self):
+    def test_number_type_exception_path(self) -> None:
         """Non-numeric text with number type returns raw text (except handler, lines 147-148)."""
         result = _postprocess_field("N/A", {"type": "number"})
         assert result == "N/A"
 
-    def test_number_type_invalid_float(self):
+    def test_number_type_invalid_float(self) -> None:
         """Text that has symbols but no digits still returns raw text."""
         result = _postprocess_field("£££", {"type": "number"})
         assert result == "£££"
 
-    def test_currency_type_empty_parse_fallback(self):
+    def test_currency_type_empty_parse_fallback(self) -> None:
         """Currency type with no digits returns original text."""
         result = _postprocess_field("FREETEXT", {"type": "currency"})
         assert result == "FREETEXT"
 
-    def test_text_type_default(self):
+    def test_text_type_default(self) -> None:
         """Default type (no type key) returns text as-is."""
         result = _postprocess_field("Hello World", {"selector": ".x"})
         assert result == "Hello World"
@@ -237,7 +237,7 @@ class TestPostprocessFieldExtended:
 
 @pytest.mark.asyncio
 class TestTryProfileExtractionFound:
-    async def test_profile_found_delegates_to_extract(self):
+    async def test_profile_found_delegates_to_extract(self) -> None:
         """When profile matches, extract_with_profile should be called."""
         with (
             patch("app.selector_profiles.loader._match_domain") as mock_match,
@@ -256,7 +256,7 @@ class TestTryProfileExtractionFound:
             assert result == [{"name": "Item1"}]
             mock_extract.assert_called_once()
 
-    async def test_profile_found_uses_correct_url(self):
+    async def test_profile_found_uses_correct_url(self) -> None:
         """The URL passed to extract_with_profile should be the original URL."""
         with (
             patch("app.selector_profiles.loader._match_domain") as mock_match,
@@ -349,7 +349,7 @@ class TestExtractWithProfilePlaywright:
     """Tests extract_with_profile by mocking Playwright internals."""
 
     @pytest.mark.asyncio
-    async def test_missing_container_and_fields(self):
+    async def test_missing_container_and_fields(self) -> None:
         """Already tested above — both missing container and fields returns []."""
         from app.selector_profiles.loader import extract_with_profile
 
@@ -360,7 +360,7 @@ class TestExtractWithProfilePlaywright:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_max_wait_defaults_from_settings(self):
+    async def test_max_wait_defaults_from_settings(self) -> None:
         """max_wait=None should use settings.PROFILE_MAX_WAIT."""
         from app.selector_profiles.loader import extract_with_profile
 
@@ -382,7 +382,7 @@ class TestExtractWithProfilePlaywright:
                 mock_page.wait_for_selector.assert_called_once_with("div.x", timeout=15000)
 
     @pytest.mark.asyncio
-    async def test_extract_with_playwright_success(self):
+    async def test_extract_with_playwright_success(self) -> None:
         """Full extraction flow with Playwright mocking returns post-processed records."""
         from app.selector_profiles.loader import extract_with_profile
 
@@ -426,7 +426,7 @@ class TestExtractWithProfilePlaywright:
             mock_page.wait_for_selector.assert_called_once_with("div.card", timeout=10000)
 
     @pytest.mark.asyncio
-    async def test_goto_timeout_fallback(self):
+    async def test_goto_timeout_fallback(self) -> None:
         """When networkidle times out, falls back to domcontentloaded."""
         from app.selector_profiles.loader import extract_with_profile
 
@@ -459,7 +459,7 @@ class TestExtractWithProfilePlaywright:
             assert mock_page.goto.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_wait_for_selector_timeout_returns_empty(self):
+    async def test_wait_for_selector_timeout_returns_empty(self) -> None:
         """When wait_for_selector times out, returns empty list."""
         from app.selector_profiles.loader import extract_with_profile
 
@@ -487,7 +487,7 @@ class TestExtractWithProfilePlaywright:
             assert mock_page.wait_for_selector.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_fatal_error_returns_empty(self):
+    async def test_fatal_error_returns_empty(self) -> None:
         """When Playwright encounters an unexpected error, returns empty."""
         from app.selector_profiles.loader import extract_with_profile
 
@@ -512,7 +512,7 @@ class TestExtractWithProfilePlaywright:
             assert result == []
 
     @pytest.mark.asyncio
-    async def test_route_filter_blocks_media(self):
+    async def test_route_filter_blocks_media(self) -> None:
         """Verify the route filter function blocks images/media/fonts."""
         from app.selector_profiles.loader import extract_with_profile
 

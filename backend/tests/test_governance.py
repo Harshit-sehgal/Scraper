@@ -8,7 +8,7 @@ from app.graph_update_scheduler import GlobalCognitiveScheduler
 from app.semantic_world_state import SemanticWorldState
 
 
-def test_governance_guardrail_enforcement():
+def test_governance_guardrail_enforcement() -> None:
     """Verify that thermodynamic violations trigger emergency stabilization."""
     ws = SemanticWorldState(node_id="gov_test")
     ws.clear()
@@ -51,7 +51,7 @@ def test_governance_guardrail_enforcement():
         policy.critical_entropy_threshold = old_threshold
 
 
-def test_community_density_quota():
+def test_community_density_quota() -> None:
     """Verify that community density violations are detected."""
     from app.policy_engine import get_policy_engine
 

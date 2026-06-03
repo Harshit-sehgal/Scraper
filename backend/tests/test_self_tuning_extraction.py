@@ -21,13 +21,13 @@ from app.self_tuning_extraction import (
 class TestSelfTuningController:
     """Test the Self-Tuning Controller."""
 
-    def test_create_controller(self):
+    def test_create_controller(self) -> None:
         """Test creating a tuning controller."""
         controller = SelfTuningController()
         assert controller is not None
         assert len(controller._parameters) == 0
 
-    def test_get_parameters_creates_defaults(self):
+    def test_get_parameters_creates_defaults(self) -> None:
         """Test that getting parameters creates defaults."""
         controller = SelfTuningController()
         params = controller.get_parameters("example.com")
@@ -37,7 +37,7 @@ class TestSelfTuningController:
         assert params.delay_between_requests_s > 0
         assert params.max_retries >= 0
 
-    def test_parameters_defaults_match_settings(self):
+    def test_parameters_defaults_match_settings(self) -> None:
         """Test default values match config."""
         controller = SelfTuningController()
         params = controller.get_parameters("example.com")
@@ -47,7 +47,7 @@ class TestSelfTuningController:
         assert params.max_retries == settings.MAX_RETRIES
         assert params.min_confidence_threshold == settings.DEFAULT_MIN_RECORD_SCORE
 
-    def test_record_telemetry_creates_history(self):
+    def test_record_telemetry_creates_history(self) -> None:
         """Test recording telemetry creates history."""
         controller = SelfTuningController()
         controller.record_telemetry(
@@ -62,7 +62,7 @@ class TestSelfTuningController:
         assert "example.com" in controller._telemetry
         assert len(controller._telemetry["example.com"]) == 1
 
-    def test_multiple_telemetry_records(self):
+    def test_multiple_telemetry_records(self) -> None:
         """Test recording multiple telemetry snapshots."""
         controller = SelfTuningController()
         for i in range(20):
@@ -77,7 +77,7 @@ class TestSelfTuningController:
 
         assert len(controller._telemetry["example.com"]) == 20
 
-    def test_history_capped_at_50(self):
+    def test_history_capped_at_50(self) -> None:
         """Test that history is capped at 50 records."""
         controller = SelfTuningController()
         for i in range(100):
@@ -92,7 +92,7 @@ class TestSelfTuningController:
 
         assert len(controller._telemetry["example.com"]) == 50
 
-    def test_fetch_timeout_adjusts_up(self):
+    def test_fetch_timeout_adjusts_up(self) -> None:
         """Test that timeout increases with slow fetches."""
         controller = SelfTuningController()
 
@@ -111,7 +111,7 @@ class TestSelfTuningController:
         # Timeout should be >= 2x avg + 5s = 2*5 + 5 = 15s
         assert params.fetch_timeout_s >= 15.0
 
-    def test_fetch_timeout_stays_within_bounds(self):
+    def test_fetch_timeout_stays_within_bounds(self) -> None:
         """Test that timeout stays within configured bounds."""
         controller = SelfTuningController()
 
@@ -130,7 +130,7 @@ class TestSelfTuningController:
         # Should not go below min_timeout (10.0)
         assert params.fetch_timeout_s >= 10.0
 
-    def test_delay_increases_with_anti_bot(self):
+    def test_delay_increases_with_anti_bot(self) -> None:
         """Test that delay increases with anti-bot score."""
         controller = SelfTuningController()
 
@@ -149,7 +149,7 @@ class TestSelfTuningController:
         # Delay should be increased beyond base
         assert params.delay_between_requests_s >= settings.CRAWL_DEFAULT_DELAY_SECONDS
 
-    def test_retries_increase_with_failures(self):
+    def test_retries_increase_with_failures(self) -> None:
         """Test that retries increase when success rate is low."""
         controller = SelfTuningController()
 
@@ -184,7 +184,7 @@ class TestSelfTuningController:
         params2 = controller.get_parameters("failing-domain.com")
         assert params2.max_retries >= initial_retries
 
-    def test_confidence_threshold_adjusts(self):
+    def test_confidence_threshold_adjusts(self) -> None:
         """Test that confidence threshold adjusts with quality."""
         controller = SelfTuningController()
         domain = "quality-domain.com"
@@ -204,13 +204,13 @@ class TestSelfTuningController:
         # Confidence threshold should not decrease with high quality
         assert params.min_confidence_threshold >= 0.35
 
-    def test_tuning_report_empty(self):
+    def test_tuning_report_empty(self) -> None:
         """Test tuning report with no data."""
         controller = SelfTuningController()
         report = controller.get_tuning_report()
         assert report["total_domains_tuned"] == 0
 
-    def test_tuning_report_with_data(self):
+    def test_tuning_report_with_data(self) -> None:
         """Test tuning report with data."""
         controller = SelfTuningController()
         controller.record_telemetry(
@@ -227,7 +227,7 @@ class TestSelfTuningController:
         assert "averages" in report
         assert report["total_adjustments"] >= 0
 
-    def test_domain_report(self):
+    def test_domain_report(self) -> None:
         """Test getting domain-specific report."""
         controller = SelfTuningController()
         controller.record_telemetry(
@@ -243,7 +243,7 @@ class TestSelfTuningController:
         assert report is not None
         assert report["domain"] == "example.com"
 
-    def test_domain_report_unknown(self):
+    def test_domain_report_unknown(self) -> None:
         """Test getting report for unknown domain."""
         controller = SelfTuningController()
         report = controller.get_domain_report("unknown.com")
@@ -253,7 +253,7 @@ class TestSelfTuningController:
 class TestSelfTuningControllerGlobal:
     """Test global singleton access."""
 
-    def test_singleton(self):
+    def test_singleton(self) -> None:
         """Test singleton access."""
         c1 = get_self_tuning_controller()
         c2 = get_self_tuning_controller()

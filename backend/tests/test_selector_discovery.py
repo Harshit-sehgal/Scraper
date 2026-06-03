@@ -64,7 +64,7 @@ async def discover_selectors(*args, **kwargs):
 class TestAnalyzePageDataType:
     """Tests for _analyze_page_data_type()."""
 
-    def test_returns_structure_profile(self):
+    def test_returns_structure_profile(self) -> None:
         html = "<html><body><table><tr><td>data</td></tr></table></body></html>"
         schema = [SchemaField(name="title", field_type=FieldType.STRING, description="", required=False)]
         result = _analyze_page_data_type(html, schema)
@@ -77,7 +77,7 @@ class TestAnalyzePageDataType:
 class TestBuildSelectorPrompt:
     """Tests for build_selector_prompt()."""
 
-    def test_basic_prompt_structure(self):
+    def test_basic_prompt_structure(self) -> None:
         snippet = "<div class='item'><h2>Title</h2></div>"
         schema = [SchemaField(name="title", field_type=FieldType.STRING, description="Product title", required=False)]
         prompt = build_selector_prompt(snippet, schema)
@@ -85,7 +85,7 @@ class TestBuildSelectorPrompt:
         assert "title" in prompt
         assert "Product title" in prompt
 
-    def test_with_page_analysis(self):
+    def test_with_page_analysis(self) -> None:
         snippet = "<div>data</div>"
         schema = [SchemaField(name="price", field_type=FieldType.FLOAT, description="", required=False)]
         analysis = {
@@ -107,7 +107,7 @@ class TestBuildSelectorPrompt:
         assert "Price" in prompt  # headers
         assert "currencies" in prompt  # patterns
 
-    def test_with_solidified_motifs(self):
+    def test_with_solidified_motifs(self) -> None:
         snippet = "<div>data</div>"
         schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]
         motifs = [{"field": "name", "selector": "h2.title", "confidence": 0.9}]
@@ -118,20 +118,20 @@ class TestBuildSelectorPrompt:
             assert "Motif hint" in prompt
             mock_instance.build_motif_context.assert_called_once_with(motifs, schema)
 
-    def test_without_solidified_motifs(self):
+    def test_without_solidified_motifs(self) -> None:
         snippet = "<div>data</div>"
         schema = [SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)]
         prompt = build_selector_prompt(snippet, schema, solidified_motifs=None)
         assert "Motif" not in prompt
         assert "x" in prompt
 
-    def test_with_empty_schema(self):
+    def test_with_empty_schema(self) -> None:
         snippet = "<div>data</div>"
         prompt = build_selector_prompt(snippet, [])
         assert "USER SCHEMA:" in prompt
         assert "JSON" in prompt
 
-    def test_contains_extraction_rules(self):
+    def test_contains_extraction_rules(self) -> None:
         snippet = "<span>data</span>"
         schema = [SchemaField(name="rating", field_type=FieldType.FLOAT, description="", required=False)]
         prompt = build_selector_prompt(snippet, schema)
@@ -139,7 +139,7 @@ class TestBuildSelectorPrompt:
         assert "Return ONLY JSON" in prompt
         assert "item_container" in prompt
 
-    def test_contains_exclusions(self):
+    def test_contains_exclusions(self) -> None:
         snippet = "<nav>menu</nav>"
         schema = [SchemaField(name="title", field_type=FieldType.STRING, description="", required=False)]
         prompt = build_selector_prompt(snippet, schema)
@@ -151,33 +151,33 @@ class TestBuildSelectorPrompt:
 class TestClassifyValue:
     """Tests for _classify_value()."""
 
-    def test_currency(self):
+    def test_currency(self) -> None:
         assert _classify_value("£450") == "currency"
         assert _classify_value("$1,200") == "currency"
 
-    def test_date(self):
+    def test_date(self) -> None:
         assert _classify_value("30-05-2026") == "date"
         assert _classify_value("2026-05-30") == "date"
 
-    def test_time(self):
+    def test_time(self) -> None:
         assert _classify_value("10:00 PM") == "time"
         assert _classify_value("14:30") == "time"
 
-    def test_code(self):
+    def test_code(self) -> None:
         assert _classify_value("LHR") == "code"
         assert _classify_value("BA123") == "string"  # Not 3-letter code
         assert _classify_value("SKU-12345") == "code"
 
-    def test_email(self):
+    def test_email(self) -> None:
         assert _classify_value("test@example.com") == "email"
 
-    def test_phone(self):
+    def test_phone(self) -> None:
         assert _classify_value("+1-555-1234") == "phone"
 
-    def test_empty_string(self):
+    def test_empty_string(self) -> None:
         assert _classify_value("") == "string"
 
-    def test_plain_text(self):
+    def test_plain_text(self) -> None:
         assert _classify_value("British Airways") == "string"
         assert _classify_value("Economy") == "string"
 
@@ -185,7 +185,7 @@ class TestClassifyValue:
 class TestBuildUrlAnalysisPrompt:
     """Tests for build_url_analysis_prompt()."""
 
-    def test_basic_structure(self):
+    def test_basic_structure(self) -> None:
         """Prompt should include value types, JSON format, and estimated_record_count."""
         values = ["British Airways", "£450", "30-05-2026", "10:00 PM", "LHR"]
         prompt = build_url_analysis_prompt(
@@ -200,7 +200,7 @@ class TestBuildUrlAnalysisPrompt:
         assert "type: currency" in prompt
         assert "type: date" in prompt
 
-    def test_no_raw_html(self):
+    def test_no_raw_html(self) -> None:
         """Prompt should NOT contain raw HTML or markup tags."""
         values = ["test", "data"]
         prompt = build_url_analysis_prompt(
@@ -210,7 +210,7 @@ class TestBuildUrlAnalysisPrompt:
         assert "<" not in prompt  # No HTML tags
         assert ">" not in prompt
 
-    def test_examples_include_domain_field_names(self):
+    def test_examples_include_domain_field_names(self) -> None:
         """Prompt examples should demonstrate mapping to descriptive field names."""
         values = ["British Airways", "BA123"]
         prompt = build_url_analysis_prompt(
@@ -221,7 +221,7 @@ class TestBuildUrlAnalysisPrompt:
         assert "departure_airport" in prompt
         assert "flight_number" in prompt
 
-    def test_values_passed_as_is(self):
+    def test_values_passed_as_is(self) -> None:
         """All provided values should appear in the prompt."""
         values = ["value1", "value2", "value3"]
         prompt = build_url_analysis_prompt(
@@ -231,7 +231,7 @@ class TestBuildUrlAnalysisPrompt:
         for val in values:
             assert val in prompt
 
-    def test_never_use_type_names_as_field_names(self):
+    def test_never_use_type_names_as_field_names(self) -> None:
         """Prompt should explicitly instruct LLM to avoid type names."""
         values = ["10:00 PM"]
         prompt = build_url_analysis_prompt(
@@ -246,28 +246,28 @@ class TestBuildUrlAnalysisPrompt:
 class TestValuePatternsToFieldTypes:
     """Tests for _value_patterns_to_field_types()."""
 
-    def test_currency_pattern(self):
+    def test_currency_pattern(self) -> None:
         patterns = ValuePatterns()
         patterns.currencies = ["£"]
         result = _value_patterns_to_field_types(patterns)
         types = [r["type"] for r in result]
         assert "currency" in types
 
-    def test_date_pattern(self):
+    def test_date_pattern(self) -> None:
         patterns = ValuePatterns()
         patterns.dates = ["2024-01-01"]
         result = _value_patterns_to_field_types(patterns)
         types = [r["type"] for r in result]
         assert "date" in types
 
-    def test_code_3letter(self):
+    def test_code_3letter(self) -> None:
         patterns = ValuePatterns()
         patterns.codes_3letter = ["LHR"]
         result = _value_patterns_to_field_types(patterns)
         types = [r["type"] for r in result]
         assert "code" in types
 
-    def test_multiple_patterns(self):
+    def test_multiple_patterns(self) -> None:
         patterns = ValuePatterns()
         patterns.currencies = ["$"]
         patterns.dates = ["2024-06-15"]
@@ -281,12 +281,12 @@ class TestValuePatternsToFieldTypes:
         assert "phone" in types
         assert "rating" in types
 
-    def test_empty_patterns_returns_empty(self):
+    def test_empty_patterns_returns_empty(self) -> None:
         patterns = ValuePatterns()
         result = _value_patterns_to_field_types(patterns)
         assert result == []
 
-    def test_no_hardcoded_field_names_in_output(self):
+    def test_no_hardcoded_field_names_in_output(self) -> None:
         """The function should return types, not guessed field names."""
         patterns = ValuePatterns()
         patterns.currencies = ["£"]
@@ -308,7 +308,7 @@ class TestValuePatternsToFieldTypes:
 class TestRenameGenericFields:
     """Tests for _rename_generic_fields()."""
 
-    def test_renames_currency_type_name(self):
+    def test_renames_currency_type_name(self) -> None:
         """Currency field named 'currency' should become 'price' with example value hint."""
         fields = [
             {"name": "currency", "type": "currency", "example_value": "$450", "confidence": 0.9},
@@ -316,7 +316,7 @@ class TestRenameGenericFields:
         result = _rename_generic_fields(fields)
         assert result[0]["name"] == "price"
 
-    def test_renames_3letter_code_to_three_letter_code(self):
+    def test_renames_3letter_code_to_three_letter_code(self) -> None:
         """Code field with 3-letter uppercase example should become 'three_letter_code'."""
         fields = [
             {"name": "code", "type": "code", "example_value": "LHR", "confidence": 0.8},
@@ -324,7 +324,7 @@ class TestRenameGenericFields:
         result = _rename_generic_fields(fields)
         assert result[0]["name"] == "three_letter_code"
 
-    def test_renames_2letter_code_to_abbreviation(self):
+    def test_renames_2letter_code_to_abbreviation(self) -> None:
         """Code field with 2-letter uppercase example should become 'code_abbreviation'."""
         fields = [
             {"name": "code", "type": "code", "example_value": "NY", "confidence": 0.7},
@@ -332,7 +332,7 @@ class TestRenameGenericFields:
         result = _rename_generic_fields(fields)
         assert result[0]["name"] == "code_abbreviation"
 
-    def test_leaves_descriptive_name_unchanged(self):
+    def test_leaves_descriptive_name_unchanged(self) -> None:
         """Non-generic field names should be left untouched."""
         fields = [
             {"name": "airline_name", "type": "string", "example_value": "British Airways", "confidence": 0.95},
@@ -340,7 +340,7 @@ class TestRenameGenericFields:
         result = _rename_generic_fields(fields)
         assert result[0]["name"] == "airline_name"
 
-    def test_deduplicates_duplicate_generic_names(self):
+    def test_deduplicates_duplicate_generic_names(self) -> None:
         """Two fields with the same generic name should be deduplicated."""
         fields = [
             {"name": "string", "type": "string", "example_value": "Hello", "confidence": 0.5},
@@ -353,7 +353,7 @@ class TestRenameGenericFields:
         assert names[0] == "string"
         assert names[1] == "string_2"
 
-    def test_renames_multiple_generic_names(self):
+    def test_renames_multiple_generic_names(self) -> None:
         """Multiple generic fields should each be renamed appropriately."""
         fields = [
             {"name": "currency", "type": "currency", "example_value": "$450", "confidence": 0.9},
@@ -368,7 +368,7 @@ class TestRenameGenericFields:
         assert names[2] == "time"
         assert names[3] == "string"  # No hint matches for generic string
 
-    def test_renames_location_with_capitalized_word(self):
+    def test_renames_location_with_capitalized_word(self) -> None:
         """Location field with proper noun example should become 'city_name'."""
         fields = [
             {"name": "location", "type": "location", "example_value": "London", "confidence": 0.9},
@@ -376,7 +376,7 @@ class TestRenameGenericFields:
         result = _rename_generic_fields(fields)
         assert result[0]["name"] == "city_name"
 
-    def test_empty_list_returns_empty(self):
+    def test_empty_list_returns_empty(self) -> None:
         """Empty input should return empty list."""
         assert _rename_generic_fields([]) == []
 
@@ -384,39 +384,39 @@ class TestRenameGenericFields:
 class TestInferFieldName:
     """Tests for _infer_field_name()."""
 
-    def test_currency_example(self):
+    def test_currency_example(self) -> None:
         assert _infer_field_name("$450", "currency") == "price"
         assert _infer_field_name("£1,200", "currency") == "price"
 
-    def test_3letter_code_example(self):
+    def test_3letter_code_example(self) -> None:
         assert _infer_field_name("LHR", "code") == "three_letter_code"
         assert _infer_field_name("JFK", "code") == "three_letter_code"
 
-    def test_2letter_code_example(self):
+    def test_2letter_code_example(self) -> None:
         assert _infer_field_name("NY", "code") == "code_abbreviation"
         assert _infer_field_name("CA", "code") == "code_abbreviation"
 
-    def test_mixed_code_example(self):
+    def test_mixed_code_example(self) -> None:
         assert _infer_field_name("BA178", "code") == "reference_code"
 
-    def test_email_example(self):
+    def test_email_example(self) -> None:
         assert _infer_field_name("test@example.com", "email") == "email"
 
-    def test_phone_example(self):
+    def test_phone_example(self) -> None:
         assert _infer_field_name("+1-555-1234", "phone") == "phone_number"
 
-    def test_city_name_example(self):
+    def test_city_name_example(self) -> None:
         assert _infer_field_name("London", "location") == "city_name"
         assert _infer_field_name("Paris", "location") == "city_name"
 
-    def test_empty_example_returns_empty(self):
+    def test_empty_example_returns_empty(self) -> None:
         assert _infer_field_name("", "string") == ""
 
-    def test_no_match_returns_empty(self):
+    def test_no_match_returns_empty(self) -> None:
         """No matching hint should return empty."""
         assert _infer_field_name("Some random text", "string") == ""
 
-    def test_wrong_type_returns_empty(self):
+    def test_wrong_type_returns_empty(self) -> None:
         """Type mismatch should return empty even if pattern matches."""
         assert _infer_field_name("LHR", "string") == ""  # LHR matches code pattern but type is string
 
@@ -425,7 +425,7 @@ class TestDiscoverSelectors:
     """Tests for discover_selectors()."""
 
     @pytest.mark.asyncio
-    async def test_successful_extraction(self):
+    async def test_successful_extraction(self) -> None:
         mock_selectors = {"item_container": "div.item", "fields": {"name": "h2"}}
         with (
             patch("app.selector_discovery.clean_html_for_selectors", return_value="<div>cleaned</div>"),
@@ -438,7 +438,7 @@ class TestDiscoverSelectors:
             assert result == mock_selectors
 
     @pytest.mark.asyncio
-    async def test_llm_returns_non_dict_falls_back_to_empty(self):
+    async def test_llm_returns_non_dict_falls_back_to_empty(self) -> None:
         with (
             patch("app.selector_discovery.clean_html_for_selectors", return_value="<div>cleaned</div>"),
             patch("app.selector_discovery.llm_json", new_callable=AsyncMock, return_value="not a dict"),
@@ -449,7 +449,7 @@ class TestDiscoverSelectors:
             assert result == {}
 
     @pytest.mark.asyncio
-    async def test_llm_raises_exception_returns_empty(self):
+    async def test_llm_raises_exception_returns_empty(self) -> None:
         with (
             patch("app.selector_discovery.clean_html_for_selectors", return_value="<div>cleaned</div>"),
             patch("app.selector_discovery.llm_json", new_callable=AsyncMock, side_effect=ValueError("API error")),
@@ -460,7 +460,7 @@ class TestDiscoverSelectors:
             assert result == {}
 
     @pytest.mark.asyncio
-    async def test_with_solidified_motifs(self):
+    async def test_with_solidified_motifs(self) -> None:
         mock_selectors = {"item_container": "div.card", "fields": {"title": "h3"}}
         motifs = [{"field": "title", "selector": "h3", "confidence": 0.8}]
         with (

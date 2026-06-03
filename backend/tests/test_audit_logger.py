@@ -53,7 +53,7 @@ def temp_log_dir():
 
 
 class TestAuditEvent:
-    def test_minimal_event(self):
+    def test_minimal_event(self) -> None:
         event = AuditEvent(
             event_type="auth",
             actor="test-user",
@@ -70,7 +70,7 @@ class TestAuditEvent:
         assert "timestamp" in data
         assert "iso_time" in data
 
-    def test_event_with_details(self):
+    def test_event_with_details(self) -> None:
         event = AuditEvent(
             event_type="rbac",
             actor="admin",
@@ -85,7 +85,7 @@ class TestAuditEvent:
         assert data["outcome"] == "denied"
         assert data["details"]["job_name"] == "test"
 
-    def test_to_log_line_is_json(self):
+    def test_to_log_line_is_json(self) -> None:
         event = AuditEvent(
             event_type="admin",
             actor="root",
@@ -102,7 +102,7 @@ class TestAuditEvent:
 
 
 class TestLogFunctions:
-    def test_log_auth_event(self, temp_log_dir):
+    def test_log_auth_event(self, temp_log_dir) -> None:
         log_auth_event(
             actor="127.0.0.1",
             action="api_key_auth",
@@ -116,7 +116,7 @@ class TestLogFunctions:
         assert events[-1]["actor"] == "127.0.0.1"
         assert events[-1]["outcome"] == "failure"
 
-    def test_log_rbac_event(self, temp_log_dir):
+    def test_log_rbac_event(self, temp_log_dir) -> None:
         log_rbac_event(
             actor="operator-1",
             action="delete_job",
@@ -130,7 +130,7 @@ class TestLogFunctions:
         assert events[-1]["details"]["role"] == "operator"
         assert events[-1]["outcome"] == "denied"
 
-    def test_log_admin_action(self, temp_log_dir):
+    def test_log_admin_action(self, temp_log_dir) -> None:
         log_admin_action(
             actor="admin-1",
             action="purge_jobs",
@@ -143,7 +143,7 @@ class TestLogFunctions:
         assert events[-1]["action"] == "purge_jobs"
         assert events[-1]["details"]["job_count"] == 42
 
-    def test_log_data_access(self, temp_log_dir):
+    def test_log_data_access(self, temp_log_dir) -> None:
         log_data_access(
             actor="user-1",
             action="export_csv",
@@ -155,7 +155,7 @@ class TestLogFunctions:
         assert events[-1]["event_type"] == "data_access"
         assert events[-1]["action"] == "export_csv"
 
-    def test_log_job_event(self, temp_log_dir):
+    def test_log_job_event(self, temp_log_dir) -> None:
         log_job_event(
             actor="admin-1",
             action="created",
@@ -168,7 +168,7 @@ class TestLogFunctions:
         assert events[-1]["resource"] == "job:job-abc-123"
         assert events[-1]["action"] == "created"
 
-    def test_log_system_event(self, temp_log_dir):
+    def test_log_system_event(self, temp_log_dir) -> None:
         log_system_event(
             action="startup",
             resource="scheduler",
@@ -180,7 +180,7 @@ class TestLogFunctions:
         assert events[-1]["actor"] == "system"
         assert events[-1]["action"] == "startup"
 
-    def test_multiple_events_ordered(self, temp_log_dir):
+    def test_multiple_events_ordered(self, temp_log_dir) -> None:
         for i in range(5):
             log_auth_event(
                 actor=f"user-{i}",
@@ -192,12 +192,12 @@ class TestLogFunctions:
         # Most recent event should be user-4
         assert events[-1]["actor"] == "user-4"
 
-    def test_get_recent_events_empty(self, temp_log_dir):
+    def test_get_recent_events_empty(self, temp_log_dir) -> None:
         """get_recent_events should return empty list when no log file exists."""
         events = get_recent_events(count=10)
         assert events == []
 
-    def test_get_recent_events_limit_and_order(self, temp_log_dir):
+    def test_get_recent_events_limit_and_order(self, temp_log_dir) -> None:
         for i in range(10):
             log_auth_event(
                 actor=f"user-{i}",
@@ -215,24 +215,24 @@ class TestLogFunctions:
 
 
 class TestParseFunctions:
-    def test_parse_audit_log_line_standard(self):
+    def test_parse_audit_log_line_standard(self) -> None:
         line = '2026-05-30T12:00:00 [AUDIT] {"event_type":"auth","actor":"test","action":"login","resource":"/","outcome":"success","details":{}}'  # noqa: E501
         parsed = _parse_audit_log_line(line)  # noqa: E501
         assert parsed is not None
         assert parsed["event_type"] == "auth"
         assert parsed["actor"] == "test"
 
-    def test_parse_audit_log_line_bare_json(self):
+    def test_parse_audit_log_line_bare_json(self) -> None:
         line = '{"event_type":"auth","actor":"test","action":"login","resource":"/","outcome":"success","details":{}}'
         parsed = _parse_audit_log_line(line)
         assert parsed is not None
         assert parsed["event_type"] == "auth"
 
-    def test_parse_audit_log_line_invalid(self):
+    def test_parse_audit_log_line_invalid(self) -> None:
         parsed = _parse_audit_log_line("this is not json")
         assert parsed is None
 
-    def test_parse_audit_log_line_empty(self):
+    def test_parse_audit_log_line_empty(self) -> None:
         parsed = _parse_audit_log_line("")
         assert parsed is None
 
@@ -241,14 +241,14 @@ class TestParseFunctions:
 
 
 class TestLogFileIO:
-    def test_log_file_created(self, temp_log_dir):
+    def test_log_file_created(self, temp_log_dir) -> None:
         log_system_event(action="test_startup")
         log_path = temp_log_dir / "test_audit.log"
         assert log_path.exists(), f"Audit log file should exist at {log_path}"
         content = log_path.read_text(encoding="utf-8")
         assert "test_startup" in content
 
-    def test_log_file_rotation(self, temp_log_dir):
+    def test_log_file_rotation(self, temp_log_dir) -> None:
         """Verify that the log file contains properly formatted lines."""
         for i in range(20):
             log_auth_event(actor=f"user-{i}", action="login", resource="/api")
@@ -264,14 +264,14 @@ class TestLogFileIO:
 
 
 class TestLoggerSingleton:
-    def test_logger_is_singleton(self):
+    def test_logger_is_singleton(self) -> None:
         from app.audit_logger import _get_audit_logger
 
         logger1 = _get_audit_logger()
         logger2 = _get_audit_logger()
         assert logger1 is logger2
 
-    def test_reset_clears_handlers(self):
+    def test_reset_clears_handlers(self) -> None:
         from app.audit_logger import _get_audit_logger
 
         logger = _get_audit_logger()

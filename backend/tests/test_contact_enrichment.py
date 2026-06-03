@@ -14,7 +14,7 @@ def _lead_schema() -> list[SchemaField]:
     ]
 
 
-def test_apply_selectors_enriches_contacts_from_mailto_tel_links():
+def test_apply_selectors_enriches_contacts_from_mailto_tel_links() -> None:
     html = """
     <html><body>
       <div class="card">
@@ -45,7 +45,7 @@ def test_apply_selectors_enriches_contacts_from_mailto_tel_links():
     assert re.sub(r"\D", "", row["phone"] or "") == "919876543210"
 
 
-def test_extract_with_regex_enriches_contacts_from_mailto_tel_links():
+def test_extract_with_regex_enriches_contacts_from_mailto_tel_links() -> None:
     html = """
     <html><body>
       <div class="listing-item">
@@ -63,7 +63,7 @@ def test_extract_with_regex_enriches_contacts_from_mailto_tel_links():
     assert any(re.sub(r"\D", "", r.get("phone") or "") == "919888822222" for r in results)
 
 
-def test_limit_source_records_prioritizes_contact_rows(monkeypatch):
+def test_limit_source_records_prioritizes_contact_rows(monkeypatch) -> None:
     from app.config import settings
 
     monkeypatch.setattr(settings, "MAX_RECORDS_PER_SOURCE", 2)
@@ -82,7 +82,7 @@ def test_limit_source_records_prioritizes_contact_rows(monkeypatch):
     assert names == {"Has Email", "Has Phone"}
 
 
-def test_boost_contacts_with_page_html_injects_page_contact_when_missing():
+def test_boost_contacts_with_page_html_injects_page_contact_when_missing() -> None:
     schema = _lead_schema()
     rows = [
         {

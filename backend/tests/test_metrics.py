@@ -1,4 +1,4 @@
-def test_metrics_endpoint_unauthenticated_when_token_set(client, monkeypatch):
+def test_metrics_endpoint_unauthenticated_when_token_set(client, monkeypatch) -> None:
     """When METRICS_TOKEN is set, requests without it should get 403."""
     monkeypatch.setattr("app.config.settings.METRICS_TOKEN", "test-token-123")
     r = client.get("/metrics")
@@ -6,7 +6,7 @@ def test_metrics_endpoint_unauthenticated_when_token_set(client, monkeypatch):
     assert "metrics token" in r.text.lower()
 
 
-def test_metrics_endpoint_authenticated_with_bearer(client, monkeypatch):
+def test_metrics_endpoint_authenticated_with_bearer(client, monkeypatch) -> None:
     """Bearer token auth should work."""
     monkeypatch.setattr("app.config.settings.METRICS_TOKEN", "test-token-123")
     r = client.get("/metrics", headers={"Authorization": "Bearer test-token-123"})
@@ -14,7 +14,7 @@ def test_metrics_endpoint_authenticated_with_bearer(client, monkeypatch):
     assert r.headers["content-type"].startswith("text/plain")
 
 
-def test_metrics_endpoint_authenticated_with_x_api_key(client, monkeypatch):
+def test_metrics_endpoint_authenticated_with_x_api_key(client, monkeypatch) -> None:
     """X-API-Key header should also work for metrics auth."""
     monkeypatch.setattr("app.config.settings.METRICS_TOKEN", "test-token-123")
     r = client.get("/metrics", headers={"X-API-Key": "test-token-123"})
@@ -22,7 +22,7 @@ def test_metrics_endpoint_authenticated_with_x_api_key(client, monkeypatch):
     assert r.headers["content-type"].startswith("text/plain")
 
 
-def test_metrics_endpoint_content(client):
+def test_metrics_endpoint_content(client) -> None:
     r = client.get("/metrics")
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/plain")
@@ -42,7 +42,7 @@ def test_metrics_endpoint_content(client):
     # (test_metrics_health_check_latency tests the actual latency export)
 
 
-def test_metrics_worker_failure_counters(client, monkeypatch):
+def test_metrics_worker_failure_counters(client, monkeypatch) -> None:
     """Worker failure counters should be exported when failures exist."""
     from app.metrics_collector import record_worker_failure, reset_for_testing
 
@@ -64,7 +64,7 @@ def test_metrics_worker_failure_counters(client, monkeypatch):
     reset_for_testing()
 
 
-def test_metrics_request_latency_tracking(client, monkeypatch):
+def test_metrics_request_latency_tracking(client, monkeypatch) -> None:
     """After making an API request, the latency histogram should capture it."""
     from app.metrics_collector import reset_for_testing
 
@@ -83,7 +83,7 @@ def test_metrics_request_latency_tracking(client, monkeypatch):
     assert "dataforge_request_duration_seconds" in text
 
 
-def test_metrics_health_check_latency(client, monkeypatch):
+def test_metrics_health_check_latency(client, monkeypatch) -> None:
     """Health check latency should be recorded when /ready is called."""
     from app.metrics_collector import reset_for_testing
 
@@ -100,7 +100,7 @@ def test_metrics_health_check_latency(client, monkeypatch):
     assert "dataforge_backend_health_check_duration_seconds" in text
 
 
-def test_metrics_histograms_disabled(client, monkeypatch):
+def test_metrics_histograms_disabled(client, monkeypatch) -> None:
     """When METRICS_ENABLE_HISTOGRAMS=False, histograms should be absent."""
     monkeypatch.setattr("app.config.settings.METRICS_ENABLE_HISTOGRAMS", False)
 
@@ -113,14 +113,14 @@ def test_metrics_histograms_disabled(client, monkeypatch):
     assert "dataforge_backend_health_check_duration_seconds" not in text
 
 
-def test_metrics_wrong_bearer_token(client, monkeypatch):
+def test_metrics_wrong_bearer_token(client, monkeypatch) -> None:
     """Wrong Bearer token should return 403."""
     monkeypatch.setattr("app.config.settings.METRICS_TOKEN", "correct-token")
     r = client.get("/metrics", headers={"Authorization": "Bearer wrong-token"})
     assert r.status_code == 403
 
 
-def test_metrics_invalid_auth_header(client, monkeypatch):
+def test_metrics_invalid_auth_header(client, monkeypatch) -> None:
     """A malformed or non-Bearer Authorization header should not bypass auth."""
     monkeypatch.setattr("app.config.settings.METRICS_TOKEN", "secure-token")
     r = client.get("/metrics", headers={"Authorization": "Basic dGVzdDp0ZXN0"})

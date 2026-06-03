@@ -93,7 +93,7 @@ def tmp_queue_db(tmp_path):
 class TestApiEnqueuesJob:
     """Verify that the API enqueues a job to the worker queue when enabled."""
 
-    def test_job_is_enqueued_when_worker_queue_enabled(self, client, tmp_queue_db, monkeypatch):
+    def test_job_is_enqueued_when_worker_queue_enabled(self, client, tmp_queue_db, monkeypatch) -> None:
         """When DATAFORGE_WORKER_QUEUE=true, creating a job should enqueue it."""
         monkeypatch.setenv("DATAFORGE_WORKER_QUEUE", "true")
 
@@ -123,7 +123,7 @@ class TestApiEnqueuesJob:
         task_ids = [t["id"] for t in next_tasks]
         assert job_id in task_ids, f"Job {job_id} not found in queued tasks: {task_ids}"
 
-    def test_job_is_not_enqueued_when_worker_queue_disabled(self, client, tmp_queue_db, monkeypatch):
+    def test_job_is_not_enqueued_when_worker_queue_disabled(self, client, tmp_queue_db, monkeypatch) -> None:
         """When DATAFORGE_WORKER_QUEUE is not set, job should not be enqueued."""
         monkeypatch.delenv("DATAFORGE_WORKER_QUEUE", raising=False)
 
@@ -154,7 +154,7 @@ class TestApiEnqueuesJob:
 class TestWorkerPicksQueuedJob:
     """Verify that the worker dequeue and job execution flow works correctly."""
 
-    def test_worker_picks_queued_job_and_updates_repo(self, client, tmp_queue_db, monkeypatch):
+    def test_worker_picks_queued_job_and_updates_repo(self, client, tmp_queue_db, monkeypatch) -> None:
         """Worker should dequeue a job, process it, and update the repository."""
         from app.worker_queue import get_worker_queue, reset_worker_queue
 
@@ -232,7 +232,7 @@ class TestWorkerPicksQueuedJob:
         assert status["pending"] == 0
         assert status["running"] == 0
 
-    def test_worker_fails_fast_without_job_id(self, tmp_queue_db, monkeypatch):
+    def test_worker_fails_fast_without_job_id(self, tmp_queue_db, monkeypatch) -> None:
         """Worker --once mode should fail fast if DATAFORGE_JOB_ID is missing."""
         from app.worker_queue import reset_worker_queue
 
@@ -248,7 +248,7 @@ class TestWorkerPicksQueuedJob:
 class TestRealWorkerHandler:
     """Tests using the actual scripts.run_worker.scrape_job_handler."""
 
-    def test_real_worker_handler_executes_via_api(self, tmp_path, monkeypatch):
+    def test_real_worker_handler_executes_via_api(self, tmp_path, monkeypatch) -> None:
         """
         End-to-end test using the real scrape_job_handler from scripts/run_worker.
 
@@ -378,7 +378,7 @@ class TestRealWorkerHandler:
         jobs_store.clear()
         recycle_bin_store.clear()
 
-    def test_real_worker_handler_missing_job_id_raises_error(self):
+    def test_real_worker_handler_missing_job_id_raises_error(self) -> None:
         """When task has no job_id, the real handler should raise ValueError."""
         import sys
 
@@ -405,7 +405,7 @@ class TestRealWorkerHandler:
 class TestWorkerPreservesRecycleBin:
     """Verify that worker full-state persistence preserves recycle_bin contents."""
 
-    def test_worker_save_all_preserves_recycle_bin(self, tmp_path, monkeypatch):
+    def test_worker_save_all_preserves_recycle_bin(self, tmp_path, monkeypatch) -> None:
         """save_all should preserve recycle_bin entries during full state writes."""
         from app.job_store import reset_job_store_for_tests
 
@@ -455,7 +455,7 @@ class TestWorkerPreservesRecycleBin:
 
         reset_job_store_for_tests()
 
-    def test_recycle_bin_survives_multiple_save_cycles(self, tmp_path, monkeypatch):
+    def test_recycle_bin_survives_multiple_save_cycles(self, tmp_path, monkeypatch) -> None:
         """Multiple save_all cycles should not lose recycle_bin entries."""
         from app.config import settings
         from app.job_store import reset_job_store_for_tests

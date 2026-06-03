@@ -2,7 +2,7 @@ from app.semantic_pipeline import run_pipeline
 from app.semantic_world_state import get_world_state
 
 
-def test_topological_inference_community_pull():
+def test_topological_inference_community_pull() -> None:
     """Roles in a stable community should boost each other's compatibility."""
     ws = get_world_state()
     ws.clear()
@@ -41,7 +41,7 @@ def test_topological_inference_community_pull():
     assert has_transport, "origin/destination community should persist"
 
 
-def test_multi_step_relaxation_resolves_ambiguity():
+def test_multi_step_relaxation_resolves_ambiguity() -> None:
     """Unstable interpretations should be retried after field relaxation."""
     ws = get_world_state()
     ws.clear()
@@ -53,7 +53,7 @@ def test_multi_step_relaxation_resolves_ambiguity():
         run_pipeline([r], schema)
 
 
-def test_semantic_entropy_quality_gate():
+def test_semantic_entropy_quality_gate() -> None:
     """High-entropy records should have low confidence."""
     ws = get_world_state()
     ws.clear()
@@ -71,7 +71,7 @@ def test_semantic_entropy_quality_gate():
     assert res[0].get("_confidence", 1.0) <= 1.0
 
 
-def test_crystalline_gravity_predictive_completion():
+def test_crystalline_gravity_predictive_completion() -> None:
     """Synthesized records should act as attractors for predictive completion.
 
     Note: HEAD version doesn't generate crystalline records automatically.

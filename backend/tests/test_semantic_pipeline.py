@@ -25,28 +25,28 @@ def _clean_engine():
     clear_semantic_state(clear_file=False)
 
 
-def test_pipeline_none_input():
+def test_pipeline_none_input() -> None:
     assert run_pipeline(None, ["name"]) == []
 
 
-def test_pipeline_empty_input():
+def test_pipeline_empty_input() -> None:
     assert run_pipeline([], ["name"]) == []
 
 
-def test_pipeline_garbage_filtered():
+def test_pipeline_garbage_filtered() -> None:
     res = run_pipeline([{"text": "!@#$%"}], ["name"])
     # Garbage records are no longer silently discarded — the field degrades
     # gracefully by producing low-confidence output rather than empty collapse.
     assert len(res) == 0  # HEAD filters garbage
 
 
-def test_pipeline_navigation_filtered():
+def test_pipeline_navigation_filtered() -> None:
     res = run_pipeline([{"text": "Home About Contact info@example.com"}], ["name", "phone"])
     # Navigation records still produce degraded field output (graceful degradation).
     assert len(res) == 0, "HEAD filters navigation records"
 
 
-def test_pipeline_metadata_stripped():
+def test_pipeline_metadata_stripped() -> None:
     res = run_pipeline(
         [{"text": "Lufthansa 238", "record_score": "0.9", "_field_confidences": {"p": 0.9}}],
         ["name", "price"],
@@ -66,7 +66,7 @@ def _check_allocation(records, schema, checks):
         assert validator(val), f"Field {field}={val!r} failed check"
 
 
-def test_flight_allocation():
+def test_flight_allocation() -> None:
     _clean_engine()
     _check_allocation(
         [{"details": "Lufthansa LON PAR", "price_col": "450"}],
@@ -80,7 +80,7 @@ def test_flight_allocation():
     )
 
 
-def test_hotel_allocation():
+def test_hotel_allocation() -> None:
     _clean_engine()
     res = run_pipeline(
         [{"info": "Marriott 4.2/5 8500 22-06-2026"}],
@@ -93,7 +93,7 @@ def test_hotel_allocation():
     assert r["date"] and "-" in r["date"]
 
 
-def test_product_allocation():
+def test_product_allocation() -> None:
     _clean_engine()
     res = run_pipeline(
         [{"data": "iPhone 16 1199 4.8/5"}],
@@ -106,7 +106,7 @@ def test_product_allocation():
     assert r["rating"] and any(c.isdigit() for c in r["rating"])
 
 
-def test_job_allocation():
+def test_job_allocation() -> None:
     _clean_engine()
     res = run_pipeline(
         [{"listing": "Google 25L INR 5+ years"}],
@@ -120,7 +120,7 @@ def test_job_allocation():
     assert has_digit, f"No fields have digits: {fields_str}"
 
 
-def test_spanish_allocation():
+def test_spanish_allocation() -> None:
     _clean_engine()
     _check_allocation(
         [{"details": "Lufthansa LON PAR", "price_col": "450"}],
@@ -132,18 +132,18 @@ def test_spanish_allocation():
     )
 
 
-def test_alloc_empty_tokens():
+def test_alloc_empty_tokens() -> None:
     result, graph = allocate_semantic_roles(SemanticRecord(tokens=[]), ["name"])
     assert graph.roles["name"].filled_by is None
 
 
-def test_alloc_empty_schema():
+def test_alloc_empty_schema() -> None:
     t = create_token("test", 0, 4, 0, SemanticType.TEXT)
     result, graph = allocate_semantic_roles(SemanticRecord(tokens=[t]), [])
     assert len(graph.roles) == 0
 
 
-def test_alloc_simple():
+def test_alloc_simple() -> None:
     tokens = [
         SemanticToken(
             raw="Lufthansa",
@@ -167,7 +167,7 @@ def test_alloc_simple():
     assert graph.roles["name"].filled_by == "Lufthansa"
 
 
-def test_role_engine_learns():
+def test_role_engine_learns() -> None:
     _clean_engine()
     reng = RoleEmbeddingEngine()
     price_start = reng.get_compatibility("price", SemanticType.PRICE)
@@ -178,7 +178,7 @@ def test_role_engine_learns():
     assert reng.get_compatibility("name", SemanticType.PRICE) <= name_start, "Compatibility should not rise on failed learning"
 
 
-def test_role_engine_certainty():
+def test_role_engine_certainty() -> None:
     _clean_engine()
     reng = RoleEmbeddingEngine()
     assert reng.get_certainty() > 0.0  # manifold has certainty from seeding
@@ -186,7 +186,7 @@ def test_role_engine_certainty():
     assert reng.get_certainty() > 0.0
 
 
-def test_role_engine_persistent_cache():
+def test_role_engine_persistent_cache() -> None:
     _clean_engine()
     reng = RoleEmbeddingEngine()
     reng.learn_from_allocation("test", SemanticType.TEXT, "x", success=True, delta=0.2)
@@ -197,75 +197,75 @@ def test_role_engine_persistent_cache():
     assert reng2.learning_count > 0
 
 
-def test_strip_metadata_none():
+def test_strip_metadata_none() -> None:
     assert strip_metadata(None) == []
 
 
-def test_strip_metadata_removes_fields():
+def test_strip_metadata_removes_fields() -> None:
     r = strip_metadata([{"name": "test", "record_score": "0.9", "_field_confidences": {}}])
     assert "record_score" not in r[0]
     assert "_field_confidences" not in r[0]
     assert r[0]["name"] == "test"
 
 
-def test_filter_noise_none():
+def test_filter_noise_none() -> None:
     assert filter_noise_records(None) == []
 
 
-def test_detect_price_with_symbol():
+def test_detect_price_with_symbol() -> None:
     st, _ = detect_semantic_type("\u00a3238", "price")
     assert st == SemanticType.PRICE
 
 
-def test_detect_price_field_hint():
+def test_detect_price_field_hint() -> None:
     st, _ = detect_semantic_type("238", "price_col")
     assert st == SemanticType.PRICE
 
 
-def test_detect_date():
+def test_detect_date() -> None:
     st, _ = detect_semantic_type("22-05-2026", "date")
     assert st == SemanticType.DATE
 
 
-def test_detect_code():
+def test_detect_code() -> None:
     st, _ = detect_semantic_type("LON", "origin")
     assert st == SemanticType.CODE
 
 
-def test_detect_rating():
+def test_detect_rating() -> None:
     st, _ = detect_semantic_type("4.5/5", "rating")
     assert st == SemanticType.RATING
 
 
-def test_detect_organization():
+def test_detect_organization() -> None:
     st, _ = detect_semantic_type("Lufthansa", "name")
     assert st == SemanticType.ORGANIZATION
 
 
-def test_detect_product_name():
+def test_detect_product_name() -> None:
     st, _ = detect_semantic_type("iPhone", "name")
     assert st == SemanticType.ORGANIZATION
 
 
-def test_detect_plain_text():
+def test_detect_plain_text() -> None:
     st, _ = detect_semantic_type("hello", "name")
     assert st == SemanticType.TEXT
 
 
-def test_pipeline_garbage_variants():
+def test_pipeline_garbage_variants() -> None:
     for text in ["!@#$%", "\n\t\r", "   ", "a"]:
         res = run_pipeline([{"text": text}], ["name"])
         # HEAD filters all garbage records
         assert len(res) == 0, f"'{text}' should be filtered"
 
 
-def test_pipeline_noise_variants():
+def test_pipeline_noise_variants() -> None:
     for text in ["xyzzy", "foobar", "qwerty"]:
         res = run_pipeline([{"text": text}], ["name"])
         assert len(res) == 0, f"'{text}' should be filtered as noise"
 
 
-def test_is_child_fragment_various():
+def test_is_child_fragment_various() -> None:
     assert is_child_fragment("5", {"4.2/5"})
     assert is_child_fragment("Cr", {"1.2 Cr"})
     assert is_child_fragment("22", {"22-05-2026"})
@@ -274,57 +274,57 @@ def test_is_child_fragment_various():
     assert not is_child_fragment("", {"test"})
 
 
-def test_is_child_fragment_date():
+def test_is_child_fragment_date() -> None:
     assert is_child_fragment("22", {"22-05-2026"})
     assert is_child_fragment("05", {"22-05-2026"})
     assert is_child_fragment("2026", {"22-05-2026"})
     assert not is_child_fragment("5", {"25L"})
 
 
-def test_group_adjacent_entities_org_suffix():
+def test_group_adjacent_entities_org_suffix() -> None:
     recs = [{"data_seg_org_0": "Prestige", "data_seg_org_1": "Group"}]
     result = group_adjacent_entities(recs)
     assert "data_seg_org_0" in result[0]
     assert result[0]["data_seg_org_0"] == "Prestige Group"
 
 
-def test_group_adjacent_entities_number_code():
+def test_group_adjacent_entities_number_code() -> None:
     recs = [{"data_seg_number_0": "3", "data_seg_code_1": "BHK"}]
     result = group_adjacent_entities(recs)
     assert result[0].get("data_seg_number_0") == "3 BHK"
 
 
-def test_group_adjacent_entities_no_merge():
+def test_group_adjacent_entities_no_merge() -> None:
     recs = [{"data_seg_org_0": "Honda", "data_seg_org_1": "Civic"}]
     result = group_adjacent_entities(recs)
     assert result[0].get("data_seg_org_0") == "Honda"
 
 
-def test_group_adjacent_entities_stop_word():
+def test_group_adjacent_entities_stop_word() -> None:
     recs = [{"data_seg_org_0": "The", "data_seg_org_1": "Italian"}]
     result = group_adjacent_entities(recs)
     assert result[0].get("data_seg_org_0") == "The Italian"
 
 
-def test_pipeline_metadata_fields():
+def test_pipeline_metadata_fields() -> None:
     res = run_pipeline([{"text": "test 123", "record_score": "0.5", "source_url": "http://x.com"}], ["name"])
     assert not res or "record_score" not in res[0]
 
 
-def test_pipeline_large_text():
+def test_pipeline_large_text() -> None:
     res = run_pipeline([{"text": "word " * 500}], ["name"])
     # Large text may still produce a result depending on tokenizer behavior
     # Verify graceful handling (no crash, at most 1 record)
     assert len(res) <= 1
 
 
-def test_pipeline_mixed_types():
+def test_pipeline_mixed_types() -> None:
     res = run_pipeline([{"text": 123, "flag": True}], ["name"])
     # Non-string values should degrade gracefully
     assert len(res) == 0  # HEAD filters non-string
 
 
-def test_boundary_engine_merge():
+def test_boundary_engine_merge() -> None:
     _clean_engine()
     from app.semantic_boundary_engine import score_boundary
 
@@ -340,7 +340,7 @@ def test_boundary_engine_merge():
         assert score_boundary(ta, tb, va, vb) == exp, f"{va}+{vb}"
 
 
-def test_boundary_engine_scores():
+def test_boundary_engine_scores() -> None:
     _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
 
@@ -351,7 +351,7 @@ def test_boundary_engine_scores():
     assert s2.separation > 0.6
 
 
-def test_boundary_engine_history():
+def test_boundary_engine_history() -> None:
     _clean_engine()
     from app.semantic_boundary_engine import MergeDecision, get_boundary_engine
 
@@ -361,7 +361,7 @@ def test_boundary_engine_history():
     assert len(e.decision_history) == n + 1
 
 
-def test_cohesion_model_records():
+def test_cohesion_model_records() -> None:
     _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
 
@@ -373,7 +373,7 @@ def test_cohesion_model_records():
     assert m.merge_success_rate("org", "org") == 1.0
 
 
-def test_cohesion_model_bias():
+def test_cohesion_model_bias() -> None:
     _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
 
@@ -385,7 +385,7 @@ def test_cohesion_model_bias():
     assert m.get_cohesion_bias("price", "price") < 0
 
 
-def test_transition_detector_bootstrap():
+def test_transition_detector_bootstrap() -> None:
     _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
 
@@ -399,7 +399,7 @@ def test_transition_detector_bootstrap():
     assert t.score_transition("number", "code").probability < 0.5
 
 
-def test_transition_detector_learns():
+def test_transition_detector_learns() -> None:
     _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
 
@@ -414,7 +414,7 @@ def test_transition_detector_learns():
     assert after > before  # Probability should increase
 
 
-def test_transition_detector_high_list():
+def test_transition_detector_high_list() -> None:
     _clean_engine()
     from app.semantic_boundary_engine import get_boundary_engine
 
@@ -424,7 +424,7 @@ def test_transition_detector_high_list():
     assert len(high) >= 2  # Should have at least a few high-transition pairs
 
 
-def test_layer5_contradiction_learning():
+def test_layer5_contradiction_learning() -> None:
     _clean_engine()
     from app.semantic_pipeline import run_pipeline
 

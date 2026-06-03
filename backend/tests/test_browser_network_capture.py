@@ -6,7 +6,7 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_live_network_capture_limits():
+async def test_live_network_capture_limits() -> None:
     # 1. Mock Playwright Page and Response
     page = MagicMock()
 
@@ -41,7 +41,7 @@ async def test_live_network_capture_limits():
 
 
 @pytest.mark.asyncio
-async def test_live_network_capture_byte_limit():
+async def test_live_network_capture_byte_limit() -> None:
     # 1. Mock Playwright Page and Response
     page = MagicMock()
 
@@ -75,7 +75,7 @@ async def test_live_network_capture_byte_limit():
 
 
 @pytest.mark.asyncio
-async def test_browser_state_capture_redacts_session_storage_values():
+async def test_browser_state_capture_redacts_session_storage_values() -> None:
     page = MagicMock()
     context = MagicMock()
     context.cookies = AsyncMock(
@@ -127,7 +127,7 @@ async def test_browser_state_capture_redacts_session_storage_values():
     assert state["cache_storage_keys"] == ["runtime-cache-v1"]
 
 
-def test_build_cookie_header_uses_raw_cookie_values_for_in_memory_reuse():
+def test_build_cookie_header_uses_raw_cookie_values_for_in_memory_reuse() -> None:
     header = browser_network_capture.build_cookie_header(
         [
             {"name": "session_id", "value": "abc123"},

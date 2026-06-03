@@ -4,7 +4,7 @@ from app.semantic_os import get_semantic_os
 from app.semantic_world_state import get_world_state
 
 
-def test_priority_ordering():
+def test_priority_ordering() -> None:
     sos = get_semantic_os()
     sos.ws.clear()
 
@@ -25,7 +25,7 @@ def test_priority_ordering():
     assert results == ["critical", "urgent", "background"]
 
 
-def test_budgeted_execution():
+def test_budgeted_execution() -> None:
     sos = get_semantic_os()
     sos.ws.clear()
 
@@ -48,7 +48,7 @@ def test_budgeted_execution():
     assert "s1" in results
 
 
-def test_pressure_preemption():
+def test_pressure_preemption() -> None:
     ws = get_world_state()
     ws.clear()
     sos = get_semantic_os()

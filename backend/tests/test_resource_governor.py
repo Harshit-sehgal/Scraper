@@ -9,13 +9,13 @@ from app.resource_governor import ResourceBudgets, ResourceGovernor
 from app.scrape_telemetry import get_scrape_telemetry
 
 
-def test_resource_budgets_initialization():
+def test_resource_budgets_initialization() -> None:
     budgets = ResourceBudgets()
     assert budgets.max_browser_memory_mb == 1024.0
     assert budgets.max_token_spend == 5.0
 
 
-def test_queue_shedding():
+def test_queue_shedding() -> None:
     budgets = ResourceBudgets(max_queue_size=5)
     governor = ResourceGovernor(budgets=budgets)
 
@@ -27,7 +27,7 @@ def test_queue_shedding():
     assert governor.metrics["queue_sheds"] == 2
 
 
-def test_telemetry_pruning():
+def test_telemetry_pruning() -> None:
     budgets = ResourceBudgets(max_telemetry_records=3)
     governor = ResourceGovernor(budgets=budgets)
 
@@ -47,7 +47,7 @@ def test_telemetry_pruning():
     assert len(recent) == 3
 
 
-def test_token_tracking_and_throttling():
+def test_token_tracking_and_throttling() -> None:
     budgets = ResourceBudgets(max_token_spend=0.01)  # tiny budget: 1 cent
     governor = ResourceGovernor(budgets=budgets)
 
@@ -67,7 +67,7 @@ def test_token_tracking_and_throttling():
 
 
 @pytest.mark.asyncio
-async def test_check_browser_memory_pruning(monkeypatch):
+async def test_check_browser_memory_pruning(monkeypatch) -> None:
     class MockContext:
         def __init__(self):
             self.closed = False

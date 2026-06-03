@@ -2,7 +2,7 @@ import pytest
 from app.topology_state import parse_topology_key
 
 
-def test_parse_topology_key_valid_tuple():
+def test_parse_topology_key_valid_tuple() -> None:
     """Verify that a valid tuple string representing two string items parses correctly."""
     result = parse_topology_key("('role_a', 'role_b')")
     assert result == ("role_a", "role_b")
@@ -11,13 +11,13 @@ def test_parse_topology_key_valid_tuple():
     assert result2 == ("role_c", "role_d")
 
 
-def test_parse_topology_key_list_fails():
+def test_parse_topology_key_list_fails() -> None:
     """Verify that a list representation instead of a tuple raises ValueError."""
     with pytest.raises(ValueError, match="Invalid topology key structure"):
         parse_topology_key("['role_a', 'role_b']")
 
 
-def test_parse_topology_key_wrong_length_fails():
+def test_parse_topology_key_wrong_length_fails() -> None:
     """Verify that a tuple with a length other than 2 raises ValueError."""
     with pytest.raises(ValueError, match="Invalid topology key structure"):
         parse_topology_key("('role_a',)")
@@ -25,7 +25,7 @@ def test_parse_topology_key_wrong_length_fails():
         parse_topology_key("('role_a', 'role_b', 'role_c')")
 
 
-def test_parse_topology_key_non_string_elements_fails():
+def test_parse_topology_key_non_string_elements_fails() -> None:
     """Verify that a tuple containing non-string elements raises ValueError."""
     with pytest.raises(ValueError, match="Invalid topology key structure"):
         parse_topology_key("('role_a', 123)")
@@ -33,13 +33,13 @@ def test_parse_topology_key_non_string_elements_fails():
         parse_topology_key("(True, 'role_b')")
 
 
-def test_parse_topology_key_malformed_string_fails():
+def test_parse_topology_key_malformed_string_fails() -> None:
     """Verify that a syntactically malformed string raises ValueError."""
     with pytest.raises(ValueError, match="Invalid topology key format"):
         parse_topology_key("('role_a', 'role_b'")
 
 
-def test_parse_topology_key_malicious_payload_fails():
+def test_parse_topology_key_malicious_payload_fails() -> None:
     """Verify that a malicious string attempting execution raises ValueError and does not execute."""
     malicious = "__import__('os').system('echo hacked')"
     with pytest.raises(ValueError, match="Invalid topology key format"):

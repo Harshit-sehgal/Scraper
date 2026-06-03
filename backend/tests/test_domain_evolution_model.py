@@ -21,13 +21,13 @@ from app.selector_memory import get_selector_memory
 class TestDomainEvolutionModel:
     """Test the Domain Evolution Model."""
 
-    def test_create_model(self):
+    def test_create_model(self) -> None:
         """Test creating an evolution model."""
         model = DomainEvolutionModel()
         assert model is not None
         assert len(model._domains) == 0
 
-    def test_record_mutation(self):
+    def test_record_mutation(self) -> None:
         """Test recording a structural mutation."""
         model = DomainEvolutionModel()
         model.record_mutation("example.com")
@@ -37,7 +37,7 @@ class TestDomainEvolutionModel:
         assert metrics.layout_drift_events == 1
         assert metrics.last_mutation > 0
 
-    def test_multiple_mutations(self):
+    def test_multiple_mutations(self) -> None:
         """Test recording multiple mutations."""
         model = DomainEvolutionModel()
         for _ in range(5):
@@ -46,7 +46,7 @@ class TestDomainEvolutionModel:
         metrics = model._domains["example.com"]
         assert metrics.mutation_count == 5
 
-    def test_record_anti_bot_escalation(self):
+    def test_record_anti_bot_escalation(self) -> None:
         """Test recording anti-bot escalation."""
         model = DomainEvolutionModel()
         model.record_anti_bot_escalation("example.com", 0.7)
@@ -55,7 +55,7 @@ class TestDomainEvolutionModel:
         assert metrics.anti_bot_escalations >= 1
         assert metrics.current_anti_bot_level in ("moderate", "aggressive")
 
-    def test_anti_bot_levels(self):
+    def test_anti_bot_levels(self) -> None:
         """Test anti-bot level computation."""
         model = DomainEvolutionModel()
 
@@ -68,7 +68,7 @@ class TestDomainEvolutionModel:
         model.record_anti_bot_escalation("example.com", 0.9)
         assert model._domains["example.com"].current_anti_bot_level == "aggressive"
 
-    def test_volatility_increases_with_mutations(self):
+    def test_volatility_increases_with_mutations(self) -> None:
         """Test that volatility increases with more mutations."""
         model = DomainEvolutionModel()
 
@@ -84,7 +84,7 @@ class TestDomainEvolutionModel:
 
         assert volatile_metrics.volatility_index >= stable_metrics.volatility_index
 
-    def test_volatility_increases_with_anti_bot(self):
+    def test_volatility_increases_with_anti_bot(self) -> None:
         """Test that anti-bot escalations increase volatility."""
         model = DomainEvolutionModel()
 
@@ -97,7 +97,7 @@ class TestDomainEvolutionModel:
 
         assert post_escalation_volatility >= base_volatility
 
-    def test_selector_replacement_tracking(self):
+    def test_selector_replacement_tracking(self) -> None:
         """Test tracking selector replacements."""
         model = DomainEvolutionModel()
         model.record_selector_replaced("example.com", 168.0)  # 7 days
@@ -106,7 +106,7 @@ class TestDomainEvolutionModel:
         assert metrics.mutation_count == 1
         assert metrics.selector_lifespan_avg_hours == 168.0
 
-    def test_selector_lifespan_moving_average(self):
+    def test_selector_lifespan_moving_average(self) -> None:
         """Test selector lifespan uses exponential moving average."""
         model = DomainEvolutionModel()
         model.record_selector_replaced("example.com", 100.0)
@@ -116,7 +116,7 @@ class TestDomainEvolutionModel:
         # After first: 100, after second: (1-0.3)*100 + 0.3*200 = 70 + 60 = 130
         assert abs(metrics.selector_lifespan_avg_hours - 130.0) < 0.1
 
-    def test_get_volatile_domains(self):
+    def test_get_volatile_domains(self) -> None:
         """Test getting volatile domains."""
         model = DomainEvolutionModel()
 
@@ -127,13 +127,13 @@ class TestDomainEvolutionModel:
         assert len(volatile) >= 1
         assert volatile[0].domain == "volatile.com"
 
-    def test_get_evolution_report_empty(self):
+    def test_get_evolution_report_empty(self) -> None:
         """Test evolution report with no data."""
         model = DomainEvolutionModel()
         report = model.get_evolution_report()
         assert report["total_domains"] == 0
 
-    def test_get_evolution_report_with_data(self):
+    def test_get_evolution_report_with_data(self) -> None:
         """Test evolution report with data."""
         model = DomainEvolutionModel()
         model.record_mutation("example.com")
@@ -145,7 +145,7 @@ class TestDomainEvolutionModel:
         assert "volatile_domains" in report
         assert "domain_map" in report
 
-    def test_analyze_from_memory(self, monkeypatch):
+    def test_analyze_from_memory(self, monkeypatch) -> None:
         """Test analyzing from selector memory."""
         memory = get_selector_memory()
         memory._memory["test.com"] = {
@@ -167,7 +167,7 @@ class TestDomainEvolutionModel:
 class TestDomainEvolutionModelGlobal:
     """Test global singleton access."""
 
-    def test_singleton(self):
+    def test_singleton(self) -> None:
         """Test singleton access."""
         m1 = get_domain_evolution_model()
         m2 = get_domain_evolution_model()

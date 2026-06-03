@@ -19,14 +19,14 @@ def _clean():
         sys.modules.pop(m, None)
 
 
-def test_html_utils_import_does_not_load_research_modules():
+def test_html_utils_import_does_not_load_research_modules() -> None:
     importlib.import_module("app.html_utils")
 
     loaded = [m for m in RESEARCH_MODULES if m in sys.modules]
     assert loaded == [], f"html_utils eagerly loaded: {loaded}"
 
 
-def test_html_utils_import_after_main_still_clean():
+def test_html_utils_import_after_main_still_clean() -> None:
     """Even when app.main is already loaded, html_utils import stays clean."""
     import os
 

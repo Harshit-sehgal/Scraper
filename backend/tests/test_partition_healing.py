@@ -17,7 +17,7 @@ def partitioned_nodes():
     return ws_a, ws_b
 
 
-def test_causal_stitching(partitioned_nodes):
+def test_causal_stitching(partitioned_nodes) -> None:
     """Verify that divergent transaction journals are stitched together."""
     ws_a, ws_b = partitioned_nodes
 
@@ -58,7 +58,7 @@ def test_causal_stitching(partitioned_nodes):
     print("\nCausal Stitching: Journals successfully re-aligned after partition.")
 
 
-def test_divergence_analyzer(partitioned_nodes):
+def test_divergence_analyzer(partitioned_nodes) -> None:
     """Verify that causal divergence is correctly quantified."""
     ws_a, ws_b = partitioned_nodes
 

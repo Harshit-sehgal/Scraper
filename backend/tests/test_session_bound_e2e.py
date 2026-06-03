@@ -29,7 +29,7 @@ FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "fixtures/pages")
 class TestSessionBoundUrlDetection:
     """Verify session-bound URL patterns with exact expected outcomes."""
 
-    def test_opaque_search_id_detected_as_session_bound(self):
+    def test_opaque_search_id_detected_as_session_bound(self) -> None:
         """Opaque /search/id/<token> must be session-bound with canonical URL."""
         from app.session_url_detector import detect_session_params
 
@@ -41,14 +41,14 @@ class TestSessionBoundUrlDetection:
         assert len(result.get("ephemeral_params", [])) > 0, "Ephemeral path params must include opaque token identifiers"
         assert result.get("confidence", 0) >= 0.5, "Confidence must cross session-bound threshold"
 
-    def test_short_ids_not_session_bound(self):
+    def test_short_ids_not_session_bound(self) -> None:
         """Short numeric IDs should not trigger false positives."""
         from app.session_url_detector import detect_session_params
 
         result = detect_session_params("https://example.com/search/id/12")
         assert not result.get("is_session_bound"), "Short numeric IDs must not be flagged as session-bound"
 
-    def test_normal_url_not_session_bound(self):
+    def test_normal_url_not_session_bound(self) -> None:
         """Plain product/search URLs are not session-bound."""
         from app.session_url_detector import detect_session_params
 
@@ -64,7 +64,7 @@ class TestSessionBoundUrlDetection:
 class TestBrowserStateEvidenceCapture:
     """Verify scraper captures and correctly processes browser state."""
 
-    def test_fixture_html_is_valid_page(self):
+    def test_fixture_html_is_valid_page(self) -> None:
         path = os.path.join(FIXTURE_DIR, "e19cf6fcf7b7.html")
         assert os.path.exists(path), f"Fixture missing: {path}"
         with open(path) as f:
@@ -72,14 +72,14 @@ class TestBrowserStateEvidenceCapture:
         assert len(html) > 1000
         assert "<html" in html.lower()
 
-    def test_fixture_has_recognizable_html_structure(self):
+    def test_fixture_has_recognizable_html_structure(self) -> None:
         path = os.path.join(FIXTURE_DIR, "e19cf6fcf7b7.html")
         with open(path) as f:
             html = f.read()
         has_structure = any(tag in html.lower() for tag in ("<div", "<span", "<table", "<li", "<article"))
         assert has_structure, "Fixture has no recognizable HTML structure"
 
-    def test_page_evidence_collector_finds_containers(self):
+    def test_page_evidence_collector_finds_containers(self) -> None:
         path = os.path.join(FIXTURE_DIR, "e19cf6fcf7b7.html")
         with open(path) as f:
             html = f.read()
@@ -90,7 +90,7 @@ class TestBrowserStateEvidenceCapture:
         assert evidence.dom_node_count > 0
         assert isinstance(evidence.candidate_containers, list)
 
-    def test_zero_result_classifier_session_bound(self):
+    def test_zero_result_classifier_session_bound(self) -> None:
         """Classifier must map session-bound + no containers = session_bound_url."""
         result = classify_zero_result(
             session_detection={"is_session_bound": True, "ephemeral_params": ["token"]},
@@ -125,7 +125,7 @@ FAKE_SECRETS = [
 class TestSecretsNotPersisted:
     """Verify browser secrets never leak into any persisted layer."""
 
-    def test_secrets_stripped_from_alignment_pipeline(self):
+    def test_secrets_stripped_from_alignment_pipeline(self) -> None:
         """Underscore-prefixed raw browser keys are stripped during alignment."""
         from app.data_utils import align_extracted_keys_to_schema
 
@@ -145,7 +145,7 @@ class TestSecretsNotPersisted:
         for key in aligned[0]:
             assert not key.startswith("_") or key == "_extraction_method", f"Leaked secret key in aligned output: {key}"
 
-    def test_secrets_not_in_job_model_dump(self):
+    def test_secrets_not_in_job_model_dump(self) -> None:
         """Job.model_dump excludes results with injected secrets via pipeline stripping."""
         job = Job(
             id="test-secrets-dump",
@@ -163,7 +163,7 @@ class TestSecretsNotPersisted:
             assert secret not in results_str, f"Leaked {secret} in job results"
             assert secret not in quality_str, f"Leaked {secret} in quality_report"
 
-    def test_secrets_not_in_db_row(self):
+    def test_secrets_not_in_db_row(self) -> None:
         """SQLite row serialization excludes known secret keys."""
         job = Job(
             id="test-secrets-row",
@@ -179,7 +179,7 @@ class TestSecretsNotPersisted:
         for secret in ("_cookie", "_localStorage", "_sessionStorage"):
             assert secret not in row_str, f"Leaked {secret} in DB row"
 
-    def test_api_serialization_excludes_secrets(self):
+    def test_api_serialization_excludes_secrets(self) -> None:
         """Full API response path excludes browser state keys."""
         job = Job(
             id="test-secrets-api",
@@ -198,7 +198,7 @@ class TestSecretsNotPersisted:
         ):
             assert secret not in results_str, f"Leaked {secret}"
 
-    def test_raw_secrets_never_in_logs_or_metadata(self):
+    def test_raw_secrets_never_in_logs_or_metadata(self) -> None:
         """Quality report, warnings, and public API output must never contain raw secret values."""
         job = Job(
             id="test-secrets-logs",
@@ -234,7 +234,7 @@ class TestSecretsNotPersisted:
 class TestFieldMappingConfidence:
     """Verify extraction output includes structured field-mapping metadata."""
 
-    def test_extraction_produces_record_score(self):
+    def test_extraction_produces_record_score(self) -> None:
         from app.selector_engine import apply_selectors
 
         html = "<div class='c'><span class='n'>Test</span><span class='p'>$10</span></div>"
@@ -250,7 +250,7 @@ class TestFieldMappingConfidence:
             assert "record_score" in r
             assert r["record_score"] > 0
 
-    def test_acquisition_lineage_evidence_fields_present(self):
+    def test_acquisition_lineage_evidence_fields_present(self) -> None:
         from app.acquisition_state import AcquisitionLineage, AcquisitionState
 
         lineage = AcquisitionLineage(
@@ -270,7 +270,7 @@ class TestFieldMappingConfidence:
         ):
             assert field in d, f"Missing lineage field: {field}"
 
-    def test_provenance_builder_tracks_field_origin(self):
+    def test_provenance_builder_tracks_field_origin(self) -> None:
         """Provenance records where each field value came from."""
         from app.extraction_provenance import ProvenanceBuilder
 
@@ -331,13 +331,13 @@ FAKE_NETWORK_JSON = json.dumps(
 class TestFakeDynamicSessionBoundWebsite:
     """Simulate a session-bound website with cookies, storage, and network JSON."""
 
-    def test_fake_html_has_data_cards(self):
+    def test_fake_html_has_data_cards(self) -> None:
         """The fake session HTML has renderable data cards."""
         assert "Result One" in FAKE_SESSION_HTML
         assert "$10" in FAKE_SESSION_HTML
         assert "localStorage" in FAKE_SESSION_HTML
 
-    def test_fake_network_json_is_valid(self):
+    def test_fake_network_json_is_valid(self) -> None:
         """Fake network payload is valid JSON with structured results."""
         payload = json.loads(FAKE_NETWORK_JSON)
         assert isinstance(payload, dict)
@@ -345,7 +345,7 @@ class TestFakeDynamicSessionBoundWebsite:
         assert len(payload["results"]) == 2
         assert payload["results"][0]["carrier"] == "TestAir"
 
-    def test_extraction_from_fake_html(self):
+    def test_extraction_from_fake_html(self) -> None:
         """Scraper extracts records from the fake session-bound HTML."""
         from app.selector_engine import apply_selectors
 
@@ -363,7 +363,7 @@ class TestFakeDynamicSessionBoundWebsite:
         names = {r.get("name") for r in records}
         assert names == {"Result One", "Result Two", "Result Three"}
 
-    def test_fake_url_detected_as_session_bound(self):
+    def test_fake_url_detected_as_session_bound(self) -> None:
         """The fake URL pattern is detected as session-bound."""
         from app.session_url_detector import detect_session_params
 
@@ -371,7 +371,7 @@ class TestFakeDynamicSessionBoundWebsite:
         result = detect_session_params("https://example.com/search/id/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6")
         assert result.get("is_session_bound") is True, f"Expected session-bound, got: {result}"
 
-    def test_secrets_not_in_extraction_output(self):
+    def test_secrets_not_in_extraction_output(self) -> None:
         """Fake session HTML has localStorage/cookie but extraction strips them."""
         from app.selector_engine import apply_selectors
 
@@ -385,7 +385,7 @@ class TestFakeDynamicSessionBoundWebsite:
                 assert "cookie" not in key.lower()
                 assert "session_id" not in key.lower()
 
-    def test_network_payload_extraction_structured(self):
+    def test_network_payload_extraction_structured(self) -> None:
         """Captured network JSON can be parsed as structured records."""
         payload = json.loads(FAKE_NETWORK_JSON)
         extracted = []
@@ -402,7 +402,7 @@ class TestFakeDynamicSessionBoundWebsite:
         assert extracted[0]["source"] == "network_payload"
         assert extracted[0]["confidence"] > 0.8
 
-    def test_network_payload_secrets_not_leaked(self):
+    def test_network_payload_secrets_not_leaked(self) -> None:
         """Network JSON extraction output must not leak raw tokens."""
         payload = json.loads(FAKE_NETWORK_JSON)
         dumped = json.dumps(payload)
@@ -482,7 +482,7 @@ class TestLocalSessionBoundServer:
     def teardown_class(cls):
         cls.server.shutdown()
 
-    def test_local_server_serves_search_page(self):
+    def test_local_server_serves_search_page(self) -> None:
         """Local server returns the session-bound search HTML."""
         import urllib.request
 
@@ -493,7 +493,7 @@ class TestLocalSessionBoundServer:
         assert "Alpha" in html
         assert "localStorage" in html
 
-    def test_local_server_sets_cookie(self):
+    def test_local_server_sets_cookie(self) -> None:
         """Local server sets a session cookie in the response."""
         import urllib.request
 
@@ -502,14 +502,14 @@ class TestLocalSessionBoundServer:
         cookies = resp.getheader("Set-Cookie") or ""
         assert "sid=deadbeef" in cookies
 
-    def test_local_url_detected_as_session_bound(self):
+    def test_local_url_detected_as_session_bound(self) -> None:
         """The local server URL pattern is detected as session-bound."""
         from app.session_url_detector import detect_session_params
 
         result = detect_session_params(f"{self.base_url}/search/id/test12345abcde")
         assert result.get("is_session_bound") is True
 
-    def test_local_server_api_returns_json(self):
+    def test_local_server_api_returns_json(self) -> None:
         """Local server /api/results returns structured JSON."""
         import urllib.request
 
@@ -520,7 +520,7 @@ class TestLocalSessionBoundServer:
         assert len(data["results"]) == 2
         assert data["results"][0]["carrier"] == "TestAir"
 
-    def test_extraction_from_local_html(self):
+    def test_extraction_from_local_html(self) -> None:
         """Scraper extracts records from the locally-served HTML."""
         import urllib.request
 
@@ -542,7 +542,7 @@ class TestLocalSessionBoundServer:
         names = {r.get("name") for r in records}
         assert names == {"Alpha", "Beta"}
 
-    def test_network_payload_extraction_from_local_api(self):
+    def test_network_payload_extraction_from_local_api(self) -> None:
         """Captured network JSON from local /api/results can be structured."""
         import urllib.request
 
@@ -562,7 +562,7 @@ class TestLocalSessionBoundServer:
         assert all(e["source"] == "network_payload" for e in extracted)
         assert all(e["confidence"] > 0.8 for e in extracted)
 
-    def test_local_html_does_not_leak_secrets_in_extraction(self):
+    def test_local_html_does_not_leak_secrets_in_extraction(self) -> None:
         """Local HTML contains localStorage/cookie text but extraction strips it."""
         import urllib.request
 

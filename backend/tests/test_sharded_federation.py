@@ -31,7 +31,7 @@ def clean_policy():
     return policy
 
 
-def test_node_registration(clean_world_state):
+def test_node_registration(clean_world_state) -> None:
     federation = FederationManager(clean_world_state)
     assert len(federation.registered_nodes) == 0
 
@@ -41,7 +41,7 @@ def test_node_registration(clean_world_state):
     assert federation.registered_nodes["node-2"]["status"] == "active"
 
 
-def test_export_local_state(clean_world_state, clean_policy):
+def test_export_local_state(clean_world_state, clean_policy) -> None:
     # Set up some local state
     state = clean_policy._get_state("example.com")
     state.consecutive_failures = 2
@@ -60,7 +60,7 @@ def test_export_local_state(clean_world_state, clean_policy):
     assert ["price", "title"] in [sorted(m) for m in snapshot.motifs]
 
 
-def test_lww_domain_reputation_merge(clean_world_state, clean_policy):
+def test_lww_domain_reputation_merge(clean_world_state, clean_policy) -> None:
     federation = FederationManager(clean_world_state)
     policy = clean_policy
 
@@ -98,7 +98,7 @@ def test_lww_domain_reputation_merge(clean_world_state, clean_policy):
     assert merged_state.last_fetch_time == 1005.0
 
 
-def test_motifs_union_merge(clean_world_state):
+def test_motifs_union_merge(clean_world_state) -> None:
     federation = FederationManager(clean_world_state)
     clean_world_state._evolved_schema.add("title-price")
 
@@ -115,7 +115,7 @@ def test_motifs_union_merge(clean_world_state):
     assert "price-rating" in clean_world_state._evolved_schema
 
 
-def test_topological_affinity_consensus_merge(clean_world_state):
+def test_topological_affinity_consensus_merge(clean_world_state) -> None:
     federation = FederationManager(clean_world_state)
 
     if hasattr(clean_world_state, "_topology"):
@@ -136,7 +136,7 @@ def test_topological_affinity_consensus_merge(clean_world_state):
     assert clean_world_state._topology._neighborhood_cohesion[("node-A", "node-B")] == pytest.approx(0.6)
 
 
-def test_rejoin_transaction_delta_replays(clean_world_state):
+def test_rejoin_transaction_delta_replays(clean_world_state) -> None:
     federation = FederationManager(clean_world_state)
 
     deltas = [
@@ -163,7 +163,7 @@ def test_rejoin_transaction_delta_replays(clean_world_state):
     assert failures.get("anti_bot_block") == 1
 
 
-def test_drift_divergence_metrics(clean_world_state):
+def test_drift_divergence_metrics(clean_world_state) -> None:
     federation = FederationManager(clean_world_state)
 
     if hasattr(clean_world_state, "_topology"):

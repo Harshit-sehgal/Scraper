@@ -7,7 +7,7 @@ from app.html_utils import _fetch_with_httpx
 from app.url_safety import is_safe_ip, validate_public_http_url
 
 
-def test_is_safe_ip():
+def test_is_safe_ip() -> None:
     # Public IPs should be safe
     assert is_safe_ip("8.8.8.8") is True
     assert is_safe_ip("1.1.1.1") is True
@@ -27,7 +27,7 @@ def test_is_safe_ip():
     assert is_safe_ip("240.0.0.0") is False
 
 
-def test_validate_public_http_url_basic_safety():
+def test_validate_public_http_url_basic_safety() -> None:
     # Public domains should pass
     validate_public_http_url("http://google.com")
     validate_public_http_url("https://github.com/trending")
@@ -49,7 +49,7 @@ def test_validate_public_http_url_basic_safety():
             validate_public_http_url(f"http://{host}")
 
 
-def test_validate_public_http_url_dns_resolution(monkeypatch):
+def test_validate_public_http_url_dns_resolution(monkeypatch) -> None:
     monkeypatch.setattr(settings, "ENV", "production")
 
     # Mock socket.getaddrinfo to resolve safe-dns.com to 8.8.8.8
@@ -85,7 +85,7 @@ def test_validate_public_http_url_dns_resolution(monkeypatch):
         validate_public_http_url("http://unresolvable-domain.com")
 
 
-def test_validate_public_http_url_allowlist(monkeypatch):
+def test_validate_public_http_url_allowlist(monkeypatch) -> None:
     # Set ALLOWED_INTERNAL_HOSTS config override
     monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "nginx,smoke-host")
 
@@ -115,7 +115,7 @@ def test_validate_public_http_url_allowlist(monkeypatch):
 # ── IPv6 private range tests ────────────────────────────────────────────
 
 
-def test_is_safe_ip_ipv6_ranges():
+def test_is_safe_ip_ipv6_ranges() -> None:
     """IPv6 private, link-local, loopback, and multicast ranges are rejected."""
     # Unique Local Address (ULA) — fc00::/7 — considered private by ipaddress
     assert is_safe_ip("fc00::1") is False
@@ -130,7 +130,7 @@ def test_is_safe_ip_ipv6_ranges():
     assert is_safe_ip("2606:4700:4700::1111") is True
 
 
-def test_is_safe_ip_ipv4_mapped_ipv6():
+def test_is_safe_ip_ipv4_mapped_ipv6() -> None:
     """IPv4-mapped IPv6 addresses are correctly classified for unsafe ranges.
 
     Note: On Python < 3.12, the entire ::ffff:0:0/96 range is considered
@@ -146,14 +146,14 @@ def test_is_safe_ip_ipv4_mapped_ipv6():
     assert is_safe_ip("::ffff:169.254.169.254") is False
 
 
-def test_validate_private_ip_explicit_urls():
+def test_validate_private_ip_explicit_urls() -> None:
     """Private IP ranges blocked when used as explicit URL hosts."""
     for host in ("10.0.0.1", "172.16.0.1", "192.168.1.1"):
         with pytest.raises(ValueError, match="restricted IP"):
             validate_public_http_url(f"http://{host}")
 
 
-def test_validate_internal_tlds():
+def test_validate_internal_tlds() -> None:
     """Internal TLDs .local, .internal, .lan, .corp are rejected."""
     # These should be rejected regardless of DNS resolution (before DNS check)
     for tld_host in ("somehost.local", "internal.host.internal", "server.lan", "company.corp"):
@@ -172,7 +172,7 @@ def test_validate_internal_tlds():
         assert "internal TLD" not in str(e)
 
 
-def test_validate_credentials_in_url():
+def test_validate_credentials_in_url() -> None:
     """Credentials embedded in URLs are rejected when host is unsafe."""
     # user@127.0.0.1 — the @ is parsed as username, host remains 127.0.0.1
     with pytest.raises(ValueError, match="restricted local loopback target"):
@@ -191,7 +191,7 @@ def test_validate_credentials_in_url():
         validate_public_http_url("http://user@public.com@127.0.0.1/")
 
 
-def test_validate_unresolved_host_in_dev(monkeypatch):
+def test_validate_unresolved_host_in_dev(monkeypatch) -> None:
     """Unresolvable hostnames pass through in development mode."""
     monkeypatch.setattr(settings, "ENV", "development")
 
@@ -204,7 +204,7 @@ def test_validate_unresolved_host_in_dev(monkeypatch):
     validate_public_http_url("http://some-nonexistent-host-xyz.com/path")
 
 
-def test_validate_resolved_private_ip_via_dns_ipv6(monkeypatch):
+def test_validate_resolved_private_ip_via_dns_ipv6(monkeypatch) -> None:
     """Hostname resolving to IPv6 private address is rejected."""
     monkeypatch.setattr(settings, "ENV", "production")
 
@@ -230,7 +230,7 @@ def test_validate_resolved_private_ip_via_dns_ipv6(monkeypatch):
         validate_public_http_url("http://link-local-host.example.com")
 
 
-def test_validate_resolved_private_ip_via_dns_decimal_ip(monkeypatch):
+def test_validate_resolved_private_ip_via_dns_decimal_ip(monkeypatch) -> None:
     """Hostname that resolves to a decimal/hex IP representation via DNS is rejected.
 
     On Linux, decimal IPs like 2130706433 resolve to 127.0.0.1 via DNS.
@@ -261,7 +261,7 @@ def test_validate_resolved_private_ip_via_dns_decimal_ip(monkeypatch):
         validate_public_http_url("http://0x7f000001/")
 
 
-def test_validate_redirect_to_private_ranges(monkeypatch):
+def test_validate_redirect_to_private_ranges(monkeypatch) -> None:
     """Ensure redirects to various private ranges are caught via the final URL validation."""
     # 10.0.0.0/8
     with pytest.raises(ValueError, match="restricted IP"):
@@ -278,7 +278,7 @@ def test_validate_redirect_to_private_ranges(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_fetch_redirect_to_private_ip(monkeypatch):
+async def test_fetch_redirect_to_private_ip(monkeypatch) -> None:
     class MockResponse:
         def __init__(self, url, status_code, headers, is_redirect=False):
             self.url = httpx.URL(url)
@@ -307,7 +307,7 @@ async def test_fetch_redirect_to_private_ip(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_fetch_redirect_to_cloud_metadata(monkeypatch):
+async def test_fetch_redirect_to_cloud_metadata(monkeypatch) -> None:
     """Redirect to 169.254.169.254 (cloud metadata) is caught."""
 
     class MockResponse:
@@ -339,7 +339,7 @@ async def test_fetch_redirect_to_cloud_metadata(monkeypatch):
 # ── Smoke mode allowlist extras ─────────────────────────────────────────
 
 
-def test_smoke_mode_internal_tld_allowed(monkeypatch):
+def test_smoke_mode_internal_tld_allowed(monkeypatch) -> None:
     """Internal TLDs are still rejected even in smoke mode (separate from ALLOWED_INTERNAL_HOSTS)."""
     monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "true")
     monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "nginx,smoke-host")
@@ -361,7 +361,7 @@ def test_smoke_mode_internal_tld_allowed(monkeypatch):
     validate_public_http_url("http://nginx/smoke/records.html")
 
 
-def test_validate_resolved_private_ip_in_dev(monkeypatch):
+def test_validate_resolved_private_ip_in_dev(monkeypatch) -> None:
     """Hosts resolving to private IPs via DNS are rejected even in development mode."""
     monkeypatch.setattr(settings, "ENV", "development")
 

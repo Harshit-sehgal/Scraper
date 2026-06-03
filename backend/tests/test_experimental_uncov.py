@@ -14,7 +14,7 @@ vector_clock, manifold_state, motif_state, energy_state, instability_state.
 class TestFieldLaws:
     """field_laws.py — foundational constants, zero upward dependencies."""
 
-    def test_import(self):
+    def test_import(self) -> None:
         import app.field_laws as fl
 
         assert hasattr(fl, "PROPAGATION_DECAY_FLOOR")
@@ -25,7 +25,7 @@ class TestFieldLaws:
         assert fl.COUPLING_COEFFICIENT == 0.05
         assert fl.FREE_ENERGY_CLAMP == 2.0
 
-    def test_role_exclusivity(self):
+    def test_role_exclusivity(self) -> None:
         from app.field_laws import ROLE_EXCLUSIVITY
 
         assert isinstance(ROLE_EXCLUSIVITY, list)
@@ -36,13 +36,13 @@ class TestFieldLaws:
 class TestInvariantFirewall:
     """invariant_firewall.py — mutation guards for semantic field."""
 
-    def test_import(self):
+    def test_import(self) -> None:
         import app.invariant_firewall as iv
 
         assert hasattr(iv, "requires_invariants")
         assert hasattr(iv, "_find_world_state")
 
-    def test_requires_invariants_decorator_structure(self):
+    def test_requires_invariants_decorator_structure(self) -> None:
         from app.invariant_firewall import requires_invariants
 
         # Verify it's a decorator (callable that returns a wrapper)
@@ -56,7 +56,7 @@ class TestInvariantFirewall:
 class TestGossipSubstrate:
     """gossip_substrate.py — push-pull gossip protocol."""
 
-    def test_vector_clock_create_and_increment(self):
+    def test_vector_clock_create_and_increment(self) -> None:
         from app.gossip_substrate import VectorClock
 
         vc = VectorClock("test-node")
@@ -65,14 +65,14 @@ class TestGossipSubstrate:
         vc.increment()
         assert vc.clock["test-node"] == 1
 
-    def test_vector_clock_compare_equal(self):
+    def test_vector_clock_compare_equal(self) -> None:
         from app.gossip_substrate import VectorClock
 
         a = VectorClock("node-a")
         b = VectorClock("node-b")
         assert a.compare(b) == "equal"
 
-    def test_vector_clock_compare_concurrent(self):
+    def test_vector_clock_compare_concurrent(self) -> None:
         from app.gossip_substrate import VectorClock
 
         a = VectorClock("node-a")
@@ -81,14 +81,14 @@ class TestGossipSubstrate:
         b.increment()  # a=[a:1], b=[b:1]
         assert a.compare(b) == "concurrent"
 
-    def test_gossip_substrate_create(self):
+    def test_gossip_substrate_create(self) -> None:
         from app.gossip_substrate import GossipSubstrate
 
         gs = GossipSubstrate("test-node")
         assert gs.node_id == "test-node"
         assert len(gs.known_nodes) == 0
 
-    def test_register_node_and_select_peers(self):
+    def test_register_node_and_select_peers(self) -> None:
         from app.gossip_substrate import GossipSubstrate
 
         gs = GossipSubstrate("local")
@@ -98,14 +98,14 @@ class TestGossipSubstrate:
         peers = gs.select_peers_for_gossip(count=2)
         assert len(peers) <= 2
 
-    def test_node_health_defaults(self):
+    def test_node_health_defaults(self) -> None:
         from app.gossip_substrate import NodeHealth
 
         nh = NodeHealth()
         assert nh.reliability_score == 0.5
         assert nh.is_healthy is False  # last_seen is 0, not recent enough
 
-    def test_get_health_report(self):
+    def test_get_health_report(self) -> None:
         from app.gossip_substrate import GossipSubstrate
 
         gs = GossipSubstrate("local")
@@ -114,7 +114,7 @@ class TestGossipSubstrate:
         assert report["local_node"] == "local"
         assert isinstance(report["peers"], dict)
 
-    def test_get_gossip_substrate_singleton(self):
+    def test_get_gossip_substrate_singleton(self) -> None:
         from app.gossip_substrate import get_gossip_substrate, reset_gossip_substrate
 
         reset_gossip_substrate("singleton-test")
@@ -128,7 +128,7 @@ class TestGossipSubstrate:
 class TestVectorClock:
     """vector_clock.py — causality tracking."""
 
-    def test_create_and_increment(self):
+    def test_create_and_increment(self) -> None:
         from app.vector_clock import VectorClock
 
         vc = VectorClock("node-1")
@@ -138,7 +138,7 @@ class TestVectorClock:
         vc.increment()
         assert vc.get_clock()["node-1"] == 1
 
-    def test_update_merge(self):
+    def test_update_merge(self) -> None:
         from app.vector_clock import VectorClock
 
         local = VectorClock("node-a")
@@ -151,14 +151,14 @@ class TestVectorClock:
         assert merged["node-a"] == 1
         assert merged["node-b"] == 2
 
-    def test_compare_equal(self):
+    def test_compare_equal(self) -> None:
         from app.vector_clock import VectorClock
 
         a = VectorClock("a")
         b = VectorClock("a")
         assert a.compare(b.get_clock()) == "equal"
 
-    def test_compare_ancestor_descendant(self):
+    def test_compare_ancestor_descendant(self) -> None:
         from app.vector_clock import VectorClock
 
         a = VectorClock("a")
@@ -168,7 +168,7 @@ class TestVectorClock:
         b.update(a.get_clock())  # b catches up to a's state
         assert b.compare(a.get_clock()) in ("descendant", "equal")
 
-    def test_compare_concurrent(self):
+    def test_compare_concurrent(self) -> None:
         from app.vector_clock import VectorClock
 
         a = VectorClock("a")
@@ -178,7 +178,7 @@ class TestVectorClock:
         result = a.compare(b.get_clock())
         assert result == "concurrent"
 
-    def test_from_dict_and_to_dict_roundtrip(self):
+    def test_from_dict_and_to_dict_roundtrip(self) -> None:
         from app.vector_clock import VectorClock
 
         original = VectorClock("node-x")
@@ -191,7 +191,7 @@ class TestVectorClock:
 class TestManifoldState:
     """manifold_state.py — role manifold geometric state."""
 
-    def test_create(self):
+    def test_create(self) -> None:
         from app.manifold_state import ManifoldState
 
         ms = ManifoldState()
@@ -199,7 +199,7 @@ class TestManifoldState:
         assert ms.dimension == 16
         assert ms.learning_count == 0
 
-    def test_set_and_get_manifold_vector(self):
+    def test_set_and_get_manifold_vector(self) -> None:
         from app.manifold_state import ManifoldState
 
         ms = ManifoldState()
@@ -209,7 +209,7 @@ class TestManifoldState:
         assert retrieved == vec
         assert retrieved is not vec  # must be a copy
 
-    def test_compute_similarity(self):
+    def test_compute_similarity(self) -> None:
         from app.manifold_state import ManifoldState
 
         ms = ManifoldState()
@@ -221,7 +221,7 @@ class TestManifoldState:
         sim_diff = ms.compute_similarity("role_a", "role_b")
         assert isinstance(sim_diff, float)
 
-    def test_anchor_and_is_role_anchored(self):
+    def test_anchor_and_is_role_anchored(self) -> None:
         from app.manifold_state import ManifoldState
 
         ms = ManifoldState()
@@ -231,7 +231,7 @@ class TestManifoldState:
         ms.unanchor_role("anchored_role")
         assert ms.is_role_anchored("anchored_role") is False
 
-    def test_to_dict_from_dict_roundtrip(self):
+    def test_to_dict_from_dict_roundtrip(self) -> None:
         from app.manifold_state import ManifoldState
 
         ms = ManifoldState()
@@ -245,7 +245,7 @@ class TestManifoldState:
         assert restored.is_role_anchored("role_x") is True
         assert restored.learning_count == 5
 
-    def test_prune_manifold(self):
+    def test_prune_manifold(self) -> None:
         from app.manifold_state import ManifoldState
 
         ms = ManifoldState()
@@ -256,7 +256,7 @@ class TestManifoldState:
         assert ms.has_manifold_role("hypo_unstable") is False
         assert ms.has_manifold_role("stable_role") is True
 
-    def test_transaction_sets_value_correctly(self):
+    def test_transaction_sets_value_correctly(self) -> None:
         # Note: transaction staging uses active_transaction context.
         # Without an active transaction, staging is a no-op but
         # direct mutation still works. This test verifies the value
@@ -272,13 +272,13 @@ class TestManifoldState:
 class TestMotifState:
     """motif_state.py — motif memory and stability tracking."""
 
-    def test_create(self):
+    def test_create(self) -> None:
         from app.motif_state import MotifState
 
         ms = MotifState()
         assert ms.count() == 0
 
-    def test_reinforce_and_count(self):
+    def test_reinforce_and_count(self) -> None:
         from app.motif_state import MotifState
 
         ms = MotifState()
@@ -287,7 +287,7 @@ class TestMotifState:
         assert ms.get_count(motif) == 1
         assert ms.count() == 1
 
-    def test_compute_stability(self):
+    def test_compute_stability(self) -> None:
         from app.motif_state import MotifState
 
         ms = MotifState()
@@ -297,7 +297,7 @@ class TestMotifState:
         stability = ms.compute_stability(motif, total_records=10)
         assert 0 <= stability <= 1
 
-    def test_prune_weak(self):
+    def test_prune_weak(self) -> None:
         from app.motif_state import MotifState
 
         ms = MotifState()
@@ -309,7 +309,7 @@ class TestMotifState:
         ms.prune_weak(threshold=1.01)
         assert ms.count() == 0
 
-    def test_predict_future_motifs(self):
+    def test_predict_future_motifs(self) -> None:
         from app.motif_state import MotifState
 
         ms = MotifState()
@@ -317,7 +317,7 @@ class TestMotifState:
         predictions = ms.predict_future_motifs(current_record=2, threshold=0.0)
         assert isinstance(predictions, list)
 
-    def test_clear(self):
+    def test_clear(self) -> None:
         from app.motif_state import MotifState
 
         ms = MotifState()
@@ -325,7 +325,7 @@ class TestMotifState:
         ms.clear()
         assert ms.count() == 0
 
-    def test_merge(self):
+    def test_merge(self) -> None:
         from app.motif_state import MotifState
 
         ms = MotifState()
@@ -342,7 +342,7 @@ class TestMotifState:
 class TestEnergyState:
     """energy_state.py — energy/macro-state variables."""
 
-    def test_create_defaults(self):
+    def test_create_defaults(self) -> None:
         from app.energy_state import EnergyState
 
         es = EnergyState()
@@ -350,7 +350,7 @@ class TestEnergyState:
         assert es.global_entropy == 0.5
         assert es.exclusion_count == 0
 
-    def test_set_energy_clamps(self):
+    def test_set_energy_clamps(self) -> None:
         from app.energy_state import EnergyState
 
         es = EnergyState()
@@ -359,28 +359,28 @@ class TestEnergyState:
         es.set_energy(-5.0)
         assert es.global_energy == 0.0  # clamped to min
 
-    def test_set_entropy_nan(self):
+    def test_set_entropy_nan(self) -> None:
         from app.energy_state import EnergyState
 
         es = EnergyState()
         es.set_entropy(float("nan"))
         assert es.global_entropy == 0.5  # unchanged
 
-    def test_field_pressure(self):
+    def test_field_pressure(self) -> None:
         from app.energy_state import EnergyState
 
         es = EnergyState()
         pressure = es.field_pressure
         assert 0 <= pressure <= 1
 
-    def test_energy_balance(self):
+    def test_energy_balance(self) -> None:
         from app.energy_state import EnergyState
 
         es = EnergyState()
         es.record_energy_flow(source_delta=1.0, sink_delta=0.5)
         assert es.energy_balance == 0.5
 
-    def test_adjust_energy(self):
+    def test_adjust_energy(self) -> None:
         from app.energy_state import EnergyState
 
         es = EnergyState()
@@ -389,7 +389,7 @@ class TestEnergyState:
         es.adjust_energy(-1.0)
         assert es.global_energy == 6.0
 
-    def test_to_dict_from_dict_roundtrip(self):
+    def test_to_dict_from_dict_roundtrip(self) -> None:
         from app.energy_state import EnergyState
 
         es = EnergyState()
@@ -403,7 +403,7 @@ class TestEnergyState:
         assert restored.global_entropy == 0.7
         assert restored.exclusion_count == 5
 
-    def test_clear(self):
+    def test_clear(self) -> None:
         from app.energy_state import EnergyState
 
         es = EnergyState()
@@ -411,7 +411,7 @@ class TestEnergyState:
         es.clear()
         assert es.global_energy == 5.0  # back to default
 
-    def test_schema_instability(self):
+    def test_schema_instability(self) -> None:
         from app.energy_state import EnergyState
 
         es = EnergyState()
@@ -422,13 +422,13 @@ class TestEnergyState:
 class TestInstabilityState:
     """instability_state.py — tension/exclusion structure."""
 
-    def test_create(self):
+    def test_create(self) -> None:
         from app.instability_state import InstabilityState
 
         inst = InstabilityState()
         assert inst.exclusion_count() == 0
 
-    def test_set_and_get_exclusion(self):
+    def test_set_and_get_exclusion(self) -> None:
         from app.instability_state import InstabilityState
 
         inst = InstabilityState()
@@ -437,7 +437,7 @@ class TestInstabilityState:
         # Order-independent lookup
         assert inst.get_exclusion("role_b", "role_a") == 0.8
 
-    def test_add_exclusion(self):
+    def test_add_exclusion(self) -> None:
         from app.instability_state import InstabilityState
 
         inst = InstabilityState()
@@ -445,7 +445,7 @@ class TestInstabilityState:
         inst.add_exclusion("x", "y", 0.2)
         assert inst.get_exclusion("x", "y") == 0.5
 
-    def test_decay(self):
+    def test_decay(self) -> None:
         from app.instability_state import InstabilityState
 
         inst = InstabilityState()
@@ -454,7 +454,7 @@ class TestInstabilityState:
         remaining = inst.get_exclusion("a", "b")
         assert remaining < 0.5  # decayed
 
-    def test_prune_exclusions_weak(self):
+    def test_prune_exclusions_weak(self) -> None:
         from app.instability_state import InstabilityState
 
         inst = InstabilityState()
@@ -468,7 +468,7 @@ class TestInstabilityState:
         assert inst.exclusion_count() == 1
         assert inst.get_exclusion("strong", "b") == 0.9
 
-    def test_clear(self):
+    def test_clear(self) -> None:
         from app.instability_state import InstabilityState
 
         inst = InstabilityState()
@@ -476,7 +476,7 @@ class TestInstabilityState:
         inst.clear()
         assert inst.exclusion_count() == 0
 
-    def test_to_dict_from_dict_roundtrip(self):
+    def test_to_dict_from_dict_roundtrip(self) -> None:
         from app.instability_state import InstabilityState
 
         inst = InstabilityState()

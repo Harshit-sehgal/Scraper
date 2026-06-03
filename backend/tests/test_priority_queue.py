@@ -20,7 +20,7 @@ class TestTransactionalPriorityQueue:
 
     # ─── Basic Priority Ordering ───────────────────────────────────────
 
-    def test_critical_before_normal(self):
+    def test_critical_before_normal(self) -> None:
         queue = TransactionalPriorityQueue()
         queue.push(PriorityLevel.NORMAL, "normal_tx")
         queue.push(PriorityLevel.CRITICAL, "critical_tx")
@@ -36,7 +36,7 @@ class TestTransactionalPriorityQueue:
         assert second is not None
         assert second.label == "normal_tx"
 
-    def test_high_before_low(self):
+    def test_high_before_low(self) -> None:
         queue = TransactionalPriorityQueue()
         queue.push(PriorityLevel.LOW, "low_tx")
         queue.push(PriorityLevel.HIGH, "high_tx")
@@ -46,7 +46,7 @@ class TestTransactionalPriorityQueue:
         assert queue.pop() is not None
         assert queue.pop() is not None
 
-    def test_fifo_within_same_priority(self):
+    def test_fifo_within_same_priority(self) -> None:
         queue = TransactionalPriorityQueue()
         queue.push(PriorityLevel.NORMAL, "first")
         queue.push(PriorityLevel.NORMAL, "second")
@@ -58,7 +58,7 @@ class TestTransactionalPriorityQueue:
 
     # ─── Aging ─────────────────────────────────────────────────────────
 
-    def test_aging_boosts_low_priority(self):
+    def test_aging_boosts_low_priority(self) -> None:
         queue = TransactionalPriorityQueue(aging_interval=0.01)
         queue.push(PriorityLevel.LOW, "low_tx")
         queue.push(PriorityLevel.NORMAL, "normal_tx")
@@ -74,7 +74,7 @@ class TestTransactionalPriorityQueue:
         peeked = queue.peek()
         assert peeked is not None
 
-    def test_starvation_prevention_with_force_age(self):
+    def test_starvation_prevention_with_force_age(self) -> None:
         queue = TransactionalPriorityQueue(aging_interval=0.01)
         # Push many high-priority entries
         for i in range(10):
@@ -93,7 +93,7 @@ class TestTransactionalPriorityQueue:
 
     # ─── Max Size & Eviction ─────────────────────────────────────────
 
-    def test_eviction_when_full(self):
+    def test_eviction_when_full(self) -> None:
         queue = TransactionalPriorityQueue(max_size=3)
         queue.push(PriorityLevel.LOW, "low_1")
         queue.push(PriorityLevel.LOW, "low_2")
@@ -107,7 +107,7 @@ class TestTransactionalPriorityQueue:
         assert first is not None
         assert first.label == "high_tx"
 
-    def test_no_eviction_within_size_limit(self):
+    def test_no_eviction_within_size_limit(self) -> None:
         queue = TransactionalPriorityQueue(max_size=5)
         for i in range(5):
             queue.push(PriorityLevel.NORMAL, f"tx_{i}")
@@ -115,7 +115,7 @@ class TestTransactionalPriorityQueue:
 
     # ─── Removal ───────────────────────────────────────────────────────
 
-    def test_remove_by_trace_id(self):
+    def test_remove_by_trace_id(self) -> None:
         queue = TransactionalPriorityQueue()
         trace_a = queue.push(PriorityLevel.NORMAL, "tx_a")
         _ = queue.push(PriorityLevel.HIGH, "tx_b")
@@ -126,7 +126,7 @@ class TestTransactionalPriorityQueue:
         assert queue.size() == 1
         assert queue.peek() is not None
 
-    def test_remove_nonexistent(self):
+    def test_remove_nonexistent(self) -> None:
         queue = TransactionalPriorityQueue()
         queue.push(PriorityLevel.NORMAL, "tx")
         removed = queue.remove("nonexistent")
@@ -134,17 +134,17 @@ class TestTransactionalPriorityQueue:
 
     # ─── Empty Queue ─────────────────────────────────────────────────
 
-    def test_pop_empty(self):
+    def test_pop_empty(self) -> None:
         queue = TransactionalPriorityQueue()
         assert queue.pop() is None
 
-    def test_peek_empty(self):
+    def test_peek_empty(self) -> None:
         queue = TransactionalPriorityQueue()
         assert queue.peek() is None
 
     # ─── Metrics & Status ─────────────────────────────────────────────
 
-    def test_status_returns_metrics(self):
+    def test_status_returns_metrics(self) -> None:
         queue = TransactionalPriorityQueue()
         queue.push(PriorityLevel.CRITICAL, "critical")
         queue.push(PriorityLevel.NORMAL, "normal")
@@ -158,7 +158,7 @@ class TestTransactionalPriorityQueue:
         assert status["oldest_wait_seconds"] >= 0.0
         assert len(status["top_entries"]) == 3
 
-    def test_mark_completed(self):
+    def test_mark_completed(self) -> None:
         queue = TransactionalPriorityQueue()
         queue.push(PriorityLevel.NORMAL, "tx")
         entry = queue.pop()
@@ -166,7 +166,7 @@ class TestTransactionalPriorityQueue:
         queue.mark_completed(entry)
         assert queue.status()["completed"] == 1
 
-    def test_clear(self):
+    def test_clear(self) -> None:
         queue = TransactionalPriorityQueue()
         queue.push(PriorityLevel.HIGH, "tx")
         assert queue.size() == 1
@@ -176,7 +176,7 @@ class TestTransactionalPriorityQueue:
 
     # ─── Entry Info ──────────────────────────────────────────────────
 
-    def test_entry_to_dict(self):
+    def test_entry_to_dict(self) -> None:
         queue = TransactionalPriorityQueue()
         queue.push(PriorityLevel.NORMAL, "test_tx", trace_id="trace_123")
         entry = queue.peek()
@@ -189,7 +189,7 @@ class TestTransactionalPriorityQueue:
 
     # ─── Aging Interval Trigger ─────────────────────────────────────────
 
-    def test_aging_happens_on_pop_after_interval(self):
+    def test_aging_happens_on_pop_after_interval(self) -> None:
         queue = TransactionalPriorityQueue(aging_interval=0.1)
         queue.push(PriorityLevel.LOW, "low_tx")
         time.sleep(0.15)

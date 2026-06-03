@@ -31,7 +31,7 @@ def _make_queue(tmp_path: Path):
 class TestWorkerQueueBasic:
     """Basic enqueue/dequeue lifecycle tests."""
 
-    def test_enqueue_and_dequeue(self, tmp_path):
+    def test_enqueue_and_dequeue(self, tmp_path) -> None:
         """A task enqueued can be dequeued with correct metadata."""
         from app.worker_queue import Priority
 
@@ -48,14 +48,14 @@ class TestWorkerQueueBasic:
         assert task.priority == Priority.HIGH
         assert task.status.value == "running"
 
-    def test_dequeue_empty_returns_none(self, tmp_path):
+    def test_dequeue_empty_returns_none(self, tmp_path) -> None:
         """Dequeueing from an empty queue returns None."""
         queue, _ = _make_queue(tmp_path)
 
         task = asyncio.run(queue.dequeue(timeout=0.5))
         assert task is None
 
-    def test_enqueue_returns_valid_id(self, tmp_path):
+    def test_enqueue_returns_valid_id(self, tmp_path) -> None:
         """Enqueuing a task returns a valid UUID string."""
         queue, _ = _make_queue(tmp_path)
 
@@ -63,7 +63,7 @@ class TestWorkerQueueBasic:
         assert task_id is not None
         assert len(task_id) > 0
 
-    def test_complete_task(self, tmp_path):
+    def test_complete_task(self, tmp_path) -> None:
         """Completing a task removes it from the active queue."""
         queue, _ = _make_queue(tmp_path)
 
@@ -77,7 +77,7 @@ class TestWorkerQueueBasic:
         remaining = asyncio.run(queue.dequeue(timeout=0.5))
         assert remaining is None
 
-    def test_cancel_pending_task(self, tmp_path):
+    def test_cancel_pending_task(self, tmp_path) -> None:
         """Cancelling a pending task removes it from the queue."""
         queue, _ = _make_queue(tmp_path)
 
@@ -89,7 +89,7 @@ class TestWorkerQueueBasic:
         task = asyncio.run(queue.dequeue(timeout=0.5))
         assert task is None
 
-    def test_cancel_running_task_fails(self, tmp_path):
+    def test_cancel_running_task_fails(self, tmp_path) -> None:
         """Cancelling a task that is already running returns False."""
         queue, _ = _make_queue(tmp_path)
 
@@ -103,7 +103,7 @@ class TestWorkerQueueBasic:
 class TestWorkerQueuePriority:
     """Priority ordering tests."""
 
-    def test_priority_ordering(self, tmp_path):
+    def test_priority_ordering(self, tmp_path) -> None:
         """Higher-priority tasks are dequeued before lower-priority ones."""
         from app.worker_queue import Priority
 
@@ -132,7 +132,7 @@ class TestWorkerQueuePriority:
 class TestWorkerQueueRetries:
     """Retry and dead letter tests."""
 
-    def test_fail_moves_to_retry(self, tmp_path):
+    def test_fail_moves_to_retry(self, tmp_path) -> None:
         """Failing a task with retries remaining sets it back to pending with future scheduled_at."""
         queue, _ = _make_queue(tmp_path)
 
@@ -148,7 +148,7 @@ class TestWorkerQueueRetries:
         assert status["running"] == 0
         assert status["retrying"] == 0
 
-    def test_fail_exhausts_retries_moves_to_dead_letter(self, tmp_path):
+    def test_fail_exhausts_retries_moves_to_dead_letter(self, tmp_path) -> None:
         """Failing a task after exhausting all retries moves it to dead letter."""
         queue, _ = _make_queue(tmp_path)
 
@@ -162,7 +162,7 @@ class TestWorkerQueueRetries:
         status = queue.get_status()
         assert status["dead_letter"] >= 1
 
-    def test_retry_task_becomes_dequeueable_after_backoff(self, tmp_path):
+    def test_retry_task_becomes_dequeueable_after_backoff(self, tmp_path) -> None:
         """A retried task is set back to pending with future scheduled_at and
         is dequeuable once scheduled_at <= now."""
         queue, _ = _make_queue(tmp_path)
@@ -186,7 +186,7 @@ class TestWorkerQueueRetries:
         assert retried is not None, "Retried task should be dequeuable after backoff"
         assert retried.id == task_id
 
-    def test_retry_dead_letter(self, tmp_path):
+    def test_retry_dead_letter(self, tmp_path) -> None:
         """A dead letter task can be re-queued."""
         queue, _ = _make_queue(tmp_path)
 
@@ -207,7 +207,7 @@ class TestWorkerQueueRetries:
 class TestWorkerQueueStartupRecovery:
     """Stuck task recovery on worker startup."""
 
-    def test_recover_stuck_tasks(self, tmp_path):
+    def test_recover_stuck_tasks(self, tmp_path) -> None:
         """Tasks stuck in 'running' state are recovered on restart."""
         from app.worker_queue import WorkerQueue
 
@@ -242,7 +242,7 @@ class TestWorkerQueueStartupRecovery:
 class TestWorkerQueueObservability:
     """Status and monitoring tests."""
 
-    def test_get_status_counts(self, tmp_path):
+    def test_get_status_counts(self, tmp_path) -> None:
         """get_status returns correct counts for all queue states."""
         queue, _ = _make_queue(tmp_path)
 
@@ -255,7 +255,7 @@ class TestWorkerQueueObservability:
         assert status["retrying"] == 0
         assert status["max_concurrency"] == 5
 
-    def test_get_status_with_dead_letter(self, tmp_path):
+    def test_get_status_with_dead_letter(self, tmp_path) -> None:
         """get_status returns correct dead_letter count."""
         queue, _ = _make_queue(tmp_path)
 
@@ -267,7 +267,7 @@ class TestWorkerQueueObservability:
         status = queue.get_status()
         assert status["dead_letter"] >= 1
 
-    def test_get_dead_letter_queue(self, tmp_path):
+    def test_get_dead_letter_queue(self, tmp_path) -> None:
         """Dead letter queue entries are retrievable."""
         queue, _ = _make_queue(tmp_path)
 
@@ -285,7 +285,7 @@ class TestWorkerQueueObservability:
 class TestWorkerQueueConcurrency:
     """Concurrency control tests."""
 
-    def test_max_concurrency_setting(self, tmp_path):
+    def test_max_concurrency_setting(self, tmp_path) -> None:
         """The max_concurrency setting is respected."""
         queue, _ = _make_queue(tmp_path)
         assert queue._max_concurrency == 5
@@ -294,7 +294,7 @@ class TestWorkerQueueConcurrency:
 class TestQueueTaskModel:
     """Tests for the QueueTask data model."""
 
-    def test_to_dict_from_dict_round_trip(self):
+    def test_to_dict_from_dict_round_trip(self) -> None:
         """A QueueTask serialized to dict and back preserves all fields."""
         from app.worker_queue import Priority, QueueTask, TaskStatus
 
@@ -318,7 +318,7 @@ class TestQueueTaskModel:
         assert restored.max_attempts == original.max_attempts
         assert restored.timeout_seconds == original.timeout_seconds
 
-    def test_default_values(self):
+    def test_default_values(self) -> None:
         """QueueTask default values are sensible."""
         from app.worker_queue import Priority, QueueTask, TaskStatus
 

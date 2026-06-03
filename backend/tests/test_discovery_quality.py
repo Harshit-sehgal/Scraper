@@ -2,11 +2,11 @@ from app.discovery import _looks_noisy_url, _score_result, _source_allowed
 from app.models import SourcePolicy
 
 
-def test_looks_noisy_url_blocks_configured_dead_domain():
+def test_looks_noisy_url_blocks_configured_dead_domain() -> None:
     assert _looks_noisy_url("https://quickfinds.org/listing/top-10-interior-design-company-in-chennai") is True
 
 
-def test_contact_field_bias_prefers_directory_sources():
+def test_contact_field_bias_prefers_directory_sources() -> None:
     item = {
         "title": "Top Interior Designers Chennai",
         "body": "Directory with contacts and listings",
@@ -32,7 +32,7 @@ def test_contact_field_bias_prefers_directory_sources():
     assert directory_score > official_score
 
 
-def test_source_policy_accepts_enum_values():
+def test_source_policy_accepts_enum_values() -> None:
     assert _source_allowed("official", SourcePolicy.OFFICIAL_ONLY) is True
     assert _source_allowed("directory", SourcePolicy.OFFICIAL_ONLY) is False
     assert _source_allowed("directory", SourcePolicy.OFFICIAL_PLUS_DIRECTORY) is True

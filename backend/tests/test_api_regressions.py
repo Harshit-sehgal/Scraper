@@ -21,7 +21,7 @@ def mock_ai_clean_and_align(monkeypatch):
     monkeypatch.setattr("app.services.job_runner.ai_clean_and_align_records", fake_ai_clean_and_align)
 
 
-def test_system_status_shape(client):
+def test_system_status_shape(client) -> None:
     r = client.get("/api/system/status")
     assert r.status_code == 200
     data = r.json()
@@ -32,13 +32,13 @@ def test_system_status_shape(client):
     assert data["jobs"]["total"] == 0
 
 
-def test_healthcheck_route(client):
+def test_healthcheck_route(client) -> None:
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json() == {"status": "ok"}
 
 
-def test_manual_mode_rejects_blank_urls(client):
+def test_manual_mode_rejects_blank_urls(client) -> None:
     payload = {
         "name": "manual-invalid",
         "mode": "manual",
@@ -50,7 +50,7 @@ def test_manual_mode_rejects_blank_urls(client):
     assert "Manual mode requires at least one URL" in r.text
 
 
-def test_manual_mode_rejects_invalid_urls(client):
+def test_manual_mode_rejects_invalid_urls(client) -> None:
     payload = {
         "name": "manual-invalid-url",
         "mode": "manual",
@@ -62,7 +62,7 @@ def test_manual_mode_rejects_invalid_urls(client):
     assert "Manual mode requires valid http(s) URLs" in r.text
 
 
-def test_auto_mode_rejects_blank_topic(client):
+def test_auto_mode_rejects_blank_topic(client) -> None:
     payload = {
         "name": "auto-invalid",
         "mode": "auto",
@@ -74,7 +74,7 @@ def test_auto_mode_rejects_blank_topic(client):
     assert "Auto mode requires a non-empty topic" in r.text
 
 
-def test_auto_mode_clears_provided_urls(client):
+def test_auto_mode_clears_provided_urls(client) -> None:
     payload = {
         "name": "auto-valid",
         "mode": "auto",
@@ -92,7 +92,7 @@ def test_auto_mode_clears_provided_urls(client):
     assert fetched.json()["urls"] == []
 
 
-def test_cancel_pending_job_sets_canceled_status(client):
+def test_cancel_pending_job_sets_canceled_status(client) -> None:
     payload = {
         "name": "cancel-me",
         "mode": "manual",
@@ -113,7 +113,7 @@ def test_cancel_pending_job_sets_canceled_status(client):
     assert fetched.json()["status"] == JobStatus.CANCELED.value
 
 
-def test_reclean_running_returns_409_before_no_results(client):
+def test_reclean_running_returns_409_before_no_results(client) -> None:
     payload = {
         "name": "reclean-running",
         "mode": "manual",
@@ -133,7 +133,7 @@ def test_reclean_running_returns_409_before_no_results(client):
     assert "still running" in reclean.text
 
 
-def test_quality_report_exposes_overall_score():
+def test_quality_report_exposes_overall_score() -> None:
     report = build_quality_report(
         raw_results=[
             {"record_score": 0.6, "source_trust_score": 0.8},
@@ -161,7 +161,7 @@ def test_quality_report_exposes_overall_score():
     assert report["ai_source_prediction"]["ai_row_rate"] == 0.5
 
 
-def test_quality_report_empty_results_scores_zero():
+def test_quality_report_empty_results_scores_zero() -> None:
     report = build_quality_report(
         raw_results=[],
         post_filter_count=0,
@@ -181,7 +181,7 @@ def test_quality_report_empty_results_scores_zero():
     assert report["overall_score"] == 0.0
 
 
-def test_scraper_stats_uses_observed_sample_counts(client):
+def test_scraper_stats_uses_observed_sample_counts(client) -> None:
     from app.scrape_telemetry import get_scrape_telemetry
 
     telemetry = get_scrape_telemetry()
@@ -198,7 +198,7 @@ def test_scraper_stats_uses_observed_sample_counts(client):
     assert body["recent_success_rate"] == 0.5
 
 
-def test_prune_history_stores_keeps_active_and_recent_terminal(monkeypatch):
+def test_prune_history_stores_keeps_active_and_recent_terminal(monkeypatch) -> None:
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
@@ -270,7 +270,7 @@ def test_prune_history_stores_keeps_active_and_recent_terminal(monkeypatch):
     assert set(main_mod.recycle_bin_store.keys()) == {"rb-mid", "rb-new"}
 
 
-def test_auto_discovery_empty_with_cancel_marks_canceled(monkeypatch):
+def test_auto_discovery_empty_with_cancel_marks_canceled(monkeypatch) -> None:
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
@@ -298,7 +298,7 @@ def test_auto_discovery_empty_with_cancel_marks_canceled(monkeypatch):
     assert main_mod.jobs_store[job.id].completed_at is not None
 
 
-def test_auto_discovery_empty_marks_failed_with_terminal_time(monkeypatch):
+def test_auto_discovery_empty_marks_failed_with_terminal_time(monkeypatch) -> None:
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
@@ -327,7 +327,7 @@ def test_auto_discovery_empty_marks_failed_with_terminal_time(monkeypatch):
     assert main_mod.jobs_store[job.id].completed_at is not None
 
 
-def test_clear_terminal_jobs_keeps_recent(client):
+def test_clear_terminal_jobs_keeps_recent(client) -> None:
     payload = {
         "name": "cleanup-seed",
         "mode": "manual",
@@ -358,7 +358,7 @@ def test_clear_terminal_jobs_keeps_recent(client):
     assert set(main_mod.jobs_store.keys()) == {ids[2], ids[3]}
 
 
-def test_clear_recycle_bin_endpoint(client):
+def test_clear_recycle_bin_endpoint(client) -> None:
     main_mod.recycle_bin_store["rb-1"] = Job(
         id="rb-1",
         name="rb-1",
@@ -378,7 +378,7 @@ def test_clear_recycle_bin_endpoint(client):
     assert main_mod.recycle_bin_store == {}
 
 
-def test_export_csv_sanitizes_filename_header(client):
+def test_export_csv_sanitizes_filename_header(client) -> None:
     job = Job(
         id="export-job",
         name='bad/name "x"',
@@ -396,13 +396,13 @@ def test_export_csv_sanitizes_filename_header(client):
     assert 'filename="bad_name_x.csv"' in resp.headers["content-disposition"]
 
 
-def test_infer_source_metadata_classifies_search_subdomain():
+def test_infer_source_metadata_classifies_search_subdomain() -> None:
     metadata = infer_source_metadata("https://search.yahoo.com/search?p=interior+designers")
     assert metadata["source_type"] == "search_result"
     assert metadata["source_trust_score"] == SOURCE_TRUST_SCORE["search_result"]
 
 
-def test_run_job_source_breakdown_counts_final_records(monkeypatch):
+def test_run_job_source_breakdown_counts_final_records(monkeypatch) -> None:
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
@@ -450,7 +450,7 @@ def test_run_job_source_breakdown_counts_final_records(monkeypatch):
     assert finished.quality_report["source_breakdown"]["unknown"]["count"] == 3
 
 
-def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch):
+def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch) -> None:
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
@@ -483,7 +483,7 @@ def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch):
     assert any("URL scrape failed" in w for w in warnings)
 
 
-def test_run_job_warns_when_contact_ai_coverage_zero_without_groq(monkeypatch):
+def test_run_job_warns_when_contact_ai_coverage_zero_without_groq(monkeypatch) -> None:
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
@@ -517,7 +517,7 @@ def test_run_job_warns_when_contact_ai_coverage_zero_without_groq(monkeypatch):
     assert any("set GROQ_API_KEY" in w for w in warnings)
 
 
-def test_run_job_creates_logs(monkeypatch):
+def test_run_job_creates_logs(monkeypatch) -> None:
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
@@ -552,7 +552,7 @@ def test_run_job_creates_logs(monkeypatch):
     assert any("Job completed successfully" in log.message for log in finished.logs)
 
 
-def test_run_job_updates_progress(monkeypatch):
+def test_run_job_updates_progress(monkeypatch) -> None:
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
@@ -581,7 +581,7 @@ def test_run_job_updates_progress(monkeypatch):
     assert finished.progress_current == finished.progress_total
 
 
-def test_cancel_during_run_sets_canceled_and_persists_state(monkeypatch):
+def test_cancel_during_run_sets_canceled_and_persists_state(monkeypatch) -> None:
     """Regression test: cancellation during in-progress scrape tasks should
     cancel in-flight tasks, mark the job as CANCELED, and persist the state."""
     main_mod.jobs_store.clear()
@@ -637,7 +637,7 @@ def test_cancel_during_run_sets_canceled_and_persists_state(monkeypatch):
     assert persist_called[0], "persist_state_fn should have been called during cancellation"
 
 
-def test_cancel_check_before_all_done_avoids_race(monkeypatch):
+def test_cancel_check_before_all_done_avoids_race(monkeypatch) -> None:
     """Regression test: cancellation watcher checks all(done) before
     cancel_requested so a cancel that fires after all tasks finish does not
     incorrectly cancel a completed job.
@@ -698,7 +698,7 @@ def test_cancel_check_before_all_done_avoids_race(monkeypatch):
     }, f"Expected COMPLETED, EMPTY_RESULT, or CANCELED, got {finished.status}"
 
 
-def test_delete_active_job_returns_409(client):
+def test_delete_active_job_returns_409(client) -> None:
     payload = {
         "name": "delete-active-test",
         "mode": "manual",
@@ -726,7 +726,7 @@ def test_delete_active_job_returns_409(client):
     assert resp_success.json()["message"] == "Job moved to recycle bin"
 
 
-def test_quality_report_ai_not_applied():
+def test_quality_report_ai_not_applied() -> None:
     report = build_quality_report(
         raw_results=[
             {"record_score": 0.6, "source_trust_score": 0.8},
@@ -749,7 +749,7 @@ def test_quality_report_ai_not_applied():
     assert report["ai_source_prediction"]["ai_row_rate"] == 0.0
 
 
-def test_quality_report_ai_applied():
+def test_quality_report_ai_applied() -> None:
     report = build_quality_report(
         raw_results=[
             {"record_score": 0.6, "source_trust_score": 0.8},

@@ -54,7 +54,7 @@ def _make_job_json(
 
 
 class TestGetStateFilePath:
-    def test_default_path(self):
+    def test_default_path(self) -> None:
         """Without env override, returns the default data file path."""
         old = os.environ.pop("DATAFORGE_STATE_FILE", None)
         try:
@@ -66,7 +66,7 @@ class TestGetStateFilePath:
             if old is not None:
                 os.environ["DATAFORGE_STATE_FILE"] = old
 
-    def test_configured_path(self):
+    def test_configured_path(self) -> None:
         """With env override, returns the configured path."""
         old = os.environ.get("DATAFORGE_STATE_FILE")
         try:
@@ -84,7 +84,7 @@ class TestGetStateFilePath:
 
 
 class TestLoadState:
-    def test_no_file_returns_empty(self):
+    def test_no_file_returns_empty(self) -> None:
         """When the state file doesn't exist, returns empty stores."""
         # Use a path that doesn't exist
         old = os.environ.get("DATAFORGE_STATE_FILE")
@@ -100,7 +100,7 @@ class TestLoadState:
             else:
                 os.environ.pop("DATAFORGE_STATE_FILE", None)
 
-    def test_load_valid_jobs(self):
+    def test_load_valid_jobs(self) -> None:
         """Loads valid jobs from a state file."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(
@@ -126,7 +126,7 @@ class TestLoadState:
             else:
                 os.environ.pop("DATAFORGE_STATE_FILE", None)
 
-    def test_load_with_recycle_bin(self):
+    def test_load_with_recycle_bin(self) -> None:
         """Loads both jobs and recycle bin entries."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(
@@ -151,7 +151,7 @@ class TestLoadState:
             else:
                 os.environ.pop("DATAFORGE_STATE_FILE", None)
 
-    def test_recovery_marks_in_progress_as_failed(self):
+    def test_recovery_marks_in_progress_as_failed(self) -> None:
         """Jobs that were in progress during shutdown are marked FAILED on load."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(
@@ -181,7 +181,7 @@ class TestLoadState:
             else:
                 os.environ.pop("DATAFORGE_STATE_FILE", None)
 
-    def test_corrupted_file_returns_empty(self):
+    def test_corrupted_file_returns_empty(self) -> None:
         """A corrupted state file should not crash, returns empty."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write("this is not json")
@@ -200,7 +200,7 @@ class TestLoadState:
             else:
                 os.environ.pop("DATAFORGE_STATE_FILE", None)
 
-    def test_skip_invalid_job_entries(self):
+    def test_skip_invalid_job_entries(self) -> None:
         """Malformed job entries are skipped gracefully."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(
@@ -233,7 +233,7 @@ class TestLoadState:
 
 
 class TestSaveState:
-    def test_save_creates_file(self):
+    def test_save_creates_file(self) -> None:
         """Saving state creates a valid JSON file."""
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "test_state.json")
@@ -271,7 +271,7 @@ class TestSaveState:
                 else:
                     os.environ.pop("DATAFORGE_STATE_FILE", None)
 
-    def test_save_and_reload_roundtrip(self):
+    def test_save_and_reload_roundtrip(self) -> None:
         """State survives a save-then-load roundtrip."""
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "roundtrip.json")
@@ -306,7 +306,7 @@ class TestSaveState:
                 else:
                     os.environ.pop("DATAFORGE_STATE_FILE", None)
 
-    def test_save_with_recycle_bin(self):
+    def test_save_with_recycle_bin(self) -> None:
         """Recycle bin entries are persisted."""
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "recycle.json")

@@ -53,14 +53,14 @@ USER_SCHEMA = [
 
 
 class TestExtractAllThenAlign:
-    def test_extract_raw_includes_all_selector_keys(self):
+    def test_extract_raw_includes_all_selector_keys(self) -> None:
         raw: list[dict[str, Any]] = extract_raw_from_selectors(SAMPLE_HTML, SELECTORS)
         assert len(raw) == 2
         fields = SELECTORS["fields"]
         assert isinstance(fields, dict)
         assert set(raw[0].keys()) == set(fields.keys())
 
-    def test_align_maps_to_user_schema(self):
+    def test_align_maps_to_user_schema(self) -> None:
         raw: list[dict[str, Any]] = extract_raw_from_selectors(SAMPLE_HTML, SELECTORS)
         aligned: list[dict[str, Any]] = align_extracted_keys_to_schema(raw, USER_SCHEMA)
         assert aligned[0]["airlines_name"] == "Acme Air"
@@ -70,7 +70,7 @@ class TestExtractAllThenAlign:
         assert aligned[0]["arrival_date"] == "02-01-2026"
         assert "stops" not in aligned[0]
 
-    def test_apply_selectors_end_to_end(self):
+    def test_apply_selectors_end_to_end(self) -> None:
         results: list[dict[str, Any]] = apply_selectors(SAMPLE_HTML, SELECTORS, USER_SCHEMA)
         assert len(results) == 2
         assert results[0]["airlines_name"] == "Acme Air"

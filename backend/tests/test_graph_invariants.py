@@ -16,7 +16,7 @@ from app.semantic_ir import (
 from app.semantic_world_state import SemanticWorldState, get_world_state
 
 
-def test_world_state_round_trip_preserves_structure():
+def test_world_state_round_trip_preserves_structure() -> None:
     """Invariant: SemanticWorldState to_dict → from_dict must be lossless."""
     ws = get_world_state()
     ws.clear()
@@ -51,7 +51,7 @@ def test_world_state_round_trip_preserves_structure():
     assert ws2.cohesion_merge_attempts.get(cohesion_key, 0) == 5.0
 
 
-def test_world_state_clear_resets_all():
+def test_world_state_clear_resets_all() -> None:
     """Invariant: clear() must reset all fields to initial values."""
     ws = get_world_state()
     ws.clear()
@@ -66,7 +66,7 @@ def test_world_state_clear_resets_all():
     assert len(ws.motif_timestamps) == 0
 
 
-def test_exclusion_edge_invariant():
+def test_exclusion_edge_invariant() -> None:
     """Invariant: ExclusionEdge strengths must be bounded [0, 1]."""
     edges = [
         ExclusionEdge(source_id=0, target_id=1, strength=0.0),
@@ -77,7 +77,7 @@ def test_exclusion_edge_invariant():
         assert 0.0 <= e.strength <= 1.0, f"ExclusionEdge strength {e.strength} out of bounds"
 
 
-def test_ownership_edge_no_self_ownership():
+def test_ownership_edge_no_self_ownership() -> None:
     """Invariant: OwnershipEdge owner_id must not equal owned_id."""
     edges = [
         OwnershipEdge(owner_region_id=1, owned_region_id=2, ownership_type="owns", confidence=0.8),
@@ -86,7 +86,7 @@ def test_ownership_edge_no_self_ownership():
         assert e.owner_region_id != e.owned_region_id, "Self-ownership is invalid"
 
 
-def test_semantic_token_confidence_bounds():
+def test_semantic_token_confidence_bounds() -> None:
     """Invariant: SemanticToken confidence values must be bounded [0, 1]."""
     tok = SemanticToken(
         raw="test",
@@ -100,7 +100,7 @@ def test_semantic_token_confidence_bounds():
         assert 0.0 <= val <= 1.0
 
 
-def test_event_dispatcher_dispatch_does_not_raise():
+def test_event_dispatcher_dispatch_does_not_raise() -> None:
     """Invariant: dispatching any SemanticEventType must never raise."""
     dispatcher = get_dispatcher()
     for event_type in SemanticEventType:
@@ -117,7 +117,7 @@ def test_event_dispatcher_dispatch_does_not_raise():
             pytest.fail(f"Dispatch of {event_type.value} raised: {e}")
 
 
-def test_owner_cannot_own_self_in_graph():
+def test_owner_cannot_own_self_in_graph() -> None:
     """Invariant: Self-ownership must be rejected by graph construction."""
     g = SemanticGraph(regions=[])
     g.ownership_edges.append(OwnershipEdge(owner_region_id=5, owned_region_id=5, ownership_type="owns", confidence=1.0))
@@ -135,7 +135,7 @@ def test_owner_cannot_own_self_in_graph():
     assert owner is None or owner.region_id != 5
 
 
-def test_graph_register_region_preserves_invariants():
+def test_graph_register_region_preserves_invariants() -> None:
     """Invariant: Registering regions must not create duplicate IDs."""
     g = SemanticGraph(regions=[])
     ids = [0, 1, 2]
@@ -154,7 +154,7 @@ def test_graph_register_region_preserves_invariants():
     assert len(all_ids) == len(set(all_ids))
 
 
-def test_exclusion_edge_always_bidirectional():
+def test_exclusion_edge_always_bidirectional() -> None:
     """Invariant: Exclusion edges imply mutual exclusion in both directions."""
     g = SemanticGraph(regions=[])
     e1 = ExclusionEdge(source_id=1, target_id=2, strength=0.7)

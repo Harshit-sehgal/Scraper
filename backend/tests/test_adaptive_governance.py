@@ -16,7 +16,7 @@ def ws():
     return state
 
 
-def test_attractor_rebalancing(ws):
+def test_attractor_rebalancing(ws) -> None:
     """Verify that monopolistic basin dominance triggers energy dissipation."""
     # 1. Setup a dominant role
     ws.set_manifold_vector("role_a", [0.9] * 16)
@@ -33,7 +33,7 @@ def test_attractor_rebalancing(ws):
     print(f"\nAttractor Rebalanced: Energy={ws.metrics.global_energy:.2f}, Entropy={ws.metrics.global_entropy:.2f}")
 
 
-def test_topology_restructuring_lock_escape(ws):
+def test_topology_restructuring_lock_escape(ws) -> None:
     """Verify that metastable locks trigger structural rewiring."""
     # 1. Setup a lock state
     with ws.transaction("lock_setup"):
@@ -55,7 +55,7 @@ def test_topology_restructuring_lock_escape(ws):
     print("\nMetastable Lock Escaped via structural rewiring.")
 
 
-def test_substrate_sharding_assignment(ws):
+def test_substrate_sharding_assignment(ws) -> None:
     """Verify that the partitioner correctly assigns regions to shards."""
     # 1. Setup disconnected communities
     with ws.transaction("shard_setup"):

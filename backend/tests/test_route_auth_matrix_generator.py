@@ -34,7 +34,7 @@ def _row_by_method_path(rows, method: str, path: str):
     raise AssertionError(f"route not found: {method} {path}")
 
 
-def test_route_auth_matrix_classifies_core_route_tiers(monkeypatch, tmp_path):
+def test_route_auth_matrix_classifies_core_route_tiers(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("DATAFORGE_DOTENV_PATH", "/dev/null")
     monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
     monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "jobs_state.json"))
@@ -49,7 +49,7 @@ def test_route_auth_matrix_classifies_core_route_tiers(monkeypatch, tmp_path):
     assert _row_by_method_path(matrix, "GET", "/metrics").access == "metrics-token-if-configured"
 
 
-def test_route_auth_matrix_flags_system_merge_legacy_admin_key(monkeypatch, tmp_path):
+def test_route_auth_matrix_flags_system_merge_legacy_admin_key(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("DATAFORGE_DOTENV_PATH", "/dev/null")
     monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
     monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "jobs_state.json"))
@@ -62,7 +62,7 @@ def test_route_auth_matrix_flags_system_merge_legacy_admin_key(monkeypatch, tmp_
     assert "X-Admin-Key" in row.notes
 
 
-def test_route_auth_matrix_markdown_contains_all_rows(monkeypatch, tmp_path):
+def test_route_auth_matrix_markdown_contains_all_rows(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("DATAFORGE_DOTENV_PATH", "/dev/null")
     monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
     monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "jobs_state.json"))
@@ -75,7 +75,7 @@ def test_route_auth_matrix_markdown_contains_all_rows(monkeypatch, tmp_path):
     assert "| `DELETE` | `/api/jobs/{job_id}` | admin |" in markdown
 
 
-def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path):
+def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("DATAFORGE_DOTENV_PATH", "/dev/null")
     monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
     monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "jobs_state.json"))

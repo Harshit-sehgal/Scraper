@@ -35,14 +35,14 @@ client = LocalASGIClient(app)
 class TestHealthEndpoint:
     """Tests for the /health liveness probe."""
 
-    def test_health_returns_200(self):
+    def test_health_returns_200(self) -> None:
         """/health should always return 200 with status ok."""
         response = client.get("/health")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
 
-    def test_health_is_fast(self):
+    def test_health_is_fast(self) -> None:
         """/health should respond quickly (lightweight check)."""
         import time
 
@@ -57,7 +57,7 @@ class TestHealthEndpoint:
 class TestReadyEndpoint:
     """Tests for the /ready readiness probe."""
 
-    def test_ready_returns_storage_ok(self):
+    def test_ready_returns_storage_ok(self) -> None:
         """/ready should check SQLite and return status."""
         response = client.get("/ready")
         assert response.status_code == 200
@@ -66,21 +66,21 @@ class TestReadyEndpoint:
         assert data["storage"] == "ok"
         assert data["migrations"] == "ok"
 
-    def test_ready_includes_backend_type(self):
+    def test_ready_includes_backend_type(self) -> None:
         """/ready should include the backend type."""
         response = client.get("/ready")
         data = response.json()
         assert "backend" in data
         assert data["backend"] in ("sqlite", "postgres")
 
-    def test_ready_includes_schema_version(self):
+    def test_ready_includes_schema_version(self) -> None:
         """/ready should include schema_version >= 2."""
         response = client.get("/ready")
         data = response.json()
         assert "schema_version" in data
         assert data["schema_version"] >= 2
 
-    def test_ready_includes_job_and_recycle_counts(self):
+    def test_ready_includes_job_and_recycle_counts(self) -> None:
         """/ready should include job_count and recycle_bin_count."""
         response = client.get("/ready")
         data = response.json()
@@ -93,14 +93,14 @@ class TestReadyEndpoint:
 class TestDomainPolicyEndpoint:
     """Tests for the /api/system/domain-policy endpoint."""
 
-    def test_domain_policy_returns_dict(self):
+    def test_domain_policy_returns_dict(self) -> None:
         """Domain policy endpoint should return a dict."""
         response = client.get("/api/system/domain-policy")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, dict)
 
-    def test_domain_policy_includes_domain_keys(self):
+    def test_domain_policy_includes_domain_keys(self) -> None:
         """After recording failures, the endpoint should include that domain."""
         from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
 
@@ -111,7 +111,7 @@ class TestDomainPolicyEndpoint:
         data = response.json()
         assert "test-domain-policy.com" in data
 
-    def test_domain_policy_includes_recommended_action(self):
+    def test_domain_policy_includes_recommended_action(self) -> None:
         """Each domain entry should include a recommended_action."""
         from app.domain_runtime_policy import get_domain_runtime_policy, reset_domain_runtime_policy
 
@@ -124,7 +124,7 @@ class TestDomainPolicyEndpoint:
         assert "recommended_action" in entry
         assert isinstance(entry["recommended_action"], str)
 
-    def test_domain_policy_fields(self):
+    def test_domain_policy_fields(self) -> None:
         """Each domain entry should have the expected fields."""
         from app.domain_runtime_policy import reset_domain_runtime_policy
 
@@ -147,7 +147,7 @@ class TestDomainPolicyEndpoint:
 class TestStorageStatusEndpoint:
     """Tests for the /api/system/storage/status endpoint."""
 
-    def test_storage_status_returns_200(self):
+    def test_storage_status_returns_200(self) -> None:
         """Storage status should return 200 with SQLite backend info."""
         response = client.get("/api/system/storage/status")
         assert response.status_code == 200
@@ -156,7 +156,7 @@ class TestStorageStatusEndpoint:
         assert "db_path" in data
         assert data["db_path"].endswith(".db")
 
-    def test_storage_status_includes_schema_version(self):
+    def test_storage_status_includes_schema_version(self) -> None:
         """Storage status should report schema version."""
         response = client.get("/api/system/storage/status")
         data = response.json()
@@ -164,7 +164,7 @@ class TestStorageStatusEndpoint:
         assert data["schema_version"] >= 2
         assert "latest_schema_version" in data
 
-    def test_storage_status_includes_job_counts(self):
+    def test_storage_status_includes_job_counts(self) -> None:
         """Storage status should report job and recycle bin counts."""
         response = client.get("/api/system/storage/status")
         data = response.json()
@@ -172,21 +172,21 @@ class TestStorageStatusEndpoint:
         assert data["job_count"] >= 0
         assert "recycle_bin_count" in data
 
-    def test_storage_status_includes_wal_mode(self):
+    def test_storage_status_includes_wal_mode(self) -> None:
         """Storage status should report WAL mode."""
         response = client.get("/api/system/storage/status")
         data = response.json()
         assert "wal_mode" in data
         assert data["wal_mode"] == "wal"
 
-    def test_ready_reports_sqlite_backend(self):
+    def test_ready_reports_sqlite_backend(self) -> None:
         """/ready should report sqlite backend when using SQLite."""
         response = client.get("/ready")
         assert response.status_code == 200
         data = response.json()
         assert data["backend"] == "sqlite"
 
-    def test_storage_status_reports_sqlite(self):
+    def test_storage_status_reports_sqlite(self) -> None:
         """/api/system/storage/status should report sqlite backend when using SQLite."""
         response = client.get("/api/system/storage/status")
         assert response.status_code == 200
@@ -225,7 +225,7 @@ class TestReadyWithMockedPostgres:
             }
         return mock_repo
 
-    def test_ready_reports_postgres_backend(self, monkeypatch):
+    def test_ready_reports_postgres_backend(self, monkeypatch) -> None:
         """/ready should report postgres backend when Postgres repository is active."""
         mock_repo = self._make_mock_postgres_repo(healthy=True)
         monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
@@ -238,7 +238,7 @@ class TestReadyWithMockedPostgres:
         assert data["job_count"] == 5
         assert data["recycle_bin_count"] == 2
 
-    def test_ready_returns_503_when_postgres_unhealthy(self, monkeypatch):
+    def test_ready_returns_503_when_postgres_unhealthy(self, monkeypatch) -> None:
         """/ready should return 503 when Postgres repository is unhealthy."""
         mock_repo = self._make_mock_postgres_repo(healthy=False)
         monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
@@ -249,7 +249,7 @@ class TestReadyWithMockedPostgres:
         assert data["status"] == "not_ready"
         assert "error" in data
 
-    def test_storage_status_reports_postgres_counts(self, monkeypatch):
+    def test_storage_status_reports_postgres_counts(self, monkeypatch) -> None:
         """/api/system/storage/status should report postgres backend with counts."""
         mock_repo = self._make_mock_postgres_repo(healthy=True)
         monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)
@@ -263,7 +263,7 @@ class TestReadyWithMockedPostgres:
         assert data["job_count"] == 5
         assert data["recycle_bin_count"] == 2
 
-    def test_storage_status_reports_postgres_unhealthy(self, monkeypatch):
+    def test_storage_status_reports_postgres_unhealthy(self, monkeypatch) -> None:
         """/api/system/storage/status should report postgres as not ok when unhealthy."""
         mock_repo = self._make_mock_postgres_repo(healthy=False)
         monkeypatch.setattr("app.main.get_job_repository", lambda: mock_repo)

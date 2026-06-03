@@ -4,7 +4,7 @@ from app.checkpoint_manager import get_checkpoint_manager
 from app.semantic_world_state import get_world_state
 
 
-def test_exhaustive_replay_manifold():
+def test_exhaustive_replay_manifold() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -26,7 +26,7 @@ def test_exhaustive_replay_manifold():
     assert ws._manifold.get_manifold_vector("role_x")[0] == 0.1
 
 
-def test_checkpoint_round_trip():
+def test_checkpoint_round_trip() -> None:
     ws = get_world_state()
     ws.clear()
     mgr = get_checkpoint_manager()
@@ -56,7 +56,7 @@ def test_checkpoint_round_trip():
     os.remove(path)
 
 
-def test_nested_transaction_causality():
+def test_nested_transaction_causality() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -75,7 +75,7 @@ def test_nested_transaction_causality():
     assert any(e["subsystem"] == "energy" and e["action"] == "set_entropy" for e in tx["entries"])
 
 
-def test_semantic_os_gateway():
+def test_semantic_os_gateway() -> None:
     from app.semantic_os import get_semantic_os
 
     sos = get_semantic_os()

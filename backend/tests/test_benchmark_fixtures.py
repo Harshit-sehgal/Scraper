@@ -67,7 +67,7 @@ async def test_fixture_extraction_yields_records(
     schema_fields,
     min_expected_records,
     required_fields,
-):
+) -> None:
     """Verify that discovery-based extraction from static fixture HTML produces expected records."""
     html = _load_fixture(fixture_name)
     assert html, f"Empty fixture: {fixture_name}"
@@ -117,7 +117,7 @@ async def test_fixture_extraction_yields_records(
 async def test_blocked_fixture_does_not_produce_false_records(
     fixture_name,
     expected_block_type,
-):
+) -> None:
     """Verify that anti-bot and empty pages are NOT treated as successful extractions."""
     html = _load_fixture(fixture_name)
     assert html, f"Empty fixture: {fixture_name}"
@@ -171,7 +171,7 @@ async def test_blocked_fixture_does_not_produce_false_records(
         ("travel_site", "direct"),
     ],
 )
-def test_acquisition_lineage_is_truthful(fixture_name, expected_state):
+def test_acquisition_lineage_is_truthful(fixture_name, expected_state) -> None:
     """Verify that acquisition lineage reports the correct state for fixture pages."""
     from app.acquisition_state import AcquisitionLineage, AcquisitionState
 

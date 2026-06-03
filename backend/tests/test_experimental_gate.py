@@ -35,7 +35,7 @@ from app.experimental_startup import (
 # ─── Gate function ──────────────────────────────────────────────────────────
 
 
-def test_gate_reads_settings_flag(monkeypatch):
+def test_gate_reads_settings_flag(monkeypatch) -> None:
     """When settings.ENABLE_EXPERIMENTAL_ROUTES is True, gate returns True."""
     from app.config import settings
 
@@ -43,7 +43,7 @@ def test_gate_reads_settings_flag(monkeypatch):
     assert experimental_subsystems_enabled() is True
 
 
-def test_gate_returns_false_by_default(monkeypatch):
+def test_gate_returns_false_by_default(monkeypatch) -> None:
     """When settings.ENABLE_EXPERIMENTAL_ROUTES is False, gate returns False."""
     from app.config import settings
 
@@ -51,7 +51,7 @@ def test_gate_returns_false_by_default(monkeypatch):
     assert experimental_subsystems_enabled() is False
 
 
-def test_gate_falls_back_to_false_if_attribute_missing(monkeypatch):
+def test_gate_falls_back_to_false_if_attribute_missing(monkeypatch) -> None:
     """If settings has no ENABLE_EXPERIMENTAL_ROUTES attribute, gate defaults to False."""
     from app import experimental_startup
 
@@ -85,38 +85,38 @@ def gate_on(monkeypatch):
     yield
 
 
-def test_init_graph_scheduler_noop_when_disabled(gate_off, caplog):
+def test_init_graph_scheduler_noop_when_disabled(gate_off, caplog) -> None:
     with caplog.at_level(logging.DEBUG, logger="app.experimental_startup"):
         init_graph_scheduler()
     # Function should not have raised and should not have logged a successful init.
     assert "Graph update scheduler initialized" not in caplog.text
 
 
-def test_init_recovery_framework_noop_when_disabled(gate_off, caplog):
+def test_init_recovery_framework_noop_when_disabled(gate_off, caplog) -> None:
     with caplog.at_level(logging.DEBUG, logger="app.experimental_startup"):
         init_recovery_framework()
     assert "Recovery handlers registered" not in caplog.text
 
 
-def test_init_domain_health_monitor_noop_when_disabled(gate_off, caplog):
+def test_init_domain_health_monitor_noop_when_disabled(gate_off, caplog) -> None:
     with caplog.at_level(logging.DEBUG, logger="app.experimental_startup"):
         init_domain_health_monitor()
     assert "Domain health monitor initialized" not in caplog.text
 
 
-def test_init_gossip_and_heartbeat_returns_none_tuple_when_disabled(gate_off):
+def test_init_gossip_and_heartbeat_returns_none_tuple_when_disabled(gate_off) -> None:
     gossip, heartbeat = init_gossip_and_heartbeat()
     assert gossip is None
     assert heartbeat is None
 
 
-def test_restore_semantic_world_state_noop_when_disabled(gate_off):
+def test_restore_semantic_world_state_noop_when_disabled(gate_off) -> None:
     # Should not raise even with arbitrary input.
     restore_semantic_world_state({"some": "data"}, "/tmp/state.json")
     restore_semantic_world_state(None, "")
 
 
-def test_persist_semantic_world_state_noop_when_disabled(gate_off):
+def test_persist_semantic_world_state_noop_when_disabled(gate_off) -> None:
     # Should not raise.
     persist_semantic_world_state()
 
@@ -124,7 +124,7 @@ def test_persist_semantic_world_state_noop_when_disabled(gate_off):
 # ─── schedule_gossip_propagation is gated ─────────────────────────────────
 
 
-def test_schedule_gossip_propagation_noop_when_disabled(gate_off):
+def test_schedule_gossip_propagation_noop_when_disabled(gate_off) -> None:
     # Even if a non-None gossip object is passed, the gate must short-circuit
     # and return None — we don't want research work to start accidentally.
     fake_gossip = object()
@@ -133,7 +133,7 @@ def test_schedule_gossip_propagation_noop_when_disabled(gate_off):
     assert result is None
 
 
-def test_schedule_gossip_propagation_noop_when_gossip_is_none(gate_on):
+def test_schedule_gossip_propagation_noop_when_gossip_is_none(gate_on) -> None:
     # Even with the gate open, None gossip should still short-circuit.
     result = asyncio.run(schedule_gossip_propagation(None, None, interval=1.0))
     assert result is None
@@ -142,7 +142,7 @@ def test_schedule_gossip_propagation_noop_when_gossip_is_none(gate_on):
 # ─── close_postgres_pool is NOT gated (Postgres is product kernel) ─────────
 
 
-def test_close_postgres_pool_is_not_gated(monkeypatch, caplog):
+def test_close_postgres_pool_is_not_gated(monkeypatch, caplog) -> None:
     """close_postgres_pool must run even when the experimental gate is closed.
 
     Postgres is a product-kernel storage backend, so its pool-close

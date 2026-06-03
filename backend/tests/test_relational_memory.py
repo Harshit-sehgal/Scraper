@@ -1,7 +1,7 @@
 from app.semantic_world_state import get_world_state
 
 
-def test_relational_recall_stabilizes_new_basins():
+def test_relational_recall_stabilizes_new_basins() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -27,7 +27,7 @@ def test_relational_recall_stabilizes_new_basins():
     assert region.instability < 0.2
 
 
-def test_temporal_manifold_weighting():
+def test_temporal_manifold_weighting() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -53,7 +53,7 @@ def test_temporal_manifold_weighting():
     assert boost_new > 0.5  # 1.0 (new) + 0.13 (old) = 1.13 -> clamped to 1.0
 
 
-def test_substrate_checksum_deterministic():
+def test_substrate_checksum_deterministic() -> None:
     ws = get_world_state()
     ws.clear()
 

@@ -80,14 +80,14 @@ def module_postgres_container():
 class TestPostgresQueueImports:
     """Verify the module imports and key symbols are available."""
 
-    def test_import_postgres_queue_module(self):
+    def test_import_postgres_queue_module(self) -> None:
         """The worker_queue_postgres module imports without error."""
         _require_psycopg2()
         from app.worker_queue_postgres import PostgresWorkerQueue  # noqa: F811
 
         assert PostgresWorkerQueue is not None
 
-    def test_factory_functions_available(self):
+    def test_factory_functions_available(self) -> None:
         """get_postgres_worker_queue and reset_postgres_worker_queue are exported."""
         _require_psycopg2()
         from app.worker_queue_postgres import (
@@ -98,7 +98,7 @@ class TestPostgresQueueImports:
         assert callable(get_postgres_worker_queue)
         assert callable(reset_postgres_worker_queue)
 
-    def test_ensure_schema_sql_syntax_valid(self):
+    def test_ensure_schema_sql_syntax_valid(self) -> None:
         """The _ensure_schema function contains valid SQL statements."""
         _require_psycopg2()
         from app.worker_queue_postgres import _ensure_schema
@@ -107,7 +107,7 @@ class TestPostgresQueueImports:
         # but we can verify the function is defined and callable
         assert callable(_ensure_schema)
 
-    def test_module_imports_priority_from_worker_queue(self):
+    def test_module_imports_priority_from_worker_queue(self) -> None:
         """Priority and QueueTask are imported from the base worker_queue module."""
         _require_psycopg2()
         from app.worker_queue import Priority, QueueTask, TaskStatus
@@ -124,7 +124,7 @@ class TestPostgresQueueImports:
 class TestPostgresQueueFactory:
     """Factory singleton tests (require Postgres connection)."""
 
-    def test_factory_returns_same_instance(self, module_postgres_container):
+    def test_factory_returns_same_instance(self, module_postgres_container) -> None:
         """get_postgres_worker_queue returns the same instance on repeated calls."""
         _require_psycopg2()
         from app.worker_queue_postgres import (
@@ -140,7 +140,7 @@ class TestPostgresQueueFactory:
         finally:
             reset_postgres_worker_queue()
 
-    def test_reset_creates_new_instance(self, module_postgres_container):
+    def test_reset_creates_new_instance(self, module_postgres_container) -> None:
         """After reset_postgres_worker_queue, a new instance is created."""
         _require_psycopg2()
         from app.worker_queue_postgres import (
@@ -161,7 +161,7 @@ class TestPostgresQueueFactory:
 class TestPostgresQueueConstruction:
     """Construction and configuration tests (no DB connection required)."""
 
-    def test_default_construction_config(self):
+    def test_default_construction_config(self) -> None:
         """Default PostgresWorkerQueue has sensible defaults."""
         _require_psycopg2()
         from app.worker_queue_postgres import PostgresWorkerQueue
@@ -170,7 +170,7 @@ class TestPostgresQueueConstruction:
         # __init__ calls _ensure_schema(). Instead verify config constants.
         assert PostgresWorkerQueue is not None
 
-    def test_method_signatures_match_sqlite_queue(self):
+    def test_method_signatures_match_sqlite_queue(self) -> None:
         """PostgresWorkerQueue exposes the same public methods as WorkerQueue."""
         _require_psycopg2()
         from app.worker_queue_postgres import PostgresWorkerQueue
@@ -205,7 +205,7 @@ class TestPostgresQueueConstruction:
 class TestWorkerQueueFactoryDispatch:
     """Verify get_worker_queue() correctly dispatches to Postgres backend."""
 
-    def test_factory_dispatch_postgres_env(self, module_postgres_container, monkeypatch):
+    def test_factory_dispatch_postgres_env(self, module_postgres_container, monkeypatch) -> None:
         """get_worker_queue(backend='postgres') returns PostgresWorkerQueue."""
         _require_psycopg2()
         from app.worker_queue import get_worker_queue, reset_worker_queue
@@ -220,7 +220,7 @@ class TestWorkerQueueFactoryDispatch:
         finally:
             reset_worker_queue()
 
-    def test_factory_dispatch_sqlite_default(self, tmp_path, monkeypatch):
+    def test_factory_dispatch_sqlite_default(self, tmp_path, monkeypatch) -> None:
         """get_worker_queue() with no backend returns SQLite WorkerQueue."""
         from app.worker_queue import WorkerQueue, get_worker_queue, reset_worker_queue
 
@@ -234,7 +234,7 @@ class TestWorkerQueueFactoryDispatch:
             reset_worker_queue()
         monkeypatch.delenv("DATAFORGE_WORKER_QUEUE", raising=False)
 
-    def test_factory_dispatch_postgres_via_param(self, module_postgres_container, monkeypatch):
+    def test_factory_dispatch_postgres_via_param(self, module_postgres_container, monkeypatch) -> None:
         """get_worker_queue(backend='postgres') dispatches correctly."""
         _require_psycopg2()
         from app.worker_queue import get_worker_queue, reset_worker_queue
@@ -248,7 +248,7 @@ class TestWorkerQueueFactoryDispatch:
         finally:
             reset_worker_queue()
 
-    def test_reset_clears_both_backends(self, module_postgres_container, monkeypatch):
+    def test_reset_clears_both_backends(self, module_postgres_container, monkeypatch) -> None:
         """reset_worker_queue() clears both SQLite and Postgres singletons."""
         _require_psycopg2()
         from app.worker_queue import get_worker_queue, reset_worker_queue
@@ -310,7 +310,7 @@ class TestPostgresQueueIntegration:
         reset_postgres_worker_queue()
         reset_worker_queue()
 
-    def test_enqueue_and_dequeue(self):
+    def test_enqueue_and_dequeue(self) -> None:
         """A task enqueued can be dequeued with correct metadata."""
         from app.worker_queue import Priority
         from app.worker_queue_postgres import PostgresWorkerQueue
@@ -328,7 +328,7 @@ class TestPostgresQueueIntegration:
         assert task.priority == Priority.HIGH
         assert task.status.value == "running"
 
-    def test_dequeue_empty_returns_none(self):
+    def test_dequeue_empty_returns_none(self) -> None:
         """Dequeueing from an empty Postgres queue returns None."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
@@ -336,7 +336,7 @@ class TestPostgresQueueIntegration:
         task = asyncio.run(queue.dequeue(timeout=1.0))
         assert task is None
 
-    def test_priority_ordering(self):
+    def test_priority_ordering(self) -> None:
         """Higher-priority tasks are dequeued before lower-priority ones."""
         from app.worker_queue import Priority
         from app.worker_queue_postgres import PostgresWorkerQueue
@@ -360,7 +360,7 @@ class TestPostgresQueueIntegration:
         t4 = asyncio.run(queue.dequeue(timeout=5.0))
         assert t4 is not None and t4.id == id_low
 
-    def test_complete_task(self):
+    def test_complete_task(self) -> None:
         """Completing a task removes it from the active queue."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
@@ -375,7 +375,7 @@ class TestPostgresQueueIntegration:
         remaining = asyncio.run(queue.dequeue(timeout=1.0))
         assert remaining is None
 
-    def test_fail_moves_to_retry(self):
+    def test_fail_moves_to_retry(self) -> None:
         """Failing a task with retries remaining sets it back to pending."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
@@ -390,7 +390,7 @@ class TestPostgresQueueIntegration:
         status = queue.get_status()
         assert status["pending"] >= 1, f"Expected >=1 pending, got {status}"
 
-    def test_fail_exhausts_retries_moves_to_dead_letter(self):
+    def test_fail_exhausts_retries_moves_to_dead_letter(self) -> None:
         """Failing after exhausting retries moves task to dead letter."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
@@ -405,7 +405,7 @@ class TestPostgresQueueIntegration:
         status = queue.get_status()
         assert status["dead_letter"] >= 1
 
-    def test_cancel_pending_task(self):
+    def test_cancel_pending_task(self) -> None:
         """Cancelling a pending task removes it from the queue."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
@@ -418,7 +418,7 @@ class TestPostgresQueueIntegration:
         task = asyncio.run(queue.dequeue(timeout=1.0))
         assert task is None
 
-    def test_cancel_nonexistent_task_returns_false(self):
+    def test_cancel_nonexistent_task_returns_false(self) -> None:
         """Cancelling a task that doesn't exist returns False."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
@@ -426,7 +426,7 @@ class TestPostgresQueueIntegration:
         cancelled = asyncio.run(queue.cancel("nonexistent-id"))
         assert cancelled is False
 
-    def test_retry_dead_letter(self):
+    def test_retry_dead_letter(self) -> None:
         """A dead letter task can be re-queued."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
@@ -444,7 +444,7 @@ class TestPostgresQueueIntegration:
         assert status["dead_letter"] == 0
         assert status["pending"] >= 1
 
-    def test_get_status_counts(self):
+    def test_get_status_counts(self) -> None:
         """get_status returns correct counts for all states."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
@@ -458,7 +458,7 @@ class TestPostgresQueueIntegration:
         assert status["running"] == 0
         assert status["max_concurrency"] == 5
 
-    def test_get_dead_letter_queue(self):
+    def test_get_dead_letter_queue(self) -> None:
         """Dead letter queue entries are retrievable."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
@@ -474,7 +474,7 @@ class TestPostgresQueueIntegration:
         ids = [entry["id"] for entry in dl]
         assert task_id in ids
 
-    def test_clear_completed_history(self):
+    def test_clear_completed_history(self) -> None:
         """clear_completed_history can run without error."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
@@ -482,7 +482,7 @@ class TestPostgresQueueIntegration:
         # Should not raise on an empty history
         queue.clear_completed_history(older_than_days=1)
 
-    def test_recover_stuck_tasks(self):
+    def test_recover_stuck_tasks(self) -> None:
         """Tasks stuck in 'running' state are recovered via start()."""
         import psycopg2
         from app.worker_queue_postgres import PostgresWorkerQueue, reset_postgres_worker_queue
@@ -519,7 +519,7 @@ class TestPostgresQueueIntegration:
         assert status["running"] == 0, f"Expected 0 running, got {status}"
         assert status["pending"] >= 1, f"Expected >=1 pending, got {status}"
 
-    def test_register_handler_and_worker_loop(self):
+    def test_register_handler_and_worker_loop(self) -> None:
         """A registered handler is called when the worker processes a task."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 
@@ -528,7 +528,7 @@ class TestPostgresQueueIntegration:
 
             results = []
 
-            async def test_handler(task):
+            async def test_handler(task) -> None:
                 results.append(task.id)
                 return {"handled": True}
 
@@ -551,7 +551,7 @@ class TestPostgresQueueIntegration:
         task_id, results = asyncio.run(run())
         assert task_id in results, f"Handler never called for {task_id}"
 
-    def test_missing_handler_moves_to_dead_letter(self):
+    def test_missing_handler_moves_to_dead_letter(self) -> None:
         """A task with no registered handler goes to dead letter."""
         from app.worker_queue_postgres import PostgresWorkerQueue
 

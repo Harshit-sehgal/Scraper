@@ -35,7 +35,7 @@ def _capture_last_tx(ws):
 # ═══════════════════════════════════════════════════════════════════
 
 
-def test_full_multi_subsystem_replay():
+def test_full_multi_subsystem_replay() -> None:
     """Execute mutations across all 10 replayable subsystems, clear,
     replay, and verify state equivalence on every subsystem."""
     ws = get_world_state()
@@ -151,7 +151,7 @@ def test_full_multi_subsystem_replay():
 # ═══════════════════════════════════════════════════════════════════
 
 
-def test_replay_empty_entries():
+def test_replay_empty_entries() -> None:
     """Replay a transaction with no entries must not crash."""
     ws = get_world_state()
     ws.clear()
@@ -166,7 +166,7 @@ def test_replay_empty_entries():
     # No crash = pass
 
 
-def test_replay_missing_optional_fields():
+def test_replay_missing_optional_fields() -> None:
     """Replay a transaction with minimal/missing fields must not crash."""
     ws = get_world_state()
     ws.clear()
@@ -176,7 +176,7 @@ def test_replay_missing_optional_fields():
     # No crash = pass
 
 
-def test_replay_unknown_subsystem_skipped():
+def test_replay_unknown_subsystem_skipped() -> None:
     """Entries with unknown subsystems must be skipped, not crash."""
     ws = get_world_state()
     ws.clear()
@@ -186,7 +186,7 @@ def test_replay_unknown_subsystem_skipped():
     # No crash = pass
 
 
-def test_replay_unknown_method_skipped():
+def test_replay_unknown_method_skipped() -> None:
     """Entries with non-existent methods on a valid subsystem must be skipped."""
     ws = get_world_state()
     ws.clear()
@@ -196,7 +196,7 @@ def test_replay_unknown_method_skipped():
     # No crash = pass
 
 
-def test_replay_invalid_args_skipped():
+def test_replay_invalid_args_skipped() -> None:
     """Entries with wrong argument names must be skipped, not crash the batch."""
     ws = get_world_state()
     ws.clear()
@@ -218,7 +218,7 @@ def test_replay_invalid_args_skipped():
     assert abs(ws.metrics.global_energy - 3.0) < 0.001, f"Expected 3.0 from valid entries, got {ws.metrics.global_energy}"
 
 
-def test_replay_partial_failure_recovers():
+def test_replay_partial_failure_recovers() -> None:
     """A batch where only some entries fail must still replay all valid ones."""
     ws = get_world_state()
     ws.clear()
@@ -248,7 +248,7 @@ def test_replay_partial_failure_recovers():
 # ═══════════════════════════════════════════════════════════════════
 
 
-def test_journal_entry_structure():
+def test_journal_entry_structure() -> None:
     """Every journal entry must have subsystem, action, and details fields."""
     ws = get_world_state()
     ws.clear()
@@ -269,7 +269,7 @@ def test_journal_entry_structure():
         assert isinstance(entry["details"], dict), f"Entry 'details' must be a dict, got {type(entry['details'])}"
 
 
-def test_all_replayable_subsystems_record():
+def test_all_replayable_subsystems_record() -> None:
     """Each replayable subsystem must generate journal entries under
     normal operation. Excludes 'global' which is orchestration-level."""
     ws = get_world_state()
@@ -300,7 +300,7 @@ def test_all_replayable_subsystems_record():
         assert name in recorded_subsystems, f"Subsystem '{name}' did not produce a journal entry"
 
 
-def test_journal_trace_id_propagation():
+def test_journal_trace_id_propagation() -> None:
     """Journal entries within a transaction must carry the trace_id."""
     ws = get_world_state()
     ws.clear()
@@ -320,7 +320,7 @@ def test_journal_trace_id_propagation():
 # ═══════════════════════════════════════════════════════════════════
 
 
-def test_cumulative_replay_multiple_transactions():
+def test_cumulative_replay_multiple_transactions() -> None:
     """Execute 3 chained transactions, clear, replay all in order,
     verify final state matches exactly."""
     ws = get_world_state()
@@ -393,7 +393,7 @@ def test_cumulative_replay_multiple_transactions():
         assert abs(restored - val) < 0.001, f"Transition {key}: expected {val}, got {restored}"
 
 
-def test_replay_idempotent():
+def test_replay_idempotent() -> None:
     """Replaying the same transaction twice should produce the same
     final state as replaying it once."""
     ws = get_world_state()
@@ -423,7 +423,7 @@ def test_replay_idempotent():
 # ═══════════════════════════════════════════════════════════════════
 
 
-def test_direct_mutation_recorded_outside_transaction():
+def test_direct_mutation_recorded_outside_transaction() -> None:
     """Mutations made outside a transaction must still appear in the
     global journal (with 'direct_mutation' label)."""
     ws = get_world_state()
@@ -451,7 +451,7 @@ def test_direct_mutation_recorded_outside_transaction():
 # ═══════════════════════════════════════════════════════════════════
 
 
-def test_topology_add_replay_structural():
+def test_topology_add_replay_structural() -> None:
     """Replaying topology.add() must restore the correct number of
     regions with matching tokens and roles (ID-independent verification)."""
     ws = get_world_state()
@@ -480,7 +480,7 @@ def test_topology_add_replay_structural():
         assert len(regions) >= 1, f"Token {t} not found after replay"
 
 
-def test_topological_law_replay():
+def test_topological_law_replay() -> None:
     """Topological law mutations must survive replay."""
     ws = get_world_state()
     ws.clear()
@@ -505,7 +505,7 @@ def test_topological_law_replay():
 # ═══════════════════════════════════════════════════════════════════
 
 
-def test_replay_instability_tuple_key_deserialization():
+def test_replay_instability_tuple_key_deserialization() -> None:
     """Tuple keys in instability entries must survive JSON serialization/
     deserialization during replay."""
     ws = get_world_state()
@@ -528,7 +528,7 @@ def test_replay_instability_tuple_key_deserialization():
             entry["details"]["key"] = tuple(entry["details"]["key"])
 
 
-def test_long_horizon_replay_parity():
+def test_long_horizon_replay_parity() -> None:
     """Execute 500 random transactions, capture the journal, and verify
     that full replay results in identical metrics and manifold checksum."""
     import random

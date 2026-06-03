@@ -2,7 +2,7 @@ from app.semantic_os import get_semantic_os
 from app.semantic_world_state import get_world_state
 
 
-def test_autonomous_action_dispatch():
+def test_autonomous_action_dispatch() -> None:
     ws = get_world_state()
     ws.clear()
     sos = get_semantic_os()
@@ -32,7 +32,7 @@ def test_autonomous_action_dispatch():
     assert history[0]["details"]["role"] == "cost"
 
 
-def test_outcome_feedback_loop():
+def test_outcome_feedback_loop() -> None:
     ws = get_world_state()
     ws.clear()
     sos = get_semantic_os()
@@ -53,7 +53,7 @@ def test_outcome_feedback_loop():
     assert vec[0] < 0.5
 
 
-def test_policy_engine_restriction():
+def test_policy_engine_restriction() -> None:
     ws = get_world_state()
     ws.clear()
     sos = get_semantic_os()

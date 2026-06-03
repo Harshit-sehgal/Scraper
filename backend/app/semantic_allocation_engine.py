@@ -274,10 +274,10 @@ def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abst
 
     # Compute compatibility scores (Geometric)
     for cand_key, token in graph.candidates.items():
-        for role_name, role in graph.roles.items():  # type: ignore[assignment]
-            score = _compute_compatibility(token, role_name, role)  # type: ignore[arg-type]
+        for r_name, r_obj in graph.roles.items():
+            score = _compute_compatibility(token, r_name, r_obj)
             if score > 0:
-                graph.compatibility[(cand_key, role_name)] = score
+                graph.compatibility[(cand_key, r_name)] = score
 
     # Field instability damping
     # Unstable basins reduce proposal confidence for their roles.

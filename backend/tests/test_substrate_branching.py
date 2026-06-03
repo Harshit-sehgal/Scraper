@@ -2,7 +2,7 @@ import pytest
 from app.semantic_os import get_semantic_os
 
 
-def test_substrate_branching_isolation():
+def test_substrate_branching_isolation() -> None:
     sos = get_semantic_os()
     sos.ws.clear()
 
@@ -25,7 +25,7 @@ def test_substrate_branching_isolation():
     assert branch_sos.ws._manifold.has_manifold_role("new_role")
 
 
-def test_substrate_merging():
+def test_substrate_merging() -> None:
     sos = get_semantic_os()
     sos.ws.clear()
 
@@ -51,7 +51,7 @@ def test_substrate_merging():
     assert sos.ws._manifold.has_manifold_role("r2")
 
 
-def test_causal_lineage_versioning():
+def test_causal_lineage_versioning() -> None:
     sos = get_semantic_os()
     sos.ws.clear()
 

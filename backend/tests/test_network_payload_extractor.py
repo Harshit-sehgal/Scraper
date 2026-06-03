@@ -50,7 +50,7 @@ MIXED_PAYLOAD = json.dumps(
 
 
 class TestFindRecordArrays:
-    def test_finds_results_array(self):
+    def test_finds_results_array(self) -> None:
         payload = json.loads(FLIGHT_PAYLOAD)
         candidates = find_record_arrays(payload)
         assert len(candidates) > 0
@@ -58,20 +58,20 @@ class TestFindRecordArrays:
         assert best.path in ("results", "$.results")
         assert len(best.records) == 3
 
-    def test_finds_nested_arrays(self):
+    def test_finds_nested_arrays(self) -> None:
         payload = json.loads(NESTED_PAYLOAD)
         candidates = find_record_arrays(payload)
         assert len(candidates) > 0
         paths = [c.path for c in candidates]
         assert any("flights" in p for p in paths)
 
-    def test_ignores_non_object_arrays(self):
+    def test_ignores_non_object_arrays(self) -> None:
         payload = json.loads(MIXED_PAYLOAD)
         candidates = find_record_arrays(payload)
         paths = [c.path for c in candidates]
         assert not any("tags" in p for p in paths)  # tags is string array, not objects
 
-    def test_finds_items_in_mixed_payload(self):
+    def test_finds_items_in_mixed_payload(self) -> None:
         payload = json.loads(MIXED_PAYLOAD)
         candidates = find_record_arrays(payload)
         paths = [c.path for c in candidates]
@@ -81,7 +81,7 @@ class TestFindRecordArrays:
 
 
 class TestScoreRecordArray:
-    def test_flight_schema_scores_high(self):
+    def test_flight_schema_scores_high(self) -> None:
         payload = json.loads(FLIGHT_PAYLOAD)
         candidates = find_record_arrays(payload)
         schema = [
@@ -91,13 +91,13 @@ class TestScoreRecordArray:
         score = score_record_array(candidates[0], schema)
         assert score > 30, f"Score too low: {score}"
 
-    def test_empty_schema_scores_zero(self):
+    def test_empty_schema_scores_zero(self) -> None:
         payload = json.loads(FLIGHT_PAYLOAD)
         candidates = find_record_arrays(payload)
         score = score_record_array(candidates[0], [])
         assert score == 0.0
 
-    def test_irrelevant_schema_scores_low(self):
+    def test_irrelevant_schema_scores_low(self) -> None:
         payload = json.loads(FLIGHT_PAYLOAD)
         candidates = find_record_arrays(payload)
         schema = [
@@ -109,7 +109,7 @@ class TestScoreRecordArray:
 
 
 class TestMapJsonRecords:
-    def test_maps_carrier_to_airline(self):
+    def test_maps_carrier_to_airline(self) -> None:
         payload = json.loads(FLIGHT_PAYLOAD)
         records = payload["results"]
         schema = [
@@ -121,7 +121,7 @@ class TestMapJsonRecords:
         assert mapped[0].get("airline") == "IndiGo"
         assert mapped[0].get("price") == 4500
 
-    def test_field_map_has_provenance(self):
+    def test_field_map_has_provenance(self) -> None:
         payload = json.loads(FLIGHT_PAYLOAD)
         records = payload["results"]
         schema = [
@@ -132,7 +132,7 @@ class TestMapJsonRecords:
         assert field_map["airline"].source == "network_payload"
         assert field_map["airline"].confidence > 0.5
 
-    def test_nested_flight_payload_maps(self):
+    def test_nested_flight_payload_maps(self) -> None:
         payload = json.loads(NESTED_PAYLOAD)
         flights = payload["data"]["searchResults"]["flights"]
         schema = [
@@ -145,7 +145,7 @@ class TestMapJsonRecords:
 
 
 class TestExtractFromNetworkPayloads:
-    def test_extracts_from_flight_payload(self):
+    def test_extracts_from_flight_payload(self) -> None:
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -155,7 +155,7 @@ class TestExtractFromNetworkPayloads:
         assert result.record_count == 3
         assert result.score > 30
 
-    def test_returns_none_for_empty_payloads(self):
+    def test_returns_none_for_empty_payloads(self) -> None:
         result = extract_from_network_payloads(
             [],
             [
@@ -164,7 +164,7 @@ class TestExtractFromNetworkPayloads:
         )
         assert result is None
 
-    def test_returns_none_for_low_scoring_payload(self):
+    def test_returns_none_for_low_scoring_payload(self) -> None:
         result = extract_from_network_payloads(
             [json.dumps({"not": "records", "here": 1})],
             [SchemaField(name="airline", field_type=FieldType.STRING, required=False)],
@@ -173,7 +173,7 @@ class TestExtractFromNetworkPayloads:
 
 
 class TestSourceArbitration:
-    def test_network_wins_when_dom_empty(self):
+    def test_network_wins_when_dom_empty(self) -> None:
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -183,7 +183,7 @@ class TestSourceArbitration:
         assert source == net_result.source
         assert len(records) == 3
 
-    def test_dom_wins_when_network_weak(self):
+    def test_dom_wins_when_network_weak(self) -> None:
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
         ]
@@ -199,7 +199,7 @@ class TestSourceArbitration:
         assert source == "dom"
         assert records == dom_records
 
-    def test_weak_dom_strong_network_chooses_network(self):
+    def test_weak_dom_strong_network_chooses_network(self) -> None:
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -214,7 +214,7 @@ class TestSourceArbitration:
         assert source == net_result.source
         assert len(records) == 3
 
-    def test_strong_dom_weak_network_chooses_dom(self):
+    def test_strong_dom_weak_network_chooses_dom(self) -> None:
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -235,7 +235,7 @@ class TestSourceArbitration:
         assert source == "dom"
         assert len(records) == 2
 
-    def test_both_weak_arbitration_flow(self):
+    def test_both_weak_arbitration_flow(self) -> None:
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -252,7 +252,7 @@ class TestSourceArbitration:
         assert source == "dom"
         assert records == dom_records
 
-    def test_graphql_shape_unwrapping(self):
+    def test_graphql_shape_unwrapping(self) -> None:
         graphql_payload = json.dumps(
             {
                 "data": {
@@ -275,7 +275,7 @@ class TestSourceArbitration:
         assert result.records[0].get("airline") == "AirIndia"
         assert result.records[1].get("price") == 2900
 
-    def test_nextjs_props_handling(self):
+    def test_nextjs_props_handling(self) -> None:
         nextjs_payload = json.dumps(
             {
                 "props": {
@@ -297,7 +297,7 @@ class TestSourceArbitration:
         assert result.record_count == 2
         assert result.records[0].get("airline") == "Delta"
 
-    def test_nested_value_extraction(self):
+    def test_nested_value_extraction(self) -> None:
         nested_val_payload = json.dumps(
             {
                 "results": [
@@ -316,7 +316,7 @@ class TestSourceArbitration:
         assert result.records[0].get("airline") == "Lufthansa"
         assert result.records[0].get("price") == "$700"
 
-    def test_secrets_not_in_field_map(self):
+    def test_secrets_not_in_field_map(self) -> None:
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
         ]
@@ -326,7 +326,7 @@ class TestSourceArbitration:
             assert "token" not in fm.mapped_from.lower()
             assert "cookie" not in fm.mapped_from.lower()
 
-    def test_root_array_payload_extraction(self):
+    def test_root_array_payload_extraction(self) -> None:
         root_array_payload = json.dumps(
             [
                 {"carrier": "British Airways", "fare": 310, "depart": "11:00"},
@@ -343,7 +343,7 @@ class TestSourceArbitration:
         assert result.records[0].get("airline") == "British Airways"
         assert result.records[1].get("price") == 420
 
-    def test_irrelevant_arrays_ignored(self):
+    def test_irrelevant_arrays_ignored(self) -> None:
         payload = json.dumps(
             {
                 "status": "success",
@@ -357,7 +357,7 @@ class TestSourceArbitration:
         result = extract_from_network_payloads([payload], schema)
         assert result is None
 
-    def test_secret_heavy_payloads_not_ignored_but_sanitized(self):
+    def test_secret_heavy_payloads_not_ignored_but_sanitized(self) -> None:
         payload = json.dumps(
             {
                 "session_id": "sess_12345",
@@ -378,7 +378,7 @@ class TestSourceArbitration:
         assert result.record_count == 2
         assert result.records[0].get("airline") == "IndiGo"
 
-    def test_candidate_array_secret_heavy_ignored(self):
+    def test_candidate_array_secret_heavy_ignored(self) -> None:
         payload = json.dumps(
             {
                 "tokens": [
@@ -393,7 +393,7 @@ class TestSourceArbitration:
         result = extract_from_network_payloads([payload], schema)
         assert result is None
 
-    def test_provenance_exact_path(self):
+    def test_provenance_exact_path(self) -> None:
         nested_payload = json.dumps(
             {
                 "data": {
@@ -415,7 +415,7 @@ class TestSourceArbitration:
         assert result.field_map["airline"].mapped_from == "$.data.flights[*].airlineName"
         assert result.field_map["price"].mapped_from == "$.data.flights[*].fareCost"
 
-    def test_strong_dom_weak_network_chooses_dom_explicit(self):
+    def test_strong_dom_weak_network_chooses_dom_explicit(self) -> None:
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -429,7 +429,7 @@ class TestSourceArbitration:
         assert source == "dom"
         assert len(records) == 2
 
-    def test_network_high_count_poor_coverage_does_not_win(self):
+    def test_network_high_count_poor_coverage_does_not_win(self) -> None:
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
@@ -444,7 +444,7 @@ class TestSourceArbitration:
         assert source == "dom"
         assert len(records) == 2
 
-    def test_mixed_safe_results_secret_metadata_extracts_safe_records(self):
+    def test_mixed_safe_results_secret_metadata_extracts_safe_records(self) -> None:
         payload = json.dumps(
             {
                 "session_id": "sess_deadbeef",
@@ -471,7 +471,7 @@ class TestSourceArbitration:
                 assert "auth_token" not in k
                 assert "client_secret" not in k
 
-    def test_provenance_nested_suffix(self):
+    def test_provenance_nested_suffix(self) -> None:
         payload = json.dumps(
             {
                 "results": [
@@ -488,7 +488,7 @@ class TestSourceArbitration:
         assert "price" in result.field_map
         assert result.field_map["price"].mapped_from == "$.results[*].price.total"
 
-    def test_invalid_airport_code_rejected_and_warnings(self):
+    def test_invalid_airport_code_rejected_and_warnings(self) -> None:
         from app.utils.quality import post_extract_validate_records
 
         schema = [
@@ -512,7 +512,7 @@ class TestSourceArbitration:
         assert "Airport-code fields failed semantic validation" in warnings2
 
     @pytest.mark.asyncio
-    async def test_memory_downgraded_and_arbitration(self, monkeypatch):
+    async def test_memory_downgraded_and_arbitration(self, monkeypatch) -> None:
         from app.container_discovery import MultiPassResult
         from app.extraction_orchestrator import orchestrate_extraction
 

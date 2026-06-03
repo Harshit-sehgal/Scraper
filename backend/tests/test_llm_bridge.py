@@ -32,44 +32,44 @@ from app.llm_bridge import (
 
 
 class TestExtractJsonPayload:
-    def test_none_or_empty(self):
+    def test_none_or_empty(self) -> None:
         assert _extract_json_payload(None) is None
         assert _extract_json_payload("") is None
         assert _extract_json_payload("   ") is None
 
-    def test_direct_json_object(self):
+    def test_direct_json_object(self) -> None:
         result = _extract_json_payload('{"name": "Test", "price": 100}')
         assert result == {"name": "Test", "price": 100}
 
-    def test_direct_json_array(self):
+    def test_direct_json_array(self) -> None:
         result = _extract_json_payload('[{"a": 1}, {"b": 2}]')
         assert result == [{"a": 1}, {"b": 2}]
 
-    def test_json_in_code_fence(self):
+    def test_json_in_code_fence(self) -> None:
         text = '```json\n{"key": "value"}\n```'
         result = _extract_json_payload(text)
         assert result == {"key": "value"}
 
-    def test_code_fence_without_json_tag(self):
+    def test_code_fence_without_json_tag(self) -> None:
         text = '```\n{"answer": 42}\n```'
         result = _extract_json_payload(text)
         assert result == {"answer": 42}
 
-    def test_embedded_object_in_text(self):
+    def test_embedded_object_in_text(self) -> None:
         text = 'Here is the result: {"found": true, "count": 5}. End.'
         result = _extract_json_payload(text)
         assert result == {"found": True, "count": 5}
 
-    def test_embedded_array_in_text(self):
+    def test_embedded_array_in_text(self) -> None:
         text = "Results: [1, 2, 3] are ready."
         result = _extract_json_payload(text)
         assert result == [1, 2, 3]
 
-    def test_invalid_json_returns_none(self):
+    def test_invalid_json_returns_none(self) -> None:
         result = _extract_json_payload("this is not json at all")
         assert result is None
 
-    def test_nested_object(self):
+    def test_nested_object(self) -> None:
         text = '{"level1": {"level2": [1, 2, 3]}}'
         result = _extract_json_payload(text)
         assert result == {"level1": {"level2": [1, 2, 3]}}
@@ -79,34 +79,34 @@ class TestExtractJsonPayload:
 
 
 class TestShouldRetryHttpError:
-    def test_retryable_http_status(self):
+    def test_retryable_http_status(self) -> None:
         for status in (429, 500, 502, 503, 504):
             resp = MagicMock(spec=httpx.Response)
             resp.status_code = status
             err = httpx.HTTPStatusError("error", request=MagicMock(), response=resp)
             assert _should_retry_http_error(err), f"Status {status} should be retryable"
 
-    def test_non_retryable_http_status(self):
+    def test_non_retryable_http_status(self) -> None:
         for status in (400, 401, 403, 404, 422, 501):
             resp = MagicMock(spec=httpx.Response)
             resp.status_code = status
             err = httpx.HTTPStatusError("error", request=MagicMock(), response=resp)
             assert not _should_retry_http_error(err), f"Status {status} should NOT be retryable"
 
-    def test_request_error_is_retryable(self):
+    def test_request_error_is_retryable(self) -> None:
         err = httpx.RequestError("Connection refused", request=MagicMock())
         assert _should_retry_http_error(err)
 
-    def test_error_string_containing_retryable_token(self):
+    def test_error_string_containing_retryable_token(self) -> None:
         for token in ("429", "timed out", "connection", "temporary"):
             err = RuntimeError(f"Something {token} happened")
             assert _should_retry_http_error(err), f"Error with '{token}' should be retryable"
 
-    def test_error_without_retryable_token(self):
+    def test_error_without_retryable_token(self) -> None:
         err = RuntimeError("Invalid request")
         assert not _should_retry_http_error(err)
 
-    def test_response_is_none(self):
+    def test_response_is_none(self) -> None:
         """HTTPStatusError with response=None should still check status code."""
         resp = MagicMock(spec=httpx.Response)
         resp.status_code = 429
@@ -118,7 +118,7 @@ class TestShouldRetryHttpError:
 
 
 class TestGroqModelCandidates:
-    def test_defaults_when_no_env_vars(self):
+    def test_defaults_when_no_env_vars(self) -> None:
         with (
             patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "llama-3.3-70b-versatile"),
             patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant"),
@@ -126,7 +126,7 @@ class TestGroqModelCandidates:
             models = _groq_model_candidates()
             assert models == ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 
-    def test_uses_settings(self):
+    def test_uses_settings(self) -> None:
         with (
             patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "mixtral-8x7b-32768"),
             patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama2-70b-4096"),
@@ -134,7 +134,7 @@ class TestGroqModelCandidates:
             models = _groq_model_candidates()
             assert models == ["mixtral-8x7b-32768", "llama2-70b-4096"]
 
-    def test_deduplicates_identical_models(self):
+    def test_deduplicates_identical_models(self) -> None:
         with (
             patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", "llama-3.3-70b-versatile"),
             patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", "llama-3.3-70b-versatile"),
@@ -142,7 +142,7 @@ class TestGroqModelCandidates:
             models = _groq_model_candidates()
             assert models == ["llama-3.3-70b-versatile"]  # Deduplicated
 
-    def test_uses_defaults_on_none(self):
+    def test_uses_defaults_on_none(self) -> None:
         with patch("app.llm_bridge.settings.GROQ_DEFAULT_MODEL", ""), patch("app.llm_bridge.settings.GROQ_FALLBACK_MODEL", ""):
             models = _groq_model_candidates()
             # Empty strings resolve to defaults due to `or` operator
@@ -153,13 +153,13 @@ class TestGroqModelCandidates:
 
 
 class TestRecordLlmDegradation:
-    def test_records_degradation(self):
+    def test_records_degradation(self) -> None:
         ws_mock = MagicMock()
         with patch("app.semantic_world_state.get_world_state", return_value=ws_mock):
             _record_llm_degradation("groq", "API timeout", severity="critical")
             ws_mock.record_degradation.assert_called_once_with(subsystem="groq", severity="critical", cause="API timeout")
 
-    def test_handles_world_state_unavailable(self):
+    def test_handles_world_state_unavailable(self) -> None:
         with patch("app.semantic_world_state.get_world_state", side_effect=Exception("No WS")):
             _record_llm_degradation("test", "failure")  # Should not raise
 
@@ -171,10 +171,10 @@ class TestCallCounting:
     def setup_method(self):
         reset_llm_call_count()
 
-    def test_initial_count_is_zero(self):
+    def test_initial_count_is_zero(self) -> None:
         assert get_llm_call_count() == 0
 
-    def test_reset_works(self):
+    def test_reset_works(self) -> None:
         from app.llm_bridge import _record_call
 
         _record_call()
@@ -221,7 +221,7 @@ class _MockAsyncClient:
 
 class TestCallOpenaiCompatibleJson:
     @pytest.mark.asyncio
-    async def test_successful_call(self):
+    async def test_successful_call(self) -> None:
         mock_response = MagicMock()
         mock_response.json.return_value = {"choices": [{"message": {"content": '{"key": "value"}'}}]}
 
@@ -230,7 +230,7 @@ class TestCallOpenaiCompatibleJson:
             assert result == {"key": "value"}
 
     @pytest.mark.asyncio
-    async def test_retry_on_500(self):
+    async def test_retry_on_500(self) -> None:
         mock_client = _MockAsyncClient()
 
         mock_fail = MagicMock(spec=httpx.Response)
@@ -250,7 +250,7 @@ class TestCallOpenaiCompatibleJson:
             assert mock_client.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_non_retryable_error_raises(self):
+    async def test_non_retryable_error_raises(self) -> None:
         mock_client = _MockAsyncClient()
 
         mock_bad = MagicMock(spec=httpx.Response)
@@ -267,7 +267,7 @@ class TestCallOpenaiCompatibleJson:
 
 class TestCallOpenaiCompatibleText:
     @pytest.mark.asyncio
-    async def test_successful_call(self):
+    async def test_successful_call(self) -> None:
         mock_response = MagicMock()
         mock_response.json.return_value = {"choices": [{"message": {"content": "  Hello World  "}}]}
 
@@ -276,7 +276,7 @@ class TestCallOpenaiCompatibleText:
             assert result == "Hello World"  # Stripped
 
     @pytest.mark.asyncio
-    async def test_empty_content_returns_empty_string(self):
+    async def test_empty_content_returns_empty_string(self) -> None:
         mock_response = MagicMock()
         mock_response.json.return_value = {"choices": [{"message": {"content": ""}}]}
 
@@ -290,7 +290,7 @@ class TestCallOpenaiCompatibleText:
 
 class TestLlmJson:
     @pytest.mark.asyncio
-    async def test_groq_success(self):
+    async def test_groq_success(self) -> None:
         with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}):
             with (
                 patch("app.llm_bridge._groq_model_candidates", return_value=["llama-3.3-70b-versatile"]),
@@ -301,7 +301,7 @@ class TestLlmJson:
                 mock_call.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_groq_fails_then_pollinations(self):
+    async def test_groq_fails_then_pollinations(self) -> None:
         with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}):
             with (
                 patch("app.llm_bridge._groq_model_candidates", return_value=["llama-3.3-70b-versatile"]),
@@ -321,7 +321,7 @@ class TestLlmJson:
                 assert mock_call.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_all_providers_fail_returns_empty_dict(self):
+    async def test_all_providers_fail_returns_empty_dict(self) -> None:
         with (
             patch.dict(os.environ, {}, clear=True),  # No GROQ key
             patch("app.llm_bridge._call_openai_compatible_json", side_effect=Exception("API error")),
@@ -333,7 +333,7 @@ class TestLlmJson:
             assert result == {}  # Empty dict fallback
 
     @pytest.mark.asyncio
-    async def test_public_fallbacks_disabled_skips_unauthenticated_http(self):
+    async def test_public_fallbacks_disabled_skips_unauthenticated_http(self) -> None:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("app.llm_bridge._call_openai_compatible_json") as mock_json,
@@ -348,7 +348,7 @@ class TestLlmJson:
 
 class TestLlmJsonFast:
     @pytest.mark.asyncio
-    async def test_groq_success(self):
+    async def test_groq_success(self) -> None:
         with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}):
             with (
                 patch("app.llm_bridge._groq_model_candidates", return_value=["llama-3.3-70b-versatile"]),
@@ -359,7 +359,7 @@ class TestLlmJsonFast:
                 mock_call.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_all_fail_returns_empty_dict(self):
+    async def test_all_fail_returns_empty_dict(self) -> None:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("app.llm_bridge._call_openai_compatible_json", side_effect=Exception("fail")),
@@ -373,7 +373,7 @@ class TestLlmJsonFast:
 
 class TestLlmText:
     @pytest.mark.asyncio
-    async def test_groq_success(self):
+    async def test_groq_success(self) -> None:
         with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}):
             with (
                 patch("app.llm_bridge._groq_model_candidates", return_value=["llama-3.3-70b-versatile"]),
@@ -384,7 +384,7 @@ class TestLlmText:
                 mock_call.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_empty_response_when_all_fail(self):
+    async def test_empty_response_when_all_fail(self) -> None:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("app.llm_bridge._call_openai_compatible_text", side_effect=Exception("fail")),
@@ -404,7 +404,7 @@ class TestSubstratePluginManager:
     def setup_method(self):
         reset_plugin_manager()
 
-    def test_register_handler(self):
+    def test_register_handler(self) -> None:
         mgr = SubstratePluginManager()
 
         def handler(**kwargs):
@@ -413,7 +413,7 @@ class TestSubstratePluginManager:
         mgr.register_handler("test_handler", handler)
         assert "test_handler" in mgr.get_available_tools()
 
-    def test_call_tool_executes_handler(self):
+    def test_call_tool_executes_handler(self) -> None:
         mgr = SubstratePluginManager()
 
         def handler(**kwargs):
@@ -423,12 +423,12 @@ class TestSubstratePluginManager:
         result = mgr.call_tool("echo", x=42)
         assert result == "processed 42"
 
-    def test_call_tool_unknown_handler(self):
+    def test_call_tool_unknown_handler(self) -> None:
         mgr = SubstratePluginManager()
         with pytest.raises(ValueError, match="Unknown handler"):
             mgr.call_tool("nonexistent")
 
-    def test_call_tool_records_execution_history(self):
+    def test_call_tool_records_execution_history(self) -> None:
         mgr = SubstratePluginManager()
 
         def handler(**kwargs):
@@ -440,7 +440,7 @@ class TestSubstratePluginManager:
         assert mgr._execution_history[0]["handler"] == "h1"
         assert mgr._execution_history[0]["status"] == "success"
 
-    def test_call_tool_records_failure_in_history(self):
+    def test_call_tool_records_failure_in_history(self) -> None:
         mgr = SubstratePluginManager()
 
         def handler(**kwargs):
@@ -451,7 +451,7 @@ class TestSubstratePluginManager:
             mgr.call_tool("failing")
         assert mgr._execution_history[0]["status"] == "error"
 
-    def test_call_tool_respects_policy_block(self):
+    def test_call_tool_respects_policy_block(self) -> None:
         ws_mock = MagicMock()
         ws_mock.get_system_pressure.return_value = 0.9
 
@@ -472,18 +472,18 @@ class TestSubstratePluginManager:
 
             policy_instance.can_dispatch_action.assert_called_once()
 
-    def test_native_role_merger_no_ws(self):
+    def test_native_role_merger_no_ws(self) -> None:
         mgr = SubstratePluginManager(ws=None)
         result = mgr._native_role_merger(role_a="a", role_b="b")
         assert "Fail" in result
 
-    def test_native_role_merger_missing_roles(self):
+    def test_native_role_merger_missing_roles(self) -> None:
         ws_mock = MagicMock()
         mgr = SubstratePluginManager(ws=ws_mock)
         result = mgr._native_role_merger(role_a=None, role_b="b")
         assert "Fail" in result
 
-    def test_native_role_merger_success(self):
+    def test_native_role_merger_success(self) -> None:
         ws_mock = MagicMock()
         ws_mock.role_manifold = {
             "role_a": [1.0, 0.0] * 8,
@@ -498,7 +498,7 @@ class TestSubstratePluginManager:
             ws_mock.set_manifold_vector.assert_called_once()
             ws_mock.remove_manifold_role.assert_called_once_with("role_b")
 
-    def test_native_manifold_compressor_sparse(self):
+    def test_native_manifold_compressor_sparse(self) -> None:
         ws_mock = MagicMock()
         ws_mock.role_manifold = {"r1": [0.5] * 16}
         ws_mock.manifold_dimension = 16
@@ -508,7 +508,7 @@ class TestSubstratePluginManager:
         result = mgr._native_manifold_compressor()
         assert "Skip" in result
 
-    def test_native_manifold_compressor_dense(self):
+    def test_native_manifold_compressor_dense(self) -> None:
         ws_mock = MagicMock()
         ws_mock.role_manifold = {f"r{i}": [0.5] * 16 for i in range(15)}
         # Make dimension 0 constant (zero variance)
@@ -520,7 +520,7 @@ class TestSubstratePluginManager:
         result = mgr._native_manifold_compressor()
         assert "Success" in result
 
-    def test_get_available_tools_includes_native(self):
+    def test_get_available_tools_includes_native(self) -> None:
         mgr = SubstratePluginManager()
         tools = mgr.get_available_tools()
         assert "role_merger" in tools
@@ -531,12 +531,12 @@ class TestGetPluginManager:
     def setup_method(self):
         reset_plugin_manager()
 
-    def test_singleton_behavior(self):
+    def test_singleton_behavior(self) -> None:
         first = get_plugin_manager()
         second = get_plugin_manager()
         assert first is second
 
-    def test_reset_works(self):
+    def test_reset_works(self) -> None:
         first = get_plugin_manager()
         reset_plugin_manager()
         second = get_plugin_manager()

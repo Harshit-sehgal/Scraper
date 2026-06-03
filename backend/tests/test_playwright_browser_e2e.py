@@ -119,7 +119,7 @@ def browser_server():
 
 
 @pytest.mark.asyncio
-async def test_playwright_loads_session_page(browser_server):
+async def test_playwright_loads_session_page(browser_server) -> None:
     """Playwright loads the session-bound search page successfully."""
     from playwright.async_api import async_playwright
 
@@ -135,7 +135,7 @@ async def test_playwright_loads_session_page(browser_server):
 
 
 @pytest.mark.asyncio
-async def test_playwright_captures_cookies(browser_server):
+async def test_playwright_captures_cookies(browser_server) -> None:
     """Playwright captures cookies set by the server."""
     from playwright.async_api import async_playwright
 
@@ -153,7 +153,7 @@ async def test_playwright_captures_cookies(browser_server):
 
 
 @pytest.mark.asyncio
-async def test_playwright_reads_local_storage(browser_server):
+async def test_playwright_reads_local_storage(browser_server) -> None:
     """Playwright verifies localStorage is written by the page JS."""
     from playwright.async_api import async_playwright
 
@@ -170,7 +170,7 @@ async def test_playwright_reads_local_storage(browser_server):
 
 
 @pytest.mark.asyncio
-async def test_playwright_reads_session_storage(browser_server):
+async def test_playwright_reads_session_storage(browser_server) -> None:
     """Playwright verifies sessionStorage is written by the page JS."""
     from playwright.async_api import async_playwright
 
@@ -187,7 +187,7 @@ async def test_playwright_reads_session_storage(browser_server):
 
 
 @pytest.mark.asyncio
-async def test_playwright_captures_network_response(browser_server):
+async def test_playwright_captures_network_response(browser_server) -> None:
     """Playwright captures the /api/results network JSON response."""
     from playwright.async_api import async_playwright
 
@@ -232,7 +232,7 @@ async def test_playwright_captures_network_response(browser_server):
 
 
 @pytest.mark.asyncio
-async def test_playwright_extraction_from_rendered_dom(browser_server):
+async def test_playwright_extraction_from_rendered_dom(browser_server) -> None:
     """Extraction works on Playwright-rendered HTML."""
     from playwright.async_api import async_playwright
 
@@ -264,7 +264,7 @@ async def test_playwright_extraction_from_rendered_dom(browser_server):
 
 
 @pytest.mark.asyncio
-async def test_playwright_secrets_not_in_extraction(browser_server):
+async def test_playwright_secrets_not_in_extraction(browser_server) -> None:
     """Browser storage values do NOT leak into extraction output."""
     from playwright.async_api import async_playwright
 
@@ -293,7 +293,7 @@ async def test_playwright_secrets_not_in_extraction(browser_server):
 
 
 @pytest.mark.asyncio
-async def test_playwright_url_detected_as_session_bound():
+async def test_playwright_url_detected_as_session_bound() -> None:
     """Long opaque token in /search/id/ path is detected as session-bound."""
     from app.session_url_detector import detect_session_params
 
@@ -302,7 +302,7 @@ async def test_playwright_url_detected_as_session_bound():
 
 
 @pytest.mark.asyncio
-async def test_playwright_network_capture_feeds_extractor(browser_server):
+async def test_playwright_network_capture_feeds_extractor(browser_server) -> None:
     """E2E proving actual network capture feeds the extractor."""
     from app.network_payload_extractor import extract_from_network_payloads
     from playwright.async_api import async_playwright
@@ -347,7 +347,7 @@ async def test_playwright_network_capture_feeds_extractor(browser_server):
 
 
 @pytest.mark.asyncio
-async def test_playwright_pipeline_integration(browser_server, monkeypatch):
+async def test_playwright_pipeline_integration(browser_server, monkeypatch) -> None:
     """True pipeline E2E integration: weak DOM + naturally fetched strong JSON -> chooses network."""
     from app import html_utils, url_safety
     from app.browser_pool import BrowserPool

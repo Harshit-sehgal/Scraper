@@ -3,7 +3,7 @@ import json
 import requests
 
 
-def test_pollinations_api():
+def test_pollinations_api() -> None:
     markdown = """
     # Books to Scrape
     - A Light in the Attic. Price: £51.77. Rating: Three. In stock.

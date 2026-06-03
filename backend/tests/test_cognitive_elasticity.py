@@ -2,7 +2,7 @@ from app.semantic_inference_engine import RoleEmbeddingEngine
 from app.semantic_world_state import get_world_state
 
 
-def test_cognitive_elasticity_rate_scaling():
+def test_cognitive_elasticity_rate_scaling() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -26,7 +26,7 @@ def test_cognitive_elasticity_rate_scaling():
     assert p_high > p_low
 
 
-def test_manifold_dimensionality_induction():
+def test_manifold_dimensionality_induction() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -53,7 +53,7 @@ def test_manifold_dimensionality_induction():
     assert len(type_vec) == 32
 
 
-def test_knowledge_distillation_atoms():
+def test_knowledge_distillation_atoms() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -72,7 +72,7 @@ def test_knowledge_distillation_atoms():
     assert atoms[0]["token"] == "token_x"
 
 
-def test_dimensionality_induction_trigger():
+def test_dimensionality_induction_trigger() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -93,7 +93,7 @@ def test_dimensionality_induction_trigger():
     assert ws._manifold.dimension == initial_dim + 8
 
 
-def test_basin_pre_heating():
+def test_basin_pre_heating() -> None:
     ws = get_world_state()
     ws.clear()
 

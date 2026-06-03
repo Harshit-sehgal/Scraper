@@ -47,7 +47,7 @@ def _skip_if_no_api_key():
 
 
 @pytest.mark.asyncio
-async def test_profile_extraction_aligns_all_schema_fields():
+async def test_profile_extraction_aligns_all_schema_fields() -> None:
     """Profile returns multiple rows; alignment maps every profile key to best schema field."""
     _skip_if_no_api_key()
     profiles = _load_all_profiles()
@@ -101,7 +101,7 @@ async def test_profile_extraction_aligns_all_schema_fields():
 
 
 @pytest.mark.asyncio
-async def test_scrape_url_end_to_end_multiple_records():
+async def test_scrape_url_end_to_end_multiple_records() -> None:
     _skip_if_no_api_key()
     profiles = _load_all_profiles()
     if not profiles:

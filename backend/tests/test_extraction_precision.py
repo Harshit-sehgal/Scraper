@@ -19,7 +19,7 @@ def load_fixture(name: str) -> str:
         return f.read()
 
 
-def test_travel_site_regex_extraction():
+def test_travel_site_regex_extraction() -> None:
     html = load_fixture("travel_site.html")
     fields = [
         SchemaField(name="airline", field_type=FieldType.STRING, description="", required=False),
@@ -39,7 +39,7 @@ def test_travel_site_regex_extraction():
     assert "245.50" in prices or "£245.50" in prices
 
 
-def test_legacy_directory_regex_extraction():
+def test_legacy_directory_regex_extraction() -> None:
     html = load_fixture("legacy_directory.html")
     fields = [
         SchemaField(name="company", field_type=FieldType.STRING, description="", required=False),
@@ -61,7 +61,7 @@ def test_legacy_directory_regex_extraction():
     assert any("acme.example.com" in (u or "") for u in urls)
 
 
-def test_messy_blog_regex_extraction():
+def test_messy_blog_regex_extraction() -> None:
     html = load_fixture("messy_blog.html")
     fields = [
         SchemaField(name="title", field_type=FieldType.STRING, description="", required=False),
@@ -77,7 +77,7 @@ def test_messy_blog_regex_extraction():
     assert "The Future of AI Agents" in titles
 
 
-def test_selector_application_precision():
+def test_selector_application_precision() -> None:
     html = load_fixture("travel_site.html")
     fields = [
         SchemaField(name="airline", field_type=FieldType.STRING, description="", required=False),

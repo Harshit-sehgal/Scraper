@@ -739,8 +739,8 @@ class TopologyState:
         view = self.get_view()
         forces: Dict[Tuple[str, str], Dict[str, float | str]] = {}
         for edge in view.get_edge_fields():
-            pair = tuple(sorted([edge.source, edge.target]))
-            forces[pair] = {  # type: ignore[index]
+            pair = (edge.source, edge.target) if edge.source < edge.target else (edge.target, edge.source)
+            forces[pair] = {
                 "affinity": edge.affinity,
                 "repulsion": edge.repulsion,
                 "pressure": edge.pressure,
@@ -939,8 +939,8 @@ class TopologyState:
             roles = r.competing_roles
             for i in range(len(roles)):
                 for j in range(i + 1, len(roles)):
-                    pair = tuple(sorted([roles[i], roles[j]]))
-                    f = forces.get(pair)  # type: ignore[arg-type]
+                    pair = (roles[i], roles[j]) if roles[i] < roles[j] else (roles[j], roles[i])
+                    f = forces.get(pair)
                     if f:
                         region_pressure = max(region_pressure, f["pressure"])
                         region_affinity = max(region_affinity, f["affinity"])
@@ -1091,8 +1091,8 @@ class TopologyState:
                 edge_conductance = 0.0
                 for ra in ri.competing_roles:
                     for rb in rj.competing_roles:
-                        pair = tuple(sorted([ra, rb]))
-                        force = forces.get(pair)  # type: ignore[arg-type]
+                        pair = (ra, rb) if ra < rb else (rb, ra)
+                        force = forces.get(pair)
                         if force:
                             # Edge conductance = route_strength (how well
                             # signals flow)
@@ -1131,9 +1131,9 @@ class TopologyState:
         # 2. Apply deltas
         for rid, delta in deltas.items():
             if abs(delta) > 1e-6:
-                r = self.get_region(rid)  # type: ignore[assignment]
-                if r is not None:
-                    self.set_region_instability(rid, r.instability + delta)
+                region_to_update = self.get_region(rid)
+                if region_to_update is not None:
+                    self.set_region_instability(rid, region_to_update.instability + delta)
 
         total_flow = round(sum(abs(d) for d in deltas.values()), 4)
         self._record(
@@ -1250,8 +1250,8 @@ class TopologyState:
             max_route = 0.0
             for ra in source.competing_roles:
                 for rb in target.competing_roles:
-                    pair = tuple(sorted([ra, rb]))
-                    f = forces.get(pair)  # type: ignore[arg-type]
+                    pair = (ra, rb) if ra < rb else (rb, ra)
+                    f = forces.get(pair)
                     if f:
                         max_route = max(max_route, f["route_strength"])
 

@@ -1,7 +1,7 @@
 from app.semantic_world_state import SemanticWorldState
 
 
-def test_unified_edge_field_combines_topology_forces():
+def test_unified_edge_field_combines_topology_forces() -> None:
     ws = SemanticWorldState()
     ws.clear()
 
@@ -27,7 +27,7 @@ def test_unified_edge_field_combines_topology_forces():
     assert contradiction_edge.impossible is True
 
 
-def test_negative_topological_laws_survive_decay_and_merge():
+def test_negative_topological_laws_survive_decay_and_merge() -> None:
     local = SemanticWorldState(node_id="edge_local")
     remote = SemanticWorldState(node_id="edge_remote")
     local.clear()

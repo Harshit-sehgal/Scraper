@@ -58,22 +58,22 @@ async def client(app: FastAPI):
 
 class TestExportErrors:
     @pytest.mark.asyncio
-    async def test_csv_missing_job_returns_404(self, client):
+    async def test_csv_missing_job_returns_404(self, client) -> None:
         resp = await client.get("/api/jobs/nonexistent/export/csv")
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_json_missing_job_returns_404(self, client):
+    async def test_json_missing_job_returns_404(self, client) -> None:
         resp = await client.get("/api/jobs/nonexistent/export/json")
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_excel_missing_job_returns_404(self, client):
+    async def test_excel_missing_job_returns_404(self, client) -> None:
         resp = await client.get("/api/jobs/nonexistent/export/excel")
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_csv_empty_results_returns_400(self):
+    async def test_csv_empty_results_returns_400(self) -> None:
         from httpx import ASGITransport, AsyncClient
 
         jobs_store: dict[str, Job] = {}
@@ -87,7 +87,7 @@ class TestExportErrors:
         assert resp.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_json_empty_results_returns_400(self):
+    async def test_json_empty_results_returns_400(self) -> None:
         from httpx import ASGITransport, AsyncClient
 
         jobs_store: dict[str, Job] = {}
@@ -101,7 +101,7 @@ class TestExportErrors:
         assert resp.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_excel_empty_results_returns_400(self):
+    async def test_excel_empty_results_returns_400(self) -> None:
         from httpx import ASGITransport, AsyncClient
 
         jobs_store: dict[str, Job] = {}
@@ -145,23 +145,23 @@ class TestCsvExport:
             yield c
 
     @pytest.mark.asyncio
-    async def test_csv_returns_200(self, csv_client):
+    async def test_csv_returns_200(self, csv_client) -> None:
         resp = await csv_client.get("/api/jobs/csv-job/export/csv")
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_csv_content_type(self, csv_client):
+    async def test_csv_content_type(self, csv_client) -> None:
         resp = await csv_client.get("/api/jobs/csv-job/export/csv")
         assert resp.headers.get("content-type", "").startswith("text/csv")
 
     @pytest.mark.asyncio
-    async def test_csv_has_disposition_header(self, csv_client):
+    async def test_csv_has_disposition_header(self, csv_client) -> None:
         resp = await csv_client.get("/api/jobs/csv-job/export/csv")
         assert "Content-Disposition" in resp.headers
         assert "attachment" in resp.headers["content-disposition"]
 
     @pytest.mark.asyncio
-    async def test_csv_contains_data(self, csv_client):
+    async def test_csv_contains_data(self, csv_client) -> None:
         resp = await csv_client.get("/api/jobs/csv-job/export/csv")
         text = resp.text
         assert "Alice" in text
@@ -170,7 +170,7 @@ class TestCsvExport:
         assert "price" in text
 
     @pytest.mark.asyncio
-    async def test_csv_lists_flattened(self, csv_client):
+    async def test_csv_lists_flattened(self, csv_client) -> None:
         """List values should be joined with comma+space."""
         resp = await csv_client.get("/api/jobs/csv-job/export/csv")
         text = resp.text
@@ -202,17 +202,17 @@ class TestJsonExport:
             yield c
 
     @pytest.mark.asyncio
-    async def test_json_returns_200(self, json_client):
+    async def test_json_returns_200(self, json_client) -> None:
         resp = await json_client.get("/api/jobs/json-job/export/json")
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_json_content_type(self, json_client):
+    async def test_json_content_type(self, json_client) -> None:
         resp = await json_client.get("/api/jobs/json-job/export/json")
         assert "application/json" in resp.headers.get("content-type", "")
 
     @pytest.mark.asyncio
-    async def test_json_content_parses(self, json_client):
+    async def test_json_content_parses(self, json_client) -> None:
         resp = await json_client.get("/api/jobs/json-job/export/json")
         data = json.loads(resp.content)
         assert isinstance(data, list)
@@ -221,7 +221,7 @@ class TestJsonExport:
         assert data[1]["name"] == "Bob"
 
     @pytest.mark.asyncio
-    async def test_json_indented(self, json_client):
+    async def test_json_indented(self, json_client) -> None:
         """JSON should be pretty-printed with indent=2."""
         resp = await json_client.get("/api/jobs/json-job/export/json")
         text = resp.text
@@ -258,17 +258,17 @@ class TestExcelExport:
             yield c
 
     @pytest.mark.asyncio
-    async def test_excel_returns_200(self, excel_client):
+    async def test_excel_returns_200(self, excel_client) -> None:
         resp = await excel_client.get("/api/jobs/xlsx-job/export/excel")
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_excel_content_type(self, excel_client):
+    async def test_excel_content_type(self, excel_client) -> None:
         resp = await excel_client.get("/api/jobs/xlsx-job/export/excel")
         assert "spreadsheetml" in resp.headers.get("content-type", "")
 
     @pytest.mark.asyncio
-    async def test_excel_is_binary(self, excel_client):
+    async def test_excel_is_binary(self, excel_client) -> None:
         resp = await excel_client.get("/api/jobs/xlsx-job/export/excel")
         # Excel files are binary (not plain text)
         assert len(resp.content) > 0
@@ -276,7 +276,7 @@ class TestExcelExport:
         assert resp.content[:2] == b"PK"
 
     @pytest.mark.asyncio
-    async def test_excel_has_disposition(self, excel_client):
+    async def test_excel_has_disposition(self, excel_client) -> None:
         resp = await excel_client.get("/api/jobs/xlsx-job/export/excel")
         assert "Content-Disposition" in resp.headers
 
@@ -308,7 +308,7 @@ class TestExportWithoutSchema:
             yield c
 
     @pytest.mark.asyncio
-    async def test_csv_infers_headers(self, no_schema_client):
+    async def test_csv_infers_headers(self, no_schema_client) -> None:
         resp = await no_schema_client.get("/api/jobs/noschema/export/csv")
         assert resp.status_code == 200
         text = resp.text
@@ -316,7 +316,7 @@ class TestExportWithoutSchema:
         assert "Product A" in text
 
     @pytest.mark.asyncio
-    async def test_json_infers_fields(self, no_schema_client):
+    async def test_json_infers_fields(self, no_schema_client) -> None:
         resp = await no_schema_client.get("/api/jobs/noschema/export/json")
         assert resp.status_code == 200
         data = json.loads(resp.content)
@@ -324,7 +324,7 @@ class TestExportWithoutSchema:
         assert "title" in data[0]
 
     @pytest.mark.asyncio
-    async def test_excel_infers_fields(self, no_schema_client):
+    async def test_excel_infers_fields(self, no_schema_client) -> None:
         """Excel should also handle schema-less export by inferring field names."""
         resp = await no_schema_client.get("/api/jobs/noschema/export/excel")
         assert resp.status_code == 200
@@ -375,7 +375,7 @@ class TestExportResultsOnDisk:
                 yield c
 
     @pytest.mark.asyncio
-    async def test_csv_loads_from_disk(self, disk_client):
+    async def test_csv_loads_from_disk(self, disk_client) -> None:
         resp = await disk_client.get("/api/jobs/disk-job/export/csv")
         assert resp.status_code == 200
         text = resp.text
@@ -383,7 +383,7 @@ class TestExportResultsOnDisk:
         assert "Paris" in text
 
     @pytest.mark.asyncio
-    async def test_json_loads_from_disk(self, disk_client):
+    async def test_json_loads_from_disk(self, disk_client) -> None:
         resp = await disk_client.get("/api/jobs/disk-job/export/json")
         assert resp.status_code == 200
         data = json.loads(resp.content)
@@ -391,7 +391,7 @@ class TestExportResultsOnDisk:
         assert data[0]["city"] == "London"
 
     @pytest.mark.asyncio
-    async def test_excel_loads_from_disk(self, disk_client):
+    async def test_excel_loads_from_disk(self, disk_client) -> None:
         resp = await disk_client.get("/api/jobs/disk-job/export/excel")
         assert resp.status_code == 200
         assert resp.content[:2] == b"PK"
@@ -401,7 +401,7 @@ class TestExportResultsOnDiskExcelSafeLoading:
     """Excel export uses ``load_job_results_from_disk_safe`` for corruption-tolerant loading."""
 
     @pytest.mark.asyncio
-    async def test_excel_uses_safe_loader(self):
+    async def test_excel_uses_safe_loader(self) -> None:
         """Excel should call load_job_results_from_disk_safe, not load_job_results_from_disk."""
         from httpx import ASGITransport, AsyncClient
 
@@ -427,7 +427,7 @@ class TestExportResultsOnDiskExcelSafeLoading:
         assert resp.content[:2] == b"PK"
 
     @pytest.mark.asyncio
-    async def test_excel_handles_corrupt_data_via_safe_loader(self):
+    async def test_excel_handles_corrupt_data_via_safe_loader(self) -> None:
         """With a corruption warning from safe loader, Excel should still produce output."""
         from httpx import ASGITransport, AsyncClient
 
@@ -457,7 +457,7 @@ class TestStreamingExportWithLargeDataset:
     """When results_on_disk is True and dataset spans multiple pages, exports should stream."""
 
     @pytest.mark.asyncio
-    async def test_csv_streams_multiple_pages(self):
+    async def test_csv_streams_multiple_pages(self) -> None:
         """500-row dataset should produce all rows in CSV output."""
         from httpx import ASGITransport, AsyncClient
 
@@ -495,7 +495,7 @@ class TestStreamingExportWithLargeDataset:
         assert lines[-1].strip() == "499"
 
     @pytest.mark.asyncio
-    async def test_json_streams_multiple_pages(self):
+    async def test_json_streams_multiple_pages(self) -> None:
         """500-row dataset should produce all rows in JSON output."""
         from httpx import ASGITransport, AsyncClient
 
@@ -538,7 +538,7 @@ class TestExcelWorksheetCreation:
     """Edge case: Workbook.active returns None."""
 
     @pytest.mark.asyncio
-    async def test_excel_ws_none_returns_500(self):
+    async def test_excel_ws_none_returns_500(self) -> None:
         """When openpyxl's Workbook().active is None, return 500."""
         from unittest.mock import patch as mock_patch
 
@@ -591,7 +591,7 @@ class TestExcelListNoneValues:
             yield c
 
     @pytest.mark.asyncio
-    async def test_excel_with_none_in_lists(self, none_list_client):
+    async def test_excel_with_none_in_lists(self, none_list_client) -> None:
         """None items in list values should not cause errors in Excel export."""
         resp = await none_list_client.get("/api/jobs/none-list-job/export/excel")
         assert resp.status_code == 200
@@ -627,14 +627,14 @@ class TestExportFilename:
             yield c
 
     @pytest.mark.asyncio
-    async def test_csv_filename_contains_job_name(self, name_client):
+    async def test_csv_filename_contains_job_name(self, name_client) -> None:
         resp = await name_client.get("/api/jobs/n1/export/csv")
         disp = resp.headers.get("content-disposition", "")
         assert "My_Cool_Job" in disp
         assert ".csv" in disp
 
     @pytest.mark.asyncio
-    async def test_json_filename_clean(self, name_client):
+    async def test_json_filename_clean(self, name_client) -> None:
         resp = await name_client.get("/api/jobs/n2/export/json")
         disp = resp.headers.get("content-disposition", "")
         # Special chars should be sanitized

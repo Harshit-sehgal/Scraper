@@ -21,7 +21,7 @@ def _app_path(rel_path: str) -> str:
     return rel_path
 
 
-def test_lifecycle_hooks_exist():
+def test_lifecycle_hooks_exist() -> None:
     """Every method called in the pipeline must exist on SemanticWorldState."""
     with open(_app_path("app/semantic_pipeline.py")) as f:
         pipeline = f.read()
@@ -57,7 +57,7 @@ def test_lifecycle_hooks_exist():
     )
 
 
-def test_no_orphan_methods():
+def test_no_orphan_methods() -> None:
     """All SemanticWorldState public methods should be reachable from the pipeline or scheduler."""
     methods = set()
     ws_dir = os.path.dirname(_app_path("app/semantic_world_state/core.py"))
@@ -170,7 +170,7 @@ def test_no_orphan_methods():
     ), f"Uncalled public methods on SemanticWorldState: {uncalled}. These may be dead code or indicate incomplete cleanup."
 
 
-def test_event_subscribers_are_defined():
+def test_event_subscribers_are_defined() -> None:
     """Every event type with subscribers must be dispatched somewhere."""
     with open(_app_path("app/semantic_events.py")) as f:
         events_src = f.read()
@@ -208,7 +208,7 @@ def test_event_subscribers_are_defined():
     assert not not_dispatched, f"Subscribed but never dispatched: {not_dispatched}. Subscribers will never fire."
 
 
-def test_no_stale_pyc():
+def test_no_stale_pyc() -> None:
     """No .pyc files without corresponding .py source."""
     app_dir = _app_path("app")
     pyc_files = []
@@ -226,7 +226,7 @@ def test_no_stale_pyc():
     assert not pyc_files, f"Stale .pyc files: {pyc_files}. These will be loaded instead of current source."
 
 
-def test_no_dead_imports():
+def test_no_dead_imports() -> None:
     """Core modules should not import symbols that don't exist."""
     core_modules = [
         "semantic_world_state",
@@ -278,7 +278,7 @@ def test_no_dead_imports():
     assert isinstance(imports, dict), "imports should be a dict"
 
 
-def test_coupling_coefficient_exists():
+def test_coupling_coefficient_exists() -> None:
     """COUPLING_COEFFICIENT and FREE_ENERGY_CLAMP must be defined in field_laws.
 
     These constants are required for the thermodynamic free-energy-gradient-driven
@@ -294,7 +294,7 @@ def test_coupling_coefficient_exists():
     assert 0.0 < fl.FREE_ENERGY_CLAMP <= 10.0, "FREE_ENERGY_CLAMP must be in (0, 10]"
 
 
-def test_energy_conservation_tracking():
+def test_energy_conservation_tracking() -> None:
     """EnergyState must have energy_balance property and record_energy_flow method.
 
     These are required for energy conservation enforcement and tracking.

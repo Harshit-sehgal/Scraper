@@ -2,7 +2,7 @@ from app.instability_api import get_immune_system
 from app.semantic_world_state import get_world_state
 
 
-def test_source_quarantine():
+def test_source_quarantine() -> None:
     ws = get_world_state()
     ws.clear()
     _ = get_immune_system(ws=ws)
@@ -16,7 +16,7 @@ def test_source_quarantine():
     # ... Wait, observe_field_perturbation updates exclusions based on ROLE_EXCLUSIVITY
 
 
-def test_shielding_high_integrity_roles():
+def test_shielding_high_integrity_roles() -> None:
     ws = get_world_state()
     ws.clear()
     immune = get_immune_system(ws=ws)
@@ -33,7 +33,7 @@ def test_shielding_high_integrity_roles():
     assert allowed is False
 
 
-def test_quarantine_block():
+def test_quarantine_block() -> None:
     ws = get_world_state()
     ws.clear()
     immune = get_immune_system(ws=ws)
@@ -46,7 +46,7 @@ def test_quarantine_block():
     assert allowed is False
 
 
-def test_adversarial_pressure_quarantine():
+def test_adversarial_pressure_quarantine() -> None:
     ws = get_world_state()
     ws.clear()
     immune = get_immune_system(ws=ws)
@@ -64,7 +64,7 @@ def test_adversarial_pressure_quarantine():
     assert immune.get_trust(source) == 0.3  # 0.5 - 0.2
 
 
-def test_immune_response_cascade():
+def test_immune_response_cascade() -> None:
     ws = get_world_state()
     ws.clear()
 

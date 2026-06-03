@@ -48,7 +48,7 @@ def get_world_state(*args, **kwargs):
     return app.semantic_world_state.get_world_state(*args, **kwargs)
 
 
-def test_manifold_transfer():
+def test_manifold_transfer() -> None:
     """New roles should inherit interpretations from stable similar roles."""
     ws = get_world_state()
     ws.clear()
@@ -68,7 +68,7 @@ def test_manifold_transfer():
     assert ws._energy.get_schema_instability("price_val") == 0.05
 
 
-def test_topological_dreaming():
+def test_topological_dreaming() -> None:
     """Dreaming should reduce field entropy and energy."""
     ws = get_world_state()
     ws.clear()
@@ -91,7 +91,7 @@ def test_topological_dreaming():
     assert ws.metrics.global_entropy < initial_entropy
 
 
-def test_re_align_communities():
+def test_re_align_communities() -> None:
     """Roles in a community should pull each other toward a manifold consensus."""
     ws = get_world_state()
     ws.clear()
@@ -126,7 +126,7 @@ def test_re_align_communities():
     assert new_a[0] < 1.0
 
 
-def test_induce_constraints():
+def test_induce_constraints() -> None:
     """System should learn exclusions from persistent conflict basins."""
     ws = get_world_state()
     ws.clear()
@@ -147,7 +147,7 @@ def test_induce_constraints():
     assert ws.learned_exclusions.get(key, 0.0) > 0.0
 
 
-def test_autonomous_role_spawning():
+def test_autonomous_role_spawning() -> None:
     """System should hypothesize new roles from recurring unidentified basins."""
     ws = get_world_state()
     ws.clear()
@@ -177,7 +177,7 @@ def test_autonomous_role_spawning():
     assert has_hypo
 
 
-def test_manifold_merge_sovereignty():
+def test_manifold_merge_sovereignty() -> None:
     """System should be able to merge knowledge from external sources."""
     ws = get_world_state()
     ws.clear()
@@ -201,7 +201,7 @@ def test_manifold_merge_sovereignty():
     assert ws.learned_exclusions[("destination", "origin")] == 0.8
 
 
-def test_exclusion_pruning_via_cohesion():
+def test_exclusion_pruning_via_cohesion() -> None:
     """Exclusions should decay faster if roles have high mutual cohesion."""
     ws = get_world_state()
     ws.clear()
@@ -221,7 +221,7 @@ def test_exclusion_pruning_via_cohesion():
     assert ws.learned_exclusions[key] < 0.8
 
 
-def test_manifold_re_seeding():
+def test_manifold_re_seeding() -> None:
     """Highly unstable roles should be re-seeded from community stable members."""
     ws = get_world_state()
     ws.clear()
@@ -251,7 +251,7 @@ def test_manifold_re_seeding():
     assert ws._energy.get_schema_instability("role_b") == 0.4
 
 
-def test_topology_self_healing():
+def test_topology_self_healing() -> None:
     """Contradictory laws and exclusions should be thermodynamicly resolved."""
     ws = get_world_state()
     ws.clear()

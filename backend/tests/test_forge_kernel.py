@@ -27,7 +27,7 @@ from forge_kernel.services.job_service import JobService
 # ─────────────────────────────────────────────────────────────────────
 
 
-def test_settings_groups():
+def test_settings_groups() -> None:
     browser = BrowserSettings()
     assert browser.PLAYWRIGHT_TIMEOUT == 45000
     assert browser.PLAYWRIGHT_HEADLESS is True
@@ -57,7 +57,7 @@ def test_settings_groups():
     assert llm.LLM_ENABLE_PUBLIC_FALLBACKS is False
 
 
-def test_kernel_settings_aggregate():
+def test_kernel_settings_aggregate() -> None:
     settings = KernelSettings()
     assert isinstance(settings.browser, BrowserSettings)
     assert isinstance(settings.http, HttpSettings)
@@ -73,7 +73,7 @@ def test_kernel_settings_aggregate():
 # ─────────────────────────────────────────────────────────────────────
 
 
-def test_schema_field_validation():
+def test_schema_field_validation() -> None:
     # Valid field
     field = SchemaField(name="company_name", field_type=FieldType.STRING, description="Name")
     assert field.name == "company_name"
@@ -91,7 +91,7 @@ def test_schema_field_validation():
         SchemaField(name="source_url", field_type=FieldType.STRING)
 
 
-def test_job_model():
+def test_job_model() -> None:
     job = Job(
         name="test_job",
         mode=ScrapeMode.MANUAL,
@@ -109,7 +109,7 @@ def test_job_model():
 # ─────────────────────────────────────────────────────────────────────
 
 
-def test_job_service_lifecycle():
+def test_job_service_lifecycle() -> None:
     jobs_store: dict = {}
     recycle_bin_store: dict = {}
     svc = JobService(jobs_store=jobs_store, recycle_bin_store=recycle_bin_store)
@@ -165,7 +165,7 @@ def api_client():
     return TestClient(app)
 
 
-def test_health_ready_endpoints(api_client, monkeypatch):
+def test_health_ready_endpoints(api_client, monkeypatch) -> None:
     # Liveness
     resp = api_client.get("/health")
     assert resp.status_code == 200
@@ -188,7 +188,7 @@ def test_health_ready_endpoints(api_client, monkeypatch):
     persistence.reset_repository()
 
 
-def test_jobs_api_lifecycle(api_client, monkeypatch):
+def test_jobs_api_lifecycle(api_client, monkeypatch) -> None:
     from forge_kernel.config import settings
 
     monkeypatch.setattr(settings.security, "ADMIN_API_KEY", "admin-key")

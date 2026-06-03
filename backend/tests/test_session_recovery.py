@@ -64,7 +64,7 @@ FRESH_RESULTS_PAGE = """
 class TestSessionExpiredRedirectDetection:
     """Verify that session-expired redirects are correctly classified."""
 
-    def test_deep_path_to_homepage_is_session_expired(self):
+    def test_deep_path_to_homepage_is_session_expired(self) -> None:
         """A deep URL with session token redirecting to homepage = session expired."""
         result = _detect_redirect(
             "https://www.example.com/search/results/abc123session456",
@@ -74,7 +74,7 @@ class TestSessionExpiredRedirectDetection:
         assert result["redirect_type"] == "session_expired"
         assert "expired" in result["message"].lower()
 
-    def test_deep_path_to_shallow_path_is_session_expired(self):
+    def test_deep_path_to_shallow_path_is_session_expired(self) -> None:
         """A deep search URL redirecting to a shallow path = session expired."""
         result = _detect_redirect(
             "https://example.com/flights/search/abc123def",
@@ -83,7 +83,7 @@ class TestSessionExpiredRedirectDetection:
         assert result["redirected"] is True
         assert result["redirect_type"] == "session_expired"
 
-    def test_stable_url_no_redirect(self):
+    def test_stable_url_no_redirect(self) -> None:
         """A URL that doesn't redirect should report no redirect."""
         result = _detect_redirect(
             "https://example.com/flights/LAX-LHR",
@@ -96,19 +96,19 @@ class TestSessionExpiredRedirectDetection:
 class TestSearchFormDetection:
     """Verify that search forms are detected on landing pages."""
 
-    def test_detects_flight_search_form(self):
+    def test_detects_flight_search_form(self) -> None:
         form = _detect_search_form(LANDING_PAGE_WITH_SEARCH_FORM)
         assert form["detected"] is True
         assert form["action"] == "/search"
         assert form["method"] == "POST"
         assert len(form["search_fields"]) >= 3  # from, to, departdate at minimum
 
-    def test_no_form_on_empty_page(self):
+    def test_no_form_on_empty_page(self) -> None:
         html = "<html><body><p>No form here</p></body></html>"
         form = _detect_search_form(html)
         assert form["detected"] is False
 
-    def test_form_fields_have_names(self):
+    def test_form_fields_have_names(self) -> None:
         form = _detect_search_form(LANDING_PAGE_WITH_SEARCH_FORM)
         field_names = [f["name"] for f in form["fields"]]
         assert "from" in field_names
@@ -118,7 +118,7 @@ class TestSearchFormDetection:
 class TestSearchParamMapping:
     """Verify that user-provided search params map to form fields."""
 
-    def test_maps_origin_destination(self):
+    def test_maps_origin_destination(self) -> None:
         form = _detect_search_form(LANDING_PAGE_WITH_SEARCH_FORM)
         mapped = _map_search_params_to_fields(
             {"origin": "NYC", "destination": "LHR"},
@@ -131,7 +131,7 @@ class TestSearchParamMapping:
         assert "to" in mapped
         assert mapped["to"] == "LHR"
 
-    def test_maps_departure_date(self):
+    def test_maps_departure_date(self) -> None:
         form = _detect_search_form(LANDING_PAGE_WITH_SEARCH_FORM)
         mapped = _map_search_params_to_fields(
             {"departure_date": "2026-06-15"},
@@ -141,7 +141,7 @@ class TestSearchParamMapping:
         assert "departdate" in mapped
         assert mapped["departdate"] == "2026-06-15"
 
-    def test_empty_params_returns_empty(self):
+    def test_empty_params_returns_empty(self) -> None:
         form = _detect_search_form(LANDING_PAGE_WITH_SEARCH_FORM)
         mapped = _map_search_params_to_fields({}, form["fields"])
         assert mapped == {}
@@ -157,7 +157,7 @@ class TestSessionRecoveryMetadata:
     """
 
     @pytest.mark.asyncio
-    async def test_recovery_updates_redirect_info(self):
+    async def test_recovery_updates_redirect_info(self) -> None:
         """After successful form recovery, redirect_info must say recovery
         succeeded, NOT that the session is still expired.
 
@@ -280,7 +280,7 @@ class TestSessionRecoveryMetadata:
             assert result["redirect_info"]["final_url"] != stale_url
 
     @pytest.mark.asyncio
-    async def test_no_recovery_without_search_params(self):
+    async def test_no_recovery_without_search_params(self) -> None:
         """When no search_params are provided, recovery should not be attempted
         even if a redirect and search form are detected."""
         stale_url = "https://www.example.com/search/results/abc123session456"

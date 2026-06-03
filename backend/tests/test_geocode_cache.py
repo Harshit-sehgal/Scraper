@@ -27,12 +27,12 @@ def clean_cache_env():
             pass
 
 
-def test_geocode_cache_initialization():
+def test_geocode_cache_initialization() -> None:
     GeocodeCache()
     assert os.path.exists(CACHE_DB_PATH)
 
 
-def test_geocode_cache_set_and_get():
+def test_geocode_cache_set_and_get() -> None:
     cache = GeocodeCache()
 
     # Try a query not in the cache (should miss)
@@ -53,7 +53,7 @@ def test_geocode_cache_set_and_get():
     assert cache.get_hit_rate() == 0.5
 
 
-def test_negative_caching():
+def test_negative_caching() -> None:
     cache = GeocodeCache()
 
     # Query negative entry

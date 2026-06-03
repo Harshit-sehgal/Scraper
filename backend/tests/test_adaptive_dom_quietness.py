@@ -8,7 +8,7 @@ import pytest
 from app.telemetry_state import get_telemetry_state
 
 
-def test_default_stabilization_threshold():
+def test_default_stabilization_threshold() -> None:
     telemetry = get_telemetry_state()
     telemetry.clear()
 
@@ -17,7 +17,7 @@ def test_default_stabilization_threshold():
     assert val == 1500.0
 
 
-def test_adaptive_stabilization_learning():
+def test_adaptive_stabilization_learning() -> None:
     telemetry = get_telemetry_state()
     telemetry.clear()
 
@@ -37,7 +37,7 @@ def test_adaptive_stabilization_learning():
     assert val_slow == pytest.approx(4000.0)
 
 
-def test_bounding_rules():
+def test_bounding_rules() -> None:
     telemetry = get_telemetry_state()
     telemetry.clear()
 

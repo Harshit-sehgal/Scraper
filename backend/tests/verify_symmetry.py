@@ -37,7 +37,7 @@ def verify_symmetry(subsystem_name, state_obj):
     return True
 
 
-def test_all_subsystems_symmetry():
+def test_all_subsystems_symmetry() -> None:
     ws = SemanticWorldState()
 
     # 1. Populate with some dummy data to ensure we aren't just comparing empty dicts

@@ -9,7 +9,7 @@ from app.instability_state import InstabilityState
 from app.topology_state import TopologyState
 
 
-def test_independent_topology():
+def test_independent_topology() -> None:
     """TopologyState works entirely independently."""
     ts = TopologyState()
     r = ts.add(["origin", "destination"], "LAX", instability=0.5)
@@ -25,7 +25,7 @@ def test_independent_topology():
     assert ts.region_count() == 0
 
 
-def test_independent_energy():
+def test_independent_energy() -> None:
     """EnergyState works entirely independently."""
     es = EnergyState()
     assert es.global_energy == 5.0
@@ -49,7 +49,7 @@ def test_independent_energy():
     assert es.global_energy == 5.0
 
 
-def test_independent_instability():
+def test_independent_instability() -> None:
     """InstabilityState works entirely independently."""
     ist = InstabilityState()
     ist.add_exclusion("origin", "destination", 0.8)
@@ -63,7 +63,7 @@ def test_independent_instability():
     assert ist.exclusion_count() == 0
 
 
-def test_combined_ownership():
+def test_combined_ownership() -> None:
     """Three state objects together form a complete management layer."""
     ts = TopologyState()
     es = EnergyState()
@@ -87,7 +87,7 @@ def test_combined_ownership():
     assert ist.exclusion_count() == 1
 
 
-def test_owner_encapsulation():
+def test_owner_encapsulation() -> None:
     """No external code should be able to bypass the state objects' controlled interfaces."""
     ts = TopologyState()
     es = EnergyState()

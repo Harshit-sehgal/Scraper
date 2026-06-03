@@ -43,7 +43,7 @@ def mock_dns_resolution(monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", dummy_getaddrinfo)
 
 
-def test_nginx_blocks_metrics_and_docs():
+def test_nginx_blocks_metrics_and_docs() -> None:
     """Verify that operational metrics and FastAPI docs are explicitly returned as 404 in public Nginx."""
     nginx_path = Path(__file__).resolve().parents[2] / "nginx.conf"
     assert nginx_path.exists()
@@ -57,7 +57,7 @@ def test_nginx_blocks_metrics_and_docs():
     assert "return 404;" in content
 
 
-def test_production_prometheus_mounts_alert_rules():
+def test_production_prometheus_mounts_alert_rules() -> None:
     """Production compose must mount the same alert rule file Prometheus loads."""
     root = Path(__file__).resolve().parents[2]
     compose = (root / "docker-compose.prod.yml").read_text()
@@ -70,7 +70,7 @@ def test_production_prometheus_mounts_alert_rules():
     assert "__DATAFORGE_METRICS_TOKEN__" in prometheus
 
 
-def test_prometheus_does_not_reference_undeployed_alertmanager():
+def test_prometheus_does_not_reference_undeployed_alertmanager() -> None:
     """Prometheus should not point at Alertmanager unless compose deploys it."""
     root = Path(__file__).resolve().parents[2]
     compose = (root / "docker-compose.prod.yml").read_text()
@@ -82,7 +82,7 @@ def test_prometheus_does_not_reference_undeployed_alertmanager():
 
 
 @pytest.mark.skip(reason="Promtool config validation removed from simplified CI to keep it lightweight.")
-def test_ci_prometheus_check_matches_production_mount_layout():
+def test_ci_prometheus_check_matches_production_mount_layout() -> None:
     """CI promtool validation should use the same selected-file mounts as prod."""
     workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "ci.yml"
     content = workflow.read_text()
@@ -92,7 +92,7 @@ def test_ci_prometheus_check_matches_production_mount_layout():
     assert "$PWD:/etc/prometheus:ro" not in content
 
 
-def test_ci_does_not_install_optional_g4f_by_default():
+def test_ci_does_not_install_optional_g4f_by_default() -> None:
     """Optional LLM providers should not make CI differ from production installs."""
     workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "ci.yml"
     content = workflow.read_text()
@@ -100,7 +100,7 @@ def test_ci_does_not_install_optional_g4f_by_default():
     assert "pip install g4f" not in content
 
 
-def test_start_script_checks_runtime_scraper_dependencies():
+def test_start_script_checks_runtime_scraper_dependencies() -> None:
     """The dev startup script should check scraper/discovery dependencies, not just FastAPI."""
     script = Path(__file__).resolve().parents[2] / "scripts" / "start.sh"
     content = script.read_text()
@@ -110,7 +110,7 @@ def test_start_script_checks_runtime_scraper_dependencies():
     assert "python -m playwright install chromium" in content
 
 
-def test_clear_terminal_jobs_preserves_result_files(client, tmp_path, monkeypatch):
+def test_clear_terminal_jobs_preserves_result_files(client, tmp_path, monkeypatch) -> None:
     """Verify that moving terminal jobs to the recycle bin does NOT delete their result files."""
     # Mock results directory to use tmp_path
     results_dir = tmp_path / "results"
@@ -153,7 +153,7 @@ def test_clear_terminal_jobs_preserves_result_files(client, tmp_path, monkeypatc
     assert result_file.exists(), "The result file was deleted, but it should have been preserved!"
 
 
-def test_backfill_metadata_only_saves_single_job(client, monkeypatch):
+def test_backfill_metadata_only_saves_single_job(client, monkeypatch) -> None:
     """Verify that backfill-metadata endpoint only saves the single job updated and doesn't call a global save."""
     saved_jobs = []
 
@@ -202,7 +202,7 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch):
     assert not persist_called, "Global persist_state was called, bringing back concurrency risk!"
 
 
-def test_create_job_enqueue_failure_cleanup(client, monkeypatch):
+def test_create_job_enqueue_failure_cleanup(client, monkeypatch) -> None:
     """Verify that if enqueue fails in production, the job is removed from memory and repository (not left orphaned)."""
     from app.config import settings
 
@@ -232,7 +232,7 @@ def test_create_job_enqueue_failure_cleanup(client, monkeypatch):
     assert len(main_mod.jobs_store) == 0
 
 
-def test_auto_discovery_url_filtering(client, monkeypatch):
+def test_auto_discovery_url_filtering(client, monkeypatch) -> None:
     """Verify that auto-discovered URLs are filtered against SSRF protections in both API and Job runner contexts."""
     from app.config import settings
 
@@ -265,7 +265,7 @@ def test_auto_discovery_url_filtering(client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_search_form_recovery_ssrf_blocking(monkeypatch):
+async def test_search_form_recovery_ssrf_blocking(monkeypatch) -> None:
     """Verify that search form recovery action and redirect target URLs are checked against SSRF."""
     from app.selector_discovery import _try_form_search_recovery
 
@@ -288,7 +288,7 @@ async def test_search_form_recovery_ssrf_blocking(monkeypatch):
     assert "failed security check" in res["error"]
 
 
-def test_backend_cors_origins_enforcement(client, monkeypatch):
+def test_backend_cors_origins_enforcement(client, monkeypatch) -> None:
     """Verify that backend CORS rejects/allows origins based on settings.CORS_ORIGINS."""
     from app.config import settings
 
@@ -333,7 +333,7 @@ def test_backend_cors_origins_enforcement(client, monkeypatch):
     assert resp.headers.get("access-control-allow-origin") is None
 
 
-def test_body_size_limit_normal_payload(client, monkeypatch):
+def test_body_size_limit_normal_payload(client, monkeypatch) -> None:
     """Verify that a normal payload under 5MB passes the body-size limit middleware."""
     from app.config import settings
 
@@ -347,7 +347,7 @@ def test_body_size_limit_normal_payload(client, monkeypatch):
     assert resp.status_code != 413
 
 
-def test_body_size_limit_oversized_payload(client, monkeypatch):
+def test_body_size_limit_oversized_payload(client, monkeypatch) -> None:
     """Verify that an oversized payload (> 5MB) with Content-Length is rejected with 413."""
     from app.config import settings
 
@@ -363,7 +363,7 @@ def test_body_size_limit_oversized_payload(client, monkeypatch):
     assert "too large" in resp.json()["detail"]
 
 
-def test_body_size_limit_chunked_normal(client, monkeypatch):
+def test_body_size_limit_chunked_normal(client, monkeypatch) -> None:
     """Verify that chunked/streaming requests under 5MB are accepted."""
     from app.config import settings
 
@@ -380,7 +380,7 @@ def test_body_size_limit_chunked_normal(client, monkeypatch):
     assert resp.status_code != 413
 
 
-def test_body_size_limit_chunked_oversized(client, monkeypatch):
+def test_body_size_limit_chunked_oversized(client, monkeypatch) -> None:
     """Verify that chunked/streaming requests without Content-Length exceeding 5MB are rejected with 413."""
     from app.config import settings
 

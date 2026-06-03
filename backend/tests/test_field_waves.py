@@ -27,7 +27,7 @@ def clean_state():
 
 
 @pytest.mark.asyncio
-async def test_field_wave_propagation():
+async def test_field_wave_propagation() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -75,7 +75,7 @@ async def test_field_wave_propagation():
 
 
 @pytest.mark.asyncio
-async def test_wave_causal_chain():
+async def test_wave_causal_chain() -> None:
     ws = get_world_state()
     ws.clear()
 

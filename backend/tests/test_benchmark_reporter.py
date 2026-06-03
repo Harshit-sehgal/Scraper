@@ -30,12 +30,12 @@ def clean_benchmark_env():
                 pass
 
 
-def test_db_initialization():
+def test_db_initialization() -> None:
     BenchmarkReporter()
     assert os.path.exists(DB_PATH)
 
 
-def test_record_run():
+def test_record_run() -> None:
     reporter = BenchmarkReporter()
     run = BenchmarkRun(
         run_id="run-1",
@@ -56,7 +56,7 @@ def test_record_run():
     assert sorted(history[0].failed_selectors) == sorted(["#price", ".rating"])
 
 
-def test_regression_alert_trigger():
+def test_regression_alert_trigger() -> None:
     reporter = BenchmarkReporter()
 
     # Record strong historic runs
@@ -88,7 +88,7 @@ def test_regression_alert_trigger():
     assert comparison["precision_drift"] < -0.05
 
 
-def test_dashboard_generation():
+def test_dashboard_generation() -> None:
     reporter = BenchmarkReporter()
     run = BenchmarkRun(
         run_id="dashboard-run", timestamp=time.time(), precision=0.92, recall=0.88, fallback_rate=0.08, latency_ms=950.0

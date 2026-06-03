@@ -20,7 +20,7 @@ def ws():
     return state
 
 
-def test_mvcc_conflict_detection(ws):
+def test_mvcc_conflict_detection(ws) -> None:
     """Verify that concurrent modifications to the same region trigger ConflictError."""
 
     # 1. Create a region
@@ -74,7 +74,7 @@ def test_mvcc_conflict_detection(ws):
     assert "A_SUCCESS" not in results
 
 
-def test_version_incrementing(ws):
+def test_version_incrementing(ws) -> None:
     """Verify that every commit increments region versions."""
     with ws.transaction("tx1"):
         r = ws._topology.add(["r1"], "t1", instability=0.5)

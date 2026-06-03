@@ -48,7 +48,7 @@ def clean_router_imports():
         sys.modules.pop(name, None)
 
 
-def test_scraper_router_does_not_load_research_modules(clean_router_imports):
+def test_scraper_router_does_not_load_research_modules(clean_router_imports) -> None:
     """Importing app.routers.scraper must not pull in any research module."""
     importlib.import_module("app.routers.scraper")
 
@@ -59,7 +59,7 @@ def test_scraper_router_does_not_load_research_modules(clean_router_imports):
     )
 
 
-def test_operator_router_does_not_load_research_modules(clean_router_imports):
+def test_operator_router_does_not_load_research_modules(clean_router_imports) -> None:
     """Importing app.routers.operator must not pull in any research module."""
     importlib.import_module("app.routers.operator")
 
@@ -70,7 +70,7 @@ def test_operator_router_does_not_load_research_modules(clean_router_imports):
     )
 
 
-def test_both_routers_clean_together(clean_router_imports):
+def test_both_routers_clean_together(clean_router_imports) -> None:
     """Importing both routers in sequence must keep research modules absent."""
     importlib.import_module("app.routers.operator")
     importlib.import_module("app.routers.scraper")
@@ -80,7 +80,7 @@ def test_both_routers_clean_together(clean_router_imports):
 
 
 @pytest.mark.parametrize("research_module", RESEARCH_MODULES_USED_BY_ROUTERS)
-def test_router_endpoint_imports_trigger_lazy_load(research_module, clean_router_imports):
+def test_router_endpoint_imports_trigger_lazy_load(research_module, clean_router_imports) -> None:
     """Sanity check: the research modules themselves can be imported.
 
     This isn't a functional test of the endpoints (which need much

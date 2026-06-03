@@ -55,7 +55,7 @@ def sample_html() -> str:
 class TestCaptureCriteria:
     """Verify the capture criteria work correctly."""
 
-    def test_captures_empty_results_with_high_confidence(self, capture_instance, sample_html):
+    def test_captures_empty_results_with_high_confidence(self, capture_instance, sample_html) -> None:
         """Captures when extraction returned 0 records with high confidence."""
         entry = capture_instance.maybe_capture(
             url="https://example.com/page",
@@ -69,7 +69,7 @@ class TestCaptureCriteria:
         assert entry.failure_confidence == 0.85
         assert entry.html_size == len(sample_html)
 
-    def test_skips_low_confidence_with_results(self, capture_instance, sample_html):
+    def test_skips_low_confidence_with_results(self, capture_instance, sample_html) -> None:
         """Skips when extraction returned records and confidence is below threshold."""
         entry = capture_instance.maybe_capture(
             url="https://example.com/page",
@@ -80,7 +80,7 @@ class TestCaptureCriteria:
         )
         assert entry is None
 
-    def test_skips_empty_html(self, capture_instance):
+    def test_skips_empty_html(self, capture_instance) -> None:
         """Skips when HTML is None or too short."""
         entry = capture_instance.maybe_capture(
             url="https://example.com/page",
@@ -100,7 +100,7 @@ class TestCaptureCriteria:
         )
         assert entry is None
 
-    def test_skips_short_html(self, capture_instance):
+    def test_skips_short_html(self, capture_instance) -> None:
         """Skips when HTML is below min_html_length."""
         entry = capture_instance.maybe_capture(
             url="https://example.com/page",
@@ -111,7 +111,7 @@ class TestCaptureCriteria:
         )
         assert entry is None
 
-    def test_force_capture_bypasses_criteria(self, capture_instance):
+    def test_force_capture_bypasses_criteria(self, capture_instance) -> None:
         """force=True captures regardless of criteria."""
         entry = capture_instance.maybe_capture(
             url="https://example.com/page",
@@ -124,7 +124,7 @@ class TestCaptureCriteria:
         assert entry is not None
         assert entry.failure_category == "low_quality"
 
-    def test_captures_with_schema_fields(self, capture_instance, sample_html):
+    def test_captures_with_schema_fields(self, capture_instance, sample_html) -> None:
         """Captures with schema field metadata."""
         entry = capture_instance.maybe_capture(
             url="https://example.com/data",
@@ -138,7 +138,7 @@ class TestCaptureCriteria:
         assert "company_name" in entry.schema_fields
         assert len(entry.schema_fields) == 3
 
-    def test_captures_with_telemetry(self, capture_instance, sample_html):
+    def test_captures_with_telemetry(self, capture_instance, sample_html) -> None:
         """Captures with telemetry snapshot."""
         telemetry = {
             "fetch_method": "playwright",
@@ -158,7 +158,7 @@ class TestCaptureCriteria:
         assert entry is not None
         assert entry.telemetry_snapshot["anti_bot_score"] == 0.8
 
-    def test_records_count_zero_always_captures_with_confidence(self, capture_instance, sample_html):
+    def test_records_count_zero_always_captures_with_confidence(self, capture_instance, sample_html) -> None:
         """Zero records with sufficient confidence always captures."""
         entry = capture_instance.maybe_capture(
             url="https://example.com/no-data",
@@ -173,7 +173,7 @@ class TestCaptureCriteria:
 class TestDeduplication:
     """Verify duplicate detection works."""
 
-    def test_duplicate_content_skipped(self, capture_instance, sample_html):
+    def test_duplicate_content_skipped(self, capture_instance, sample_html) -> None:
         """Same HTML content hash is not captured twice."""
         entry1 = capture_instance.maybe_capture(
             url="https://example.com/page1",
@@ -192,7 +192,7 @@ class TestDeduplication:
         assert entry1 is not None
         assert entry2 is None  # Same content hash, should be skipped
 
-    def test_different_content_captured(self, capture_instance):
+    def test_different_content_captured(self, capture_instance) -> None:
         """Different HTML content generates different hashes."""
         entry1 = capture_instance.maybe_capture(
             url="https://example.com/page1",
@@ -216,7 +216,7 @@ class TestDeduplication:
 class TestFixtureCreation:
     """Verify fixture files are created correctly."""
 
-    def test_fixture_file_created(self, capture_instance, tmp_path):
+    def test_fixture_file_created(self, capture_instance, tmp_path) -> None:
         """Captured HTML is saved as a fixture file."""
         html = "<html><body>Fixture content here</body></html>"
         entry = capture_instance.maybe_capture(
@@ -231,7 +231,7 @@ class TestFixtureCreation:
         assert fixture_path.exists()
         assert fixture_path.read_text(encoding="utf-8") == html
 
-    def test_fixture_not_created_when_auto_archive_off(self, tmp_path):
+    def test_fixture_not_created_when_auto_archive_off(self, tmp_path) -> None:
         """auto_archive=False skips fixture file creation."""
         capture = RegressionCapture(
             fixtures_dir=str(tmp_path / "fixtures"),
@@ -255,7 +255,7 @@ class TestFixtureCreation:
 class TestRegistryPersistence:
     """Verify the registry saves and loads correctly."""
 
-    def test_registry_saved_to_disk(self, capture_instance, tmp_path, sample_html):
+    def test_registry_saved_to_disk(self, capture_instance, tmp_path, sample_html) -> None:
         """After capture, registry file exists with correct data."""
         capture_instance.maybe_capture(
             url="https://example.com/persist",
@@ -270,7 +270,7 @@ class TestRegistryPersistence:
         assert data["total_captured"] == 1
         assert len(data["entries"]) == 1
 
-    def test_registry_loads_from_disk(self, tmp_path):
+    def test_registry_loads_from_disk(self, tmp_path) -> None:
         """Captures survive a fresh RegressionCapture instance."""
         fixtures_dir = tmp_path / "fixtures"
         registry_path = tmp_path / "registry.json"
@@ -299,7 +299,7 @@ class TestRegistryPersistence:
         assert len(registry.entries) == 1
         assert registry.entries[0].failure_category == "hydration_failure"
 
-    def test_empty_registry_on_no_file(self, tmp_path):
+    def test_empty_registry_on_no_file(self, tmp_path) -> None:
         """Capturing with non-existent registry path starts fresh."""
         capture = RegressionCapture(
             fixtures_dir=str(tmp_path / "fixtures"),
@@ -309,7 +309,7 @@ class TestRegistryPersistence:
         assert registry.total_captured == 0
         assert len(registry.entries) == 0
 
-    def test_corrupted_registry_handled_gracefully(self, tmp_path):
+    def test_corrupted_registry_handled_gracefully(self, tmp_path) -> None:
         """Corrupted registry JSON falls back to empty registry."""
         registry_path = tmp_path / "registry.json"
         registry_path.write_text("corrupted json { bad data", encoding="utf-8")
@@ -325,7 +325,7 @@ class TestRegistryPersistence:
 class TestStatistics:
     """Verify statistics and coverage tracking."""
 
-    def test_statistics_after_multiple_captures(self, capture_instance):
+    def test_statistics_after_multiple_captures(self, capture_instance) -> None:
         """Statistics reflect all captures correctly."""
         entries_data = [
             ("https://example.com/a", "<html><body>A</body></html>", "anti_bot_block"),
@@ -352,7 +352,7 @@ class TestStatistics:
         # example.com should have 3 captures
         assert stats["domain_coverage"]["example.com"] == 3
 
-    def test_category_coverage(self, capture_instance):
+    def test_category_coverage(self, capture_instance) -> None:
         """Category coverage is tracked correctly."""
         categories = ["anti_bot_block", "anti_bot_block", "hydration_failure", "empty_page"]
         for i, cat in enumerate(categories):
@@ -373,7 +373,7 @@ class TestStatistics:
 class TestReplayTestGeneration:
     """Verify replay test generation."""
 
-    def test_generate_replay_test(self, capture_instance, sample_html, tmp_path):
+    def test_generate_replay_test(self, capture_instance, sample_html, tmp_path) -> None:
         """Replay test is generated for a captured regression."""
         entry = capture_instance.maybe_capture(
             url="https://example.com/replay",
@@ -396,12 +396,12 @@ class TestReplayTestGeneration:
         registry = capture_instance.get_registry()
         assert registry.total_with_replay_tests == 1
 
-    def test_generate_replay_test_missing_entry(self, capture_instance):
+    def test_generate_replay_test_missing_entry(self, capture_instance) -> None:
         """Returns None for non-existent entry ID."""
         result = capture_instance.generate_replay_test("nonexistent_id")
         assert result is None
 
-    def test_generate_replay_test_missing_fixture(self, capture_instance):
+    def test_generate_replay_test_missing_fixture(self, capture_instance) -> None:
         """Returns None if fixture file was deleted."""
         entry = capture_instance.maybe_capture(
             url="https://example.com/missing-fixture",
@@ -420,7 +420,7 @@ class TestReplayTestGeneration:
         result = capture_instance.generate_replay_test(entry.id)
         assert result is None
 
-    def test_generate_all_replay_tests(self, capture_instance):
+    def test_generate_all_replay_tests(self, capture_instance) -> None:
         """Generates tests for all captures without existing tests."""
         capture_instance.maybe_capture(
             url="https://example.com/a",
@@ -448,7 +448,7 @@ class TestReplayTestGeneration:
 class TestEdgeCases:
     """Edge cases and robustness."""
 
-    def test_unknown_domain_handling(self, capture_instance, sample_html):
+    def test_unknown_domain_handling(self, capture_instance, sample_html) -> None:
         """URL with no valid domain is handled gracefully."""
         entry = capture_instance.maybe_capture(
             url="not-a-valid-url",
@@ -460,7 +460,7 @@ class TestEdgeCases:
         assert entry is not None
         assert entry.domain == "unknown"
 
-    def test_long_html_is_truncated_in_preview(self, capture_instance):
+    def test_long_html_is_truncated_in_preview(self, capture_instance) -> None:
         """HTML preview is limited to 200 chars."""
         long_html = "<html>" + "A" * 1000 + "</html>"
         entry = capture_instance.maybe_capture(
@@ -474,7 +474,7 @@ class TestEdgeCases:
         assert len(entry.html_preview) <= 200
         assert entry.html_size == len(long_html)
 
-    def test_timestamp_is_set_on_capture(self, capture_instance, sample_html):
+    def test_timestamp_is_set_on_capture(self, capture_instance, sample_html) -> None:
         """captured_at is set to a reasonable timestamp."""
         before = time.time()
         entry = capture_instance.maybe_capture(
@@ -488,7 +488,7 @@ class TestEdgeCases:
         assert entry is not None
         assert before <= entry.captured_at <= after or abs(entry.captured_at - before) < 2
 
-    def test_registry_last_capture_at_updated(self, capture_instance, sample_html):
+    def test_registry_last_capture_at_updated(self, capture_instance, sample_html) -> None:
         """Registry tracks when the last capture occurred."""
         before = time.time()
         capture_instance.maybe_capture(
@@ -502,7 +502,7 @@ class TestEdgeCases:
         registry = capture_instance.get_registry()
         assert before <= registry.last_capture_at <= after or abs(registry.last_capture_at - before) < 2
 
-    def test_negative_confidence_handled(self, capture_instance, sample_html):
+    def test_negative_confidence_handled(self, capture_instance, sample_html) -> None:
         """Very low confidence with records doesn't capture (unless forced)."""
         entry = capture_instance.maybe_capture(
             url="https://example.com/low-conf",
@@ -513,7 +513,7 @@ class TestEdgeCases:
         )
         assert entry is None  # Negative is below min_confidence
 
-    def test_html_size_zero_for_none_html(self, capture_instance):
+    def test_html_size_zero_for_none_html(self, capture_instance) -> None:
         """When html is None, size should be 0 (but capture is skipped)."""
         entry = capture_instance.maybe_capture(
             url="https://example.com/no-html",
@@ -533,12 +533,12 @@ class TestEdgeCases:
 class TestSingleton:
     """Verify the module-level singleton accessor."""
 
-    def test_get_regression_capture_returns_instance(self):
+    def test_get_regression_capture_returns_instance(self) -> None:
         """get_regression_capture() returns a RegressionCapture instance."""
         capture = get_regression_capture()
         assert isinstance(capture, RegressionCapture)
 
-    def test_singleton_returns_same_instance(self):
+    def test_singleton_returns_same_instance(self) -> None:
         """Multiple calls return the same instance."""
         c1 = get_regression_capture()
         c2 = get_regression_capture()
@@ -553,7 +553,7 @@ class TestSingleton:
 class TestConcurrentCapture:
     """Verify registry integrity under multiple captures."""
 
-    def test_multiple_captures_maintain_counts(self, capture_instance):
+    def test_multiple_captures_maintain_counts(self, capture_instance) -> None:
         """After many captures, all counts are consistent."""
         n = 10
         for i in range(n):
@@ -573,7 +573,7 @@ class TestConcurrentCapture:
         registry = capture_instance.get_registry()
         assert len(registry.entries) == n
 
-    def test_duplicate_across_domains(self, capture_instance):
+    def test_duplicate_across_domains(self, capture_instance) -> None:
         """Same HTML from different domains — second is skipped."""
         html = "<html><body>Identical content</body></html>"
         entry1 = capture_instance.maybe_capture(
@@ -593,7 +593,7 @@ class TestConcurrentCapture:
         assert entry1 is not None
         assert entry2 is None  # Duplicate HTML hash
 
-    def test_id_generation_is_deterministic(self, capture_instance):
+    def test_id_generation_is_deterministic(self, capture_instance) -> None:
         """Same HTML produces same ID."""
         html = "<html><body>Deterministic ID</body></html>"
         entry1 = capture_instance.maybe_capture(
@@ -608,7 +608,7 @@ class TestConcurrentCapture:
         assert len(entry1.id) == 12  # SHA256 prefix
         assert all(c in "0123456789abcdef" for c in entry1.id)  # hex
 
-    def test_generated_test_includes_imports(self, capture_instance):
+    def test_generated_test_includes_imports(self, capture_instance) -> None:
         """Verify that generated replay tests include all required imports."""
         entry = capture_instance.maybe_capture(
             url="https://example.com/imports-test",

@@ -1,7 +1,7 @@
 import asyncio
 
 
-async def test_provider(provider):
+async def test_provider(provider) -> None:
     import g4f
 
     print(f"Testing {provider.__name__}...")

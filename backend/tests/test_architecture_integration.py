@@ -8,7 +8,7 @@ tracked files is checked out — asserting invariants rather than specific field
 import pytest
 
 
-def test_topology_state_has_owned_data():
+def test_topology_state_has_owned_data() -> None:
     """TopologyState must own its data (not reference external state)."""
     from app.topology_state import TopologyState
 
@@ -26,7 +26,7 @@ def test_topology_state_has_owned_data():
     assert ts.region_count() == 0
 
 
-def test_energy_state_owns_variables():
+def test_energy_state_owns_variables() -> None:
     """EnergyState must own energy variables independently."""
     from app.energy_state import EnergyState
 
@@ -39,7 +39,7 @@ def test_energy_state_owns_variables():
     assert 0 <= es.field_pressure <= 1
 
 
-def test_instability_state_owns_exclusions():
+def test_instability_state_owns_exclusions() -> None:
     """InstabilityState must own learned_exclusions independently."""
     from app.instability_state import InstabilityState
 
@@ -51,7 +51,7 @@ def test_instability_state_owns_exclusions():
     assert ist.exclusion_count() == 0
 
 
-def test_event_journal_tracks_mutations():
+def test_event_journal_tracks_mutations() -> None:
     """EventJournal must record and replay mutation events."""
     from app.event_journal import get_journal
 
@@ -67,7 +67,7 @@ def test_event_journal_tracks_mutations():
     j.clear()
 
 
-def test_topology_gc_removes_stale():
+def test_topology_gc_removes_stale() -> None:
     """topology_gc must remove stale field regions."""
     from app.core_types import FieldConflictRegion
 
@@ -84,7 +84,7 @@ def test_topology_gc_removes_stale():
     assert alive[0].token == "ALIVE"
 
 
-def test_field_validator_detects_nan():
+def test_field_validator_detects_nan() -> None:
     """field_validator must detect NaN values."""
     from app.energy_state import EnergyState
 
@@ -100,7 +100,7 @@ def test_field_validator_detects_nan():
     assert math.isnan(es.global_energy)
 
 
-def test_observability_is_read_only():
+def test_observability_is_read_only() -> None:
     """observability functions must not mutate state."""
     from app.observability import field_summary
 
@@ -123,7 +123,7 @@ def _app_path(rel_path: str) -> str:
     return rel_path
 
 
-def test_mutation_apis_have_rw_separation():
+def test_mutation_apis_have_rw_separation() -> None:
     """API classes must have separate read/write sections."""
     for name in ["topology_api", "energy_api", "instability_api"]:
         with open(_app_path(f"app/{name}.py")) as f:
@@ -132,7 +132,7 @@ def test_mutation_apis_have_rw_separation():
         assert "Mutation Operations" in content, f"{name} missing Mutation section"
 
 
-def test_field_laws_are_accessible():
+def test_field_laws_are_accessible() -> None:
     """field_laws must export all law constants."""
     from app.field_laws import MAX_ATTRACTOR_PULL, MAX_COUPLING_TRANSFER, MAX_INSTABILITY_FLUX, PROPAGATION_DECAY_FLOOR
 
@@ -142,21 +142,21 @@ def test_field_laws_are_accessible():
     assert MAX_ATTRACTOR_PULL == 2.0
 
 
-def test_persistence_state_has_clear():
+def test_persistence_state_has_clear() -> None:
     """persistence_state must expose clear_world_state."""
     from app.persistence_state import clear_world_state
 
     assert callable(clear_world_state)
 
 
-def test_invariant_firewall_decorator():
+def test_invariant_firewall_decorator() -> None:
     """invariant_firewall must provide requires_invariants decorator."""
     from app.invariant_firewall import requires_invariants
 
     assert callable(requires_invariants)
 
 
-def test_core_types_are_shared():
+def test_core_types_are_shared() -> None:
     """core_types must provide FieldConflictRegion."""
     import dataclasses
 
@@ -173,7 +173,7 @@ def test_core_types_are_shared():
     assert 0.0 <= es.global_energy <= 10.0
 
 
-def test_all_14_modules_are_importable():
+def test_all_14_modules_are_importable() -> None:
     """All 14 extracted modules must import without error."""
     modules = [
         "app.core_types",

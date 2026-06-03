@@ -117,7 +117,7 @@ def _clean_import_app_main():
 # ─── Phase R1 achievement tests ─────────────────────────────────────────────
 
 
-def test_app_main_does_not_load_experimental_router_when_gate_off():
+def test_app_main_does_not_load_experimental_router_when_gate_off() -> None:
     """When ENABLE_EXPERIMENTAL_ROUTES is False, the experimental router
     module must not be in sys.modules after a clean import of app.main.
 
@@ -164,7 +164,7 @@ FIXED_MODULES: tuple[str, ...] = (
 
 
 @pytest.mark.parametrize("fixed_module", FIXED_MODULES)
-def test_fixed_research_leak_stays_absent(fixed_module):
+def test_fixed_research_leak_stays_absent(fixed_module) -> None:
     """Verify that a previously-known leak remains absent at startup.
 
     This test passes only if the module is NOT in sys.modules after a
@@ -180,7 +180,7 @@ def test_fixed_research_leak_stays_absent(fixed_module):
 
 
 @pytest.mark.parametrize("leaky_module", LEAKY_MODULES)
-def test_known_pending_research_leak_is_still_present(leaky_module):
+def test_known_pending_research_leak_is_still_present(leaky_module) -> None:
     """Document that this research module is still pulled in at startup.
 
     This test passes as long as the leak still exists. When a future

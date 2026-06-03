@@ -1,7 +1,7 @@
 from app.semantic_world_state import get_world_state
 
 
-def test_stability_debt_accumulation():
+def test_stability_debt_accumulation() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -19,7 +19,7 @@ def test_stability_debt_accumulation():
     assert ws.metrics.stability_debt > 0.0
 
 
-def test_phase_transition_trigger():
+def test_phase_transition_trigger() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -45,7 +45,7 @@ def test_phase_transition_trigger():
     assert ws.learned_exclusions.get(key, 0.0) < 0.3
 
 
-def test_anchors_resist_melting():
+def test_anchors_resist_melting() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -62,7 +62,7 @@ def test_anchors_resist_melting():
     assert ws.learned_exclusions.get(key, 0.0) == 1.0
 
 
-def test_local_reservoir_burst():
+def test_local_reservoir_burst() -> None:
     from app.core_types import FieldConflictRegion
 
     region = FieldConflictRegion(competing_roles=["a", "b"], token="X", instability=0.8)

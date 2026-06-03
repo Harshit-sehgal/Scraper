@@ -21,7 +21,7 @@ class TestTelemetryStateAdapter:
         ts._telemetry_state = None
         st._collector = None
 
-    def test_initial_stats_empty(self):
+    def test_initial_stats_empty(self) -> None:
         adapter = TelemetryStateAdapter()
         stats = adapter.get_stats()
         assert stats["total_scrapes"] == 0
@@ -29,32 +29,32 @@ class TestTelemetryStateAdapter:
         assert stats["fallback_rate"] == 0.0
         assert stats["avg_confidence"] == 0.0
 
-    def test_record_scrape_delegates_to_telemetry(self):
+    def test_record_scrape_delegates_to_telemetry(self) -> None:
         adapter = TelemetryStateAdapter()
         with patch.object(adapter._telemetry, "record") as mock_record:
             adapter.record_scrape("http://example.com", fetch_ms=100)
             mock_record.assert_called_once_with("http://example.com", fetch_ms=100)
 
-    def test_record_stabilization(self):
+    def test_record_stabilization(self) -> None:
         adapter = TelemetryStateAdapter()
         adapter.record_stabilization("example.com", 1200.0)
         assert adapter.get_avg_stabilization("example.com") == 1200.0
 
-    def test_avg_stabilization_bounded(self):
+    def test_avg_stabilization_bounded(self) -> None:
         adapter = TelemetryStateAdapter()
         adapter.record_stabilization("slow.com", 9999.0)
         assert adapter.get_avg_stabilization("slow.com") == 5000.0  # Clamped to max
 
-    def test_avg_stabilization_minimum(self):
+    def test_avg_stabilization_minimum(self) -> None:
         adapter = TelemetryStateAdapter()
         adapter.record_stabilization("fast.com", 10.0)
         assert adapter.get_avg_stabilization("fast.com") == 500.0  # Clamped to min
 
-    def test_default_stabilization_is_1500(self):
+    def test_default_stabilization_is_1500(self) -> None:
         adapter = TelemetryStateAdapter()
         assert adapter.get_avg_stabilization("unknown.com") == 1500.0
 
-    def test_stabilization_rolling_window(self):
+    def test_stabilization_rolling_window(self) -> None:
         adapter = TelemetryStateAdapter()
         for _ in range(15):
             adapter.record_stabilization("test.com", 1000.0)
@@ -62,14 +62,14 @@ class TestTelemetryStateAdapter:
         assert len(adapter._domain_stabilization_times["test.com"]) == 10
         assert adapter.get_avg_stabilization("test.com") == 1000.0
 
-    def test_clear_wipes_telemetry(self):
+    def test_clear_wipes_telemetry(self) -> None:
         adapter = TelemetryStateAdapter()
         adapter.record_scrape("http://example.com")
         with patch.object(adapter._telemetry, "clear") as mock_clear:
             adapter.clear()
             mock_clear.assert_called_once()
 
-    def test_get_recent_snapshots(self):
+    def test_get_recent_snapshots(self) -> None:
         adapter = TelemetryStateAdapter()
         expected = [{"url": "http://x.com"}]
         with patch.object(adapter._telemetry, "get_recent", return_value=expected) as mock_get:
@@ -77,7 +77,7 @@ class TestTelemetryStateAdapter:
             assert result == expected
             mock_get.assert_called_once_with(5)
 
-    def test_get_confidence_histogram(self):
+    def test_get_confidence_histogram(self) -> None:
         adapter = TelemetryStateAdapter()
         expected = {"high": 10, "low": 2}
         with patch.object(adapter._telemetry, "get_confidence_histogram", return_value=expected) as mock_get:
@@ -85,7 +85,7 @@ class TestTelemetryStateAdapter:
             assert result == expected
             mock_get.assert_called_once_with(50)
 
-    def test_get_stats_with_data(self):
+    def test_get_stats_with_data(self) -> None:
         """get_stats() with non-empty recent data (covers confidence_scores logic)."""
         adapter = TelemetryStateAdapter()
         mock_recent = [
@@ -111,7 +111,7 @@ class TestGetTelemetryState:
         ts._telemetry_state = None
         st._collector = None
 
-    def test_returns_singleton(self):
+    def test_returns_singleton(self) -> None:
         import app.telemetry_state as ts
 
         ts._telemetry_state = None
@@ -120,7 +120,7 @@ class TestGetTelemetryState:
         second = get_telemetry_state()
         assert first is second  # Same instance
 
-    def test_type(self):
+    def test_type(self) -> None:
         import app.telemetry_state as ts
 
         ts._telemetry_state = None

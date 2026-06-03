@@ -133,7 +133,7 @@ def _multi_domain_history() -> list[dict]:
 class TestTrendAnalyzerEmpty:
     """Tests with empty or minimal telemetry."""
 
-    def test_empty_history(self):
+    def test_empty_history(self) -> None:
         analyzer = TrendAnalyzer()
         report = analyzer.analyze([])
         assert isinstance(report, TrendReport)
@@ -141,7 +141,7 @@ class TestTrendAnalyzerEmpty:
         assert report.total_scrapes == 0
         assert report.alerts == []
 
-    def test_single_event(self):
+    def test_single_event(self) -> None:
         analyzer = TrendAnalyzer()
         history = [_make_telemetry(url="https://example.com/page")]
         report = analyzer.analyze(history)
@@ -156,14 +156,14 @@ class TestTrendAnalyzerEmpty:
 class TestTrendAnalyzerDomainGrouping:
     """Tests that domains are correctly grouped and analyzed."""
 
-    def test_single_domain(self):
+    def test_single_domain(self) -> None:
         analyzer = TrendAnalyzer()
         history = _healthy_history(10)
         report = analyzer.analyze(history)
         assert report.domain_count == 1
         assert "example.com" in report.domain_trends
 
-    def test_multi_domain(self):
+    def test_multi_domain(self) -> None:
         analyzer = TrendAnalyzer()
         history = _multi_domain_history()
         report = analyzer.analyze(history)
@@ -172,7 +172,7 @@ class TestTrendAnalyzerDomainGrouping:
         assert "ok.example.com" in report.domain_trends
         assert "bad.example.com" in report.domain_trends
 
-    def test_domain_extraction(self):
+    def test_domain_extraction(self) -> None:
         assert TrendAnalyzer.extract_domain("https://www.example.com/path") == "www.example.com"
         assert TrendAnalyzer.extract_domain("http://sub.domain.co.uk/page?q=1") == "sub.domain.co.uk"
         assert TrendAnalyzer.extract_domain("") == "unknown"
@@ -181,21 +181,21 @@ class TestTrendAnalyzerDomainGrouping:
 class TestTrendAnalyzerHealthScores:
     """Tests for health score computation."""
 
-    def test_healthy_domain_high_score(self):
+    def test_healthy_domain_high_score(self) -> None:
         analyzer = TrendAnalyzer()
         history = _healthy_history(10)
         report = analyzer.analyze(history)
         trend = report.domain_trends["example.com"]
         assert trend.health_score >= 80
 
-    def test_degrading_domain_low_score(self):
+    def test_degrading_domain_low_score(self) -> None:
         analyzer = TrendAnalyzer()
         history = _degrading_history(10)
         report = analyzer.analyze(history)
         trend = report.domain_trends["bad.example.com"]
         assert trend.health_score < 60
 
-    def test_failing_domain_very_low_score(self):
+    def test_failing_domain_very_low_score(self) -> None:
         """100% failure rate domain should have very low health."""
         analyzer = TrendAnalyzer()
         history = [
@@ -212,7 +212,7 @@ class TestTrendAnalyzerHealthScores:
         assert trend.failure_rate == 1.0
         assert trend.health_score < 40
 
-    def test_health_score_with_mixed_signals(self):
+    def test_health_score_with_mixed_signals(self) -> None:
         """Domain with mixed performance should get intermediate score."""
         analyzer = TrendAnalyzer()
         # 5 good events then 5 bad events
@@ -244,7 +244,7 @@ class TestTrendAnalyzerHealthScores:
 class TestTrendAnalyzerTrendDetection:
     """Tests for trend direction detection."""
 
-    def test_improving_latency(self):
+    def test_improving_latency(self) -> None:
         """Latencies that decrease over time should be 'improving'."""
         analyzer = TrendAnalyzer()
         # Each event gets faster (improving)
@@ -260,7 +260,7 @@ class TestTrendAnalyzerTrendDetection:
         trend = report.domain_trends["improving.example.com"]
         assert trend.fetch_latency_trend == "improving"
 
-    def test_degrading_quality(self):
+    def test_degrading_quality(self) -> None:
         """Quality scores that decrease over time should be 'degrading'."""
         analyzer = TrendAnalyzer()
         events = [
@@ -274,7 +274,7 @@ class TestTrendAnalyzerTrendDetection:
         trend = report.domain_trends["degrading-quality.example.com"]
         assert trend.quality_trend == "degrading"
 
-    def test_stable_domain(self):
+    def test_stable_domain(self) -> None:
         """Stable metrics should produce 'stable' trends."""
         analyzer = TrendAnalyzer()
         events = [
@@ -290,7 +290,7 @@ class TestTrendAnalyzerTrendDetection:
         assert trend.quality_trend == "stable"
         assert trend.fetch_latency_trend == "stable"
 
-    def test_short_history_is_stable(self):
+    def test_short_history_is_stable(self) -> None:
         """Fewer than 3 events should be classified as 'stable' (not enough data)."""
         analyzer = TrendAnalyzer()
         events = [
@@ -301,7 +301,7 @@ class TestTrendAnalyzerTrendDetection:
         trend = report.domain_trends["short.example.com"]
         assert trend.fetch_latency_trend == "stable"
 
-    def test_anti_bot_trend(self):
+    def test_anti_bot_trend(self) -> None:
         """Anti-bot scores that increase should be 'degrading'."""
         analyzer = TrendAnalyzer()
         events = [
@@ -319,7 +319,7 @@ class TestTrendAnalyzerTrendDetection:
 class TestTrendAnalyzerMetrics:
     """Tests for specific metric computations."""
 
-    def test_failure_rate_calculation(self):
+    def test_failure_rate_calculation(self) -> None:
         analyzer = TrendAnalyzer()
         events = [
             _make_telemetry(url="https://x.example.com/page", records_final=5, error=None),
@@ -332,7 +332,7 @@ class TestTrendAnalyzerMetrics:
         assert trend.failure_rate == 0.5  # 2 out of 4
         assert trend.total_failures == 2
 
-    def test_latency_averaging(self):
+    def test_latency_averaging(self) -> None:
         analyzer = TrendAnalyzer()
         events = [
             _make_telemetry(url="https://latency.example.com/page", fetch_ms=1000.0),
@@ -343,7 +343,7 @@ class TestTrendAnalyzerMetrics:
         trend = report.domain_trends["latency.example.com"]
         assert trend.avg_fetch_ms == 2000.0
 
-    def test_quality_score_averaging(self):
+    def test_quality_score_averaging(self) -> None:
         analyzer = TrendAnalyzer()
         events = [
             _make_telemetry(url="https://quality.example.com/page", selector_hit_rate=0.9),
@@ -354,7 +354,7 @@ class TestTrendAnalyzerMetrics:
         trend = report.domain_trends["quality.example.com"]
         assert trend.avg_quality_score == pytest.approx(0.7, 0.01)
 
-    def test_cost_averaging(self):
+    def test_cost_averaging(self) -> None:
         analyzer = TrendAnalyzer()
         events = [
             _make_telemetry(url="https://cost.example.com/page", estimated_cost_usd=0.10),
@@ -364,7 +364,7 @@ class TestTrendAnalyzerMetrics:
         trend = report.domain_trends["cost.example.com"]
         assert trend.avg_cost_usd == pytest.approx(0.15, 0.01)
 
-    def test_failure_category_tracking(self):
+    def test_failure_category_tracking(self) -> None:
         analyzer = TrendAnalyzer()
         events = [
             _make_telemetry(
@@ -402,7 +402,7 @@ class TestTrendAnalyzerMetrics:
 class TestTrendAnalyzerAlerts:
     """Tests for alert generation."""
 
-    def test_degrading_domain_alert(self):
+    def test_degrading_domain_alert(self) -> None:
         analyzer = TrendAnalyzer()
         history = _degrading_history(10)
         report = analyzer.analyze(history)
@@ -413,14 +413,14 @@ class TestTrendAnalyzerAlerts:
         bad_alerts = [a for a in report.alerts if "bad.example.com" in a["domain"]]
         assert len(bad_alerts) >= 1
 
-    def test_no_alerts_for_healthy(self):
+    def test_no_alerts_for_healthy(self) -> None:
         analyzer = TrendAnalyzer()
         history = _healthy_history(10)
         report = analyzer.analyze(history)
         high_alerts = [a for a in report.alerts if a["severity"] == "high"]
         assert len(high_alerts) == 0
 
-    def test_selector_decay_alert(self):
+    def test_selector_decay_alert(self) -> None:
         """Selector decay acceleration should generate medium alerts."""
         analyzer = TrendAnalyzer()
         # Events where fallback rate increases over time
@@ -437,7 +437,7 @@ class TestTrendAnalyzerAlerts:
         decay_alerts = [a for a in report.alerts if "selector decay" in a["message"].lower()]
         assert len(decay_alerts) >= 1
 
-    def test_anti_bot_alert(self):
+    def test_anti_bot_alert(self) -> None:
         """Increasing anti-bot scores should generate medium alerts."""
         analyzer = TrendAnalyzer()
         events = [
@@ -455,20 +455,20 @@ class TestTrendAnalyzerAlerts:
 class TestTrendAnalyzerCategorization:
     """Tests for domain health categorization."""
 
-    def test_degrading_domains_list(self):
+    def test_degrading_domains_list(self) -> None:
         analyzer = TrendAnalyzer()
         history = _multi_domain_history()
         report = analyzer.analyze(history)
         assert "bad.example.com" in report.degrading_domains
 
-    def test_stable_domains_list(self):
+    def test_stable_domains_list(self) -> None:
         analyzer = TrendAnalyzer()
         history = _multi_domain_history()
         report = analyzer.analyze(history)
         # good.example.com has 10 healthy scrapes
         assert "good.example.com" in report.improving_domains
 
-    def test_unseen_domains(self):
+    def test_unseen_domains(self) -> None:
         """Domains with < 2 events should be 'unseen'."""
         analyzer = TrendAnalyzer()
         history = [
@@ -477,7 +477,7 @@ class TestTrendAnalyzerCategorization:
         report = analyzer.analyze(history)
         assert "fresh.example.com" in report.unseen_domains
 
-    def test_domain_in_both_lists(self):
+    def test_domain_in_both_lists(self) -> None:
         """A domain should only appear in one category list."""
         analyzer = TrendAnalyzer()
         history = _multi_domain_history()
@@ -497,7 +497,7 @@ class TestTrendAnalyzerCategorization:
 class TestEconomicTrackerEmpty:
     """Tests with empty or minimal telemetry."""
 
-    def test_empty_history(self):
+    def test_empty_history(self) -> None:
         tracker = EconomicTracker()
         report = tracker.analyze([])
         assert isinstance(report, EconomicReport)
@@ -505,7 +505,7 @@ class TestEconomicTrackerEmpty:
         assert report.total_scrapes == 0
         assert report.total_records == 0
 
-    def test_single_event(self):
+    def test_single_event(self) -> None:
         tracker = EconomicTracker()
         history = [
             _make_telemetry(
@@ -523,7 +523,7 @@ class TestEconomicTrackerEmpty:
 class TestEconomicTrackerCostAnalysis:
     """Tests for cost calculations."""
 
-    def test_cost_from_estimated_field(self):
+    def test_cost_from_estimated_field(self) -> None:
         tracker = EconomicTracker()
         history = [
             _make_telemetry(
@@ -542,7 +542,7 @@ class TestEconomicTrackerCostAnalysis:
         assert summary.total_cost_usd == pytest.approx(0.20, 0.01)
         assert summary.avg_cost_per_scrape == pytest.approx(0.10, 0.01)
 
-    def test_cost_from_components(self):
+    def test_cost_from_components(self) -> None:
         """When estimated_cost_usd is 0, costs should be derived from components."""
         tracker = EconomicTracker()
         history = [
@@ -564,7 +564,7 @@ class TestEconomicTrackerCostAnalysis:
         assert summary.cost_breakdown["network"] == pytest.approx(0.001, 0.01)
         assert summary.total_cost_usd == pytest.approx(expected, 0.01)
 
-    def test_httpx_lower_cost(self):
+    def test_httpx_lower_cost(self) -> None:
         """httpx (no browser) should cost less than playwright."""
         tracker = EconomicTracker()
         httpx_history = [
@@ -595,7 +595,7 @@ class TestEconomicTrackerCostAnalysis:
 class TestEconomicTrackerMultiDomain:
     """Tests for multi-domain cost analysis."""
 
-    def test_multi_domain_cost_breakdown(self):
+    def test_multi_domain_cost_breakdown(self) -> None:
         tracker = EconomicTracker()
         history = _multi_domain_history()
         report = tracker.analyze(history)
@@ -604,7 +604,7 @@ class TestEconomicTrackerMultiDomain:
         assert "bad.example.com" in report.cost_by_domain
         assert report.most_expensive_domains[0]["domain"] == "bad.example.com"
 
-    def test_cost_by_category(self):
+    def test_cost_by_category(self) -> None:
         tracker = EconomicTracker()
         history = [
             _make_telemetry(
@@ -620,7 +620,7 @@ class TestEconomicTrackerMultiDomain:
         assert "browser" in report.cost_by_category
         assert "network" in report.cost_by_category
 
-    def test_total_cost_aggregation(self):
+    def test_total_cost_aggregation(self) -> None:
         tracker = EconomicTracker()
         history = _multi_domain_history()  # 10 + 6 + 8 = 24 events
         report = tracker.analyze(history)
@@ -631,21 +631,21 @@ class TestEconomicTrackerMultiDomain:
 class TestEconomicTrackerEfficiency:
     """Tests for efficiency rating calculations."""
 
-    def test_high_efficiency(self):
+    def test_high_efficiency(self) -> None:
         """Cost per record <= 0.01 should be 'excellent'."""
         assert EconomicTracker._rate_efficiency(0.005) == "excellent"
         assert EconomicTracker._rate_efficiency(0.01) == "excellent"
 
-    def test_good_efficiency(self):
+    def test_good_efficiency(self) -> None:
         assert EconomicTracker._rate_efficiency(0.02) == "good"
 
-    def test_fair_efficiency(self):
+    def test_fair_efficiency(self) -> None:
         assert EconomicTracker._rate_efficiency(0.05) == "fair"
 
-    def test_poor_efficiency(self):
+    def test_poor_efficiency(self) -> None:
         assert EconomicTracker._rate_efficiency(0.15) == "poor"
 
-    def test_efficiency_in_report(self):
+    def test_efficiency_in_report(self) -> None:
         """Report-level efficiency should match domain averages."""
         tracker = EconomicTracker()
         history = [
@@ -664,7 +664,7 @@ class TestEconomicTrackerEfficiency:
 class TestEconomicTrackerDomainSorting:
     """Tests for most/least expensive domain ordering."""
 
-    def test_most_expensive_first(self):
+    def test_most_expensive_first(self) -> None:
         tracker = EconomicTracker()
         history = _multi_domain_history()
         report = tracker.analyze(history)
@@ -672,7 +672,7 @@ class TestEconomicTrackerDomainSorting:
         # bad.example.com should be most expensive (highest failure rate)
         assert report.most_expensive_domains[0]["domain"] == "bad.example.com"
 
-    def test_domain_summary_fields(self):
+    def test_domain_summary_fields(self) -> None:
         tracker = EconomicTracker()
         history = [
             _make_telemetry(

@@ -38,26 +38,26 @@ FULL_SCHEMA = [STR_FIELD, INT_FIELD, FLOAT_FIELD, EMAIL_FIELD, PHONE_FIELD]
 class TestNormalizeScrapedRecord:
     """Tests for normalize_scraped_record()."""
 
-    def test_normalizes_values(self):
+    def test_normalizes_values(self) -> None:
         record = {"name": "  Acme  ", "count": "5"}
         result = normalize_scraped_record(record, SIMPLE_SCHEMA)
         assert result["name"] == "  Acme  "
         assert result["count"] == "5"
 
-    def test_empty_value_becomes_none(self):
+    def test_empty_value_becomes_none(self) -> None:
         record = {"name": "", "count": None}
         result = normalize_scraped_record(record, SIMPLE_SCHEMA)
         assert result["name"] is None
         assert result["count"] is None
 
-    def test_preserves_metadata_fields(self):
+    def test_preserves_metadata_fields(self) -> None:
         record = {"name": "A", "count": "1", "source_url": "http://example.com", "record_score": 0.9, "_key": "abc123"}
         result = normalize_scraped_record(record, SIMPLE_SCHEMA)
         assert result["source_url"] == "http://example.com"
         assert result["record_score"] == 0.9
         assert result["_key"] == "abc123"
 
-    def test_missing_field_is_none(self):
+    def test_missing_field_is_none(self) -> None:
         record = {"name": "A"}
         result = normalize_scraped_record(record, SIMPLE_SCHEMA)
         assert result["name"] == "A"
@@ -70,15 +70,15 @@ class TestNormalizeScrapedRecord:
 class TestValidateExtractedData:
     """Tests for _validate_extracted_data()."""
 
-    def test_valid_if_meaningful_data_exists(self):
+    def test_valid_if_meaningful_data_exists(self) -> None:
         record = {"name": "Acme Corp", "count": "42"}
         assert _validate_extracted_data(record, SIMPLE_SCHEMA) is True
 
-    def test_invalid_if_all_empty(self):
+    def test_invalid_if_all_empty(self) -> None:
         record = {"name": "", "count": None}
         assert _validate_extracted_data(record, SIMPLE_SCHEMA) is False
 
-    def test_invalid_if_all_none(self):
+    def test_invalid_if_all_none(self) -> None:
         record = {"name": None, "count": None}
         assert _validate_extracted_data(record, SIMPLE_SCHEMA) is False
 
@@ -89,7 +89,7 @@ class TestValidateExtractedData:
 class TestDedupeRecords:
     """Tests for _dedupe_records()."""
 
-    def test_dedupe_name_field(self):
+    def test_dedupe_name_field(self) -> None:
         schema = [STR_FIELD]
         records = [{"name": "Alpha"}, {"name": "Beta"}, {"name": "alpha"}]
         result = _dedupe_records(records, schema)
@@ -97,16 +97,16 @@ class TestDedupeRecords:
         assert result[0]["name"] == "Alpha"
         assert result[1]["name"] == "Beta"
 
-    def test_empty_input_returns_empty(self):
+    def test_empty_input_returns_empty(self) -> None:
         assert _dedupe_records([], [STR_FIELD]) == []
 
-    def test_all_duplicates(self):
+    def test_all_duplicates(self) -> None:
         schema = [STR_FIELD]
         records = [{"name": "X"}, {"name": "X"}, {"name": "X"}]
         result = _dedupe_records(records, schema)
         assert len(result) == 1
 
-    def test_fallback_to_all_fields(self):
+    def test_fallback_to_all_fields(self) -> None:
         """When no name/company/title fields, use all fields as identity."""
         schema = [
             SchemaField(name="code", field_type=FieldType.STRING, description="", required=False),
@@ -127,12 +127,12 @@ class TestDedupeRecords:
 class TestLimitSourceRecords:
     """Tests for _limit_source_records()."""
 
-    def test_under_limit_returns_all(self):
+    def test_under_limit_returns_all(self) -> None:
         records = [{"name": str(i)} for i in range(5)]
         result = _limit_source_records(records, FULL_SCHEMA, max_records=10)
         assert len(result) == 5
 
-    def test_over_limit_prioritizes_email_phone(self):
+    def test_over_limit_prioritizes_email_phone(self) -> None:
         records = [
             {"name": "No Contact"},
             {"name": "Has Email", "email": "a@b.com"},
@@ -145,13 +145,13 @@ class TestLimitSourceRecords:
         assert result[0]["name"] == "Has Both"
         assert result[1]["name"] in ("Has Email", "Has Phone")
 
-    def test_over_limit_preserves_order_without_contact_fields(self):
+    def test_over_limit_preserves_order_without_contact_fields(self) -> None:
         schema = [SchemaField(name="title", field_type=FieldType.STRING, description="", required=False)]
         records = [{"title": f"Record {i}", "record_score": 1.0 - (i * 0.01)} for i in range(5)]
         result = _limit_source_records(records, schema, max_records=3)
         assert [r["title"] for r in result] == ["Record 0", "Record 1", "Record 2"]
 
-    def test_empty_returns_all(self):
+    def test_empty_returns_all(self) -> None:
         assert _limit_source_records([], FULL_SCHEMA) == []
 
 
@@ -161,19 +161,19 @@ class TestLimitSourceRecords:
 class TestTrimPromptValue:
     """Tests for _trim_prompt_value()."""
 
-    def test_none_returns_empty_string(self):
+    def test_none_returns_empty_string(self) -> None:
         assert _trim_prompt_value(None) == ""
 
-    def test_short_value_unchanged(self):
+    def test_short_value_unchanged(self) -> None:
         assert _trim_prompt_value("hello") == "hello"
 
-    def test_long_value_trimmed(self):
+    def test_long_value_trimmed(self) -> None:
         long_val = "a" * 200
         result = _trim_prompt_value(long_val, max_chars=180)
         assert len(result) == 183  # 180 chars + "..."
         assert result.endswith("...")
 
-    def test_exact_length_unchanged(self):
+    def test_exact_length_unchanged(self) -> None:
         val = "a" * 180
         assert _trim_prompt_value(val, max_chars=180) == val
 
@@ -184,19 +184,19 @@ class TestTrimPromptValue:
 class TestPrepareRecordsForAi:
     """Tests for _prepare_records_for_ai()."""
 
-    def test_prepares_records(self):
+    def test_prepares_records(self) -> None:
         records = [{"name": "Acme", "count": "42", "extra": "ignored"}, {"name": "Beta", "count": "7"}]
         schema = [STR_FIELD, INT_FIELD]
         result = _prepare_records_for_ai(records, schema)
         assert len(result) == 2
         assert "extra" not in result[0]  # Not in schema
 
-    def test_empty_values_excluded(self):
+    def test_empty_values_excluded(self) -> None:
         records = [{"name": "", "count": None}]
         result = _prepare_records_for_ai(records, [STR_FIELD, INT_FIELD])
         assert result == []  # Both values empty
 
-    def test_long_values_trimmed(self):
+    def test_long_values_trimmed(self) -> None:
         long_name = "x" * 200
         records = [{"name": long_name, "count": "1"}]
         result = _prepare_records_for_ai(records, [STR_FIELD, INT_FIELD])
@@ -210,17 +210,17 @@ class TestPrepareRecordsForAi:
 class TestProcessRawRecords:
     """Tests for process_raw_records()."""
 
-    def test_empty_input_returns_empty(self):
+    def test_empty_input_returns_empty(self) -> None:
         assert process_raw_records([], SIMPLE_SCHEMA, 0.0) == []
 
-    def test_processes_records(self):
+    def test_processes_records(self) -> None:
         records = [{"name": "Acme", "count": "42"}]
         with patch("app.semantic_pipeline.run_pipeline", return_value=[{"name": "Acme", "count": "42"}]):
             result = process_raw_records(records, SIMPLE_SCHEMA, 0.0)
             assert len(result) == 1
             assert result[0]["name"] == "Acme"
 
-    def test_min_score_filters_low_quality(self):
+    def test_min_score_filters_low_quality(self) -> None:
         records = [{"name": "", "count": None}]
         with patch("app.semantic_pipeline.run_pipeline", return_value=[]):
             result = process_raw_records(records, SIMPLE_SCHEMA, 0.5)
@@ -234,7 +234,7 @@ class TestProcessRawRecords:
 class TestAlignProfileKeysToSchema:
     """Tests for align_profile_keys_to_schema()."""
 
-    def test_exact_matches_preserved(self):
+    def test_exact_matches_preserved(self) -> None:
         from app.data_utils import align_profile_keys_to_schema
 
         records = [{"name": "Acme", "price": "100"}]
@@ -246,7 +246,7 @@ class TestAlignProfileKeysToSchema:
         assert aligned[0]["name"] == "Acme"
         assert aligned[0]["price"] == "100"
 
-    def test_fuzzy_substring_mapping(self):
+    def test_fuzzy_substring_mapping(self) -> None:
         from app.data_utils import align_profile_keys_to_schema
 
         records = [{"origin": "LON", "destination": "PAR"}]
@@ -258,7 +258,7 @@ class TestAlignProfileKeysToSchema:
         assert aligned[0]["origin_airport"] == "LON"
         assert aligned[0]["destination_airport"] == "PAR"
 
-    def test_synonym_group_mapping(self):
+    def test_synonym_group_mapping(self) -> None:
         from app.data_utils import align_profile_keys_to_schema
 
         records = [{"fee": "250"}]
@@ -268,7 +268,7 @@ class TestAlignProfileKeysToSchema:
         aligned = align_profile_keys_to_schema(records, schema)
         assert aligned[0]["ticket_price"] == "250"
 
-    def test_t15_custom_schema_mapping(self):
+    def test_t15_custom_schema_mapping(self) -> None:
         """Regression: custom schema must map full profile field set via semantic alignment."""
         from app.data_utils import align_profile_keys_to_schema
 
@@ -312,7 +312,7 @@ class TestAlignProfileKeysToSchema:
         assert row["arrival_date"] == "02-01-2026"
         assert "stops" not in row
 
-    def test_return_date_maps_to_arrival_date(self):
+    def test_return_date_maps_to_arrival_date(self) -> None:
         from app.data_utils import align_profile_keys_to_schema
 
         records = [{"return_date": "01-06-2026", "date": "30-05-2026"}]
@@ -326,7 +326,7 @@ class TestAlignProfileKeysToSchema:
         assert aligned[0]["departure_date"] == "30-05-2026"
         assert aligned[0]["arrival_date"] == "01-06-2026"
 
-    def test_intent_boost_mapping(self):
+    def test_intent_boost_mapping(self) -> None:
         from app.data_utils import align_extracted_keys_to_schema
 
         records = [{"fee": "250"}]
@@ -338,7 +338,7 @@ class TestAlignProfileKeysToSchema:
         )
         assert aligned[0]["ticket_price"] == "250"
 
-    def test_stops_not_mapped_to_arrival_date(self):
+    def test_stops_not_mapped_to_arrival_date(self) -> None:
         from app.data_utils import align_profile_keys_to_schema
 
         records = [{"stops": "1 Stop", "date": "30-05-2026"}]

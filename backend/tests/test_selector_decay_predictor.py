@@ -21,41 +21,41 @@ from app.selector_memory import get_selector_memory
 class TestSelectorDecayPredictor:
     """Test the Selector Decay Predictor."""
 
-    def test_create_predictor(self):
+    def test_create_predictor(self) -> None:
         """Test creating a decay predictor."""
         predictor = SelectorDecayPredictor()
         assert predictor is not None
         assert len(predictor._confidence_snapshots) == 0
 
-    def test_record_observation(self):
+    def test_record_observation(self) -> None:
         """Test recording a confidence observation."""
         predictor = SelectorDecayPredictor()
         predictor.record_observation("example.com", 0.95)
         assert "example.com" in predictor._confidence_snapshots
         assert len(predictor._confidence_snapshots["example.com"]) == 1
 
-    def test_multiple_observations(self):
+    def test_multiple_observations(self) -> None:
         """Test recording multiple observations."""
         predictor = SelectorDecayPredictor()
         for i in range(10):
             predictor.record_observation("example.com", 0.9 - i * 0.05)
         assert len(predictor._confidence_snapshots["example.com"]) == 10
 
-    def test_observation_capped_at_100(self):
+    def test_observation_capped_at_100(self) -> None:
         """Test that observations are capped at 100."""
         predictor = SelectorDecayPredictor()
         for i in range(150):
             predictor.record_observation("example.com", 0.5)
         assert len(predictor._confidence_snapshots["example.com"]) == 100
 
-    def test_predict_decay_no_data(self):
+    def test_predict_decay_no_data(self) -> None:
         """Test decay prediction with no selector data."""
         predictor = SelectorDecayPredictor()
         prediction = predictor.predict_decay("unknown-domain.com")
         assert prediction.decay_risk == 0.0
         assert prediction.risk_level == "stable"
 
-    def test_predict_decay_with_healthy_selector(self, monkeypatch):
+    def test_predict_decay_with_healthy_selector(self, monkeypatch) -> None:
         """Test decay prediction with a healthy selector."""
         memory = get_selector_memory()
         domain = "healthy.example.com"
@@ -78,7 +78,7 @@ class TestSelectorDecayPredictor:
         assert prediction.risk_level in ("stable", "watch")
         assert prediction.days_until_failure >= 30.0
 
-    def test_predict_decay_with_degrading_selector(self, monkeypatch):
+    def test_predict_decay_with_degrading_selector(self, monkeypatch) -> None:
         """Test decay prediction with a degrading selector."""
         memory = get_selector_memory()
         domain = "degrading.example.com"
@@ -101,7 +101,7 @@ class TestSelectorDecayPredictor:
         assert prediction.decay_risk > 0.4  # Should be elevated
         assert prediction.risk_level != "stable"
 
-    def test_get_domains_at_risk(self, monkeypatch):
+    def test_get_domains_at_risk(self, monkeypatch) -> None:
         """Test getting domains at risk above threshold."""
         memory = get_selector_memory()
 
@@ -134,7 +134,7 @@ class TestSelectorDecayPredictor:
         # The degrading domain should be first (highest risk)
         assert at_risk[0].domain == "degrading.com"
 
-    def test_get_decay_report(self, monkeypatch):
+    def test_get_decay_report(self, monkeypatch) -> None:
         """Test comprehensive decay report."""
         memory = get_selector_memory()
         memory._memory["test.com"] = {
@@ -154,7 +154,7 @@ class TestSelectorDecayPredictor:
         assert "predictions" in report
         assert len(report["predictions"]) >= 1
 
-    def test_generate_recommendations_critical(self):
+    def test_generate_recommendations_critical(self) -> None:
         """Test recommendations for critical risk level."""
         predictor = SelectorDecayPredictor()
         recs = predictor._generate_recommendations(
@@ -163,7 +163,7 @@ class TestSelectorDecayPredictor:
         assert any("URGENT" in r for r in recs)
         assert any("Re-discover" in r or "re-discover" in r for r in recs)
 
-    def test_generate_recommendations_stable(self):
+    def test_generate_recommendations_stable(self) -> None:
         """Test recommendations for stable risk level."""
         predictor = SelectorDecayPredictor()
         recs = predictor._generate_recommendations(
@@ -176,13 +176,13 @@ class TestSelectorDecayPredictor:
 class TestSelectorDecayPredictorGlobal:
     """Test global singleton access."""
 
-    def test_singleton(self):
+    def test_singleton(self) -> None:
         """Test singleton access."""
         p1 = get_selector_decay_predictor()
         p2 = get_selector_decay_predictor()
         assert p1 is p2
 
-    def test_snapshot_persistence(self, monkeypatch):
+    def test_snapshot_persistence(self, monkeypatch) -> None:
         """Test that confidence snapshots are persisted to JSON and successfully reloaded."""
         import os
 

@@ -62,7 +62,7 @@ class _AllowAllCrawlPolicy:
 # ── 1. Backward compatibility ────────────────────────────────────────
 
 
-def test_scrape_attempt_result_is_list_subclass():
+def test_scrape_attempt_result_is_list_subclass() -> None:
     """ScrapeAttemptResult behaves as a plain list for backward compat."""
     sar = ScrapeAttemptResult(
         [{"name": "Alpha"}, {"name": "Beta"}],
@@ -93,7 +93,7 @@ def test_scrape_attempt_result_is_list_subclass():
     assert list(sar) == [{"name": "Alpha"}, {"name": "Beta"}]
 
 
-def test_scrape_attempt_result_empty_list():
+def test_scrape_attempt_result_empty_list() -> None:
     """An empty ScrapeAttemptResult still behaves as list."""
     sar = ScrapeAttemptResult([])
     assert len(sar) == 0
@@ -103,7 +103,7 @@ def test_scrape_attempt_result_empty_list():
 # ── 2. HTML evidence attachment ──────────────────────────────────────
 
 
-def test_scrape_attempt_result_carries_html_evidence():
+def test_scrape_attempt_result_carries_html_evidence() -> None:
     """HTML evidence is preserved as an attribute, especially for zero-record results."""
     html = "<html><body><div>Some data container</div></body></html>"
     sar = ScrapeAttemptResult(
@@ -128,7 +128,7 @@ def test_scrape_attempt_result_carries_html_evidence():
     assert sar.zero_result_classification.recommended_action == "retry_with_recovery"
 
 
-def test_scrape_attempt_result_html_none():
+def test_scrape_attempt_result_html_none() -> None:
     """When fetch fails, html is None but result still functions."""
     sar = ScrapeAttemptResult([], html=None, telemetry={"error": "timeout"})
     assert sar.html is None
@@ -138,7 +138,7 @@ def test_scrape_attempt_result_html_none():
 # ── 3. Zero-record classification ────────────────────────────────────
 
 
-def test_zero_result_classification_preserved():
+def test_zero_result_classification_preserved() -> None:
     """Zero-result classification metadata is preserved on the result."""
     classification = ZeroResultClassification(
         zero_result=True,
@@ -165,13 +165,13 @@ def test_zero_result_classification_preserved():
     assert "captcha detected" in sar.warnings
 
 
-def test_zero_result_classification_none():
+def test_zero_result_classification_none() -> None:
     """When no zero-result classification, the field is None."""
     sar = ScrapeAttemptResult([{"name": "Acme"}], html="<html>ok</html>")
     assert sar.zero_result_classification is None
 
 
-def test_zero_result_classification_empty_shell():
+def test_zero_result_classification_empty_shell() -> None:
     """Empty shell classification is preserved with evidence scores."""
     classification = ZeroResultClassification(
         zero_result=True,
@@ -198,7 +198,7 @@ def test_zero_result_classification_empty_shell():
 # ── 4. Anti-bot lineage ──────────────────────────────────────────────
 
 
-def test_anti_bot_lineage_preserved():
+def test_anti_bot_lineage_preserved() -> None:
     """Anti-bot detection scores and fetch method propagate through result."""
     sar = ScrapeAttemptResult(
         [],
@@ -230,7 +230,7 @@ def test_anti_bot_lineage_preserved():
 # ── 5. to_telemetry_dict ─────────────────────────────────────────────
 
 
-def test_to_telemetry_dict():
+def test_to_telemetry_dict() -> None:
     """to_telemetry_dict produces a flat diagnostic dict."""
     sar = ScrapeAttemptResult(
         [{"name": "A"}, {"name": "B"}],
@@ -256,7 +256,7 @@ def test_to_telemetry_dict():
     assert d["warnings"] == ["slow JS render"]
 
 
-def test_to_telemetry_dict_zero_result():
+def test_to_telemetry_dict_zero_result() -> None:
     """to_telemetry_dict includes zero-result classification when present."""
     sar = ScrapeAttemptResult(
         [],
@@ -281,7 +281,7 @@ def test_to_telemetry_dict_zero_result():
 
 
 @pytest.mark.asyncio
-async def test_scrape_url_attempt_returns_rich_result(monkeypatch):
+async def test_scrape_url_attempt_returns_rich_result(monkeypatch) -> None:
     """scrape_url_attempt returns a ScrapeAttemptResult with lineage."""
     from app import scraper
 
@@ -348,7 +348,7 @@ async def test_scrape_url_attempt_returns_rich_result(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_scrape_url_attempt_handles_monkeypatched_plain_list(monkeypatch):
+async def test_scrape_url_attempt_handles_monkeypatched_plain_list(monkeypatch) -> None:
     """scrape_url_attempt gracefully handles when scrape_url returns a plain list."""
     from app import scraper
 
@@ -378,7 +378,7 @@ async def test_scrape_url_attempt_handles_monkeypatched_plain_list(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_scrape_url_attempt_zero_result_with_html(monkeypatch):
+async def test_scrape_url_attempt_zero_result_with_html(monkeypatch) -> None:
     """scrape_url_attempt preserves HTML and classification in zero-record case."""
     from app import scraper
 
@@ -458,32 +458,32 @@ async def test_scrape_url_attempt_zero_result_with_html(monkeypatch):
 # ── 7. Edge cases ────────────────────────────────────────────────────
 
 
-def test_warnings_defaults_to_empty_list():
+def test_warnings_defaults_to_empty_list() -> None:
     """Warnings default to [] when not provided."""
     sar = ScrapeAttemptResult([], html="<html></html>")
     assert sar.warnings == []
 
 
-def test_warnings_explicitly_provided():
+def test_warnings_explicitly_provided() -> None:
     """Warnings are preserved when explicitly provided."""
     sar = ScrapeAttemptResult([], html="<html></html>", warnings=["timeout", "retry"])
     assert sar.warnings == ["timeout", "retry"]
 
 
-def test_scores_default_to_zero():
+def test_scores_default_to_zero() -> None:
     """anti_bot_score and data_evidence_score default to 0.0."""
     sar = ScrapeAttemptResult([{"name": "X"}])
     assert sar.anti_bot_score == 0.0
     assert sar.data_evidence_score == 0.0
 
 
-def test_recommended_next_action_defaults_to_empty():
+def test_recommended_next_action_defaults_to_empty() -> None:
     """recommended_next_action defaults to empty string."""
     sar = ScrapeAttemptResult([])
     assert sar.recommended_next_action == ""
 
 
-def test_multiple_zero_results_with_different_classifications():
+def test_multiple_zero_results_with_different_classifications() -> None:
     """Different failure classes are properly represented."""
     classifications = [
         ("anti_bot_block", "use_authorized_access_or_retry_later"),

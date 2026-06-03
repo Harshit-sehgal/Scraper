@@ -6,7 +6,7 @@ from app.selector_discovery import _assess_content_quality, _detect_redirect
 class TestDetectRedirect:
     """Tests for _detect_redirect — URL path comparison logic."""
 
-    def test_no_redirect_same_url(self):
+    def test_no_redirect_same_url(self) -> None:
         result = _detect_redirect(
             "https://example.com/search/results",
             "https://example.com/search/results",
@@ -14,7 +14,7 @@ class TestDetectRedirect:
         assert result["redirected"] is False
         assert result["redirect_type"] == "none"
 
-    def test_no_redirect_trailing_slash(self):
+    def test_no_redirect_trailing_slash(self) -> None:
         result = _detect_redirect(
             "https://example.com/search/results",
             "https://example.com/search/results/",
@@ -22,7 +22,7 @@ class TestDetectRedirect:
         assert result["redirected"] is False
         assert result["redirect_type"] == "none"
 
-    def test_homepage_redirect(self):
+    def test_homepage_redirect(self) -> None:
         result = _detect_redirect(
             "https://www.cheapflightsfares.com/search/id/SaCLIvTQmmfXOHXOFqMzQOfK",
             "https://www.cheapflightsfares.com/",
@@ -33,7 +33,7 @@ class TestDetectRedirect:
         assert result["redirect_type"] == "session_expired"
         assert "expired" in result["message"].lower()
 
-    def test_session_expired_redirect(self):
+    def test_session_expired_redirect(self) -> None:
         result = _detect_redirect(
             "https://example.com/flights/search/abc123def",
             "https://example.com/flights",
@@ -42,7 +42,7 @@ class TestDetectRedirect:
         assert result["redirect_type"] == "session_expired"
         assert "expired" in result["message"].lower()
 
-    def test_path_changed_redirect(self):
+    def test_path_changed_redirect(self) -> None:
         result = _detect_redirect(
             "https://example.com/old-path",
             "https://example.com/new-path",
@@ -50,7 +50,7 @@ class TestDetectRedirect:
         assert result["redirected"] is True
         assert result["redirect_type"] == "path_changed"
 
-    def test_cross_domain_not_flagged(self):
+    def test_cross_domain_not_flagged(self) -> None:
         """Cross-domain redirects (different netloc) are not flagged as redirects."""
         result = _detect_redirect(
             "https://example.com/search",
@@ -60,7 +60,7 @@ class TestDetectRedirect:
         assert result["redirected"] is False
         assert result["redirect_type"] == "none"
 
-    def test_preserves_original_and_final_urls(self):
+    def test_preserves_original_and_final_urls(self) -> None:
         original = "https://example.com/a/b/c"
         final = "https://example.com/"
         result = _detect_redirect(original, final)
@@ -71,7 +71,7 @@ class TestDetectRedirect:
 class TestAssessContentQuality:
     """Tests for _assess_content_quality — landing page vs data page detection."""
 
-    def test_good_quality_with_many_cards(self):
+    def test_good_quality_with_many_cards(self) -> None:
         html = (
             "<html><body>"
             + "".join(f'<div class="result-card">New York → London £{i}50 - Flight {i} results</div>' for i in range(10))
@@ -86,7 +86,7 @@ class TestAssessContentQuality:
         assert result["quality"] == "good"
         assert result["data_container_count"] >= 3
 
-    def test_landing_page_with_form(self):
+    def test_landing_page_with_form(self) -> None:
         html = """
         <html><body>
             <div class="hero-banner"><h1>Welcome</h1></div>
@@ -104,7 +104,7 @@ class TestAssessContentQuality:
         # Message says "a landing or homepage" ("landing" and "page" not contiguous)
         assert "landing" in result["message"].lower() or "homepage" in result["message"].lower()
 
-    def test_low_quality_no_containers(self):
+    def test_low_quality_no_containers(self) -> None:
         html = "<html><body><p>Just a paragraph</p><p>Another one</p></body></html>"
 
         class MockProfile:
@@ -114,13 +114,13 @@ class TestAssessContentQuality:
         assert result["quality"] in ("low", "landing_page")
         assert result["has_data_containers"] is False
 
-    def test_none_profile_handled(self):
+    def test_none_profile_handled(self) -> None:
         html = "<html><body><div class='card'>A</div></body></html>"
         result = _assess_content_quality(html, None)
         assert isinstance(result, dict)
         assert "quality" in result
 
-    def test_profile_container_used(self):
+    def test_profile_container_used(self) -> None:
         html = (
             "<html><body>"
             + "".join(f'<div class="flight-box">Flight to New York City - £{i}50 one-way ticket</div>' for i in range(5))

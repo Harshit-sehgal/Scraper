@@ -141,7 +141,7 @@ def _zero_result_trend() -> DomainTrend:
 
 
 class TestPredictionModel:
-    def test_to_dict_returns_all_keys(self):
+    def test_to_dict_returns_all_keys(self) -> None:
         p = Prediction(
             domain="test.com",
             risk_level="high",
@@ -159,7 +159,7 @@ class TestPredictionModel:
         assert d["predicted_failure_type"] == "selector_decay"
         assert "generated_at" in d
 
-    def test_prediction_defaults(self):
+    def test_prediction_defaults(self) -> None:
         p = Prediction(
             domain="test.com",
             risk_level="low",
@@ -177,7 +177,7 @@ class TestPredictionModel:
 
 
 class TestPredictionReport:
-    def test_empty_report(self):
+    def test_empty_report(self) -> None:
         r = PredictionReport()
         d = r.to_dict()
         assert d["domains_analyzed"] == 0
@@ -185,7 +185,7 @@ class TestPredictionReport:
         assert d["systemic_risk_level"] == "low"
         assert "summary" in d
 
-    def test_report_with_predictions(self):
+    def test_report_with_predictions(self) -> None:
         r = PredictionReport()
         r.domains_analyzed = 2
         r.predictions = [
@@ -235,7 +235,7 @@ class TestPredictionReport:
 
 
 class TestDegradationPredictor:
-    def test_predict_healthy_domain_no_predictions(self):
+    def test_predict_healthy_domain_no_predictions(self) -> None:
         predictor = DegradationPredictor()
         trends = {"example.com": _healthy_domain_trend()}
         report = predictor.predict([], trends)
@@ -247,7 +247,7 @@ class TestDegradationPredictor:
             high_risk == 0
         ), f"Expected no high-risk predictions for healthy domain, got {high_risk}: {[p.to_dict() for p in report.predictions]}"
 
-    def test_predict_degrading_domain_has_predictions(self):
+    def test_predict_degrading_domain_has_predictions(self) -> None:
         predictor = DegradationPredictor()
         trends = {"degrading.com": _degrading_domain_trend()}
         report = predictor.predict([], trends)
@@ -258,7 +258,7 @@ class TestDegradationPredictor:
         severities = {p.risk_level for p in report.predictions}
         assert severities & {"medium", "high", "critical"}, f"Expected at least medium severity, got {severities}"
 
-    def test_predict_critical_domain_generates_high_risk(self):
+    def test_predict_critical_domain_generates_high_risk(self) -> None:
         predictor = DegradationPredictor()
         trends = {"critical.com": _critical_domain_trend()}
         report = predictor.predict([], trends)
@@ -271,7 +271,7 @@ class TestDegradationPredictor:
         has_cascade = any(p.cascade_risk for p in report.predictions)
         assert has_cascade, "High-volume critical domain should have cascade risk"
 
-    def test_predict_selector_decay_accelerating(self):
+    def test_predict_selector_decay_accelerating(self) -> None:
         predictor = DegradationPredictor()
         trend = _make_domain_trend(
             health_score=45.0,
@@ -289,7 +289,7 @@ class TestDegradationPredictor:
         decay = decay_preds[0]
         assert decay.estimated_time_to_failure_hours is not None
 
-    def test_predict_anti_bot_intensification(self):
+    def test_predict_anti_bot_intensification(self) -> None:
         predictor = DegradationPredictor()
         trend = _make_domain_trend(
             health_score=55.0,
@@ -302,7 +302,7 @@ class TestDegradationPredictor:
         bot_preds = [p for p in report.predictions if p.predicted_failure_type == "anti_bot_block"]
         assert len(bot_preds) >= 1, "Degrading anti-bot should generate a prediction"
 
-    def test_predict_latency_timeout_spiral(self):
+    def test_predict_latency_timeout_spiral(self) -> None:
         predictor = DegradationPredictor()
         trends = {"slow.com": _latency_creep_trend()}
         report = predictor.predict([], trends)
@@ -310,7 +310,7 @@ class TestDegradationPredictor:
         timeout_preds = [p for p in report.predictions if p.predicted_failure_type == "timeout_death_spiral"]
         assert len(timeout_preds) >= 1, "High latency with degrading trend should warn of timeout death spiral"
 
-    def test_predict_zero_result_drift(self):
+    def test_predict_zero_result_drift(self) -> None:
         predictor = DegradationPredictor()
         trends = {"empty.com": _zero_result_trend()}
         report = predictor.predict([], trends)
@@ -318,7 +318,7 @@ class TestDegradationPredictor:
         zero_preds = [p for p in report.predictions if p.predicted_failure_type == "zero_result_drift"]
         assert len(zero_preds) >= 1, "Very low quality with enough samples should predict zero result drift"
 
-    def test_predict_sustained_failure_rate(self):
+    def test_predict_sustained_failure_rate(self) -> None:
         predictor = DegradationPredictor()
         trend = _make_domain_trend(
             health_score=25.0,
@@ -333,7 +333,7 @@ class TestDegradationPredictor:
         assert len(failure_preds) >= 1, "High failure rate should generate sustained failure prediction"
         assert failure_preds[0].risk_level in ("high", "critical")
 
-    def test_predict_insufficient_data(self):
+    def test_predict_insufficient_data(self) -> None:
         predictor = DegradationPredictor()
         trend = _make_domain_trend(
             sample_count=1,
@@ -345,7 +345,7 @@ class TestDegradationPredictor:
         # No predictions should be made for domains with < 2 samples
         assert len(report.predictions) == 0
 
-    def test_confidence_increases_with_samples(self):
+    def test_confidence_increases_with_samples(self) -> None:
         predictor = DegradationPredictor()
         low_sample = _make_domain_trend(
             health_score=35.0,
@@ -368,7 +368,7 @@ class TestDegradationPredictor:
         avg_high = report_high.average_confidence
         assert avg_high >= avg_low, f"Expected higher confidence with more samples ({avg_high} >= {avg_low})"
 
-    def test_systemic_risk_computation(self):
+    def test_systemic_risk_computation(self) -> None:
         predictor = DegradationPredictor()
 
         # Create a report with critical predictions
@@ -396,7 +396,7 @@ class TestDegradationPredictor:
         risk4 = predictor._compute_systemic_risk(report4)
         assert risk4 == "critical", f"Expected 'critical' systemic risk for 3 critical, got {risk4}"
 
-    def test_top_risks_sorted_by_severity(self):
+    def test_top_risks_sorted_by_severity(self) -> None:
         predictor = DegradationPredictor()
         trends = {
             "low.com": _healthy_domain_trend(),
@@ -415,7 +415,7 @@ class TestDegradationPredictor:
                 current <= next_
             ), f"Top risks not sorted: {report.top_risks[i]['risk_level']} before {report.top_risks[i + 1]['risk_level']}"
 
-    def test_multi_domain_prediction(self):
+    def test_multi_domain_prediction(self) -> None:
         predictor = DegradationPredictor()
         trends = {
             "healthy.com": _healthy_domain_trend(),
@@ -431,7 +431,7 @@ class TestDegradationPredictor:
             healthy_preds
         ), f"Degrading domain ({len(degrading_preds)}) should have >= predictions than healthy ({len(healthy_preds)})"
 
-    def test_health_trend_determination(self):
+    def test_health_trend_determination(self) -> None:
         predictor = DegradationPredictor()
         trend_all_bad = _make_domain_trend(
             quality_trend="degrading",
@@ -480,7 +480,7 @@ class TestDegradationPredictor:
         result = predictor._determine_health_trend(ImprovingFakeTrend())
         assert result == "improving", f"Expected improving, got {result}"
 
-    def test_multi_predictions_use_recommended_actions(self):
+    def test_multi_predictions_use_recommended_actions(self) -> None:
         """Verify that predictions include actionable recommendations."""
         predictor = DegradationPredictor()
         trends = {"degrading.com": _degrading_domain_trend()}
@@ -499,7 +499,7 @@ class TestDegradationPredictor:
 
 
 class TestDegradationPredictorIntegration:
-    def test_predict_with_real_telemetry(self):
+    def test_predict_with_real_telemetry(self) -> None:
         """Use simulated telemetry events to drive predictions."""
         events = []
         # 8 healthy events
@@ -533,12 +533,12 @@ class TestDegradationPredictorIntegration:
         if degrading_preds:
             assert any(p.risk_level in ("medium", "high") for p in degrading_preds)
 
-    def test_singleton_returns_same_instance(self):
+    def test_singleton_returns_same_instance(self) -> None:
         p1 = get_degradation_predictor()
         p2 = get_degradation_predictor()
         assert p1 is p2
 
-    def test_empty_telemetry_returns_empty_report(self):
+    def test_empty_telemetry_returns_empty_report(self) -> None:
         predictor = DegradationPredictor()
         report = predictor.predict([])
         assert report.domains_analyzed == 0

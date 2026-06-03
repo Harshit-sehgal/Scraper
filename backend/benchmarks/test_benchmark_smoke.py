@@ -15,6 +15,7 @@ import os
 import sys
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
 import pytest
 from app.config import settings
@@ -424,7 +425,7 @@ async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:
 
         telemetry = get_scrape_telemetry()
         recent = telemetry.get_recent(10)
-        t_data = next((t for t in recent if t.get("url") == site.url), {})
+        t_data: dict[str, Any] = next((t for t in recent if t.get("url") == site.url), {})
 
         dom_nodes = t_data.get("dom_nodes", 0) or 0
         anti_bot = t_data.get("anti_bot_score", 0.0) or 0.0
