@@ -31,6 +31,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.txt
 
+      - name: Install Playwright Chromium with system deps
+        run: |
+          python -m playwright install --with-deps chromium
+
       - name: Run Golden Dataset tests
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
