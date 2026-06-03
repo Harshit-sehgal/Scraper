@@ -1,4 +1,5 @@
 {
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "chat.tools.terminal.autoApprove": {
         "/home/harshit/Documents/Work/Money/scraper/.venv/bin/python": true,
         "./venv/bin/python": true,
