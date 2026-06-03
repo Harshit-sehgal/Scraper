@@ -71,11 +71,17 @@ module = [
     "app.container_discovery",
     "app.selector_engine",
     "app.scraper",
-    "manual_test_workflow",
-    "manual_test_chennai",
-    "manual_run_manual_test",
-    "manual_test_extract",
-    "manual_test_threebestrated"
+    "backend.app.page_evidence_collector",
+    "backend.app.content_quality",
+    "backend.app.search_form_recovery",
+    "backend.app.container_discovery",
+    "backend.app.selector_engine",
+    "backend.app.scraper",
+    "backend.tests.manual_test_workflow",
+    "backend.tests.manual_test_chennai",
+    "backend.tests.manual_run_manual_test",
+    "backend.tests.manual_test_extract",
+    "backend.tests.manual_test_threebestrated"
 ]
 ignore_errors = true
 

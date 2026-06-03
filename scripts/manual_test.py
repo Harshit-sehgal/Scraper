@@ -92,7 +92,8 @@ def api_get(path: str, timeout: int = 10) -> Optional[dict]:
         print(f"  ⏱️  Timeout fetching {path}")
         return None
     except requests.HTTPError as e:
-        print(f"  ❌ HTTP {e.response.status_code}: {path}")
+        status = e.response.status_code if e.response is not None else "unknown"
+        print(f"  ❌ HTTP {status}: {path}")
         return None
 
 
@@ -105,7 +106,9 @@ def api_post(path: str, data: dict, timeout: int = 30) -> Optional[dict]:
         print(f"  ❌ Connection refused on {API_BASE}{path}")
         return None
     except requests.HTTPError as e:
-        print(f"  ❌ HTTP {e.response.status_code}: {e.response.text[:200]}")
+        status = e.response.status_code if e.response is not None else "unknown"
+        text = e.response.text[:200] if e.response is not None else ""
+        print(f"  ❌ HTTP {status}: {text}")
         return None
     except requests.Timeout:
         print(f"  ⏱️  Timeout on {path}")
