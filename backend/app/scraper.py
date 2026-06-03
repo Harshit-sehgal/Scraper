@@ -46,7 +46,6 @@ from app.html_utils import (
     _is_empty_value,
     fetch_page_content,
 )
-from app.insight_engine import generate_data_insight, suggest_schema_from_intent, suggest_schema_from_intent_sync
 from app.models import SchemaField
 from app.page_evidence_collector import collect_page_evidence
 from app.regression_capture import get_regression_capture
@@ -55,9 +54,7 @@ from app.scrape_telemetry import (
     estimate_dom_nodes,
     get_scrape_telemetry,
 )
-from app.selector_decay_predictor import get_selector_decay_predictor
 from app.selector_profiles.loader import match_profile_for_url, try_profile_extraction
-from app.self_tuning_extraction import get_self_tuning_controller
 from app.zero_result_classifier import classify_zero_result
 
 logger = logging.getLogger(__name__)
@@ -133,6 +130,24 @@ __all__ = [
     "suggest_schema_from_intent",
     "suggest_schema_from_intent_sync",
 ]
+
+
+async def generate_data_insight(*args, **kwargs):
+    from app.insight_engine import generate_data_insight as impl
+
+    return await impl(*args, **kwargs)
+
+
+async def suggest_schema_from_intent(*args, **kwargs):
+    from app.insight_engine import suggest_schema_from_intent as impl
+
+    return await impl(*args, **kwargs)
+
+
+def suggest_schema_from_intent_sync(*args, **kwargs):
+    from app.insight_engine import suggest_schema_from_intent_sync as impl
+
+    return impl(*args, **kwargs)
 
 
 def _limit_source_records(records: list[dict], schema_fields: list[SchemaField]) -> list[dict]:
@@ -882,6 +897,8 @@ async def scrape_url(
     # ── Predictive Adaptation: Record observations ────────────────────
     # 1. Selector Decay Prediction: Track confidence trend
     try:
+        from app.selector_decay_predictor import get_selector_decay_predictor  # research-shell, lazy
+
         decay_predictor = get_selector_decay_predictor()
         decay_predictor.record_observation(intel.domain, selector_hit_rate)
 
@@ -914,6 +931,8 @@ async def scrape_url(
 
     # 3. Self-Tuning Extraction: Feed telemetry for parameter adjustment
     try:
+        from app.self_tuning_extraction import get_self_tuning_controller  # research-shell, lazy
+
         tuning_controller = get_self_tuning_controller()
         tuning_controller.record_telemetry(
             intel.domain,
