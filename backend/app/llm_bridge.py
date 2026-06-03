@@ -36,7 +36,7 @@ def _extract_json_payload(text: str | None):
         except json.JSONDecodeError:
             logging.getLogger(__name__).debug("_extract_json_payload: direct JSON parse failed (len=%d)", len(candidate))
 
-    match = re.search(r"\{[\s\S]*\}", raw)
+    match = re.search(r"\{[\s\S]*?\}", raw)
     if match:
         try:
             return json.loads(match.group(0))
@@ -45,7 +45,7 @@ def _extract_json_payload(text: str | None):
                 "_extract_json_payload: object JSON parse failed for match of len %d", len(match.group(0))
             )
 
-    match = re.search(r"\[[\s\S]*\]", raw)
+    match = re.search(r"\[[\s\S]*?\]", raw)
     if match:
         try:
             return json.loads(match.group(0))

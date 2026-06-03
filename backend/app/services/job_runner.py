@@ -515,7 +515,7 @@ async def run_job(
 
         # Post-process
         _add_job_log(job, "Applying filters and deduplication...", persist_fn=persist_job_state_fn)
-        filtered_results, total, filtered_count, type_integrity_report = process_results(
+        filtered_results, total, filtered_count, type_integrity_report = await process_results(
             all_raw_results, job.schema_fields, job.filters
         )
         post_filter_count = len(filtered_results)
@@ -529,7 +529,7 @@ async def run_job(
             "max_distance_km": job.max_distance_km,
         }
         if job.origin_location and job.max_distance_km is not None:
-            filtered_results, radius_report = apply_location_radius(
+            filtered_results, radius_report = await apply_location_radius(
                 records=filtered_results,
                 schema_fields=job.schema_fields,
                 origin_address=job.origin_location,

@@ -3,9 +3,9 @@ Post-Processing Engine: Type coercion, Geospatial distance calculation, and Data
 Uses geopy (free OpenStreetMap Nominatim geocoder) for distance calculations.
 """
 
+import asyncio
 import logging
 import re
-import time
 from typing import Any, Optional
 
 from geopy.distance import geodesic
@@ -23,7 +23,7 @@ _geocode_cache: dict[str, Optional[tuple[float, float]]] = {}
 _LOCATION_NAME_HINTS = ("location", "address", "city", "area", "region", "zip", "pincode")
 
 
-def geocode_address(address: str) -> Optional[tuple[float, float]]:
+async def geocode_address(address: str) -> Optional[tuple[float, float]]:
     """Convert an address string to (latitude, longitude) using free OpenStreetMap."""
     from app.geocode_cache import get_geocode_cache
 
@@ -38,7 +38,7 @@ def geocode_address(address: str) -> Optional[tuple[float, float]]:
     backoff = 1.0  # Base delay in seconds
     for attempt in range(max_retries):
         try:
-            location = _geocoder.geocode(address)
+            location = await asyncio.to_thread(_geocoder.geocode, address)
             if location:
                 coords = (location.latitude, location.longitude)
                 cache.set(address, location.latitude, location.longitude, location.address)
@@ -53,7 +53,7 @@ def geocode_address(address: str) -> Optional[tuple[float, float]]:
                     backoff,
                     str(e),
                 )
-                time.sleep(backoff)
+                await asyncio.sleep(backoff)
                 backoff *= 2.0  # Exponential backoff
             else:
                 logging.exception("Geocode error for %s after %d attempts: %s", address, max_retries, e)
@@ -264,7 +264,7 @@ def enforce_schema_integrity(record: dict, schema_fields: list[SchemaField]) -> 
 # ──────────────────────────────────────────────
 
 
-def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField]) -> bool:
+async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField]) -> bool:
     """
     Check if a single record passes a filter rule.
     Returns True if the record should be KEPT.
@@ -273,7 +273,7 @@ def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField
 
     # Special case: Distance filter
     if rule.operator == FilterOperator.DISTANCE_WITHIN:
-        return _apply_distance_filter(value, rule)
+        return await _apply_distance_filter(value, rule)
 
     # Is Empty / Is Not Empty (works on None)
     if rule.operator == FilterOperator.IS_EMPTY:
@@ -337,7 +337,7 @@ def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField
     return True
 
 
-def _apply_distance_filter(location_value, rule: FilterRule) -> bool:
+async def _apply_distance_filter(location_value, rule: FilterRule) -> bool:
     """
     Special distance filter: geocodes both the record's location and the
     origin address, then checks if the distance is within the threshold.
@@ -345,8 +345,8 @@ def _apply_distance_filter(location_value, rule: FilterRule) -> bool:
     if not location_value or not rule.origin_address:
         return False
 
-    target_coords = geocode_address(str(location_value))
-    origin_coords = geocode_address(rule.origin_address)
+    target_coords = await geocode_address(str(location_value))
+    origin_coords = await geocode_address(rule.origin_address)
 
     if not target_coords or not origin_coords:
         logging.warning("Could not geocode: %s or %s", location_value, rule.origin_address)
@@ -398,7 +398,7 @@ def _pick_record_location(record: dict, candidate_fields: list[str]) -> Optional
     return None
 
 
-def apply_location_radius(
+async def apply_location_radius(
     records: list[dict],
     schema_fields: list[SchemaField],
     origin_address: str,
@@ -430,7 +430,7 @@ def apply_location_radius(
         report["reason"] = "invalid_radius"
         return records, report
 
-    origin_coords = geocode_address(origin_address)
+    origin_coords = await geocode_address(origin_address)
     if not origin_coords:
         report["reason"] = "origin_geocode_failed"
         return records, report
@@ -450,7 +450,7 @@ def apply_location_radius(
             dropped_missing_location += 1
             continue
 
-        target_coords = geocode_address(location_value)
+        target_coords = await geocode_address(location_value)
         if not target_coords:
             dropped_geocode_fail += 1
             continue
@@ -471,7 +471,7 @@ def apply_location_radius(
     return kept, report
 
 
-def process_results(
+async def process_results(
     raw_results: list[dict], schema_fields: list[SchemaField], filters: list[FilterRule]
 ) -> tuple[list[dict], int, int, dict]:
     """
@@ -489,8 +489,10 @@ def process_results(
     if filters:
         filtered = []
         for record in coerced:
-            passes_all = all(apply_filter(record, rule, schema_fields) for rule in filters)
-            if passes_all:
+            results = []
+            for rule in filters:
+                results.append(await apply_filter(record, rule, schema_fields))
+            if all(results):
                 filtered.append(record)
     else:
         filtered = coerced
