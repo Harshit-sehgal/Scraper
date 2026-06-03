@@ -11,16 +11,54 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from app.models import FieldType, SchemaField
 from app.page_profiler import ValuePatterns
-from app.selector_discovery import (
-    _analyze_page_data_type,
-    _classify_value,
-    _infer_field_name,
-    _rename_generic_fields,
-    _value_patterns_to_field_types,
-    build_selector_prompt,
-    build_url_analysis_prompt,
-    discover_selectors,
-)
+
+
+def _analyze_page_data_type(*args, **kwargs):
+    import app.selector_discovery
+
+    return app.selector_discovery._analyze_page_data_type(*args, **kwargs)
+
+
+def _classify_value(*args, **kwargs):
+    import app.selector_discovery
+
+    return app.selector_discovery._classify_value(*args, **kwargs)
+
+
+def _infer_field_name(*args, **kwargs):
+    import app.selector_discovery
+
+    return app.selector_discovery._infer_field_name(*args, **kwargs)
+
+
+def _rename_generic_fields(*args, **kwargs):
+    import app.selector_discovery
+
+    return app.selector_discovery._rename_generic_fields(*args, **kwargs)
+
+
+def _value_patterns_to_field_types(*args, **kwargs):
+    import app.selector_discovery
+
+    return app.selector_discovery._value_patterns_to_field_types(*args, **kwargs)
+
+
+def build_selector_prompt(*args, **kwargs):
+    import app.selector_discovery
+
+    return app.selector_discovery.build_selector_prompt(*args, **kwargs)
+
+
+def build_url_analysis_prompt(*args, **kwargs):
+    import app.selector_discovery
+
+    return app.selector_discovery.build_url_analysis_prompt(*args, **kwargs)
+
+
+async def discover_selectors(*args, **kwargs):
+    import app.selector_discovery
+
+    return await app.selector_discovery.discover_selectors(*args, **kwargs)
 
 
 class TestAnalyzePageDataType:

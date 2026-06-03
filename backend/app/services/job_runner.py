@@ -16,12 +16,30 @@ from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
 
-# Research-shell boundary:
-# `app.scraper_recovery_integration`, `app.semantic_persistence`, and
-# `app.semantic_pipeline` are research modules (see
-# backend/app/research/__init__.py). They are imported lazily inside
-# `run_job()` so that `import app.services.job_runner` does not pull
-# the research shell into the product kernel at startup.
+
+# --- Dynamic delegation to research-shell modules to keep imports lazy but mockable ---
+async def scrape_url_with_recovery(*args, **kwargs):
+    from app.scraper_recovery_integration import scrape_url_with_recovery as impl
+
+    return await impl(*args, **kwargs)
+
+
+def load_semantic_state(*args, **kwargs):
+    from app.semantic_persistence import load_semantic_state as impl
+
+    return impl(*args, **kwargs)
+
+
+def save_semantic_state(*args, **kwargs):
+    from app.semantic_persistence import save_semantic_state as impl
+
+    return impl(*args, **kwargs)
+
+
+def run_pipeline(*args, **kwargs):
+    from app.semantic_pipeline import run_pipeline as impl
+
+    return impl(*args, **kwargs)
 
 
 def _add_job_log(job, message: str, level: str = "info", persist_fn=None, persist_single_fn=None):
@@ -104,12 +122,7 @@ async def run_job(
         return
 
     try:
-        # Lazy imports: these 3 modules are part of the research shell.
-        # Imported here (not at module level) so that importing
-        # app.services.job_runner does not pull in the research shell.
-        from app.scraper_recovery_integration import scrape_url_with_recovery  # research-shell, lazy
-        from app.semantic_persistence import load_semantic_state, save_semantic_state  # research-shell, lazy
-        from app.semantic_pipeline import run_pipeline  # research-shell, lazy
+        # Using module-level lazy wrappers to satisfy quarantine and mockability
 
         load_semantic_state()
 

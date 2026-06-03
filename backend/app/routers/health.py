@@ -12,13 +12,18 @@ import time
 
 from app.config import settings
 from app.globals import jobs_store, recycle_bin_store
-from app.storage_interface import get_job_repository
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["system"])
+
+
+def get_job_repository():
+    import app.main
+
+    return app.main.get_job_repository()
 
 
 @router.get("/")

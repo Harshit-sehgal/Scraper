@@ -290,7 +290,6 @@ async def test_search_form_recovery_ssrf_blocking(monkeypatch):
 
 def test_backend_cors_origins_enforcement(client, monkeypatch):
     """Verify that backend CORS rejects/allows origins based on settings.CORS_ORIGINS."""
-    from app import main as main_mod
     from app.config import settings
 
     # Set production-like API auth and CORS settings. Preflight requests must
@@ -299,10 +298,10 @@ def test_backend_cors_origins_enforcement(client, monkeypatch):
     monkeypatch.setattr(settings, "CORS_ORIGINS", ["https://trusted.com"])
 
     # Locate and patch the CORSMiddleware instance in the ASGI middleware stack
-    if main_mod.app.middleware_stack is None:
-        main_mod.app.middleware_stack = main_mod.app.build_middleware_stack()
+    if client.app.middleware_stack is None:
+        client.app.middleware_stack = client.app.build_middleware_stack()
 
-    current_app = main_mod.app.middleware_stack
+    current_app = client.app.middleware_stack
     cors_mw = None
     while current_app is not None:
         if current_app.__class__.__name__ == "CORSMiddleware":

@@ -1,6 +1,11 @@
 import pytest
 from app.semantic_inference_engine import RoleEmbeddingEngine
-from app.semantic_world_state import get_world_state
+
+
+def get_world_state():
+    import app.semantic_world_state
+
+    return app.semantic_world_state.get_world_state()
 
 
 def test_manifold_sharding():

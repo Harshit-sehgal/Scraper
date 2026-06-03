@@ -3,7 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List, Optional
 
 from app.semantic_ir import SemanticType
-from app.semantic_world_state import get_world_state
+
+
+def get_world_state() -> "SemanticWorldState":
+    import app.semantic_world_state
+
+    return app.semantic_world_state.get_world_state()
+
 
 if TYPE_CHECKING:
     from app.semantic_world_state import SemanticWorldState
@@ -13,7 +19,7 @@ class TopologicalQuery:
     """Evaluates geometric and relational queries against the semantic field."""
 
     def __init__(self, ws: Optional[SemanticWorldState] = None):
-        self.ws = ws or get_world_state()
+        self.ws: SemanticWorldState = ws or get_world_state()
 
     def find_roles_near(self, role_name: str, radius: float = 0.5) -> List[dict]:
         """Find roles within geometric radius in the manifold."""

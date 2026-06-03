@@ -16,7 +16,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from app.acquisition_telemetry import AcquisitionTelemetryCollector
 from app.page_profiler import StructureProfile, ValuePatterns
-from app.selector_discovery import analyze_url_for_fields
 
 # ── HTML fixtures ──────────────────────────────────────────────────────
 
@@ -149,6 +148,8 @@ class TestThreeWayAcquisition:
                 {"name": "price", "type": "currency", "confidence": 0.9},
             ]
 
+            from app.selector_discovery import analyze_url_for_fields
+
             result = await analyze_url_for_fields(url)
 
             # Verify acquisition lineage
@@ -238,6 +239,8 @@ class TestThreeWayAcquisition:
             }
 
             # No search_params provided — no recovery attempted
+            from app.selector_discovery import analyze_url_for_fields
+
             result = await analyze_url_for_fields(stale_url, acquisition_mode="aggressive")
 
             # Verify acquisition lineage — awaiting search params
@@ -355,6 +358,8 @@ class TestThreeWayAcquisition:
                 "canonical_url": "https://www.example.com/search/results/",
                 "confidence": 0.8,
             }
+
+            from app.selector_discovery import analyze_url_for_fields
 
             result = await analyze_url_for_fields(
                 stale_url,

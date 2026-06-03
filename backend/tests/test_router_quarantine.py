@@ -15,6 +15,7 @@ use them. This file pins the contract.
 
 from __future__ import annotations
 
+import importlib
 import sys
 
 import pytest
@@ -49,7 +50,7 @@ def clean_router_imports():
 
 def test_scraper_router_does_not_load_research_modules(clean_router_imports):
     """Importing app.routers.scraper must not pull in any research module."""
-    import app.routers.scraper  # noqa: F401
+    importlib.import_module("app.routers.scraper")
 
     loaded = [m for m in RESEARCH_MODULES_USED_BY_ROUTERS if m in sys.modules]
     assert loaded == [], (
@@ -60,7 +61,7 @@ def test_scraper_router_does_not_load_research_modules(clean_router_imports):
 
 def test_operator_router_does_not_load_research_modules(clean_router_imports):
     """Importing app.routers.operator must not pull in any research module."""
-    import app.routers.operator  # noqa: F401
+    importlib.import_module("app.routers.operator")
 
     loaded = [m for m in RESEARCH_MODULES_USED_BY_ROUTERS if m in sys.modules]
     assert loaded == [], (
@@ -71,8 +72,8 @@ def test_operator_router_does_not_load_research_modules(clean_router_imports):
 
 def test_both_routers_clean_together(clean_router_imports):
     """Importing both routers in sequence must keep research modules absent."""
-    import app.routers.operator  # noqa: F401
-    import app.routers.scraper  # noqa: F401
+    importlib.import_module("app.routers.operator")
+    importlib.import_module("app.routers.scraper")
 
     loaded = [m for m in RESEARCH_MODULES_USED_BY_ROUTERS if m in sys.modules]
     assert loaded == [], f"Either or both router modules eagerly imported: {loaded}."

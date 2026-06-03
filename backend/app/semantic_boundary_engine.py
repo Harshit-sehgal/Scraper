@@ -10,7 +10,11 @@ boundary decisions based on structural signals and learned history.
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from app.semantic_world_state import get_world_state
+
+def get_world_state():
+    import app.semantic_world_state
+
+    return app.semantic_world_state.get_world_state()
 
 
 @dataclass

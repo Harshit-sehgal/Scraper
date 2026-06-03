@@ -16,8 +16,6 @@ from typing import Any, cast
 
 from bs4 import BeautifulSoup
 
-from app.acquisition_mode import AcquisitionConfig, AcquisitionMode, escalate_mode, should_escalate
-from app.acquisition_telemetry import get_acquisition_telemetry
 from app.config import settings
 from app.content_quality import (
     _assess_content_quality,
@@ -26,7 +24,6 @@ from app.content_quality import (
 from app.empty_response_detector import EmptyResponseCheck, detect_empty_response
 from app.html_utils import clean_html_for_selectors
 from app.llm_bridge import llm_json, reset_llm_call_count
-from app.motif_feedback import MotifFeedbackEngine
 from app.page_profiler import detect_page_structure, detect_value_patterns
 from app.search_form_recovery import (
     _build_absolute_url,
@@ -48,7 +45,6 @@ from app.selector_discovery_analysis import (
     discover_selectors,
 )
 from app.session_url_detector import detect_session_params
-from app.strategy_evolution import FetchStrategy
 
 # ── Re-exports from refactored url-analysis sub-modules ───────────────
 from app.url_redirects import (
@@ -75,7 +71,6 @@ __all__ = [
     "_fallback_parent_child_discovery",
     "_build_css_for_element",
     "_infer_field_selectors_from_container",
-    "MotifFeedbackEngine",
     "_detect_redirect",
     "build_redirect_info",
     "_assess_content_quality",
@@ -90,6 +85,25 @@ __all__ = [
     "_rename_generic_fields",
     "_infer_field_name",
 ]
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.acquisition_telemetry import get_acquisition_telemetry
+    from app.motif_feedback import MotifFeedbackEngine
+else:
+
+    class MotifFeedbackEngine:
+        def __new__(cls, *args, **kwargs):
+            from app.motif_feedback import MotifFeedbackEngine as impl
+
+            return impl(*args, **kwargs)
+
+    def get_acquisition_telemetry(*args, **kwargs):
+        from app.acquisition_telemetry import get_acquisition_telemetry as impl
+
+        return impl(*args, **kwargs)
+
 
 logger = logging.getLogger(__name__)
 
@@ -139,8 +153,10 @@ async def analyze_url_for_fields(
     """
     import httpx
 
+    from app.acquisition_mode import AcquisitionConfig, AcquisitionMode, escalate_mode, should_escalate  # research-shell, lazy
     from app.html_utils import fetch_page_content as _fetch_page_content
     from app.scrape_telemetry import detect_anti_bot
+    from app.strategy_evolution import FetchStrategy  # research-shell, lazy
 
     reset_llm_call_count()
     start_time = time.time()

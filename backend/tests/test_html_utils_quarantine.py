@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import sys
 
 import pytest
@@ -19,7 +20,7 @@ def _clean():
 
 
 def test_html_utils_import_does_not_load_research_modules():
-    import app.html_utils  # noqa: F401
+    importlib.import_module("app.html_utils")
 
     loaded = [m for m in RESEARCH_MODULES if m in sys.modules]
     assert loaded == [], f"html_utils eagerly loaded: {loaded}"
@@ -37,8 +38,8 @@ def test_html_utils_import_after_main_still_clean():
     for m in ("app.main", "app.html_utils"):
         sys.modules.pop(m, None)
 
-    import app.html_utils  # noqa: F401
-    import app.main  # noqa: F401
+    importlib.import_module("app.html_utils")
+    importlib.import_module("app.main")
 
     loaded = [m for m in RESEARCH_MODULES if m in sys.modules]
     assert loaded == [], f"html_utils eagerly loaded after main: {loaded}"

@@ -3,7 +3,7 @@ import time
 from collections import Counter
 from contextlib import contextmanager
 from copy import deepcopy
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 from app.invariant_firewall import requires_invariants
 from app.semantic_world_state.events import EventMixin
@@ -14,10 +14,17 @@ from app.semantic_world_state.serialization import SerializationMixin
 from app.semantic_world_state.topology import TopologyMixin
 from app.transaction_context import active_transaction
 
+if TYPE_CHECKING:
+    from app.energy_state import EnergyState
+    from app.observability import ObservabilityState
+
 logger = logging.getLogger(__name__)
 
 
 class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMixin, TopologyMixin):
+    _observability: "ObservabilityState"
+    metrics: "EnergyState"
+
     """
     Canonical Semantic World State — now a true orchestrator.
 

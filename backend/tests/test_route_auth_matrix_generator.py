@@ -10,6 +10,15 @@ SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "route_auth_matr
 
 
 def _load_module():
+    from app.config import settings
+
+    settings.ENABLE_EXPERIMENTAL_ROUTES = True
+
+    # Pop app modules so they re-import with experimental routes enabled
+    modules_to_pop = ["app.main", "app.routers.experimental", "app.experimental_startup"]
+    for m in modules_to_pop:
+        sys.modules.pop(m, None)
+
     spec = importlib.util.spec_from_file_location("route_auth_matrix", SCRIPT_PATH)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None

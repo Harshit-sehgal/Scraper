@@ -4,8 +4,11 @@ import asyncio
 import logging
 import re
 import time
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlparse
+
+if TYPE_CHECKING:
+    from app.strategy_evolution import FetchStrategy
 
 import httpx
 from bs4 import BeautifulSoup

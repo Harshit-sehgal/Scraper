@@ -165,23 +165,35 @@ def _setup_settings(monkeypatch):
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
     """Create an ASGI client pointing at the app without running lifespan.
 
     These tests verify auth middleware and route guards. Running the full
     startup lifespan makes them slow and can hang on unrelated background
     services, which obscures the route-auth signal.
     """
+    import importlib
     import os
+    import sys
 
     mp = pytest.MonkeyPatch()
     mp.setenv("DATAFORGE_STATE_FILE", "/tmp/test_auth_state.json")
     mp.setenv("DATAFORGE_SEMANTIC_STATE_PATH", "/tmp/test_auth_semantic.json")
 
-    try:
-        from app.main import app
+    # Force ENABLE_EXPERIMENTAL_ROUTES = True
+    from app.config import settings
 
-        yield LocalASGIClient(app)
+    monkeypatch.setattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", True)
+
+    # Pop modules so that app.main re-imports with the updated settings
+    modules_to_pop = ["app.main", "app.routers.experimental", "app.experimental_startup"]
+    old_modules = {m: sys.modules.get(m) for m in modules_to_pop}
+    for m in modules_to_pop:
+        sys.modules.pop(m, None)
+
+    try:
+        app_mod = importlib.import_module("app.main")
+        yield LocalASGIClient(app_mod.app)
     except Exception as e:
         pytest.skip(f"Could not initialize app for auth tests: {e}")
     finally:
@@ -191,6 +203,11 @@ def client():
                 os.remove(f)
             except OSError:
                 pass
+        # Restore sys.modules
+        for m in modules_to_pop:
+            sys.modules.pop(m, None)
+            if old_modules[m] is not None:
+                sys.modules[m] = old_modules[m]
 
 
 # ── Parameterized route auth tests ─────────────────────────────────────

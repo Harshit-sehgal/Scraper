@@ -71,7 +71,7 @@ def _adaptive_exclusion_threshold() -> float:
     from app.semantic_world_state import get_world_state
 
     ws = get_world_state()
-    metrics: _SemanticMetricsProtocol = ws.metrics  # type: ignore[has-type]
+    metrics = ws.metrics
     base: float = float(metrics._smoothed_structural)
     temp: float = float(metrics.semantic_temperature)
     conv: float = float(metrics.integrity_score)
@@ -85,7 +85,7 @@ def _adaptive_runtime_exclusion_threshold() -> float:
     from app.semantic_world_state import get_world_state
 
     ws = get_world_state()
-    metrics: _SemanticMetricsProtocol = ws.metrics  # type: ignore[has-type]
+    metrics = ws.metrics
     base: float = float(metrics._smoothed_runtime)
     temp: float = float(metrics.semantic_temperature)
     conv: float = float(metrics.integrity_score)

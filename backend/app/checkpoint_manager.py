@@ -4,7 +4,11 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
-from app.semantic_world_state import get_world_state
+
+def get_world_state():
+    import app.semantic_world_state
+
+    return app.semantic_world_state.get_world_state()
 
 
 class CheckpointManager:
