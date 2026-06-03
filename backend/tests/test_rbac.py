@@ -11,15 +11,18 @@ from fastapi import HTTPException
 
 def test_role_resolution_with_keys(monkeypatch) -> None:
     """Verify that get_current_role resolves correct roles from API keys."""
+    from typing import Any
+
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-secret-key")
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-secret-key")
     monkeypatch.setattr(settings, "API_KEY", "user-secret-key")
     monkeypatch.setattr(settings, "ENV", "production")
 
     class MockRequest:
-        def __init__(self, headers):
+        def __init__(self, headers: dict[str, str]):
             self.headers = headers
 
+    req: Any
     # 1. Admin resolution
     req = MockRequest({"X-API-Key": "admin-secret-key"})
     assert get_current_role(req) == UserRole.ADMIN

@@ -33,7 +33,8 @@ def test_phase_transition_trigger() -> None:
     ws._energy.set_convergence(0.2)
 
     # 1. Add an exclusion that is NOT anchored
-    key = tuple(sorted(["role_a", "role_b"]))
+    sorted_roles = sorted(["role_a", "role_b"])
+    key = (sorted_roles[0], sorted_roles[1])
     ws._instability.set_exclusion(key, 0.8)
 
     # 2. Evolve macro state - should trigger phase transition
@@ -50,7 +51,8 @@ def test_anchors_resist_melting() -> None:
     ws.clear()
 
     # 1. Establish an Anchor
-    key = tuple(sorted(["origin", "destination"]))
+    sorted_keys = sorted(["origin", "destination"])
+    key = (sorted_keys[0], sorted_keys[1])
     ws._topology.record_anchor(key)
     ws._instability.set_exclusion(key, 1.0)
 
