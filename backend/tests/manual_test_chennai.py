@@ -1,12 +1,13 @@
 import json
 import time
 from pathlib import Path
+from typing import Any
 
 import requests
 
 
 def main():
-    payload = {
+    payload: Any = {
         "name": "B2B Chennai Interior Designers",
         "urls": [
             "https://irishinterior.com/contact-us/",

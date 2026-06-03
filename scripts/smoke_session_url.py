@@ -16,8 +16,8 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parent.parent / "backend"
 sys.path.insert(0, str(BACKEND))
 
-from app.models import FieldType, SchemaField
-from app.network_payload_extractor import (
+from app.models import FieldType, SchemaField  # noqa: E402
+from app.network_payload_extractor import (  # noqa: E402
     _is_candidate_secret_heavy,
     _sanitize_payload,
     arbitrate_sources,
@@ -25,9 +25,9 @@ from app.network_payload_extractor import (
     find_record_arrays,
     score_record_array,
 )
-from app.page_evidence_collector import collect_page_evidence
-from app.selector_engine import apply_selectors
-from app.session_url_detector import detect_session_params
+from app.page_evidence_collector import collect_page_evidence  # noqa: E402
+from app.selector_engine import apply_selectors  # noqa: E402
+from app.session_url_detector import detect_session_params  # noqa: E402
 
 
 async def fetch_and_capture(url: str) -> tuple[str, list[str | dict], dict]:

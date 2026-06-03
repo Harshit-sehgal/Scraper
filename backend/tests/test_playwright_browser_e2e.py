@@ -249,8 +249,8 @@ async def test_playwright_extraction_from_rendered_dom(browser_server) -> None:
     from app.selector_engine import apply_selectors
 
     schema = [
-        SchemaField(name="airline", field_type=FieldType.STRING),
-        SchemaField(name="price", field_type=FieldType.CURRENCY),
+        SchemaField(name="airline", field_type=FieldType.STRING, description="", required=False),
+        SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
     ]
     selectors = {
         "item_container": "div.card",
@@ -280,7 +280,7 @@ async def test_playwright_secrets_not_in_extraction(browser_server) -> None:
 
     from app.selector_engine import apply_selectors
 
-    schema = [SchemaField(name="airline", field_type=FieldType.STRING)]
+    schema = [SchemaField(name="airline", field_type=FieldType.STRING, description="", required=False)]
     selectors = {"item_container": "div.card", "fields": {"airline": ".airline"}}
     result = apply_selectors(html, selectors, schema)
     records = result if isinstance(result, list) else result[0]
@@ -334,8 +334,8 @@ async def test_playwright_network_capture_feeds_extractor(browser_server) -> Non
 
     # Now verify that the captured response feeds successfully into the network payload extractor
     schema = [
-        SchemaField(name="airline", field_type=FieldType.STRING),
-        SchemaField(name="price", field_type=FieldType.CURRENCY),
+        SchemaField(name="airline", field_type=FieldType.STRING, description="", required=False),
+        SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
     ]
     assert len(captured_payloads) > 0, "No network JSON response captured"
     result = extract_from_network_payloads(captured_payloads, schema)
@@ -364,8 +364,8 @@ async def test_playwright_pipeline_integration(browser_server, monkeypatch) -> N
     from app.scraper import scrape_url_attempt
 
     schema = [
-        SchemaField(name="airline", field_type=FieldType.STRING),
-        SchemaField(name="price", field_type=FieldType.CURRENCY),
+        SchemaField(name="airline", field_type=FieldType.STRING, description="", required=False),
+        SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
     ]
 
     url = f"{browser_server}/search/id/pipeline_test_token_xyz"

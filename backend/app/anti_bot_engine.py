@@ -15,7 +15,7 @@ import logging
 import random
 import re
 import time
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from app.config import settings
 
@@ -79,7 +79,7 @@ class AntiBotEngine:
     def __init__(self) -> None:
         self._block_history: Dict[str, List[float]] = {}
         # Lazy import to avoid circular dependencies
-        self._proxy_manager: Optional[object] = None
+        self._proxy_manager: Any = None
         self._cookies: Dict[str, str] = {}  # domain -> cookie_string
         self._last_cookie_update: Dict[str, float] = {}
         # domain -> user agents used

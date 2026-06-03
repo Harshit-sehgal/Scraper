@@ -443,8 +443,9 @@ async def fetch_page_content(
         # Phase 1: Try networkidle with quick timeout for faster failure
         # detection
         try:
+            wait_until: Literal["domcontentloaded", "networkidle"]
             if skip_networkidle:
-                wait_until: Literal["domcontentloaded", "networkidle"] = "domcontentloaded"
+                wait_until = "domcontentloaded"
             elif strategy != FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
                 wait_until = "networkidle"
             else:

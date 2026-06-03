@@ -1,5 +1,5 @@
 import pytest
-from app.models import Job, JobStatus
+from app.models import Job, JobStatus, ScrapeMode
 from app.storage_interface import SQLiteJobRepository
 
 
@@ -24,9 +24,9 @@ def test_sqlite_repository_atomic_move_and_restore() -> None:
     # 1. Create a job
     job = Job(
         name="atomic-test-job",
-        mode="manual",
+        mode=ScrapeMode.MANUAL,
         urls=["http://atomic.com"],
-        schema_fields=[{"name": "field", "field_type": "string"}],
+        schema_fields=[],
     )
     repo.save_single(job)
 
@@ -56,7 +56,7 @@ def test_sqlite_repository_atomic_move_and_restore() -> None:
 def test_sqlite_repository_atomic_hard_delete() -> None:
     repo = SQLiteJobRepository()
 
-    job = Job(name="delete-test-job", mode="manual", urls=["http://delete.com"], schema_fields=[])
+    job = Job(name="delete-test-job", mode=ScrapeMode.MANUAL, urls=["http://delete.com"], schema_fields=[])
     repo.save_single(job)
 
     # Move to recycle bin
@@ -74,12 +74,12 @@ def test_sqlite_repository_clear_terminal_jobs() -> None:
     repo = SQLiteJobRepository()
 
     # Active job
-    job_active = Job(name="active-job", mode="manual", urls=["http://active.com"], schema_fields=[])
+    job_active = Job(name="active-job", mode=ScrapeMode.MANUAL, urls=["http://active.com"], schema_fields=[])
     job_active.status = JobStatus.RUNNING
     repo.save_single(job_active)
 
     # Terminal job
-    job_terminal = Job(name="terminal-job", mode="manual", urls=["http://terminal.com"], schema_fields=[])
+    job_terminal = Job(name="terminal-job", mode=ScrapeMode.MANUAL, urls=["http://terminal.com"], schema_fields=[])
     job_terminal.status = JobStatus.COMPLETED
     repo.save_single(job_terminal)
 

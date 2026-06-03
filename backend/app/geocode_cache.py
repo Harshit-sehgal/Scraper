@@ -133,3 +133,9 @@ def get_geocode_cache() -> GeocodeCache:
     if _geocode_cache is None:
         _geocode_cache = GeocodeCache()
     return _geocode_cache
+
+
+def reset_geocode_cache() -> None:
+    """Reset the global singleton (used in tests to avoid cross-test pollution)."""
+    global _geocode_cache
+    _geocode_cache = None

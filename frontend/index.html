@@ -20,19 +20,19 @@
                 <span class="brand">DataForge Studio</span>
                 <span class="sep">/</span>
                 <nav class="tabs">
-                    <button class="tab active" data-view="jobs" id="tab-jobs">Jobs</button>
-                    <button class="tab" data-view="new" id="tab-new">New</button>
-                    <button class="tab recycle-tab" data-view="recycle" id="tab-recycle">Recycle Bin</button>
-                    <button class="tab cognition-tab" data-view="cognition" id="tab-cognition" title="Experimental research views — not production-validated">Cognition 🧪</button>
-                    <button class="tab dashboard-tab" data-view="dashboard" id="tab-dashboard">Dashboard</button>
+                    <button type="button" class="tab active" data-view="jobs" id="tab-jobs">Jobs</button>
+                    <button type="button" class="tab" data-view="new" id="tab-new">New</button>
+                    <button type="button" class="tab recycle-tab" data-view="recycle" id="tab-recycle">Recycle Bin</button>
+                    <button type="button" class="tab cognition-tab" data-view="cognition" id="tab-cognition" title="Experimental research views — not production-validated">Cognition 🧪</button>
+                    <button type="button" class="tab dashboard-tab" data-view="dashboard" id="tab-dashboard">Dashboard</button>
                 </nav>
             </div>
             <div class="topbar-right">
-                            <button class="btn ghost small" data-action="show-api-key" title="Set API key for production access" style="font-size:0.75rem; padding:0.2rem 0.5rem;">🔑 Key</button>
-                            <button class="btn ghost small" data-action="show-admin-key" title="Set admin key for protected actions" style="font-size:0.75rem; padding:0.2rem 0.5rem;">🛡️ Admin</button>
+                            <button type="button" class="btn ghost small" data-action="show-api-key" title="Set API key for production access">🔑 Key</button>
+                            <button type="button" class="btn ghost small" data-action="show-admin-key" title="Set admin key for protected actions">🛡️ Admin</button>
                             <span class="shortcut-hint" title="Keyboard shortcuts">N new • / search • Esc clear</span>
-                            <button class="topbar-btn" id="btn-shortcuts" title="Keyboard shortcuts" data-action="show-shortcuts">?</button>
-                            <button class="topbar-btn" id="btn-theme-toggle" title="Toggle dark mode" data-action="toggle-theme">🌙</button>
+                            <button type="button" class="topbar-btn" id="btn-shortcuts" title="Keyboard shortcuts" data-action="show-shortcuts">?</button>
+                            <button type="button" class="topbar-btn" id="btn-theme-toggle" title="Toggle dark mode" data-action="toggle-theme">🌙</button>
                 <span class="engine-status" id="engine-status"><span class="dot"></span><span id="engine-status-text">Ready</span></span>
             </div>
         </header>
@@ -47,7 +47,7 @@
                         <h1>Scraping Jobs</h1>
                         <p class="subtle">Manage and track your data extraction tasks</p>
                     </div>
-                    <button class="btn primary" data-action="switch-view" data-view="new" id="btn-create-new">Create Job</button>
+                    <button type="button" class="btn primary" data-action="switch-view" data-view="new" id="btn-create-new">Create Job</button>
                 </div>
 
                 <div class="jobs-toolbar">
@@ -65,8 +65,8 @@
                     </div>
                     <div class="jobs-toolbar-right">
                         <span class="jobs-last-updated" id="jobs-last-updated">Never updated</span>
-                        <button class="btn ghost small" data-action="clear-terminal-jobs" id="btn-clear-terminal">Clear terminal</button>
-                        <button class="btn ghost small" data-action="refresh-jobs" id="btn-refresh-jobs">Refresh</button>
+                        <button type="button" class="btn ghost small" data-action="clear-terminal-jobs" id="btn-clear-terminal">Clear terminal</button>
+                        <button type="button" class="btn ghost small" data-action="refresh-jobs" id="btn-refresh-jobs">Refresh</button>
                     </div>
                 </div>
 
@@ -106,7 +106,7 @@
                         <h1>Recycle Bin</h1>
                         <p class="subtle">Restore or permanently delete jobs</p>
                     </div>
-                    <button class="btn ghost small" data-action="clear-recycle-bin" id="btn-clear-recycle">Empty Bin</button>
+                    <button type="button" class="btn ghost small" data-action="clear-recycle-bin" id="btn-clear-recycle">Empty Bin</button>
                 </div>
 
                 <div class="list-head recycle-list-head">
@@ -134,8 +134,8 @@
                         <h1>Operations Dashboard</h1>
                         <p class="subtle">Real-time system health, operator mode, degradation predictions</p>
                     </div>
-                    <div style="display:flex; gap:0.5rem;">
-                        <button class="btn primary small" data-action="refresh-dashboard">Refresh ↻</button>
+                    <div class="flex-row" style="gap:0.5rem;">
+                        <button type="button" class="btn primary small" data-action="refresh-dashboard">Refresh ↻</button>
                     </div>
                 </div>
 
@@ -146,11 +146,11 @@
                         <span class="dash-badge" id="dash-current-mode">loading...</span>
                     </div>
                     <div class="mode-switcher">
-                        <button class="mode-btn" data-mode="production" data-action="switch-operator-mode">Production</button>
-                        <button class="mode-btn" data-mode="benchmark" data-action="switch-operator-mode">Benchmark</button>
-                        <button class="mode-btn" data-mode="forensic" data-action="switch-operator-mode">Forensic</button>
-                        <button class="mode-btn" data-mode="stealth" data-action="switch-operator-mode">Stealth</button>
-                        <button class="mode-btn" data-mode="low_cost" data-action="switch-operator-mode">Low Cost</button>
+                        <button type="button" class="mode-btn" data-mode="production" data-action="switch-operator-mode">Production</button>
+                        <button type="button" class="mode-btn" data-mode="benchmark" data-action="switch-operator-mode">Benchmark</button>
+                        <button type="button" class="mode-btn" data-mode="forensic" data-action="switch-operator-mode">Forensic</button>
+                        <button type="button" class="mode-btn" data-mode="stealth" data-action="switch-operator-mode">Stealth</button>
+                        <button type="button" class="mode-btn" data-mode="low_cost" data-action="switch-operator-mode">Low Cost</button>
                     </div>
                     <div id="mode-feedback" class="mode-feedback hidden"></div>
                 </div>
@@ -299,6 +299,8 @@
                 </div>
 
                 <form id="job-form">
+                    <!-- Hidden submit button for WCAG compliance -->
+                    <button type="submit" hidden aria-hidden="true"></button>
 
                     <!-- Mode Toggle -->
                     <div class="section">
@@ -319,7 +321,7 @@
                     <div class="section">
                         <label class="section-label" for="inp-intent">Describe The Data You Want</label>
                         <textarea id="inp-intent" rows="3" placeholder="Example: Find interior designers in Chennai, include company name, phone, email, address and keep only businesses within 15 km of T Nagar." aria-label="Data description"></textarea>
-                        <div class="form-actions" style="border-top: 0; margin-top: 0.5rem; padding-top: 0; justify-content: flex-start;">
+                        <div class="form-actions form-actions-inline">
                             <button type="button" class="btn secondary small" data-action="suggest-schema" id="btn-suggest-schema">Suggest topic + schema from intent</button>
                         </div>
                         <p id="suggestion-note" class="hint-block hidden"></p>
@@ -336,7 +338,7 @@
                         <label class="section-label" for="inp-topic">What do you want to find?</label>
                         <input type="text" id="inp-topic" placeholder="e.g. Interior designers in Chennai with contact info" aria-label="Search topic">
 
-                        <div class="row-2" style="margin-top: 0.75rem;">
+                        <div class="row-2 mt-0\.75">
                             <div>
                                 <label class="section-label small" for="inp-location">Location focus</label>
                                 <input type="text" id="inp-location" placeholder="e.g. Chennai, India" aria-label="Location focus">
@@ -346,7 +348,7 @@
                                 <input type="text" id="inp-domain" placeholder="e.g. justdial.com (optional)" aria-label="Preferred domain">
                             </div>
                         </div>
-                        <div class="row-2" style="margin-top: 0.75rem;">
+                        <div class="row-2 mt-0\.75">
                             <div>
                                 <label class="section-label small" for="inp-origin-location">Origin for radius optimization</label>
                                 <input type="text" id="inp-origin-location" placeholder="e.g. T Nagar, Chennai" aria-label="Origin location for radius">
@@ -356,7 +358,7 @@
                                 <input type="number" id="inp-max-distance-km" min="0" step="0.5" placeholder="e.g. 15" aria-label="Max distance in km">
                             </div>
                         </div>
-                        <div class="row-2" style="margin-top: 0.75rem;">
+                        <div class="row-2 mt-0\.75">
                             <div>
                                 <label class="section-label small" for="inp-discover-pages">Max Pages to Discover</label>
                                 <input type="number" id="inp-discover-pages" placeholder="Default: 12" value="12" min="1" max="20" aria-label="Max pages to discover">
@@ -367,7 +369,7 @@
                             </div>
                         </div>
 
-                        <button type="button" class="btn secondary small" data-action="preview-discovery" id="btn-preview" style="margin-top: 0.75rem;">
+                        <button type="button" class="btn secondary small" data-action="preview-discovery" id="btn-preview">
                             Preview discovered URLs
                         </button>
                         <div id="discovery-preview" class="discovery-preview hidden"></div>
@@ -449,21 +451,21 @@
             <div class="container">
                 <div class="page-head">
                     <div>
-                        <button class="btn ghost small" data-action="switch-view" data-view="jobs" style="margin-bottom: 0.5rem;">← Back</button>
+                        <button type="button" class="btn ghost small" data-action="switch-view" data-view="jobs">← Back</button>
                          <h1 id="res-title">Results</h1>
                          <p class="subtle" id="res-meta"></p>
-                         <div id="result-warning" style="display:none; margin: 0.5rem 0; padding: 0.5rem 0.75rem; border-radius: 4px; font-size: 0.875rem;"></div>
-                        <div id="lineage-summary" style="display:none; margin: 0.5rem 0; padding: 0.4rem 0.75rem; border-radius: 4px; font-size: 0.78rem; background:#f0fdf4; border:1px solid #bbf7d0; color:#166534;"></div>
-                        <div id="res-progress-wrap" class="job-progress-wrap hidden" style="margin-top: 0.6rem; width: 240px;">
+                         <div id="result-warning"></div>
+                        <div id="lineage-summary"></div>
+                        <div id="res-progress-wrap" class="job-progress-wrap hidden">
                             <div id="res-progress-bar" class="job-progress-bar" style="width: 0%"></div>
-                            <span id="res-progress-text" class="job-progress-text" style="right: -40px;">0%</span>
+                            <span id="res-progress-text" class="job-progress-text">0%</span>
                         </div>
                     </div>
                     <div class="btn-group" id="export-group" style="display:none;">
-                        <button class="btn secondary small" data-action="reclean-job" id="btn-reclean">AI Re-clean</button>
-                        <button class="btn secondary small" data-action="export-csv" id="btn-csv">CSV ↓</button>
-                        <button class="btn secondary small" data-action="export-json" id="btn-json">JSON ↓</button>
-                        <button class="btn secondary small" data-action="export-excel" id="btn-excel">Excel ↓</button>
+                        <button type="button" class="btn secondary small" data-action="reclean-job" id="btn-reclean">AI Re-clean</button>
+                        <button type="button" class="btn secondary small" data-action="export-csv" id="btn-csv">CSV ↓</button>
+                        <button type="button" class="btn secondary small" data-action="export-json" id="btn-json">JSON ↓</button>
+                        <button type="button" class="btn secondary small" data-action="export-excel" id="btn-excel">Excel ↓</button>
                     </div>
                 </div>
 
@@ -514,7 +516,7 @@
                         <p class="subtle">Research-only semantic/topology views — not validated for production use</p>
                     </div>
                     <div style="display:flex; gap:0.5rem;">
-                        <button class="btn ghost small" data-action="refresh-cognition">Refresh</button>
+                        <button type="button" class="btn ghost small" data-action="refresh-cognition">Refresh</button>
                         <a href="/api/system/export/knowledge" download="knowledge-manifold.json" class="btn small">Download Knowledge</a>
                     </div>
                 </div>
@@ -588,7 +590,7 @@
             <h2 id="apikey-modal-title">🔑 API Key</h2>
             <p id="apikey-modal-desc" class="modal-desc">Enter your DataForge API key for production access.</p>
             <form id="apikey-form" class="api-key-form" onsubmit="return false;">
-                <input type="password" id="apikey-input" class="mono-input" placeholder="Paste your API key here..." autocomplete="off" spellcheck="false" aria-label="API key">
+                <input type="password" id="apikey-input" class="mono-input" placeholder="Paste your API key here..." autocomplete="new-password" spellcheck="false" aria-label="API key">
                 <label class="check-label" style="margin-top: 0.5rem;">
                     <input type="checkbox" id="apikey-toggle-vis">
                     <span>Show key</span>
@@ -596,8 +598,8 @@
             </form>
             <p id="apikey-error" class="api-key-error hidden"></p>
             <div class="shortcut-close-row" style="margin-top: 1rem;">
-                <button class="btn ghost small" data-action="close-apikey" id="btn-apikey-cancel">Cancel</button>
-                <button class="btn primary small" data-action="save-apikey" id="btn-apikey-save">Save Key</button>
+                <button type="button" class="btn ghost small" data-action="close-apikey" id="btn-apikey-cancel">Cancel</button>
+                <button type="button" class="btn primary small" data-action="save-apikey" id="btn-apikey-save">Save Key</button>
             </div>
         </div>
     </div>
@@ -608,8 +610,8 @@
             <h2 id="confirm-modal-title">Confirm</h2>
             <p id="confirm-modal-desc" class="modal-desc">Are you sure?</p>
             <div class="shortcut-close-row" style="margin-top: 1rem; justify-content: flex-end; gap: 0.5rem;">
-                <button class="btn ghost small" data-action="close-confirm" id="btn-confirm-cancel">Cancel</button>
-                <button class="btn primary small danger-confirm-btn" data-action="confirm-action" id="btn-confirm-ok">Confirm</button>
+                <button type="button" class="btn ghost small" data-action="close-confirm" id="btn-confirm-cancel">Cancel</button>
+                <button type="button" class="btn primary small danger-confirm-btn" data-action="confirm-action" id="btn-confirm-ok">Confirm</button>
             </div>
         </div>
     </div>
@@ -641,7 +643,7 @@
                 </div>
             </div>
             <div class="shortcut-close-row">
-                <button class="btn secondary small" data-action="close-shortcuts">Close</button>
+                <button type="button" class="btn secondary small" data-action="close-shortcuts">Close</button>
             </div>
         </div>
     </div>

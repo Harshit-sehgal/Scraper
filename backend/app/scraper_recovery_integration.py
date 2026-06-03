@@ -143,6 +143,7 @@ async def scrape_url_with_recovery(
     attempt = 0
     last_error: Optional[Exception] = None
     attempt_ctx = AttemptContext()
+    result: Any = None
 
     while attempt < max_recovery_attempts:
         if attempt_ctx.skip_url:

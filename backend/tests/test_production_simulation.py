@@ -374,7 +374,7 @@ class TestAuthAndRBAC:
         from app.models import FieldType, SchemaField
 
         # Verify SchemaField model works
-        field = SchemaField(name="email", field_type=FieldType.EMAIL, required=True)
+        field = SchemaField(name="email", field_type=FieldType.EMAIL, required=True, description="")
 
         assert field.name == "email"
         assert field.field_type == FieldType.EMAIL

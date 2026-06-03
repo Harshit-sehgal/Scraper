@@ -31,7 +31,13 @@ def main():
         star_el = c.find(class_=re.compile(r"star|rating", re.I))
         rating = "N/A"
         if star_el:
-            for cls in star_el.get("class", []):
+            classes = star_el.get("class")
+            class_list: list[str] = []
+            if isinstance(classes, list):
+                class_list = classes
+            elif isinstance(classes, str):
+                class_list = [classes]
+            for cls in class_list:
                 for w in ["One", "Two", "Three", "Four", "Five"]:
                     if w in cls:
                         rating = w

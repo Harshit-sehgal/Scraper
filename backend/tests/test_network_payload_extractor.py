@@ -85,8 +85,8 @@ class TestScoreRecordArray:
         payload = json.loads(FLIGHT_PAYLOAD)
         candidates = find_record_arrays(payload)
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         score = score_record_array(candidates[0], schema)
         assert score > 30, f"Score too low: {score}"
@@ -101,8 +101,8 @@ class TestScoreRecordArray:
         payload = json.loads(FLIGHT_PAYLOAD)
         candidates = find_record_arrays(payload)
         schema = [
-            SchemaField(name="color", field_type=FieldType.STRING, required=False),
-            SchemaField(name="weight", field_type=FieldType.STRING, required=False),
+            SchemaField(name="color", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="weight", field_type=FieldType.STRING, required=False, description=""),
         ]
         score = score_record_array(candidates[0], schema)
         assert score < 35, f"Score should be relatively low for irrelevant schema: {score}"
@@ -113,8 +113,8 @@ class TestMapJsonRecords:
         payload = json.loads(FLIGHT_PAYLOAD)
         records = payload["results"]
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         mapped, field_map = map_json_records_to_schema(records, schema)
         assert len(mapped) == 3
@@ -125,7 +125,7 @@ class TestMapJsonRecords:
         payload = json.loads(FLIGHT_PAYLOAD)
         records = payload["results"]
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
         ]
         _, field_map = map_json_records_to_schema(records, schema)
         assert "airline" in field_map
@@ -136,8 +136,8 @@ class TestMapJsonRecords:
         payload = json.loads(NESTED_PAYLOAD)
         flights = payload["data"]["searchResults"]["flights"]
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         mapped, _ = map_json_records_to_schema(flights, schema)
         assert len(mapped) == 2
@@ -147,8 +147,8 @@ class TestMapJsonRecords:
 class TestExtractFromNetworkPayloads:
     def test_extracts_from_flight_payload(self) -> None:
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         result = extract_from_network_payloads([FLIGHT_PAYLOAD], schema)
         assert result is not None
@@ -159,7 +159,7 @@ class TestExtractFromNetworkPayloads:
         result = extract_from_network_payloads(
             [],
             [
-                SchemaField(name="x", field_type=FieldType.STRING, required=False),
+                SchemaField(name="x", field_type=FieldType.STRING, required=False, description=""),
             ],
         )
         assert result is None
@@ -167,7 +167,7 @@ class TestExtractFromNetworkPayloads:
     def test_returns_none_for_low_scoring_payload(self) -> None:
         result = extract_from_network_payloads(
             [json.dumps({"not": "records", "here": 1})],
-            [SchemaField(name="airline", field_type=FieldType.STRING, required=False)],
+            [SchemaField(name="airline", field_type=FieldType.STRING, required=False, description="")],
         )
         assert result is None
 
@@ -175,8 +175,8 @@ class TestExtractFromNetworkPayloads:
 class TestSourceArbitration:
     def test_network_wins_when_dom_empty(self) -> None:
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         net_result = extract_from_network_payloads([FLIGHT_PAYLOAD], schema)
         assert net_result is not None
@@ -186,7 +186,7 @@ class TestSourceArbitration:
 
     def test_dom_wins_when_network_weak(self) -> None:
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
         ]
         dom_records = [
             {"airline": "TestAir", "price": "$100"},
@@ -203,8 +203,8 @@ class TestSourceArbitration:
 
     def test_weak_dom_strong_network_chooses_network(self) -> None:
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         # Strong network data: has high field coverage and high score
         net_result = extract_from_network_payloads([FLIGHT_PAYLOAD], schema)
@@ -219,8 +219,8 @@ class TestSourceArbitration:
 
     def test_strong_dom_weak_network_chooses_dom(self) -> None:
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         # Weak network data
         net_result = extract_from_network_payloads(
@@ -240,8 +240,8 @@ class TestSourceArbitration:
 
     def test_both_weak_arbitration_flow(self) -> None:
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         # Both DOM and network have very low quality data
         net_result = extract_from_network_payloads(
@@ -269,8 +269,8 @@ class TestSourceArbitration:
             }
         )
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         result = extract_from_network_payloads([graphql_payload], schema)
         assert result is not None
@@ -292,8 +292,8 @@ class TestSourceArbitration:
             }
         )
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         result = extract_from_network_payloads([nextjs_payload], schema)
         assert result is not None
@@ -310,8 +310,8 @@ class TestSourceArbitration:
             }
         )
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         result = extract_from_network_payloads([nested_val_payload], schema)
         assert result is not None
@@ -321,7 +321,7 @@ class TestSourceArbitration:
 
     def test_secrets_not_in_field_map(self) -> None:
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
         ]
         result = extract_from_network_payloads([FLIGHT_PAYLOAD], schema)
         assert result is not None
@@ -337,8 +337,8 @@ class TestSourceArbitration:
             ]
         )
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         result = extract_from_network_payloads([root_array_payload], schema)
         assert result is not None
@@ -355,7 +355,7 @@ class TestSourceArbitration:
             }
         )
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
         ]
         result = extract_from_network_payloads([payload], schema)
         assert result is None
@@ -373,8 +373,8 @@ class TestSourceArbitration:
             }
         )
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         result = extract_from_network_payloads([payload], schema)
         assert result is not None
@@ -391,7 +391,7 @@ class TestSourceArbitration:
             }
         )
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
         ]
         result = extract_from_network_payloads([payload], schema)
         assert result is None
@@ -408,8 +408,8 @@ class TestSourceArbitration:
             }
         )
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         result = extract_from_network_payloads([nested_payload], schema)
         assert result is not None
@@ -420,8 +420,8 @@ class TestSourceArbitration:
 
     def test_strong_dom_weak_network_chooses_dom_explicit(self) -> None:
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         net_result = extract_from_network_payloads([json.dumps({"results": [{"x": 1}]})], schema)
         dom_records = [
@@ -434,8 +434,8 @@ class TestSourceArbitration:
 
     def test_network_high_count_poor_coverage_does_not_win(self) -> None:
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         unrelated_records = [{"id": i, "timestamp": 123456789} for i in range(50)]
         net_result = extract_from_network_payloads([json.dumps({"results": unrelated_records})], schema)
@@ -460,8 +460,8 @@ class TestSourceArbitration:
             }
         )
         schema = [
-            SchemaField(name="airline", field_type=FieldType.STRING, required=False),
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         result = extract_from_network_payloads([payload], schema)
         assert result is not None
@@ -484,7 +484,7 @@ class TestSourceArbitration:
             }
         )
         schema = [
-            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
+            SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
         result = extract_from_network_payloads([payload], schema)
         assert result is not None
@@ -495,8 +495,8 @@ class TestSourceArbitration:
         from app.utils.quality import post_extract_validate_records
 
         schema = [
-            SchemaField(name="origin_airport_code", field_type=FieldType.STRING, required=True),
-            SchemaField(name="destination_airport_code", field_type=FieldType.STRING, required=False),
+            SchemaField(name="origin_airport_code", field_type=FieldType.STRING, required=True, description=""),
+            SchemaField(name="destination_airport_code", field_type=FieldType.STRING, required=False, description=""),
         ]
 
         # 1. Required field invalid -> Discards record
@@ -522,8 +522,8 @@ class TestSourceArbitration:
         url = "https://example.com/search/id/opaque_session_token_123"
         html = "<html><body>Some content</body></html>"
         schema = [
-            SchemaField(name="origin_airport_code", field_type=FieldType.STRING, required=True),
-            SchemaField(name="destination_airport_code", field_type=FieldType.STRING, required=True),
+            SchemaField(name="origin_airport_code", field_type=FieldType.STRING, required=True, description=""),
+            SchemaField(name="destination_airport_code", field_type=FieldType.STRING, required=True, description=""),
         ]
 
         # Mock selector memory to return empty selectors

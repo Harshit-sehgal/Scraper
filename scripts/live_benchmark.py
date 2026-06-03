@@ -8,8 +8,8 @@ from pathlib import Path
 backend_dir = Path(__file__).resolve().parent.parent / "backend"
 sys.path.insert(0, str(backend_dir))
 
-from app.models import FieldType, SchemaField
-from app.scraper_recovery_integration import scrape_url_with_recovery
+from app.models import FieldType, SchemaField  # noqa: E402
+from app.scraper_recovery_integration import scrape_url_with_recovery  # noqa: E402
 
 # Default sandbox targets
 DEFAULT_TARGETS = [

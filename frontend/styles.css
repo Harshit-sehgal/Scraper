@@ -1682,6 +1682,36 @@ kbd {
     font-size: 1rem;
 }
 
+/* ─── Layout Utility Classes ─── */
+.flex-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.flex-row.gap-0\.5 {
+    gap: 0.5rem;
+}
+
+.mt-0\.75 {
+    margin-top: 0.75rem;
+}
+
+.mt-1\.5 {
+    margin-top: 1.5rem;
+}
+
+.mt-2 {
+    margin-top: 2rem;
+}
+
+.mb-0\.5 {
+    margin-bottom: 0.5rem;
+}
+
+.gap-0\.5 {
+    gap: 0.5rem;
+}
+
 /* ═══════════════════════════════════════════
    Thermodynamic Gating Styles
    ═══════════════════════════════════════════ */
@@ -1971,6 +2001,38 @@ kbd {
     display: flex;
     gap: 0.35rem;
     flex-wrap: wrap;
+}
+
+/* ─── Inline form actions (no top border, flush with content) ─── */
+.form-actions-inline {
+    border-top: 0 !important;
+    margin-top: 0.5rem !important;
+    padding-top: 0 !important;
+    justify-content: flex-start !important;
+}
+
+/* ─── Result warning & lineage summary banners ─── */
+#result-warning {
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+#result-warning.banner-warning {
+    background: #fef9c3;
+    border: 1px solid #fde047;
+    color: #854d0e;
+}
+
+#lineage-summary {
+    margin: 0.5rem 0;
+    padding: 0.4rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
 }
 
 /* ── Acquisition Pipeline Banner ── */

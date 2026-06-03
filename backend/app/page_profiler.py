@@ -238,7 +238,7 @@ def _detect_cards_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
     ]
 
     best_container = None
-    best_headers = []
+    best_headers: list[str] = []
     max_items = 0
     confidence = 0.0
 
@@ -270,18 +270,19 @@ def _detect_cards_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
                 best_container = containers[0].parent if containers[0].parent else containers[0]
                 # Try to extract headers from first card
                 headers = []
-                for h in container.find_all(["h1", "h2", "h3", "h4", "strong", "b"])[:5]:
-                    headers.append(h.get_text(strip=True))
+                if containers:
+                    first_container = containers[0]
+                    for h in first_container.find_all(["h1", "h2", "h3", "h4", "strong", "b"])[:5]:
+                        headers.append(h.get_text(strip=True))
                 best_headers = headers
 
     if max_items < 3:
         return None
 
     # Generate CSS selector
-    if best_container:
+    container_sel = "div[class*='card'], div[class*='item'], article"
+    if best_container is not None:
         container_sel = _generate_container_selector(best_container)
-    else:
-        container_sel = "div[class*='card'], div[class*='item'], article"
 
     return StructureProfile(
         structure_type="cards",

@@ -1,4 +1,5 @@
 import time
+from typing import Any
 
 import requests
 
@@ -6,7 +7,7 @@ API = "http://localhost:8000"
 
 
 def main():
-    payload = {
+    payload: Any = {
         "name": "Live DDG Scrape",
         "mode": "auto",
         "urls": [],
