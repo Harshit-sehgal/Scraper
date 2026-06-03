@@ -528,7 +528,7 @@ class TestPostgresQueueIntegration:
 
             results = []
 
-            async def test_handler(task) -> None:
+            async def test_handler(task) -> dict:
                 results.append(task.id)
                 return {"handled": True}
 

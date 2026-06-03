@@ -386,9 +386,9 @@ async def test_scrape_url_attempt_zero_result_with_html(monkeypatch) -> None:
         return "<html><body>No results found</body></html>", 0.0, "playwright_full", 0
 
     class FakeExtractionResult:
-        records = []
-        method = "regex"
-        selector_success = False
+        records: list = []
+        method: str = "regex"
+        selector_success: bool = False
         selectors: dict = {"fields": {}}
 
     async def fake_orchestrate(*args, **kwargs):
@@ -412,8 +412,8 @@ async def test_scrape_url_attempt_zero_result_with_html(monkeypatch) -> None:
             return 0
 
     class FakeEvidence:
-        forms = None
-        candidate_containers = []
+        forms: str | None = None
+        candidate_containers: list = []
 
     monkeypatch.setattr(scraper, "get_scrape_telemetry", lambda: FakeTelemetry())
     monkeypatch.setattr(scraper, "get_crawl_frontier", lambda: FakeFrontier())
