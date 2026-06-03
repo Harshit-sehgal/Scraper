@@ -457,7 +457,7 @@ def create_jobs_router(
             reclean_warnings.append("AI re-clean failed; used deterministic post-processing.")
             logging.error("Job %s: Re-clean failed: %s", job_id, e)
 
-        filtered_results, total, filtered_count, type_integrity_report = process_results(
+        filtered_results, total, filtered_count, type_integrity_report = await process_results(
             cleaned_rows,
             job.schema_fields,
             job.filters,
