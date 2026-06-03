@@ -71,7 +71,7 @@ def get_world_state(*args, **kwargs):
 # ─────────────────────────────────────────────────────────────
 
 
-def test_field_pressure_bounds():
+def test_field_pressure_bounds() -> None:
     ws = get_world_state()
     ws.clear()
     p = ws.metrics.field_pressure
@@ -87,7 +87,7 @@ def test_field_pressure_bounds():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_field_pressure_decreases_with_stabilization():
+def test_field_pressure_decreases_with_stabilization() -> None:
     ws = get_world_state()
     ws.clear()
     # Initial state: high energy, high entropy
@@ -105,7 +105,7 @@ def test_field_pressure_decreases_with_stabilization():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_adaptive_threshold_bounds():
+def test_adaptive_threshold_bounds() -> None:
     ws = get_world_state()
     ws.clear()
     for _ in range(20):
@@ -121,7 +121,7 @@ def test_adaptive_threshold_bounds():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_contradiction_pipeline_invariant():
+def test_contradiction_pipeline_invariant() -> None:
     ws = get_world_state()
     ws.clear()
     schema = ["source", "target"]
@@ -142,7 +142,7 @@ def test_contradiction_pipeline_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_no_false_contradiction_invariant():
+def test_no_false_contradiction_invariant() -> None:
     ws = get_world_state()
     ws.clear()
     schema = ["source", "target"]
@@ -162,7 +162,7 @@ def test_no_false_contradiction_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_event_cascade_invariant():
+def test_event_cascade_invariant() -> None:
     d = get_dispatcher()
     for et in [SemanticEventType.TOPOLOGY_SHIFT, SemanticEventType.UNCERTAINTY_SPIKE]:
         subs = d.subscribers.get(et, [])
@@ -174,7 +174,7 @@ def test_event_cascade_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_import_order_independence_invariant():
+def test_import_order_independence_invariant() -> None:
     """Verified at the module level — direct import must produce cascade."""
     # This test verifies that importing event_dispatcher directly (not through
     # main or semantic_pipeline) triggers the cascade self-bootstrap.
@@ -194,7 +194,7 @@ def test_import_order_independence_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_topology_evolution_invariant():
+def test_topology_evolution_invariant() -> None:
     ws = get_world_state()
     ws.clear()
     key = ("source", "target")
@@ -223,7 +223,7 @@ def test_topology_evolution_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_topology_replay_invariant():
+def test_topology_replay_invariant() -> None:
     ws = get_world_state()
     ws.clear()
     before = len(ws.topology_snapshots)
@@ -250,7 +250,7 @@ def test_topology_replay_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_pressure_energy_causality_invariant():
+def test_pressure_energy_causality_invariant() -> None:
     ws = get_world_state()
     ws.clear()
     ws._energy.set_energy(5.0)
@@ -265,7 +265,7 @@ def test_pressure_energy_causality_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_exclusion_persistence_invariant():
+def test_exclusion_persistence_invariant() -> None:
     import os
     import tempfile
 
@@ -302,7 +302,7 @@ def test_exclusion_persistence_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_memory_gravity_invariant():
+def test_memory_gravity_invariant() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -322,7 +322,7 @@ def test_memory_gravity_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_exclusion_bounds_invariant():
+def test_exclusion_bounds_invariant() -> None:
     """Learned exclusions produced by the system must stay bounded [0, 1]."""
     ws = get_world_state()
     ws.clear()
@@ -339,7 +339,7 @@ def test_exclusion_bounds_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_role_exclusivity_consistency_invariant():
+def test_role_exclusivity_consistency_invariant() -> None:
     seen = set()
     for pair in ROLE_EXCLUSIVITY:
         sorted_pair = tuple(sorted(pair))
@@ -352,7 +352,7 @@ def test_role_exclusivity_consistency_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_uncertainty_bounds_invariant():
+def test_uncertainty_bounds_invariant() -> None:
     ws = get_world_state()
     ws.clear()
     ws._energy.total_records_processed = 100
@@ -365,7 +365,7 @@ def test_uncertainty_bounds_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_field_pressure_includes_contradictions():
+def test_field_pressure_includes_contradictions() -> None:
     ws = get_world_state()
     ws.clear()
     p_before = ws.metrics.field_pressure
@@ -384,7 +384,7 @@ def test_field_pressure_includes_contradictions():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_propagation_wave_tracing():
+def test_propagation_wave_tracing() -> None:
     ws = get_world_state()
     ws.clear()
     ws.snapshot("alloc_0")
@@ -402,7 +402,7 @@ def test_propagation_wave_tracing():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_field_pressure_unifies_dimensions():
+def test_field_pressure_unifies_dimensions() -> None:
     ws = get_world_state()
     ws.clear()
     p = ws.metrics.field_pressure
@@ -421,7 +421,7 @@ def test_field_pressure_unifies_dimensions():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_topology_causality_invariant():
+def test_topology_causality_invariant() -> None:
     """Higher field pressure must produce tighter exclusion thresholds."""
     from app.semantic_allocation_engine import _adaptive_exclusion_threshold
 
@@ -449,7 +449,7 @@ def test_topology_causality_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_semantic_gravity_invariant():
+def test_semantic_gravity_invariant() -> None:
     """Stable motifs should reduce exclusion pressure between roles."""
     ws = get_world_state()
     ws.clear()
@@ -471,7 +471,7 @@ def test_semantic_gravity_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_field_equilibrium_invariant():
+def test_field_equilibrium_invariant() -> None:
     """Processing more records without contradictions should lower field pressure."""
     ws = get_world_state()
     ws.clear()
@@ -489,7 +489,7 @@ def test_field_equilibrium_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_topology_restructuring_invariant():
+def test_topology_restructuring_invariant() -> None:
     """Repeated contradictions must increase learned exclusions."""
     ws = get_world_state()
     ws.clear()
@@ -506,7 +506,7 @@ def test_topology_restructuring_invariant():
 # ─────────────────────────────────────────────────────────────
 
 
-def test_propagation_conservation_invariant():
+def test_propagation_conservation_invariant() -> None:
     """Field propagation must spread instability to neighboring roles."""
     ws = get_world_state()
     ws.clear()

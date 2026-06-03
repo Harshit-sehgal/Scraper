@@ -24,7 +24,7 @@ from app.models import Job
 class TestWorkerRecovery:
     """Verify worker restart recovery scenarios."""
 
-    def test_job_persistence_survives_process_restart(self):
+    def test_job_persistence_survives_process_restart(self) -> None:
         """Jobs persisted to disk must survive a process restart."""
         from app.job_store import load_state, save_state
         from app.models import JobStatus
@@ -48,7 +48,7 @@ class TestWorkerRecovery:
         assert job.id in loaded_jobs
         assert loaded_jobs[job.id].status == JobStatus.PENDING
 
-    def test_in_progress_jobs_marked_failed_on_recovery(self):
+    def test_in_progress_jobs_marked_failed_on_recovery(self) -> None:
         """In-progress jobs must be marked as failed on startup recovery."""
         from app.job_store import load_state, save_state
         from app.models import JobStatus
@@ -75,7 +75,7 @@ class TestWorkerRecovery:
 class TestDatabaseFailure:
     """Verify database failure and recovery scenarios."""
 
-    def test_database_connection_handles_transient_failure(self):
+    def test_database_connection_handles_transient_failure(self) -> None:
         """Database connection should handle transient failures."""
         from app.job_store import _get_connection
 
@@ -93,7 +93,7 @@ class TestDatabaseFailure:
         assert conn is not None
         conn.close()
 
-    def test_database_unavailable_handled_gracefully(self):
+    def test_database_unavailable_handled_gracefully(self) -> None:
         """System should handle database unavailability."""
         from app.job_store import load_state
 
@@ -127,7 +127,7 @@ class TestRateLimiting:
         except Exception:
             pass  # Table may not exist yet — that's fine
 
-    def test_rate_limiter_enforces_max_requests(self):
+    def test_rate_limiter_enforces_max_requests(self) -> None:
         """Rate limiter should block requests that exceed limit."""
         from app.rate_limiter import DatabaseSlidingWindowCounter
 
@@ -148,7 +148,7 @@ class TestRateLimiting:
         finally:
             self._cleanup_rate_limit_keys(test_key)
 
-    def test_different_keys_have_independent_limits(self):
+    def test_different_keys_have_independent_limits(self) -> None:
         """Different rate limit keys should have independent counters."""
         from app.rate_limiter import DatabaseSlidingWindowCounter
 
@@ -175,7 +175,7 @@ class TestRateLimiting:
 class TestExtractionFailure:
     """Verify extraction failure and result handling."""
 
-    def test_extraction_result_success_case(self):
+    def test_extraction_result_success_case(self) -> None:
         """ExtractionResult should capture successful extraction."""
         from app.extraction_orchestrator import ExtractionResult
 
@@ -191,7 +191,7 @@ class TestExtractionFailure:
         assert result.method == "schema"
         assert result.selector_success is False
 
-    def test_extraction_result_failure_case(self):
+    def test_extraction_result_failure_case(self) -> None:
         """Failed extraction should return empty records."""
         from app.extraction_orchestrator import ExtractionResult
 
@@ -208,7 +208,7 @@ class TestExtractionFailure:
 class TestConcurrentJobLoad:
     """Verify concurrent job handling scenarios."""
 
-    def test_multiple_jobs_persist_and_recover(self):
+    def test_multiple_jobs_persist_and_recover(self) -> None:
         """System should persist and recover multiple concurrent jobs."""
         from app.job_store import load_state, save_state
         from app.models import JobStatus
@@ -234,7 +234,7 @@ class TestConcurrentJobLoad:
         for job_id in jobs.keys():
             assert job_id in loaded
 
-    def test_jobs_with_mixed_states_persist(self):
+    def test_jobs_with_mixed_states_persist(self) -> None:
         """Jobs with different states should all persist correctly."""
         from app.job_store import load_state, save_state
         from app.models import JobStatus
@@ -266,7 +266,7 @@ class TestConcurrentJobLoad:
 class TestBackupRestoreConsistency:
     """Verify backup/restore data consistency scenarios."""
 
-    def test_job_configuration_preserved_in_store(self):
+    def test_job_configuration_preserved_in_store(self) -> None:
         """Job configuration should be preserved exactly through store/load cycle."""
         from app.job_store import load_state, save_state
         from app.models import JobStatus
@@ -287,7 +287,7 @@ class TestBackupRestoreConsistency:
         assert restored.urls == job.urls
         assert restored.results == job.results
 
-    def test_job_results_data_fidelity(self):
+    def test_job_results_data_fidelity(self) -> None:
         """Job results should maintain data fidelity through store/load cycle."""
         from app.job_store import load_state, save_state
         from app.models import JobStatus
@@ -317,7 +317,7 @@ class TestBackupRestoreConsistency:
 class TestMetricsCollection:
     """Verify metrics collection scenarios."""
 
-    def test_request_latency_recording(self):
+    def test_request_latency_recording(self) -> None:
         """Request latencies should be recorded and aggregated."""
         from app.metrics_collector import get_request_latencies, record_request_latency, reset_for_testing
 
@@ -332,7 +332,7 @@ class TestMetricsCollection:
         latencies = get_request_latencies()
         assert len(latencies) >= 3
 
-    def test_error_tracking_by_type(self):
+    def test_error_tracking_by_type(self) -> None:
         """Errors should be tracked and categorized by type."""
         from app.metrics_collector import get_errors, record_error, reset_for_testing
 
@@ -350,7 +350,7 @@ class TestMetricsCollection:
         assert errors.get("connection_refused", 0) >= 1
         assert errors.get("extraction_failed", 0) >= 1
 
-    def test_llm_call_counting(self):
+    def test_llm_call_counting(self) -> None:
         """LLM calls should be counted for cost and usage tracking."""
         from app.metrics_collector import get_llm_calls, record_llm_call, reset_for_testing
 
@@ -369,7 +369,7 @@ class TestMetricsCollection:
 class TestAuthAndRBAC:
     """Verify authentication and authorization scenarios."""
 
-    def test_job_can_be_created_with_valid_schema(self):
+    def test_job_can_be_created_with_valid_schema(self) -> None:
         """Jobs should be creatable with valid schema fields."""
         from app.models import FieldType, SchemaField
 
@@ -380,7 +380,7 @@ class TestAuthAndRBAC:
         assert field.field_type == FieldType.EMAIL
         assert field.required is True
 
-    def test_job_model_validates_field_names(self):
+    def test_job_model_validates_field_names(self) -> None:
         """Job schema should enforce field name rules."""
         from app.models import FieldType, SchemaField
 

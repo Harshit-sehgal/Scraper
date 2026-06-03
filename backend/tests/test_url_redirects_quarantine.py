@@ -39,7 +39,7 @@ def clean_url_redirects_import():
         sys.modules.pop(name, None)
 
 
-def test_url_redirects_does_not_load_acquisition_state_at_import(clean_url_redirects_import):
+def test_url_redirects_does_not_load_acquisition_state_at_import(clean_url_redirects_import) -> None:
     """Importing app.url_redirects must NOT pull in app.acquisition_state.
 
     This is the contract that the Phase R2 quarantine established.
@@ -53,7 +53,7 @@ def test_url_redirects_does_not_load_acquisition_state_at_import(clean_url_redir
     )
 
 
-def test_build_redirect_info_triggers_lazy_import(clean_url_redirects_import):
+def test_build_redirect_info_triggers_lazy_import(clean_url_redirects_import) -> None:
     """Calling build_redirect_info must trigger the lazy import."""
     import app.url_redirects
 
@@ -71,7 +71,7 @@ def test_build_redirect_info_triggers_lazy_import(clean_url_redirects_import):
     )
 
 
-def test_build_redirect_info_returns_expected_dict(clean_url_redirects_import):
+def test_build_redirect_info_returns_expected_dict(clean_url_redirects_import) -> None:
     """The public behavior of build_redirect_info is unchanged."""
     import app.url_redirects
 
@@ -91,7 +91,7 @@ def test_build_redirect_info_returns_expected_dict(clean_url_redirects_import):
     assert result["redirect_type"] in {"session_expired", "homepage_redirect", "path_changed"}
 
 
-def test_detect_redirect_works_without_acquisition_state(clean_url_redirects_import):
+def test_detect_redirect_works_without_acquisition_state(clean_url_redirects_import) -> None:
     """_detect_redirect is pure-Python and must not require research imports."""
     import app.url_redirects
 

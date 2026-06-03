@@ -100,7 +100,7 @@ class TestThreeWayAcquisition:
     """Three-way integration test: direct, session-expired, and recovered URLs."""
 
     @pytest.mark.asyncio
-    async def test_direct_url_acquisition(self):
+    async def test_direct_url_acquisition(self) -> None:
         """Scenario 1: Direct URL — no redirect, no session issues.
 
         Expected: AcquisitionState.DIRECT, no session detection,
@@ -173,7 +173,7 @@ class TestThreeWayAcquisition:
             assert summary["state_distribution"]["direct"] == 1
 
     @pytest.mark.asyncio
-    async def test_session_expired_awaiting_params(self):
+    async def test_session_expired_awaiting_params(self) -> None:
         """Scenario 2: Session-expired URL — redirect detected, form found, no search params.
 
         Expected: AcquisitionState.AWAITING_SEARCH_PARAMS, session_bound detected,
@@ -261,7 +261,7 @@ class TestThreeWayAcquisition:
             assert summary["state_distribution"]["awaiting_search_params"] == 1
 
     @pytest.mark.asyncio
-    async def test_recovered_url_acquisition(self):
+    async def test_recovered_url_acquisition(self) -> None:
         """Scenario 3: Session-expired URL with successful search form recovery.
 
         Expected: AcquisitionState.RECOVERED, canonical_url == recovered_url,

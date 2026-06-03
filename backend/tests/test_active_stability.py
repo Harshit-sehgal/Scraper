@@ -16,7 +16,7 @@ def ws():
     return state
 
 
-def test_active_damping_calculation(ws):
+def test_active_damping_calculation(ws) -> None:
     """Verify that damping factor decreases as oscillations are detected."""
     # 1. No oscillations
     snapshots = [{"energy": 5.0}] * 10
@@ -34,7 +34,7 @@ def test_active_damping_calculation(ws):
     print(f"\nDamping factor for oscillation: {damping:.2f}")
 
 
-def test_value_aware_pruning_priority(ws):
+def test_value_aware_pruning_priority(ws) -> None:
     """Verify that high-importance regions are preserved during shedding."""
     # 1. Create 60 regions
     # Region 1: High Centrality, High Stability (Should be kept)
@@ -60,7 +60,7 @@ def test_value_aware_pruning_priority(ws):
     print("\nValue-Aware Pruning: High-importance region successfully preserved.")
 
 
-def test_stability_policy_generation(ws):
+def test_stability_policy_generation(ws) -> None:
     """Verify that the engine generates a valid stabilization policy."""
     policy = ws._observability.get_stability_policy(ws.capture_governance_snapshot())
     assert "propagation_damping" in policy

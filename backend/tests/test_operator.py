@@ -55,7 +55,7 @@ def client(app):
 
 
 class TestGetMode:
-    def test_get_mode_returns_valid_response(self, client):
+    def test_get_mode_returns_valid_response(self, client) -> None:
         with patch("app.routers.operator.get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.PRODUCTION
@@ -72,7 +72,7 @@ class TestGetMode:
             assert "production" in data["available_modes"]
             assert "forensic" in data["available_modes"]
 
-    def test_get_mode_has_all_five_modes(self, client):
+    def test_get_mode_has_all_five_modes(self, client) -> None:
         with patch("app.routers.operator.get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.PRODUCTION
@@ -86,7 +86,7 @@ class TestGetMode:
 
 
 class TestSetMode:
-    def test_set_mode_valid(self, client):
+    def test_set_mode_valid(self, client) -> None:
         with patch("app.routers.operator.get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.FORENSIC
@@ -99,12 +99,12 @@ class TestSetMode:
             assert data["active_mode"] == "forensic"
             assert "message" in data
 
-    def test_set_mode_invalid(self, client):
+    def test_set_mode_invalid(self, client) -> None:
         resp = client.post("/api/operator/mode", json={"mode": "invalid_mode"})
         assert resp.status_code == 400
         assert "detail" in resp.json()
 
-    def test_set_mode_case_insensitive(self, client):
+    def test_set_mode_case_insensitive(self, client) -> None:
         with patch("app.routers.operator.get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.STEALTH
@@ -115,7 +115,7 @@ class TestSetMode:
             assert resp.status_code == 200
             assert resp.json()["active_mode"] == "stealth"
 
-    def test_set_mode_all_modes_valid(self, client):
+    def test_set_mode_all_modes_valid(self, client) -> None:
         for mode in ("production", "benchmark", "forensic", "stealth", "low_cost"):
             with patch("app.routers.operator.get_governance_dashboard") as mock_dash:
                 mock_instance = MagicMock()
@@ -133,7 +133,7 @@ class TestSetMode:
 
 
 class TestDashboard:
-    def test_dashboard_returns_all_sections(self, client):
+    def test_dashboard_returns_all_sections(self, client) -> None:
         with (
             patch("app.routers.operator.get_governance_dashboard") as mock_dash,
             patch("app.routers.operator.get_domain_health_monitor") as mock_monitor,
@@ -196,7 +196,7 @@ class TestDashboard:
 
 
 class TestPredictionEndpoints:
-    def test_get_predictions_no_data(self, client):
+    def test_get_predictions_no_data(self, client) -> None:
         with patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry:
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = []
@@ -208,7 +208,7 @@ class TestPredictionEndpoints:
             assert data["domains_analyzed"] == 0
             assert "message" in data
 
-    def test_get_predictions_with_data(self, client):
+    def test_get_predictions_with_data(self, client) -> None:
         with (
             patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry,
             patch("app.routers.operator.get_degradation_predictor") as mock_predictor,
@@ -242,7 +242,7 @@ class TestPredictionEndpoints:
             assert data["domains_analyzed"] == 1
             assert data["systemic_risk_level"] == "low"
 
-    def test_get_predictions_min_confidence_filter(self, client):
+    def test_get_predictions_min_confidence_filter(self, client) -> None:
         with (
             patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry,
             patch("app.routers.operator.get_degradation_predictor") as mock_predictor,
@@ -275,7 +275,7 @@ class TestPredictionEndpoints:
             data = resp.json()
             assert data["summary"]["total_filtered"] == 1
 
-    def test_get_domain_prediction_not_found(self, client):
+    def test_get_domain_prediction_not_found(self, client) -> None:
         with patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry:
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = [{"url": "https://other.com/page", "success": True}]
@@ -291,7 +291,7 @@ class TestPredictionEndpoints:
 
 
 class TestHealthSummary:
-    def test_health_summary_healthy(self, client):
+    def test_health_summary_healthy(self, client) -> None:
         with (
             patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry,
             patch("app.routers.operator.get_browser_pool") as mock_pool,
@@ -324,7 +324,7 @@ class TestHealthSummary:
             assert data["success_rate"] == 1.0
             assert data["domains_degraded"] == 0
 
-    def test_health_summary_degraded(self, client):
+    def test_health_summary_degraded(self, client) -> None:
         with (
             patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry,
             patch("app.routers.operator.get_browser_pool") as mock_pool,

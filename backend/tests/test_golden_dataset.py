@@ -122,7 +122,7 @@ def compute_f1(
 @pytest.mark.golden_dataset
 @pytest.mark.parametrize("site_def", load_sites(), ids=lambda s: s["id"])
 @pytest.mark.asyncio
-async def test_golden_dataset_site(site_def, monkeypatch):
+async def test_golden_dataset_site(site_def, monkeypatch) -> None:
     """Run extraction against a golden dataset site and compare to expected.
 
     This live test verifies the site is reachable, extraction produces enough
@@ -235,7 +235,7 @@ async def test_golden_dataset_site(site_def, monkeypatch):
 
 
 @pytest.mark.golden_dataset
-def test_golden_dataset_sites_file_exists():
+def test_golden_dataset_sites_file_exists() -> None:
     """Verify that the golden dataset sites file is valid JSON and has sites."""
     assert SITES_FILE.exists(), f"Sites file not found: {SITES_FILE}"
     sites = load_sites()
@@ -243,7 +243,7 @@ def test_golden_dataset_sites_file_exists():
 
 
 @pytest.mark.golden_dataset
-def test_golden_dataset_expected_files():
+def test_golden_dataset_expected_files() -> None:
     """Verify that all expected output files are valid JSON arrays."""
     sites = load_sites()
     for site in sites:
@@ -257,7 +257,7 @@ def test_golden_dataset_expected_files():
 
 
 @pytest.mark.golden_dataset
-def test_golden_dataset_f1_scoring():
+def test_golden_dataset_f1_scoring() -> None:
     """Verify the F1 scoring logic used by golden dataset tests."""
     # Perfect match
     extracted = [{"title": "A"}, {"title": "B"}]

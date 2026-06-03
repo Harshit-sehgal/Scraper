@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 
-def test_pyflakes_clean():
+def test_pyflakes_clean() -> None:
     """Run pyflakes programmatically over backend/app and backend/tests and assert no warnings or errors."""
     # Resolve the absolute path to the backend directory dynamically
     backend_dir = Path(__file__).resolve().parents[1]

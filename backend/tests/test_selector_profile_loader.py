@@ -19,24 +19,24 @@ from app.selector_profiles.loader import (
 
 
 class TestParseCurrency:
-    def test_currency_with_symbol_prefix(self):
+    def test_currency_with_symbol_prefix(self) -> None:
         assert _parse_currency("£238") == "238"
         assert _parse_currency("$500") == "500"
         assert _parse_currency("€99.50") == "99.50"
 
-    def test_currency_with_thousands_separator(self):
+    def test_currency_with_thousands_separator(self) -> None:
         assert _parse_currency("£1,234.56") == "1234.56"
         assert _parse_currency("$12,345") == "12345"
 
-    def test_currency_with_currency_code(self):
+    def test_currency_with_currency_code(self) -> None:
         assert _parse_currency("AED 500") == "500"
         assert _parse_currency("USD 99.99") == "99.99"
 
-    def test_currency_none_or_empty(self):
+    def test_currency_none_or_empty(self) -> None:
         assert _parse_currency(None) is None
         assert _parse_currency("") is None
 
-    def test_currency_no_digits(self):
+    def test_currency_no_digits(self) -> None:
         assert _parse_currency("FREE") is None
         assert _parse_currency("N/A") is None
 
@@ -45,30 +45,30 @@ class TestParseCurrency:
 
 
 class TestPostprocessField:
-    def test_text_type_passthrough(self):
+    def test_text_type_passthrough(self) -> None:
         result = _postprocess_field("Hello World", {"type": "text"})
         assert result == "Hello World"
 
-    def test_currency_type(self):
+    def test_currency_type(self) -> None:
         result = _postprocess_field("£238", {"type": "currency"})
         assert result == "238"
 
-    def test_number_type(self):
+    def test_number_type(self) -> None:
         result = _postprocess_field("£99.50", {"type": "number"})
         assert result == "99.5"
 
-    def test_number_type_cleans_symbols(self):
+    def test_number_type_cleans_symbols(self) -> None:
         result = _postprocess_field("$1,234.56", {"type": "number"})
         assert result == "1234.56"
 
-    def test_none_value(self):
+    def test_none_value(self) -> None:
         for field_type in ("text", "currency", "number"):
             assert _postprocess_field(None, {"type": field_type}) is None
 
-    def test_empty_string(self):
+    def test_empty_string(self) -> None:
         assert _postprocess_field("", {"type": "text"}) is None
 
-    def test_whitespace_only(self):
+    def test_whitespace_only(self) -> None:
         assert _postprocess_field("  ", {"type": "text"}) is None
 
 
@@ -82,19 +82,19 @@ class TestProfileLoading:
     def teardown_method(self):
         reload_profiles()
 
-    def test_load_empty_dir_returns_empty(self):
+    def test_load_empty_dir_returns_empty(self) -> None:
         profiles = _load_all_profiles()
         # The real profiles dir may or may not exist; test handles both
         assert isinstance(profiles, dict)
 
-    def test_cache_works(self):
+    def test_cache_works(self) -> None:
         # First call populates cache
         first = _load_all_profiles()
         # Second call should return same cached object
         second = _load_all_profiles()
         assert first is second
 
-    def test_reload_clears_cache(self):
+    def test_reload_clears_cache(self) -> None:
         first = _load_all_profiles()
         reload_profiles()
         second = _load_all_profiles()
@@ -112,12 +112,12 @@ class TestMatchDomain:
     def teardown_method(self):
         reload_profiles()
 
-    def test_match_returns_profile_for_known_profile(self):
+    def test_match_returns_profile_for_known_profile(self) -> None:
         result = _match_domain("https://example.com/page")
         assert result is not None
         assert result["domain"] == "example.com"
 
-    def test_match_handles_invalid_url(self):
+    def test_match_handles_invalid_url(self) -> None:
         result = _match_domain("not-a-url")
         assert result is None
 
@@ -127,7 +127,7 @@ class TestMatchDomain:
 
 class TestTryProfileExtraction:
     @pytest.mark.asyncio
-    async def test_no_profile_found(self):
+    async def test_no_profile_found(self) -> None:
         """When no profile matches, try_profile_extraction returns None."""
         reload_profiles()
         from app.selector_profiles.loader import try_profile_extraction
@@ -141,7 +141,7 @@ class TestTryProfileExtraction:
 
 class TestExtractWithProfile:
     @pytest.mark.asyncio
-    async def test_missing_item_container_returns_empty(self):
+    async def test_missing_item_container_returns_empty(self) -> None:
         """When profile lacks item_container, returns empty list."""
         from app.selector_profiles.loader import extract_with_profile
 
@@ -152,7 +152,7 @@ class TestExtractWithProfile:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_missing_fields_returns_empty(self):
+    async def test_missing_fields_returns_empty(self) -> None:
         """When profile lacks fields, returns empty list."""
         from app.selector_profiles.loader import extract_with_profile
 

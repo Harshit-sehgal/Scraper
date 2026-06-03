@@ -116,21 +116,21 @@ def _assert_job_field_parity(restored: Job, expected: Job) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_sqlite_preserves_job_warnings_empty(isolated_db):
+def test_sqlite_preserves_job_warnings_empty(isolated_db) -> None:
     """A job with no warnings attribute round-trips to an empty list in the row."""
     job = _make_job()
     row = _job_to_row(job)
     assert row["warnings"] == "[]", f"Expected '[]', got {row['warnings']!r}"
 
 
-def test_sqlite_preserves_job_warnings_with_data(isolated_db):
+def test_sqlite_preserves_job_warnings_with_data(isolated_db) -> None:
     """Warnings field value is persisted (not overwritten with [])."""
     job = _make_job(warnings=["selector drift detected", "low confidence"])
     row = _job_to_row(job)
     assert json.loads(row["warnings"]) == ["selector drift detected", "low confidence"]
 
 
-def test_sqlite_preserves_job_warnings_restored(isolated_db):
+def test_sqlite_preserves_job_warnings_restored(isolated_db) -> None:
     """warnings stored in the row are restored onto the job."""
     job = _make_job(warnings=["w1", "w2"])
     row = _job_to_row(job)
@@ -140,7 +140,7 @@ def test_sqlite_preserves_job_warnings_restored(isolated_db):
     assert restored.warnings == ["w1", "w2"]
 
 
-def test_sqlite_warnings_via_db(isolated_db):
+def test_sqlite_warnings_via_db(isolated_db) -> None:
     """End-to-end: warnings survive save_state → load_state."""
     job = _make_job(status=JobStatus.COMPLETED, warnings=["test warning"])
     save_state({job.id: job}, {})
@@ -155,21 +155,21 @@ def test_sqlite_warnings_via_db(isolated_db):
 # ---------------------------------------------------------------------------
 
 
-def test_sqlite_preserves_acquisition_mode_default(isolated_db):
+def test_sqlite_preserves_acquisition_mode_default(isolated_db) -> None:
     """A job with no acquisition_mode attribute defaults to 'standard' in the row."""
     job = _make_job()
     row = _job_to_row(job)
     assert row["acquisition_mode"] == "standard"
 
 
-def test_sqlite_preserves_acquisition_mode_custom_string(isolated_db):
+def test_sqlite_preserves_acquisition_mode_custom_string(isolated_db) -> None:
     """A string acquisition_mode is persisted as-is."""
     job = _make_job(acquisition_mode="deep_crawl")
     row = _job_to_row(job)
     assert row["acquisition_mode"] == "deep_crawl"
 
 
-def test_sqlite_preserves_acquisition_mode_enum(isolated_db):
+def test_sqlite_preserves_acquisition_mode_enum(isolated_db) -> None:
     """An enum acquisition_mode uses .value for serialization."""
     from enum import Enum
 
@@ -182,7 +182,7 @@ def test_sqlite_preserves_acquisition_mode_enum(isolated_db):
     assert row["acquisition_mode"] == "aggressive"
 
 
-def test_sqlite_preserves_acquisition_mode_restored(isolated_db):
+def test_sqlite_preserves_acquisition_mode_restored(isolated_db) -> None:
     """acquisition_mode stored in the row is restored onto the job."""
     job = _make_job(acquisition_mode="deep_crawl")
     row = _job_to_row(job)
@@ -192,7 +192,7 @@ def test_sqlite_preserves_acquisition_mode_restored(isolated_db):
     assert restored.acquisition_mode == "deep_crawl"
 
 
-def test_sqlite_acquisition_mode_not_overwritten_on_save(isolated_db):
+def test_sqlite_acquisition_mode_not_overwritten_on_save(isolated_db) -> None:
     """Saving a job with a non-standard mode does not reset it to 'standard'."""
     job = _make_job(status=JobStatus.COMPLETED, acquisition_mode="aggressive")
     save_state({job.id: job}, {})
@@ -207,14 +207,14 @@ def test_sqlite_acquisition_mode_not_overwritten_on_save(isolated_db):
 # ---------------------------------------------------------------------------
 
 
-def test_sqlite_full_job_field_parity(isolated_db):
+def test_sqlite_full_job_field_parity(isolated_db) -> None:
     """Every important Job field survives a _job_to_row → _row_to_job round-trip."""
     job = _make_parity_job()
     restored = _roundtrip(job)
     _assert_job_field_parity(restored, job)
 
 
-def test_sqlite_full_job_field_parity_via_db(isolated_db):
+def test_sqlite_full_job_field_parity_via_db(isolated_db) -> None:
     """Every important Job field survives a real save_state → load_state round-trip."""
     job = _make_parity_job()
 
@@ -233,7 +233,7 @@ def test_sqlite_full_job_field_parity_via_db(isolated_db):
 # ---------------------------------------------------------------------------
 
 
-def test_restart_recovery_writes_failed_status_to_db(isolated_db, monkeypatch):
+def test_restart_recovery_writes_failed_status_to_db(isolated_db, monkeypatch) -> None:
     """load_state() must write FAILED back to SQLite, not just return it in-memory.
 
     Regression guard: if the DB write is removed, the next load_state() call
@@ -259,7 +259,7 @@ def test_restart_recovery_writes_failed_status_to_db(isolated_db, monkeypatch):
     assert row[0] == "failed", f"DB row still has status={row[0]!r}, expected 'failed'"
 
 
-def test_load_state_can_skip_restart_recovery_for_worker_reads(isolated_db):
+def test_load_state_can_skip_restart_recovery_for_worker_reads(isolated_db) -> None:
     """Worker hot-path reads must not mark active jobs as restart-recovered."""
     import sqlite3 as _sqlite3
 
@@ -278,7 +278,7 @@ def test_load_state_can_skip_restart_recovery_for_worker_reads(isolated_db):
     assert row in {("running", None), ("running", "")}
 
 
-def test_restart_recovery_survives_second_load(isolated_db):
+def test_restart_recovery_survives_second_load(isolated_db) -> None:
     """After recovery, a second load_state() must not re-recover the same job."""
     job = _make_job(status=JobStatus.PENDING)
     save_state({job.id: job}, {})

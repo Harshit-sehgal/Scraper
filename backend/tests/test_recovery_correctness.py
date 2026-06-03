@@ -15,7 +15,7 @@ class _AllowAllCrawlPolicy:
 
 
 @pytest.mark.asyncio
-async def test_attempt_context_does_not_skip_profiles_by_default(monkeypatch):
+async def test_attempt_context_does_not_skip_profiles_by_default(monkeypatch) -> None:
     from app import scraper
 
     called: dict = {"profile": 0, "fetch": 0}
@@ -49,7 +49,7 @@ async def test_attempt_context_does_not_skip_profiles_by_default(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_force_llm_discovery_skips_profiles_and_passes_recovery_flags(monkeypatch):
+async def test_force_llm_discovery_skips_profiles_and_passes_recovery_flags(monkeypatch) -> None:
     from app import scraper
     from app.extraction_orchestrator import ExtractionResult
 
@@ -84,7 +84,7 @@ async def test_force_llm_discovery_skips_profiles_and_passes_recovery_flags(monk
     assert called["provided_selectors"]["force_container_discovery"] is True
 
 
-def test_acquisition_lineage_to_dict_contains_quality_and_action_fields():
+def test_acquisition_lineage_to_dict_contains_quality_and_action_fields() -> None:
     lineage = AcquisitionLineage(
         original_url="https://example.com/old",
         final_url="https://example.com/new",
@@ -116,7 +116,7 @@ def test_acquisition_lineage_to_dict_contains_quality_and_action_fields():
 
 
 @pytest.mark.asyncio
-async def test_failed_lineage_uses_computed_anti_bot_state(monkeypatch):
+async def test_failed_lineage_uses_computed_anti_bot_state(monkeypatch) -> None:
     import app.scraper_recovery_integration as recovery
 
     async def fake_scrape_url(*args, **kwargs):
@@ -137,7 +137,7 @@ async def test_failed_lineage_uses_computed_anti_bot_state(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_skip_url_stops_recovery_loop(monkeypatch):
+async def test_skip_url_stops_recovery_loop(monkeypatch) -> None:
     import app.scraper_recovery_integration as recovery
 
     async def fake_scrape_url(*args, **kwargs):
@@ -163,7 +163,7 @@ async def test_skip_url_stops_recovery_loop(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_extra_headers_and_timeout_passed_to_httpx(monkeypatch):
+async def test_extra_headers_and_timeout_passed_to_httpx(monkeypatch) -> None:
     from app import html_utils
     from app.strategy_evolution import FetchStrategy
 
@@ -188,7 +188,7 @@ async def test_extra_headers_and_timeout_passed_to_httpx(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_force_container_discovery_skips_llm_and_memory(monkeypatch):
+async def test_force_container_discovery_skips_llm_and_memory(monkeypatch) -> None:
     from app import extraction_orchestrator as orchestrator
 
     called = {"discover": 0, "memory": 0, "container": 0}
@@ -229,7 +229,7 @@ async def test_force_container_discovery_skips_llm_and_memory(monkeypatch):
     assert called == {"discover": 0, "memory": 0, "container": 1}
 
 
-def test_selectors_map_rejects_malformed_shapes():
+def test_selectors_map_rejects_malformed_shapes() -> None:
     payload = {
         "name": "bad selectors",
         "mode": "manual",
@@ -242,13 +242,13 @@ def test_selectors_map_rejects_malformed_shapes():
         JobCreate.model_validate(payload)
 
 
-def test_schema_rejects_runtime_metadata_field_names():
+def test_schema_rejects_runtime_metadata_field_names() -> None:
     with pytest.raises((ValueError, Exception)):
         SchemaField(name="record_score", field_type=FieldType.FLOAT)
 
 
 @pytest.mark.asyncio
-async def test_crawl_policy_active_counter_never_leaks_on_fetch_failure(monkeypatch):
+async def test_crawl_policy_active_counter_never_leaks_on_fetch_failure(monkeypatch) -> None:
     from app import scraper
     from app.crawl_policy import get_crawl_policy
 
@@ -278,7 +278,7 @@ async def test_crawl_policy_active_counter_never_leaks_on_fetch_failure(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_scrape_attempt_result_exposes_html_and_telemetry(monkeypatch):
+async def test_scrape_attempt_result_exposes_html_and_telemetry(monkeypatch) -> None:
     from app import scraper
     from app.crawl_policy import get_crawl_policy
 

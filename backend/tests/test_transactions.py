@@ -1,7 +1,7 @@
 from app.semantic_world_state import get_world_state
 
 
-def test_transaction_commit():
+def test_transaction_commit() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -13,7 +13,7 @@ def test_transaction_commit():
     assert ws.metrics.global_energy == 8.0
 
 
-def test_transaction_rollback():
+def test_transaction_rollback() -> None:
     ws = get_world_state()
     ws.clear()
     initial_energy = ws.metrics.global_energy
@@ -30,7 +30,7 @@ def test_transaction_rollback():
     assert ws.metrics.global_energy == initial_energy
 
 
-def test_nested_transaction():
+def test_nested_transaction() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -44,7 +44,7 @@ def test_nested_transaction():
     assert ws.metrics.global_energy == 6.0
 
 
-def test_nested_transaction_rollback():
+def test_nested_transaction_rollback() -> None:
     ws = get_world_state()
     ws.clear()
     initial_energy = ws.metrics.global_energy
@@ -70,7 +70,7 @@ def test_nested_transaction_rollback():
     assert ws.metrics.global_energy == initial_energy
 
 
-def test_topology_transaction_rollback():
+def test_topology_transaction_rollback() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -97,7 +97,7 @@ def test_topology_transaction_rollback():
     assert committed.instability == 0.5
 
 
-def test_topology_addition_rollback():
+def test_topology_addition_rollback() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -112,7 +112,7 @@ def test_topology_addition_rollback():
     assert ws._topology.region_count() == 0
 
 
-def test_failure_injection_rollback():
+def test_failure_injection_rollback() -> None:
     ws = get_world_state()
     ws.clear()
     initial_energy = ws.metrics.global_energy
@@ -135,7 +135,7 @@ def test_failure_injection_rollback():
     assert ws.metrics.global_energy == initial_energy
 
 
-def test_deterministic_replay():
+def test_deterministic_replay() -> None:
     ws = get_world_state()
     ws.clear()
 

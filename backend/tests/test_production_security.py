@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 
 @pytest.mark.asyncio
-async def test_production_security_enforcement_wildcard_cors(monkeypatch):
+async def test_production_security_enforcement_wildcard_cors(monkeypatch) -> None:
     monkeypatch.setattr(settings, "ENV", "production")
     monkeypatch.setattr(settings, "CORS_ORIGINS", ["*"])
     monkeypatch.setattr(settings, "API_KEY", "secure_key")
@@ -19,7 +19,7 @@ async def test_production_security_enforcement_wildcard_cors(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_production_security_enforcement_empty_api_key(monkeypatch):
+async def test_production_security_enforcement_empty_api_key(monkeypatch) -> None:
     monkeypatch.setattr(settings, "ENV", "production")
     monkeypatch.setattr(settings, "CORS_ORIGINS", ["https://trusted.com"])
     monkeypatch.setattr(settings, "API_KEY", "")

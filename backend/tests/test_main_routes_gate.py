@@ -29,7 +29,7 @@ def _experimental_route_paths(app) -> set[str]:
     return paths
 
 
-def test_main_does_not_eagerly_import_experimental_router():
+def test_main_does_not_eagerly_import_experimental_router() -> None:
     """app.main must NOT have the experimental router in its import graph
     when ENABLE_EXPERIMENTAL_ROUTES is False. This keeps the default-mode
     startup free of research-module imports.
@@ -58,7 +58,7 @@ def test_main_does_not_eagerly_import_experimental_router():
     )
 
 
-def test_experimental_routes_not_mounted_when_gate_off(monkeypatch):
+def test_experimental_routes_not_mounted_when_gate_off(monkeypatch) -> None:
     """With ENABLE_EXPERIMENTAL_ROUTES=False, no /api/system/* research
     paths should appear in the route table.
     """
@@ -85,7 +85,7 @@ def test_experimental_routes_not_mounted_when_gate_off(monkeypatch):
         ), f"Experimental route {experimental_path} was mounted despite ENABLE_EXPERIMENTAL_ROUTES=False."
 
 
-def test_experimental_routes_mounted_when_gate_on(monkeypatch):
+def test_experimental_routes_mounted_when_gate_on(monkeypatch) -> None:
     """With ENABLE_EXPERIMENTAL_ROUTES=True, the research paths MUST appear."""
     from app.config import settings
 
@@ -107,7 +107,7 @@ def test_experimental_routes_mounted_when_gate_on(monkeypatch):
     )
 
 
-def test_production_warning_when_experimental_enabled_in_prod(monkeypatch, caplog):
+def test_production_warning_when_experimental_enabled_in_prod(monkeypatch, caplog) -> None:
     """When the gate is open AND env=production, a WARNING must be logged."""
     from app.config import settings
 

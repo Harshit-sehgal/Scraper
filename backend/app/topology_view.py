@@ -139,17 +139,17 @@ class TopologyView:
             roles = sorted(set(region.competing_roles))
             for i, ra in enumerate(roles):
                 for rb in roles[i + 1 :]:
-                    pair = tuple(sorted((ra, rb)))
+                    pair = (ra, rb) if ra < rb else (rb, ra)
                     pairs.add(pair)
-                    region_instability.setdefault(pair, []).append(region.instability)  # type: ignore[arg-type]
+                    region_instability.setdefault(pair, []).append(region.instability)
 
         edges = []
         for source, target in sorted(pairs):
-            pair = tuple(sorted((source, target)))
+            pair = (source, target) if source < target else (target, source)
             cohesion = _clamp01(self._cohesion.get(pair, 0.0))
             law = _clamp_signed(self._laws.get(pair, 0.0))
             impossible = pair in impossible_pairs
-            instabilities = region_instability.get(pair, [])  # type: ignore[arg-type]
+            instabilities = region_instability.get(pair, [])
             uncertainty = _clamp01(sum(instabilities) / len(instabilities)) if instabilities else 0.0
 
             affinity = _clamp01(cohesion + max(law, 0.0) * (1.0 - cohesion))

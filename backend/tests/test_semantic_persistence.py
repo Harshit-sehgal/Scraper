@@ -12,7 +12,7 @@ from app.semantic_ir import SemanticType
 from app.semantic_persistence import clear_semantic_state, load_semantic_state, save_semantic_state
 
 
-def test_persistence_round_trip():
+def test_persistence_round_trip() -> None:
     # 1. Setup local path
     test_path = str(Path(__file__).parent / "test_semantic_state.json")
     os.environ["SEMANTIC_STATE_PATH"] = test_path
@@ -78,7 +78,7 @@ def test_persistence_round_trip():
         os.remove(test_path)
 
 
-def test_persistence_affects_pipeline():
+def test_persistence_affects_pipeline() -> None:
     # Ensures that saved state actually changes run_pipeline behavior
     test_path = str(Path(__file__).parent / "test_pipeline_persistence.json")
     os.environ["SEMANTIC_STATE_PATH"] = test_path

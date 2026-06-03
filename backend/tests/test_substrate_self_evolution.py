@@ -3,7 +3,7 @@ from app.llm_bridge import get_plugin_manager
 from app.semantic_world_state import get_world_state
 
 
-def test_native_role_merger():
+def test_native_role_merger() -> None:
     ws = get_world_state()
     ws.clear()
     plugins = get_plugin_manager(ws=ws)
@@ -22,7 +22,7 @@ def test_native_role_merger():
     assert not ws._manifold.has_manifold_role("role_b")
 
 
-def test_autonomous_refactor_trigger():
+def test_autonomous_refactor_trigger() -> None:
     ws = get_world_state()
     ws.clear()
     _ = get_plugin_manager(ws=ws)
@@ -44,7 +44,7 @@ def test_autonomous_refactor_trigger():
     # update the tool to handle default params.
 
 
-def test_manifold_compression_tool():
+def test_manifold_compression_tool() -> None:
     ws = get_world_state()
     ws.clear()
     plugins = get_plugin_manager(ws=ws)

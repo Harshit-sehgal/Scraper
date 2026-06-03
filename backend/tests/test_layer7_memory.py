@@ -1,4 +1,4 @@
-def test_layer7_semantic_memory():
+def test_layer7_semantic_memory() -> None:
     import os
 
     from app.semantic_boundary_engine import get_boundary_engine

@@ -22,7 +22,7 @@ def nodes():
     return ws_a, ws_b
 
 
-def test_zombie_data_prevention(nodes):
+def test_zombie_data_prevention(nodes) -> None:
     """Verify that region deletions on one node are respected after merge."""
     ws_a, ws_b = nodes
 
@@ -52,7 +52,7 @@ def test_zombie_data_prevention(nodes):
     print("\nZombie Data Prevention: Region successfully pruned after partition recovery.")
 
 
-def test_epoch_divergence_resolution(nodes):
+def test_epoch_divergence_resolution(nodes) -> None:
     """Verify that epoch-based reconciliation handles structural divergence."""
     ws_a, ws_b = nodes
 

@@ -56,8 +56,8 @@ def check_duplicate_definitions(filepath):
     functions = [n.name for n in tree.body if isinstance(n, ast.FunctionDef)]
     counts = collections.Counter(functions)
     dupes = [f for f, count in counts.items() if count > 1]
-    for f in dupes:
-        errors.append(f"Duplicate global function '{f}' ({filepath})")
+    for func_name in dupes:
+        errors.append(f"Duplicate global function '{func_name}' ({filepath})")
 
     return errors
 

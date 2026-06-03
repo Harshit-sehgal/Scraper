@@ -18,7 +18,7 @@ def ws():
     return state
 
 
-def test_contradictory_bombardment(ws):
+def test_contradictory_bombardment(ws) -> None:
     """Feed two batches of data that directly contradict each other's schema
     patterns and verify thermodynamic containment."""
 
@@ -55,7 +55,7 @@ def test_contradictory_bombardment(ws):
     assert ws.metrics.global_entropy < 0.7
 
 
-def test_recursive_hallucination_chain(ws):
+def test_recursive_hallucination_chain(ws) -> None:
     """Simulate a loop where the system's own outputs are fed back."""
 
     schema = ["entity_name", "price"]
@@ -73,7 +73,7 @@ def test_recursive_hallucination_chain(ws):
     assert ws.metrics.global_entropy < 1.0
 
 
-def test_oscillation_detection(ws):
+def test_oscillation_detection(ws) -> None:
     """Artificially create an energy oscillation and verify detection."""
     snapshots = []
     # Create 20 snapshots with oscillating energy
@@ -88,7 +88,7 @@ def test_oscillation_detection(ws):
     print(f"\nOscillation detected: {oscillations[0]}")
 
 
-def test_massive_topology_scaling(ws):
+def test_massive_topology_scaling(ws) -> None:
     """Verify performance with 100 regions."""
     import time
 

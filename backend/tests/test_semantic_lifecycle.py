@@ -21,7 +21,7 @@ from app.transaction_context import get_active_transaction
 class TestResetWorldStateLifecycle:
     """Verify reset_world_state() cleans up the old world state properly."""
 
-    def test_reset_world_state_does_not_duplicate_field_wave_subscribers(self):
+    def test_reset_world_state_does_not_duplicate_field_wave_subscribers(self) -> None:
         """After reset_world_state(), a new world state should have exactly
         one subscriber (its own), not accumulate from the old instance."""
         from app.semantic_events import SemanticEventType
@@ -58,7 +58,7 @@ class TestResetWorldStateLifecycle:
             "This indicates a subscriber leak across reset_world_state()."
         )
 
-    def test_close_removes_subscriber(self):
+    def test_close_removes_subscriber(self) -> None:
         """Calling close() directly should remove the FIELD_WAVE subscriber."""
         from app.semantic_events import SemanticEventType
 
@@ -78,14 +78,14 @@ class TestResetWorldStateLifecycle:
 class TestTransactionContextExceptionSafety:
     """Verify the transaction context variable resets even when staging fails."""
 
-    def test_transaction_resets_on_normal_exit(self):
+    def test_transaction_resets_on_normal_exit(self) -> None:
         """Normal transaction flow should reset the context var."""
         ws = SemanticWorldState()
         with ws.transaction("test_normal"):
             assert get_active_transaction() is not None
         assert get_active_transaction() is None
 
-    def test_transaction_resets_on_exception_in_body(self):
+    def test_transaction_resets_on_exception_in_body(self) -> None:
         """Exception inside the transaction body should still reset context."""
         ws = SemanticWorldState()
         with pytest.raises(RuntimeError, match="test error"):
@@ -94,7 +94,7 @@ class TestTransactionContextExceptionSafety:
                 raise RuntimeError("test error")
         assert get_active_transaction() is None
 
-    def test_nested_transaction_does_not_set_new_context(self):
+    def test_nested_transaction_does_not_set_new_context(self) -> None:
         """Nested transaction should skip setting a new context var."""
         ws = SemanticWorldState()
         with ws.transaction("outer"):
@@ -105,7 +105,7 @@ class TestTransactionContextExceptionSafety:
             assert inner_tx is outer_tx
         assert get_active_transaction() is None
 
-    def test_transaction_context_resets_if_begin_transaction_fails(self):
+    def test_transaction_context_resets_if_begin_transaction_fails(self) -> None:
         """If a sub-state's begin_transaction() raises, the context variable
         must still be reset to its previous value."""
         ws = SemanticWorldState()
@@ -134,7 +134,7 @@ class TestTransactionContextExceptionSafety:
 class TestBackwardCompatibility:
     """Verify that old import paths still work after the refactor."""
 
-    def test_import_semantic_world_state_from_package(self):
+    def test_import_semantic_world_state_from_package(self) -> None:
         """Direct import from the old module path should still work."""
         from app.semantic_world_state import SemanticWorldState
 
@@ -143,7 +143,7 @@ class TestBackwardCompatibility:
         assert hasattr(ws, "transaction")
         assert hasattr(ws, "close")
 
-    def test_import_get_world_state(self):
+    def test_import_get_world_state(self) -> None:
         """get_world_state should be importable and returns a valid instance."""
         from app.semantic_world_state import get_world_state
 
@@ -151,14 +151,14 @@ class TestBackwardCompatibility:
         assert ws is not None
         assert hasattr(ws, "get_cognitive_health")
 
-    def test_import_reset_world_state(self):
+    def test_import_reset_world_state(self) -> None:
         """reset_world_state should be importable and callable without error."""
         from app.semantic_world_state import reset_world_state
 
         # Should not raise
         reset_world_state()
 
-    def test_get_world_state_returns_working_instance(self):
+    def test_get_world_state_returns_working_instance(self) -> None:
         """The world state returned by get_world_state should be functional."""
         from app.semantic_world_state import get_world_state
 
@@ -175,21 +175,21 @@ class TestBackwardCompatibility:
 class TestCloseIdempotency:
     """Verify that close() is idempotent and safe to call multiple times."""
 
-    def test_close_can_be_called_multiple_times(self):
+    def test_close_can_be_called_multiple_times(self) -> None:
         """Calling close() twice should not raise."""
         ws = SemanticWorldState()
         ws.close()
         # Second call must not raise
         ws.close()
 
-    def test_close_sets_closed_flag(self):
+    def test_close_sets_closed_flag(self) -> None:
         """After close(), _closed should be True."""
         ws = SemanticWorldState()
         assert not ws._closed
         ws.close()
         assert ws._closed
 
-    def test_close_removes_subscriber_only_once(self):
+    def test_close_removes_subscriber_only_once(self) -> None:
         """Calling close() multiple times should not cause subscriber errors."""
         ws = SemanticWorldState()
         ws.close()
@@ -198,7 +198,7 @@ class TestCloseIdempotency:
         # A new close shouldn't error
         ws.close()
 
-    def test_reset_world_state_with_close(self):
+    def test_reset_world_state_with_close(self) -> None:
         """reset_world_state should handle close() cleanly."""
         from app.semantic_world_state import get_world_state, reset_world_state
 
@@ -210,7 +210,7 @@ class TestCloseIdempotency:
         assert ws2 is not None
         assert ws2 is not ws1
 
-    def test_operations_after_close(self):
+    def test_operations_after_close(self) -> None:
         """Basic operations should still work after close()."""
         ws = SemanticWorldState()
         ws.close()
@@ -227,7 +227,7 @@ class TestBestEffortRollback:
     rollback fails, the others still roll back and the original exception
     is re-raised."""
 
-    def test_best_effort_rollback_logs_and_continues(self):
+    def test_best_effort_rollback_logs_and_continues(self) -> None:
         """If one subsystem's rollback fails, others should still roll back."""
         ws = SemanticWorldState()
 
@@ -249,7 +249,7 @@ class TestBestEffortRollback:
         # After the exception, the context var must still be reset
         assert get_active_transaction() is None, "Transaction context was not reset despite rollback error"
 
-    def test_best_effort_all_rollbacks_fail(self):
+    def test_best_effort_all_rollbacks_fail(self) -> None:
         """If ALL subsystem rollbacks fail, the original exception is still re-raised."""
         ws = SemanticWorldState()
 
@@ -292,7 +292,7 @@ class TestBestEffortRollback:
 
         assert get_active_transaction() is None
 
-    def test_transaction_context_resets_if_commit_fails(self):
+    def test_transaction_context_resets_if_commit_fails(self) -> None:
         """If a subsystem's commit() raises, the transaction context must reset.
         Additionally, rollback must be attempted on all subsystems that have it."""
         ws = SemanticWorldState()
@@ -320,7 +320,7 @@ class TestBestEffortRollback:
             ws._manifold.commit = original_commit
             ws._manifold.rollback = original_rollback
 
-    def test_rollback_failure_does_not_mask_original_exception(self):
+    def test_rollback_failure_does_not_mask_original_exception(self) -> None:
         """When a subsystem rollback fails, the ORIGINAL exception
         (not the rollback exception) must be raised to the caller."""
         ws = SemanticWorldState()
@@ -350,7 +350,7 @@ class TestBestEffortRollback:
 
         assert get_active_transaction() is None
 
-    def test_all_subsystems_attempt_rollback_even_if_one_fails(self):
+    def test_all_subsystems_attempt_rollback_even_if_one_fails(self) -> None:
         """When one subsystem rollback fails, the remaining subsystems
         must still have their rollback() called."""
         ws = SemanticWorldState()
@@ -404,7 +404,7 @@ class TestMetricsProtocol:
     """Verify the _SemanticMetricsProtocol is structurally compatible
     with EnergyState (the actual ws.metrics object)."""
 
-    def test_metrics_protocol_attributes_exist_on_energy_state(self):
+    def test_metrics_protocol_attributes_exist_on_energy_state(self) -> None:
         """All attributes required by the Protocol must exist on the
         EnergyState object that ws.metrics points to."""
         from app.semantic_world_state import get_world_state
@@ -424,7 +424,7 @@ class TestMetricsProtocol:
         assert isinstance(metrics.semantic_temperature, float)
         assert isinstance(metrics.integrity_score, float)
 
-    def test_metrics_protocol_can_be_used_instead_of_any(self):
+    def test_metrics_protocol_can_be_used_instead_of_any(self) -> None:
         """The Protocol should be usable as a type annotation
         without mypy errors (verified structurally)."""
         from app.semantic_allocation_engine import _SemanticMetricsProtocol

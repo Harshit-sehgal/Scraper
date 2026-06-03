@@ -22,7 +22,7 @@ from app.selector_ml_optimizer import (
 class TestSelectorFeatureExtractor:
     """Test CSS selector feature extraction."""
 
-    def test_extract_simple_class_selector(self):
+    def test_extract_simple_class_selector(self) -> None:
         """Test feature extraction from simple class selector."""
         selector = ".product-name"
         features = SelectorFeatureExtractor.extract_features(selector)
@@ -34,7 +34,7 @@ class TestSelectorFeatureExtractor:
         assert features.wildcard_usage is False
         assert features.uses_text_node is False
 
-    def test_extract_id_selector(self):
+    def test_extract_id_selector(self) -> None:
         """Test feature extraction from ID selector."""
         selector = "#main-content"
         features = SelectorFeatureExtractor.extract_features(selector)
@@ -44,7 +44,7 @@ class TestSelectorFeatureExtractor:
         assert features.class_count == 0
         assert features.specificity_score > 0.5  # IDs are specific
 
-    def test_extract_complex_selector(self):
+    def test_extract_complex_selector(self) -> None:
         """Test feature extraction from complex nested selector."""
         selector = "div.container > p.text-content"
         features = SelectorFeatureExtractor.extract_features(selector)
@@ -54,7 +54,7 @@ class TestSelectorFeatureExtractor:
         assert features.descendant_depth > 0
         assert features.tag_count > 0
 
-    def test_extract_selector_with_nth_child(self):
+    def test_extract_selector_with_nth_child(self) -> None:
         """Test that nth-child selectors are detected."""
         selector = "ul > li:nth-child(2)"
         features = SelectorFeatureExtractor.extract_features(selector)
@@ -62,7 +62,7 @@ class TestSelectorFeatureExtractor:
         assert features.has_nth_child is True
         assert features.stability_score < 1.0  # nth-child reduces stability
 
-    def test_extract_selector_with_wildcard(self):
+    def test_extract_selector_with_wildcard(self) -> None:
         """Test that wildcard usage is detected."""
         selector = "div * .text"
         features = SelectorFeatureExtractor.extract_features(selector)
@@ -70,7 +70,7 @@ class TestSelectorFeatureExtractor:
         assert features.wildcard_usage is True
         assert features.stability_score < 1.0
 
-    def test_extract_selector_with_attribute_match(self):
+    def test_extract_selector_with_attribute_match(self) -> None:
         """Test attribute matching detection."""
         selector = "a[href*='example.com']"
         features = SelectorFeatureExtractor.extract_features(selector)
@@ -78,7 +78,7 @@ class TestSelectorFeatureExtractor:
         assert features.has_attribute_match is True
         assert features.attribute_count > 0
 
-    def test_extract_batch_multiple_selectors(self):
+    def test_extract_batch_multiple_selectors(self) -> None:
         """Test batch extraction of multiple selectors."""
         selectors = [
             ".product-name",
@@ -94,7 +94,7 @@ class TestSelectorFeatureExtractor:
         assert features_list[0].selector == selectors[0]
         assert features_list[3].has_nth_child is True
 
-    def test_specificity_score_range(self):
+    def test_specificity_score_range(self) -> None:
         """Test that specificity scores stay in valid range."""
         selectors = [
             "p",
@@ -108,7 +108,7 @@ class TestSelectorFeatureExtractor:
             features = SelectorFeatureExtractor.extract_features(selector)
             assert 0.0 <= features.specificity_score <= 1.0
 
-    def test_stability_score_range(self):
+    def test_stability_score_range(self) -> None:
         """Test that stability scores stay in valid range."""
         selectors = [
             "p",
@@ -126,7 +126,7 @@ class TestSelectorFeatureExtractor:
 class TestSelectorQualityPredictor:
     """Test ML-based selector quality prediction."""
 
-    def test_predict_quality_simple_selector(self):
+    def test_predict_quality_simple_selector(self) -> None:
         """Test quality prediction for simple selector."""
         predictor = SelectorQualityPredictor()
         features = SelectorFeatureExtractor.extract_features(".product-name")
@@ -139,7 +139,7 @@ class TestSelectorQualityPredictor:
         assert prediction.recommendation in ["keep", "improve", "replace"]
         assert isinstance(prediction.suggested_mutations, list)
 
-    def test_prediction_high_quality_selector(self):
+    def test_prediction_high_quality_selector(self) -> None:
         """Test that specific, stable selectors get high quality scores."""
         predictor = SelectorQualityPredictor()
         # ID selectors are specific and stable
@@ -151,7 +151,7 @@ class TestSelectorQualityPredictor:
         assert prediction.predicted_quality > 0.5
         assert prediction.confidence > 0.5
 
-    def test_prediction_low_quality_selector(self):
+    def test_prediction_low_quality_selector(self) -> None:
         """Test that generic selectors get lower quality scores."""
         predictor = SelectorQualityPredictor()
         # Generic selectors with wildcards are unstable
@@ -164,7 +164,7 @@ class TestSelectorQualityPredictor:
         # Confidence might vary
         assert prediction.confidence >= 0.0
 
-    def test_feature_importance_computed(self):
+    def test_feature_importance_computed(self) -> None:
         """Test that feature importance is computed in predictions."""
         predictor = SelectorQualityPredictor()
         features = SelectorFeatureExtractor.extract_features("div.container > p.text")
@@ -176,7 +176,7 @@ class TestSelectorQualityPredictor:
         # All feature importance values should be non-negative
         assert all(v >= 0 for v in prediction.feature_importance.values())
 
-    def test_recommendation_logic(self):
+    def test_recommendation_logic(self) -> None:
         """Test that recommendations are based on quality score."""
         predictor = SelectorQualityPredictor()
 
@@ -218,7 +218,7 @@ class TestSelectorQualityPredictor:
         pred_low = predictor.predict(low_quality)
         assert pred_low.recommendation == "replace"
 
-    def test_suggest_mutations_from_pseudo_classes(self):
+    def test_suggest_mutations_from_pseudo_classes(self) -> None:
         """Test mutation suggestion removes pseudo-classes."""
         predictor = SelectorQualityPredictor()
         features = SelectorFeatureExtractor.extract_features("a:hover")
@@ -229,7 +229,7 @@ class TestSelectorQualityPredictor:
         # Should suggest removing the :hover part
         assert any("a" in mut for mut in prediction.suggested_mutations)
 
-    def test_suggest_mutations_from_deep_nesting(self):
+    def test_suggest_mutations_from_deep_nesting(self) -> None:
         """Test mutation suggestion for deeply nested selectors."""
         predictor = SelectorQualityPredictor()
         features = SelectorFeatureExtractor.extract_features("body > main > article > section > div > p")
@@ -238,7 +238,7 @@ class TestSelectorQualityPredictor:
 
         assert len(prediction.suggested_mutations) > 0
 
-    def test_predict_batch(self):
+    def test_predict_batch(self) -> None:
         """Test batch prediction of multiple selectors."""
         predictor = SelectorQualityPredictor()
         features_list = [
@@ -252,7 +252,7 @@ class TestSelectorQualityPredictor:
         assert len(predictions) == len(features_list)
         assert all(isinstance(p, SelectorPrediction) for p in predictions)
 
-    def test_update_weights_improves_model(self):
+    def test_update_weights_improves_model(self) -> None:
         """Test that weight updates improve predictions."""
         predictor = SelectorQualityPredictor()
         features = SelectorFeatureExtractor.extract_features("#stable-id")
@@ -271,7 +271,7 @@ class TestSelectorQualityPredictor:
         # Quality should have increased
         assert updated_quality >= initial_quality
 
-    def test_update_weights_with_multiple_samples(self):
+    def test_update_weights_with_multiple_samples(self) -> None:
         """Test weight update with multiple feedback samples."""
         predictor = SelectorQualityPredictor()
 
@@ -284,7 +284,7 @@ class TestSelectorQualityPredictor:
         # Should not raise an error
         predictor.update_weights(feedback, learning_rate=0.01)
 
-    def test_update_weights_empty_feedback(self):
+    def test_update_weights_empty_feedback(self) -> None:
         """Test that empty feedback is handled gracefully."""
         predictor = SelectorQualityPredictor()
 
@@ -295,7 +295,7 @@ class TestSelectorQualityPredictor:
 class TestSelectorOptimizationEngine:
     """Test the optimization engine orchestration."""
 
-    def test_optimize_selectors_single_domain(self):
+    def test_optimize_selectors_single_domain(self) -> None:
         """Test selector optimization for a domain."""
         engine = SelectorOptimizationEngine()
 
@@ -321,7 +321,7 @@ class TestSelectorOptimizationEngine:
         assert summary["keep"] + summary["improve"] + summary["replace"] == 3
         assert 0.0 <= summary["total_quality"] <= 1.0
 
-    def test_optimization_report_structure(self):
+    def test_optimization_report_structure(self) -> None:
         """Test that optimization report has correct structure."""
         engine = SelectorOptimizationEngine()
 
@@ -342,7 +342,7 @@ class TestSelectorOptimizationEngine:
             assert "features" in opt
             assert isinstance(opt["features"], dict)
 
-    def test_optimization_history_tracking(self):
+    def test_optimization_history_tracking(self) -> None:
         """Test that optimization history is tracked."""
         engine = SelectorOptimizationEngine()
 
@@ -361,7 +361,7 @@ class TestSelectorOptimizationEngine:
         assert history[0]["domain"] == domain
         assert history[-1]["domain"] == domain
 
-    def test_optimization_history_limit(self):
+    def test_optimization_history_limit(self) -> None:
         """Test that optimization history respects limit."""
         engine = SelectorOptimizationEngine()
 
@@ -377,7 +377,7 @@ class TestSelectorOptimizationEngine:
 
         assert len(history) == 10
 
-    def test_learn_from_results(self):
+    def test_learn_from_results(self) -> None:
         """Test learning from actual extraction results."""
         engine = SelectorOptimizationEngine()
 
@@ -405,7 +405,7 @@ class TestSelectorOptimizationEngine:
         )
         assert re_report["original_count"] == 2, "Optimization should still produce a report"
 
-    def test_learn_from_multiple_results(self):
+    def test_learn_from_multiple_results(self) -> None:
         """Test learning from multiple extraction results."""
         engine = SelectorOptimizationEngine()
 
@@ -437,14 +437,14 @@ class TestSelectorOptimizationEngine:
 class TestSelectorOptimizationGlobal:
     """Test global singleton access."""
 
-    def test_get_selector_optimizer_singleton(self):
+    def test_get_selector_optimizer_singleton(self) -> None:
         """Test that get_selector_optimizer returns singleton."""
         opt1 = get_selector_optimizer()
         opt2 = get_selector_optimizer()
 
         assert opt1 is opt2
 
-    def test_optimizer_preserves_state_across_calls(self):
+    def test_optimizer_preserves_state_across_calls(self) -> None:
         """Test that optimizer preserves state across calls."""
         optimizer = get_selector_optimizer()
 
@@ -463,7 +463,7 @@ class TestSelectorOptimizationGlobal:
 class TestIntegrationSelectorML:
     """Integration tests for selector ML system."""
 
-    def test_end_to_end_optimization_workflow(self):
+    def test_end_to_end_optimization_workflow(self) -> None:
         """Test complete optimization workflow."""
         optimizer = SelectorOptimizationEngine()
 
@@ -506,7 +506,7 @@ class TestIntegrationSelectorML:
         assert updated_report is not None
         assert len(updated_report["optimizations"]) == 4
 
-    def test_quality_improvement_through_learning(self):
+    def test_quality_improvement_through_learning(self) -> None:
         """Test that quality predictions improve through learning."""
         optimizer = SelectorOptimizationEngine()
         predictor = optimizer.predictor
@@ -525,7 +525,7 @@ class TestIntegrationSelectorML:
 
         assert updated_pred.predicted_quality >= initial_pred.predicted_quality
 
-    def test_batch_optimization_multiple_domains(self):
+    def test_batch_optimization_multiple_domains(self) -> None:
         """Test optimization across multiple domains."""
         optimizer = SelectorOptimizationEngine()
 

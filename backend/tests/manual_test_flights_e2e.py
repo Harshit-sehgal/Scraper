@@ -47,7 +47,7 @@ def clean_airport(text: str | None) -> str | None:
     return match.group(1) if match else text.strip()
 
 
-async def test_flights_scrape():
+async def test_flights_scrape() -> None:
     import os
 
     os.environ["DATAFORGE_STATE_FILE"] = str(Path(__file__).resolve().parent.parent / "data" / "jobs_state_test.json")

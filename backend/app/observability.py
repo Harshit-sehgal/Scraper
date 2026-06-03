@@ -646,12 +646,12 @@ class ObservabilityState:
         self._telemetry_stream = deque(list(self._telemetry_stream)[-100:], maxlen=1000)
 
         # 2. Prune History
-        ws._history.trim_journal(200)  # type: ignore
-        ws._history.trim_snapshots(50)  # type: ignore
+        ws._history.trim_journal(200)
+        ws._history.trim_snapshots(50)
 
         # 3. Value-Aware Region Pruning (Phase 50)
         # Instead of just trimming from end, we sort by importance
-        regs = ws._topology._get_regions()  # type: ignore
+        regs = ws._topology._get_regions()
         if len(regs) > 50:
             # Rank by importance using snapshot centrality
             scored_regs = [(self.calculate_semantic_importance(r, snapshot.topology_centrality), r) for r in regs]
@@ -659,17 +659,17 @@ class ObservabilityState:
 
             # Keep top 50
             kept_regs = [r for score, r in scored_regs[:50]]
-            ws._topology.replace_all(kept_regs)  # type: ignore
+            ws._topology.replace_all(kept_regs)
 
         # 4. Prune Weak Motifs
-        ws._motif.prune_weak(threshold=0.2)  # type: ignore
+        ws._motif.prune_weak(threshold=0.2)
 
         self.emit_telemetry(
             "resource_shedding",
             {
                 "old_bytes": profile["total_estimated_bytes"],
                 "telemetry_pruned": old_telemetry - len(self._telemetry_stream),
-                "regions_count": len(ws._topology._get_regions()),  # type: ignore
+                "regions_count": len(ws._topology._get_regions()),
             },
         )
         return True

@@ -2,7 +2,7 @@ from app.semantic_os import get_semantic_os
 from app.semantic_world_state import get_world_state
 
 
-def test_telemetry_emission():
+def test_telemetry_emission() -> None:
     sos = get_semantic_os()
     sos.ws.clear()
 
@@ -21,7 +21,7 @@ def test_telemetry_emission():
     assert heatmap["r1"] == 1.0
 
 
-def test_heatmap_decay():
+def test_heatmap_decay() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -37,7 +37,7 @@ def test_heatmap_decay():
     assert ws._observability.heatmap["r1"] == 0.5
 
 
-def test_drift_logging():
+def test_drift_logging() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -49,7 +49,7 @@ def test_drift_logging():
     assert drift == [0.05, 0.02]
 
 
-def test_observability_persistence():
+def test_observability_persistence() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -65,7 +65,7 @@ def test_observability_persistence():
     assert ws._observability.get_role_drift("role_a") == [0.1]
 
 
-def test_manifold_drift_telemetry():
+def test_manifold_drift_telemetry() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -94,7 +94,7 @@ def test_manifold_drift_telemetry():
     assert any(t["type"] == "manifold_relaxation" for t in telemetry)
 
 
-def test_health_guardian_alert():
+def test_health_guardian_alert() -> None:
     ws = get_world_state()
     ws.clear()
 

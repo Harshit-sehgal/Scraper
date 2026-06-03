@@ -8,7 +8,7 @@ def get_client():
     return TestClient(app)
 
 
-def test_manual_mode():
+def test_manual_mode() -> None:
     client = get_client()
     print("=== Testing MANUAL Mode ===")
     response = client.post(
@@ -42,7 +42,7 @@ def test_manual_mode():
         time.sleep(2)
 
 
-def test_auto_mode():
+def test_auto_mode() -> None:
     client = get_client()
     print("\n=== Testing AUTO Mode ===")
     response = client.post(

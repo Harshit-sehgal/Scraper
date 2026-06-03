@@ -47,7 +47,7 @@ class TestCheckProdEnvCore:
         spec.loader.exec_module(mod)
         return mod
 
-    def test_load_env_file_reads_variables(self):
+    def test_load_env_file_reads_variables(self) -> None:
         """load_env_file should parse a basic .env file."""
         mod = self._import_module()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
@@ -65,23 +65,23 @@ class TestCheckProdEnvCore:
         finally:
             os.unlink(f.name)
 
-    def test_load_env_file_handles_missing_file(self):
+    def test_load_env_file_handles_missing_file(self) -> None:
         """load_env_file should return empty dict for missing file."""
         mod = self._import_module()
         result = mod.load_env_file(Path("/nonexistent/.env"))
         assert result == {}
 
-    def test_check_var_missing_required_fails(self):
+    def test_check_var_missing_required_fails(self) -> None:
         """A required but missing variable should fail."""
         mod = self._import_module()
         assert not mod.check_var({}, "DATAFORGE_API_KEY", required=True)
 
-    def test_check_var_optional_missing_passes(self):
+    def test_check_var_optional_missing_passes(self) -> None:
         """An optional missing variable should pass."""
         mod = self._import_module()
         assert mod.check_var({}, "OPTIONAL_VAR", required=False)
 
-    def test_check_var_with_validator_passes(self):
+    def test_check_var_with_validator_passes(self) -> None:
         """A variable that passes validation should succeed."""
         mod = self._import_module()
 
@@ -90,7 +90,7 @@ class TestCheckProdEnvCore:
 
         assert mod.check_var({"MY_VAR": "ok"}, "MY_VAR", validator=always_true)
 
-    def test_check_var_with_validator_fails(self):
+    def test_check_var_with_validator_fails(self) -> None:
         """A variable that fails validation should fail."""
         mod = self._import_module()
 
@@ -99,7 +99,7 @@ class TestCheckProdEnvCore:
 
         assert not mod.check_var({"MY_VAR": "bad"}, "MY_VAR", validator=always_false)
 
-    def test_mask_value_redacts_database_url_password(self):
+    def test_mask_value_redacts_database_url_password(self) -> None:
         """Database URLs should not print credentials in validation output."""
         mod = self._import_module()
         masked = mod._mask_value(
@@ -126,53 +126,53 @@ class TestCheckProdEnvValidators:
         spec.loader.exec_module(mod)
         return mod
 
-    def test_check_cors_origins_valid_json_list(self):
+    def test_check_cors_origins_valid_json_list(self) -> None:
         """Valid JSON array of origins should pass."""
         mod = self._import_module()
         assert mod.check_cors_origins('["https://example.com"]')
         assert mod.check_cors_origins('["https://app.example.com", "https://api.example.com"]')
 
-    def test_check_cors_origins_rejects_wildcard(self):
+    def test_check_cors_origins_rejects_wildcard(self) -> None:
         """Wildcard '*' in origins should fail."""
         mod = self._import_module()
         assert not mod.check_cors_origins('["*"]')
         assert not mod.check_cors_origins('["https://example.com", "*"]')
 
-    def test_check_cors_origins_rejects_invalid_json(self):
+    def test_check_cors_origins_rejects_invalid_json(self) -> None:
         """Invalid JSON should fail."""
         mod = self._import_module()
         assert not mod.check_cors_origins("not-json")
         assert not mod.check_cors_origins("{invalid}")
         assert not mod.check_cors_origins("")
 
-    def test_check_cors_origins_rejects_non_list(self):
+    def test_check_cors_origins_rejects_non_list(self) -> None:
         """Non-list JSON should fail."""
         mod = self._import_module()
         assert not mod.check_cors_origins('"https://example.com"')
         assert not mod.check_cors_origins("{}")
         assert not mod.check_cors_origins("42")
 
-    def test_check_cors_origins_rejects_non_url(self):
+    def test_check_cors_origins_rejects_non_url(self) -> None:
         """Origins that don't start with http:// or https:// should fail."""
         mod = self._import_module()
         assert not mod.check_cors_origins('["ftp://example.com"]')
         assert not mod.check_cors_origins('["example.com"]')
 
-    def test_check_storage_backend_accepts_postgres(self):
+    def test_check_storage_backend_accepts_postgres(self) -> None:
         """'postgres' should pass."""
         mod = self._import_module()
         assert mod.check_storage_backend("postgres")
         assert mod.check_storage_backend("POSTGRES")
         assert mod.check_storage_backend("Postgres")
 
-    def test_check_storage_backend_rejects_other(self):
+    def test_check_storage_backend_rejects_other(self) -> None:
         """Anything other than 'postgres' should fail."""
         mod = self._import_module()
         assert not mod.check_storage_backend("sqlite")
         assert not mod.check_storage_backend("mysql")
         assert not mod.check_storage_backend("")
 
-    def test_check_worker_queue_accepts_true(self):
+    def test_check_worker_queue_accepts_true(self) -> None:
         """'true' should pass."""
         mod = self._import_module()
         assert mod.check_worker_queue("true")
@@ -180,7 +180,7 @@ class TestCheckProdEnvValidators:
         assert mod.check_worker_queue("1")
         assert mod.check_worker_queue("yes")
 
-    def test_check_worker_queue_rejects_false(self):
+    def test_check_worker_queue_rejects_false(self) -> None:
         """'false' or other values should fail."""
         mod = self._import_module()
         assert not mod.check_worker_queue("false")
@@ -188,13 +188,13 @@ class TestCheckProdEnvValidators:
         assert not mod.check_worker_queue("no")
         assert not mod.check_worker_queue("")
 
-    def test_check_database_url_accepts_postgresql(self):
+    def test_check_database_url_accepts_postgresql(self) -> None:
         """postgresql:// URLs should pass."""
         mod = self._import_module()
         assert mod.check_database_url("postgresql://user:strong-password-123@localhost:5432/db")
         assert mod.check_database_url("postgres://user:strong-password-123@postgres:5432/db")
 
-    def test_check_database_url_rejects_non_postgres(self):
+    def test_check_database_url_rejects_non_postgres(self) -> None:
         """Non-postgres URLs should fail."""
         mod = self._import_module()
         assert not mod.check_database_url("sqlite:///path/to/db")
@@ -202,7 +202,7 @@ class TestCheckProdEnvValidators:
         assert not mod.check_database_url("")
         assert not mod.check_database_url("not-a-url")
 
-    def test_check_api_key_rejects_default_placeholders(self):
+    def test_check_api_key_rejects_default_placeholders(self) -> None:
         """Known default API key values should fail."""
         mod = self._import_module()
         assert not mod.check_api_key("change-me"), "'change-me' should fail"
@@ -213,18 +213,18 @@ class TestCheckProdEnvValidators:
         assert not mod.check_api_key("CHANGE_ME_GENERATE_STRONG_API_KEY")
         assert not mod.check_api_key("replace_this_with_random_key")
 
-    def test_check_api_key_rejects_short_keys(self):
+    def test_check_api_key_rejects_short_keys(self) -> None:
         """API keys shorter than 16 chars should fail."""
         mod = self._import_module()
         assert not mod.check_api_key("short")
         assert not mod.check_api_key("123456789012345")
 
-    def test_check_api_key_accepts_strong_key(self):
+    def test_check_api_key_accepts_strong_key(self) -> None:
         """A strong, long API key should pass."""
         mod = self._import_module()
         assert mod.check_api_key("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4")
 
-    def test_check_db_password_rejects_default_placeholders(self):
+    def test_check_db_password_rejects_default_placeholders(self) -> None:
         """Known default DB password values should fail."""
         mod = self._import_module()
         assert not mod.check_db_password("dataforge"), "'dataforge' default should fail"
@@ -235,17 +235,17 @@ class TestCheckProdEnvValidators:
         assert not mod.check_db_password("CHANGE_ME_GENERATE_STRONG_DB_PASSWORD")
         assert not mod.check_db_password("replace_this_with_random_password")
 
-    def test_check_database_url_rejects_placeholder_password_pattern(self):
+    def test_check_database_url_rejects_placeholder_password_pattern(self) -> None:
         """Database URL password validation should reject generated placeholder text."""
         mod = self._import_module()
         assert not mod.check_database_url("postgresql://dataforge:CHANGE_ME_GENERATE_STRONG_DB_PASSWORD@localhost:5432/db")
 
-    def test_check_grafana_password_rejects_placeholder_pattern(self):
+    def test_check_grafana_password_rejects_placeholder_pattern(self) -> None:
         """Grafana password validation should reject generated placeholder text."""
         mod = self._import_module()
         assert not mod.check_grafana_password("CHANGE_ME_GENERATE_STRONG_GRAFANA_PASSWORD")
 
-    def test_check_distinct_api_keys_rejects_reused_role_key(self):
+    def test_check_distinct_api_keys_rejects_reused_role_key(self) -> None:
         """Production role API keys must be separate secrets."""
         mod = self._import_module()
         env = {
@@ -255,7 +255,7 @@ class TestCheckProdEnvValidators:
         }
         assert not mod.check_distinct_api_keys(env)
 
-    def test_check_distinct_api_keys_accepts_unique_role_keys(self):
+    def test_check_distinct_api_keys_accepts_unique_role_keys(self) -> None:
         """Distinct production role API keys should pass the role separation check."""
         mod = self._import_module()
         env = {
@@ -265,25 +265,25 @@ class TestCheckProdEnvValidators:
         }
         assert mod.check_distinct_api_keys(env)
 
-    def test_check_db_password_rejects_short_passwords(self):
+    def test_check_db_password_rejects_short_passwords(self) -> None:
         """Passwords shorter than 8 chars should fail."""
         mod = self._import_module()
         assert not mod.check_db_password("short")
         assert not mod.check_db_password("1234567")
 
-    def test_check_db_password_accepts_strong_password(self):
+    def test_check_db_password_accepts_strong_password(self) -> None:
         """A strong, unique password should pass."""
         mod = self._import_module()
         assert mod.check_db_password("secure-password-123!@#")
 
-    def test_check_env_accepts_production(self):
+    def test_check_env_accepts_production(self) -> None:
         """'production' should pass."""
         mod = self._import_module()
         assert mod.check_env("production")
         assert mod.check_env("PRODUCTION")
         assert mod.check_env("Production")
 
-    def test_check_env_rejects_non_production(self):
+    def test_check_env_rejects_non_production(self) -> None:
         """Anything other than 'production' should fail."""
         mod = self._import_module()
         assert not mod.check_env("development")
@@ -308,7 +308,7 @@ class TestCheckProdEnvIntegration:
         spec.loader.exec_module(mod)
         return mod
 
-    def test_valid_env_passes_all_checks(self, env_file):
+    def test_valid_env_passes_all_checks(self, env_file) -> None:
         """A fully valid .env should pass all checks."""
         mod = self._import_module()
         _write_env(
@@ -348,7 +348,7 @@ class TestCheckProdEnvIntegration:
 
         assert all_pass, "All production env checks should pass with valid values"
 
-    def test_rejects_development_env(self, env_file):
+    def test_rejects_development_env(self, env_file) -> None:
         """Env with DATAFORGE_ENV=development should fail."""
         mod = self._import_module()
         _write_env(
@@ -367,7 +367,7 @@ class TestCheckProdEnvIntegration:
         env = mod.load_env_file(env_file)
         assert not mod.check_var(env, "DATAFORGE_ENV", required=True, validator=mod.check_env)
 
-    def test_rejects_wildcard_cors(self, env_file):
+    def test_rejects_wildcard_cors(self, env_file) -> None:
         """Env with wildcard CORS should fail CORS check."""
         mod = self._import_module()
         _write_env(
@@ -386,7 +386,7 @@ class TestCheckProdEnvIntegration:
         env = mod.load_env_file(env_file)
         assert not mod.check_var(env, "DATAFORGE_CORS_ORIGINS", required=True, validator=mod.check_cors_origins)
 
-    def test_rejects_default_api_key(self, env_file):
+    def test_rejects_default_api_key(self, env_file) -> None:
         """Default/placeholder API key should fail."""
         mod = self._import_module()
         _write_env(
@@ -406,7 +406,7 @@ class TestCheckProdEnvIntegration:
         # check_api_key should reject the default placeholder
         assert not mod.check_var(env, "DATAFORGE_API_KEY", required=True, validator=mod.check_api_key)
 
-    def test_rejects_default_db_password(self, env_file):
+    def test_rejects_default_db_password(self, env_file) -> None:
         """Default DB password should fail with check_db_password."""
         mod = self._import_module()
         _write_env(
@@ -426,7 +426,7 @@ class TestCheckProdEnvIntegration:
         # check_db_password should reject the default 'dataforge' value
         assert not mod.check_var(env, "DATAFORGE_DB_PASSWORD", required=True, validator=mod.check_db_password)
 
-    def test_accepts_postgres_env(self, env_file):
+    def test_accepts_postgres_env(self, env_file) -> None:
         """All valid Postgres env vars should pass."""
         mod = self._import_module()
         _write_env(
@@ -465,7 +465,7 @@ class TestCheckProdEnvIntegration:
         ]
         assert all(checks), f"All checks should pass: {checks}"
 
-    def test_rejects_missing_grafana_password(self, env_file):
+    def test_rejects_missing_grafana_password(self, env_file) -> None:
         """Missing GRAFANA_PASSWORD should fail validation."""
         mod = self._import_module()
         _write_env(

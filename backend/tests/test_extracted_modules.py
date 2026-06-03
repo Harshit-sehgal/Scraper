@@ -4,7 +4,7 @@ from app.semantic_persistence import clear_semantic_state
 from app.semantic_world_state import FieldConflictRegion, get_world_state
 
 
-def test_topology_state():
+def test_topology_state() -> None:
     """TopologyState: add, find, remove, prune, neighbors."""
     from app.topology_state import TopologyState
 
@@ -22,7 +22,7 @@ def test_topology_state():
     print("  topology_state.py: OK")
 
 
-def test_energy_state():
+def test_energy_state() -> None:
     """EnergyState: set, adjust, NaN rejection."""
     from app.energy_state import EnergyState
 
@@ -37,7 +37,7 @@ def test_energy_state():
     print("  energy_state.py: OK")
 
 
-def test_instability_state():
+def test_instability_state() -> None:
     """InstabilityState: add_exclusion, decay, get_exclusion."""
     from app.instability_state import InstabilityState
 
@@ -50,7 +50,7 @@ def test_instability_state():
     print("  instability_state.py: OK")
 
 
-def test_topology_api():
+def test_topology_api() -> None:
     ws = get_world_state()
     """TopologyAPI: read/write separation."""
     from app.topology_api import TopologyAPI
@@ -75,7 +75,7 @@ def test_topology_api():
     print("  topology_api.py: OK")
 
 
-def test_energy_api():
+def test_energy_api() -> None:
     ws = get_world_state()
     """EnergyAPI: controlled energy mutations with NaN rejection."""
     from app.energy_api import EnergyAPI
@@ -89,7 +89,7 @@ def test_energy_api():
     print("  energy_api.py: OK")
 
 
-def test_instability_api():
+def test_instability_api() -> None:
     ws = get_world_state()
     """InstabilityAPI: controlled exclusion mutations."""
     from app.instability_api import InstabilityAPI
@@ -103,7 +103,7 @@ def test_instability_api():
     print("  instability_api.py: OK")
 
 
-def test_event_journal():
+def test_event_journal() -> None:
     """EventJournal: record, replay, causality chain."""
     from app.event_journal import get_journal
 
@@ -120,7 +120,7 @@ def test_event_journal():
     print("  event_journal.py: OK")
 
 
-def test_field_validator():
+def test_field_validator() -> None:
     ws = get_world_state()
     """field_validator: detects NaN, clean on fresh state."""
     from app.field_validator import validate_world_state
@@ -134,7 +134,7 @@ def test_field_validator():
     print("  field_validator.py: OK")
 
 
-def test_observability():
+def test_observability() -> None:
     ws = get_world_state()
     """observability: field_summary, topology_report."""
     from app.observability import field_summary, topology_report
@@ -147,7 +147,7 @@ def test_observability():
     print("  observability.py: OK")
 
 
-def test_field_laws():
+def test_field_laws() -> None:
     """field_laws: constants are accessible."""
     from app.field_laws import MAX_COUPLING_TRANSFER, PROPAGATION_DECAY_FLOOR
 
@@ -156,7 +156,7 @@ def test_field_laws():
     print("  field_laws.py: OK")
 
 
-def test_persistence():
+def test_persistence() -> None:
     ws = get_world_state()
     """persistence_state: serialize/deserialize round-trip."""
     from app.persistence_state import clear_world_state, world_state_to_dict
@@ -170,7 +170,7 @@ def test_persistence():
     print("  persistence_state.py: OK")
 
 
-def test_core_types():
+def test_core_types() -> None:
     """core_types: FieldConflictRegion."""
     from app.core_types import FieldConflictRegion
 
@@ -184,7 +184,7 @@ def test_core_types():
     print("  core_types.py: OK")
 
 
-def test_topology_gc():
+def test_topology_gc() -> None:
     ws = get_world_state()
     """topology_gc: collect_garbage returns counts."""
     from app.topology_gc import collect_garbage
@@ -196,7 +196,7 @@ def test_topology_gc():
     print("  topology_gc.py: OK")
 
 
-def test_invariant_firewall():
+def test_invariant_firewall() -> None:
     """invariant_firewall: decorator runs without error."""
     from app.invariant_firewall import requires_invariants
 

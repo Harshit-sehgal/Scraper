@@ -5,7 +5,7 @@ import app.scraper as scraper_mod
 from app.models import FieldType, SchemaField
 
 
-def test_ai_clean_and_align_records_recovers_after_fast_empty(monkeypatch):
+def test_ai_clean_and_align_records_recovers_after_fast_empty(monkeypatch) -> None:
     schema = [
         SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True),
         SchemaField(name="phone", field_type=FieldType.PHONE, description="", required=False),
@@ -28,7 +28,7 @@ def test_ai_clean_and_align_records_recovers_after_fast_empty(monkeypatch):
     assert output[0]["company_name"] == "Acme Interiors"
 
 
-def test_ai_clean_and_align_records_honors_consecutive_failure_threshold(monkeypatch):
+def test_ai_clean_and_align_records_honors_consecutive_failure_threshold(monkeypatch) -> None:
     schema = [SchemaField(name="company_name", field_type=FieldType.STRING, description="", required=True)]
     records = [
         {"company_name": "A"},
@@ -51,7 +51,7 @@ def test_ai_clean_and_align_records_honors_consecutive_failure_threshold(monkeyp
     assert report["model_fallback_mode"] is True
 
 
-def test_llm_json_fast_uses_groq_fallback_model(monkeypatch):
+def test_llm_json_fast_uses_groq_fallback_model(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     from app.config import settings
 

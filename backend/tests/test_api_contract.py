@@ -17,24 +17,24 @@ from fastapi import FastAPI
 class TestSchemaFieldContract:
     """SchemaField must maintain its expected shape."""
 
-    def test_valid_schema_field(self):
+    def test_valid_schema_field(self) -> None:
         field = SchemaField(name="company_name", field_type=FieldType.STRING)
         assert field.name == "company_name"
         assert field.field_type == FieldType.STRING
         assert field.required is True  # Default
         assert field.description == ""  # Default
 
-    def test_schema_field_optional_description(self):
+    def test_schema_field_optional_description(self) -> None:
         field = SchemaField(name="price", field_type=FieldType.CURRENCY, description="The price in USD", required=False)
         assert field.description == "The price in USD"
         assert field.required is False
 
-    def test_schema_field_rejects_reserved_names(self):
+    def test_schema_field_rejects_reserved_names(self) -> None:
         for reserved in ("record_score", "_provenance", "_extraction_method", "source_url"):
             with pytest.raises(ValueError):
                 SchemaField(name=reserved, field_type=FieldType.STRING)
 
-    def test_schema_field_rejects_invalid_names(self):
+    def test_schema_field_rejects_invalid_names(self) -> None:
         with pytest.raises(ValueError):
             SchemaField(name="123_invalid", field_type=FieldType.STRING)
         with pytest.raises(ValueError):
@@ -46,14 +46,14 @@ class TestSchemaFieldContract:
 class TestJobCreateContract:
     """JobCreate must accept valid payloads and reject invalid ones."""
 
-    def test_minimal_manual_job(self):
+    def test_minimal_manual_job(self) -> None:
         job = JobCreate(name="test", urls=["https://example.com"])
         assert job.name == "test"
         assert job.mode.value == "manual"
         assert job.urls == ["https://example.com"]
         assert job.schema_fields == []
 
-    def test_manual_job_with_schema(self):
+    def test_manual_job_with_schema(self) -> None:
         job = JobCreate(
             name="books-demo",
             mode="manual",
@@ -69,19 +69,19 @@ class TestJobCreateContract:
         assert job.schema_fields[0].field_type == FieldType.STRING
         assert job.schema_fields[0].required is True
 
-    def test_manual_job_rejects_empty_urls(self):
+    def test_manual_job_rejects_empty_urls(self) -> None:
         with pytest.raises(ValueError):
             JobCreate(name="empty", mode="manual", urls=[])
 
-    def test_max_pages_default(self):
+    def test_max_pages_default(self) -> None:
         job = JobCreate(name="test", urls=["https://example.com"])
         assert job.max_pages == 10
 
-    def test_deduplicate_default(self):
+    def test_deduplicate_default(self) -> None:
         job = JobCreate(name="test", urls=["https://example.com"])
         assert job.deduplicate is True
 
-    def test_min_record_score_default(self):
+    def test_min_record_score_default(self) -> None:
         job = JobCreate(name="test", urls=["https://example.com"])
         assert job.min_record_score == 0.35
 
@@ -89,7 +89,7 @@ class TestJobCreateContract:
 class TestJobContract:
     """Job (the domain model) must contain all expected fields."""
 
-    def test_job_has_required_fields(self):
+    def test_job_has_required_fields(self) -> None:
         job = Job(name="integration-test")
         assert job.id is not None
         assert len(job.id) > 0
@@ -101,7 +101,7 @@ class TestJobContract:
         assert job.results == []
         assert job.created_at is not None
 
-    def test_job_with_results(self):
+    def test_job_with_results(self) -> None:
         results = [
             {"title": "A Light in the Attic", "price": "51.77", "rating": "Three"},
             {"title": "Tipping the Velvet", "price": "53.74", "rating": "One"},
@@ -117,19 +117,19 @@ class TestJobContract:
         assert job.total_records == 2
         assert job.results[0]["title"] == "A Light in the Attic"
 
-    def test_job_has_quality_report_field(self):
+    def test_job_has_quality_report_field(self) -> None:
         job = Job(name="quality-test")
         assert job.quality_report == {}
 
-    def test_job_has_estimated_cost_field(self):
+    def test_job_has_estimated_cost_field(self) -> None:
         job = Job(name="cost-test")
         assert job.estimated_cost_usd == 0.0
 
-    def test_job_has_logs_field(self):
+    def test_job_has_logs_field(self) -> None:
         job = Job(name="logs-test")
         assert job.logs == []
 
-    def test_job_has_progress_fields(self):
+    def test_job_has_progress_fields(self) -> None:
         job = Job(name="progress-test")
         assert job.progress_current == 0
         assert job.progress_total == 0
@@ -138,7 +138,7 @@ class TestJobContract:
 class TestJobStatusContract:
     """JobStatus enum must contain all expected states."""
 
-    def test_all_statuses(self):
+    def test_all_statuses(self) -> None:
         expected_statuses = [
             "pending",
             "discovering",
@@ -157,7 +157,7 @@ class TestJobStatusContract:
 class TestFieldTypeContract:
     """FieldType enum must contain all expected types."""
 
-    def test_all_field_types(self):
+    def test_all_field_types(self) -> None:
         expected = [
             "string",
             "integer",
@@ -182,23 +182,23 @@ class TestFieldTypeContract:
 class TestExportShapeContract:
     """Export endpoints must return expected response shapes and headers."""
 
-    def test_csv_content_disposition_format(self):
+    def test_csv_content_disposition_format(self) -> None:
         """Content-Disposition must contain 'attachment' and .csv extension."""
         result = safe_export_filename("test_job", "csv")
         assert result.endswith(".csv")
         assert "_" in result or "-" in result
 
-    def test_json_content_disposition_format(self):
+    def test_json_content_disposition_format(self) -> None:
         """Content-Disposition must contain 'attachment' and .json extension."""
         result = safe_export_filename("test_job", "json")
         assert result.endswith(".json")
 
-    def test_excel_content_disposition_format(self):
+    def test_excel_content_disposition_format(self) -> None:
         """Content-Disposition must contain 'attachment' and .xlsx extension."""
         result = safe_export_filename("test_job", "xlsx")
         assert result.endswith(".xlsx")
 
-    def test_csv_content_type_header(self):
+    def test_csv_content_type_header(self) -> None:
         """CSV export must have text/csv content type."""
         jobs_store: dict[str, Job] = {}
         router = create_exports_router(jobs_store)
@@ -226,7 +226,7 @@ class TestExportShapeContract:
 
         asyncio.run(_test())
 
-    def test_json_response_body_is_array(self):
+    def test_json_response_body_is_array(self) -> None:
         """JSON export must return a valid JSON array of records."""
         jobs_store: dict[str, Job] = {}
         router = create_exports_router(jobs_store)
@@ -256,7 +256,7 @@ class TestExportShapeContract:
 
         asyncio.run(_test())
 
-    def test_json_strips_system_fields(self):
+    def test_json_strips_system_fields(self) -> None:
         """System fields starting with _ must not appear in JSON exports."""
         jobs_store: dict[str, Job] = {}
         router = create_exports_router(jobs_store)
@@ -284,7 +284,7 @@ class TestExportShapeContract:
 
         asyncio.run(_test())
 
-    def test_excel_content_type_header(self):
+    def test_excel_content_type_header(self) -> None:
         """Excel export must have spreadsheetml content type."""
         jobs_store: dict[str, Job] = {}
         router = create_exports_router(jobs_store)
@@ -311,7 +311,7 @@ class TestExportShapeContract:
 
         asyncio.run(_test())
 
-    def test_missing_job_returns_404(self):
+    def test_missing_job_returns_404(self) -> None:
         """Export for nonexistent job must return 404."""
         jobs_store: dict[str, Job] = {}
         router = create_exports_router(jobs_store)

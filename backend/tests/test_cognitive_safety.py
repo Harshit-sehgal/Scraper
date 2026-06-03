@@ -2,7 +2,7 @@ from app.semantic_inference_engine import RoleEmbeddingEngine
 from app.semantic_world_state import get_world_state
 
 
-def test_invariant_anchoring():
+def test_invariant_anchoring() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -21,7 +21,7 @@ def test_invariant_anchoring():
     assert all(v == 1.0 for v in vec)
 
 
-def test_ontological_firewall_high_entropy():
+def test_ontological_firewall_high_entropy() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -35,7 +35,7 @@ def test_ontological_firewall_high_entropy():
     assert not ws._manifold.has_manifold_role("uncertain_role")
 
 
-def test_ontological_firewall_contradiction():
+def test_ontological_firewall_contradiction() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -54,7 +54,7 @@ def test_ontological_firewall_contradiction():
     assert vec[0] == 1.0
 
 
-def test_cognitive_health_summary():
+def test_cognitive_health_summary() -> None:
     ws = get_world_state()
     ws.clear()
 

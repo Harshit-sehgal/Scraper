@@ -6,7 +6,7 @@ from app.semantic_ir import SemanticToken, SemanticType, Span
 from app.semantic_world_state import get_world_state
 
 
-def test_field_conflict_drives_exclusion_learning():
+def test_field_conflict_drives_exclusion_learning() -> None:
     """When allocation conflicts exist, observe_field_perturbation must reinforce exclusions."""
     ws = get_world_state()
     ws.clear()
@@ -29,7 +29,7 @@ def test_field_conflict_drives_exclusion_learning():
     assert learned > 0.0, f"Expected learned exclusion > 0 from field conflicts, got {learned}"
 
 
-def test_no_field_conflict_does_not_reinforce():
+def test_no_field_conflict_does_not_reinforce() -> None:
     """Without allocation conflicts, learned_exclusions must decay (not reinforce)."""
     ws = get_world_state()
     ws.clear()
@@ -53,7 +53,7 @@ def test_no_field_conflict_does_not_reinforce():
     assert learned < 0.5, f"Exclusion should decay without reinforcement, got {learned}"
 
 
-def test_exclusion_to_topology_law_bridge():
+def test_exclusion_to_topology_law_bridge() -> None:
     """High learned exclusion must create repulsive topological law."""
     ws = get_world_state()
     ws.clear()
@@ -67,7 +67,7 @@ def test_exclusion_to_topology_law_bridge():
     assert law < 0.0, f"Expected repulsive topological law from high exclusion, got {law}"
 
 
-def test_topology_law_to_exclusion_bridge():
+def test_topology_law_to_exclusion_bridge() -> None:
     """Strong repulsive topological law must sync back to learned_exclusions."""
     ws = get_world_state()
     ws.clear()
@@ -86,7 +86,7 @@ def test_topology_law_to_exclusion_bridge():
     assert exclusion > 0.28, f"Expected exclusion > 0.28 from repulsive law (after decay), got {exclusion}"
 
 
-def test_contradiction_pressure_triggers_restructuring():
+def test_contradiction_pressure_triggers_restructuring() -> None:
     """High contradiction pressure triggers topology restructuring."""
     ws = get_world_state()
     ws.clear()
@@ -135,7 +135,7 @@ def test_contradiction_pressure_triggers_restructuring():
         ws._topology.restructure_topology = original
 
 
-def test_contradiction_pressure_low_does_not_restructure():
+def test_contradiction_pressure_low_does_not_restructure() -> None:
     """Low contradiction pressure does not unnecessarily restructure topology."""
     ws = get_world_state()
     ws.clear()

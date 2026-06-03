@@ -6,18 +6,18 @@ from app.empty_response_detector import detect_empty_response
 class TestDetectEmptyResponse:
     """Tests for detect_empty_response()."""
 
-    def test_blank_page(self):
+    def test_blank_page(self) -> None:
         result = detect_empty_response("")
         assert result.is_empty is True
         assert result.empty_type == "blank"
         assert result.confidence == 1.0
 
-    def test_near_blank_page(self):
+    def test_near_blank_page(self) -> None:
         result = detect_empty_response("<html><body>   </body></html>")
         assert result.is_empty is True
         assert result.empty_type == "blank"
 
-    def test_cookie_wall(self):
+    def test_cookie_wall(self) -> None:
         html = """
         <html><body>
         <div class="cookie-banner">
@@ -31,7 +31,7 @@ class TestDetectEmptyResponse:
         assert result.empty_type == "cookie_wall"
         assert result.suggestions is not None and len(result.suggestions) > 0
 
-    def test_login_wall(self):
+    def test_login_wall(self) -> None:
         html = """
         <html><body>
         <div class="login-prompt">
@@ -44,7 +44,7 @@ class TestDetectEmptyResponse:
         assert result.is_empty is True
         assert result.empty_type == "login_wall"
 
-    def test_captcha_page(self):
+    def test_captcha_page(self) -> None:
         html = """
         <html><body>
         <div class="challenge">
@@ -57,7 +57,7 @@ class TestDetectEmptyResponse:
         assert result.is_empty is True
         assert result.empty_type == "captcha"
 
-    def test_js_shell(self):
+    def test_js_shell(self) -> None:
         html = """
         <html><body>
         <noscript>Please enable JavaScript to use this site.</noscript>
@@ -69,7 +69,7 @@ class TestDetectEmptyResponse:
         assert result.is_empty is True
         assert result.empty_type == "js_shell"
 
-    def test_data_rich_page_not_empty(self):
+    def test_data_rich_page_not_empty(self) -> None:
         html = """
         <html><body>
         <div class="result">
@@ -90,13 +90,13 @@ class TestDetectEmptyResponse:
         assert result.is_empty is False
         assert result.data_signals >= 5
 
-    def test_minimal_content_page(self):
+    def test_minimal_content_page(self) -> None:
         html = "<html><body><p>Hello world this is a very short page with minimal content that barely qualifies</p></body></html>"
         result = detect_empty_response(html)
         assert result.is_empty is True
         assert result.empty_type == "minimal"
 
-    def test_moderate_content_with_data(self):
+    def test_moderate_content_with_data(self) -> None:
         html = """
         <html><body>
         <div class="info">
@@ -107,7 +107,7 @@ class TestDetectEmptyResponse:
         result = detect_empty_response(html)
         assert result.is_empty is False
 
-    def test_meta_redirect(self):
+    def test_meta_redirect(self) -> None:
         html = """
         <html><head>
         <meta http-equiv="refresh" content="0;url=https://example.com/new-page" />
@@ -119,7 +119,7 @@ class TestDetectEmptyResponse:
         assert result.is_empty is True
         assert result.empty_type == "redirect_meta"
 
-    def test_suggestions_for_cookie_wall(self):
+    def test_suggestions_for_cookie_wall(self) -> None:
         html = """
         <html><body>
         <div>We use cookies. Accept all cookies to continue.</div>

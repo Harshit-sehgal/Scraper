@@ -61,7 +61,7 @@ SIMPLE_HTML = """
 class TestExtractionResult:
     """Verify ExtractionResult carries metadata correctly."""
 
-    def test_creates_with_basic_fields(self):
+    def test_creates_with_basic_fields(self) -> None:
         records = [{"name": "Test"}]
         result = ExtractionResult(records, "regex", selector_success=False)
         assert result.records == records
@@ -70,7 +70,7 @@ class TestExtractionResult:
         assert result.selectors == {}
         assert result.network_diagnostics == []
 
-    def test_creates_with_all_fields(self):
+    def test_creates_with_all_fields(self) -> None:
         selectors = {"item_container": "div.item"}
         diag = ["test diagnostic"]
         result = ExtractionResult(
@@ -93,43 +93,43 @@ class TestExtractionResult:
 class TestCheckTypeCompatibility:
     """Verify type compatibility scoring."""
 
-    def test_integer_matches_numbers(self):
+    def test_integer_matches_numbers(self) -> None:
         score = _check_type_compatibility(FieldType.INTEGER, ["42", "-7", "0"])
         assert score >= 0.8
 
-    def test_integer_rejects_text(self):
+    def test_integer_rejects_text(self) -> None:
         score = _check_type_compatibility(FieldType.INTEGER, ["hello", "world"])
         assert score < 0.5
 
-    def test_currency_detects_symbol(self):
+    def test_currency_detects_symbol(self) -> None:
         score = _check_type_compatibility(FieldType.CURRENCY, ["$42.00", "€10", "£5"])
         assert score >= 0.8
 
-    def test_email_detects_pattern(self):
+    def test_email_detects_pattern(self) -> None:
         score = _check_type_compatibility(FieldType.EMAIL, ["user@example.com", "test@domain.co.uk"])
         assert score >= 0.8
 
-    def test_email_rejects_plain_text(self):
+    def test_email_rejects_plain_text(self) -> None:
         score = _check_type_compatibility(FieldType.EMAIL, ["hello", "world", "test"])
         assert score < 0.5
 
-    def test_url_detects_http(self):
+    def test_url_detects_http(self) -> None:
         score = _check_type_compatibility(FieldType.URL, ["https://example.com", "/relative/path"])
         assert score >= 0.5
 
-    def test_string_always_matches(self):
+    def test_string_always_matches(self) -> None:
         score = _check_type_compatibility(FieldType.STRING, ["anything", 42, None])
         assert score >= 0.5
 
-    def test_empty_values_returns_mid(self):
+    def test_empty_values_returns_mid(self) -> None:
         score = _check_type_compatibility(FieldType.INTEGER, [])
         assert score == 0.5
 
-    def test_phone_detects_pattern(self):
+    def test_phone_detects_pattern(self) -> None:
         score = _check_type_compatibility(FieldType.PHONE, ["+1-555-0100", "(212) 555-0199"])
         assert score >= 0.5
 
-    def test_boolean_detects_true_false(self):
+    def test_boolean_detects_true_false(self) -> None:
         score = _check_type_compatibility(FieldType.BOOLEAN, ["true", "false", "0", "1"])
         assert score >= 0.8
 
@@ -142,14 +142,14 @@ class TestCheckTypeCompatibility:
 class TestDetectFieldSwaps:
     """Verify field swap detection logic."""
 
-    def test_no_swap_when_types_match(self):
+    def test_no_swap_when_types_match(self) -> None:
         fields = _make_fields([("name", FieldType.STRING), ("price", FieldType.CURRENCY)])
         quality_map = {"name": 0.9, "price": 0.85}
         extracted = {"name": ["Acme Corp"], "price": ["$42.00"]}
         swaps = _detect_field_swaps(quality_map, fields, extracted)
         assert swaps == {}
 
-    def test_swap_detected_when_currency_gets_text(self):
+    def test_swap_detected_when_currency_gets_text(self) -> None:
         fields = _make_fields([("name", FieldType.STRING), ("cost", FieldType.CURRENCY)])
         quality_map = {"name": 0.3, "cost": 0.9}  # name has low quality but should be easy
         extracted = {"name": ["Acme Corp"], "cost": ["$42.00"]}
@@ -157,14 +157,14 @@ class TestDetectFieldSwaps:
         swaps = _detect_field_swaps(quality_map, fields, extracted)
         assert swaps == {}
 
-    def test_swap_detected_by_value_analysis(self):
+    def test_swap_detected_by_value_analysis(self) -> None:
         fields = _make_fields([("name", FieldType.STRING), ("cost", FieldType.STRING)])
         # If values look like they were swapped
         extracted = {"name": ["$42.00", "€10"], "cost": ["Acme Corp"]}
         swaps = _detect_field_swaps({"name": 0.5, "cost": 0.5}, fields, extracted)
         assert isinstance(swaps, dict)
 
-    def test_swap_no_values_falls_back_to_quality(self):
+    def test_swap_no_values_falls_back_to_quality(self) -> None:
         fields = _make_fields([("email", FieldType.EMAIL), ("name", FieldType.STRING)])
         # email has low quality but should be easy to match
         quality_map = {"email": 0.2, "name": 0.95}
@@ -180,13 +180,13 @@ class TestDetectFieldSwaps:
 class TestAlignSelectors:
     """Verify selector alignment on detected swaps."""
 
-    def test_swaps_field_selectors(self):
+    def test_swaps_field_selectors(self) -> None:
         selectors = {"fields": {"email": "span.email", "name": "h2.name"}}
         result = _align_selectors(selectors, {"email": "name"})
         assert result["fields"]["email"] == "h2.name"
         assert result["fields"]["name"] == "span.email"
 
-    def test_no_swap_returns_unchanged(self):
+    def test_no_swap_returns_unchanged(self) -> None:
         selectors = {"fields": {"a": "sel.a", "b": "sel.b"}}
         result = _align_selectors(selectors, {})
         assert result["fields"]["a"] == "sel.a"
@@ -200,16 +200,16 @@ class TestAlignSelectors:
 class TestMergeCompositeRecords:
     """Verify multi-pass record merging."""
 
-    def test_single_pass_returns_asis(self):
+    def test_single_pass_returns_asis(self) -> None:
         records = [{"name": "A"}, {"name": "B"}]
         result = _merge_composite_records([records], BASIC_SCHEMA)
         assert result == records
 
-    def test_no_records_returns_empty(self):
+    def test_no_records_returns_empty(self) -> None:
         result = _merge_composite_records([], BASIC_SCHEMA)
         assert result == []
 
-    def test_merges_disjoint_fields(self):
+    def test_merges_disjoint_fields(self) -> None:
         fields = _make_fields([("name", FieldType.STRING)])
         pass1 = [{"name": "Acme"}]
         pass2 = [{"name": "Acme", "email": "a@a.com"}]
@@ -218,14 +218,14 @@ class TestMergeCompositeRecords:
         assert len(result) == 1
         assert result[0]["name"] == "Acme"
 
-    def test_sorts_by_record_score(self):
+    def test_sorts_by_record_score(self) -> None:
         fields = _make_fields([("name", FieldType.STRING)])
         low = [{"name": "Low", "record_score": 0.3}]
         high = [{"name": "High", "record_score": 0.9}]
         result = _merge_composite_records([low, high], fields)
         assert result[0]["name"] == "High"
 
-    def test_merges_multiple_passes(self):
+    def test_merges_multiple_passes(self) -> None:
         fields = _make_fields([("name", FieldType.STRING)])
         pass1 = [{"name": "A"}, {"name": "B"}]
         pass2 = [{"name": "C"}]
@@ -248,7 +248,7 @@ class TestOrchestrationCascade:
     """
 
     @pytest.mark.asyncio
-    async def test_handles_empty_html(self):
+    async def test_handles_empty_html(self) -> None:
         """Empty HTML cascades to regex fallback."""
         fields = _make_fields([("name", FieldType.STRING)])
         result = await orchestrate_extraction(
@@ -261,7 +261,7 @@ class TestOrchestrationCascade:
         assert isinstance(result.records, list)
 
     @pytest.mark.asyncio
-    async def test_handles_minmal_html_with_text(self):
+    async def test_handles_minmal_html_with_text(self) -> None:
         """Simple text content should produce some regex extraction."""
         html = "<html><body>Hello World</body></html>"
         fields = _make_fields([("name", FieldType.STRING)])
@@ -275,7 +275,7 @@ class TestOrchestrationCascade:
         assert isinstance(result.network_diagnostics, list)
 
     @pytest.mark.asyncio
-    async def test_provided_selectors_are_tried(self):
+    async def test_provided_selectors_are_tried(self) -> None:
         """Provided selectors should be tried as the first DOM layer."""
         html = SIMPLE_HTML
         fields = _make_fields([("company_name", FieldType.STRING), ("email", FieldType.EMAIL)])
@@ -298,7 +298,7 @@ class TestOrchestrationCascade:
         assert isinstance(result.records, list)
 
     @pytest.mark.asyncio
-    async def test_cascade_with_min_record_score(self):
+    async def test_cascade_with_min_record_score(self) -> None:
         """Different min_record_score values affect gate threshold behavior."""
         fields = _make_fields([("name", FieldType.STRING)])
         result_low = await orchestrate_extraction(
@@ -318,7 +318,7 @@ class TestOrchestrationCascade:
         assert isinstance(result_high, ExtractionResult)
 
     @pytest.mark.asyncio
-    async def test_network_diagnostics_collected(self):
+    async def test_network_diagnostics_collected(self) -> None:
         """Diagnostics should be populated even without network payloads."""
         result = await orchestrate_extraction(
             url="https://example.com",
@@ -332,7 +332,7 @@ class TestOrchestrationCascade:
         assert "session" in diag_text or "captured" in diag_text or "arbitration" in diag_text
 
     @pytest.mark.asyncio
-    async def test_multi_pass_fallback_with_complex_html(self):
+    async def test_multi_pass_fallback_with_complex_html(self) -> None:
         """Complex HTML with nested elements should survive cascade without crash."""
         complex_html = """
         <html><body>
@@ -355,7 +355,7 @@ class TestOrchestrationCascade:
         assert isinstance(result.records, list)
 
     @pytest.mark.asyncio
-    async def test_cascade_with_all_fallbacks(self):
+    async def test_cascade_with_all_fallbacks(self) -> None:
         """Empty content should still produce arbitration diagnostics."""
         result = await orchestrate_extraction(
             url="https://example.com/empty",
@@ -375,7 +375,7 @@ class TestOrchestrationCascade:
 class TestExtractionEdgeCases:
     """Edge cases for the extraction pipeline."""
 
-    def test_extraction_result_boolean_behavior(self):
+    def test_extraction_result_boolean_behavior(self) -> None:
         """ExtractionResult with empty records should be falsy in bool context."""
         empty = ExtractionResult([], "regex")
         assert len(empty.records) == 0
@@ -383,7 +383,7 @@ class TestExtractionEdgeCases:
         filled = ExtractionResult([{"name": "A"}], "discovery")
         assert len(filled.records) == 1
 
-    def test_merge_sorts_by_score_descending(self):
+    def test_merge_sorts_by_score_descending(self) -> None:
         """Verify merged records are sorted by record_score descending."""
         fields = _make_fields([("name", FieldType.STRING)])
         results = _merge_composite_records(

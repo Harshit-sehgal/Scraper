@@ -78,21 +78,21 @@ KERNEL_SPOT_CHECKS = (
 )
 
 
-def test_registry_is_non_empty():
+def test_registry_is_non_empty() -> None:
     assert len(RESEARCH_MODULES) > 0
     # We expect at least 50 research modules — the deep-research-report
     # enumerates roughly that many.
     assert len(RESEARCH_MODULES) >= 50
 
 
-def test_all_research_spot_checks_are_registered():
+def test_all_research_spot_checks_are_registered() -> None:
     for name in RESEARCH_SPOT_CHECKS:
         assert (
             name in RESEARCH_MODULES
         ), f"Expected {name!r} to be in the research registry. Either add it or update the spot-check."
 
 
-def test_all_kernel_spot_checks_are_NOT_registered():
+def test_all_kernel_spot_checks_are_NOT_registered() -> None:
     for name in KERNEL_SPOT_CHECKS:
         assert name not in RESEARCH_MODULES, (
             f"{name!r} is a product-kernel module and must NOT be in the "
@@ -101,37 +101,37 @@ def test_all_kernel_spot_checks_are_NOT_registered():
         )
 
 
-def test_is_research_module_accepts_bare_names():
+def test_is_research_module_accepts_bare_names() -> None:
     assert is_research_module("semantic_world_state") is True
     assert is_research_module("topology_state") is True
     assert is_research_module("scraper") is False
     assert is_research_module("extraction_orchestrator") is False
 
 
-def test_is_research_module_accepts_dotted_paths():
+def test_is_research_module_accepts_dotted_paths() -> None:
     assert is_research_module("app.semantic_world_state") is True
     assert is_research_module("app.semantic_world_state.core") is True
     assert is_research_module("backend.app.topology_state") is True
     assert is_research_module("app.scraper") is False
 
 
-def test_is_research_module_handles_empty_and_junk_input():
+def test_is_research_module_handles_empty_and_junk_input() -> None:
     assert is_research_module("") is False
     assert is_research_module(None) is False
 
 
-def test_is_research_path_strips_known_package_prefixes():
+def test_is_research_path_strips_known_package_prefixes() -> None:
     assert is_research_path("app.semantic_os") is True
     assert is_research_path("backend.app.semantic_os") is True
     assert is_research_path("app.scraper") is False
     assert is_research_path("backend.app.scraper") is False
 
 
-def test_is_research_path_handles_empty_input():
+def test_is_research_path_handles_empty_input() -> None:
     assert is_research_path("") is False
 
 
-def test_research_summary_groups_every_module():
+def test_research_summary_groups_every_module() -> None:
     summary = research_summary()
     total_count = int(summary["total_count"][0])
     assert total_count == len(RESEARCH_MODULES)
@@ -143,7 +143,7 @@ def test_research_summary_groups_every_module():
     )
 
 
-def test_research_summary_includes_all_expected_families():
+def test_research_summary_includes_all_expected_families() -> None:
     summary = research_summary()
     expected_families = {
         "semantic",
@@ -161,7 +161,7 @@ def test_research_summary_includes_all_expected_families():
     assert expected_families.issubset(summary.keys())
 
 
-def test_research_summary_is_sorted_within_each_family():
+def test_research_summary_is_sorted_within_each_family() -> None:
     summary = research_summary()
     for family, modules in summary.items():
         if family == "total_count":
@@ -169,6 +169,6 @@ def test_research_summary_is_sorted_within_each_family():
         assert modules == sorted(modules), f"Family {family!r} should be sorted alphabetically."
 
 
-def test_registry_is_immutable():
+def test_registry_is_immutable() -> None:
     """`frozenset` should reject mutation; verify the type contract."""
     assert isinstance(RESEARCH_MODULES, frozenset)

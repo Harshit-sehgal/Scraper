@@ -39,7 +39,7 @@ def _create_job_in_store(client, name: str = "lifecycle-test") -> str:
 # ──────────────────────────────────────────────────────────────────────
 
 
-def test_double_cancel_terminal_job_returns_early(client, monkeypatch):
+def test_double_cancel_terminal_job_returns_early(client, monkeypatch) -> None:
     """Canceling a job that is already in a terminal status returns 'already in terminal'."""
     import app.main as main_mod
 
@@ -60,7 +60,7 @@ def test_double_cancel_terminal_job_returns_early(client, monkeypatch):
     assert r2.json()["status"] == JobStatus.COMPLETED.value
 
 
-def test_cancel_active_job_sets_request_flag(client, monkeypatch):
+def test_cancel_active_job_sets_request_flag(client, monkeypatch) -> None:
     """Canceling a RUNNING job sets cancel_requested without changing status."""
     import app.main as main_mod
 
@@ -77,7 +77,7 @@ def test_cancel_active_job_sets_request_flag(client, monkeypatch):
     assert body["status"] == JobStatus.RUNNING.value  # Status unchanged
 
 
-def test_cancel_pending_job_auto_cancels(client, monkeypatch):
+def test_cancel_pending_job_auto_cancels(client, monkeypatch) -> None:
     """Canceling a PENDING job auto-cancels it to CANCELED status."""
     import app.main as main_mod
 
@@ -101,7 +101,7 @@ def test_cancel_pending_job_auto_cancels(client, monkeypatch):
 # ──────────────────────────────────────────────────────────────────────
 
 
-def test_delete_terminal_job_moves_to_recycle_bin(client, monkeypatch):
+def test_delete_terminal_job_moves_to_recycle_bin(client, monkeypatch) -> None:
     """Deleting a terminal-status job moves it to the recycle bin."""
     import app.main as main_mod
 
@@ -118,13 +118,13 @@ def test_delete_terminal_job_moves_to_recycle_bin(client, monkeypatch):
     assert job_id in main_mod.recycle_bin_store
 
 
-def test_delete_nonexistent_job_returns_404(client):
+def test_delete_nonexistent_job_returns_404(client) -> None:
     """Delete on a job ID that doesn't exist returns 404."""
     r = client.delete("/api/jobs/nonexistent-job-id")
     assert r.status_code == 404
 
 
-def test_cancel_nonexistent_job_returns_404(client):
+def test_cancel_nonexistent_job_returns_404(client) -> None:
     """Cancel on a job ID that doesn't exist returns 404."""
     r = client.post("/api/jobs/nonexistent-job-id/cancel")
     assert r.status_code == 404
@@ -135,7 +135,7 @@ def test_cancel_nonexistent_job_returns_404(client):
 # ──────────────────────────────────────────────────────────────────────
 
 
-def test_restore_job_from_recycle_bin(client, monkeypatch):
+def test_restore_job_from_recycle_bin(client, monkeypatch) -> None:
     """Restoring a job from recycle bin puts it back in active jobs."""
     import app.main as main_mod
 
@@ -156,14 +156,14 @@ def test_restore_job_from_recycle_bin(client, monkeypatch):
     assert job_id not in main_mod.recycle_bin_store
 
 
-def test_restore_nonexistent_recycle_bin_job_returns_404(client):
+def test_restore_nonexistent_recycle_bin_job_returns_404(client) -> None:
     """Restore on a job ID that is not in recycle bin returns 404."""
     r = client.post("/api/recycle_bin/nonexistent/restore")
     assert r.status_code == 404
     assert "not in recycle bin" in r.json()["detail"]
 
 
-def test_list_recycle_bin_shows_moved_jobs(client, monkeypatch):
+def test_list_recycle_bin_shows_moved_jobs(client, monkeypatch) -> None:
     """Listing the recycle bin shows jobs that were moved there."""
     import app.main as main_mod
 
@@ -179,7 +179,7 @@ def test_list_recycle_bin_shows_moved_jobs(client, monkeypatch):
     assert job_id in job_ids
 
 
-def test_restore_and_re_delete_round_trip(client, monkeypatch):
+def test_restore_and_re_delete_round_trip(client, monkeypatch) -> None:
     """A job can be restored from recycle bin and moved back again."""
     import app.main as main_mod
 
@@ -206,7 +206,7 @@ def test_restore_and_re_delete_round_trip(client, monkeypatch):
 # ──────────────────────────────────────────────────────────────────────
 
 
-def test_hard_delete_removes_permanently(client, monkeypatch):
+def test_hard_delete_removes_permanently(client, monkeypatch) -> None:
     """Hard deleting from recycle bin removes the job permanently."""
     import app.main as main_mod
 
@@ -231,13 +231,13 @@ def test_hard_delete_removes_permanently(client, monkeypatch):
     assert r_get.status_code == 404
 
 
-def test_hard_delete_nonexistent_from_recycle_bin_returns_404(client):
+def test_hard_delete_nonexistent_from_recycle_bin_returns_404(client) -> None:
     """Hard delete on a job not in recycle bin returns 404."""
     r = client.delete("/api/recycle_bin/nonexistent")
     assert r.status_code == 404
 
 
-def test_hard_delete_cleans_disk_results(client, monkeypatch, tmp_path):
+def test_hard_delete_cleans_disk_results(client, monkeypatch, tmp_path) -> None:
     """Hard delete cleans up the results file on disk."""
     import app.main as main_mod
 
@@ -268,7 +268,7 @@ def test_hard_delete_cleans_disk_results(client, monkeypatch, tmp_path):
 # ──────────────────────────────────────────────────────────────────────
 
 
-def test_enqueue_failure_rollback_in_production(client, monkeypatch):
+def test_enqueue_failure_rollback_in_production(client, monkeypatch) -> None:
     """When enqueue fails in production mode, the job is cleaned up from store and repository.
 
     settings.ENV is cached at import time, so we must monkeypatch the settings

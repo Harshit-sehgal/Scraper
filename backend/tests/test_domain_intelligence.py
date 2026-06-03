@@ -14,7 +14,7 @@ def registry():
     return reg
 
 
-def test_moving_average_hydration(registry):
+def test_moving_average_hydration(registry) -> None:
     url = "https://moving-avg.com/page1"
 
     # First update: 2000ms
@@ -30,7 +30,7 @@ def test_moving_average_hydration(registry):
     assert intel.hydration_delay_ms == 720.0
 
 
-def test_strategy_preference(registry):
+def test_strategy_preference(registry) -> None:
     url = "https://strategy.com"
 
     # Successful regex fallback
@@ -57,7 +57,7 @@ def test_strategy_preference(registry):
     assert intel.preferred_strategy == "regex"
 
 
-def test_persistence(registry):
+def test_persistence(registry) -> None:
     url = "https://persist.com"
     registry.update_from_telemetry({"url": url, "infinite_scroll_required": True, "js_render_delay_ms": 500.0})
 

@@ -15,7 +15,7 @@ from app.scraper_diagnostics import ScraperDiagnosticReport, run_diagnostics
 class TestScraperDiagnosticReport:
     """Tests for the ScraperDiagnosticReport data class."""
 
-    def test_default_values(self):
+    def test_default_values(self) -> None:
         report = ScraperDiagnosticReport("http://example.com")
         assert report.url == "http://example.com"
         assert report.fetch_ms == 0
@@ -30,7 +30,7 @@ class TestScraperDiagnosticReport:
         assert report.record_samples == []
         assert report.errors == []
 
-    def test_to_dict_structure(self):
+    def test_to_dict_structure(self) -> None:
         report = ScraperDiagnosticReport("http://example.com")
         report.fetch_ms = 150.5
         report.fetch_method = "playwright"
@@ -58,20 +58,20 @@ class TestScraperDiagnosticReport:
         assert "latency_ms" in d
         assert d["errors"] == []
 
-    def test_to_dict_samples_limited_to_3(self):
+    def test_to_dict_samples_limited_to_3(self) -> None:
         report = ScraperDiagnosticReport("http://example.com")
         report.record_samples = [{"i": i} for i in range(10)]
         d = report.to_dict()
         assert len(d["results"]["samples"]) == 3
 
-    def test_to_dict_includes_errors(self):
+    def test_to_dict_includes_errors(self) -> None:
         report = ScraperDiagnosticReport("http://example.com")
         report.errors.append("Network timeout")
         report.errors.append("Parse error")
         d = report.to_dict()
         assert d["errors"] == ["Network timeout", "Parse error"]
 
-    def test_to_dict_latency_ms_is_positive(self):
+    def test_to_dict_latency_ms_is_positive(self) -> None:
         report = ScraperDiagnosticReport("http://example.com")
         import time
 
@@ -84,7 +84,7 @@ class TestScraperDiagnosticReport:
 class TestRunDiagnostics:
     """Tests for the run_diagnostics async function."""
 
-    async def test_success_path(self):
+    async def test_success_path(self) -> None:
         """Successful extraction returns a populated report."""
         schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]
 
@@ -133,7 +133,7 @@ class TestRunDiagnostics:
             mock_extract.assert_called_once()
             mock_process.assert_called_once()
 
-    async def test_error_path_populates_errors(self):
+    async def test_error_path_populates_errors(self) -> None:
         """When extraction throws, errors list should be populated."""
         schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]
 
@@ -153,7 +153,7 @@ class TestRunDiagnostics:
             assert report.final_records_count == 0
             assert report.record_samples == []
 
-    async def test_fetch_failure_still_produces_report(self):
+    async def test_fetch_failure_still_produces_report(self) -> None:
         """Even early failures produce a report with error."""
         schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]
 
@@ -165,7 +165,7 @@ class TestRunDiagnostics:
             assert len(report.errors) == 1
             assert "Connection refused" in report.errors[0]
 
-    async def test_memory_miss(self):
+    async def test_memory_miss(self) -> None:
         """When no selectors in memory, memory_hit is False."""
         schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]
 

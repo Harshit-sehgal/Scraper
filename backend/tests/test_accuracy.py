@@ -6,7 +6,7 @@ import pytest
 from app.benchmark_accuracy import calculate_extraction_accuracy
 
 
-def test_perfect_extraction_accuracy():
+def test_perfect_extraction_accuracy() -> None:
     golden = [{"name": "British Airways", "price": "£245.50"}, {"name": "Air France", "price": "£199.00"}]
 
     extracted = [
@@ -25,7 +25,7 @@ def test_perfect_extraction_accuracy():
     assert res.field_accuracy["price"] == 1.0
 
 
-def test_partial_extraction_accuracy():
+def test_partial_extraction_accuracy() -> None:
     golden = [{"name": "Acme Corp", "city": "London", "phone": "12345"}, {"name": "Globex", "city": "NY", "phone": "67890"}]
 
     # Missing phone for Globex, extra field 'country' for Acme
@@ -45,7 +45,7 @@ def test_partial_extraction_accuracy():
     assert res.schema_conformity == 5 / 6
 
 
-def test_duplicate_detection():
+def test_duplicate_detection() -> None:
     golden = [{"name": "A"}, {"name": "B"}]
     extracted = [{"name": "A"}, {"name": "A"}, {"name": "B"}]
 
@@ -54,7 +54,7 @@ def test_duplicate_detection():
     assert res.completeness == 1.0
 
 
-def test_extra_records_are_penalized_in_precision():
+def test_extra_records_are_penalized_in_precision() -> None:
     golden = [{"name": "A"}]
     extracted = [
         {"name": "A"},
@@ -67,7 +67,7 @@ def test_extra_records_are_penalized_in_precision():
     assert res.f1_score == pytest.approx(0.5)
 
 
-def test_extra_schema_fields_are_penalized():
+def test_extra_schema_fields_are_penalized() -> None:
     golden = [{"name": "A"}]
     extracted = [{"name": "A", "price": "999"}]
 
@@ -77,7 +77,7 @@ def test_extra_schema_fields_are_penalized():
     assert res.schema_conformity == pytest.approx(0.5)
 
 
-def test_hallucination_indicators():
+def test_hallucination_indicators() -> None:
     golden = [{"name": "A"}]
     extracted = [{"name": "I'm sorry, I cannot determine the name"}]
 

@@ -17,7 +17,7 @@ from app.domain_health_alerts import (
 class TestDomainHealthStress:
     """Stress test the domain health monitoring system."""
 
-    def test_many_domains_concurrent_monitoring(self):
+    def test_many_domains_concurrent_monitoring(self) -> None:
         """Test monitoring many domains simultaneously."""
         monitor = DomainHealthMonitor()
 
@@ -38,7 +38,7 @@ class TestDomainHealthStress:
         assert len(all_health) == num_domains
         assert all(h["health_score"] is not None for h in all_health)
 
-    def test_rapid_state_changes(self):
+    def test_rapid_state_changes(self) -> None:
         """Test rapid success/failure state changes."""
         monitor = DomainHealthMonitor()
         domain = "https://volatile.com/"
@@ -53,7 +53,7 @@ class TestDomainHealthStress:
         assert health is not None
         assert health["success_rate"] == pytest.approx(0.5, 0.1)
 
-    def test_extreme_failure_rate(self):
+    def test_extreme_failure_rate(self) -> None:
         """Test monitoring of domain with extreme failure rate."""
         monitor = DomainHealthMonitor()
         domain = "https://broken.com/"
@@ -69,7 +69,7 @@ class TestDomainHealthStress:
         assert health["health_level"] == "blacklisted"  # Should be blacklisted
         assert health["success_rate"] == pytest.approx(0.05, 0.01)
 
-    def test_recovery_from_critical(self):
+    def test_recovery_from_critical(self) -> None:
         """Test recovery from critical state to healthy."""
         monitor = DomainHealthMonitor()
         domain = "https://recovering.com/"
@@ -90,7 +90,7 @@ class TestDomainHealthStress:
         assert health_recovered is not None
         assert health_recovered["health_score"] > health_critical["health_score"]
 
-    def test_long_tail_domain_pattern(self):
+    def test_long_tail_domain_pattern(self) -> None:
         """Test monitoring of long-tail domain with sparse updates."""
         monitor = DomainHealthMonitor()
 
@@ -110,7 +110,7 @@ class TestDomainHealthStress:
         scores = [h["health_score"] for h in all_health]
         assert min(scores) < max(scores)  # Should have variation
 
-    def test_alert_cooldown_prevents_spam(self):
+    def test_alert_cooldown_prevents_spam(self) -> None:
         """Test that alert cooldown prevents alert spam."""
         monitor = DomainHealthMonitor()
         alert_count = 0
@@ -133,7 +133,7 @@ class TestDomainHealthStress:
         # This test just ensures no exceptions are raised
         assert monitor is not None
 
-    def test_consistency_score_high_variance(self):
+    def test_consistency_score_high_variance(self) -> None:
         """Test consistency scoring with high variance failures."""
         monitor = DomainHealthMonitor()
         domain = "https://inconsistent.com/"
@@ -153,7 +153,7 @@ class TestDomainHealthStress:
         assert health is not None
         assert health["consistency_score"] < 1.0
 
-    def test_trend_detection_gradual_degradation(self):
+    def test_trend_detection_gradual_degradation(self) -> None:
         """Test trend detection for gradual degradation."""
         monitor = DomainHealthMonitor()
         domain = "https://degrading.com/"
@@ -172,7 +172,7 @@ class TestDomainHealthStress:
         # Trend could be positive or negative depending on implementation
         assert -1.0 <= health.get("degradation_trend", 0) <= 1.0
 
-    def test_memory_efficiency_large_history(self):
+    def test_memory_efficiency_large_history(self) -> None:
         """Test memory efficiency with large attempt history."""
         monitor = DomainHealthMonitor()
 
@@ -191,7 +191,7 @@ class TestDomainHealthStress:
         for domain_metrics in monitor._domains.values():
             assert len(domain_metrics.recent_attempts) <= 50
 
-    def test_failure_category_tracking(self):
+    def test_failure_category_tracking(self) -> None:
         """Test tracking of specific failure categories over time."""
         monitor = DomainHealthMonitor()
         domain = "https://categories.com/"
@@ -208,7 +208,7 @@ class TestDomainHealthStress:
         # Should have tracked a failure category
         assert health.get("recent_failure_category") in categories
 
-    def test_concurrent_domain_updates(self):
+    def test_concurrent_domain_updates(self) -> None:
         """Test concurrent updates to multiple domains."""
         monitor = DomainHealthMonitor()
 
@@ -231,7 +231,7 @@ class TestDomainHealthStress:
 class TestHealthMetricsEdgeCases:
     """Test edge cases in health calculations."""
 
-    def test_single_attempt_domain(self):
+    def test_single_attempt_domain(self) -> None:
         """Test health calculation with single attempt."""
         monitor = DomainHealthMonitor()
 
@@ -241,7 +241,7 @@ class TestHealthMetricsEdgeCases:
         assert health is not None
         assert health["success_rate"] == 1.0  # Single success
 
-    def test_100_percent_failure_domain(self):
+    def test_100_percent_failure_domain(self) -> None:
         """Test domain with 100% failure rate."""
         monitor = DomainHealthMonitor()
         domain = "https://perfect-fail.com/"
@@ -254,7 +254,7 @@ class TestHealthMetricsEdgeCases:
         assert health["success_rate"] == 0.0
         assert health["health_level"] == "blacklisted"
 
-    def test_100_percent_success_domain(self):
+    def test_100_percent_success_domain(self) -> None:
         """Test domain with 100% success rate."""
         monitor = DomainHealthMonitor()
         domain = "https://perfect-success.com/"
@@ -267,7 +267,7 @@ class TestHealthMetricsEdgeCases:
         assert health["success_rate"] == 1.0
         assert health["health_level"] == "healthy"
 
-    def test_very_fresh_domain(self):
+    def test_very_fresh_domain(self) -> None:
         """Test domain with minimal history."""
         monitor = DomainHealthMonitor()
 

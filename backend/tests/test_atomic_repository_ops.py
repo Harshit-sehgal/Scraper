@@ -18,7 +18,7 @@ def clean_job_store():
             conn.close()
 
 
-def test_sqlite_repository_atomic_move_and_restore():
+def test_sqlite_repository_atomic_move_and_restore() -> None:
     repo = SQLiteJobRepository()
 
     # 1. Create a job
@@ -53,7 +53,7 @@ def test_sqlite_repository_atomic_move_and_restore():
     assert len(repo.load_recycle_bin()) == 0
 
 
-def test_sqlite_repository_atomic_hard_delete():
+def test_sqlite_repository_atomic_hard_delete() -> None:
     repo = SQLiteJobRepository()
 
     job = Job(name="delete-test-job", mode="manual", urls=["http://delete.com"], schema_fields=[])
@@ -70,7 +70,7 @@ def test_sqlite_repository_atomic_hard_delete():
     assert job.id not in repo.load_jobs()
 
 
-def test_sqlite_repository_clear_terminal_jobs():
+def test_sqlite_repository_clear_terminal_jobs() -> None:
     repo = SQLiteJobRepository()
 
     # Active job

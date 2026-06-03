@@ -53,7 +53,7 @@ class TestSnapshotDesyncDetector:
 
     # ─── Identical Snapshots ────────────────────────────────────────────
 
-    def test_identical_snapshots_no_divergence(self):
+    def test_identical_snapshots_no_divergence(self) -> None:
         snap = make_snapshot()
         detector = SnapshotDesyncDetector()
         report = detector.compare(snap, snap, "node_a", "node_b")
@@ -63,7 +63,7 @@ class TestSnapshotDesyncDetector:
 
     # ─── Causal Scenarios ───────────────────────────────────────────────
 
-    def test_causal_descendant_is_accepted(self):
+    def test_causal_descendant_is_accepted(self) -> None:
         snap_a = make_snapshot(clock={"node_a": 10, "node_b": 5}, node_id="node_a")
         snap_b = make_snapshot(clock={"node_a": 5, "node_b": 10}, node_id="node_b")
         detector = SnapshotDesyncDetector()
@@ -71,7 +71,7 @@ class TestSnapshotDesyncDetector:
         # Even without topology divergence, the clock shows A has more updates
         assert report.divergence_score == 0.0
 
-    def test_concurrent_clocks_detected(self):
+    def test_concurrent_clocks_detected(self) -> None:
         snap_a = make_snapshot(clock={"node_a": 10, "node_b": 5}, node_id="node_a")
         snap_b = make_snapshot(clock={"node_a": 5, "node_b": 10}, node_id="node_b")
         # Add actual divergence
@@ -84,7 +84,7 @@ class TestSnapshotDesyncDetector:
 
     # ─── Topology Divergence ────────────────────────────────────────────
 
-    def test_topology_region_count_divergence(self):
+    def test_topology_region_count_divergence(self) -> None:
         snap_a = make_snapshot()
         snap_b = make_snapshot()
         snap_b["topology"]["regions"] = [
@@ -95,7 +95,7 @@ class TestSnapshotDesyncDetector:
         report = detector.compare(snap_a, snap_b)
         assert report.subsystem_divergence.get("topology", 0) > 0.0
 
-    def test_topology_laws_divergence(self):
+    def test_topology_laws_divergence(self) -> None:
         snap_a = make_snapshot()
         snap_b = make_snapshot()
         snap_b["topology"]["topological_laws"] = {"a|b": -0.5, "c|d": 0.8}
@@ -103,7 +103,7 @@ class TestSnapshotDesyncDetector:
         report = detector.compare(snap_a, snap_b)
         assert "topology" in report.subsystem_divergence
 
-    def test_topology_epoch_divergence_triggers_critical(self):
+    def test_topology_epoch_divergence_triggers_critical(self) -> None:
         snap_a = make_snapshot()
         snap_b = make_snapshot()
         snap_b["topology"]["topology_epoch"] = 5
@@ -115,7 +115,7 @@ class TestSnapshotDesyncDetector:
 
     # ─── Manifold Divergence ────────────────────────────────────────────
 
-    def test_manifold_role_set_divergence(self):
+    def test_manifold_role_set_divergence(self) -> None:
         snap_a = make_snapshot()
         snap_b = make_snapshot()
         snap_b["manifold"]["role_manifold"] = {
@@ -126,7 +126,7 @@ class TestSnapshotDesyncDetector:
         report = detector.compare(snap_a, snap_b)
         assert report.subsystem_divergence.get("manifold", 0) > 0.0
 
-    def test_manifold_vector_divergence(self):
+    def test_manifold_vector_divergence(self) -> None:
         snap_a = make_snapshot()
         snap_b = make_snapshot()
         snap_b["manifold"]["role_manifold"] = {
@@ -138,7 +138,7 @@ class TestSnapshotDesyncDetector:
 
     # ─── Energy Divergence ──────────────────────────────────────────────
 
-    def test_energy_divergence(self):
+    def test_energy_divergence(self) -> None:
         snap_a = make_snapshot()
         snap_b = make_snapshot()
         snap_b["energy"]["global_energy"] = 9.0  # Very different from 5.0
@@ -148,7 +148,7 @@ class TestSnapshotDesyncDetector:
 
     # ─── Instability Divergence ─────────────────────────────────────────
 
-    def test_instability_exclusion_divergence(self):
+    def test_instability_exclusion_divergence(self) -> None:
         snap_a = make_snapshot()
         snap_b = make_snapshot()
         snap_b["instability"]["exclusions"] = {"a|b": 0.8}
@@ -158,7 +158,7 @@ class TestSnapshotDesyncDetector:
 
     # ─── Composite Critical Threshold ───────────────────────────────────
 
-    def test_high_divergence_triggers_critical(self):
+    def test_high_divergence_triggers_critical(self) -> None:
         snap_a = make_snapshot()
         snap_b = make_snapshot()
         snap_b["topology"]["regions"] = [
@@ -175,7 +175,7 @@ class TestSnapshotDesyncDetector:
 
     # ─── Edge Cases ─────────────────────────────────────────────────────
 
-    def test_empty_snapshots(self):
+    def test_empty_snapshots(self) -> None:
         snap_a = make_snapshot()
         snap_b = make_snapshot()
         snap_b["topology"]["regions"] = []
@@ -189,7 +189,7 @@ class TestSnapshotDesyncDetector:
         assert report.divergence_score >= 0.0
         assert isinstance(report.critical, bool)
 
-    def test_recent_reports_tracking(self):
+    def test_recent_reports_tracking(self) -> None:
         snap_a = make_snapshot()
         snap_b = make_snapshot()
         snap_b["topology"]["regions"] = [{"region_id": "r2", "competing_roles": ["c"]}]
@@ -200,7 +200,7 @@ class TestSnapshotDesyncDetector:
         assert reports[0]["node_a"] == "n1"
         assert reports[0]["node_b"] == "n2"
 
-    def test_recommendation_causal_merge(self):
+    def test_recommendation_causal_merge(self) -> None:
         snap_a = make_snapshot(clock={"node_a": 10, "node_b": 5}, node_id="node_a")
         snap_b = make_snapshot(clock={"node_a": 5, "node_b": 10}, node_id="node_b")
         snap_b["topology"]["regions"] = [

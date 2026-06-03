@@ -4,7 +4,7 @@ from app.semantic_os import get_semantic_os
 from app.semantic_world_state import get_world_state
 
 
-def test_envelope_creation_and_persistence():
+def test_envelope_creation_and_persistence() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -33,7 +33,7 @@ def test_envelope_creation_and_persistence():
     assert env2["constituents"] == {"role_a", "role_b"}
 
 
-def test_causal_replay_abstraction():
+def test_causal_replay_abstraction() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -52,7 +52,7 @@ def test_causal_replay_abstraction():
     assert ws._abstraction.get_role_level("env1") == 1
 
 
-def test_autonomous_hierarchical_synthesis():
+def test_autonomous_hierarchical_synthesis() -> None:
     ws = get_world_state()
     ws.clear()
     sos = get_semantic_os()
@@ -84,7 +84,7 @@ def test_autonomous_hierarchical_synthesis():
     assert sos.get_role_abstraction_level(env_id) == 1
 
 
-def test_hierarchical_interpretation():
+def test_hierarchical_interpretation() -> None:
     from app.semantic_allocation_engine import allocate_semantic_roles
     from app.semantic_ir import SemanticRecord, SemanticToken, SemanticType, Span
 
@@ -124,7 +124,7 @@ def test_hierarchical_interpretation():
     assert "email" in graph.roles
 
 
-def test_topological_meta_reasoning():
+def test_topological_meta_reasoning() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -144,7 +144,7 @@ def test_topological_meta_reasoning():
     assert report["contradictions"][0]["type"] == "internal_repulsion"
 
 
-def test_cross_domain_knowledge_synthesis():
+def test_cross_domain_knowledge_synthesis() -> None:
     ws = get_world_state()
     ws.clear()
 

@@ -2,7 +2,7 @@ import importlib
 import os
 
 
-def test_deterministic_dotenv_loading(tmp_path, monkeypatch):
+def test_deterministic_dotenv_loading(tmp_path, monkeypatch) -> None:
     """Verify app package loads the configured dotenv path even when CWD changes."""
     test_key = "DATAFORGE_TEST_DETERMINISTIC_ENV_VAR"
     test_val = "loaded_successfully_from_temp_dotenv"

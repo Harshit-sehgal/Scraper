@@ -5,14 +5,14 @@ from app.semantic_persistence import clear_semantic_state
 from app.semantic_world_state import get_world_state
 
 
-def test_fresh_state_is_valid():
+def test_fresh_state_is_valid() -> None:
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     issues = validate_world_state(ws)
     assert not issues, f"Fresh state should be clean: {issues}"
 
 
-def test_nan_energy_detected():
+def test_nan_energy_detected() -> None:
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     ws._energy._global_energy = float("nan")  # Bypass setter
@@ -20,7 +20,7 @@ def test_nan_energy_detected():
     assert any("NaN" in i for i in issues)
 
 
-def test_nan_entropy_detected():
+def test_nan_entropy_detected() -> None:
     """global_entropy NaN should be flagged."""
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
@@ -29,7 +29,7 @@ def test_nan_entropy_detected():
     assert any("entropy" in i.lower() and "nan" in i.lower() for i in issues)
 
 
-def test_inf_energy_detected():
+def test_inf_energy_detected() -> None:
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     ws._energy._global_energy = float("inf")
@@ -37,7 +37,7 @@ def test_inf_energy_detected():
     assert any("inf" in i for i in issues)
 
 
-def test_orphan_region_detected():
+def test_orphan_region_detected() -> None:
     """A region with no competing_roles should be flagged as orphan."""
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
@@ -49,7 +49,7 @@ def test_orphan_region_detected():
     assert any("orphan" in i.lower() for i in issues)
 
 
-def test_nan_region_instability_detected():
+def test_nan_region_instability_detected() -> None:
     """Bypass topology clamping by hacking the internal FieldConflictRegion."""
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
@@ -64,7 +64,7 @@ def test_nan_region_instability_detected():
     assert any("nan" in i and "instability" in i.lower() for i in issues)
 
 
-def test_instability_out_of_bounds():
+def test_instability_out_of_bounds() -> None:
     """Bypass topology clamping by hacking the internal FieldConflictRegion."""
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
@@ -78,7 +78,7 @@ def test_instability_out_of_bounds():
     assert any("out of bounds" in i and "instability" in i.lower() for i in issues)
 
 
-def test_energy_out_of_bounds():
+def test_energy_out_of_bounds() -> None:
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     from app.core_types import FieldConflictRegion
@@ -89,7 +89,7 @@ def test_energy_out_of_bounds():
     assert any("out of bounds" in i and "energy" in i.lower() for i in issues)
 
 
-def test_exclusion_out_of_bounds():
+def test_exclusion_out_of_bounds() -> None:
     """Directly hack the internal instability exclusions dict."""
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
@@ -98,7 +98,7 @@ def test_exclusion_out_of_bounds():
     assert any("exclusion" in i.lower() and "out of bounds" in i for i in issues)
 
 
-def test_entropy_metric_out_of_bounds():
+def test_entropy_metric_out_of_bounds() -> None:
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     ws._energy._global_entropy = 5.0
@@ -106,7 +106,7 @@ def test_entropy_metric_out_of_bounds():
     assert any("entropy" in i.lower() and "out of bounds" in i for i in issues)
 
 
-def test_integrity_out_of_bounds():
+def test_integrity_out_of_bounds() -> None:
     """Bypass topology clamping by hacking the internal FieldConflictRegion."""
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
@@ -120,7 +120,7 @@ def test_integrity_out_of_bounds():
     assert any("integrity" in i.lower() and "out of bounds" in i for i in issues)
 
 
-def test_energy_global_out_of_bounds():
+def test_energy_global_out_of_bounds() -> None:
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     ws._energy._global_energy = 50.0
@@ -128,7 +128,7 @@ def test_energy_global_out_of_bounds():
     assert any("global_energy" in i and "out of bounds" in i for i in issues)
 
 
-def test_decision_history_exceeds_5000():
+def test_decision_history_exceeds_5000() -> None:
     """decision_history > 5000 entries should be flagged as memory bloat."""
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
@@ -137,7 +137,7 @@ def test_decision_history_exceeds_5000():
     assert any("decision_history" in i and "5000" in i for i in issues)
 
 
-def test_region_count_exceeds_500():
+def test_region_count_exceeds_500() -> None:
     """field_regions > 500 should be flagged as memory bloat."""
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
@@ -151,7 +151,7 @@ def test_region_count_exceeds_500():
     assert any("field_regions" in i and "500" in i for i in issues)
 
 
-def test_learned_exclusions_exceeds_500():
+def test_learned_exclusions_exceeds_500() -> None:
     """learned_exclusions > 500 entries should be flagged as memory bloat."""
     clear_semantic_state(clear_file=False)
     ws = get_world_state()

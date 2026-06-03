@@ -3,7 +3,7 @@ from app.semantic_os import get_semantic_os
 from app.semantic_world_state import get_world_state
 
 
-def test_intent_biasing_manifold():
+def test_intent_biasing_manifold() -> None:
     ws = get_world_state()
     ws.clear()
     sos = get_semantic_os()
@@ -28,7 +28,7 @@ def test_intent_biasing_manifold():
     assert vec[0] < 1.0  # Should be moving toward it
 
 
-def test_targeted_intent_isolation():
+def test_targeted_intent_isolation() -> None:
     ws = get_world_state()
     ws.clear()
     sos = get_semantic_os()
@@ -53,7 +53,7 @@ def test_targeted_intent_isolation():
     assert abs(v2[0] - 0.5) < 0.01
 
 
-def test_intent_persistence_checkpoint():
+def test_intent_persistence_checkpoint() -> None:
     ws = get_world_state()
     ws.clear()
     sos = get_semantic_os()

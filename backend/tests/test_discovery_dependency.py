@@ -4,7 +4,7 @@ import pytest
 from app.discovery import DiscoveryDependencyError, get_ddgs_class
 
 
-def test_get_ddgs_class_reports_missing_optional_dependency(monkeypatch):
+def test_get_ddgs_class_reports_missing_optional_dependency(monkeypatch) -> None:
     """Missing search packages should fail discovery, not app import."""
     real_import = builtins.__import__
 
@@ -21,7 +21,7 @@ def test_get_ddgs_class_reports_missing_optional_dependency(monkeypatch):
     assert "Discovery requires ddgs or duckduckgo_search" in str(excinfo.value)
 
 
-def test_discover_endpoint_returns_503_when_discovery_dependency_missing(client, monkeypatch):
+def test_discover_endpoint_returns_503_when_discovery_dependency_missing(client, monkeypatch) -> None:
     from app.config import settings
 
     monkeypatch.setattr(settings, "API_KEY", "")

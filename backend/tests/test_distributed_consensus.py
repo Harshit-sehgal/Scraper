@@ -2,7 +2,7 @@ from app.semantic_os import SemanticOS
 from app.semantic_world_state import SemanticWorldState
 
 
-def test_causal_sync():
+def test_causal_sync() -> None:
     # Node A starts
     ws_a = SemanticWorldState(node_id="node_a")
     ws_a.clear()
@@ -33,7 +33,7 @@ def test_causal_sync():
     assert abs(ws_a.metrics.global_energy - 1.3) < 0.01
 
 
-def test_concurrent_conflict_resolution():
+def test_concurrent_conflict_resolution() -> None:
     ws_base = SemanticWorldState(node_id="base")
     ws_base.clear()
     base_state = ws_base.to_dict()
@@ -65,7 +65,7 @@ def test_concurrent_conflict_resolution():
     assert clock["node_b"] == 1
 
 
-def test_gossip_substrate_propagation():
+def test_gossip_substrate_propagation() -> None:
     # 1. Setup three nodes
     os_a = SemanticOS(SemanticWorldState(node_id="node_a"))
     os_b = SemanticOS(SemanticWorldState(node_id="node_b"))

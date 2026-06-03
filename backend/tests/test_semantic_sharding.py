@@ -8,7 +8,7 @@ def get_world_state():
     return app.semantic_world_state.get_world_state()
 
 
-def test_manifold_sharding():
+def test_manifold_sharding() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -43,7 +43,7 @@ def test_manifold_sharding():
     assert len(reng.force_buffer) == 0
 
 
-def test_cross_shard_repulsion_isolation():
+def test_cross_shard_repulsion_isolation() -> None:
     """Roles in different shards should not repel each other (Phase 35 isolation)."""
     ws = get_world_state()
     ws.clear()
@@ -69,7 +69,7 @@ def test_cross_shard_repulsion_isolation():
     assert v1_after == pytest.approx(v1_before, abs=1e-4)
 
 
-def test_shard_rebalancing():
+def test_shard_rebalancing() -> None:
     ws = get_world_state()
     ws.clear()
 

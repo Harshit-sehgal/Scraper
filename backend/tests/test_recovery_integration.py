@@ -28,7 +28,7 @@ from app.selector_memory import get_selector_memory
 class TestRecoveryStrategist:
     """Test recovery plan generation."""
 
-    def test_recovery_plan_hydration_failure(self):
+    def test_recovery_plan_hydration_failure(self) -> None:
         """Test recovery plan for hydration failure."""
         strategist = get_recovery_strategist()
 
@@ -44,7 +44,7 @@ class TestRecoveryStrategist:
         assert len(plan.secondary_actions) > 0
         assert plan.max_retry_attempts == 3
 
-    def test_recovery_plan_selector_decay(self):
+    def test_recovery_plan_selector_decay(self) -> None:
         """Test recovery plan for selector decay."""
         strategist = get_recovery_strategist()
 
@@ -59,7 +59,7 @@ class TestRecoveryStrategist:
         assert plan.primary_action == RecoveryAction.FORCE_REDISCOVERY
         assert RecoveryAction.ESCALATE_TO_LLM in plan.secondary_actions
 
-    def test_recovery_plan_anti_bot_block(self):
+    def test_recovery_plan_anti_bot_block(self) -> None:
         """Test recovery plan for anti-bot block."""
         strategist = get_recovery_strategist()
 
@@ -74,7 +74,7 @@ class TestRecoveryStrategist:
         assert plan.primary_action == RecoveryAction.ROTATE_PROXY
         assert plan.backoff_seconds == 10.0
 
-    def test_recovery_escalation_on_retry(self):
+    def test_recovery_escalation_on_retry(self) -> None:
         """Test that recovery escalates on retry attempts."""
         strategist = get_recovery_strategist()
 
@@ -91,7 +91,7 @@ class TestRecoveryStrategist:
         plan2 = strategist.generate_recovery_plan(classification, attempt_number=2)
         assert plan2.primary_action in [RecoveryAction.ROTATE_PROXY, RecoveryAction.BACKOFF_AND_SLOW]
 
-    def test_parameter_tuning_high_anti_bot_risk(self):
+    def test_parameter_tuning_high_anti_bot_risk(self) -> None:
         """Test parameter tuning for high anti-bot risk domains."""
         strategist = get_recovery_strategist()
 
@@ -116,7 +116,7 @@ class TestRecoveryStrategist:
 class TestDomainHealthMonitor:
     """Test domain health monitoring."""
 
-    def test_health_monitor_tracks_success_failure(self):
+    def test_health_monitor_tracks_success_failure(self) -> None:
         """Test that health monitor tracks successes and failures."""
         monitor = DomainHealthMonitor()
 
@@ -131,7 +131,7 @@ class TestDomainHealthMonitor:
         assert health is not None
         assert health["success_rate"] == pytest.approx(2 / 3, 0.01)
 
-    def test_health_level_classification(self):
+    def test_health_level_classification(self) -> None:
         """Test health level classification."""
         monitor = DomainHealthMonitor()
 
@@ -144,7 +144,7 @@ class TestDomainHealthMonitor:
         assert health["health_level"] == "healthy"
         assert health["health_score"] >= 0.8
 
-    def test_health_degradation_detection(self):
+    def test_health_degradation_detection(self) -> None:
         """Test that health monitor detects degradation."""
         monitor = DomainHealthMonitor()
 
@@ -161,7 +161,7 @@ class TestDomainHealthMonitor:
         assert health["degradation_trend"] > 0.0  # Positive trend = degrading
         assert health["health_level"] in ["degrading", "unhealthy"]
 
-    def test_health_consistency_score(self):
+    def test_health_consistency_score(self) -> None:
         """Test consistency score calculation."""
         monitor = DomainHealthMonitor()
 
@@ -176,7 +176,7 @@ class TestDomainHealthMonitor:
         # Clustered failures = lower consistency (more predictable failure pattern)
         assert "consistency_score" in health
 
-    def test_critical_health_threshold(self):
+    def test_critical_health_threshold(self) -> None:
         """Test critical health status."""
         monitor = DomainHealthMonitor()
 
@@ -190,7 +190,7 @@ class TestDomainHealthMonitor:
         assert health is not None
         assert health["health_level"] in ["unhealthy", "critical"]
 
-    def test_system_wide_health_summary(self):
+    def test_system_wide_health_summary(self) -> None:
         """Test system-wide health reporting."""
         monitor = DomainHealthMonitor()
 
@@ -211,7 +211,7 @@ class TestDomainHealthMonitor:
 class TestSelectorMemoryCleanup:
     """Test selector memory cleanup integration."""
 
-    def test_cleanup_removes_low_confidence(self):
+    def test_cleanup_removes_low_confidence(self) -> None:
         """Test that cleanup removes low-confidence selectors."""
         selector_memory = get_selector_memory()
 
@@ -234,7 +234,7 @@ class TestSelectorMemoryCleanup:
         # Should have deleted low-confidence selector
         assert len(selector_memory._memory) <= initial_count
 
-    def test_get_selector_confidence(self):
+    def test_get_selector_confidence(self) -> None:
         """Test confidence scoring for selectors."""
         selector_memory = get_selector_memory()
 
@@ -258,7 +258,7 @@ class TestSelectorMemoryCleanup:
         assert confidence is not None
         assert confidence.final_score > 0.8  # Should be high confidence
 
-    def test_memory_stats_reporting(self):
+    def test_memory_stats_reporting(self) -> None:
         """Test memory statistics reporting."""
         selector_memory = get_selector_memory()
 
@@ -290,7 +290,7 @@ class TestSelectorMemoryCleanup:
 class TestRecoveryHandlers:
     """Test recovery action handlers."""
 
-    async def test_rotate_proxy_handler(self):
+    async def test_rotate_proxy_handler(self) -> None:
         """Test proxy rotation handler."""
         from app.recovery_handlers import handle_rotate_proxy
 
@@ -306,7 +306,7 @@ class TestRecoveryHandlers:
             assert result is True
             mock_mgr.rotate.assert_called_once()
 
-    async def test_backoff_and_slow_handler(self):
+    async def test_backoff_and_slow_handler(self) -> None:
         """Test backoff handler."""
         from app.recovery_handlers import handle_backoff_and_slow
 
@@ -322,7 +322,7 @@ class TestRecoveryHandlers:
         assert result is True
         assert elapsed >= 100  # Should have waited at least delay_ms
 
-    async def test_force_rediscovery_handler(self):
+    async def test_force_rediscovery_handler(self) -> None:
         """Test force rediscovery handler."""
         from app.recovery_handlers import handle_force_rediscovery
 
@@ -346,7 +346,7 @@ class TestRecoveryHandlers:
         # Should have deleted the cached entry
         assert domain not in selector_memory._memory
 
-    async def test_skip_url_handler(self):
+    async def test_skip_url_handler(self) -> None:
         """Test skip URL handler."""
         from app.recovery_handlers import handle_skip_url
 
@@ -359,7 +359,7 @@ class TestRecoveryHandlers:
 class TestRecoveryIntegration:
     """Integration tests for full recovery flows."""
 
-    def test_recovery_handler_registration(self):
+    def test_recovery_handler_registration(self) -> None:
         """Test that all recovery handlers are registered."""
         register_all_recovery_handlers()
 
@@ -369,7 +369,7 @@ class TestRecoveryIntegration:
         for action in RecoveryAction:
             assert action in executor.action_handlers
 
-    def test_failure_to_recovery_flow(self):
+    def test_failure_to_recovery_flow(self) -> None:
         """Test end-to-end failure -> classification -> recovery plan."""
         strategist = get_recovery_strategist()
 

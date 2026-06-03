@@ -19,7 +19,7 @@ def wait_for_job(job_id):
     print("Job timed out!")
 
 
-def test_manual():
+def test_manual() -> None:
     print("=== Testing MANUAL Mode ===")
     res = requests.post(
         f"{BASE_URL}/api/jobs",
@@ -41,7 +41,7 @@ def test_manual():
     wait_for_job(job_id)
 
 
-def test_auto():
+def test_auto() -> None:
     print("\n=== Testing AUTO Mode ===")
     res = requests.post(
         f"{BASE_URL}/api/jobs",

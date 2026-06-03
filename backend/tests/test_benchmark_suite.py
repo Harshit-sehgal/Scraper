@@ -34,7 +34,7 @@ def _load_fixture(name: str) -> str:
 
 
 @pytest.mark.asyncio
-async def test_deterministic_benchmark_run():
+async def test_deterministic_benchmark_run() -> None:
     """Execute the extraction benchmark suite and verify target performance metrics."""
     metrics = {
         "success_rate": 0.0,

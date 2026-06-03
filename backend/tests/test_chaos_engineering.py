@@ -49,7 +49,7 @@ def setup_chaos_environment():
 
 
 @pytest.mark.asyncio
-async def test_network_timeout_recovery():
+async def test_network_timeout_recovery() -> None:
     """Verifies that NETWORK_TIMEOUT triggers INCREASE_TIMEOUT and recovery succeeds on retry."""
     chaos = get_chaos_simulator()
     chaos.active_failures[FailureMode.NETWORK_TIMEOUT.value] = True
@@ -106,7 +106,7 @@ async def test_network_timeout_recovery():
 
 
 @pytest.mark.asyncio
-async def test_browser_crash_recovery():
+async def test_browser_crash_recovery() -> None:
     """Verifies BROWSER_CRASH triggers recovery and successfully recycles browser resources."""
     chaos = get_chaos_simulator()
     chaos.active_failures[FailureMode.BROWSER_CRASH.value] = True
@@ -149,7 +149,7 @@ async def test_browser_crash_recovery():
 
 
 @pytest.mark.asyncio
-async def test_selector_decay_rediscovery():
+async def test_selector_decay_rediscovery() -> None:
     """Verifies that empty record returns classify as SELECTOR_DECAY and successfully clear selector memory."""
     chaos = get_chaos_simulator()
     chaos.active_failures[FailureMode.SELECTOR_POISONING.value] = True
@@ -203,7 +203,7 @@ async def test_selector_decay_rediscovery():
 
 
 @pytest.mark.asyncio
-async def test_anti_bot_proxy_rotation():
+async def test_anti_bot_proxy_rotation() -> None:
     """Verifies anti-bot block triggers active proxy rotation and exponential backoff."""
     chaos = get_chaos_simulator()
     chaos.active_failures[FailureMode.ANTI_BOT_ESCALATION.value] = True
@@ -253,7 +253,7 @@ async def test_anti_bot_proxy_rotation():
 
 
 @pytest.mark.asyncio
-async def test_concurrency_reduction_under_resource_exhaustion():
+async def test_concurrency_reduction_under_resource_exhaustion() -> None:
     """Verifies that cascading/repeated failures (like browser crash or timeout) trigger REDUCE_CONCURRENCY."""
     chaos = get_chaos_simulator()
     # Trigger browser crash to initiate failures

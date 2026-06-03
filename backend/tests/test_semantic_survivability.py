@@ -48,7 +48,7 @@ def simulate_event(ws: SemanticWorldState, role_name: str, token_type: SemanticT
         ws.aggregate_from_regions()
 
 
-def test_long_horizon_stability(ws):
+def test_long_horizon_stability(ws) -> None:
     """Run 500 events and check for basic thermodynamic sanity."""
     roles = ["price", "date", "location", "org", "rating"]
     types = [SemanticType.PRICE, SemanticType.DATE, SemanticType.LOCATION, SemanticType.ORGANIZATION, SemanticType.RATING]
@@ -72,7 +72,7 @@ def test_long_horizon_stability(ws):
     assert len(ws.role_manifold) == len(roles)
 
 
-def test_chaos_transaction_survivability(ws):
+def test_chaos_transaction_survivability(ws) -> None:
     """Inject random failures during 100 transactions and verify atomicity."""
     set_injection_probability(0.05)  # 5% failure rate
 
@@ -95,7 +95,7 @@ def test_chaos_transaction_survivability(ws):
     assert ws.metrics.global_energy >= 0.0
 
 
-def test_attractor_collapse_resistance(ws):
+def test_attractor_collapse_resistance(ws) -> None:
     """Feed adversarial contradictory data and check if entropy increases."""
     role = "unstable_role"
     # Constant bombardment with contradictory types
@@ -120,7 +120,7 @@ def test_attractor_collapse_resistance(ws):
     assert ws.metrics.global_entropy < 0.95
 
 
-def test_causal_lineage_traceability(ws):
+def test_causal_lineage_traceability(ws) -> None:
     """Verify that every state mutation is linked to a trace ID."""
     simulate_event(ws, "traced_role", SemanticType.NUMBER)
 

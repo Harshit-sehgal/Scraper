@@ -1,7 +1,7 @@
 from app.semantic_world_state import SemanticWorldState, get_world_state
 
 
-def test_dynamic_schema_expansion():
+def test_dynamic_schema_expansion() -> None:
     ws = get_world_state()
     ws.clear()
 
@@ -19,7 +19,7 @@ def test_dynamic_schema_expansion():
     assert not ws._manifold.has_manifold_role("hypo_discount")
 
 
-def test_manifold_federation_blending():
+def test_manifold_federation_blending() -> None:
     ws_local = get_world_state()
     ws_local.clear()
 
@@ -40,7 +40,7 @@ def test_manifold_federation_blending():
     assert abs(vec[0] - 0.96) < 0.01
 
 
-def test_manifold_federation_acquisition():
+def test_manifold_federation_acquisition() -> None:
     ws_local = get_world_state()
     ws_local.clear()
 

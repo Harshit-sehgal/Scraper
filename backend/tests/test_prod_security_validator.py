@@ -28,7 +28,7 @@ class MockSettings:
         self.DATABASE_URL = database_url
 
 
-def test_validator_does_nothing_in_development():
+def test_validator_does_nothing_in_development() -> None:
     """Verify that validator passes immediately without error in development mode, even with weak keys."""
     settings = MockSettings(
         env="development",
@@ -42,7 +42,7 @@ def test_validator_does_nothing_in_development():
     validate_production_credentials(settings)
 
 
-def test_validator_fails_on_empty_keys_in_production():
+def test_validator_fails_on_empty_keys_in_production() -> None:
     """Verify that validator raises ValueError in production if any key is empty."""
     settings = MockSettings(
         env="production",
@@ -54,7 +54,7 @@ def test_validator_fails_on_empty_keys_in_production():
         validate_production_credentials(settings)
 
 
-def test_validator_fails_on_placeholder_keys_in_production():
+def test_validator_fails_on_placeholder_keys_in_production() -> None:
     """Verify that validator raises ValueError in production if any key is a default placeholder."""
     settings = MockSettings(
         env="production",
@@ -66,7 +66,7 @@ def test_validator_fails_on_placeholder_keys_in_production():
         validate_production_credentials(settings)
 
 
-def test_validator_fails_on_generated_placeholder_keys_in_production():
+def test_validator_fails_on_generated_placeholder_keys_in_production() -> None:
     """Generated example placeholders should fail even when they are long."""
     settings = MockSettings(
         env="production",
@@ -78,7 +78,7 @@ def test_validator_fails_on_generated_placeholder_keys_in_production():
         validate_production_credentials(settings)
 
 
-def test_validator_fails_on_duplicate_role_keys_in_production():
+def test_validator_fails_on_duplicate_role_keys_in_production() -> None:
     """User, operator, and admin API keys must remain separate in production."""
     settings = MockSettings(
         env="production",
@@ -90,7 +90,7 @@ def test_validator_fails_on_duplicate_role_keys_in_production():
         validate_production_credentials(settings)
 
 
-def test_validator_fails_on_short_keys_in_production():
+def test_validator_fails_on_short_keys_in_production() -> None:
     """Verify that validator raises ValueError in production if any key is less than 16 characters."""
     settings = MockSettings(
         env="production",
@@ -102,7 +102,7 @@ def test_validator_fails_on_short_keys_in_production():
         validate_production_credentials(settings)
 
 
-def test_validator_fails_on_missing_db_url_in_postgres_production():
+def test_validator_fails_on_missing_db_url_in_postgres_production() -> None:
     """Verify that validator raises ValueError in production with postgres backend if DATABASE_URL is missing."""
     settings = MockSettings(
         env="production",
@@ -120,7 +120,7 @@ def test_validator_fails_on_missing_db_url_in_postgres_production():
         validate_production_credentials(settings)
 
 
-def test_validator_fails_on_weak_db_password_in_postgres_production():
+def test_validator_fails_on_weak_db_password_in_postgres_production() -> None:
     """Verify that validator raises ValueError in production with postgres backend if database password is weak/default."""
     settings = MockSettings(
         env="production",
@@ -134,7 +134,7 @@ def test_validator_fails_on_weak_db_password_in_postgres_production():
         validate_production_credentials(settings)
 
 
-def test_validator_fails_on_generated_placeholder_db_password_in_production(monkeypatch):
+def test_validator_fails_on_generated_placeholder_db_password_in_production(monkeypatch) -> None:
     """Postgres URL password validation should reject generated placeholder text."""
     monkeypatch.delenv("DATAFORGE_DATABASE_URL", raising=False)
     settings = MockSettings(
@@ -149,7 +149,7 @@ def test_validator_fails_on_generated_placeholder_db_password_in_production(monk
         validate_production_credentials(settings)
 
 
-def test_validator_fails_on_short_db_password_in_postgres_production():
+def test_validator_fails_on_short_db_password_in_postgres_production() -> None:
     """Verify that validator raises ValueError in production with postgres backend if database password is too short."""
     settings = MockSettings(
         env="production",
@@ -163,7 +163,7 @@ def test_validator_fails_on_short_db_password_in_postgres_production():
         validate_production_credentials(settings)
 
 
-def test_validator_passes_on_strong_credentials_in_production():
+def test_validator_passes_on_strong_credentials_in_production() -> None:
     """Verify that validator succeeds with zero exceptions under a strong credential setup."""
     settings = MockSettings(
         env="production",

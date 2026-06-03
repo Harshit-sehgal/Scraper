@@ -2,7 +2,7 @@ from app.semantic_pipeline import run_pipeline
 from app.semantic_world_state import get_world_state
 
 
-def test_adversarial_domain_switching():
+def test_adversarial_domain_switching() -> None:
     """Field must survive rapid switching between conflicting domains."""
     ws = get_world_state()
     ws.clear()
@@ -42,7 +42,7 @@ def test_adversarial_domain_switching():
     assert "product" in ws.role_manifold
 
 
-def test_field_memory_pruning_stress():
+def test_field_memory_pruning_stress() -> None:
     """Field pruning must prevent regional memory bloat under load."""
     ws = get_world_state()
     ws.clear()
@@ -58,7 +58,7 @@ def test_field_memory_pruning_stress():
     assert len(ws.field_regions) <= 200
 
 
-def test_manifold_solidification_adversarial():
+def test_manifold_solidification_adversarial() -> None:
     """Solidified roles must resist corruption from adversarial noise."""
     ws = get_world_state()
     ws.clear()

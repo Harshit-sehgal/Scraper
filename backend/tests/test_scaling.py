@@ -8,7 +8,7 @@ from app.event_journal import get_journal
 from app.semantic_world_state import SemanticWorldState
 
 
-def test_hierarchical_causal_pruning():
+def test_hierarchical_causal_pruning() -> None:
     """Verify that trivial manifold updates are pruned from the journal."""
     ws = SemanticWorldState(node_id="scale_test")
     ws.clear()
@@ -38,7 +38,7 @@ def test_hierarchical_causal_pruning():
     print("\nHierarchical Causal Pruning: Trivial noise successfully filtered.")
 
 
-def test_attractor_skeletonization():
+def test_attractor_skeletonization() -> None:
     """Verify that extremely stable attractors skip redundant learning."""
     ws = SemanticWorldState(node_id="skeleton_test")
     ws.clear()
@@ -71,7 +71,7 @@ def test_attractor_skeletonization():
     print("\nAttractor Skeletonization: Semantic Saturation successfully applied.")
 
 
-def test_journal_skeletonization_fidelity():
+def test_journal_skeletonization_fidelity() -> None:
     """Verify that historical structural events are preserved during trimming."""
     ws = SemanticWorldState(node_id="journal_test")
     journal = get_journal()

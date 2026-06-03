@@ -20,19 +20,19 @@ class TestGenerateDataInsight:
     """Tests for generate_data_insight()."""
 
     @pytest.mark.asyncio
-    async def test_empty_results(self):
+    async def test_empty_results(self) -> None:
         result = await generate_data_insight([])
         assert result == "No data available for analysis."
 
     @pytest.mark.asyncio
-    async def test_calls_llm_text(self):
+    async def test_calls_llm_text(self) -> None:
         mock_response = "Key insight: prices vary by region."
         with patch("app.insight_engine._llm_text", new_callable=AsyncMock, return_value=mock_response):
             result = await generate_data_insight([{"name": "A", "price": "100"}])
             assert result == mock_response
 
     @pytest.mark.asyncio
-    async def test_none_response_falls_back(self):
+    async def test_none_response_falls_back(self) -> None:
         with patch("app.insight_engine._llm_text", new_callable=AsyncMock, return_value=None):
             result = await generate_data_insight([{"name": "A"}])
             assert "encountered an upstream model error" in result
@@ -42,7 +42,7 @@ class TestSuggestSchemaFromIntent:
     """Tests for suggest_schema_from_intent()."""
 
     @pytest.mark.asyncio
-    async def test_returns_schema_dict(self):
+    async def test_returns_schema_dict(self) -> None:
         mock_schema = {
             "name": "Job",
             "fields": [{"name": "title", "type": "string", "required": True, "description": "Product title"}],
@@ -53,7 +53,7 @@ class TestSuggestSchemaFromIntent:
             assert "fields" in result
 
     @pytest.mark.asyncio
-    async def test_passes_max_fields(self):
+    async def test_passes_max_fields(self) -> None:
         with patch("app.insight_engine._llm_json", new_callable=AsyncMock, return_value={"fields": []}):
             result = await suggest_schema_from_intent("scrape products", max_fields=5)
             assert result == {"fields": []}
@@ -62,7 +62,7 @@ class TestSuggestSchemaFromIntent:
 class TestSuggestSchemaFromIntentSync:
     """Tests for the sync wrapper suggest_schema_from_intent_sync()."""
 
-    def test_returns_schema_dict(self):
+    def test_returns_schema_dict(self) -> None:
         mock_schema = {"name": "Sync Job", "fields": [{"name": "x", "type": "string", "required": False, "description": ""}]}
         with patch("app.insight_engine.suggest_schema_from_intent", new_callable=AsyncMock, return_value=mock_schema):
             result = suggest_schema_from_intent_sync("test intent")

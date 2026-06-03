@@ -57,7 +57,7 @@ def clean_db(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_frontier_persistence_across_restarts():
+async def test_frontier_persistence_across_restarts() -> None:
     # 1. Start original frontier and add some URLs
     frontier = CrawlFrontier()
 
@@ -114,7 +114,7 @@ async def test_frontier_persistence_across_restarts():
 
 
 @pytest.mark.asyncio
-async def test_domain_crawl_limit():
+async def test_domain_crawl_limit() -> None:
     from app.config import settings
 
     # Override settings limit for testing

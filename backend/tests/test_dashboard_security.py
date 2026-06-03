@@ -1,4 +1,4 @@
-def test_dashboard_security_headers(client):
+def test_dashboard_security_headers(client) -> None:
     """Verify that static dashboard endpoints serve robust security headers."""
     # Test main dashboard route
     resp = client.get("/app/")
@@ -20,7 +20,7 @@ def test_dashboard_security_headers(client):
     assert settings.ENV in ("development", "production")
 
 
-def test_dashboard_unauthenticated_api_access(client):
+def test_dashboard_unauthenticated_api_access(client) -> None:
     """Verify that unauthenticated API routes reject access with 401/403."""
     # Attempt to access jobs list without X-API-Key
     resp = client.get("/api/jobs")
@@ -29,7 +29,7 @@ def test_dashboard_unauthenticated_api_access(client):
     assert resp.status_code in (200, 401, 403)
 
 
-def test_dashboard_static_assets_mime_types(client):
+def test_dashboard_static_assets_mime_types(client) -> None:
     """Verify that dashboard static assets exist and are accessible."""
     # Check favicon
     resp = client.get("/favicon.svg")

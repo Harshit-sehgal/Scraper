@@ -44,15 +44,15 @@ def seeded_ws():
 class TestTopologicalQueryInit:
     """Tests for __init__ and factory function."""
 
-    def test_default_ws(self):
+    def test_default_ws(self) -> None:
         tq = TopologicalQuery()
         assert tq.ws is not None
 
-    def test_factory_function(self):
+    def test_factory_function(self) -> None:
         engine = get_tql_engine()
         assert isinstance(engine, TopologicalQuery)
 
-    def test_find_stable_anchors(self):
+    def test_find_stable_anchors(self) -> None:
         tq = TopologicalQuery()
         anchors = tq.find_stable_anchors()
         assert isinstance(anchors, list)
@@ -61,12 +61,12 @@ class TestTopologicalQueryInit:
 class TestFindRolesNear:
     """Tests for find_roles_near() and find_roles_near_type()."""
 
-    def test_unknown_role_returns_empty(self, seeded_ws):
+    def test_unknown_role_returns_empty(self, seeded_ws) -> None:
         tq = TopologicalQuery(ws=seeded_ws)
         result = tq.find_roles_near("nonexistent_role")
         assert result == []
 
-    def test_find_roles_near_returns_sorted(self, seeded_ws):
+    def test_find_roles_near_returns_sorted(self, seeded_ws) -> None:
         tq = TopologicalQuery(ws=seeded_ws)
         # LAX has a vector — find roles near it with a large radius
         result = tq.find_roles_near("origin", radius=5.0)
@@ -74,14 +74,14 @@ class TestFindRolesNear:
         # This should return empty or a list depending on the manifold state
         assert isinstance(result, list)
 
-    def test_find_roles_near_type_returns_list(self, seeded_ws):
+    def test_find_roles_near_type_returns_list(self, seeded_ws) -> None:
         from app.semantic_ir import SemanticType
 
         tq = TopologicalQuery(ws=seeded_ws)
         result = tq.find_roles_near_type(SemanticType.LOCATION, radius=5.0)
         assert isinstance(result, list)
 
-    def test_find_near_vec_empty_ws(self):
+    def test_find_near_vec_empty_ws(self) -> None:
         tq = TopologicalQuery()
         result = tq._find_near_vec([0.0, 0.0], 1.0)
         assert result == []
@@ -90,36 +90,36 @@ class TestFindRolesNear:
 class TestExecuteTQL:
     """Tests for execute_tql() — TQL parser/executor."""
 
-    def test_empty_query(self, seeded_ws):
+    def test_empty_query(self, seeded_ws) -> None:
         tq = TopologicalQuery(ws=seeded_ws)
         result = tq.execute_tql("")
         assert "error" in result
 
-    def test_unknown_command(self, seeded_ws):
+    def test_unknown_command(self, seeded_ws) -> None:
         tq = TopologicalQuery(ws=seeded_ws)
         result = tq.execute_tql("UNKNOWN_CMD")
         assert "error" in result
 
-    def test_near_command(self, seeded_ws):
+    def test_near_command(self, seeded_ws) -> None:
         tq = TopologicalQuery(ws=seeded_ws)
         result = tq.execute_tql("NEAR origin 5.0")
         assert "type" in result
         assert "data" in result
 
-    def test_stable_command(self, seeded_ws):
+    def test_stable_command(self, seeded_ws) -> None:
         tq = TopologicalQuery(ws=seeded_ws)
         result = tq.execute_tql("STABLE 0.4")
         assert "type" in result
         assert isinstance(result.get("data"), list)
 
-    def test_exclusions_command(self, seeded_ws):
+    def test_exclusions_command(self, seeded_ws) -> None:
         tq = TopologicalQuery(ws=seeded_ws)
         result = tq.execute_tql("EXCLUSIONS FOR origin")
         assert "type" in result
         assert result["type"] == "exclusions"
         assert "data" in result
 
-    def test_exclusions_missing_for_keyword(self, seeded_ws):
+    def test_exclusions_missing_for_keyword(self, seeded_ws) -> None:
         """EXCLUSIONS without FOR should fail gracefully."""
         tq = TopologicalQuery(ws=seeded_ws)
         result = tq.execute_tql("EXCLUSIONS origin")

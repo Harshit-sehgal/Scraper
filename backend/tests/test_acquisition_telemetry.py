@@ -7,7 +7,7 @@ from app.acquisition_telemetry import AcquisitionTelemetryCollector
 class TestAcquisitionTelemetryCollector:
     """Tests for the AcquisitionTelemetryCollector."""
 
-    def test_record_direct_acquisition(self):
+    def test_record_direct_acquisition(self) -> None:
         collector = AcquisitionTelemetryCollector()
         event = collector.record(
             url="https://example.com/data",
@@ -19,7 +19,7 @@ class TestAcquisitionTelemetryCollector:
         assert event.state == "direct"
         assert event.url == "https://example.com/data"
 
-    def test_record_session_expired(self):
+    def test_record_session_expired(self) -> None:
         collector = AcquisitionTelemetryCollector()
         collector.record(
             url="https://example.com/search/abc123",
@@ -33,7 +33,7 @@ class TestAcquisitionTelemetryCollector:
         assert summary["session_bound_urls"] == 1
         assert summary["state_distribution"]["session_expired"] == 1
 
-    def test_record_recovery_success(self):
+    def test_record_recovery_success(self) -> None:
         collector = AcquisitionTelemetryCollector()
         collector.record(
             url="https://example.com/search/abc123",
@@ -50,7 +50,7 @@ class TestAcquisitionTelemetryCollector:
         assert summary["recovery_successes"] == 1
         assert summary["recovery_success_rate"] == 1.0
 
-    def test_record_recovery_failure(self):
+    def test_record_recovery_failure(self) -> None:
         collector = AcquisitionTelemetryCollector()
         collector.record(
             url="https://example.com/search/abc123",
@@ -63,7 +63,7 @@ class TestAcquisitionTelemetryCollector:
         assert summary["recovery_successes"] == 0
         assert summary["recovery_success_rate"] == 0.0
 
-    def test_mixed_acquisitions(self):
+    def test_mixed_acquisitions(self) -> None:
         collector = AcquisitionTelemetryCollector()
         collector.record(
             url="https://a.com", state=AcquisitionState.DIRECT, original_url="https://a.com", final_url="https://a.com"
@@ -87,7 +87,7 @@ class TestAcquisitionTelemetryCollector:
         assert summary["state_distribution"]["recovered"] == 1
         assert summary["state_distribution"]["session_expired"] == 1
 
-    def test_get_recent_events(self):
+    def test_get_recent_events(self) -> None:
         collector = AcquisitionTelemetryCollector()
         for i in range(5):
             collector.record(
@@ -100,7 +100,7 @@ class TestAcquisitionTelemetryCollector:
         assert len(recent) == 3
         assert recent[-1]["url"] == "https://example.com/4"
 
-    def test_max_history_trimming(self):
+    def test_max_history_trimming(self) -> None:
         collector = AcquisitionTelemetryCollector(max_history=10)
         for i in range(15):
             collector.record(
@@ -112,7 +112,7 @@ class TestAcquisitionTelemetryCollector:
         assert len(collector._history) == 10
         assert collector._history[0].url == "https://example.com/5"
 
-    def test_clear(self):
+    def test_clear(self) -> None:
         collector = AcquisitionTelemetryCollector()
         collector.record(
             url="https://a.com", state=AcquisitionState.DIRECT, original_url="https://a.com", final_url="https://a.com"
@@ -120,7 +120,7 @@ class TestAcquisitionTelemetryCollector:
         collector.clear()
         assert collector.get_summary()["total_acquisitions"] == 0
 
-    def test_recovery_rate_with_mixed_outcomes(self):
+    def test_recovery_rate_with_mixed_outcomes(self) -> None:
         collector = AcquisitionTelemetryCollector()
         collector.record(
             url="https://a.com", state=AcquisitionState.RECOVERED, original_url="https://a.com", final_url="https://a.com/fresh"

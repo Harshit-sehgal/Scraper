@@ -16,7 +16,7 @@ from app.patch_status import check_all_fixes, generate_patch_report
 class TestCheckAllFixes:
     """Tests for check_all_fixes() — verifies it scans files and returns results."""
 
-    def test_returns_dict_with_results(self):
+    def test_returns_dict_with_results(self) -> None:
         results = check_all_fixes()
         assert isinstance(results, dict)
         assert len(results) > 0
@@ -24,7 +24,7 @@ class TestCheckAllFixes:
         for key, ok in results.items():
             assert isinstance(ok, bool), f"{key}: expected bool, got {type(ok)}"
 
-    def test_expected_keys_present(self):
+    def test_expected_keys_present(self) -> None:
         results = check_all_fixes()
         key_categories = [
             "ROLE_EXCLUSIVITY",
@@ -40,7 +40,7 @@ class TestCheckAllFixes:
             matches = [k for k in results if category in k]
             assert matches, f"No result key contains '{category}'"
 
-    def test_file_not_found_does_not_crash(self):
+    def test_file_not_found_does_not_crash(self) -> None:
         """Even if a tracked file were missing, the function should not crash."""
         results = check_all_fixes()
         # All should at least be valid booleans
@@ -51,7 +51,7 @@ class TestCheckAllFixes:
 class TestGeneratePatchReport:
     """Tests for generate_patch_report() — formatting and aggregation."""
 
-    def test_full_success_report(self):
+    def test_full_success_report(self) -> None:
         results = {
             "ROLE_EXCLUSIVITY price/cost (field_laws.py)": True,
             "create_token source_field": True,
@@ -69,7 +69,7 @@ class TestGeneratePatchReport:
         assert "✓" in report
         assert "✗" not in report
 
-    def test_partial_failure_report(self):
+    def test_partial_failure_report(self) -> None:
         results = {
             "ROLE_EXCLUSIVITY price/cost (field_laws.py)": True,
             "create_token source_field": False,
@@ -80,11 +80,11 @@ class TestGeneratePatchReport:
         assert "✓" in report
         assert "✗" in report
 
-    def test_empty_results(self):
+    def test_empty_results(self) -> None:
         report = generate_patch_report({})
         assert "Fixes applied: 0/0" in report
 
-    def test_categorizes_by_module(self):
+    def test_categorizes_by_module(self) -> None:
         results = {
             "ROLE_EXCLUSIVITY price/cost": True,
             "create_token source_field": False,
@@ -96,7 +96,7 @@ class TestGeneratePatchReport:
         assert "semantic_ir.py" in report
         assert "semantic_pipeline.py" in report
 
-    def test_unknown_key_falls_to_other_module(self):
+    def test_unknown_key_falls_to_other_module(self) -> None:
         """Keys that don't match any known module should be grouped under 'other'."""
         results = {
             "some_random_unknown_check": True,
@@ -112,7 +112,7 @@ class TestGeneratePatchReport:
 class TestMainBlock:
     """Tests for the `if __name__ == '__main__'` block in patch_status.py."""
 
-    def test_main_block_runs_without_error(self):
+    def test_main_block_runs_without_error(self) -> None:
         """Running patch_status.py as __main__ should not crash."""
         patch_path = Path(__file__).parent.parent / "app" / "patch_status.py"
         result = subprocess.run(

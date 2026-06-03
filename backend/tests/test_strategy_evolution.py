@@ -21,7 +21,7 @@ from app.strategy_evolution import (
 class TestFetchStrategy:
     """Test FetchStrategy enum."""
 
-    def test_all_strategies_defined(self):
+    def test_all_strategies_defined(self) -> None:
         """Test that all strategies are available."""
         strategies = [
             FetchStrategy.PLAYWRIGHT_FULL,
@@ -37,7 +37,7 @@ class TestFetchStrategy:
         assert len(strategies) == 8
         assert all(isinstance(s, FetchStrategy) for s in strategies)
 
-    def test_strategy_string_values(self):
+    def test_strategy_string_values(self) -> None:
         """Test that strategy values are strings."""
         assert isinstance(FetchStrategy.PLAYWRIGHT_FULL.value, str)
         assert FetchStrategy.PLAYWRIGHT_FULL.value == "playwright_full"
@@ -46,7 +46,7 @@ class TestFetchStrategy:
 class TestStrategyPerformance:
     """Test strategy performance tracking."""
 
-    def test_create_strategy_performance(self):
+    def test_create_strategy_performance(self) -> None:
         """Test creating strategy performance record."""
         perf = StrategyPerformance(
             domain="example.com",
@@ -59,7 +59,7 @@ class TestStrategyPerformance:
         assert perf.failure_count == 0
         assert perf.consecutive_failures == 0
 
-    def test_success_rate_calculation(self):
+    def test_success_rate_calculation(self) -> None:
         """Test success rate calculation."""
         perf = StrategyPerformance(
             domain="example.com",
@@ -70,7 +70,7 @@ class TestStrategyPerformance:
 
         assert perf.success_rate == 0.8
 
-    def test_success_rate_no_attempts(self):
+    def test_success_rate_no_attempts(self) -> None:
         """Test success rate with no attempts."""
         perf = StrategyPerformance(
             domain="example.com",
@@ -79,7 +79,7 @@ class TestStrategyPerformance:
 
         assert perf.success_rate == 0.0
 
-    def test_avg_time_calculation(self):
+    def test_avg_time_calculation(self) -> None:
         """Test average time calculation."""
         perf = StrategyPerformance(
             domain="example.com",
@@ -90,7 +90,7 @@ class TestStrategyPerformance:
 
         assert perf.avg_time_ms == 100.0  # 1000 / 10
 
-    def test_is_healthy_property(self):
+    def test_is_healthy_property(self) -> None:
         """Test is_healthy property."""
         # Healthy: high success rate, no failures
         healthy = StrategyPerformance(
@@ -110,7 +110,7 @@ class TestStrategyPerformance:
         )
         assert unhealthy.is_healthy is False
 
-    def test_is_degraded_property(self):
+    def test_is_degraded_property(self) -> None:
         """Test is_degraded property."""
         # Degraded: too many consecutive failures
         degraded = StrategyPerformance(
@@ -131,7 +131,7 @@ class TestStrategyPerformance:
         )
         assert low_success.is_degraded is True
 
-    def test_to_dict_conversion(self):
+    def test_to_dict_conversion(self) -> None:
         """Test conversion to dictionary."""
         perf = StrategyPerformance(
             domain="example.com",
@@ -150,7 +150,7 @@ class TestStrategyPerformance:
 class TestDomainStrategyState:
     """Test per-domain strategy state tracking."""
 
-    def test_create_domain_strategy_state(self):
+    def test_create_domain_strategy_state(self) -> None:
         """Test creating domain strategy state."""
         state = DomainStrategyState(domain="example.com")
 
@@ -158,7 +158,7 @@ class TestDomainStrategyState:
         assert len(state.strategies) == 8  # All strategies initialized
         assert state.current_strategy == FetchStrategy.PLAYWRIGHT_FULL
 
-    def test_all_strategies_initialized(self):
+    def test_all_strategies_initialized(self) -> None:
         """Test that all strategies are initialized."""
         state = DomainStrategyState(domain="example.com")
 
@@ -168,7 +168,7 @@ class TestDomainStrategyState:
             assert perf.domain == "example.com"
             assert perf.success_count == 0
 
-    def test_record_success_attempt(self):
+    def test_record_success_attempt(self) -> None:
         """Test recording a successful fetch attempt."""
         state = DomainStrategyState(domain="example.com")
 
@@ -187,7 +187,7 @@ class TestDomainStrategyState:
         # First record uses exponential moving average: alpha=0.3, so 0.3 * 0.95 = 0.285
         assert perf.avg_quality == 0.285
 
-    def test_record_failure_attempt(self):
+    def test_record_failure_attempt(self) -> None:
         """Test recording a failed fetch attempt."""
         state = DomainStrategyState(domain="example.com")
 
@@ -203,7 +203,7 @@ class TestDomainStrategyState:
         assert perf.failure_count == 1
         assert perf.consecutive_failures == 1
 
-    def test_multiple_attempts_success_rate(self):
+    def test_multiple_attempts_success_rate(self) -> None:
         """Test success rate with multiple attempts."""
         state = DomainStrategyState(domain="example.com")
         strategy = FetchStrategy.HTTPX_BASIC
@@ -217,7 +217,7 @@ class TestDomainStrategyState:
         perf = state.strategies[strategy]
         assert perf.success_rate == 0.8
 
-    def test_get_best_strategy(self):
+    def test_get_best_strategy(self) -> None:
         """Test getting best performing strategy."""
         state = DomainStrategyState(domain="example.com")
 
@@ -235,7 +235,7 @@ class TestDomainStrategyState:
         best = state.get_best_strategy()
         assert best == FetchStrategy.PLAYWRIGHT_FULL
 
-    def test_get_worst_strategy(self):
+    def test_get_worst_strategy(self) -> None:
         """Test getting worst performing strategy."""
         state = DomainStrategyState(domain="example.com")
 
@@ -251,14 +251,14 @@ class TestDomainStrategyState:
 class TestStrategyEvolutionEngine:
     """Test strategy evolution engine."""
 
-    def test_create_strategy_evolution_engine(self):
+    def test_create_strategy_evolution_engine(self) -> None:
         """Test creating strategy evolution engine."""
         engine = StrategyEvolutionEngine()
 
         assert isinstance(engine, StrategyEvolutionEngine)
         assert len(engine.domain_states) == 0
 
-    def test_record_fetch_attempt(self):
+    def test_record_fetch_attempt(self) -> None:
         """Test recording a fetch attempt."""
         engine = StrategyEvolutionEngine()
 
@@ -274,7 +274,7 @@ class TestStrategyEvolutionEngine:
         perf = state.strategies[FetchStrategy.PLAYWRIGHT_FULL]
         assert perf.success_count == 1
 
-    def test_record_multiple_attempts(self):
+    def test_record_multiple_attempts(self) -> None:
         """Test recording multiple attempts."""
         engine = StrategyEvolutionEngine()
 
@@ -292,7 +292,7 @@ class TestStrategyEvolutionEngine:
         assert perf.success_count == 4
         assert perf.failure_count == 1
 
-    def test_recommend_strategy_insufficient_data(self):
+    def test_recommend_strategy_insufficient_data(self) -> None:
         """Test strategy recommendation with insufficient data."""
         engine = StrategyEvolutionEngine()
         engine.exploration_probability = 0.0
@@ -304,7 +304,7 @@ class TestStrategyEvolutionEngine:
         assert recommendation.confidence < 0.5
         assert "Cold start" in recommendation.reason
 
-    def test_cold_start_does_not_randomly_explore(self):
+    def test_cold_start_does_not_randomly_explore(self) -> None:
         """Cold-start domains should use the safe browser path before random exploration."""
         engine = StrategyEvolutionEngine()
         engine.exploration_probability = 1.0
@@ -314,7 +314,7 @@ class TestStrategyEvolutionEngine:
         assert recommendation.recommended_strategy == FetchStrategy.PLAYWRIGHT_FULL
         assert "Cold start" in recommendation.reason
 
-    def test_recommend_strategy_with_data(self):
+    def test_recommend_strategy_with_data(self) -> None:
         """Test strategy recommendation with sufficient data."""
         engine = StrategyEvolutionEngine()
         engine.exploration_probability = 0.0
@@ -341,7 +341,7 @@ class TestStrategyEvolutionEngine:
         assert recommendation.confidence > 0.5
         assert isinstance(recommendation.alternatives, list)
 
-    def test_recommendation_confidence_increases_with_success(self):
+    def test_recommendation_confidence_increases_with_success(self) -> None:
         """Test that confidence increases with high success rates."""
         engine = StrategyEvolutionEngine()
         engine.exploration_probability = 0.0
@@ -378,7 +378,7 @@ class TestStrategyEvolutionEngine:
 
         assert high_rec.confidence > low_rec.confidence
 
-    def test_should_switch_strategy_healthy(self):
+    def test_should_switch_strategy_healthy(self) -> None:
         """Test that healthy strategies don't trigger switch."""
         engine = StrategyEvolutionEngine()
 
@@ -395,7 +395,7 @@ class TestStrategyEvolutionEngine:
         should_switch = engine.should_switch_strategy("example.com")
         assert should_switch is False
 
-    def test_should_switch_strategy_degraded(self):
+    def test_should_switch_strategy_degraded(self) -> None:
         """Test that degraded strategies trigger switch."""
         engine = StrategyEvolutionEngine()
 
@@ -413,7 +413,7 @@ class TestStrategyEvolutionEngine:
         should_switch = engine.should_switch_strategy("example.com")
         assert should_switch is True
 
-    def test_evolve_strategy_picks_best(self):
+    def test_evolve_strategy_picks_best(self) -> None:
         """Test that evolution picks best available strategy."""
         engine = StrategyEvolutionEngine()
         engine.exploration_probability = 0.0
@@ -450,7 +450,7 @@ class TestStrategyEvolutionEngine:
         # Should recommend PLAYWRIGHT_FULL (best success rate)
         assert new_strategy in [FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HTTPX_BASIC]
 
-    def test_get_domain_strategy_report(self):
+    def test_get_domain_strategy_report(self) -> None:
         """Test generating domain strategy report."""
         engine = StrategyEvolutionEngine()
 
@@ -473,7 +473,7 @@ class TestStrategyEvolutionEngine:
         assert len(report["strategies"]) == 8
         assert "success_rate" in report["strategies"][0]
 
-    def test_get_all_domains_strategy_report(self):
+    def test_get_all_domains_strategy_report(self) -> None:
         """Test generating report for all domains."""
         engine = StrategyEvolutionEngine()
 
@@ -495,7 +495,7 @@ class TestStrategyEvolutionEngine:
         assert len(report["domains"]) == 3
         assert "avg_success_rate" in report
 
-    def test_strategy_caching(self):
+    def test_strategy_caching(self) -> None:
         """Test that strategy recommendations are consistent."""
         engine = StrategyEvolutionEngine()
         engine.exploration_probability = 0.0
@@ -522,14 +522,14 @@ class TestStrategyEvolutionEngine:
 class TestStrategyEvolutionGlobal:
     """Test global singleton access."""
 
-    def test_get_strategy_evolution_engine_singleton(self):
+    def test_get_strategy_evolution_engine_singleton(self) -> None:
         """Test that get_strategy_evolution_engine returns singleton."""
         engine1 = get_strategy_evolution_engine()
         engine2 = get_strategy_evolution_engine()
 
         assert engine1 is engine2
 
-    def test_engine_preserves_state_across_calls(self):
+    def test_engine_preserves_state_across_calls(self) -> None:
         """Test that engine preserves state across calls."""
         engine = get_strategy_evolution_engine()
 
@@ -550,7 +550,7 @@ class TestStrategyEvolutionGlobal:
 class TestIntegrationStrategyEvolution:
     """Integration tests for strategy evolution."""
 
-    def test_end_to_end_strategy_learning_and_evolution(self):
+    def test_end_to_end_strategy_learning_and_evolution(self) -> None:
         """Test complete strategy learning and evolution workflow."""
         engine = StrategyEvolutionEngine()
         domain = "ecommerce.example.com"
@@ -599,7 +599,7 @@ class TestIntegrationStrategyEvolution:
         assert report["total_attempts"] > 5
         assert report["current_strategy"] == FetchStrategy.PLAYWRIGHT_FULL.value
 
-    def test_strategy_switch_on_degradation(self):
+    def test_strategy_switch_on_degradation(self) -> None:
         """Test that strategy switches when current one degrades."""
         engine = StrategyEvolutionEngine()
         domain = "example.com"
@@ -638,7 +638,7 @@ class TestIntegrationStrategyEvolution:
         new_strategy = engine.evolve_strategy(domain)
         assert new_strategy != FetchStrategy.PLAYWRIGHT_FULL
 
-    def test_multiple_domains_independent_evolution(self):
+    def test_multiple_domains_independent_evolution(self) -> None:
         """Test that multiple domains evolve independently."""
         engine = StrategyEvolutionEngine()
         engine.exploration_probability = 0.0

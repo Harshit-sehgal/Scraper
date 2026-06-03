@@ -215,7 +215,7 @@ def client(monkeypatch):
 
 
 @pytest.mark.parametrize("method,path,min_role", ROUTE_MATRIX)
-def test_route_auth_no_key(client, method, path, min_role):
+def test_route_auth_no_key(client, method, path, min_role) -> None:
     """Without any API key, public routes work but /api/* returns 403."""
     expected = expected_status(method, path, "none", min_role)
     response = client.request(method, path, headers=NO_AUTH)
@@ -225,7 +225,7 @@ def test_route_auth_no_key(client, method, path, min_role):
 
 
 @pytest.mark.parametrize("method,path,min_role", ROUTE_MATRIX)
-def test_route_auth_user_key(client, method, path, min_role):
+def test_route_auth_user_key(client, method, path, min_role) -> None:
     """With a USER-level API key, user routes work; operator/admin routes blocked."""
     expected = expected_status(method, path, "user", min_role)
     response = client.request(method, path, headers=USER_AUTH)
@@ -235,7 +235,7 @@ def test_route_auth_user_key(client, method, path, min_role):
 
 
 @pytest.mark.parametrize("method,path,min_role", ROUTE_MATRIX)
-def test_route_auth_operator_key(client, method, path, min_role):
+def test_route_auth_operator_key(client, method, path, min_role) -> None:
     """With an OPERATOR-level API key, user + operator routes work; admin routes blocked."""
     expected = expected_status(method, path, "operator", min_role)
     response = client.request(method, path, headers=OPERATOR_AUTH)
@@ -245,7 +245,7 @@ def test_route_auth_operator_key(client, method, path, min_role):
 
 
 @pytest.mark.parametrize("method,path,min_role", ROUTE_MATRIX)
-def test_route_auth_admin_key(client, method, path, min_role):
+def test_route_auth_admin_key(client, method, path, min_role) -> None:
     """With an ADMIN-level API key, all routes work."""
     expected = expected_status(method, path, "admin", min_role)
     response = client.request(method, path, headers=ADMIN_AUTH)
@@ -257,13 +257,13 @@ def test_route_auth_admin_key(client, method, path, min_role):
 # ── Specific auth scenarios ────────────────────────────────────────────
 
 
-def test_invalid_api_key_returns_403(client):
+def test_invalid_api_key_returns_403(client) -> None:
     """An unrecognized API key should be rejected with 403."""
     response = client.get("/api/jobs", headers=make_headers(api_key="invalid_key"))
     assert response.status_code == 403, f"Expected 403, got {response.status_code}"
 
 
-def test_bearer_token_auth(client):
+def test_bearer_token_auth(client) -> None:
     """Bearer token in Authorization header should work like X-API-Key."""
     response = client.get(
         "/api/jobs",
@@ -272,7 +272,7 @@ def test_bearer_token_auth(client):
     assert response.status_code == 200, f"Expected 200, got {response.status_code}"
 
 
-def test_wrong_role_details_in_response(client):
+def test_wrong_role_details_in_response(client) -> None:
     """When require_role denies access, the response should indicate the required roles."""
     response = client.post("/api/operator/mode", json={"mode": "production"}, headers=USER_AUTH)
     assert response.status_code == 403, f"Expected 403, got {response.status_code}"
@@ -281,13 +281,13 @@ def test_wrong_role_details_in_response(client):
     assert "admin" in body["detail"].lower()
 
 
-def test_no_auth_public_routes_work(client):
+def test_no_auth_public_routes_work(client) -> None:
     """Public routes outside /api/ are accessible without any authentication."""
     response = client.get("/health")
     assert response.status_code == 200, f"Expected 200, got {response.status_code}"
 
 
-def test_admin_via_x_admin_key(client):
+def test_admin_via_x_admin_key(client) -> None:
     """X-Admin-Key header should also work for admin routes."""
     response = client.post(
         "/api/operator/mode",
@@ -297,7 +297,7 @@ def test_admin_via_x_admin_key(client):
     assert response.status_code in (200, 422), f"Expected 200 or 422, got {response.status_code}: {response.text[:200]}"
 
 
-def test_no_keys_no_auth_required(client, monkeypatch):
+def test_no_keys_no_auth_required(client, monkeypatch) -> None:
     """When no API keys are configured, /api/* routes should not require auth."""
     from app.config import settings
 

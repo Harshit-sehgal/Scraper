@@ -22,7 +22,7 @@ def seed_job_with_results():
         del jobs_store[job.id]
 
 
-def test_get_job_no_results_by_default(client, seed_job_with_results):
+def test_get_job_no_results_by_default(client, seed_job_with_results) -> None:
     job = seed_job_with_results
     r = client.get(f"/api/jobs/{job.id}")
     assert r.status_code == 200
@@ -30,7 +30,7 @@ def test_get_job_no_results_by_default(client, seed_job_with_results):
     assert data["results"] == []
 
 
-def test_get_job_include_results_parameter(client, seed_job_with_results):
+def test_get_job_include_results_parameter(client, seed_job_with_results) -> None:
     job = seed_job_with_results
     r = client.get(f"/api/jobs/{job.id}?include_results=true")
     assert r.status_code == 200
@@ -39,7 +39,7 @@ def test_get_job_include_results_parameter(client, seed_job_with_results):
     assert data["results"][0]["title"] == "Result 0"
 
 
-def test_get_job_results_pagination(client, seed_job_with_results):
+def test_get_job_results_pagination(client, seed_job_with_results) -> None:
     job = seed_job_with_results
     # Fetch with limit=5
     r = client.get(f"/api/jobs/{job.id}/results?limit=5")
@@ -61,7 +61,7 @@ def test_get_job_results_pagination(client, seed_job_with_results):
     assert data2["results"][0]["title"] == "Result 5"
 
 
-def test_get_job_results_next_offset(client, seed_job_with_results):
+def test_get_job_results_next_offset(client, seed_job_with_results) -> None:
     """The next_offset cursor should be present when more results exist, None on last page."""
     job = seed_job_with_results
 
@@ -84,7 +84,7 @@ def test_get_job_results_next_offset(client, seed_job_with_results):
     assert data3["next_offset"] is None
 
 
-def test_backfill_metadata_endpoint(client, seed_job_with_results):
+def test_backfill_metadata_endpoint(client, seed_job_with_results) -> None:
     job = seed_job_with_results
     r = client.post(f"/api/jobs/{job.id}/backfill-metadata")
     assert r.status_code == 200

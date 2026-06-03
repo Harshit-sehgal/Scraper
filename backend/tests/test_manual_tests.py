@@ -31,7 +31,7 @@ MANUAL_TEST_FILES = [
 
 
 @pytest.mark.parametrize("module_name", MANUAL_TEST_FILES)
-def test_manual_script_import_safety(module_name):
+def test_manual_script_import_safety(module_name) -> None:
     """Import manual test modules dynamically to assert that they are syntactically
 
     correct and have no side effects (e.g. blocking HTTP calls or database actions

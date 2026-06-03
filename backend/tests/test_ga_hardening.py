@@ -13,7 +13,7 @@ from app.models import FieldType, Job, JobStatus, SchemaField
 from app.utils.job_results_store import get_job_results_path, save_job_results_to_disk
 
 
-def test_job_results_disk_offload_and_retrieval(client, monkeypatch):
+def test_job_results_disk_offload_and_retrieval(client, monkeypatch) -> None:
     """Test Component 1: Bound Job Results Memory Footprint offloading and dynamic loading."""
     # 1. Setup a job with 1005 mock records
     job_id = "test-large-job-123"
@@ -78,7 +78,7 @@ def test_job_results_disk_offload_and_retrieval(client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_browser_pool_hard_recycling(monkeypatch):
+async def test_browser_pool_hard_recycling(monkeypatch) -> None:
     """Test Component 2: Playwright Hard Process Recycling conditions."""
     pool = BrowserPool()
 
@@ -133,7 +133,7 @@ async def test_browser_pool_hard_recycling(monkeypatch):
     assert pool._recycling is False
 
 
-def test_diagnostics_exporter_endpoint(client, monkeypatch):
+def test_diagnostics_exporter_endpoint(client, monkeypatch) -> None:
     """Test Component 3: GET /api/system/diagnostics/export and PII sanitization."""
     # Seed job store with PII data to verify sanitization
     pii_job_id = "pii-job-999"
@@ -227,7 +227,7 @@ def test_diagnostics_exporter_endpoint(client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_domain_escalation_webhook(monkeypatch):
+async def test_domain_escalation_webhook(monkeypatch) -> None:
     """Test Component 4: Outgoing anti-bot escalation webhook alerts."""
     webhook_triggered = False
     webhook_url = "http://test-webhook.local/alert"

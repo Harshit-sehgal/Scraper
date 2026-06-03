@@ -1,7 +1,7 @@
 from app.semantic_world_state import SemanticWorldState, get_world_state
 
 
-def test_cross_node_causality_trace():
+def test_cross_node_causality_trace() -> None:
     # 1. Node A creates a transaction
     ws_a = SemanticWorldState(node_id="node_a")
     ws_a.clear()
@@ -31,7 +31,7 @@ def test_cross_node_causality_trace():
     assert merge_entry["details"]["remote_trace"] == trace_id
 
 
-def test_substrate_heartbeat_alignment():
+def test_substrate_heartbeat_alignment() -> None:
     from app.heartbeat_manager import get_heartbeat_manager
 
     hm = get_heartbeat_manager()
@@ -52,7 +52,7 @@ def test_substrate_heartbeat_alignment():
     assert health["alignment_score"] < 1.0
 
 
-def test_adaptive_pressure_throttling():
+def test_adaptive_pressure_throttling() -> None:
     ws = get_world_state()
     ws.clear()
 

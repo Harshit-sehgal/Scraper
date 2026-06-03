@@ -9,7 +9,7 @@ from app.utils.rbac import UserRole, get_current_role
 from fastapi import HTTPException
 
 
-def test_role_resolution_with_keys(monkeypatch):
+def test_role_resolution_with_keys(monkeypatch) -> None:
     """Verify that get_current_role resolves correct roles from API keys."""
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-secret-key")
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-secret-key")
@@ -47,7 +47,7 @@ def test_role_resolution_with_keys(monkeypatch):
         get_current_role(req)
 
 
-def test_rbac_endpoint_guards(client, monkeypatch):
+def test_rbac_endpoint_guards(client, monkeypatch) -> None:
     """Verify that actual FastAPI endpoints enforce RBAC rules under production mode."""
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-secret")
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-secret")
@@ -85,7 +85,7 @@ def test_rbac_endpoint_guards(client, monkeypatch):
     assert resp.status_code in (200, 400)
 
 
-def test_api_middleware_accepts_bearer_tokens_before_rbac(client, monkeypatch):
+def test_api_middleware_accepts_bearer_tokens_before_rbac(client, monkeypatch) -> None:
     """Global API auth must not reject Bearer tokens before route RBAC runs."""
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "admin-secret")
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "operator-secret")

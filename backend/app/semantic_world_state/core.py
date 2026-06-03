@@ -16,7 +16,10 @@ from app.transaction_context import active_transaction
 
 if TYPE_CHECKING:
     from app.energy_state import EnergyState
+    from app.history_state import HistoryState
+    from app.motif_state import MotifState
     from app.observability import ObservabilityState
+    from app.topology_state import TopologyState
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +27,10 @@ logger = logging.getLogger(__name__)
 class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMixin, TopologyMixin):
     _observability: "ObservabilityState"
     metrics: "EnergyState"
+    _history: "HistoryState"
+    _topology: "TopologyState"
+    _energy: "EnergyState"
+    _motif: "MotifState"
 
     """
     Canonical Semantic World State — now a true orchestrator.

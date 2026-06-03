@@ -70,7 +70,7 @@ def ws():
     return state
 
 
-def test_mega_horizon_simulation(ws):
+def test_mega_horizon_simulation(ws) -> None:
     """Run 5,000 evolution cycles and analyze dynamics."""
     analyzer = DynamicalAnalyzer()
     roles = ["price", "date", "org", "loc", "person"]
@@ -122,7 +122,7 @@ def test_mega_horizon_simulation(ws):
     assert "oscillation_detected" not in analysis  # No hidden loops
 
 
-def test_attractor_runaway_vulnerability(ws):
+def test_attractor_runaway_vulnerability(ws) -> None:
     """Stress test the substrate with a single dominant role to check for runaway."""
     analyzer = DynamicalAnalyzer()
 
@@ -149,7 +149,7 @@ def test_attractor_runaway_vulnerability(ws):
     assert ws.metrics.global_energy < 20.0
 
 
-def test_emergent_risk_detection(ws):
+def test_emergent_risk_detection(ws) -> None:
     """Verify that the observability layer can detect oscillations and runaway attractors."""
     # 1. Runaway Attractor
     history = {"role_a": [0.99] * 30}  # Zero variance, high value
@@ -176,7 +176,7 @@ def test_emergent_risk_detection(ws):
     print("\nResource shedding successfully triggered and executed.")
 
 
-def test_topology_scaling_benchmark(ws):
+def test_topology_scaling_benchmark(ws) -> None:
     """Verify propagation latency with 500+ regions (Phase 47)."""
     roles = ["r1", "r2", "r3", "r4", "r5"]
 

@@ -87,14 +87,14 @@ def clean_db(postgres_container):
 class TestPostgresJobRepositoryIntegration:
     """Full round-trip tests against a real Postgres instance."""
 
-    def test_ping(self, postgres_container):
+    def test_ping(self, postgres_container) -> None:
         """Smoke test: Postgres is reachable."""
         from app.postgres_repository import verify_postgres_connectivity
 
         result = verify_postgres_connectivity()
         assert result["ok"] is True, f"Postgres connectivity failed: {result}"
 
-    def test_health_check_success(self, clean_db):
+    def test_health_check_success(self, clean_db) -> None:
         """Health check returns healthy state with real Postgres."""
         repo = get_job_repository()
         health = repo.health_check()
@@ -102,7 +102,7 @@ class TestPostgresJobRepositoryIntegration:
         assert health["backend"] == "postgres"
         assert health["schema_version"] >= 1
 
-    def test_health_check_on_fresh_empty_db(self, postgres_container):
+    def test_health_check_on_fresh_empty_db(self, postgres_container) -> None:
         """health_check works on a fresh DB where no schema has been created yet."""
         from app.postgres_repository import PostgresJobRepository
 
@@ -116,7 +116,7 @@ class TestPostgresJobRepositoryIntegration:
         assert health["job_count"] == 0
         assert health["recycle_bin_count"] == 0
 
-    def test_recycle_bin_table_exists_after_schema_creation(self, postgres_container):
+    def test_recycle_bin_table_exists_after_schema_creation(self, postgres_container) -> None:
         """recycle_bin table is explicitly created in the Postgres schema."""
         from app.postgres_repository import PostgresJobRepository, _conn, _fetch_one
 
@@ -137,7 +137,7 @@ class TestPostgresJobRepositoryIntegration:
         _, recycle, _ = repo.load_all()
         assert "test-id" in recycle
 
-    def test_factory_returns_postgres(self, postgres_container):
+    def test_factory_returns_postgres(self, postgres_container) -> None:
         """Factory returns PostgresJobRepository when configured."""
         from app.postgres_repository import PostgresJobRepository
 
@@ -147,7 +147,7 @@ class TestPostgresJobRepositoryIntegration:
 
     # ─── Save / Load round-trips ────────────────────────────────────────
 
-    def test_save_single_and_load_all(self, clean_db):
+    def test_save_single_and_load_all(self, clean_db) -> None:
         """save_single persists a job, load_all retrieves it."""
         repo = get_job_repository()
         reset_repository()
@@ -177,7 +177,7 @@ class TestPostgresJobRepositoryIntegration:
         assert loaded.warnings == ["test warning"]
         assert loaded.acquisition_mode == "aggressive"
 
-    def test_save_all_load_all_full_job_parity(self, clean_db):
+    def test_save_all_load_all_full_job_parity(self, clean_db) -> None:
         """Every important Job field survives a save_all → load_all round-trip."""
         repo = get_job_repository()
         reset_repository()
@@ -227,7 +227,7 @@ class TestPostgresJobRepositoryIntegration:
         assert restored is not None
         assert restored.model_dump(mode="json") == job.model_dump(mode="json")
 
-    def test_recycle_bin_round_trip(self, clean_db):
+    def test_recycle_bin_round_trip(self, clean_db) -> None:
         """Jobs in recycle bin are stored and loaded separately."""
         repo = get_job_repository()
         reset_repository()
@@ -245,7 +245,7 @@ class TestPostgresJobRepositoryIntegration:
         assert job.id not in jobs
         assert job.id in recycle
 
-    def test_save_single_updates_existing(self, clean_db):
+    def test_save_single_updates_existing(self, clean_db) -> None:
         """save_single updates an existing row."""
         repo = get_job_repository()
         reset_repository()
@@ -268,7 +268,7 @@ class TestPostgresJobRepositoryIntegration:
 
     # ─── Restart recovery ──────────────────────────────────────────────
 
-    def test_restart_recovery_persists_failed_status(self, clean_db):
+    def test_restart_recovery_persists_failed_status(self, clean_db) -> None:
         """On load_all, in-progress jobs are recovered and persisted to DB."""
         repo = get_job_repository()
         reset_repository()
@@ -355,7 +355,7 @@ class TestPostgresSchemaRepairIntegration:
             """)
         conn.commit()
 
-    def test_recycle_bin_created_when_missing_from_v1(self, postgres_container):
+    def test_recycle_bin_created_when_missing_from_v1(self, postgres_container) -> None:
         """
         Given: schema_version=1, jobs table exists, recycle_bin is missing.
         When: PostgresJobRepository is created and health_check() called.
@@ -419,7 +419,7 @@ class TestPostgresSchemaRepairIntegration:
         _close_pool()
         reset_repository()
 
-    def test_soft_deleted_job_restored_by_save_single(self, postgres_container):
+    def test_soft_deleted_job_restored_by_save_single(self, postgres_container) -> None:
         """
         Given: A job exists, is soft-deleted (moved to recycle bin).
         When: save_single is called with an active job with the same ID.

@@ -4,7 +4,7 @@ from app.semantic_os import get_semantic_os
 from app.semantic_world_state import get_world_state
 
 
-def test_plugin_registration_and_execution():
+def test_plugin_registration_and_execution() -> None:
     ws = get_world_state()
     ws.clear()
     sos = get_semantic_os()
@@ -34,7 +34,7 @@ def test_plugin_registration_and_execution():
     assert "Processed target_role for tok1" in str(history[0]["details"]["tool_result"])
 
 
-def test_plugin_policy_restriction():
+def test_plugin_policy_restriction() -> None:
     ws = get_world_state()
     ws.clear()
     plugins = get_plugin_manager(ws=ws)
