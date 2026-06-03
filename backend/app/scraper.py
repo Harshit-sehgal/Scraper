@@ -460,8 +460,7 @@ async def scrape_url(
             error_message=str(e),
             fetch_method=fetch_method,
         )
-        provenance_builder.add_error(f"Classified: {
-            classification.category.value}")
+        provenance_builder.add_error(f"Classified: {classification.category.value}")
         update_domain_with_failure(get_domain_intelligence(), url, classification)
         telemetry.record(url=url, error=str(e), fetch_ms=fetch_ms, failure_category=classification.category.value)
 
@@ -557,7 +556,7 @@ async def scrape_url(
             session_detect = detect_session_params(url)
             if session_detect.get("is_session_bound"):
                 logger.warning(
-                    "[SessionRecovery] URL %s is session-bound but no search_params provided — " "page may be stale",
+                    "[SessionRecovery] URL %s is session-bound but no search_params provided — page may be stale",
                     url,
                 )
         except Exception:
@@ -737,8 +736,7 @@ async def scrape_url(
                 fetch_method=fetch_method,
             )
             if classification:
-                provenance_builder.add_error(f"No records: {
-                    classification.recovery_strategy}")
+                provenance_builder.add_error(f"No records: {classification.recovery_strategy}")
                 update_domain_with_failure(get_domain_intelligence(), url, classification)
 
         # Log zero-result classification for diagnostics
@@ -750,9 +748,9 @@ async def scrape_url(
                 zero_classification.user_message,
                 zero_classification.confidence,
             )
-            provenance_builder.add_error(f"Zero-result: {
-                zero_classification.failure_class} ({
-                zero_classification.recommended_action})")
+            provenance_builder.add_error(
+                f"Zero-result: {zero_classification.failure_class} ({zero_classification.recommended_action})"
+            )
 
         # Capture regression candidates for future benchmark expansion
         if classification:

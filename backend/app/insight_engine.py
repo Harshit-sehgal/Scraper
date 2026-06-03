@@ -21,8 +21,7 @@ async def generate_data_insight(results: list[dict]) -> str:
         return "No data available for analysis."
 
     sample = results[: settings.INSIGHT_SAMPLE_SIZE]
-    prompt = f"Analyze these {
-        len(results)} scraped records and provide 3 key insights or patterns found:\n\n{sample}"
+    prompt = f"Analyze these {len(results)} scraped records and provide 3 key insights or patterns found:\n\n{sample}"
 
     messages = [
         {"role": "system", "content": "You are a data analyst. Provide concise, valuable insights."},

@@ -49,7 +49,7 @@ def validate_llm_json(
         return False, "Response is None"
 
     if not isinstance(raw, expected_type):
-        return False, (f"Expected type {expected_type.__name__}, " f"got {type(raw).__name__}: {str(raw)[:200]}")
+        return False, (f"Expected type {expected_type.__name__}, got {type(raw).__name__}: {str(raw)[:200]}")
 
     if expected_type is dict and isinstance(raw, dict):
         if required_keys:
@@ -68,7 +68,7 @@ def validate_llm_json(
                     if not isinstance(raw[key], expected):
                         expected_name = getattr(expected, "__name__", str(expected))
                         return False, (
-                            f"Key '{key}' expected type {expected_name}, " f"got {type(raw[key]).__name__}: {str(raw[key])[:100]}"
+                            f"Key '{key}' expected type {expected_name}, got {type(raw[key]).__name__}: {str(raw[key])[:100]}"
                         )
 
     if expected_type is list and isinstance(raw, list):
@@ -76,12 +76,7 @@ def validate_llm_json(
             for i, item in enumerate(raw):
                 if not isinstance(item, list_item_type):
                     return False, (
-                        f"List item {i} expected type {
-                        list_item_type.__name__}, "
-                        f"got {
-                        type(item).__name__}: {
-                        str(item)[
-                            :100]}"
+                        f"List item {i} expected type {list_item_type.__name__}, got {type(item).__name__}: {str(item)[:100]}"
                     )
 
     return True, None
@@ -239,9 +234,7 @@ def validate_selector_response(raw: Any) -> tuple[bool, str | None]:
     if not isinstance(d["item_container"], str):
         return (
             False,
-            f"'item_container' must be a string, got {
-            type(
-                d['item_container']).__name__}",
+            f"'item_container' must be a string, got {type(d['item_container']).__name__}",
         )
 
     if "fields" in d and d["fields"] is not None:
@@ -249,15 +242,13 @@ def validate_selector_response(raw: Any) -> tuple[bool, str | None]:
         if not isinstance(fields, dict):
             return (
                 False,
-                f"'fields' must be a dict, got {
-                type(fields).__name__}",
+                f"'fields' must be a dict, got {type(fields).__name__}",
             )
         for field_name, selector in fields.items():
             if not isinstance(selector, str):
                 return (
                     False,
-                    f"Field '{field_name}' selector must be a string, got {
-                    type(selector).__name__}",
+                    f"Field '{field_name}' selector must be a string, got {type(selector).__name__}",
                 )
 
     return True, None

@@ -500,7 +500,7 @@ class TestPostgresQueueIntegration:
             try:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "UPDATE queue_tasks SET status = 'running', started_at = NOW() " "WHERE id = %s",
+                        "UPDATE queue_tasks SET status = 'running', started_at = NOW() WHERE id = %s",
                         (task_id,),
                     )
                 conn.commit()

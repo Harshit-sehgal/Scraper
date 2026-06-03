@@ -96,17 +96,15 @@ def validate_production_credentials(settings) -> None:
         val = (value or "").strip()
         if not val:
             raise ValueError(
-                f"Production check failed: {name} is empty or not configured. "
-                f"In production mode, all key roles must be secured."
+                f"Production check failed: {name} is empty or not configured. In production mode, all key roles must be secured."
             )
         if _is_weak_or_placeholder(val):
             raise ValueError(
-                f"Production check failed: {name} is set to a weak/placeholder value. " f"Please generate a strong random key."
+                f"Production check failed: {name} is set to a weak/placeholder value. Please generate a strong random key."
             )
         if len(val) < 16:
             raise ValueError(
-                f"Production check failed: {name} is too short ({len(val)} chars). "
-                f"Must be at least 16 characters in production."
+                f"Production check failed: {name} is too short ({len(val)} chars). Must be at least 16 characters in production."
             )
 
     _validate_distinct_api_keys(keys_to_check)
@@ -118,7 +116,7 @@ def validate_production_credentials(settings) -> None:
         db_url = settings.DATABASE_URL
         if not db_url:
             raise ValueError(
-                "Production check failed: STORAGE_BACKEND is set to postgres but " "DATAFORGE_DATABASE_URL is not configured."
+                "Production check failed: STORAGE_BACKEND is set to postgres but DATAFORGE_DATABASE_URL is not configured."
             )
 
         try:

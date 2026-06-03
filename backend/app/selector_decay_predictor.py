@@ -216,9 +216,7 @@ class SelectorDecayPredictor:
 
         if risk_level == "critical":
             recs.append("URGENT: Re-discover selectors immediately — imminent failure")
-            recs.append(f"Decay risk at {
-                decay_risk:.0%}, velocity {
-                velocity:+.3f}")
+            recs.append(f"Decay risk at {decay_risk:.0%}, velocity {velocity:+.3f}")
             recs.append("Consider switching fetch strategy as precaution")
         elif risk_level == "decaying":
             recs.append("Schedule selector re-discovery within 7 days")
@@ -227,8 +225,7 @@ class SelectorDecayPredictor:
         elif risk_level == "watch":
             recs.append("Monitor selector health — minor degradation detected")
             if velocity > 0.05:
-                recs.append(f"Failure trend rising ({
-                    velocity:+.3f}) — prepare re-discovery")
+                recs.append(f"Failure trend rising ({velocity:+.3f}) — prepare re-discovery")
         else:
             recs.append("Selector is stable — no action required")
 

@@ -60,7 +60,7 @@ def _get_database_url() -> str:
     if env == "development":
         return "postgresql://dataforge:dataforge@localhost:5432/dataforge"
     raise RuntimeError(
-        "DATAFORGE_DATABASE_URL is required in non-development environments. " "Set it to a valid Postgres connection string."
+        "DATAFORGE_DATABASE_URL is required in non-development environments. Set it to a valid Postgres connection string."
     )
 
 

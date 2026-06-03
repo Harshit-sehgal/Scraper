@@ -130,7 +130,7 @@ def configure_routes(app: FastAPI):
     if settings.ENABLE_EXPERIMENTAL_ROUTES:
         if settings.ENV.lower() == "production":
             logger.warning(
-                "EXPERIMENTAL ROUTES ENABLED IN PRODUCTION — " "research-only endpoints are exposed. This is not recommended."
+                "EXPERIMENTAL ROUTES ENABLED IN PRODUCTION — research-only endpoints are exposed. This is not recommended."
             )
         # Lazy import: the experimental router module and its transitive
         # research dependencies are only loaded when we are actually
@@ -141,7 +141,7 @@ def configure_routes(app: FastAPI):
         app.include_router(experimental_router)
         logger.info("Experimental / research router mounted")
     else:
-        logger.info("Experimental / research router NOT mounted " "(set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable)")
+        logger.info("Experimental / research router NOT mounted (set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable)")
 
 
 def configure_exception_handlers(app: FastAPI):

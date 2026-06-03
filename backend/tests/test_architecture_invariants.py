@@ -165,9 +165,9 @@ def test_no_orphan_methods():
     if "field_summary" in uncalled:
         uncalled.remove("field_summary")
 
-    assert not uncalled, (
-        f"Uncalled public methods on SemanticWorldState: {uncalled}. " "These may be dead code or indicate incomplete cleanup."
-    )
+    assert (
+        not uncalled
+    ), f"Uncalled public methods on SemanticWorldState: {uncalled}. These may be dead code or indicate incomplete cleanup."
 
 
 def test_event_subscribers_are_defined():
@@ -205,7 +205,7 @@ def test_event_subscribers_are_defined():
 
     # Every subscribed event type should be dispatched somewhere
     not_dispatched = subscribed - dispatched
-    assert not not_dispatched, f"Subscribed but never dispatched: {not_dispatched}. " "Subscribers will never fire."
+    assert not not_dispatched, f"Subscribed but never dispatched: {not_dispatched}. Subscribers will never fire."
 
 
 def test_no_stale_pyc():

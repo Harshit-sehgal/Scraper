@@ -38,6 +38,9 @@ jobs:
       - name: Run Architecture Validation
         run: PYTHONPATH=backend python architecture_validator.py
 
+      - name: Install Playwright Chromium
+        run: python -m playwright install --with-deps chromium
+
       - name: Run Benchmark Smoke Test (SQLite)
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \

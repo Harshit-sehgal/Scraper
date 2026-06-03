@@ -51,8 +51,7 @@ def requires_invariants(mutation_fn: Callable):
                     ws.record_degradation(
                         subsystem="invariant_firewall",
                         severity="warning",
-                        cause=f"Snapshot failed before {
-                            mutation_fn.__name__}: {snapshot_err}",
+                        cause=f"Snapshot failed before {mutation_fn.__name__}: {snapshot_err}",
                     )
                 except Exception:
                     pass
@@ -84,8 +83,7 @@ def requires_invariants(mutation_fn: Callable):
                             ws.record_degradation(
                                 subsystem="invariant_firewall",
                                 severity="critical",
-                                cause=f"Rollback failed for {
-                                    mutation_fn.__name__}: {rollback_err}. State may be corrupt!",
+                                cause=f"Rollback failed for {mutation_fn.__name__}: {rollback_err}. State may be corrupt!",
                             )
                         except Exception:
                             pass
@@ -97,21 +95,13 @@ def requires_invariants(mutation_fn: Callable):
                         ws.record_degradation(
                             subsystem="invariant_firewall",
                             severity="critical",
-                            cause=f"Cannot rollback {
-                                mutation_fn.__name__} — no snapshot available. State may be corrupt!",
+                            cause=f"Cannot rollback {mutation_fn.__name__} — no snapshot available. State may be corrupt!",
                         )
                     except Exception:
                         pass
                 raise RuntimeError(
-                    f"Invariant violation in {
-                    mutation_fn.__name__}: "
-                    f"{
-                    post_issues[0]}{
-                    ' (+' +
-                        str(
-                            len(post_issues) -
-                            1) +
-                        ' more)' if len(post_issues) > 1 else ''}"
+                    f"Invariant violation in {mutation_fn.__name__}: "
+                    f"{post_issues[0]}{' (+' + str(len(post_issues) - 1) + ' more)' if len(post_issues) > 1 else ''}"
                 )
 
         return result

@@ -128,8 +128,7 @@ class TestPostgresJobRepositoryIntegration:
         with _conn() as conn:
             row = _fetch_one(
                 conn,
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'public' AND table_name = 'recycle_bin'",
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'recycle_bin'",
             )
             assert row is not None, "recycle_bin table does not exist in Postgres schema"
 
@@ -383,8 +382,7 @@ class TestPostgresSchemaRepairIntegration:
         with _conn() as c:
             row = _fetch_one(
                 c,
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'public' AND table_name = 'recycle_bin'",
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'recycle_bin'",
             )
             assert row is None, "recycle_bin should NOT exist before repair"
 
@@ -401,8 +399,7 @@ class TestPostgresSchemaRepairIntegration:
         with _conn() as c:
             row = _fetch_one(
                 c,
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'public' AND table_name = 'recycle_bin'",
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'recycle_bin'",
             )
             assert row is not None, "recycle_bin table should exist after repair"
 

@@ -100,9 +100,7 @@ class ScrapeTelemetryCollector:
             ws.record_degradation(
                 subsystem="scraper",
                 severity="info",
-                cause=f"Scraped {url}: {
-                    telemetry.records_final} records in {
-                    telemetry.fetch_ms:.0f}ms"
+                cause=f"Scraped {url}: {telemetry.records_final} records in {telemetry.fetch_ms:.0f}ms"
                 + (" (profile)" if telemetry.profile_match else "")
                 + (" (fallback)" if telemetry.fallback_triggered else ""),
             )

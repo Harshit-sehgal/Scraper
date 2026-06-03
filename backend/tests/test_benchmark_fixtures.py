@@ -92,9 +92,9 @@ async def test_fixture_extraction_yields_records(
             f"or has unusual HTML structure."
         )
 
-    assert len(records) >= min_expected_records, (
-        f"Expected at least {min_expected_records} records from {fixture_name}, " f"got {len(records)}"
-    )
+    assert (
+        len(records) >= min_expected_records
+    ), f"Expected at least {min_expected_records} records from {fixture_name}, got {len(records)}"
 
     # Check required fields are populated in at least one record
     for field_name in required_fields:

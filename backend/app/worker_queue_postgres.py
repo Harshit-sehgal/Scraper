@@ -696,7 +696,7 @@ class PostgresWorkerQueue:
                 )
                 completed_24h = _fetch_one(
                     conn,
-                    "SELECT COUNT(*) AS cnt FROM queue_task_history " "WHERE finished_at >= NOW() - INTERVAL '24 hours'",
+                    "SELECT COUNT(*) AS cnt FROM queue_task_history WHERE finished_at >= NOW() - INTERVAL '24 hours'",
                 )
 
                 top_pending = _fetch_all(

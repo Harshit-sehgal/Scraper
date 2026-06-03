@@ -1045,10 +1045,7 @@ def expand_composite_records(
             for i, cand in enumerate(meaningful):
                 # Encode topological information in the key: type, index, and span
                 # Format: {key}_seg_{type}_{i}_{start}_{end}
-                new_key = f"{key}_seg_{
-                    cand.primary_type.value}_{i}_{
-                    cand.span_start}_{
-                    cand.span_end}"
+                new_key = f"{key}_seg_{cand.primary_type.value}_{i}_{cand.span_start}_{cand.span_end}"
                 new_record[new_key] = cand.cleaned
 
         # Update structural memory
@@ -1201,8 +1198,7 @@ def is_likely_noise_field(name: str, value: str) -> Tuple[bool, float, List[str]
         # Name fields shouldn't contain structured data (prices, dates, etc.)
         typed_candidates = [c for c in segments.candidates if c.primary_type not in ("text", "number")]
         if typed_candidates:
-            evidence.append(f"name_field_has_typed_content:{
-                typed_candidates[0].primary_type}")
+            evidence.append(f"name_field_has_typed_content:{typed_candidates[0].primary_type}")
             return False, 0.4, evidence
         # Plain text is fine for name fields
         return False, 0.9, ["plain_text_name_field"]

@@ -69,7 +69,7 @@ def get_ddgs_class():
             return DDGS
         except ImportError as exc:
             raise DiscoveryDependencyError(
-                "Discovery requires ddgs or duckduckgo_search. " "Install backend requirements first."
+                "Discovery requires ddgs or duckduckgo_search. Install backend requirements first."
             ) from exc
 
 
@@ -185,9 +185,7 @@ def _build_search_query(
         parts.append(f"in {location.strip()}")
 
     if origin_location and max_distance_km is not None and max_distance_km > 0:
-        parts.append(f"within {
-            int(max_distance_km)} km of {
-            origin_location.strip()}")
+        parts.append(f"within {int(max_distance_km)} km of {origin_location.strip()}")
 
     if domain:
         parts.append(f"site:{domain.strip()}")

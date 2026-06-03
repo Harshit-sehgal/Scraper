@@ -477,10 +477,9 @@ class SubstratePluginManager:
             # PRUNE DIMENSION (Geometric Refactoring)
             # In a real system, we'd rebuild the manifold.
             # Here we emit telemetry and log success.
-            logging.getLogger(__name__).info(f"REFACTOR: Compressed manifold from {dim} to {
-                dim -
-                1} (Pruned Dim {min_idx} with var {
-                min_var:.4f})")
+            logging.getLogger(__name__).info(
+                f"REFACTOR: Compressed manifold from {dim} to {dim - 1} (Pruned Dim {min_idx} with var {min_var:.4f})"
+            )
             return f"Success: Pruned low-variance dimension {min_idx}"
 
         return "Success: Manifold density optimal"

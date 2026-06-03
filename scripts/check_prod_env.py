@@ -196,14 +196,13 @@ def check_cors_origins(value: str) -> bool:
 
     if "*" in origins:
         print(
-            "  [FAIL]  DATAFORGE_CORS_ORIGINS contains wildcard '*'. "
-            "In production, CORS must be locked down to trusted domains."
+            "  [FAIL]  DATAFORGE_CORS_ORIGINS contains wildcard '*'. In production, CORS must be locked down to trusted domains."
         )
         return False
 
     for origin in origins:
         if not isinstance(origin, str) or not origin.startswith(("http://", "https://")):
-            print(f"  [FAIL]  CORS origin {origin!r} is invalid. " "Must be a valid URL starting with http:// or https://.")
+            print(f"  [FAIL]  CORS origin {origin!r} is invalid. Must be a valid URL starting with http:// or https://.")
             return False
 
     return True
@@ -212,7 +211,7 @@ def check_cors_origins(value: str) -> bool:
 def check_storage_backend(value: str) -> bool:
     """Validate DATAFORGE_STORAGE_BACKEND is 'postgres'."""
     if value.lower() != "postgres":
-        print(f"  [FAIL]  DATAFORGE_STORAGE_BACKEND={value!r}. " "Production requires 'postgres'.")
+        print(f"  [FAIL]  DATAFORGE_STORAGE_BACKEND={value!r}. Production requires 'postgres'.")
         return False
     return True
 
@@ -220,7 +219,7 @@ def check_storage_backend(value: str) -> bool:
 def check_worker_queue(value: str) -> bool:
     """Validate DATAFORGE_WORKER_QUEUE is 'true'."""
     if value.lower() not in ("true", "1", "yes"):
-        print(f"  [FAIL]  DATAFORGE_WORKER_QUEUE={value!r}. " "Production requires 'true'.")
+        print(f"  [FAIL]  DATAFORGE_WORKER_QUEUE={value!r}. Production requires 'true'.")
         return False
     return True
 
@@ -228,7 +227,7 @@ def check_worker_queue(value: str) -> bool:
 def check_queue_backend(value: str) -> bool:
     """Validate DATAFORGE_QUEUE_BACKEND is 'postgres'."""
     if value.lower() != "postgres":
-        print(f"  [FAIL]  DATAFORGE_QUEUE_BACKEND={value!r}. " "Production requires 'postgres'.")
+        print(f"  [FAIL]  DATAFORGE_QUEUE_BACKEND={value!r}. Production requires 'postgres'.")
         return False
     return True
 
@@ -243,7 +242,7 @@ def check_grafana_password(value: str) -> bool:
         )
         return False
     if len(value) < 8:
-        print(f"  [FAIL]  GRAFANA_PASSWORD is too short ({len(value)} chars). " "Must be at least 8 characters.")
+        print(f"  [FAIL]  GRAFANA_PASSWORD is too short ({len(value)} chars). Must be at least 8 characters.")
         return False
     return True
 
@@ -251,7 +250,7 @@ def check_grafana_password(value: str) -> bool:
 def check_database_url(value: str) -> bool:
     """Validate DATAFORGE_DATABASE_URL is a postgresql:// URL."""
     if not value.startswith(("postgresql://", "postgres://")):
-        print(f"  [FAIL]  DATAFORGE_DATABASE_URL={value!r}. " "Must be a postgresql:// or postgres:// URL.")
+        print(f"  [FAIL]  DATAFORGE_DATABASE_URL={value!r}. Must be a postgresql:// or postgres:// URL.")
         return False
     try:
         parsed = urlsplit(value)
@@ -283,14 +282,10 @@ def check_db_password(value: str) -> bool:
 def _check_password_secret(name: str, value: str) -> bool:
     """Validate a database-style password is not a default/placeholder value."""
     if _is_placeholder_secret(value):
-        print(
-            f"  [FAIL]  {name}={_mask_value(name, value)} "
-            "is a known default/placeholder value. "
-            "Use a strong, unique password."
-        )
+        print(f"  [FAIL]  {name}={_mask_value(name, value)} is a known default/placeholder value. Use a strong, unique password.")
         return False
     if len(value) < 8:
-        print(f"  [FAIL]  {name} is too short ({len(value)} chars). " "Must be at least 8 characters.")
+        print(f"  [FAIL]  {name} is too short ({len(value)} chars). Must be at least 8 characters.")
         return False
     return True
 
@@ -313,7 +308,7 @@ def _check_api_key_not_default(name: str, value: str) -> bool:
         )
         return False
     if len(value) < 16:
-        print(f"  [FAIL]  {name} is too short ({len(value)} chars). " "Must be at least 16 characters.")
+        print(f"  [FAIL]  {name} is too short ({len(value)} chars). Must be at least 16 characters.")
         return False
     return True
 
@@ -348,7 +343,7 @@ def check_distinct_api_keys(env: dict[str, str]) -> bool:
 def check_env(value: str) -> bool:
     """Validate DATAFORGE_ENV is set to 'production'."""
     if value.lower() != "production":
-        print(f"  [FAIL]  DATAFORGE_ENV={value!r}. " "Must be set to 'production'.")
+        print(f"  [FAIL]  DATAFORGE_ENV={value!r}. Must be set to 'production'.")
         return False
     return True
 

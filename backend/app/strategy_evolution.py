@@ -328,7 +328,8 @@ class StrategyEvolutionEngine:
                         recommended_strategy=FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT,
                         alternatives=[FetchStrategy.PLAYWRIGHT_FULL, FetchStrategy.HYBRID],
                         reason=f"Timeout-aware: PLAYWRIGHT_FULL had {timeout_count} timeouts, LIGHTWEIGHT has {
-                            lightweight_perf.success_count} successes",
+                            lightweight_perf.success_count
+                        } successes",
                         confidence=0.7,
                         estimated_success_rate=lightweight_perf.success_rate,
                     )

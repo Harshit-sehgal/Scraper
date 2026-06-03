@@ -102,8 +102,7 @@ PAGE STRUCTURE DETECTED: {structure_type.upper()} (confidence: {structure_confid
     if patterns:
         detected = [k for k, v in patterns.items() if v]
         if detected:
-            structure_context += f"\nVALUE PATTERNS DETECTED: {
-                ', '.join(detected)}"
+            structure_context += f"\nVALUE PATTERNS DETECTED: {', '.join(detected)}"
 
     header_context = ""
     if headers:
@@ -179,7 +178,7 @@ async def discover_selectors(
             messages=[
                 {
                     "role": "system",
-                    "content": ("You output valid JSON objects for CSS selector extraction. " "No markdown, no commentary."),
+                    "content": ("You output valid JSON objects for CSS selector extraction. No markdown, no commentary."),
                 },
                 {"role": "user", "content": prompt},
             ],

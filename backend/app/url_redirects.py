@@ -69,9 +69,7 @@ def _detect_redirect(original_url: str, final_url: str) -> dict:
         return {
             "redirected": False,
             "redirect_type": "none",
-            "message": f"Different domain: {
-                parsed_orig.netloc} → {
-                parsed_final.netloc}",
+            "message": f"Different domain: {parsed_orig.netloc} → {parsed_final.netloc}",
             "original_url": original_url,
             "final_url": final_url,
         }

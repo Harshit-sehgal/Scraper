@@ -363,7 +363,7 @@ def get_job_repository() -> JobRepository:
             raise
         except Exception as e:
             raise RuntimeError(
-                f"Failed to create PostgresJobRepository: {e}. " "Install psycopg2-binary: pip install psycopg2-binary"
+                f"Failed to create PostgresJobRepository: {e}. Install psycopg2-binary: pip install psycopg2-binary"
             ) from e
 
     repo_sqlite: JobRepository = SQLiteJobRepository()

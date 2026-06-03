@@ -53,9 +53,7 @@ class EventDispatcher:
                     ws.record_degradation(
                         subsystem="event_dispatcher",
                         severity="warning",
-                        cause=f"Event callback failed for {
-                            event.event_type.value} from {
-                            event.source}: {e}",
+                        cause=f"Event callback failed for {event.event_type.value} from {event.source}: {e}",
                     )
                 except Exception:
                     pass

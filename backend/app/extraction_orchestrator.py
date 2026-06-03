@@ -692,8 +692,7 @@ async def orchestrate_extraction(
         failure = classify_container_failure(container_result)
         logger.info("[Orchestrator] Container discovery failed: %s", failure["failure_class"])
         if provenance_builder:
-            provenance_builder.add_error(f"container_discovery: {
-                failure['failure_class']}")
+            provenance_builder.add_error(f"container_discovery: {failure['failure_class']}")
 
     # ── Layer 5: Rendered Visible-Text Extraction ────────────────────────
     # Try grouping visible text blocks into visual cards and extracting
