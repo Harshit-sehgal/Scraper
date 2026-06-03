@@ -59,14 +59,14 @@ class DiscoveryDependencyError(RuntimeError):
 def get_ddgs_class():
     """Resolve the preferred DuckDuckGo search client lazily."""
     try:
-        from ddgs import DDGS
+        from ddgs import DDGS as _PreferredDDGS
 
-        return DDGS
+        return _PreferredDDGS
     except ImportError:
         try:
-            from duckduckgo_search import DDGS
+            from duckduckgo_search import DDGS as _FallbackDDGS
 
-            return DDGS
+            return _FallbackDDGS
         except ImportError as exc:
             raise DiscoveryDependencyError(
                 "Discovery requires ddgs or duckduckgo_search. Install backend requirements first."

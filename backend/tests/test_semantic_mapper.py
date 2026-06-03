@@ -155,7 +155,7 @@ class TestIsChildFragment:
 
 class TestIsNoiseValue:
     def test_none_is_noise(self):
-        assert _is_noise_value(None) is True  # type: ignore[arg-type]
+        assert _is_noise_value(None) is True
 
     def test_empty_string_is_noise(self):
         assert _is_noise_value("") is True

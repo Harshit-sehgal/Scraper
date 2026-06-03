@@ -7,6 +7,8 @@ Covers the hardening sprint:
 4. Metrics Protocol compatibility with EnergyState
 """
 
+# mypy: disable-error-code="method-assign"
+
 from __future__ import annotations
 
 import pytest
@@ -430,6 +432,6 @@ class TestMetricsProtocol:
 
         ws = get_world_state()
         # This is the exact pattern used in semantic_allocation_engine
-        metrics: _SemanticMetricsProtocol = ws.metrics  # type: ignore[assignment]
+        metrics: _SemanticMetricsProtocol = ws.metrics
         assert isinstance(metrics._smoothed_structural, float)
         assert isinstance(metrics.semantic_temperature, float)

@@ -41,7 +41,7 @@ def _create_job_in_store(client, name: str = "lifecycle-test") -> str:
 
 def test_double_cancel_terminal_job_returns_early(client, monkeypatch):
     """Canceling a job that is already in a terminal status returns 'already in terminal'."""
-    from app import main as main_mod
+    import app.main as main_mod
 
     job_id = _create_job_in_store(client)
 
@@ -62,7 +62,7 @@ def test_double_cancel_terminal_job_returns_early(client, monkeypatch):
 
 def test_cancel_active_job_sets_request_flag(client, monkeypatch):
     """Canceling a RUNNING job sets cancel_requested without changing status."""
-    from app import main as main_mod
+    import app.main as main_mod
 
     job_id = _create_job_in_store(client)
 
@@ -79,7 +79,7 @@ def test_cancel_active_job_sets_request_flag(client, monkeypatch):
 
 def test_cancel_pending_job_auto_cancels(client, monkeypatch):
     """Canceling a PENDING job auto-cancels it to CANCELED status."""
-    from app import main as main_mod
+    import app.main as main_mod
 
     job_id = _create_job_in_store(client)
 
@@ -103,7 +103,7 @@ def test_cancel_pending_job_auto_cancels(client, monkeypatch):
 
 def test_delete_terminal_job_moves_to_recycle_bin(client, monkeypatch):
     """Deleting a terminal-status job moves it to the recycle bin."""
-    from app import main as main_mod
+    import app.main as main_mod
 
     job_id = _create_job_in_store(client)
     main_mod.jobs_store[job_id].status = JobStatus.COMPLETED
@@ -137,7 +137,7 @@ def test_cancel_nonexistent_job_returns_404(client):
 
 def test_restore_job_from_recycle_bin(client, monkeypatch):
     """Restoring a job from recycle bin puts it back in active jobs."""
-    from app import main as main_mod
+    import app.main as main_mod
 
     job_id = _create_job_in_store(client)
     main_mod.jobs_store[job_id].status = JobStatus.COMPLETED
@@ -165,7 +165,7 @@ def test_restore_nonexistent_recycle_bin_job_returns_404(client):
 
 def test_list_recycle_bin_shows_moved_jobs(client, monkeypatch):
     """Listing the recycle bin shows jobs that were moved there."""
-    from app import main as main_mod
+    import app.main as main_mod
 
     job_id = _create_job_in_store(client, name="list-rb-test")
     main_mod.jobs_store[job_id].status = JobStatus.COMPLETED
@@ -181,7 +181,7 @@ def test_list_recycle_bin_shows_moved_jobs(client, monkeypatch):
 
 def test_restore_and_re_delete_round_trip(client, monkeypatch):
     """A job can be restored from recycle bin and moved back again."""
-    from app import main as main_mod
+    import app.main as main_mod
 
     job_id = _create_job_in_store(client)
     main_mod.jobs_store[job_id].status = JobStatus.COMPLETED
@@ -208,7 +208,7 @@ def test_restore_and_re_delete_round_trip(client, monkeypatch):
 
 def test_hard_delete_removes_permanently(client, monkeypatch):
     """Hard deleting from recycle bin removes the job permanently."""
-    from app import main as main_mod
+    import app.main as main_mod
 
     job_id = _create_job_in_store(client)
     main_mod.jobs_store[job_id].status = JobStatus.COMPLETED
@@ -239,7 +239,7 @@ def test_hard_delete_nonexistent_from_recycle_bin_returns_404(client):
 
 def test_hard_delete_cleans_disk_results(client, monkeypatch, tmp_path):
     """Hard delete cleans up the results file on disk."""
-    from app import main as main_mod
+    import app.main as main_mod
 
     job_id = _create_job_in_store(client)
     main_mod.jobs_store[job_id].status = JobStatus.COMPLETED

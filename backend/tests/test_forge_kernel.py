@@ -110,8 +110,8 @@ def test_job_model():
 
 
 def test_job_service_lifecycle():
-    jobs_store = {}
-    recycle_bin_store = {}
+    jobs_store: dict = {}
+    recycle_bin_store: dict = {}
     svc = JobService(jobs_store=jobs_store, recycle_bin_store=recycle_bin_store)
 
     job = Job(

@@ -35,7 +35,7 @@ def test_travel_site_regex_extraction():
     assert "British Airways" in airlines
     assert "Air France" in airlines
 
-    prices = [r.get("price") for r in results]  # type: ignore[union-attr,call-overload]
+    prices = [r.get("price") for r in results]
     assert "245.50" in prices or "£245.50" in prices
 
 

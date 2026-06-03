@@ -193,6 +193,7 @@ def client(monkeypatch):
 
     try:
         app_mod = importlib.import_module("app.main")
+        assert app_mod is not None
         yield LocalASGIClient(app_mod.app)
     except Exception as e:
         pytest.skip(f"Could not initialize app for auth tests: {e}")
@@ -207,7 +208,7 @@ def client(monkeypatch):
         for m in modules_to_pop:
             sys.modules.pop(m, None)
             if old_modules[m] is not None:
-                sys.modules[m] = old_modules[m]
+                sys.modules[m] = old_modules[m]  # type: ignore[assignment]
 
 
 # ── Parameterized route auth tests ─────────────────────────────────────

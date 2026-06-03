@@ -1,8 +1,8 @@
 import socket
 from pathlib import Path
 
+import app.main as main_mod
 import pytest
-from app import main as main_mod
 from app.models import Job, JobStatus, ScrapeMode
 
 

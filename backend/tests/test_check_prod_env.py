@@ -41,7 +41,9 @@ class TestCheckProdEnvCore:
             "check_prod_env",
             _SCRIPT_PATH / "check_prod_env.py",
         )
+        assert spec is not None
         mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
         spec.loader.exec_module(mod)
         return mod
 
@@ -118,7 +120,9 @@ class TestCheckProdEnvValidators:
             "check_prod_env",
             _SCRIPT_PATH / "check_prod_env.py",
         )
+        assert spec is not None
         mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
         spec.loader.exec_module(mod)
         return mod
 
@@ -298,7 +302,9 @@ class TestCheckProdEnvIntegration:
             "check_prod_env",
             _SCRIPT_PATH / "check_prod_env.py",
         )
+        assert spec is not None
         mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
         spec.loader.exec_module(mod)
         return mod
 

@@ -1,5 +1,7 @@
 """Test field-driven exclusion learning — verifies continuous field tension learning."""
 
+# mypy: disable-error-code="method-assign"
+
 from app.semantic_ir import SemanticToken, SemanticType, Span
 from app.semantic_world_state import get_world_state
 
@@ -125,12 +127,12 @@ def test_contradiction_pressure_triggers_restructuring():
     ]
 
     try:
-        ws._topology.restructure_topology = tracked_restructure  # type: ignore[method-assign]
+        ws._topology.restructure_topology = tracked_restructure
         ws.observe_field_perturbation(output, tokens)
         # Contradiction pressure should have triggered restructuring
         assert was_restructured[0], "restructure_topology should have been called under high contradiction pressure"
     finally:
-        ws._topology.restructure_topology = original  # type: ignore[method-assign]
+        ws._topology.restructure_topology = original
 
 
 def test_contradiction_pressure_low_does_not_restructure():
@@ -165,14 +167,14 @@ def test_contradiction_pressure_low_does_not_restructure():
     ]
 
     try:
-        ws._topology.restructure_topology = tracked_restructure  # type: ignore[method-assign]
+        ws._topology.restructure_topology = tracked_restructure
         # contradiction_pressure = (1 + 1) / 4 = 0.5, but field_pressure 0.3 < 0.5
         # So threshold (contradiction_pressure > 0.3 AND field_pressure > 0.5) is NOT met
         ws.observe_field_perturbation(output, tokens)
         # Verify restructuring was NOT triggered
         assert not was_restructured[0], "restructure_topology should NOT have been called under low pressure"
     finally:
-        ws._topology.restructure_topology = original  # type: ignore[method-assign]
+        ws._topology.restructure_topology = original
 
     # Verify observable outcome — exclusion was still learned
     key = ("source", "target")

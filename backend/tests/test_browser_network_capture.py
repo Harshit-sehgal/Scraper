@@ -1,8 +1,8 @@
 import json
 from unittest.mock import AsyncMock, MagicMock
 
+import app.browser_network_capture as browser_network_capture
 import pytest
-from app import browser_network_capture
 
 
 @pytest.mark.asyncio

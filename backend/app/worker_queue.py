@@ -688,10 +688,15 @@ class WorkerQueue:
                 # Dispatch
                 t = asyncio.create_task(self._execute_task(task))
 
-                async with self._in_flight_lock:
-                    self._in_flight[task.id] = t
+                task_id = task.id
 
-                t.add_done_callback(lambda _, tid=task.id: asyncio.ensure_future(self._cleanup_in_flight(tid)))
+                async with self._in_flight_lock:
+                    self._in_flight[task_id] = t
+
+                def _on_task_done(fut: object, tid: str = task_id) -> None:
+                    asyncio.ensure_future(self._cleanup_in_flight(tid))
+
+                t.add_done_callback(_on_task_done)
 
             except asyncio.CancelledError:
                 break

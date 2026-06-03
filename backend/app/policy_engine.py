@@ -74,14 +74,14 @@ class SubstratePolicy:
 
         return {"valid": len([i for i in issues if i["severity"] == "critical"]) == 0, "issues": issues}
 
-    def enforce_guardrails(self):
+    def enforce_guardrails(self) -> None:
         """Automatically trigger stabilization if guardrails are violated (Phase 68)."""
         health = self.validate_substrate_health()
         if not health["valid"]:
             # Trigger emergency stabilization
             self.ws.apply_memory_decay(rate=0.5)
             # Phase 68: Refresh metrics immediately to reflect stabilization
-            self.ws._energy.update_from_regions(self.ws._topology._regions)
+            self.ws._energy.update_from_regions(self.ws._topology._regions)  # type: ignore[has-type]
 
             self.ws.emit_telemetry(
                 "governance_enforcement",

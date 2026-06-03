@@ -18,7 +18,7 @@ class _AllowAllCrawlPolicy:
 async def test_attempt_context_does_not_skip_profiles_by_default(monkeypatch):
     from app import scraper
 
-    called = {"profile": 0, "fetch": 0}
+    called: dict = {"profile": 0, "fetch": 0}
 
     async def fake_profile(url, max_wait=None):
         called["profile"] += 1
@@ -53,7 +53,7 @@ async def test_force_llm_discovery_skips_profiles_and_passes_recovery_flags(monk
     from app import scraper
     from app.extraction_orchestrator import ExtractionResult
 
-    called = {"profile": 0, "provided_selectors": None}
+    called: dict = {"profile": 0, "provided_selectors": None}
 
     async def fake_profile(url, max_wait=None):
         called["profile"] += 1

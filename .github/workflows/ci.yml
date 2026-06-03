@@ -92,5 +92,5 @@ jobs:
         continue-on-error: true
 
       - name: Run Mypy Typecheck (Advisory)
-        run: python -m mypy backend/app --ignore-missing-imports
+        run: python -m mypy backend/app backend/tests --check-untyped-defs
         continue-on-error: true
