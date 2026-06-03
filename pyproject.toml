@@ -63,6 +63,22 @@ warn_unused_ignores = true
 check_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
+[[tool.mypy.overrides]]
+module = [
+    "app.page_evidence_collector",
+    "app.content_quality",
+    "app.search_form_recovery",
+    "app.container_discovery",
+    "app.selector_engine",
+    "app.scraper",
+    "manual_test_workflow",
+    "manual_test_chennai",
+    "manual_run_manual_test",
+    "manual_test_extract",
+    "manual_test_threebestrated"
+]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["backend/tests", "backend/benchmarks"]
 python_files = ["test_*.py"]

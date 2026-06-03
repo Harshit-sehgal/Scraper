@@ -8,7 +8,7 @@ Core principle: Detect structure and value patterns, not domain-specific feature
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from bs4 import BeautifulSoup, Tag
 
@@ -230,7 +230,7 @@ def _detect_table_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
 def _detect_cards_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
     """Detect if page uses card / listings structure."""
     # Card indicators (generic, not domain-specific)
-    card_selectors = [
+    card_selectors: list[tuple[str, dict[str, Any]]] = [
         ("div", {"class": re.compile(r"(card|item|result|listing|product)", re.I)}),
         ("article", {}),
         ("li", {"class": re.compile(r"(item|result)", re.I)}),
