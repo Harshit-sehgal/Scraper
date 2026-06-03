@@ -80,7 +80,7 @@ lint: ## Run all linters
 	$(DC) exec $(SERVICE) python -m pyflakes backend/app backend/tests
 
 mypy: ## Run mypy type checker
-	$(DC) exec $(SERVICE) python -m mypy backend/app --ignore-missing-imports
+	$(DC) exec $(SERVICE) python -m mypy backend/app backend/tests --check-untyped-defs
 
 lint-all: lint mypy ## Run pyflakes + mypy
 

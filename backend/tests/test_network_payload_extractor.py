@@ -498,18 +498,18 @@ class TestSourceArbitration:
 
         # 1. Required field invalid -> Discards record
         records1 = [{"origin_airport_code": "Guatemala City aerial view", "destination_airport_code": "JFK"}]
-        warnings = []
+        warnings: list = []
         res1 = post_extract_validate_records(records1, schema, warnings=warnings)
         assert len(res1) == 0
         assert "Airport-code fields failed semantic validation" in warnings
 
         # 2. Optional field invalid -> Sets to None
         records2 = [{"origin_airport_code": "MIA", "destination_airport_code": "New York City"}]
-        warnings = []
-        res2 = post_extract_validate_records(records2, schema, warnings=warnings)
+        warnings2: list = []
+        res2 = post_extract_validate_records(records2, schema, warnings=warnings2)
         assert len(res2) == 1
         assert res2[0]["destination_airport_code"] is None
-        assert "Airport-code fields failed semantic validation" in warnings
+        assert "Airport-code fields failed semantic validation" in warnings2
 
     @pytest.mark.asyncio
     async def test_memory_downgraded_and_arbitration(self, monkeypatch):
@@ -557,7 +557,7 @@ class TestSourceArbitration:
         monkeypatch.setattr("app.extraction_orchestrator.extract_from_visible_blocks", lambda *args, **kwargs: [])
         monkeypatch.setattr("app.extraction_orchestrator.extract_with_regex", lambda *args, **kwargs: [])
 
-        warnings = []
+        warnings: list = []
         _ = await orchestrate_extraction(
             url=url,
             html=html,

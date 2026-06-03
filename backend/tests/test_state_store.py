@@ -242,7 +242,7 @@ class TestSaveState:
                 os.environ["DATAFORGE_STATE_FILE"] = fpath
 
                 job = Job(
-                    id="save-test",  # type: ignore[call-overload]
+                    id="save-test",
                     name="test-job",
                     status=JobStatus.COMPLETED,
                     results=[{"key": "value"}],
@@ -280,7 +280,7 @@ class TestSaveState:
                 os.environ["DATAFORGE_STATE_FILE"] = fpath
 
                 job = Job(
-                    id="roundtrip-job",  # type: ignore[call-overload]
+                    id="roundtrip-job",
                     name="test-job",
                     status=JobStatus.COMPLETED,
                     results=[{"items": ["a", "b"]}],
@@ -315,7 +315,7 @@ class TestSaveState:
                 os.environ["DATAFORGE_STATE_FILE"] = fpath
 
                 deleted_job = Job(
-                    id="deleted",  # type: ignore[call-overload]
+                    id="deleted",
                     name="deleted-job",
                     status=JobStatus.FAILED,
                     results=[],

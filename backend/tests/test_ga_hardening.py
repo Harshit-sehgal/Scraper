@@ -4,8 +4,8 @@ import json
 import zipfile
 from typing import Any, cast
 
+import app.main as main_mod
 import pytest
-from app import main as main_mod
 from app.browser_pool import BrowserPool
 from app.config import settings
 from app.domain_evolution_model import get_domain_evolution_model

@@ -27,14 +27,14 @@ class TestTransactionalPriorityQueue:
 
         first = queue.pop()
         assert first is not None
-        first_label = first.label  # type: ignore[union-attr]
-        first_priority = first.priority  # type: ignore[union-attr]
+        first_label = first.label
+        first_priority = first.priority
         assert first_label == "critical_tx"
         assert first_priority == PriorityLevel.CRITICAL
 
         second = queue.pop()
         assert second is not None
-        assert second.label == "normal_tx"  # type: ignore[union-attr]
+        assert second.label == "normal_tx"
 
     def test_high_before_low(self):
         queue = TransactionalPriorityQueue()
@@ -105,7 +105,7 @@ class TestTransactionalPriorityQueue:
         assert queue.size() == 3
         first = queue.pop()
         assert first is not None
-        assert first.label == "high_tx"  # type: ignore[union-attr]
+        assert first.label == "high_tx"
 
     def test_no_eviction_within_size_limit(self):
         queue = TransactionalPriorityQueue(max_size=5)

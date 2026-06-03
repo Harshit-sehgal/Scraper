@@ -50,8 +50,8 @@ def test_anchors_resist_melting():
     ws.clear()
 
     # 1. Establish an Anchor
-    key = tuple(sorted(["origin", "destination"]))
-    ws._topology.record_anchor(key)  # type: ignore[arg-type]
+    key: tuple[str, ...] = tuple(sorted(["origin", "destination"]))
+    ws._topology.record_anchor(key)
     ws._instability.set_exclusion(key, 1.0)
 
     # 2. Trigger Phase Transition manually

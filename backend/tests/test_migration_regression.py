@@ -315,7 +315,7 @@ def test_save_and_load_job_from_sqlite(monkeypatch):
         )
 
         jobs_store = {job.id: job}
-        recycle_bin_store = {}
+        recycle_bin_store: dict = {}
 
         save_state(jobs_store, recycle_bin_store)
 
@@ -365,7 +365,7 @@ def test_running_job_marked_failed_after_restart(monkeypatch):
         )
 
         jobs_store = {job_running.id: job_running}
-        recycle_bin_store = {}
+        recycle_bin_store: dict = {}
 
         save_state(jobs_store, recycle_bin_store)
 

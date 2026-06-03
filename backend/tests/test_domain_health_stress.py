@@ -51,7 +51,7 @@ class TestDomainHealthStress:
         health = monitor.get_domain_health(f"{domain}any")
 
         assert health is not None
-        assert health["success_rate"] == pytest.approx(0.5, 0.1)  # type: ignore[index]
+        assert health["success_rate"] == pytest.approx(0.5, 0.1)
 
     def test_extreme_failure_rate(self):
         """Test monitoring of domain with extreme failure rate."""
@@ -66,8 +66,8 @@ class TestDomainHealthStress:
         health = monitor.get_domain_health(f"{domain}any")
 
         assert health is not None
-        assert health["health_level"] == "blacklisted"  # type: ignore[index]  # Should be blacklisted
-        assert health["success_rate"] == pytest.approx(0.05, 0.01)  # type: ignore[index]
+        assert health["health_level"] == "blacklisted"  # Should be blacklisted
+        assert health["success_rate"] == pytest.approx(0.05, 0.01)
 
     def test_recovery_from_critical(self):
         """Test recovery from critical state to healthy."""
@@ -239,7 +239,7 @@ class TestHealthMetricsEdgeCases:
 
         health = monitor.get_domain_health("https://single.com/any")
         assert health is not None
-        assert health["success_rate"] == 1.0  # type: ignore[index]  # Single success
+        assert health["success_rate"] == 1.0  # Single success
 
     def test_100_percent_failure_domain(self):
         """Test domain with 100% failure rate."""

@@ -4,6 +4,7 @@ import os
 os.environ["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "true"
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import httpx
 import pytest
@@ -146,13 +147,15 @@ os.environ["DATAFORGE_OPERATOR_API_KEY"] = ""
 os.environ["DATAFORGE_STORAGE_BACKEND"] = "sqlite"
 os.environ.pop("DATAFORGE_DATABASE_URL", None)
 
+main_mod: ModuleType | None = None
 try:
-    from app import main as main_mod  # noqa: E402
+    import app.main  # noqa: E402
+
+    main_mod = app.main
 except ImportError as e:
     import warnings
 
     warnings.warn(f"Could not import app.main (tests requiring the client fixture will fail): {e}", stacklevel=2)
-    main_mod = None  # type: ignore[assignment]
 
 
 @pytest.fixture(autouse=True)
@@ -233,13 +236,24 @@ def client(monkeypatch):
         await asyncio.sleep(0.01)
 
     def fake_schedule_background_task(coro):
+        try:
+            loop = asyncio.get_running_loop()
+            if loop.is_running():
+                return loop.create_task(coro)
+        except RuntimeError:
+            pass
         return None
 
     # Avoid writing persistence files in API unit tests.
     monkeypatch.setattr("app.services.state.persist_state", lambda **kwargs: None)
     monkeypatch.setattr(main_mod, "run_job", fake_run_job)
+    # Also patch lifespan.run_job because run_job_wrapper imports run_job at
+    # module level from app.services.job_runner, not from app.main. Without
+    # this patch, running the coroutine would trigger real job execution.
+    monkeypatch.setattr("app.lifespan.run_job", fake_run_job)
     monkeypatch.setattr(main_mod, "_schedule_background_task", fake_schedule_background_task)
 
+    assert main_mod is not None
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 

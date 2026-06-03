@@ -16,7 +16,7 @@ repos:
           - types-requests
           - types-beautifulsoup4
         # Only scan backend/app; scripts/ and other dirs have module namespace issues
-        args: [backend/app]
+        args: [backend/app, --check-untyped-defs]
         pass_filenames: false
 
   - repo: https://github.com/PyCQA/bandit

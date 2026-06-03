@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 
@@ -12,14 +14,33 @@ class LazyClassMeta(type):
         return isinstance(instance, app.scraper.ScrapeAttemptResult)
 
 
-class ScrapeAttemptResult(metaclass=LazyClassMeta):
-    def __new__(cls, *args, **kwargs):
+class ScrapeAttemptResult(list, metaclass=LazyClassMeta):
+    """Test proxy for app.scraper.ScrapeAttemptResult — behaves as a list subclass."""
+
+    html: str | None
+    final_url: str | None
+    fetch_method: str | None
+    extraction_method: str | None
+    telemetry: Any
+    zero_result_classification: Any
+    acquisition_lineage: dict | None
+    anti_bot_score: float
+    data_evidence_score: float
+    recommended_next_action: str
+    warnings: list[str]
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> ScrapeAttemptResult:
         import app.scraper
 
         return app.scraper.ScrapeAttemptResult(*args, **kwargs)
 
+    def to_telemetry_dict(self) -> dict:
+        import app.scraper
 
-async def scrape_url_attempt(*args, **kwargs):
+        return app.scraper.ScrapeAttemptResult().to_telemetry_dict()
+
+
+async def scrape_url_attempt(*args: Any, **kwargs: Any) -> ScrapeAttemptResult:
     import app.scraper
 
     return await app.scraper.scrape_url_attempt(*args, **kwargs)
@@ -271,7 +292,7 @@ async def test_scrape_url_attempt_returns_rich_result(monkeypatch):
         records = [{"company_name": "Acme", "record_score": 0.95}]
         method = "memory"
         selector_success = True
-        selectors = {"fields": {}}
+        selectors: dict = {"fields": {}}
 
     async def fake_orchestrate(*args, **kwargs):
         return FakeExtractionResult()
@@ -368,7 +389,7 @@ async def test_scrape_url_attempt_zero_result_with_html(monkeypatch):
         records = []
         method = "regex"
         selector_success = False
-        selectors = {"fields": {}}
+        selectors: dict = {"fields": {}}
 
     async def fake_orchestrate(*args, **kwargs):
         return FakeExtractionResult()

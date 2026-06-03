@@ -117,7 +117,7 @@ def test_is_research_module_accepts_dotted_paths():
 
 def test_is_research_module_handles_empty_and_junk_input():
     assert is_research_module("") is False
-    assert is_research_module(None) is False  # type: ignore[arg-type]
+    assert is_research_module(None) is False
 
 
 def test_is_research_path_strips_known_package_prefixes():

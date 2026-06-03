@@ -1,6 +1,6 @@
 import re
 
-from app import scraper as scraper_mod
+import app.scraper as scraper_mod
 from app.models import FieldType, SchemaField
 from app.selector_engine import apply_selectors, extract_with_regex
 

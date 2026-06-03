@@ -465,6 +465,11 @@ class _SessionBoundHandler(http.server.BaseHTTPRequestHandler):
 class TestLocalSessionBoundServer:
     """End-to-end test with a real local HTTP server simulating session-bound behavior."""
 
+    server: http.server.HTTPServer
+    port: int
+    base_url: str
+    thread: threading.Thread
+
     @classmethod
     def setup_class(cls):
         cls.server = http.server.HTTPServer(("127.0.0.1", 0), _SessionBoundHandler)
