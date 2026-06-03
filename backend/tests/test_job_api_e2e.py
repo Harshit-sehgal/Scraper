@@ -116,6 +116,7 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
     # 1. Bypass local loopback URL validation for E2E testing
     from app import html_utils, url_safety
 
+    monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "true")
     monkeypatch.setattr(url_safety, "validate_public_http_url", lambda url: None)
     monkeypatch.setattr(html_utils, "_validate_url_safe", lambda url: None)
     from app.config import settings

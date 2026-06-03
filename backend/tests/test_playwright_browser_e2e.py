@@ -352,6 +352,7 @@ async def test_playwright_pipeline_integration(browser_server, monkeypatch):
     from app import html_utils, url_safety
     from app.browser_pool import BrowserPool
 
+    monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "true")
     monkeypatch.setattr(url_safety, "validate_public_http_url", lambda url: None)
     monkeypatch.setattr(html_utils, "_validate_url_safe", lambda url: None)
     pool = BrowserPool()
