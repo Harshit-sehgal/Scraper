@@ -14,6 +14,8 @@ import logging
 import os
 import sys
 import time
+
+# ruff: noqa: E501 — decorative separator lines exceed line length
 from dataclasses import dataclass, field
 from typing import Any
 

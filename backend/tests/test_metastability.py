@@ -50,7 +50,7 @@ def test_anchors_resist_melting() -> None:
     ws.clear()
 
     # 1. Establish an Anchor
-    key: tuple[str, ...] = tuple(sorted(["origin", "destination"]))
+    key = tuple(sorted(["origin", "destination"]))
     ws._topology.record_anchor(key)
     ws._instability.set_exclusion(key, 1.0)
 

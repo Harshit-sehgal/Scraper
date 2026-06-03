@@ -19,6 +19,7 @@ does not pull the research shell into the product kernel at startup.
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from app.browser_pool import get_browser_pool
 from app.scrape_telemetry import get_scrape_telemetry
@@ -30,8 +31,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/operator", tags=["operator"])
 
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.degradation_predictor import get_degradation_predictor

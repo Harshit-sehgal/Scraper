@@ -472,7 +472,7 @@ def _detect_value_type(values: List[str], value_patterns: ValuePatterns) -> Opti
     return None
 
 
-def _is_noise_value(value: str) -> bool:
+def _is_noise_value(value: str | None) -> bool:
     """Check if a value is likely noise (navigation, UI elements, etc.)."""
     if value is None:
         return True

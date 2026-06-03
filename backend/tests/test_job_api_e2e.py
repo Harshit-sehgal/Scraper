@@ -4,6 +4,7 @@ Submits a session-bound URL to the public jobs REST API, executes it with the re
 worker flow, and verifies the final results utilize the network_payload source
 with safe, token-free provenance.
 """
+# ruff: noqa: E402 — imports after sys.path.insert are intentional
 
 import sys
 from pathlib import Path

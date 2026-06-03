@@ -7,7 +7,7 @@ Covers the hardening sprint:
 4. Metrics Protocol compatibility with EnergyState
 """
 
-# mypy: disable-error-code="method-assign"
+# mypy: disable-error-code="method-assign,attr-defined"
 
 from __future__ import annotations
 

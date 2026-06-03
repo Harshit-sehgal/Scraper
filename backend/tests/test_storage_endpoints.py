@@ -57,6 +57,12 @@ class TestHealthEndpoint:
 class TestReadyEndpoint:
     """Tests for the /ready readiness probe."""
 
+    def _mock_sqlite_backend(self, monkeypatch):
+        """Force SQLite backend for tests that assert sqlite-specific behavior."""
+        from app.storage_interface import SQLiteJobRepository
+
+        monkeypatch.setattr("app.main.get_job_repository", lambda: SQLiteJobRepository())
+
     def test_ready_returns_storage_ok(self) -> None:
         """/ready should check SQLite and return status."""
         response = client.get("/ready")
@@ -73,8 +79,9 @@ class TestReadyEndpoint:
         assert "backend" in data
         assert data["backend"] in ("sqlite", "postgres")
 
-    def test_ready_includes_schema_version(self) -> None:
+    def test_ready_includes_schema_version(self, monkeypatch) -> None:
         """/ready should include schema_version >= 2."""
+        self._mock_sqlite_backend(monkeypatch)
         response = client.get("/ready")
         data = response.json()
         assert "schema_version" in data
@@ -147,8 +154,15 @@ class TestDomainPolicyEndpoint:
 class TestStorageStatusEndpoint:
     """Tests for the /api/system/storage/status endpoint."""
 
-    def test_storage_status_returns_200(self) -> None:
+    def _mock_sqlite_backend(self, monkeypatch):
+        """Force SQLite backend for tests that assert sqlite-specific behavior."""
+        from app.storage_interface import SQLiteJobRepository
+
+        monkeypatch.setattr("app.main.get_job_repository", lambda: SQLiteJobRepository())
+
+    def test_storage_status_returns_200(self, monkeypatch) -> None:
         """Storage status should return 200 with SQLite backend info."""
+        self._mock_sqlite_backend(monkeypatch)
         response = client.get("/api/system/storage/status")
         assert response.status_code == 200
         data = response.json()
@@ -156,8 +170,9 @@ class TestStorageStatusEndpoint:
         assert "db_path" in data
         assert data["db_path"].endswith(".db")
 
-    def test_storage_status_includes_schema_version(self) -> None:
+    def test_storage_status_includes_schema_version(self, monkeypatch) -> None:
         """Storage status should report schema version."""
+        self._mock_sqlite_backend(monkeypatch)
         response = client.get("/api/system/storage/status")
         data = response.json()
         assert "schema_version" in data
@@ -172,22 +187,25 @@ class TestStorageStatusEndpoint:
         assert data["job_count"] >= 0
         assert "recycle_bin_count" in data
 
-    def test_storage_status_includes_wal_mode(self) -> None:
+    def test_storage_status_includes_wal_mode(self, monkeypatch) -> None:
         """Storage status should report WAL mode."""
+        self._mock_sqlite_backend(monkeypatch)
         response = client.get("/api/system/storage/status")
         data = response.json()
         assert "wal_mode" in data
         assert data["wal_mode"] == "wal"
 
-    def test_ready_reports_sqlite_backend(self) -> None:
+    def test_ready_reports_sqlite_backend(self, monkeypatch) -> None:
         """/ready should report sqlite backend when using SQLite."""
+        self._mock_sqlite_backend(monkeypatch)
         response = client.get("/ready")
         assert response.status_code == 200
         data = response.json()
         assert data["backend"] == "sqlite"
 
-    def test_storage_status_reports_sqlite(self) -> None:
+    def test_storage_status_reports_sqlite(self, monkeypatch) -> None:
         """/api/system/storage/status should report sqlite backend when using SQLite."""
+        self._mock_sqlite_backend(monkeypatch)
         response = client.get("/api/system/storage/status")
         assert response.status_code == 200
         data = response.json()

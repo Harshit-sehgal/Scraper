@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from app.zero_result_classifier import ZeroResultClassification
 
 
 class LazyClassMeta(type):
@@ -29,7 +30,7 @@ class ScrapeAttemptResult(list, metaclass=LazyClassMeta):
     recommended_next_action: str
     warnings: list[str]
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> ScrapeAttemptResult:
+    def __new__(cls, *args: Any, **kwargs: Any) -> "ScrapeAttemptResult":  # noqa: F821
         import app.scraper
 
         return app.scraper.ScrapeAttemptResult(*args, **kwargs)
@@ -40,13 +41,11 @@ class ScrapeAttemptResult(list, metaclass=LazyClassMeta):
         return app.scraper.ScrapeAttemptResult().to_telemetry_dict()
 
 
-async def scrape_url_attempt(*args: Any, **kwargs: Any) -> ScrapeAttemptResult:
+async def scrape_url_attempt(*args: Any, **kwargs: Any) -> "ScrapeAttemptResult":  # noqa: F821
     import app.scraper
 
     return await app.scraper.scrape_url_attempt(*args, **kwargs)
 
-
-from app.zero_result_classifier import ZeroResultClassification
 
 # ── Helper: Stub crawl policy that allows all ──────────────────────────
 

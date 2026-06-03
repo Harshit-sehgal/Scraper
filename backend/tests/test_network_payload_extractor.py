@@ -179,6 +179,7 @@ class TestSourceArbitration:
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False),
         ]
         net_result = extract_from_network_payloads([FLIGHT_PAYLOAD], schema)
+        assert net_result is not None
         records, source, _ = arbitrate_sources([], 0, net_result, schema)
         assert source == net_result.source
         assert len(records) == 3
@@ -195,6 +196,7 @@ class TestSourceArbitration:
             [json.dumps({"results": [{"x": 1}]})],
             schema,
         )
+        # net_result is expected to be None (payload doesn't match schema)
         records, source, _ = arbitrate_sources(dom_records, 80, net_result, schema)
         assert source == "dom"
         assert records == dom_records
@@ -206,6 +208,7 @@ class TestSourceArbitration:
         ]
         # Strong network data: has high field coverage and high score
         net_result = extract_from_network_payloads([FLIGHT_PAYLOAD], schema)
+        assert net_result is not None
 
         # Weak DOM data: low coverage (e.g. missing prices, only 1 record, low score)
         dom_records = [{"airline": "PoorDOM"}]

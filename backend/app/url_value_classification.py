@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-# ─── Value Classification ────────────────────────────────────────────
+# ─── Value Classification ───────────────────────────────────────────
 
 
 def _classify_value(value: str) -> str:
@@ -301,44 +301,69 @@ Input values from a product listing page:
 
 Expected output:
 {"page_type": "cards", "estimated_record_count": 36, "fields": [
-  {"name": "product_name", "type": "string", "example_value": "Ergonomic Office Chair", "confidence": 0.95, "description": "Product name"},
-  {"name": "sku", "type": "code", "example_value": "FURN-4032", "confidence": 0.95, "description": "Product SKU or item code"},
-  {"name": "price", "type": "currency", "example_value": "$299.99", "confidence": 0.95, "description": "Product price"},
-  {"name": "rating", "type": "rating", "example_value": "4.5 / 5", "confidence": 0.90, "description": "Customer rating"},
-  {"name": "delivery_info", "type": "string", "example_value": "Free shipping", "confidence": 0.80, "description": "Shipping or delivery information"},
-  {"name": "delivery_time", "type": "string", "example_value": "2 - 3 business days", "confidence": 0.80, "description": "Estimated delivery time"},
-  {"name": "availability", "type": "boolean", "example_value": "In Stock", "confidence": 0.90, "description": "Stock availability status"},
-  {"name": "brand", "type": "string", "example_value": "SteelFrame Co.", "confidence": 0.95, "description": "Brand or manufacturer"},
-  {"name": "materials", "type": "string", "example_value": "Leather, Aluminum", "confidence": 0.85, "description": "Product materials or features"},
-  {"name": "weight_lbs", "type": "number", "example_value": "450", "confidence": 0.75, "description": "Product weight"},
-  {"name": "color", "type": "string", "example_value": "Black, White", "confidence": 0.90, "description": "Available colors"}
+  {"name": "product_name", "type": "string", "example_value": "Ergonomic Office Chair",
+  "confidence": 0.95, "description": "Product name"},
+  {"name": "sku", "type": "code", "example_value": "FURN-4032",
+  "confidence": 0.95, "description": "Product SKU or item code"},
+  {"name": "price", "type": "currency", "example_value": "$299.99",
+  "confidence": 0.95, "description": "Product price"},
+  {"name": "rating", "type": "rating", "example_value": "4.5 / 5",
+  "confidence": 0.90, "description": "Customer rating"},
+  {"name": "delivery_info", "type": "string", "example_value": "Free shipping",
+  "confidence": 0.80, "description": "Shipping or delivery information"},
+  {"name": "delivery_time", "type": "string", "example_value": "2 - 3 business days",
+  "confidence": 0.80, "description": "Estimated delivery time"},
+  {"name": "availability", "type": "boolean", "example_value": "In Stock",
+  "confidence": 0.90, "description": "Stock availability status"},
+  {"name": "brand", "type": "string", "example_value": "SteelFrame Co.",
+  "confidence": 0.95, "description": "Brand or manufacturer"},
+  {"name": "materials", "type": "string", "example_value": "Leather, Aluminum",
+  "confidence": 0.85, "description": "Product materials or features"},
+  {"name": "weight_lbs", "type": "number", "example_value": "450",
+  "confidence": 0.75, "description": "Product weight"},
+  {"name": "color", "type": "string", "example_value": "Black, White",
+  "confidence": 0.90, "description": "Available colors"}
 ]}
 === END EXAMPLE ===
 """
 
     return f"""You are a data schema designer. Name each data field found on this webpage.
 
-I extracted these values from ONE data row on this {structure_type.upper()} page (confidence: {structure_confidence:.0%}):
+I extracted these values from ONE data row on this {structure_type.upper()} page
+(confidence: {structure_confidence:.0%}):
 
 {value_block}
 
 {few_shot}
 
 For EACH value, assign a descriptive snake_case field name.
-Determine its data type from: string, number, currency, email, phone, url, date, time, rating, boolean, percentage, location, code.
+Determine its data type from: string, number, currency, email, phone, url,
+date, time, rating, boolean, percentage, location, code.
 
 CRITICAL: NEVER use type names as field names.
-  BAD: {{"name": "string"}}  or {{"name": "code"}}  or {{"name": "time"}}  or {{"name": "text"}}  or {{"name": "number"}}  or {{"name": "date"}}  or {{"name": "currency"}}
-  GOOD: {{"name": "airline_name"}}  or {{"name": "flight_number"}}  or {{"name": "departure_airport"}}  or {{"name": "departure_time"}}  or {{"name": "price"}}
+  BAD: {{"name": "string"}}  or {{"name": "code"}}  or {{"name": "time"}}
+  or {{"name": "text"}}  or {{"name": "number"}}  or {{"name": "date"}}
+  or {{"name": "currency"}}
+  GOOD: {{"name": "airline_name"}}  or {{"name": "flight_number"}}
+  or {{"name": "departure_airport"}}  or {{"name": "departure_time"}}
+  or {{"name": "price"}}
 
-Differentiate duplicate types — if two values share the same type, give them distinct context-specific names (e.g. "origin_airport_code" vs "destination_airport_code" instead of "code" and "code").
+Differentiate duplicate types — if two values share the same type,
+give them distinct context-specific names
+(e.g. "origin_airport_code" vs "destination_airport_code"
+instead of "code" and "code").
 
 Look at each value carefully and infer its contextual meaning. For example:
-- A 3-letter uppercase word like "LHR" or "JFK" is likely an airport code, name it "origin_airport_code" or "destination_airport_code"
-- A city name like "London" or "New York" is a location, name it "origin_city" or "destination_city"
-- A monetary value like "$450" or "Â£450" is a price, name it "price", "total_price", or "fee"
-- A short time like "08:30" or "14:00" is a time, name it "departure_time" or "arrival_time"
-- A date like "30 / 05 / 2026" is a date, name it "departure_date", "travel_date", or "return_date"
+- A 3-letter uppercase word like "LHR" or "JFK" is likely an airport code,
+  name it "origin_airport_code" or "destination_airport_code"
+- A city name like "London" or "New York" is a location,
+  name it "origin_city" or "destination_city"
+- A monetary value like "$450" or "Â£450" is a price,
+  name it "price", "total_price", or "fee"
+- A short time like "08:30" or "14:00" is a time,
+  name it "departure_time" or "arrival_time"
+- A date like "30 / 05 / 2026" is a date,
+  name it "departure_date", "travel_date", or "return_date"
 
 Return ONLY JSON — NO markdown, NO commentary:
 {{"page_type": "{structure_type}",
@@ -353,7 +378,7 @@ Return ONLY JSON — NO markdown, NO commentary:
 }} """
 
 
-# ─── Generic field name post-processing ───────────────────────────────────
+# ─── Generic field name post-processing ────────────────────────────────
 
 _GENERIC_NAMES: set[str] = {
     "string",

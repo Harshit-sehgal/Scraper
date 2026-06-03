@@ -374,6 +374,7 @@ def test_running_job_marked_failed_after_restart(monkeypatch) -> None:
         assert job_running.id in loaded_jobs
         loaded = loaded_jobs[job_running.id]
         assert loaded.status == JobStatus.FAILED
+        assert loaded.error is not None
         assert "Recovered after restart" in loaded.error
 
     finally:

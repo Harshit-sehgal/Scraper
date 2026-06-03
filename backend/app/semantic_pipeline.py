@@ -125,10 +125,10 @@ class PipelineReport:
     metadata_fields_stripped: List[str] = field(default_factory=list)
 
 
-def strip_metadata(records: list) -> list:
+def strip_metadata(records: list | None) -> list:
     """Remove all metadata fields from records."""
     if not records:
-        return records if records is not None else []
+        return []
 
     cleaned = []
     for record in records:
@@ -138,7 +138,7 @@ def strip_metadata(records: list) -> list:
     return cleaned
 
 
-def filter_noise_records(records: List[dict]) -> List[dict]:
+def filter_noise_records(records: List[dict] | None) -> list[dict]:
     """Filter out likely noise records using graph-based relational density."""
     if not records:
         return []
@@ -296,7 +296,7 @@ def detect_role_swap_warnings(output: dict, schema_fields: list, detect_type_fn:
 
 
 def run_pipeline(
-    records: list,
+    records: list | None,
     schema_fields: List[str],
 ) -> list:
     """Run the full semantic pipeline orchestrator."""

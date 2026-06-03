@@ -49,7 +49,7 @@ async def ready():
     start_time = time.time()
     repo = get_job_repository()
     try:
-        if hasattr(repo, "health_check"):
+        if getattr(repo, "backend", "") == "postgres":
             health_info = repo.health_check()
         else:
             from app.job_store import get_storage_health

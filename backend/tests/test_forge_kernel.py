@@ -138,6 +138,7 @@ def test_job_service_lifecycle() -> None:
 
         # Cancel
         cancelled = svc.cancel(created.id)
+        assert cancelled is not None
         assert cancelled.status == JobStatus.CANCELED
         assert cancelled.completed_at is not None
 
