@@ -403,7 +403,7 @@ def extract_from_network_payloads(
                 payload = json.loads(raw)
             else:
                 payload = raw
-        except Exception:
+        except Exception:  # nosec B112
             continue
 
         candidates = find_record_arrays(payload)

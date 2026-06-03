@@ -83,10 +83,18 @@ def _detect_search_form(html: str) -> dict:
 
         for inp in all_inputs:
             tag_name = inp.name
-            field_id = inp.get("id", "") or ""
-            field_name = inp.get("name", "") or ""
-            field_type = inp.get("type", "text") if tag_name == "input" else "select"
-            placeholder = inp.get("placeholder", "") or ""
+
+            id_val = inp.get("id", "") or ""
+            field_id = id_val[0] if isinstance(id_val, list) else str(id_val)
+
+            name_val = inp.get("name", "") or ""
+            field_name = name_val[0] if isinstance(name_val, list) else str(name_val)
+
+            type_val = inp.get("type", "text") if tag_name == "input" else "select"
+            field_type = type_val[0] if isinstance(type_val, list) else str(type_val)
+
+            placeholder_val = inp.get("placeholder", "") or ""
+            placeholder = placeholder_val[0] if isinstance(placeholder_val, list) else str(placeholder_val)
 
             input_type_lower = field_type.lower()
             if input_type_lower not in ("", "text", "search", "date", "datetime-local", "tel", "number"):
@@ -139,8 +147,11 @@ def _detect_search_form(html: str) -> dict:
             "search_fields": [],
         }
 
-    action = best_form.get("action", "") or ""
-    method = (best_form.get("method", "post") or "post").upper()
+    action_val = best_form.get("action", "") or ""
+    action = action_val[0] if isinstance(action_val, list) else str(action_val)
+    method_val = best_form.get("method", "post") or "post"
+    method_str = method_val[0] if isinstance(method_val, list) else str(method_val)
+    method = method_str.upper()
 
     return {
         "detected": True,

@@ -53,7 +53,7 @@ def requires_invariants(mutation_fn: Callable):
                         severity="warning",
                         cause=f"Snapshot failed before {mutation_fn.__name__}: {snapshot_err}",
                     )
-                except Exception:
+                except Exception:  # nosec B110
                     pass
 
             # Check pre-conditions
@@ -85,7 +85,7 @@ def requires_invariants(mutation_fn: Callable):
                                 severity="critical",
                                 cause=f"Rollback failed for {mutation_fn.__name__}: {rollback_err}. State may be corrupt!",
                             )
-                        except Exception:
+                        except Exception:  # nosec B110
                             pass
                     finally:
                         setattr(ws, _ROLLBACK_GUARD_ATTR, False)
@@ -97,7 +97,7 @@ def requires_invariants(mutation_fn: Callable):
                             severity="critical",
                             cause=f"Cannot rollback {mutation_fn.__name__} — no snapshot available. State may be corrupt!",
                         )
-                    except Exception:
+                    except Exception:  # nosec B110
                         pass
                 raise RuntimeError(
                     f"Invariant violation in {mutation_fn.__name__}: "

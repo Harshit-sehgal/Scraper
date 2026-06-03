@@ -212,7 +212,8 @@ def collect_page_evidence(
     links = []
     seen_hrefs = set()
     for a_tag in soup.find_all("a", href=True):
-        href = a_tag["href"]
+        href_val = a_tag.get("href")
+        href = href_val[0] if isinstance(href_val, list) else str(href_val) if href_val else ""
         text = a_tag.get_text(strip=True)
         if href and href not in seen_hrefs and not href.startswith("#"):
             seen_hrefs.add(href)
@@ -225,7 +226,9 @@ def collect_page_evidence(
     for btn in soup.find_all(["button", "input"]):
         if btn.name == "input" and btn.get("type") not in (None, "submit", "button"):
             continue
-        text = (btn.get_text(strip=True) or btn.get("value", "") or "").strip()
+        val_attr = btn.get("value")
+        val_str = val_attr[0] if isinstance(val_attr, list) else str(val_attr) if val_attr else ""
+        text = (btn.get_text(strip=True) or val_str).strip()
         if text and text not in seen_btn_text:
             seen_btn_text.add(text)
             buttons.append({"text": text[:80], "tag": btn.name})
@@ -235,7 +238,9 @@ def collect_page_evidence(
     forms = []
     for form in soup.find_all("form"):
         action = form.get("action", "") or ""
-        method = (form.get("method", "get") or "get").upper()
+        method_attr = form.get("method", "get") or "get"
+        method_str = method_attr[0] if isinstance(method_attr, list) else str(method_attr)
+        method = method_str.upper()
         inputs = []
         for inp in form.find_all(["input", "select", "textarea"]):
             inp_name = inp.get("name", "") or ""
@@ -303,7 +308,7 @@ def _collect_visible_text_blocks(soup: BeautifulSoup) -> list[VisibleTextBlock]:
 
         # Build parent path
         path_parts = []
-        parent = element
+        parent: Any = element
         while parent and parent.name:
             path_parts.append(parent.name)
             if len(path_parts) >= 6:
@@ -372,8 +377,9 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
     jsonld_data = []
     for script in jsonld_scripts:
         try:
-            data = json.loads(script.string)
-            jsonld_data.append(data)
+            if script.string:
+                data = json.loads(script.string)
+                jsonld_data.append(data)
         except (json.JSONDecodeError, TypeError):
             pass
     if jsonld_data:
@@ -488,7 +494,13 @@ def _discover_candidate_containers(soup: BeautifulSoup) -> list[CandidateContain
             if len(unique_tags) <= 2 and len(children) >= 3:
                 class_sets = []
                 for c in children:
-                    cls = " ".join(c.get("class", []))
+                    cls_val = c.get("class")
+                    if isinstance(cls_val, list):
+                        cls = " ".join(cls_val)
+                    elif isinstance(cls_val, str):
+                        cls = cls_val
+                    else:
+                        cls = ""
                     class_sets.append(cls)
                 unique_classes = set(class_sets)
                 if len(unique_classes) <= 2 and len(unique_classes) < len(children):
@@ -532,10 +544,11 @@ def _discover_candidate_containers(soup: BeautifulSoup) -> list[CandidateContain
 def _build_container_selector(element: Tag) -> str:
     """Build a minimal CSS selector for an element."""
     tag = element.name
-    classes = element.get("class", [])
+    cls_val = element.get("class")
+    classes = cls_val if isinstance(cls_val, list) else ([cls_val] if isinstance(cls_val, str) else [])
     if classes:
         # Use up to 2 most specific classes
-        cls_part = ".".join(c for c in classes if c)[:2]
+        cls_part = ".".join(c for c in classes[:2] if c)
         return f"{tag}.{cls_part}" if cls_part else tag
     return tag
 
@@ -547,10 +560,10 @@ def _score_container(element: Tag, selector: str, siblings: list[Tag]) -> Candid
 
     # Get all text snippets within
     all_texts = []
-    for t in element.find_all(string=True):
-        t = t.strip()
-        if t and len(t) > 1:
-            all_texts.append(t)
+    for t_element in element.find_all(string=True):
+        t_str = t_element.strip()
+        if t_str and len(t_str) > 1:
+            all_texts.append(t_str)
 
     # Count descendants
     descendants = element.find_all(True)

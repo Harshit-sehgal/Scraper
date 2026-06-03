@@ -65,7 +65,7 @@ class RoleEmbeddingEngine:
                     import random
 
                     for i in range(len(vec)):
-                        jitter = (random.random() - 0.5) * 0.01
+                        jitter = (random.random() - 0.5) * 0.01  # nosec B311
                         vec[i] = max(0.0, min(1.0, vec[i] * 0.85 + 0.5 * 0.15 + jitter))
                     self.ws.set_manifold_vector(role, vec)
 

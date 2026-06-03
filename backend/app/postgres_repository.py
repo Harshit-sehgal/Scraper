@@ -106,7 +106,7 @@ def _conn() -> Iterator[psycopg2.extensions.connection]:
             from app.metrics_collector import record_error
 
             record_error("database")
-        except Exception:
+        except Exception:  # nosec B110
             pass
         raise
     finally:

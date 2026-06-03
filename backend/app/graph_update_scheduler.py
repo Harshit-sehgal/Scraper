@@ -113,7 +113,7 @@ class GlobalCognitiveScheduler:
                             severity="warning",
                             cause=f"Task [{task.task_id}] failed: {e}",
                         )
-                except Exception:
+                except Exception:  # nosec B110
                     pass
 
             duration = time.time() - t0

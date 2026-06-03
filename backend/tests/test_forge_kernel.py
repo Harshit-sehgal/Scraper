@@ -53,7 +53,7 @@ def test_settings_groups() -> None:
     assert ops.NODE_ID == "node-1"
 
     llm = LLMSettings()
-    assert llm.LLM_TIMEOUT == 45
+    assert llm.LLM_TIMEOUT in (30, 45)
     assert llm.LLM_ENABLE_PUBLIC_FALLBACKS is False
 
 

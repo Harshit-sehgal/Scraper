@@ -408,7 +408,7 @@ async def metrics(request: Request):
     if settings.METRICS_TOKEN:
         auth_header = request.headers.get("Authorization", "")
         api_key_header = request.headers.get("X-API-Key", "")
-        bearer_token = ""
+        bearer_token = ""  # nosec B105
         if auth_header.startswith("Bearer "):
             bearer_token = auth_header[7:]
         if not secrets.compare_digest(bearer_token, settings.METRICS_TOKEN) and not secrets.compare_digest(

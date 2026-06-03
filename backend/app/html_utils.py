@@ -481,7 +481,7 @@ async def fetch_page_content(
                 for sel in loading_selectors:
                     try:
                         await page.wait_for_selector(sel, state="hidden", timeout=2000)
-                    except Exception:
+                    except Exception:  # nosec B110
                         pass
 
             # Adaptive post-network buffer: check DOM stabilization
@@ -527,7 +527,7 @@ async def fetch_page_content(
                      }}""",
                     timeout=settle_timeout * 1000,
                 )
-            except Exception:
+            except Exception:  # nosec B110
                 pass
             js_render_delay_ms = (time.time() - stabilization_start) * 1000
             telemetry.record_stabilization(domain, js_render_delay_ms)
@@ -565,7 +565,7 @@ async def fetch_page_content(
                     raise ValueError(f"Anti-bot challenge detected during {wait_until}: {e}")
             except ValueError:
                 raise  # Re-raise anti-bot detection so scraper records the proper failure reason
-            except Exception:
+            except Exception:  # nosec B110
                 pass
 
             logger.warning(
@@ -615,7 +615,7 @@ async def fetch_page_content(
         if page:
             try:
                 html_content = await page.content()
-            except Exception:
+            except Exception:  # nosec B110
                 pass
 
         err_msg = str(e).lower()
@@ -649,7 +649,7 @@ async def fetch_page_content(
         if page:
             try:
                 await page.close()
-            except Exception:
+            except Exception:  # nosec B110
                 pass
 
 

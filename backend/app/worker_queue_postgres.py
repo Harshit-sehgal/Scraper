@@ -139,7 +139,7 @@ def _ensure_schema():
                 # Add result column (used for storing successful task results)
                 try:
                     _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN result TEXT")
-                except Exception:
+                except Exception:  # nosec B110
                     pass
                 current = 2
 
@@ -147,7 +147,7 @@ def _ensure_schema():
                 # Add execution_time_ms column for tracking task latencies
                 try:
                     _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN execution_time_ms INTEGER")
-                except Exception:
+                except Exception:  # nosec B110
                     pass
                 current = 3
 

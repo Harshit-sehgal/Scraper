@@ -15,7 +15,7 @@ class FailureInjector:
 
     def inject(self, label: str = "anonymous"):
         """Randomly raise an exception if failure injection is active."""
-        if self.active and random.random() < self.probability:
+        if self.active and random.random() < self.probability:  # nosec B311
             logging.getLogger(__name__).warning(f"FAILURE INJECTED: {label}")
             raise RuntimeError(f"Simulated failure in {label}")
 

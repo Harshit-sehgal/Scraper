@@ -559,7 +559,7 @@ async def scrape_url(
                     "[SessionRecovery] URL %s is session-bound but no search_params provided — page may be stale",
                     url,
                 )
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
     anti_bot = detect_anti_bot(html)
@@ -576,7 +576,7 @@ async def scrape_url(
     if world_state and hasattr(world_state, "solidified_motifs"):
         try:
             solidified_motifs_count = len(world_state.solidified_motifs)
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
     result_warnings: list[str] = []
@@ -659,7 +659,10 @@ async def scrape_url(
         soup = BeautifulSoup(html, "html.parser")
         discovered_links = []
         for a_tag in soup.find_all("a", href=True):
-            href = a_tag["href"]
+            href_val = a_tag.get("href")
+            href = href_val[0] if isinstance(href_val, list) else str(href_val) if href_val else ""
+            if not href:
+                continue
             if href.startswith("http") and intel.domain in urlparse(href).netloc:
                 discovered_links.append(href)
             elif href.startswith("/") or href.startswith("?"):

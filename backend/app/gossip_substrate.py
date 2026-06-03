@@ -146,12 +146,12 @@ class GossipSubstrate:
 
         # Weighted random selection
         if max(weights) <= 0:
-            return random.sample(candidates, min(count, len(candidates)))
+            return random.sample(candidates, min(count, len(candidates)))  # nosec B311
 
         selected = []
         for _ in range(min(count, len(candidates))):
             total = sum(weights)
-            pick = random.uniform(0, total)
+            pick = random.uniform(0, total)  # nosec B311
             cumsum = 0.0
             for i, w in enumerate(weights):
                 cumsum += w
