@@ -19,7 +19,7 @@ def test_cors_origin(url: str, origin: str) -> tuple[int, dict]:
     try:
         req = urllib.request.Request(url, method="GET")
         req.add_header("Origin", origin)
-        with urllib.request.urlopen(req, timeout=3) as resp:
+        with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310 — fixed local probe URL from CLI arg with secure default
             return resp.status, {k.lower(): v for k, v in resp.headers.items()}
     except urllib.error.HTTPError as e:
         return e.code, {k.lower(): v for k, v in e.headers.items()}

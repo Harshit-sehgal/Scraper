@@ -458,9 +458,9 @@ def check_crystalline():
 def run_test_suite():
     """Run pytest and report results."""
     _print_header("TEST SUITE")
-    import subprocess
+    import subprocess  # nosec B404 — operational script, hardcoded command vector
 
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603 — hardcoded pytest invocation, no shell, no untrusted input
         [sys.executable, "-m", "pytest", "backend/tests/", "-v", "--tb=short", "-x"],
         capture_output=True,
         text=True,
