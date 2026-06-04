@@ -82,7 +82,7 @@ async def ready():
             "job_count": health_info.get("job_count", len(jobs_store)),
             "recycle_bin_count": health_info.get("recycle_bin_count", len(recycle_bin_store)),
         }
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         duration = time.time() - start_time
         from app.metrics_collector import record_health_check_latency
 

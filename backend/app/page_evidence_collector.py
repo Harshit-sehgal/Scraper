@@ -380,7 +380,7 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
                 data = json.loads(script.string)
                 jsonld_data.append(data)
         except (json.JSONDecodeError, TypeError):
-            pass
+            pass  # nosec B110
     if jsonld_data:
         hydration["jsonld"] = jsonld_data[:10]
 
@@ -397,7 +397,7 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
             if "initialState" in data:
                 hydration["nextjs_initial_state"] = _truncate_large_values(data["initialState"])
         except (json.JSONDecodeError, TypeError):
-            pass
+            pass  # nosec B110
 
     # Window __INITIAL_STATE__
     for script in soup.find_all("script"):
@@ -427,7 +427,7 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
                             data = json.loads(text[start:end])
                             hydration[var_name] = _truncate_large_values(data)
                         except (json.JSONDecodeError, TypeError):
-                            pass
+                            pass  # nosec B110
 
     # Apollo / Relay state
     for script in soup.find_all("script"):
@@ -441,7 +441,7 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
                     data = json.loads(match.group(1))
                     hydration["apollo_state"] = _truncate_large_values(data)
                 except (json.JSONDecodeError, TypeError):
-                    pass
+                    pass  # nosec B110
 
     return hydration
 

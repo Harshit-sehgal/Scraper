@@ -521,7 +521,7 @@ class ObservabilityState:
         def estimate_dict(d: dict) -> int:
             try:
                 return len(json.dumps(d, sort_keys=True, default=str))
-            except Exception:  # noqa: BLE001
+            except Exception:
                 return 0
 
         telemetry_size = len(json.dumps(list(snapshot.telemetry_stream), sort_keys=True, default=str))

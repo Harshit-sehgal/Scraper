@@ -225,8 +225,8 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
                         "reason": conf.reason,
                     },
                 }
-    except Exception as e:
-        logger.exception("Failed to build selector decay snapshots for diagnostics: %s")
+    except (AttributeError, ImportError, RuntimeError) as e:
+        logger.exception("Failed to build selector decay snapshots for diagnostics")
         selector_decay_snapshots = {"error": {"message": str(e)}}
 
     # 4. telemetry_snapshots.json
@@ -237,8 +237,8 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
         ws = get_world_state()
         if hasattr(ws, "_observability") and ws._observability:
             telemetry_snapshots = sanitize_value(ws._observability.telemetry)
-    except Exception as e:
-        logger.exception("Failed to build telemetry snapshots for diagnostics: %s")
+    except (AttributeError, ImportError, RuntimeError) as e:
+        logger.exception("Failed to build telemetry snapshots for diagnostics")
         telemetry_snapshots = [{"error": str(e)}]
 
     # Create ZIP archive in memory
@@ -358,9 +358,9 @@ def _render_basic_metrics_text() -> str:
         repo = get_job_repository()
         backend = getattr(repo, "backend", "sqlite")
         lines.append(_basic_metric_line("dataforge_backend", 1, {"backend": backend}))
-    except Exception:
+    except (AttributeError, ImportError, RuntimeError):
         backend_ok = 0
-        logger.exception("Metrics fallback: backend collection failed: %s")
+        logger.exception("Metrics fallback: backend collection failed")
     lines.append(_basic_metric_line("dataforge_backend_collection_ok", backend_ok))
 
     queue_ok = 1
@@ -371,9 +371,9 @@ def _render_basic_metrics_text() -> str:
         lines.append(_basic_metric_line("dataforge_queue_pending", q_status.get("pending", 0)))
         lines.append(_basic_metric_line("dataforge_queue_running", q_status.get("running", 0)))
         lines.append(_basic_metric_line("dataforge_queue_dead_letter", q_status.get("dead_letter", 0)))
-    except Exception:
+    except (AttributeError, ImportError, RuntimeError):
         queue_ok = 0
-        logger.exception("Metrics fallback: queue collection failed: %s")
+        logger.exception("Metrics fallback: queue collection failed")
     lines.append(_basic_metric_line("dataforge_queue_collection_ok", queue_ok))
 
     for task_type, count in get_worker_failures().items():
@@ -463,10 +463,10 @@ async def metrics(request: Request):
         backend = getattr(repo, "backend", "sqlite")
         backend_gauge = Gauge("dataforge_backend", "Storage backend type", ["backend"], registry=registry)
         backend_gauge.labels(backend=backend).set(1)
-    except Exception:
+    except (AttributeError, ImportError, RuntimeError):
         backend_ok = 0
         METRICS_COLLECTION_ERRORS += 1
-        logger.exception("Metrics: backend collection failed: %s")
+        logger.exception("Metrics: backend collection failed")
 
     backend_ok_gauge = Gauge(
         "dataforge_backend_collection_ok",
@@ -488,10 +488,10 @@ async def metrics(request: Request):
         queue_running.set(q_status.get("running", 0))
         queue_dead_letter = Gauge("dataforge_queue_dead_letter", "Dead letter queue size", registry=registry)
         queue_dead_letter.set(q_status.get("dead_letter", 0))
-    except Exception:
+    except (AttributeError, ImportError, RuntimeError):
         queue_ok = 0
         METRICS_COLLECTION_ERRORS += 1
-        logger.exception("Metrics: queue collection failed: %s")
+        logger.exception("Metrics: queue collection failed")
 
     queue_ok_gauge = Gauge(
         "dataforge_queue_collection_ok",

@@ -173,7 +173,7 @@ def _multi_pass_extraction(
                 )
                 if isinstance(alt_result, list) and alt_result:
                     passes.append(alt_result)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.debug("[Orchestrator] Alt container pass failed for %s: %s", alt_sel, e)
 
     # Pass 3: Raw extraction without container (extract from full page)
@@ -192,7 +192,7 @@ def _multi_pass_extraction(
                 for rec in aligned:
                     rec["record_score"] = score_record_quality(rec, schema_fields)
                 passes.append([r for r in aligned if r.get("record_score", 0) > 0])
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug("[Orchestrator] Raw extraction pass failed: %s", e)
 
     # Merge all passes
@@ -284,7 +284,7 @@ async def orchestrate_extraction(
 
             candidates = find_record_arrays(payload)
             record_arrays_found += len(candidates)
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass  # nosec B110
 
     # Extract network results
@@ -566,7 +566,7 @@ async def orchestrate_extraction(
                             payload={"url": url, "avg_score": avg_score},
                         ),
                     )
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     logger.warning("[Orchestrator] Failed to dispatch selector failure event: %s", e)
 
     # ── Layer 3: LLM Discovery ─────────────────────────────────────────

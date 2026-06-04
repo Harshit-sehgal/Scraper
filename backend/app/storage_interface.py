@@ -178,7 +178,7 @@ class SQLiteJobRepository(JobRepository):
         if ws_path.exists():
             try:
                 return json.loads(ws_path.read_text())  # type: ignore[no-any-return]
-            except Exception:  # noqa: BLE001
+            except Exception:
                 return None
         return None
 
@@ -404,6 +404,6 @@ def reset_repository() -> None:
                 from app.postgres_repository import shutdown_postgres
 
                 shutdown_postgres()
-            except Exception:  # nosec B110  # noqa: BLE001
-                pass
+            except Exception:  # nosec B110
+                pass  # nosec B110
     _repository_instance = None

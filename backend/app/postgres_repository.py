@@ -107,7 +107,7 @@ def _conn() -> Iterator[psycopg2.extensions.connection]:
             from app.metrics_collector import record_error
 
             record_error("database")
-        except Exception:  # noqa: BLE001  # metrics must never break the caller
+        except Exception:  # metrics must never break the caller
             pass  # nosec B110
         raise
     finally:
@@ -236,7 +236,7 @@ def _ensure_required_tables(conn) -> None:
             _execute(conn, "SAVEPOINT alter_jobs_col")
             _execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
             _execute(conn, "RELEASE SAVEPOINT alter_jobs_col")
-        except Exception:  # noqa: BLE001
+        except Exception:
             _execute(conn, "ROLLBACK TO SAVEPOINT alter_jobs_col")
 
     _execute(conn, _build_create_recycle_bin_sql())
@@ -246,7 +246,7 @@ def _ensure_required_tables(conn) -> None:
             _execute(conn, "SAVEPOINT alter_recycle_col")
             _execute(conn, f"ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS {col_def}")
             _execute(conn, "RELEASE SAVEPOINT alter_recycle_col")
-        except Exception:  # noqa: BLE001
+        except Exception:
             _execute(conn, "ROLLBACK TO SAVEPOINT alter_recycle_col")
 
     for idx_sql in [
@@ -257,7 +257,7 @@ def _ensure_required_tables(conn) -> None:
             _execute(conn, "SAVEPOINT create_index")
             _execute(conn, idx_sql)
             _execute(conn, "RELEASE SAVEPOINT create_index")
-        except Exception:  # noqa: BLE001
+        except Exception:
             _execute(conn, "ROLLBACK TO SAVEPOINT create_index")
 
 

@@ -131,7 +131,7 @@ async def capture_bounding_boxes(page) -> list[dict]:
             return results;
         }""")
         return boxes if isinstance(boxes, list) else []
-    except Exception:  # noqa: BLE001
+    except Exception:
         return []
 
 

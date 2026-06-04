@@ -230,7 +230,7 @@ class ProvenanceBuilder:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
-        except Exception:  # noqa: BLE001
+        except Exception:
             return "unknown"
 
 

@@ -152,9 +152,9 @@ def persist_semantic_world_state() -> None:
             try:
                 repo.save_world_state(ws.to_dict())
                 logger.info("Semantic world state persisted to repository on shutdown")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning("Failed to persist world state on shutdown: %s", e)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.warning("Failed to check repository support for world state during shutdown: %s", e)
 
 
@@ -172,7 +172,7 @@ def close_postgres_pool() -> None:
         shutdown_postgres()
     except ImportError:
         logger.debug("Postgres support is not installed; no Postgres pool to close")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.warning("Failed to close Postgres connection pool during shutdown: %s", e)
 
 
@@ -195,7 +195,7 @@ async def schedule_gossip_propagation(gossip: Any, heartbeat_mgr: Any, interval:
                     propagated = gossip.propagate_state_via_gossip(heartbeat_manager=heartbeat_mgr)
                     if propagated:
                         logger.debug("Propagated gossip state to %d peers", propagated)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.debug("Gossip propagation skipped: %s", e)
 
     task = asyncio.create_task(_propagate())

@@ -95,7 +95,7 @@ Rules:
                     raw_response = await res_fast
                 else:
                     raw_response = res_fast
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning("Fast-path semantic inference failed for chunk %d/%d: %s", chunks_processed, len(chunks), e)
                 try:
                     from app.semantic_world_state import get_world_state
@@ -106,7 +106,7 @@ Rules:
                         severity="warning",
                         cause=f"Fast-path LLM inference failed for chunk {chunks_processed}: {e}",
                     )
-                except Exception as telemetry_err:  # noqa: BLE001
+                except Exception as telemetry_err:
                     logger.debug("Telemetry failed: %s", telemetry_err)
 
             cleaned_list = _extract_list_from_json(raw_response)

@@ -208,7 +208,7 @@ class GossipSubstrate:
             logger.debug("[Gossip] %s <-> %s: sync successful", local_node_id, peer_id)
             return True
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.peer_health[peer_id].failure_count += 1
             logger.warning("[Gossip] Sync with %s failed: %s", peer_id, e)
             return False
@@ -324,7 +324,7 @@ class GossipSubstrate:
                     success_count += 1
                     self.peer_health[peer_id].success_count += 1
                     self.peer_health[peer_id].last_seen = time.time()
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     logger.warning("[Gossip] State propagation to %s failed: %s", peer_id, e)
                     self.peer_health[peer_id].failure_count += 1
 

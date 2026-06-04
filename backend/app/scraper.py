@@ -545,7 +545,7 @@ async def scrape_url(
                         "[SessionRecovery] No search form detected on %s — proceeding with original HTML",
                         url,
                     )
-        except Exception as recovery_err:  # noqa: BLE001
+        except Exception as recovery_err:
             logger.warning(
                 "[SessionRecovery] Recovery attempt failed for %s: %s",
                 url,
@@ -561,7 +561,7 @@ async def scrape_url(
                     "[SessionRecovery] URL %s is session-bound but no search_params provided — page may be stale",
                     url,
                 )
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass  # nosec B110
 
     anti_bot = detect_anti_bot(html)
@@ -578,7 +578,7 @@ async def scrape_url(
     if world_state and hasattr(world_state, "solidified_motifs"):
         try:
             solidified_motifs_count = len(world_state.solidified_motifs)
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass  # nosec B110
 
     result_warnings: list[str] = []
@@ -676,7 +676,7 @@ async def scrape_url(
             added = await frontier.add_discovered_links(discovered_links, url, source_depth=0)
             if added > 0:
                 logger.debug("[Scraper] Added %d/%d discovered links to frontier from %s", added, len(discovered_links), url)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.debug("[Scraper] Link discovery skipped for %s: %s", url, e)
 
     # ── Zero-Result Classification & Failure Classification ────────────
@@ -913,7 +913,7 @@ async def scrape_url(
                 prediction.risk_level,
                 prediction.days_until_failure,
             )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.debug("[PredictiveAdaptation] Decay prediction failed: %s", e)
 
     # 2. Domain Evolution Model: Track mutations and anti-bot changes
@@ -927,7 +927,7 @@ async def scrape_url(
         if anti_bot > 0.5:
             # Anti-bot escalation detected
             evolution_model.record_anti_bot_escalation(intel.domain, anti_bot)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.debug("[PredictiveAdaptation] Evolution modeling failed: %s", e)
 
     # 3. Self-Tuning Extraction: Feed telemetry for parameter adjustment
@@ -945,7 +945,7 @@ async def scrape_url(
                 "confidence_map": confidence_map,
             },
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.debug("[PredictiveAdaptation] Self-tuning failed: %s", e)
 
     # Cleanup: Release browser network capture buffer for this URL

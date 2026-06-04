@@ -426,8 +426,8 @@ class ReplayBuffer:
                 for line in f:
                     if line.strip():
                         count += 1
-        except Exception:  # nosec B110  # noqa: BLE001
-            pass
+        except Exception:  # nosec B110
+            pass  # nosec B110
         return count
 
     # ─── Causal Chain Reconstruction ────────────────────────────

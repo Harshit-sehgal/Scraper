@@ -147,7 +147,7 @@ class DatabaseSlidingWindowCounter:
                     )
                     _execute(conn, "CREATE INDEX IF NOT EXISTS idx_rate_limits_key_ts ON rate_limits(key, timestamp)")
                 self._initialized = True
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning("Failed to initialize Postgres rate limit table: %s", e)
         else:
             try:
@@ -167,7 +167,7 @@ class DatabaseSlidingWindowCounter:
                     finally:
                         conn.close()
                 self._initialized = True
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning("Failed to initialize SQLite rate limit table: %s", e)
 
     def allow(self) -> bool:
@@ -193,7 +193,7 @@ class DatabaseSlidingWindowCounter:
                     # Insert new request timestamp
                     _execute(conn, "INSERT INTO rate_limits (key, timestamp) VALUES (%s, %s)", (self.key, now))
                 return True
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning("Postgres rate limiter database error: %s. Falling back to in-memory behavior.", e)
                 return self._fallback_counter.allow()
         else:
@@ -216,7 +216,7 @@ class DatabaseSlidingWindowCounter:
                     finally:
                         conn.close()
                 return True
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning("SQLite rate limiter database error: %s. Falling back to in-memory behavior.", e)
                 return self._fallback_counter.allow()
 
@@ -237,7 +237,7 @@ class DatabaseSlidingWindowCounter:
                     row = _fetch_one(conn, "SELECT COUNT(*) AS count FROM rate_limits WHERE key = %s", (self.key,))
                     count = row["count"] if row else 0
                     return max(0, self.max_requests - count)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 return self._fallback_counter.remaining()
         else:
             try:
@@ -252,7 +252,7 @@ class DatabaseSlidingWindowCounter:
                         return max(0, self.max_requests - count)
                     finally:
                         conn.close()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 return self._fallback_counter.remaining()
 
     def reset_in(self) -> float:
@@ -272,7 +272,7 @@ class DatabaseSlidingWindowCounter:
                     if min_ts is None:
                         return 0.0
                     return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
-            except Exception:  # noqa: BLE001
+            except Exception:
                 return self._fallback_counter.reset_in()
         else:
             try:
@@ -291,7 +291,7 @@ class DatabaseSlidingWindowCounter:
                         return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
                     finally:
                         conn.close()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 return self._fallback_counter.reset_in()
 
     def is_expired(self) -> bool:

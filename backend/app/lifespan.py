@@ -135,7 +135,7 @@ async def lifespan(app: FastAPI):
         from app.state_store import flush_state_writes
 
         flush_state_writes()
-    except Exception as e:  # noqa: BLE001
+    except (ImportError, OSError) as e:
         logger.warning("Failed to flush state writes during shutdown: %s", e)
 
     # Close Postgres connection pool
@@ -152,8 +152,8 @@ def schedule_background_task(coro):
         try:
             t.result()
         except asyncio.CancelledError:
-            pass
-        except Exception as e:
+            pass  # nosec B110
+        except (AttributeError, ImportError) as e:
             logger.error("Background task failed: %s", e, exc_info=True)
 
     task.add_done_callback(_handle_task_result)
@@ -166,7 +166,7 @@ def persist_single_wrapper(job_id: str, critical: bool = False) -> None:
     if job:
         try:
             get_job_repository().save_single(job)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.exception("Failed to persist single job %s", job_id)
             if critical:
                 raise

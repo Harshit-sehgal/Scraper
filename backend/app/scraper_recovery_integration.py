@@ -256,7 +256,7 @@ async def scrape_url_with_recovery(
             )
             return results, recovery_stats
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             last_error = e
             error_msg = str(e)
 

@@ -304,7 +304,7 @@ async def extract_with_profile(
             logger.info("[ProfileExtractor] Extracted %d records", len(records))
             return records  # type: ignore[no-any-return]
 
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.exception("[ProfileExtractor] Fatal error for %s", url)
         return []
     finally:

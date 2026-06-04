@@ -118,7 +118,7 @@ class SnapshotDesyncDetector:
         for name, fn in subsystems:
             try:
                 score = fn(snapshot_a, snapshot_b)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning("Desync compare failed for subsystem %s: %s", name, e)
                 score = 1.0  # Cannot compare = fully divergent
             if score > 0.0:

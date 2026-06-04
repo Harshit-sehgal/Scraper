@@ -225,14 +225,14 @@ class CrawlPolicyEngine:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
 
     @staticmethod
     def _extract_path(url: str) -> str:
         try:
             return urlparse(url).path or "/"
-        except Exception:  # noqa: BLE001
+        except Exception:
             return "/"
 
     async def _check_robots_txt(self, domain: str) -> None:
@@ -290,7 +290,7 @@ class CrawlPolicyEngine:
                         crawl_delay,
                     )
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug("Failed to fetch robots.txt for %s: %s", domain, e)
             # Non-fatal — proceed without robots.txt constraints
 

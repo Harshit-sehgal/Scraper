@@ -85,7 +85,7 @@ def create_exports_router(jobs_store: dict):
                 if job_id in fresh_jobs:
                     with _store_lock:
                         jobs_store[job_id] = fresh_jobs[job_id]
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.debug("Failed to refresh job %s from repo for export", job_id)
 
     @router.get("/api/jobs/{job_id}/export/csv")

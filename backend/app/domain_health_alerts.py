@@ -380,7 +380,7 @@ class DomainHealthMonitor:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
 
 

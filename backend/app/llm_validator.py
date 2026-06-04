@@ -156,7 +156,7 @@ def llm_call_with_validation(
                     effective_retries + 1,
                     error,
                 )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(
                 "LLM call failed (attempt %d/%d): %s",
                 attempt + 1,
@@ -207,7 +207,7 @@ async def llm_call_with_validation_async(
                     effective_retries + 1,
                     error,
                 )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(
                 "LLM call failed (attempt %d/%d): %s",
                 attempt + 1,

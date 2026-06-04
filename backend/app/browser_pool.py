@@ -233,7 +233,7 @@ class BrowserPool:
             await page.close()
             await ctx.close()
             return True
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning("[BrowserPool] Health check failed: %s", e)
             return False
 
@@ -254,7 +254,7 @@ class BrowserPool:
             for ctx in list(self._contexts.values()):
                 try:
                     await ctx.close()
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     logger.debug("[BrowserPool] Failed to close context during close(): %s", e)
             self._contexts.clear()
             self._context_use_count.clear()
@@ -262,7 +262,7 @@ class BrowserPool:
             if self._browser:
                 try:
                     await self._browser.close()
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     logger.debug("[BrowserPool] Failed to close browser during close(): %s", e)
                 self._browser = None
 
@@ -275,7 +275,7 @@ class BrowserPool:
             if self._playwright:
                 try:
                     await self._playwright.stop()
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     logger.debug("[BrowserPool] Failed to stop playwright during close(): %s", e)
                 self._playwright = None
 
@@ -326,7 +326,7 @@ class BrowserPool:
         for ctx in list(self._contexts.values()):
             try:
                 await ctx.close()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.debug("[BrowserPool] Failed to close context during hard recycle: %s", e)
         self._contexts.clear()
         self._context_use_count.clear()
@@ -334,14 +334,14 @@ class BrowserPool:
         if self._browser:
             try:
                 await self._browser.close()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.debug("[BrowserPool] Failed to close browser during hard recycle: %s", e)
             self._browser = None
 
         if self._playwright:
             try:
                 await self._playwright.stop()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.debug("[BrowserPool] Failed to stop playwright during hard recycle: %s", e)
             self._playwright = None
 
@@ -368,7 +368,7 @@ class BrowserPool:
                         break
             except asyncio.CancelledError:
                 raise
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 # Don't let a transient cleanup failure (e.g. ``check_health``
                 # raising) kill the watchdog loop — log and try again on the
                 # next tick.

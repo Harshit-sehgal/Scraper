@@ -46,7 +46,7 @@ def _get_audit_logger() -> logging.Logger:
             from app.config import settings
 
             configured_log_dir = settings.AUDIT_LOG_DIR
-        except Exception:  # noqa: BLE001
+        except Exception:
             configured_log_dir = ""
 
         log_dir = Path(configured_log_dir or AUDIT_LOG_DIR)
@@ -301,7 +301,7 @@ def get_audit_log_path() -> Path:
         from app.config import settings
 
         configured_log_dir = settings.AUDIT_LOG_DIR
-    except Exception:  # noqa: BLE001
+    except Exception:
         configured_log_dir = ""
     return Path(configured_log_dir or AUDIT_LOG_DIR) / AUDIT_LOG_FILE
 

@@ -153,7 +153,7 @@ async def merge_knowledge(request: Request, data: dict, _role=Depends(require_ro
     # Validate payload with size caps
     try:
         req = KnowledgeMergeRequest.validate_payload(data)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return JSONResponse(
             status_code=422,
             content={"detail": f"Invalid merge payload: {e}"},
