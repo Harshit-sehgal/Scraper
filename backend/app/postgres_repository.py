@@ -565,15 +565,25 @@ class PostgresJobRepository(JobRepository):
         self._ensure()
         with _conn() as conn:
             # Upsert jobs — do NOT delete first
+            # Safety: validate column names to avoid SQL injection.
+            # Row keys come from the internal _job_to_row serializer and
+            # should never contain user input, but we verify anyway.
+            def _safe_cols(row):
+                for k in row.keys():
+                    if not k.isidentifier():
+                        raise ValueError(f"Unsafe column name in _job_to_row: {k!r}")
+                return list(row.keys())
+
             for job in jobs.values():
                 row = _job_to_row(job)
-                cols = ", ".join(row.keys())
-                ph = ", ".join("%s" for _ in row)
-                update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in row.keys() if k != "id")
+                safe_keys = _safe_cols(row)
+                cols = ", ".join(safe_keys)
+                ph = ", ".join("%s" for _ in safe_keys)
+                update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in safe_keys if k != "id")
                 _execute(
                     conn,
-                    f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608 — cols/update_cols are model field names, not user input
-                    list(row.values()),
+                    f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608 — validated as valid identifiers
+                    [row[k] for k in safe_keys],
                 )
 
             # Only remove stale rows when explicitly requested (single-process

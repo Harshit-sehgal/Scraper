@@ -137,8 +137,8 @@ Rules:
                     if norm["record_score"] >= min_record_score:
                         final_records.append(norm)
 
-        except Exception as e:
-            logger.exception(e)
+        except Exception:
+            logger.exception("AI cleaning failed for chunk %d/%d", chunks_processed, len(chunks))
             consecutive_failures += 1
             fallback_chunks += 1
             unprocessed_records.extend(chunk)

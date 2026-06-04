@@ -113,13 +113,17 @@ def load_paginated_job_results_from_disk(
     total_count = 0
     try:
         with gzip.open(path, "rt", encoding="utf-8") as f:
-            for idx, line in enumerate(f):
+            for line in f:
                 line = line.strip()
                 if not line:
                     continue
-                total_count += 1
-                if idx >= offset and len(records) < limit:
+                # ``total_count`` is the index in the record stream
+                # (skipping blank lines). The check uses this rather than
+                # the raw file-line index so pagination is correct even
+                # when a write left a stray blank line in the file.
+                if total_count >= offset and len(records) < limit:
                     records.append(json.loads(line))
+                total_count += 1
     except Exception as e:
         logger.exception("Failed to read paginated job results from disk for %s: %s", job_id, e)
         raise e

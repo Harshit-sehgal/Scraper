@@ -123,14 +123,19 @@ class SQLiteJobRepository(JobRepository):
         save_state(jobs, recycle_bin, prune_missing=prune_missing)
 
     def is_cancel_requested(self, job_id: str) -> bool:
-        """Check from SQLite whether a job has a pending cancellation request."""
+        """Check from SQLite whether a job has a pending cancellation request.
+
+        The SQLite ``jobs`` table does not carry a ``deleted_at`` column —
+        soft-delete is modelled by moving the row into ``recycle_bin``. So a
+        ``SELECT`` on ``jobs`` alone is sufficient (and safe).
+        """
         from app.job_store import _DB_LOCK, _get_connection
 
         with _DB_LOCK:
             conn = _get_connection()
             try:
                 row = conn.execute(
-                    "SELECT cancel_requested FROM jobs WHERE id = ? AND deleted_at IS NULL",
+                    "SELECT cancel_requested FROM jobs WHERE id = ?",
                     (job_id,),
                 ).fetchone()
                 if row:
@@ -254,15 +259,21 @@ class SQLiteJobRepository(JobRepository):
                 conn.close()
 
     def hard_delete(self, job_id: str) -> bool:
-        """Permanently delete a job atomically in SQLite."""
+        """Permanently delete a job atomically in SQLite.
+
+        A job may live in either ``jobs`` (never recycled) or ``recycle_bin``
+        (soft-deleted). The caller should not have to know which — this
+        method removes the row from both tables and reports success if it
+        affected either one.
+        """
         from app.job_store import _DB_LOCK, _get_connection
 
         with _DB_LOCK:
             conn = _get_connection()
             try:
-                conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
-                cursor = conn.execute("DELETE FROM recycle_bin WHERE id = ?", (job_id,))
-                deleted = cursor.rowcount
+                jobs_cursor = conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+                recycle_cursor = conn.execute("DELETE FROM recycle_bin WHERE id = ?", (job_id,))
+                deleted = (jobs_cursor.rowcount or 0) + (recycle_cursor.rowcount or 0)
                 conn.commit()
                 return deleted > 0
             except Exception:

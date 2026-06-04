@@ -66,6 +66,14 @@ def _safe_cell(value):
 def create_exports_router(jobs_store: dict):
     router = APIRouter()
 
+    # Single-process lock guarding refresh-from-repo writes into ``jobs_store``.
+    # Without this, two concurrent export requests can race and observe a
+    # partially-overwritten job (or worse, raise ``RuntimeError: dictionary
+    # changed size during iteration`` when a reader iterates ``jobs_store``).
+    import threading
+
+    _store_lock = threading.Lock()
+
     def _refresh_job_for_export(job_id: str):
         """Refresh job from repository in worker mode to avoid stale exports."""
         if settings.WORKER_QUEUE:
@@ -75,7 +83,8 @@ def create_exports_router(jobs_store: dict):
                 repo = get_job_repository()
                 fresh_jobs = repo.load_jobs()
                 if job_id in fresh_jobs:
-                    jobs_store[job_id] = fresh_jobs[job_id]
+                    with _store_lock:
+                        jobs_store[job_id] = fresh_jobs[job_id]
             except Exception:
                 logger.debug("Failed to refresh job %s from repo for export", job_id)
 

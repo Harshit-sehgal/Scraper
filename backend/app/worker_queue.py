@@ -486,7 +486,17 @@ class WorkerQueue:
                         )
                     else:
                         # Move to dead letter queue (archive)
-                        task_data = dict(conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone())
+                        task_row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+                        if task_row is None:
+                            # Task was deleted between the two SELECTs (e.g.,
+                            # by a concurrent cancel). Nothing more to do.
+                            logger.debug(
+                                "Task %s vanished while moving to dead-letter; concurrent cancel suspected",
+                                task_id,
+                            )
+                            conn.commit()
+                            return
+                        task_data = dict(task_row)
                         # Record worker failure counter for metrics
                         try:
                             from app.metrics_collector import record_worker_failure

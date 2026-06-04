@@ -635,23 +635,20 @@ async def scrape_url(
             min_cooccurrence=settings.MOTIF_MIN_COOCCURRENCE,
         )
         if new_motifs:
-            # Merge new motifs with existing solidified motifs (dedup, keep
-            # latest)
-            existing = {tuple(sorted(m)) for m in world_state.solidified_motifs}
-            for m in new_motifs:
-                m_sorted = tuple(sorted(m))
-                if m_sorted not in existing:
-                    existing.add(m_sorted)
-                    # Append to world_state's internal motif list
-                    # Use the history state's setter to update
-                    # solidified_motifs
-                    current = list(world_state.solidified_motifs)
-                    current.append(list(m_sorted))
-                    # Write back through history state's internal setter
-                    if hasattr(world_state, "_history"):
-                        world_state._history._set_val("solidified_motifs", current)
+            # Merge into world_state atomically. The public method takes
+            # the substrate lock so concurrent extractions don't lose
+            # updates via read-modify-write races.
+            if hasattr(world_state, "add_solidified_motifs"):
+                added = world_state.add_solidified_motifs(new_motifs)
+            else:
+                # Older world_state implementations: fall back to a
+                # best-effort, non-atomic merge through history.
+                added = 0
+                if hasattr(world_state, "_history") and hasattr(world_state._history, "add_solidified_motifs"):
+                    added = world_state._history.add_solidified_motifs(new_motifs)
             logger.info(
-                "[Scraper] Closed motif feedback loop: %d new motifs from %d results",
+                "[Scraper] Closed motif feedback loop: %d new motifs (of %d candidates) from %d results",
+                added,
                 len(new_motifs),
                 len(results),
             )

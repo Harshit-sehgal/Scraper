@@ -151,6 +151,35 @@ class HistoryState:
     def solidified_motifs(self) -> list:
         return list(self._get_val("solidified_motifs"))
 
+    def add_solidified_motifs(self, new_motifs: list) -> int:
+        """Merge new motifs into the solidified set, deduplicating.
+
+        Each motif is normalised to a sorted tuple to make set-membership
+        order-independent, then stored as a list of strings (which is the
+        serialised shape consumers expect).
+
+        Returns the number of motifs that were newly added.
+        """
+        if not new_motifs:
+            return 0
+        current = list(self._get_val("solidified_motifs"))
+        existing = {tuple(sorted(m)) for m in current}
+        added = 0
+        for m in new_motifs:
+            try:
+                m_sorted = tuple(sorted(m))
+            except TypeError:
+                continue
+            if m_sorted in existing:
+                continue
+            existing.add(m_sorted)
+            current.append(list(m_sorted))
+            added += 1
+        if added:
+            self._set_val("solidified_motifs", current)
+            self._record("add_solidified_motifs", {"added": added})
+        return added
+
     # ─── Resource Management ────────────────────────────────────────────
 
     def trim_journal(self, max_entries: int = 500):

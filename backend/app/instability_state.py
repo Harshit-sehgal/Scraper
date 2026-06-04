@@ -4,6 +4,7 @@ True ownership boundary: NO external code should mutate learned_exclusions direc
 All tension changes go through this state object, which validates invariants.
 """
 
+import logging
 from collections.abc import Callable
 
 from app.transaction_context import active_transaction
@@ -138,6 +139,9 @@ class InstabilityState:
     def to_dict(self) -> dict:
         return {"learned_exclusions": {f"{k[0]}|{k[1]}": v for k, v in self._exclusions.items()}}
 
+    # Maximum length for a string key before trying ast.literal_eval
+    MAX_KEY_LENGTH = 1_000_000
+
     def from_dict(self, data: dict):
         self.clear()
         target = self._staging if self._staging is not None else self._exclusions
@@ -152,6 +156,10 @@ class InstabilityState:
                     if len(parts) == 2:
                         sk = tuple(sorted(parts))
                         target[sk] = max(0.0, min(1.0, v))
+                    continue
+
+                if len(k) > self.MAX_KEY_LENGTH:
+                    logging.getLogger(__name__).warning("Skipping overly long key (%d chars)", len(k))
                     continue
 
                 import ast

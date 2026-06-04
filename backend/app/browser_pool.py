@@ -357,17 +357,25 @@ class BrowserPool:
         """Close browser if idle for too long."""
         while True:
             await asyncio.sleep(settings.BROWSER_CLEANUP_INTERVAL)
-            if self._browser:
-                if time.time() - self._last_activity > settings.BROWSER_IDLE_TIMEOUT:
-                    logger.info("[BrowserPool] Idle timeout reached, closing browser")
-                    await self.close()
-                    break
+            try:
+                if self._browser:
+                    if time.time() - self._last_activity > settings.BROWSER_IDLE_TIMEOUT:
+                        logger.info("[BrowserPool] Idle timeout reached, closing browser")
+                        await self.close()
+                        break
 
-                # Also check health
-                if not await self.check_health():
-                    logger.warning("[BrowserPool] Unhealthy browser detected in cleanup, restarting")
-                    await self.close()
-                    break
+                    # Also check health
+                    if not await self.check_health():
+                        logger.warning("[BrowserPool] Unhealthy browser detected in cleanup, restarting")
+                        await self.close()
+                        break
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                # Don't let a transient cleanup failure (e.g. ``check_health``
+                # raising) kill the watchdog loop — log and try again on the
+                # next tick.
+                logger.warning("[BrowserPool] Periodic cleanup raised: %s", e)
 
 
 # Global Singleton

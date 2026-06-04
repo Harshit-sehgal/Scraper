@@ -165,8 +165,11 @@ class CrawlFrontier:
     async def get_next_url(self) -> str | None:
         """Get the next URL available for crawling, respecting policy."""
         tried: list[CrawlItem] = []
+        max_retries = 1000  # safety valve: prevent unbounded queue scan
+        retries = 0
 
-        while True:
+        while retries < max_retries:
+            retries += 1
             # 1. Pop a candidate item under the lock
             async with self._lock:
                 if not self._queue:
