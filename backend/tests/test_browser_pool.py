@@ -89,11 +89,15 @@ class TestGetRandomUa:
 
 
 class TestShouldRecycle:
-    @patch("app.browser_pool.settings.BROWSER_MAX_CUMULATIVE_FETCHES", 100)
     def test_returns_false_when_below_threshold(self) -> None:
         pool = BrowserPool()
         pool._cumulative_fetches = 50
-        assert pool._should_recycle() is False
+        with (
+            patch.object(pool, "_get_rss_memory", return_value=10),
+            patch("app.browser_pool.settings.BROWSER_MAX_CUMULATIVE_FETCHES", 100),
+            patch("app.browser_pool.settings.BROWSER_MAX_RSS_MEMORY_MB", 1000),
+        ):
+            assert pool._should_recycle() is False
 
     @patch("app.browser_pool.settings.BROWSER_MAX_CUMULATIVE_FETCHES", 100)
     def test_returns_true_when_at_threshold(self) -> None:
