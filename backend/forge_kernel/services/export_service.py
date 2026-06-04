@@ -20,7 +20,7 @@ try:
 
     HAS_OPENPYXL = True
 except ImportError:  # pragma: no cover - optional dependency
-    openpyxl = None
+    openpyxl = None  # type: ignore[assignment]
     HAS_OPENPYXL = False
 
 
