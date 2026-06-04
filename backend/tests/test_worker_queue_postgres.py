@@ -9,6 +9,7 @@ Covers:
 
 import asyncio
 import os
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -579,3 +580,412 @@ class TestPostgresQueueIntegration:
         queue = asyncio.run(run())
         status = queue.get_status()
         assert status["dead_letter"] >= 1, f"Expected dead_letter >=1, got {status}"
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Mocked unit tests (no Postgres connection required)
+# ───────────────────────────────────────────────────────────────────────
+
+
+class TestPostgresQueueMocked:
+    """Comprehensive mocked tests for PostgresWorkerQueue.
+
+    These tests mock the database layer (_conn, _execute, _fetch_one, _fetch_all)
+    so they run without a real Postgres connection, covering all core methods.
+    """
+
+    @pytest.fixture(autouse=True)
+    def mock_db(self, monkeypatch):
+        """Mock all postgres_repository imports used by worker_queue_postgres."""
+        import app.worker_queue_postgres as wqp
+
+        self.mock_conn = MagicMock()
+        self.mock_cursor = MagicMock()
+        self.mock_conn.__enter__.return_value = self.mock_conn
+        self.mock_conn.__exit__.return_value = None
+
+        monkeypatch.setattr(wqp, "_conn", MagicMock(return_value=self.mock_conn))
+        monkeypatch.setattr(wqp, "_execute", MagicMock())
+        self.mock_fetch_one = MagicMock(return_value=None)
+        self.mock_fetch_all = MagicMock(return_value=[])
+        monkeypatch.setattr(wqp, "_fetch_one", self.mock_fetch_one)
+        monkeypatch.setattr(wqp, "_fetch_all", self.mock_fetch_all)
+
+        return wqp
+
+    def test_init_ensures_schema(self, mock_db):
+        """Construction calls _ensure_schema which queries schema version."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        q = PostgresWorkerQueue()
+        assert q._max_concurrency == 5
+        assert q._poll_interval == 1.0
+        # _ensure_schema should have been called
+        self.mock_fetch_one.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_enqueue_creates_task(self, mock_db):
+        """enqueue inserts a task via _execute and returns a task ID."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        q = PostgresWorkerQueue()
+        # Reset mock call count after construction so we can track enqueue calls
+        mock_db._execute.reset_mock()
+        task_id = await q.enqueue("test_type", {"key": "value"})
+
+        assert task_id is not None
+        assert isinstance(task_id, str)
+        # _execute should have been called to INSERT the task
+        mock_db._execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_dequeue_returns_task(self, mock_db):
+        """dequeue returns a QueueTask when _fetch_one returns a row."""
+        import json
+
+        from app.worker_queue import Priority
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        mock_row = {
+            "id": "test-id-123",
+            "type": "scrape",
+            "payload": json.dumps({"url": "http://example.com"}),
+            "priority": int(Priority.HIGH),
+            "status": "pending",
+            "created_at": "2024-01-01 00:00:00",
+            "started_at": None,
+            "completed_at": None,
+            "attempts": 0,
+            "max_attempts": 3,
+            "last_error": None,
+            "scheduled_at": "2024-01-01 00:00:00",
+            "timeout_seconds": 300,
+        }
+        self.mock_fetch_one.return_value = mock_row
+
+        q = PostgresWorkerQueue()
+        # Dequeue with very short timeout since we mocked the row
+        # The dequeue loop will call _dequeue_one via to_thread, which
+        # won't see our mock. So we need to mock _dequeue_one directly.
+        # Actually, let's just test that _dequeue_one works sync.
+        task = q._dequeue_one()
+        assert task is not None
+        assert task.id == "test-id-123"
+        assert task.type == "scrape"
+        assert task.payload == {"url": "http://example.com"}
+        assert task.priority == Priority.HIGH
+
+    @pytest.mark.asyncio
+    async def test_dequeue_returns_none_when_empty(self, mock_db):
+        """dequeue returns None when _fetch_one returns None."""
+        self.mock_fetch_one.return_value = None
+
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        q = PostgresWorkerQueue()
+        task = q._dequeue_one()
+        assert task is None
+
+    @pytest.mark.asyncio
+    async def test_complete_moves_to_history(self, mock_db):
+        """complete inserts into queue_task_history and deletes from queue_tasks."""
+        import json
+
+        from app.worker_queue import Priority
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        mock_row = {
+            "id": "task-complete-1",
+            "type": "test",
+            "payload": json.dumps({}),
+            "priority": int(Priority.NORMAL),
+            "status": "running",
+            "created_at": "2024-01-01 00:00:00",
+            "started_at": "2024-01-01 00:01:00",
+            "completed_at": None,
+            "attempts": 1,
+            "max_attempts": 3,
+            "last_error": None,
+            "timeout_seconds": 300,
+        }
+        self.mock_fetch_one.return_value = mock_row
+
+        q = PostgresWorkerQueue()
+        await q.complete("task-complete-1", {"result": "success"})
+
+        # _execute should have been called twice (INSERT history, DELETE from queue)
+        assert mock_db._execute.call_count >= 2
+
+    @pytest.mark.asyncio
+    async def test_fail_with_retry(self, mock_db):
+        """fail with retry=True and attempts remaining updates task to pending with backoff."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        mock_row = {
+            "id": "task-retry-1",
+            "type": "test",
+            "payload": "{}",
+            "priority": 2,
+            "status": "running",
+            "created_at": "2024-01-01 00:00:00",
+            "started_at": "2024-01-01 00:01:00",
+            "completed_at": None,
+            "attempts": 1,
+            "max_attempts": 3,
+            "last_error": None,
+            "timeout_seconds": 300,
+        }
+        self.mock_fetch_one.return_value = mock_row
+
+        q = PostgresWorkerQueue()
+        await q.fail("task-retry-1", "Temporary error", retry=True)
+
+        # Should UPDATE the task back to pending with backoff
+        assert mock_db._execute.called
+
+    @pytest.mark.asyncio
+    async def test_fail_moves_to_dead_letter(self, mock_db):
+        """fail with no retries remaining moves task to dead letter."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        mock_row = {
+            "id": "task-dl-1",
+            "type": "test",
+            "payload": "{}",
+            "priority": 2,
+            "status": "running",
+            "created_at": "2024-01-01 00:00:00",
+            "started_at": "2024-01-01 00:01:00",
+            "completed_at": None,
+            "attempts": 3,
+            "max_attempts": 3,
+            "last_error": None,
+            "timeout_seconds": 300,
+        }
+        self.mock_fetch_one.return_value = mock_row
+
+        q = PostgresWorkerQueue()
+        await q.fail("task-dl-1", "Fatal error", retry=True)
+
+        # Should have called _execute for INSERT history + DELETE from queue
+        assert mock_db._execute.called
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_task(self, mock_db):
+        """cancel removes a pending task and archives it."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        mock_row = {
+            "id": "task-cancel-1",
+            "type": "test",
+            "payload": "{}",
+            "priority": 2,
+            "status": "pending",
+            "created_at": "2024-01-01 00:00:00",
+            "started_at": None,
+            "completed_at": None,
+            "attempts": 0,
+            "max_attempts": 3,
+            "last_error": None,
+            "timeout_seconds": 300,
+        }
+        self.mock_fetch_one.return_value = mock_row
+
+        q = PostgresWorkerQueue()
+        result = await q.cancel("task-cancel-1")
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_cancel_nonexistent(self, mock_db):
+        """cancel returns False for a task that doesn't exist."""
+        self.mock_fetch_one.return_value = None
+
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        q = PostgresWorkerQueue()
+        result = await q.cancel("nonexistent")
+        assert result is False
+
+    def test_register_handler(self, mock_db):
+        """register_handler stores the handler for a task type."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        q = PostgresWorkerQueue()
+
+        async def my_handler(task):
+            return {"ok": True}
+
+        q.register_handler("my_type", my_handler)
+        assert "my_type" in q._handlers
+        assert q._handlers["my_type"] is my_handler
+
+    def test_get_status(self, mock_db):
+        """get_status returns status dict with counts from DB."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        # Construct first so _ensure_schema uses default return_value=None mocks,
+        # THEN set up the specific side_effect for get_status() calls
+        q = PostgresWorkerQueue()
+
+        counts = [
+            {"cnt": 5},  # pending
+            {"cnt": 2},  # running
+            {"cnt": 1},  # dead_letter
+            {"cnt": 10},  # completed_24h
+        ]
+        self.mock_fetch_one.side_effect = counts
+
+        status = q.get_status()
+
+        assert status["ok"] is True
+        assert status["backend"] == "postgres"
+        assert status["pending"] == 5
+        assert status["running"] == 2
+        assert status["dead_letter"] == 1
+        assert status["completed_24h"] == 10
+        assert status["max_concurrency"] == 5
+
+    def test_get_task_state_in_queue(self, mock_db):
+        """get_task_state checks queue_tasks first."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        self.mock_fetch_one.return_value = {"id": "task-1", "status": "running"}
+
+        q = PostgresWorkerQueue()
+        state = q.get_task_state("task-1")
+
+        assert state is not None
+        assert state["id"] == "task-1"
+
+    def test_get_task_state_in_history(self, mock_db):
+        """get_task_state falls back to queue_task_history."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        # Construct first so _ensure_schema uses default return_value=None mocks,
+        # THEN set up the specific side_effect for get_task_state() calls
+        q = PostgresWorkerQueue()
+
+        self.mock_fetch_one.side_effect = [None, {"id": "task-2", "status": "completed"}]
+        state = q.get_task_state("task-2")
+
+        assert state is not None
+        assert state["id"] == "task-2"
+
+    def test_get_task_state_not_found(self, mock_db):
+        """get_task_state returns None when task not found anywhere."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        self.mock_fetch_one.side_effect = [None, None]
+
+        q = PostgresWorkerQueue()
+        state = q.get_task_state("nonexistent")
+
+        assert state is None
+
+    @pytest.mark.asyncio
+    async def test_get_task_state_async(self, mock_db):
+        """get_task_state_async wraps get_task_state via to_thread."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        self.mock_fetch_one.return_value = {"id": "task-async-1", "status": "pending"}
+
+        q = PostgresWorkerQueue()
+        state = await q.get_task_state_async("task-async-1")
+
+        # Should call _fetch_one for queue_tasks
+        assert state is not None
+        assert state["id"] == "task-async-1"
+
+    def test_get_dead_letter_queue(self, mock_db):
+        """get_dead_letter_queue returns archived dead letter entries."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        self.mock_fetch_all.return_value = [
+            {"id": "dl-1", "status": "dead_letter", "type": "test"},
+            {"id": "dl-2", "status": "dead_letter", "type": "test"},
+        ]
+
+        q = PostgresWorkerQueue()
+        entries = q.get_dead_letter_queue(limit=10)
+
+        assert len(entries) == 2
+        assert entries[0]["id"] == "dl-1"
+
+    def test_retry_dead_letter(self, mock_db):
+        """retry_dead_letter re-queues a dead letter task."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        self.mock_fetch_one.return_value = {
+            "id": "dl-retry-1",
+            "type": "test",
+            "payload": "{}",
+            "priority": 2,
+            "status": "dead_letter",
+            "created_at": "2024-01-01 00:00:00",
+            "started_at": None,
+            "completed_at": None,
+            "attempts": 3,
+            "max_attempts": 3,
+            "last_error": "Error",
+            "timeout_seconds": 300,
+        }
+
+        q = PostgresWorkerQueue()
+        result = q.retry_dead_letter("dl-retry-1")
+
+        assert result is True
+        # Should have called _execute for INSERT + DELETE
+        assert mock_db._execute.called
+
+    def test_retry_dead_letter_not_found(self, mock_db):
+        """retry_dead_letter returns False when task not found."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        self.mock_fetch_one.return_value = None
+
+        q = PostgresWorkerQueue()
+        result = q.retry_dead_letter("nonexistent")
+
+        assert result is False
+
+    def test_clear_completed_history(self, mock_db):
+        """clear_completed_history deletes old completed/dead_letter entries."""
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        q = PostgresWorkerQueue()
+        q.clear_completed_history(older_than_days=7)
+
+        # Should have called _execute with DELETE SQL
+        assert mock_db._execute.called
+
+    def test_get_status_handles_exception(self, monkeypatch):
+        """get_status returns error dict when _conn raises."""
+        import app.worker_queue_postgres as wqp
+
+        # Mock _ensure_schema to no-op so construction doesn't hit failing _conn
+        monkeypatch.setattr(wqp, "_ensure_schema", MagicMock())
+        monkeypatch.setattr(wqp, "_conn", MagicMock(side_effect=Exception("Connection failed")))
+        monkeypatch.setattr(wqp, "_execute", MagicMock())
+
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        q = PostgresWorkerQueue()
+        status = q.get_status()
+
+        assert status["ok"] is False
+        assert "error" in status
+
+    def test_get_dead_letter_queue_handles_exception(self, monkeypatch):
+        """get_dead_letter_queue returns empty list on error."""
+        import app.worker_queue_postgres as wqp
+
+        def failing_fetch_all(conn, sql, *args):
+            raise Exception("Query failed")
+
+        monkeypatch.setattr(wqp, "_fetch_all", failing_fetch_all)
+
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        q = PostgresWorkerQueue()
+        entries = q.get_dead_letter_queue()
+        assert entries == []

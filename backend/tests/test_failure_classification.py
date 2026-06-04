@@ -36,7 +36,7 @@ def mock_domain_intel():
     class MockIntel:
         def __init__(self) -> None:
             self.domain = "test.example.com"
-            self.failure_history = {}
+            self.failure_history: dict[str, int] = {}
             self.preferred_strategy = "none"
             self.hydration_delay_ms = 1000
             self.anti_bot_risk = 0.0
@@ -47,7 +47,7 @@ def mock_domain_intel():
 
     class MockRegistry:
         def __init__(self) -> None:
-            self._cache = {}
+            self._cache: dict[str, object] = {}
 
         def get_intelligence(self, url):
             if url not in self._cache:

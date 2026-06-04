@@ -193,9 +193,9 @@ class _MockAsyncClient:
 
     def __init__(self, response_sequence=None) -> None:
         # response_sequence: list of response objects or callables that return responses
-        self.response_sequence = response_sequence or []
+        self.response_sequence: list = response_sequence or []
         self.call_count = 0
-        self.posts = []
+        self.posts: list[tuple] = []
 
     async def __aenter__(self):
         return self
