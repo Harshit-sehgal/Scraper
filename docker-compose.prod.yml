@@ -21,7 +21,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: dataforge:latest
+    image: dataforge:${DATAFORGE_IMAGE_TAG:-latest}
     container_name: dataforge-scraper
     # Not exposed directly to the internet — behind nginx
     expose:
@@ -75,7 +75,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: dataforge:latest
+    image: dataforge:${DATAFORGE_IMAGE_TAG:-latest}
     container_name: dataforge-worker
     command: ["/app/scripts/start_worker.sh"]
     env_file:
