@@ -86,9 +86,9 @@ def test_registry_is_non_empty() -> None:
 
 def test_all_research_spot_checks_are_registered() -> None:
     for name in RESEARCH_SPOT_CHECKS:
-        assert (
-            name in RESEARCH_MODULES
-        ), f"Expected {name!r} to be in the research registry. Either add it or update the spot-check."
+        assert name in RESEARCH_MODULES, (
+            f"Expected {name!r} to be in the research registry. Either add it or update the spot-check."
+        )
 
 
 def test_all_kernel_spot_checks_are_NOT_registered() -> None:

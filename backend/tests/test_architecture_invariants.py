@@ -163,9 +163,9 @@ def test_no_orphan_methods() -> None:
     if "field_summary" in uncalled:
         uncalled.remove("field_summary")
 
-    assert (
-        not uncalled
-    ), f"Uncalled public methods on SemanticWorldState: {uncalled}. These may be dead code or indicate incomplete cleanup."
+    assert not uncalled, (
+        f"Uncalled public methods on SemanticWorldState: {uncalled}. These may be dead code or indicate incomplete cleanup."
+    )
 
 
 def test_event_subscribers_are_defined() -> None:

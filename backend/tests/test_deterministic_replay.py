@@ -375,9 +375,9 @@ def test_cumulative_replay_multiple_transactions() -> None:
     ws.replay_transaction(tx3)
 
     # Verify final state matches
-    assert (
-        abs(ws.metrics.global_energy - expected_energy) < 0.001
-    ), f"Energy: expected {expected_energy}, got {ws.metrics.global_energy}"
+    assert abs(ws.metrics.global_energy - expected_energy) < 0.001, (
+        f"Energy: expected {expected_energy}, got {ws.metrics.global_energy}"
+    )
     assert ws.metrics.total_records_processed == expected_records
     assert set(ws.get_manifold_roles()) == expected_roles
 
