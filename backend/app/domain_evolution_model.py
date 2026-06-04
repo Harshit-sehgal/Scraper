@@ -35,10 +35,10 @@ _background_tasks: set[asyncio.Task] = set()
 
 
 async def _trigger_webhook(url: str, payload: dict):
-    import httpx
-
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        from app.url_safety import get_safe_async_client
+
+        async with get_safe_async_client(timeout=5.0) as client:
             response = await client.post(url, json=payload)
             if response.status_code >= 400:
                 logger.warning("Alert webhook returned status code %d", response.status_code)
@@ -207,10 +207,11 @@ class DomainEvolutionModel:
                     import threading
 
                     def fire_sync():
-                        import httpx
+                        from app.url_safety import get_safe_client
 
                         try:
-                            httpx.post(webhook_url, json=payload, timeout=5.0)
+                            with get_safe_client(timeout=5.0) as client:
+                                client.post(webhook_url, json=payload)
                         except Exception as ex:
                             logger.debug("Failed to deliver webhook synchronously: %s", ex)
 

@@ -48,7 +48,49 @@ fi
 # 2. Perform Dump
 DB_USER="dataforge"
 DB_NAME="dataforge"
-CONTAINER_NAME="dataforge-postgres"
+DB_HOST="postgres"
+DB_PASS=""
+DB_PORT=""
+
+if [ -n "${DATAFORGE_DATABASE_URL:-}" ]; then
+    echo "[INFO] Parsing database configuration from DATAFORGE_DATABASE_URL."
+    # Run python to parse URL securely
+    parsed_config=$(python3 -c '
+import os
+from urllib.parse import urlsplit, unquote
+url = os.environ.get("DATAFORGE_DATABASE_URL", "")
+try:
+    parsed = urlsplit(url)
+    user = unquote(parsed.username) if parsed.username else "dataforge"
+    name = parsed.path.lstrip("/") if parsed.path else "dataforge"
+    host = parsed.hostname or "postgres"
+    password = unquote(parsed.password) if parsed.password else ""
+    port = parsed.port or ""
+    # Escape quotes for bash safety
+    user_esc = user.replace("\"", "\\\"")
+    name_esc = name.replace("\"", "\\\"")
+    host_esc = host.replace("\"", "\\\"")
+    pass_esc = password.replace("\"", "\\\"")
+    print(f"DB_USER=\"{user_esc}\";DB_NAME=\"{name_esc}\";DB_HOST=\"{host_esc}\";DB_PASS=\"{pass_esc}\";DB_PORT=\"{port}\"")
+except Exception:
+    pass
+' 2>/dev/null || true)
+    if [ -n "${parsed_config}" ]; then
+        eval "${parsed_config}"
+    fi
+fi
+
+# Determine CONTAINER_NAME dynamically
+CONTAINER_NAME="${DATAFORGE_CONTAINER_NAME:-${CONTAINER_NAME:-}}"
+if [ -z "${CONTAINER_NAME}" ]; then
+    if docker ps --format '{{.Names}}' | grep -q "^${DB_HOST}$"; then
+        CONTAINER_NAME="${DB_HOST}"
+    elif docker ps --format '{{.Names}}' | grep -q "^dataforge-${DB_HOST}$"; then
+        CONTAINER_NAME="dataforge-${DB_HOST}"
+    else
+        CONTAINER_NAME="dataforge-postgres"
+    fi
+fi
 
 echo "[INFO] Extracting pg_dump from container '${CONTAINER_NAME}'..."
 
@@ -58,10 +100,22 @@ if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
         echo "[ERROR] pg_dump utility not found locally, and container is not running."
         exit 1
     fi
-    PGPASSWORD="${DATAFORGE_DB_PASSWORD:-}" pg_dump -h localhost -U "${DB_USER}" -d "${DB_NAME}" | gzip > "${BACKUP_FILE}"
+    TARGET_HOST="${DB_HOST}"
+    if [ "${TARGET_HOST}" = "postgres" ]; then
+        TARGET_HOST="localhost"
+    fi
+    PORT_ARG=""
+    if [ -n "${DB_PORT}" ]; then
+        PORT_ARG="-p ${DB_PORT}"
+    fi
+    PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" pg_dump ${PORT_ARG} -h "${TARGET_HOST}" -U "${DB_USER}" -d "${DB_NAME}" | gzip > "${BACKUP_FILE}"
 else
     # Run pg_dump inside running docker container
-    docker exec -t "${CONTAINER_NAME}" pg_dump -U "${DB_USER}" -d "${DB_NAME}" | gzip > "${BACKUP_FILE}"
+    PORT_ARG=""
+    if [ -n "${DB_PORT}" ]; then
+        PORT_ARG="-p ${DB_PORT}"
+    fi
+    docker exec -e PGPASSWORD="${DATAFORGE_DB_PASSWORD:-${DB_PASS:-}}" -t "${CONTAINER_NAME}" pg_dump ${PORT_ARG} -U "${DB_USER}" -d "${DB_NAME}" | gzip > "${BACKUP_FILE}"
 fi
 
 # Restrict permissions

@@ -1,7 +1,11 @@
 import ipaddress
 import logging
 import socket
+from typing import Any
 from urllib.parse import urlparse
+
+import httpcore
+import httpx
 
 from app.config import settings
 
@@ -101,3 +105,156 @@ def validate_public_http_url(url: str) -> None:
             )
         else:
             logger.warning("DNS resolution failed for hostname '%s': %s", hostname, e)
+
+
+class SafeAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
+    def __init__(self, backend: httpcore.AsyncNetworkBackend):
+        self._backend = backend
+
+    async def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: Any = None,
+    ) -> httpcore.AsyncNetworkStream:
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+        try:
+            infos = await loop.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+            for family, type, proto, canonname, sockaddr in infos:
+                ip = str(sockaddr[0])
+                if not is_safe_ip(ip):
+                    raise ValueError(f"Rejected connection to unsafe IP address: {ip}")
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            pass
+
+        return await self._backend.connect_tcp(
+            host,
+            port,
+            timeout=timeout,
+            local_address=local_address,
+            socket_options=socket_options,
+        )
+
+    async def connect_unix_socket(
+        self,
+        path: str,
+        timeout: float | None = None,
+        socket_options: Any = None,
+    ) -> httpcore.AsyncNetworkStream:
+        raise ValueError("UNIX socket connections are disabled for security reasons.")
+
+    async def sleep(self, seconds: float) -> None:
+        await self._backend.sleep(seconds)
+
+
+class SafeAsyncHTTPTransport(httpx.AsyncHTTPTransport):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        from httpcore._backends.auto import AutoBackend
+
+        default_backend = AutoBackend()
+        self._pool._network_backend = SafeAsyncNetworkBackend(default_backend)
+
+
+def get_safe_async_client(**kwargs: Any) -> httpx.AsyncClient:
+    """Create an AsyncClient with transport-layer SSRF protection."""
+    if "transport" not in kwargs:
+        transport_kwargs = {}
+        for key in [
+            "verify",
+            "cert",
+            "trust_env",
+            "http1",
+            "http2",
+            "limits",
+            "proxy",
+            "uds",
+            "local_address",
+            "retries",
+            "socket_options",
+        ]:
+            if key in kwargs:
+                transport_kwargs[key] = kwargs.pop(key)
+        kwargs["transport"] = SafeAsyncHTTPTransport(**transport_kwargs)
+    return httpx.AsyncClient(**kwargs)
+
+
+class SafeNetworkBackend(httpcore.NetworkBackend):
+    def __init__(self, backend: httpcore.NetworkBackend):
+        self._backend = backend
+
+    def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: Any = None,
+    ) -> httpcore.NetworkStream:
+        try:
+            infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+            for family, type, proto, canonname, sockaddr in infos:
+                ip = str(sockaddr[0])
+                if not is_safe_ip(ip):
+                    raise ValueError(f"Rejected connection to unsafe IP address: {ip}")
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            pass
+
+        return self._backend.connect_tcp(
+            host,
+            port,
+            timeout=timeout,
+            local_address=local_address,
+            socket_options=socket_options,
+        )
+
+    def connect_unix_socket(
+        self,
+        path: str,
+        timeout: float | None = None,
+        socket_options: Any = None,
+    ) -> httpcore.NetworkStream:
+        raise ValueError("UNIX socket connections are disabled for security reasons.")
+
+    def sleep(self, seconds: float) -> None:
+        self._backend.sleep(seconds)
+
+
+class SafeHTTPTransport(httpx.HTTPTransport):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        from httpcore._backends.sync import SyncBackend
+
+        default_backend = SyncBackend()
+        self._pool._network_backend = SafeNetworkBackend(default_backend)
+
+
+def get_safe_client(**kwargs: Any) -> httpx.Client:
+    """Create a sync Client with transport-layer SSRF protection."""
+    if "transport" not in kwargs:
+        transport_kwargs = {}
+        for key in [
+            "verify",
+            "cert",
+            "trust_env",
+            "http1",
+            "http2",
+            "limits",
+            "proxy",
+            "uds",
+            "local_address",
+            "retries",
+            "socket_options",
+        ]:
+            if key in kwargs:
+                transport_kwargs[key] = kwargs.pop(key)
+        kwargs["transport"] = SafeHTTPTransport(**transport_kwargs)
+    return httpx.Client(**kwargs)

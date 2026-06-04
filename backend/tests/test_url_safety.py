@@ -374,3 +374,22 @@ def test_validate_resolved_private_ip_in_dev(monkeypatch) -> None:
 
     with pytest.raises(ValueError, match="resolves to restricted IP"):
         validate_public_http_url("http://bad-dev-dns.com")
+
+
+@pytest.mark.asyncio
+async def test_get_safe_async_client_blocks_private_ip() -> None:
+    from app.url_safety import get_safe_async_client
+
+    async with get_safe_async_client() as client:
+        with pytest.raises(ValueError, match="Rejected connection to unsafe IP address"):
+            await client.get("http://127.0.0.1:8000")
+
+
+@pytest.mark.asyncio
+async def test_get_safe_async_client_blocks_unix_socket() -> None:
+    from app.url_safety import SafeAsyncNetworkBackend
+    from httpcore._backends.auto import AutoBackend
+
+    backend = SafeAsyncNetworkBackend(AutoBackend())
+    with pytest.raises(ValueError, match="UNIX socket connections are disabled"):
+        await backend.connect_unix_socket("/tmp/some.sock")

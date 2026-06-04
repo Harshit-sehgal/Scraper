@@ -33,10 +33,21 @@ Status: pre-production candidate.
 |------|--------|
 | Ruff lint | ✅ 0 errors |
 | Mypy | ✅ 0 errors (349 files, `--check-untyped-defs`) |
-| Tests (SQLite) | ✅ 1970 passed, 73 skipped, 0 RuntimeWarnings |
+| Tests (SQLite) | Run tests dynamically using `pytest` (see docs/TESTING.md) |
 | Compile | ✅ Clean |
 
 For the latest verified status, including exact compile results, collected/passed test counts (SQLite, Postgres, Playwright browser, and Golden Dataset live extraction), and other detailed validation evidence, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
+
+## API and Dashboard Notes
+
+### API Payload Optimization
+To keep polling overhead and network transfer light, `/api/jobs` (and `/api/recycle_bin`) return a summary DTO. For detailed job configurations, logs, or results, query `/api/jobs/{job_id}`, `/api/jobs/{job_id}/results`, or the export endpoints.
+
+### API Security & Development Mode
+In development mode (`DATAFORGE_ENV=development`), unauthenticated calls are rejected by default. To enable silent bypass/escalation to `ADMIN` for local testing when API keys are empty, you must explicitly set `DATAFORGE_ALLOW_INSECURE_DEV_AUTH=true`.
+
+### Internal-Only Static Dashboard
+The static dashboard is strictly **internal-only** and is not mounted in production (`DATAFORGE_ENV=production`) to reduce the attack surface. In production, serve the frontend assets via Nginx/CDN with explicit network ACLs and/or reverse-proxy level auth.
 
 ## Quick Start
 

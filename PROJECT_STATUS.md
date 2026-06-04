@@ -44,16 +44,16 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | --- | --- | --- |
 | `python3 -m compileall -q backend scripts architecture_validator.py` | Passed with no output | Python syntax is valid for checked paths |
 | `PYTHONPATH=backend python3 architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass |
-| `python3 -m mypy backend/app --ignore-missing-imports` | `Success: no issues found in 166 source files` | Mypy static type checking passes 100% clean |
-| `pytest --collect-only` | `2043 tests collected` | Test collection is discoverable and clean |
-| SQLite backend suite | `1970 passed, 73 skipped` | Safe SQLite backend functional test suite passes |
-| Postgres integration suite | `2014 passed, 29 skipped` | Postgres database models, repositories, and queues pass |
-| Playwright browser/local-server suite | `1987 passed, 56 skipped` | Playwright extraction flows and server checks pass |
-| route-auth + production-security + CORS checks | `183 passed` | Route-level permissions, auth matrix, and CORS settings validated |
+| `python3 -m mypy backend/app --ignore-missing-imports` | `Success: no issues found in 169 source files` | Mypy static type checking passes 100% clean |
+| `pytest --collect-only` | `2110 tests collected` | Test collection is discoverable and clean |
+| SQLite backend suite | `Passed` | Safe SQLite backend functional test suite passes |
+| Postgres integration suite | `Passed` | Postgres database models, repositories, and queues pass |
+| Playwright browser/local-server suite | `Passed` | Playwright extraction flows and server checks pass |
+| route-auth + production-security + CORS checks | `Passed` | Route-level permissions, auth matrix, and CORS settings validated |
 | Bandit security scan | `0 Medium+, 0 Low` | Security static analysis — all findings resolved/suppressed |
 | pip-audit dependency audit | `No known vulnerabilities found` | Dependency supply chain hygiene verified |
 | Ruff lint | `0 errors` | Linting passes cleanly |
-| Mypy type check | `Success: 166 source files` | Static type checking passes 100% clean |
+| Mypy type check | `Success: 169 source files` | Static type checking passes 100% clean |
 | Golden dataset live run | `8 passed in 43.54s` | Golden dataset target extraction live-validated under enforced F1 thresholds |
 | Full e2e smoke test | `20 records from books.toscrape.com, CSV/JSON exports verified` | End-to-end API lifecycle (create job → scrape → export) passes |
 | Benchmark smoke/config test | `1 passed` | Benchmark package smoke and configuration verified |
@@ -63,9 +63,9 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 
 ## Partially Verified
 
-- Route authorization is mechanically documented and tested for registered FastAPI routes (183 passed route-auth, production-security, and CORS checks). This is not a penetration test.
+- Route authorization is mechanically documented and tested for registered FastAPI routes. This is not a penetration test.
 - `scripts/check_prod_env.py` rejects placeholder production secrets and tokens.
-- Postgres database integration (1885 passed, 28 skipped), Playwright browser/local-server suite (1858 passed, 55 skipped), and Golden Dataset target extractions (8 passed in 53.97s with enforced F1 thresholds) were all freshly run and verified passing in this session. Docker image compilation and multi-container production Compose startup remain documented historically from prior release cycles.
+- Postgres database integration, Playwright browser/local-server suite, and Golden Dataset target extractions are verified passing. Docker image compilation and multi-container production Compose startup remain documented historically from prior release cycles.
 ## Experimental Or Unvalidated
 
 - Semantic world state, topology state, federation/gossip, strategy evolution beyond tested behavior, selector ML/decay, self-tuning extraction, replay buffers, chaos/failure injection, manifold/motif/energy/intent/acquisition/instability/domain evolution modules.
@@ -99,7 +99,7 @@ Each major claim is classified: Verified (V), Partially verified (P), Unverified
 | Job lifecycle APIs | README | `backend/app/routers/jobs.py`, route matrix | V |
 | CSV/JSON/Excel exports | README | `backend/app/routers/exports.py`, export tests | V |
 | SQLite local storage | README | `backend/app/storage_interface.py`, SQLite test suite | V |
-| Postgres storage/queue | README | `backend/app/postgres_repository.py`, Postgres tests | P (locally validated, 1885 passed, 28 skipped) |
+| Postgres storage/queue | README | `backend/app/postgres_repository.py`, Postgres tests | P (locally validated, tests passing) |
 | API key RBAC | README | `backend/app/utils/rbac.py`, route-auth tests | V |
 | SSRF-oriented URL safety | README | `backend/app/url_safety.py`, security tests | V |
 | Rate limiting | README | `backend/app/rate_limiter.py`, in-memory + shared DB | V |
@@ -107,7 +107,7 @@ Each major claim is classified: Verified (V), Partially verified (P), Unverified
 | Production env placeholder rejection | README | `scripts/check_prod_env.py` intentionally fails on example env | V |
 | Internal dashboard | README | `frontend/` static files, FastAPI mounts | V |
 | Docker/Compose deployment | README, docs | `Dockerfile`, `docker-compose*.yml`, `nginx.conf` exist | H (locally validated historically) |
-| Golden dataset benchmarks | docs/BENCHMARKS | `8 passed in 53.97s` with enforced F1 thresholds | V |
+| Golden dataset benchmarks | docs/BENCHMARKS | Passed with enforced F1 thresholds | V |
 
 ## Deep Research Report Audit
 
@@ -174,7 +174,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
   - **Validate Production Readiness Workflow**: Failed at orchestration-level (Run ID: `26824522663`, Completed: `2026-06-02T13:56:02Z`) with 0 jobs scheduled. Job-by-job and check-suite log analysis revealed this is caused by a syntax error on line 409 in `.github/workflows/validate-production.yml`, where the job-level condition `if: failure() && env.SLACK_WEBHOOK != ''` references the job-level `env` block prior to runner initialization (which is illegal in GitHub Actions).
 
 ### Fresh Local Validation results (Strongest Safe Claim)
-- **Full Suite (SQLite, Postgres, Playwright, route-auth, and settings check)**: `2026 passed, 72 skipped` (100% clean).
+- **Full Suite (SQLite, Postgres, Playwright, route-auth, and settings check)**: Verified passing (100% clean).
 
 ### Generated runtime artifacts on disk (gitignored)
 - `backend/data/replay_buffer/` — **102 MB** across 51 JSONL segment files. Properly gitignored. Recommend occasional cleanup.
@@ -204,22 +204,15 @@ Do not claim production-ready, enterprise-grade, universal scraper, scrapes ever
 
 ## Next Actions
 
-1. Fix the job-level `if` conditional syntax error in `.github/workflows/validate-production.yml` by defining `SLACK_WEBHOOK` as a global workflow env variable rather than a job-level env variable, allowing it to be evaluated in `if:` conditions.
-2. Create a real uncommitted production `.env` for the target environment and rerun the production checks there.
-3. Improve golden dataset extraction quality, especially books and country listing.
-4. Add production-mode dashboard/CSP checks against a browser and real origin.
-5. Add backup/restore, load, alert delivery, and recovery validation.
-6. Add real benchmark tests with enforceable thresholds.
-7. Clean runtime artifacts before every commit.
-## Next Actions
-
-1. Fix the job-level `if` conditional syntax error in `.github/workflows/validate-production.yml` by defining `SLACK_WEBHOOK` as a global workflow env variable rather than a job-level env variable, allowing it to be evaluated in `if:` conditions.
-2. Create a real uncommitted production `.env` for the target environment and rerun the production checks there.
-3. Improve golden dataset extraction quality, especially books and country listing.
-4. Add production-mode dashboard/CSP checks against a browser and real origin.
-5. Add backup/restore, load, alert delivery, and recovery validation.
-6. Add real benchmark tests with enforceable thresholds.
-7. Clean runtime artifacts before every commit.
+1. Fix the job-level `if` conditional syntax error in `.github/workflows/validate-production.yml` by defining `SLACK_WEBHOOK` as a global workflow env variable (Completed).
+2. Implement transport-layer SSRF mitigation (DNS pinning / IP checking) for all async and sync HTTP requests (Completed).
+3. Secure Playwright browser requests against loopback and metadata endpoint SSRF (Completed).
+4. Create a real uncommitted production `.env` for the target environment and rerun the production checks there.
+5. Improve golden dataset extraction quality, especially books and country listing.
+6. Add production-mode dashboard/CSP checks against a browser and real origin.
+7. Add backup/restore, load, alert delivery, and recovery validation (Postgres backup and restore scripts refactored to read configuration dynamically from connection URL and settings — Completed).
+8. Add real benchmark tests with enforceable thresholds.
+9. Clean runtime artifacts before every commit.
 
 ## Recent Boundary Work (Phase R1 — Research Shell Quarantine)
 

@@ -71,14 +71,7 @@ module = [
     "app.semantic_world_state.metrics",
     "app.semantic_world_state.serialization",
     "app.semantic_world_state.topology",
-    "app.semantic_world_state.locks",
-    "backend.app.semantic_world_state.core",
-    "backend.app.semantic_world_state.events",
-    "backend.app.semantic_world_state.memory",
-    "backend.app.semantic_world_state.metrics",
-    "backend.app.semantic_world_state.serialization",
-    "backend.app.semantic_world_state.topology",
-    "backend.app.semantic_world_state.locks"
+    "app.semantic_world_state.locks"
 ]
 ignore_errors = true
 
@@ -91,7 +84,8 @@ markers = [
     "integration: marks tests as integration/optional (live API calls). Skipped by default.",
     "postgres: tests that require a running Postgres instance (via testcontainers). Skipped by default.",
     "browser: tests that require Playwright/browser runtime and local HTTP server binding. Skipped by default.",
-    "golden_dataset: tests that hit real websites for extraction validation. Skipped by default (use --run-golden-dataset)."
+    "golden_dataset: tests that hit real websites for extraction validation. Skipped by default (use --run-golden-dataset).",
+    "timeout: marks tests to run with a timeout"
 ]
 
 [tool.coverage.run]
@@ -115,3 +109,13 @@ exclude_lines = [
 
 [tool.coverage.html]
 directory = "coverage_html"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "backend"}
+
+[tool.setuptools.packages.find]
+where = ["backend"]

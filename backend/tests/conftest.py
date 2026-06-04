@@ -143,6 +143,7 @@ os.environ.setdefault("DATAFORGE_STATE_FILE", str(ROOT / "backend" / "data" / "j
 
 # Set development environment and disable API key validation for tests
 os.environ["DATAFORGE_ENV"] = "development"
+os.environ["DATAFORGE_ALLOW_INSECURE_DEV_AUTH"] = "true"
 os.environ["DATAFORGE_API_KEY"] = ""
 os.environ["DATAFORGE_ADMIN_API_KEY"] = ""
 os.environ["DATAFORGE_OPERATOR_API_KEY"] = ""

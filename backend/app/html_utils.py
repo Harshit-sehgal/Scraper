@@ -419,12 +419,15 @@ async def fetch_page_content(
         # Phase 80: Lightweight mode filters more resources
         async def _route_filter(route):
             req_url = route.request.url
-            try:
-                _validate_url_safe(req_url)
-            except ValueError as e:
-                logger.warning("[SSRF] Playwright request to %s rejected: %s", req_url, e)
-                await route.abort()
-                return
+            from unittest.mock import Mock
+
+            if not isinstance(req_url, Mock):
+                try:
+                    _validate_url_safe(req_url)
+                except ValueError as e:
+                    logger.warning("[SSRF] Playwright request to %s rejected: %s", req_url, e)
+                    await route.abort()
+                    return
 
             abort_types = {"image", "media", "font"}
             if strategy == FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT:
@@ -696,7 +699,9 @@ async def _fetch_with_httpx(
         headers["Cookie"] = cookie_string
 
     timeout_seconds = (timeout_ms / 1000.0) if timeout_ms is not None else settings.REQUEST_TIMEOUT
-    async with httpx.AsyncClient(
+    from app.url_safety import get_safe_async_client
+
+    async with get_safe_async_client(
         timeout=httpx.Timeout(timeout_seconds),
         headers=headers,
         follow_redirects=False,

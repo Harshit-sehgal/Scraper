@@ -59,7 +59,7 @@ jobs:
           | tee /tmp/collection.log
 
           COLLECTED=$(grep "tests collected" /tmp/collection.log | awk '{print $1}')
-          echo "Collected tests: $COLLECTED (expected ~1937)"
+          echo "Collected tests: $COLLECTED"
 
   test-sqlite:
     name: Test SQLite Backend
@@ -89,7 +89,7 @@ jobs:
           2>&1 | tee /tmp/test_results.txt
 
           PASSED=$(grep "passed" /tmp/test_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
-          echo "SQLite tests passed: ${PASSED:-0} (expected ~1863)"
+          echo "SQLite tests passed: ${PASSED:-0}"
 
   test-security:
     name: Security Tests
@@ -121,7 +121,7 @@ jobs:
           2>&1 | tee /tmp/security_results.txt
 
           PASSED=$(grep "passed" /tmp/security_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
-          echo "Security tests passed: ${PASSED:-0} (expected ~178)"
+          echo "Security tests passed: ${PASSED:-0}"
 
   test-benchmarks:
     name: Benchmark Smoke Test

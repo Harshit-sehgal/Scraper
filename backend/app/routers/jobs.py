@@ -188,7 +188,28 @@ def create_jobs_router(
 
         with _store_lock:
             ordered = sorted(jobs_store.values(), key=lambda j: j.created_at, reverse=True)
-            return {"jobs": [job.model_dump() for job in ordered]}
+            summaries = []
+            for job in ordered:
+                dumped = job.model_dump()
+                summaries.append(
+                    {
+                        "id": dumped["id"],
+                        "name": dumped["name"],
+                        "mode": dumped["mode"],
+                        "urls": dumped["urls"],
+                        "topic": dumped.get("topic", ""),
+                        "status": dumped["status"],
+                        "created_at": dumped["created_at"],
+                        "started_at": dumped.get("started_at"),
+                        "completed_at": dumped.get("completed_at"),
+                        "total_records": dumped.get("total_records", 0),
+                        "filtered_records": dumped.get("filtered_records", 0),
+                        "progress_current": dumped.get("progress_current", 0),
+                        "progress_total": dumped.get("progress_total", 0),
+                        "error": dumped.get("error"),
+                    }
+                )
+            return {"jobs": summaries}
 
     @router.get("/api/jobs/{job_id}")
     async def get_job(job_id: str, include_results: bool = Query(False)):
@@ -203,6 +224,7 @@ def create_jobs_router(
                 results_list = load_job_results_from_disk(job.id, job.results_file_path)
 
         dumped = job.model_dump()
+        dumped.pop("results_file_path", None)
         dumped["results"] = results_list
         return dumped
 
@@ -657,7 +679,28 @@ def create_jobs_router(
     async def list_recycle_bin():
         with _store_lock:
             ordered = sorted(recycle_bin_store.values(), key=lambda j: j.created_at, reverse=True)
-            return {"jobs": [job.model_dump() for job in ordered]}
+            summaries = []
+            for job in ordered:
+                dumped = job.model_dump()
+                summaries.append(
+                    {
+                        "id": dumped["id"],
+                        "name": dumped["name"],
+                        "mode": dumped["mode"],
+                        "urls": dumped["urls"],
+                        "topic": dumped.get("topic", ""),
+                        "status": dumped["status"],
+                        "created_at": dumped["created_at"],
+                        "started_at": dumped.get("started_at"),
+                        "completed_at": dumped.get("completed_at"),
+                        "total_records": dumped.get("total_records", 0),
+                        "filtered_records": dumped.get("filtered_records", 0),
+                        "progress_current": dumped.get("progress_current", 0),
+                        "progress_total": dumped.get("progress_total", 0),
+                        "error": dumped.get("error"),
+                    }
+                )
+            return {"jobs": summaries}
 
     @router.post("/api/recycle_bin/{job_id}/restore")
     async def restore_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):

@@ -175,7 +175,9 @@ async def analyze_url_for_fields(
     # resolves to, without the overhead of a full Playwright session.
     final_url = url
     try:
-        async with httpx.AsyncClient(
+        from app.url_safety import get_safe_async_client
+
+        async with get_safe_async_client(
             follow_redirects=False,
             timeout=httpx.Timeout(10.0),
         ) as client:

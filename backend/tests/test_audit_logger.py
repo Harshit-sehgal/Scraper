@@ -189,8 +189,8 @@ class TestLogFunctions:
             )
         events = get_recent_events(count=10)
         assert len(events) >= 5
-        # Most recent event should be user-4
-        assert events[-1]["actor"] == "user-4"
+        # Most recent event should be user-4, which is the first element (most recent first)
+        assert events[0]["actor"] == "user-4"
 
     def test_get_recent_events_empty(self, temp_log_dir) -> None:
         """get_recent_events should return empty list when no log file exists."""
@@ -206,9 +206,9 @@ class TestLogFunctions:
             )
         events = get_recent_events(count=3)
         assert len(events) == 3
-        # Verify they are the most recent 3 events (user-7, user-8, user-9)
+        # Verify they are the most recent 3 events, most recent first (user-9, user-8, user-7)
         actors = [e["actor"] for e in events]
-        assert actors == ["user-7", "user-8", "user-9"]
+        assert actors == ["user-9", "user-8", "user-7"]
 
 
 # ─── Parse Utility Tests ─────────────────────────────────────────────────

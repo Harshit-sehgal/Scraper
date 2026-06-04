@@ -89,7 +89,12 @@ def configure_middleware(app: FastAPI):
 
 
 def configure_static(app: FastAPI):
-    """Configure static frontend and dashboard mounts if directories exist."""
+    """Configure static frontend and dashboard mounts if directories exist and not in production."""
+    from app.config import settings
+
+    if settings.ENV.lower() == "production":
+        return
+
     FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
     if FRONTEND_DIR.exists():
         app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

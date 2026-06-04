@@ -61,8 +61,13 @@ def get_current_role(request: Request) -> UserRole:
     if is_match(api_key_header, settings.API_KEY) or is_match(provided_token, settings.API_KEY):
         return UserRole.USER
 
-    # 5. In development with no configured keys, allow full access (Admin)
-    if settings.ENV.lower() == "development" and not settings.API_KEY and not settings.ADMIN_API_KEY:
+    # 5. In development with no configured keys, allow full access (Admin) if explicitly permitted
+    if (
+        settings.ENV.lower() == "development"
+        and settings.ALLOW_INSECURE_DEV_AUTH
+        and not settings.API_KEY
+        and not settings.ADMIN_API_KEY
+    ):
         return UserRole.ADMIN
 
     # 6. Fallback / Unauthenticated

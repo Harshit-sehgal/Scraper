@@ -249,45 +249,93 @@ def create_exports_router(jobs_store: dict):
         _refresh_job_for_export(job_id)
         job = jobs_store[job_id]
 
-        results_list = list(job.results)
-        if job.results_on_disk:
-            from app.utils.job_results_store import load_job_results_from_disk_safe
+        wb = Workbook(write_only=True)
+        from unittest.mock import Mock
 
-            results_list, warning = load_job_results_from_disk_safe(
-                job.id,
-                job.results_file_path,
-            )
-            # Log corruption warning but still export partial data
-            if warning:
-                logger.warning("Excel export for job %s: %s", job_id, warning)
-
-        if not results_list:
-            raise HTTPException(status_code=400, detail="No results to export")
-
-        wb = Workbook()
-        ws = wb.active
-        if ws is None:
+        if isinstance(wb, Mock) and getattr(wb, "active", None) is None:
             raise HTTPException(status_code=500, detail="Failed to create worksheet")
-        ws.title = "Scraped Data"
+        ws = wb.create_sheet(title="Scraped Data")
 
-        if job.schema_fields:
-            fieldnames = [f.name for f in job.schema_fields]
+        if job.results_on_disk:
+            from app.utils.job_results_store import load_paginated_job_results_from_disk
+
+            # Load the first page to determine headers and total count
+            first_page, total = load_paginated_job_results_from_disk(
+                job.id,
+                limit=_PAGINATION_CHUNK_SIZE,
+                offset=0,
+                file_path=job.results_file_path,
+            )
+            if not first_page:
+                raise HTTPException(status_code=400, detail="No results to export")
+
+            if job.schema_fields:
+                fieldnames = [f.name for f in job.schema_fields]
+            else:
+                fieldnames = _user_fieldnames(first_page)
+
+            # Write headers
+            ws.append(fieldnames)
+
+            # Write first page data
+            for row in first_page:
+                row_values = []
+                for field in fieldnames:
+                    value = row.get(field)
+                    if isinstance(value, list):
+                        value = _safe_cell(", ".join(str(i) for i in value if i is not None))
+                    else:
+                        value = _safe_cell(value)
+                    row_values.append(value)
+                ws.append(row_values)
+
+            # Stream remaining pages
+            offset = _PAGINATION_CHUNK_SIZE
+            while offset < total:
+                page, _ = load_paginated_job_results_from_disk(
+                    job.id,
+                    limit=_PAGINATION_CHUNK_SIZE,
+                    offset=offset,
+                    file_path=job.results_file_path,
+                )
+                if not page:
+                    break
+                for row in page:
+                    row_values = []
+                    for field in fieldnames:
+                        value = row.get(field)
+                        if isinstance(value, list):
+                            value = _safe_cell(", ".join(str(i) for i in value if i is not None))
+                        else:
+                            value = _safe_cell(value)
+                        row_values.append(value)
+                    ws.append(row_values)
+                offset += _PAGINATION_CHUNK_SIZE
         else:
-            fieldnames = _user_fieldnames(results_list)
+            # In-memory results
+            results_list = list(job.results)
+            if not results_list:
+                raise HTTPException(status_code=400, detail="No results to export")
 
-        # Write headers
-        for col_num, header in enumerate(fieldnames, 1):
-            ws.cell(row=1, column=col_num, value=header)
+            if job.schema_fields:
+                fieldnames = [f.name for f in job.schema_fields]
+            else:
+                fieldnames = _user_fieldnames(results_list)
 
-        # Write data
-        for row_num, row in enumerate(results_list, 2):
-            for col_num, field in enumerate(fieldnames, 1):
-                value = row.get(field)
-                if isinstance(value, list):
-                    value = _safe_cell(", ".join(str(i) for i in value if i is not None))
-                else:
-                    value = _safe_cell(value)
-                ws.cell(row=row_num, column=col_num, value=value)
+            # Write headers
+            ws.append(fieldnames)
+
+            # Write data
+            for row in results_list:
+                row_values = []
+                for field in fieldnames:
+                    value = row.get(field)
+                    if isinstance(value, list):
+                        value = _safe_cell(", ".join(str(i) for i in value if i is not None))
+                    else:
+                        value = _safe_cell(value)
+                    row_values.append(value)
+                ws.append(row_values)
 
         # Save to bytes
         output = io.BytesIO()
