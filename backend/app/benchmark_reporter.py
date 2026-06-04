@@ -158,7 +158,7 @@ class BenchmarkReporter:
 
         Path(DASHBOARD_PATH).parent.mkdir(parents=True, exist_ok=True)
 
-        with open(DASHBOARD_PATH, "w", encoding="utf-8") as f:  # noqa: PTH123
+        with Path(DASHBOARD_PATH).open("w", encoding="utf-8") as f:
             f.write("# 📊 DataForge Regression Trends & Benchmarks Dashboard\n\n")
             f.write("> **Continuous Operational Intelligence**: Auto-updating regression trends tracker.\n\n")
             f.write("## 1. Recent Execution Runs\n\n")

@@ -60,8 +60,8 @@ def _assess_content_quality(html: str, profile) -> dict:
             if soup.select(sel):
                 landing_signals.append("hero_banner")
                 break
-        except Exception:  # noqa: BLE001, nosec B112
-            continue
+        except Exception:  # noqa: BLE001
+            continue  # nosec B112
 
     # Search forms (generic — any form with text / search input)
     forms = soup.find_all("form")
@@ -106,8 +106,8 @@ def _assess_content_quality(html: str, profile) -> dict:
         try:
             containers = soup.select(container_selector)
             data_container_count = sum(1 for c in containers if len(c.get_text(strip=True)) > 20)
-        except Exception:  # noqa: BLE001, nosec B110
-            pass
+        except Exception:  # noqa: BLE001
+            pass  # nosec B110
 
     # ── Generic Data Container Discovery (fallback) ─────────────────
     # When profile's container selector finds little, scan for repeating
@@ -135,8 +135,8 @@ def _assess_content_quality(html: str, profile) -> dict:
                 matching = soup.select(css_sel)
                 content_count = sum(1 for m in matching if len(m.get_text(strip=True)) > 20)
                 data_container_count = max(data_container_count, content_count)
-            except Exception:  # nosec B112  # noqa: BLE001
-                continue
+            except Exception:  # noqa: BLE001
+                continue  # nosec B112
 
         # Also scan for repeating direct children of common containers
         for container_tag in ["div", "li", "article", "section", "tr"]:

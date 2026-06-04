@@ -561,8 +561,8 @@ async def scrape_url(
                     "[SessionRecovery] URL %s is session-bound but no search_params provided — page may be stale",
                     url,
                 )
-        except Exception:  # noqa: BLE001, nosec B110
-            pass
+        except Exception:  # noqa: BLE001
+            pass  # nosec B110
 
     anti_bot = detect_anti_bot(html)
     dom_nodes = estimate_dom_nodes(html)
@@ -578,8 +578,8 @@ async def scrape_url(
     if world_state and hasattr(world_state, "solidified_motifs"):
         try:
             solidified_motifs_count = len(world_state.solidified_motifs)
-        except Exception:  # noqa: BLE001, nosec B110
-            pass
+        except Exception:  # noqa: BLE001
+            pass  # nosec B110
 
     result_warnings: list[str] = []
 

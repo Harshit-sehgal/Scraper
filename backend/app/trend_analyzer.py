@@ -398,7 +398,7 @@ class TrendAnalyzer:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
-        except Exception:  # noqa: BLE001
+        except (ValueError, AttributeError):
             return "unknown"
 
 

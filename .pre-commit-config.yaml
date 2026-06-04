@@ -10,7 +10,7 @@ repos:
     hooks:
       - id: check-research-boundary
         name: Check kernel/research boundary
-        entry: python scripts/check_research_boundary.py
+        entry: python3 scripts/check_research_boundary.py
         language: system
         pass_filenames: false
         types: [python]

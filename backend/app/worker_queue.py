@@ -244,8 +244,8 @@ def _ensure_schema(db_path: Path | None = None) -> None:
                     # successful task results)
                     try:
                         conn.execute("ALTER TABLE task_history ADD COLUMN result TEXT")
-                    except Exception:  # noqa: BLE001, nosec B110
-                        pass
+                    except Exception:  # noqa: BLE001
+                        pass  # nosec B110
                     current = 2
 
                 conn.execute("DELETE FROM queue_schema_version")
@@ -504,8 +504,8 @@ class WorkerQueue:
                             from app.metrics_collector import record_worker_failure
 
                             record_worker_failure(actual_type)
-                        except Exception:  # noqa: BLE001, nosec B110
-                            pass
+                        except Exception:  # noqa: BLE001
+                            pass  # nosec B110
                         conn.execute(
                             """INSERT OR REPLACE INTO task_history
                                (id, type, payload, priority, status, created_at,
@@ -763,8 +763,8 @@ class WorkerQueue:
                             cooldown,
                             task.type,
                         )
-            except Exception:  # noqa: BLE001, nosec B110
-                pass
+            except Exception:  # noqa: BLE001
+                pass  # nosec B110
             await self.fail(task.id, error_msg, retry=True, retry_after=retry_after, task_type=task.type)
 
     async def _cleanup_in_flight(self, task_id: str) -> None:
