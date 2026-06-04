@@ -316,6 +316,223 @@ class TestGetContext:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Check Health
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestCheckHealth:
+    @pytest.mark.asyncio
+    async def test_returns_false_when_no_browser(self) -> None:
+        pool = BrowserPool()
+        assert await pool.check_health() is False
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_browser_healthy(self) -> None:
+        pool = BrowserPool()
+        mock_browser = AsyncMock()
+        mock_browser.is_connected.return_value = True
+        mock_ctx = AsyncMock()
+        mock_page = AsyncMock()
+        mock_browser.new_context.return_value = mock_ctx
+        mock_ctx.new_page.return_value = mock_page
+        pool._browser = mock_browser
+
+        result = await pool.check_health()
+        assert result is True
+        mock_page.close.assert_awaited_once()
+        mock_ctx.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_browser_disconnected(self) -> None:
+        pool = BrowserPool()
+        mock_browser = MagicMock()
+        mock_browser.is_connected.return_value = False
+        pool._browser = mock_browser
+
+        result = await pool.check_health()
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_health_check_raises(self) -> None:
+        pool = BrowserPool()
+        mock_browser = AsyncMock()
+        mock_browser.is_connected.return_value = True
+        mock_browser.new_context.side_effect = Exception("Connection error")
+        pool._browser = mock_browser
+
+        result = await pool.check_health()
+        assert result is False
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Hard Recycle
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestHardRecycle:
+    @pytest.mark.asyncio
+    async def test_clears_all_contexts_and_browser(self) -> None:
+        pool = BrowserPool()
+        pool._contexts["test"] = AsyncMock()
+        pool._context_use_count["test"] = 5
+        pool._browser = AsyncMock()
+        pool._playwright = MagicMock()
+        pool.active_contexts = 3
+        pool._active_fetches = 2
+        pool._cumulative_fetches = 10
+
+        await pool._hard_recycle()
+
+        assert pool._contexts == {}
+        assert pool._context_use_count == {}
+        assert pool._browser is None
+        assert pool._playwright is None
+        assert pool.active_contexts == 0
+        assert pool._active_fetches == 0
+        assert pool._cumulative_fetches == 0
+
+    @pytest.mark.asyncio
+    async def test_handles_close_exceptions_gracefully(self) -> None:
+        pool = BrowserPool()
+        failing_ctx = AsyncMock()
+        failing_ctx.close.side_effect = Exception("Close failed")
+        pool._contexts["test"] = failing_ctx
+        pool._browser = AsyncMock()
+        pool._playwright = MagicMock()
+
+        await pool._hard_recycle()  # Should not raise
+        assert pool._contexts == {}
+
+    @pytest.mark.asyncio
+    async def test_handles_none_browser(self) -> None:
+        pool = BrowserPool()
+        await pool._hard_recycle()  # Should not raise
+        assert pool._contexts == {}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Stealth Strategy Context
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestStealthContext:
+    @pytest.mark.asyncio
+    async def test_creates_context_with_stealth_profile(self) -> None:
+        pool = BrowserPool()
+        mock_browser = AsyncMock()
+        mock_browser.is_connected.return_value = True
+        mock_context = AsyncMock()
+        mock_browser.new_context.return_value = mock_context
+        pool._browser = mock_browser
+        pool._playwright = MagicMock()
+
+        with (
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", True),
+            patch("app.browser_pool.settings.STEALTH_NAVIGATOR_LANGUAGES", "en-US,en"),
+            patch("app.browser_pool.settings.STEALTH_HARDWARE_CONCURRENCY", 4),
+            patch("app.browser_pool.settings.BROWSER_CONTEXT_LIFETIME", 50),
+        ):
+            from app.strategy_evolution import FetchStrategy
+
+            context = await pool.get_context("example.com", FetchStrategy.PLAYWRIGHT_STEALTH)
+
+        assert context is mock_context
+        mock_browser.new_context.assert_awaited_once()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Proxy Context
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestProxyContext:
+    @pytest.mark.asyncio
+    async def test_creates_context_with_proxy_settings(self) -> None:
+        pool = BrowserPool()
+        mock_browser = AsyncMock()
+        mock_browser.is_connected.return_value = True
+        mock_context = AsyncMock()
+        mock_browser.new_context.return_value = mock_context
+        pool._browser = mock_browser
+        pool._playwright = MagicMock()
+
+        mock_proxy = MagicMock()
+        mock_proxy.enabled = True
+        mock_proxy.get_proxy_for_playwright.return_value = {"server": "http://proxy:8080"}
+
+        with (
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
+            patch("app.browser_pool.settings.USER_AGENT", "TestUA"),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1920),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 1080),
+            patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
+            patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", True),
+            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),
+            patch("app.browser_pool.settings.BROWSER_CONTEXT_LIFETIME", 50),
+            patch("app.proxy_manager.get_proxy_manager", return_value=mock_proxy),
+        ):
+            from app.strategy_evolution import FetchStrategy
+
+            context = await pool.get_context("example.com", FetchStrategy.PLAYWRIGHT_FULL)
+
+        assert context is mock_context
+        # Verify proxy was passed to new_context
+        _, kwargs = mock_browser.new_context.call_args
+        assert "proxy" in kwargs
+        assert kwargs["proxy"]["server"] == "http://proxy:8080"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Browser Reconnection
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestBrowserReconnection:
+    @pytest.mark.asyncio
+    async def test_relaunches_when_browser_disconnected(self) -> None:
+        pool = BrowserPool()
+        mock_browser = MagicMock()
+        mock_browser.is_connected.return_value = False  # Disconnected (sync method)
+        new_browser = AsyncMock()
+        new_browser.is_connected = MagicMock(return_value=True)  # sync
+        mock_context = AsyncMock()
+        new_browser.new_context.return_value = mock_context
+
+        pool._browser = mock_browser
+        # Don't pre-set playwright — let async_playwright mock handle everything
+        pool._playwright = None
+
+        with (
+            patch("app.browser_pool.async_playwright") as mock_async_pw,
+            patch("app.browser_pool.settings.PLAYWRIGHT_HEADLESS", True),
+            patch("app.browser_pool.settings.USER_AGENT", "TestUA"),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_WIDTH", 1920),
+            patch("app.browser_pool.settings.BROWSER_VIEWPORT_HEIGHT", 1080),
+            patch("app.browser_pool.settings.STEALTH_DEFAULT_LOCALE", "en-US"),
+            patch("app.browser_pool.settings.STEALTH_TIMEZONE_POOL", "America/New_York"),
+            patch("app.browser_pool.settings.PROXY_ROTATION_ENABLED", False),
+            patch("app.browser_pool.settings.PLAYWRIGHT_STEALTH", False),
+            patch("app.browser_pool.settings.BROWSER_CONTEXT_LIFETIME", 50),
+        ):
+            mock_pw = AsyncMock()
+            mock_pw.chromium.launch.return_value = new_browser
+            mock_pw_manager = MagicMock()
+            mock_pw_manager.start = AsyncMock(return_value=mock_pw)
+            mock_async_pw.return_value = mock_pw_manager
+
+            from app.strategy_evolution import FetchStrategy
+
+            context = await pool.get_context("example.com", FetchStrategy.PLAYWRIGHT_FULL)
+
+        # New browser should be launched and used
+        assert context is mock_context
+        assert pool._browser is new_browser
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Get Browser Pool (Singleton Factory)
 # ═══════════════════════════════════════════════════════════════════════════════
 
