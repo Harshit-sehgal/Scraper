@@ -13,13 +13,18 @@ from dataclasses import dataclass
 
 
 def parse_topology_key(raw: str) -> tuple[str, str]:
+    if len(raw) > 1_000_000:
+        msg = f"Topology key too large: {len(raw)} chars"
+        raise ValueError(msg)
     try:
         value = ast.literal_eval(raw)
     except (SyntaxError, ValueError, TypeError):
-        raise ValueError(f"Invalid topology key format: {raw!r}")
+        msg = f"Invalid topology key format: {raw!r}"
+        raise ValueError(msg)
 
     if not isinstance(value, tuple) or len(value) != 2 or not all(isinstance(item, str) for item in value):
-        raise ValueError(f"Invalid topology key structure: {raw!r}")
+        msg = f"Invalid topology key structure: {raw!r}"
+        raise ValueError(msg)
 
     return value
 

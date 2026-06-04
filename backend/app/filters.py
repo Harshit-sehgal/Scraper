@@ -6,7 +6,7 @@ Uses geopy (free OpenStreetMap Nominatim geocoder) for distance calculations.
 import asyncio
 import logging
 import re
-from typing import Any, Optional
+from typing import Any
 
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
@@ -19,11 +19,11 @@ from app.models import FieldType, FilterOperator, FilterRule, SchemaField
 # ──────────────────────────────────────────────
 
 _geocoder = Nominatim(user_agent=settings.GEOCODER_USER_AGENT, timeout=settings.GEOCODER_TIMEOUT)
-_geocode_cache: dict[str, Optional[tuple[float, float]]] = {}
+_geocode_cache: dict[str, tuple[float, float] | None] = {}
 _LOCATION_NAME_HINTS = ("location", "address", "city", "area", "region", "zip", "pincode")
 
 
-async def geocode_address(address: str) -> Optional[tuple[float, float]]:
+async def geocode_address(address: str) -> tuple[float, float] | None:
     """Convert an address string to (latitude, longitude) using free OpenStreetMap."""
     from app.geocode_cache import get_geocode_cache
 
@@ -69,8 +69,8 @@ def calculate_distance(point1: tuple[float, float], point2: tuple[float, float],
     """
     dist_km = geodesic(point1, point2).kilometers
     if unit == "miles":
-        return dist_km * 0.621371
-    return dist_km
+        return dist_km * 0.621371  # type: ignore[no-any-return]
+    return dist_km  # type: ignore[no-any-return]
 
 
 # ──────────────────────────────────────────────
@@ -387,7 +387,7 @@ def _infer_location_field_names(
     return deduped
 
 
-def _pick_record_location(record: dict, candidate_fields: list[str]) -> Optional[str]:
+def _pick_record_location(record: dict, candidate_fields: list[str]) -> str | None:
     for field in candidate_fields:
         value = record.get(field)
         if value is None:
@@ -402,7 +402,7 @@ async def apply_location_radius(
     records: list[dict],
     schema_fields: list[SchemaField],
     origin_address: str,
-    max_distance_km: Optional[float],
+    max_distance_km: float | None,
     preferred_location_field: str = "",
 ) -> tuple[list[dict], dict]:
     """
@@ -472,7 +472,9 @@ async def apply_location_radius(
 
 
 async def process_results(
-    raw_results: list[dict], schema_fields: list[SchemaField], filters: list[FilterRule]
+    raw_results: list[dict],
+    schema_fields: list[SchemaField],
+    filters: list[FilterRule],
 ) -> tuple[list[dict], int, int, dict]:
     """
     Full post-processing pipeline:

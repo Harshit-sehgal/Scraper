@@ -285,7 +285,7 @@ def _discover_selectors_from_dom(html: str, schema_fields: list[SchemaField]) ->
                 "count": same_class_count,
                 "score": same_class_count * 3 + data_signal_count * 2,
                 "sample_text": text[:80],
-            }
+            },
         )
 
     if not candidates:
@@ -423,7 +423,7 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:
                 "count": len(elements),
                 "score": score,
                 "sample_text": non_empty[0][:80],
-            }
+            },
         )
 
     return candidates
@@ -493,7 +493,7 @@ def _fallback_parent_child_discovery(soup) -> list[dict]:
                     "count": len(children),
                     "score": score,
                     "sample_text": non_empty[0][:80] if non_empty else "",
-                }
+                },
             )
     return candidates
 
@@ -541,7 +541,7 @@ def _build_css_for_element(el) -> str | None:
         "tbody",
         "thead",
     ):
-        return el.name
+        return el.name  # type: ignore[no-any-return]
     return None
 
 

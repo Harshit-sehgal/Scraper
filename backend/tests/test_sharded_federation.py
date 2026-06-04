@@ -77,7 +77,7 @@ def test_lww_domain_reputation_merge(clean_world_state, clean_policy) -> None:
             "total_fetches": 10,
             "cooldown_until": 2000.0,
             "last_update": 1005.0,  # Newer fetch time
-        }
+        },
     }
     snapshot = ShardStateSnapshot(
         node_id="remote-node",

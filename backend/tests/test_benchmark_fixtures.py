@@ -89,7 +89,7 @@ async def test_fixture_extraction_yields_records(
         pytest.skip(
             f"Fixture {fixture_name} required {min_expected_records} records but discovery "
             f"returned none. This may be expected if the fixture requires JS rendering "
-            f"or has unusual HTML structure."
+            f"or has unusual HTML structure.",
         )
 
     assert (

@@ -484,14 +484,14 @@ async def run_job(
 
                 if ai_structuring_report.get("capped_records", 0) > 0:
                     warnings.append(
-                        "AI structuring processed a capped subset of rows; remaining rows used deterministic cleaning."
+                        "AI structuring processed a capped subset of rows; remaining rows used deterministic cleaning.",
                     )
                 if ai_structuring_report.get("model_fallback_mode"):
                     warnings.append("AI structuring switched to deterministic fallback after repeated model timeouts / errors.")
                 _add_job_log(job, "AI structuring complete")
             except asyncio.TimeoutError:
                 warnings.append(
-                    f"AI structuring timed out after {ai_structuring_timeout_seconds}s; continuing with deterministic processing."
+                    f"AI structuring timed out after {ai_structuring_timeout_seconds}s; continuing with deterministic processing.",
                 )
                 _add_job_log(job, "AI structuring timed out, using fallback", level="warning")
                 logging.warning("Job %s: AI structuring timed out", job_id)
@@ -516,7 +516,9 @@ async def run_job(
         # Post-process
         _add_job_log(job, "Applying filters and deduplication...", persist_fn=persist_job_state_fn)
         filtered_results, total, filtered_count, type_integrity_report = await process_results(
-            all_raw_results, job.schema_fields, job.filters
+            all_raw_results,
+            job.schema_fields,
+            job.filters,
         )
         post_filter_count = len(filtered_results)
 
@@ -555,11 +557,11 @@ async def run_job(
             if ai_source_prediction["records_ai_structured"] == 0:
                 if settings.GROQ_API_KEY:
                     warnings.append(
-                        "AI source structuring covered 0% rows in this run; provider timeouts / rate limits may reduce phone / email extraction."  # noqa: E501
+                        "AI source structuring covered 0% rows in this run; provider timeouts / rate limits may reduce phone / email extraction.",
                     )
                 else:
                     warnings.append(
-                        "AI source structuring covered 0% rows in this run; set GROQ_API_KEY to improve phone / email extraction reliability."  # noqa: E501
+                        "AI source structuring covered 0% rows in this run; set GROQ_API_KEY to improve phone / email extraction reliability.",
                     )
 
         job.quality_report = build_quality_report(
@@ -630,7 +632,8 @@ async def run_job(
         # Final cost calculation (Phase 80: Economic Optimization)
         # $0.01 per LLM call + estimated browser cost ($0.02 per URL)
         job.estimated_cost_usd = round(
-            (job.total_llm_calls * settings.COST_PER_LLM_CALL) + (job.progress_total * settings.COST_PER_URL_SCRAPE), 4
+            (job.total_llm_calls * settings.COST_PER_LLM_CALL) + (job.progress_total * settings.COST_PER_URL_SCRAPE),
+            4,
         )
 
         # Bound memory footprint if results > 1000
@@ -661,13 +664,13 @@ async def run_job(
                 persist_state_single_critical_fn()
         elif len(all_raw_results) == 0:
             job.status = JobStatus.EMPTY_RESULT
-            job.error = "The job completed but no records were extracted. This may be due to a session-bound URL, empty response, anti-bot block, JavaScript-rendered results, or missing search-form replay."  # noqa: E501
+            job.error = "The job completed but no records were extracted. This may be due to a session-bound URL, empty response, anti-bot block, JavaScript-rendered results, or missing search-form replay."
             _add_job_log(job, job.error, level="warning", persist_fn=persist_job_state_fn)
             if persist_state_single_critical_fn:
                 persist_state_single_critical_fn()
         elif urls_with_records > 0 and urls_with_records < total_urls:
             job.status = JobStatus.DEGRADED
-            msg = f"{urls_with_records} of {total_urls} URLs produced results. Some pages may have anti-bot protection, expired sessions, or require JavaScript rendering."  # noqa: E501
+            msg = f"{urls_with_records} of {total_urls} URLs produced results. Some pages may have anti-bot protection, expired sessions, or require JavaScript rendering."
             job.error = msg
             _add_job_log(job, msg, level="warning", persist_fn=persist_job_state_fn)
             if persist_state_single_critical_fn:
@@ -706,7 +709,7 @@ async def run_job(
             job.status = JobStatus.FAILED
             job.error = str(e)
             job.completed_at = datetime.datetime.now().isoformat()
-            _add_job_log(job, f"Job failed: {str(e)}", level="error")
+            _add_job_log(job, f"Job failed: {e!s}", level="error")
             logging.error("Job %s: Failed: %s", job_id, e)
         if persist_state_single_critical_fn:
             persist_state_single_critical_fn()

@@ -428,7 +428,7 @@ class TestDegradationPredictor:
         healthy_preds = [p for p in report.predictions if p.domain == "healthy.com"]
         degrading_preds = [p for p in report.predictions if p.domain == "degrading.com"]
         assert len(degrading_preds) >= len(
-            healthy_preds
+            healthy_preds,
         ), f"Degrading domain ({len(degrading_preds)}) should have >= predictions than healthy ({len(healthy_preds)})"
 
     def test_health_trend_determination(self) -> None:
@@ -510,7 +510,7 @@ class TestDegradationPredictorIntegration:
                     success=True,
                     quality_score=0.85,
                     latency_ms=1000,
-                )
+                ),
             )
         # 12 degrading events
         for i in range(12):
@@ -521,7 +521,7 @@ class TestDegradationPredictorIntegration:
                     quality_score=0.4 if i >= 6 else 0.7,
                     latency_ms=5000 if i >= 6 else 2000,
                     anti_bot_score=0.5 if i >= 6 else 0.1,
-                )
+                ),
             )
 
         predictor = DegradationPredictor(history_window=50)

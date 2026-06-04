@@ -128,16 +128,16 @@ class PageEvidence:
 
 PATTERN_DEFINITIONS: list[tuple[str, re.Pattern]] = [
     ("currency", re.compile(r"[\$\€\£\¥\₹]\s*\d+[\d,.]*")),
-    ("price", re.compile(r"(?:price|total|amount|cost|fare)\s*:?\s*[\$\€\£\¥\₹]?\s*\d+[\d,.]*", re.I)),
+    ("price", re.compile(r"(?:price|total|amount|cost|fare)\s*:?\s*[\$\€\£\¥\₹]?\s*\d+[\d,.]*", re.IGNORECASE)),
     ("date_iso", re.compile(r"\d{4}-\d{2}-\d{2}")),
     ("date_slash", re.compile(r"\d{1,2}/\d{1,2}/\d{2,4}")),
-    ("date_text", re.compile(r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}", re.I)),
-    ("time", re.compile(r"\d{1,2}:\d{2}\s*(?:am|pm)?", re.I)),
+    ("date_text", re.compile(r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}", re.IGNORECASE)),
+    ("time", re.compile(r"\d{1,2}:\d{2}\s*(?:am|pm)?", re.IGNORECASE)),
     ("email", re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")),
     ("phone", re.compile(r"\+?\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}")),
     ("percentage", re.compile(r"\d+[\.,]?\d*%")),
     ("url", re.compile(r'https?://[^\s<>"\'\]\)]+')),
-    ("rating", re.compile(r"(?:rating|score|stars?)\s*:?\s*\d+(?:\.\d+)?(?:\s*\/\s*\d+)?", re.I)),
+    ("rating", re.compile(r"(?:rating|score|stars?)\s*:?\s*\d+(?:\.\d+)?(?:\s*\/\s*\d+)?", re.IGNORECASE)),
     # 3-letter codes like MIA, JFK
     ("location_code", re.compile(r"\b[A-Z]{3}\b")),
 ]
@@ -363,7 +363,7 @@ def _collect_tables(soup: BeautifulSoup) -> list[dict]:
                     "col_count": max(len(r) for r in rows),
                     "rows": rows[:20],
                     "headers": rows[0] if rows else [],
-                }
+                },
             )
     return tables
 
@@ -572,17 +572,17 @@ def _score_container(element: Tag, selector: str, siblings: list[Tag]) -> Candid
     # Detect features
     has_price = bool(re.search(r"[\$\€\£\¥\₹]\s*\d+", text))
     has_date = bool(re.search(r"\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}", text))
-    has_time = bool(re.search(r"\d{1,2}:\d{2}\s*(?:am|pm)?", text, re.I))
+    has_time = bool(re.search(r"\d{1,2}:\d{2}\s*(?:am|pm)?", text, re.IGNORECASE))
     has_currency = bool(re.search(r"[\$\€\£\¥\₹]", text))
     # 3-letter codes with enough context
     has_location = bool(re.search(r"\b[A-Z]{3}\b", text) and len(text) > 20)
-    has_organization = bool(re.search(r"(?:inc\.?|llc|ltd\.?|corp\.?|co\.?|hospital|university|school)\b", text, re.I))
+    has_organization = bool(re.search(r"(?:inc\.?|llc|ltd\.?|corp\.?|co\.?|hospital|university|school)\b", text, re.IGNORECASE))
     has_contact = bool(re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+|\+?\d{7,}", text))
     has_link = bool(element.find("a"))
     has_button = bool(element.find(["button", "input[type=submit]"]))
     has_image = bool(element.find("img"))
     has_label_value = bool(
-        re.search(r"(?:price|name|date|time|location|phone|email|address)\s*:|\|\s*(?:price|name|date)", text, re.I)
+        re.search(r"(?:price|name|date|time|location|phone|email|address)\s*:|\|\s*(?:price|name|date)", text, re.IGNORECASE),
     )
 
     # Text density (chars per descendant)
@@ -680,7 +680,7 @@ def _compute_container_score(container: CandidateContainer) -> float:
             container.has_location,
             container.has_organization,
             container.has_contact,
-        ]
+        ],
     )
     score += min(pattern_count * 0.08, 0.30)
 
@@ -721,9 +721,8 @@ def _compute_container_score(container: CandidateContainer) -> float:
         and not container.has_organization
         and not container.has_date
         and not container.has_location
-    ):
-        if combined_len < 80:
-            score *= 0.5  # Significant penalty for narrow containers
+    ) and combined_len < 80:
+        score *= 0.5  # Significant penalty for narrow containers
 
     return round(min(score, 1.0), 4)
 
@@ -769,7 +768,7 @@ def _estimate_record_count(evidence: PageEvidence) -> int:
         return len([c for c in evidence.candidate_containers if c.record_score > 0.3])
     if evidence.page_structure == "table":
         if evidence.tables:
-            return max(t.get("row_count", 0) - 1 for t in evidence.tables)
+            return max(t.get("row_count", 0) - 1 for t in evidence.tables)  # type: ignore[no-any-return]
         return 0
     if evidence.page_structure == "list":
         return len([c for c in evidence.candidate_containers if c.tag == "li"])

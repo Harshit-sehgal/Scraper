@@ -12,7 +12,6 @@ To override, set the corresponding env var (e.g. PLAYWRIGHT_TIMEOUT=45000).
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -266,7 +265,7 @@ class Settings(BaseSettings):
     """If set, powerful admin routes (/api / system / merge, /api / system / scheduler, etc.) require this key."""
     METRICS_TOKEN: str = ""
     """If set, /metrics endpoint requires Authorization: Bearer <token> or X-API-Key header."""
-    ALERT_WEBHOOK_URL: Optional[str] = None
+    ALERT_WEBHOOK_URL: str | None = None
     """URL to send webhook alerts for domain anti-bot level shifts."""
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:8000", "http://127.0.0.1:5173", "http://127.0.0.1:8000"]
     """Allowed origins for CORS. Defaults to localhost for dev; must be locked to real domains in production."""
@@ -696,7 +695,8 @@ class Settings(BaseSettings):
         if name in aliases:
             return super().__getattribute__(aliases[name])
 
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        msg = f"'{type(self).__name__}' object has no attribute '{name}'"
+        raise AttributeError(msg)
 
 
 settings = Settings()

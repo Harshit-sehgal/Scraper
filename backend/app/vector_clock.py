@@ -1,5 +1,4 @@
 import copy
-from typing import Dict, Optional
 
 
 class VectorClock:
@@ -9,7 +8,7 @@ class VectorClock:
     No state merge can occur without partial ordering of events.
     """
 
-    def __init__(self, node_id: str, clock: Optional[Dict[str, int]] = None):
+    def __init__(self, node_id: str, clock: dict[str, int] | None = None):
         self.node_id = node_id
         self._clock = clock if clock else {node_id: 0}
 
@@ -17,7 +16,7 @@ class VectorClock:
         """Increment the local clock value."""
         self._clock[self.node_id] = self._clock.get(self.node_id, 0) + 1
 
-    def update(self, remote_clock: Dict[str, int]):
+    def update(self, remote_clock: dict[str, int]):
         """Merge a remote clock into the local clock."""
         for node, value in remote_clock.items():
             self._clock[node] = max(self._clock.get(node, 0), value)
@@ -25,10 +24,10 @@ class VectorClock:
         if self.node_id not in self._clock:
             self._clock[self.node_id] = 0
 
-    def get_clock(self) -> Dict[str, int]:
+    def get_clock(self) -> dict[str, int]:
         return copy.deepcopy(self._clock)
 
-    def compare(self, other: Dict[str, int]) -> str:
+    def compare(self, other: dict[str, int]) -> str:
         """Compare with another clock to determine causality.
 
         Returns:
@@ -60,9 +59,9 @@ class VectorClock:
             return "descendant"
         return "equal"
 
-    def to_dict(self) -> Dict[str, int]:
+    def to_dict(self) -> dict[str, int]:
         return self.get_clock()
 
     @classmethod
-    def from_dict(cls, node_id: str, data: Dict[str, int]) -> "VectorClock":
+    def from_dict(cls, node_id: str, data: dict[str, int]) -> "VectorClock":
         return cls(node_id, copy.deepcopy(data))

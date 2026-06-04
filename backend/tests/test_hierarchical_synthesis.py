@@ -105,18 +105,18 @@ def test_hierarchical_interpretation() -> None:
         tokens=[
             SemanticToken("555-0100", "5550100", Span(0, 8), 0, [0.5] * 16, SemanticType.PHONE),
             SemanticToken("test@example.com", "test@example.com", Span(10, 25), 1, [0.5] * 16, SemanticType.TEXT),
-        ]
+        ],
     )
 
     # Interpret only the envelope
-    rec, graph = allocate_semantic_roles(record, ["contact_group"], abstraction_gradient=0.0)
+    _rec, graph = allocate_semantic_roles(record, ["contact_group"], abstraction_gradient=0.0)
 
     # Should only have the envelope role in graph
     assert "contact_group" in graph.roles
     assert "phone" not in graph.roles
 
     # 3. Interpreting with abstraction_gradient=1.0 (deep interpretation)
-    rec, graph = allocate_semantic_roles(record, ["contact_group"], abstraction_gradient=1.0)
+    _rec, graph = allocate_semantic_roles(record, ["contact_group"], abstraction_gradient=1.0)
 
     # Should have both envelope AND constituents
     assert "contact_group" in graph.roles
@@ -158,8 +158,8 @@ def test_cross_domain_knowledge_synthesis() -> None:
                 "constituents": ["r2"],
                 "manifold_vec": [0.51] * 16,  # very close
                 "level": 1,
-            }
-        }
+            },
+        },
     }
 
     # 3. Merge

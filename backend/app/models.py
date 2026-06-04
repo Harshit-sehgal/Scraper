@@ -7,7 +7,6 @@ import datetime
 import re
 import uuid
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -30,7 +29,7 @@ RESERVED_FIELD_NAMES: frozenset = frozenset(
         "_zero_result_failure",
         "_element_text",
         "_record_id",
-    }
+    },
 )
 
 
@@ -94,9 +93,11 @@ class SchemaField(BaseModel):
     def validate_name(cls, v: str) -> str:
         v = v.strip().lower()
         if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", v):
-            raise ValueError("Field name must be snake_case, start with a letter, and be at most 64 characters")
+            msg = "Field name must be snake_case, start with a letter, and be at most 64 characters"
+            raise ValueError(msg)
         if v in RESERVED_FIELD_NAMES:
-            raise ValueError(f"Field name '{v}' is reserved for system use")
+            msg = f"Field name '{v}' is reserved for system use"
+            raise ValueError(msg)
         return v
 
 
@@ -106,8 +107,8 @@ class FilterRule(BaseModel):
     field_name: str = Field(..., description="Which schema field to filter on")
     operator: FilterOperator = Field(..., description="Filter operator")
     value: str = Field("", description="Value to compare against")
-    origin_address: Optional[str] = Field(None, description="Origin address for distance calculation")
-    distance_unit: Optional[str] = Field("km", description="km or miles")
+    origin_address: str | None = Field(None, description="Origin address for distance calculation")
+    distance_unit: str | None = Field("km", description="km or miles")
 
 
 class DiscoveryRequest(BaseModel):
@@ -120,10 +121,11 @@ class DiscoveryRequest(BaseModel):
     max_per_domain: int = Field(4, ge=1, le=25, description="Maximum URLs allowed per domain in discovery")
     source_policy: SourcePolicy = Field(SourcePolicy.ALL_SOURCES, description="Source inclusion policy for discovery")
     schema_field_names: list[str] = Field(
-        default_factory=list, description="Optional schema field names to improve search relevance"
+        default_factory=list,
+        description="Optional schema field names to improve search relevance",
     )
     origin_location: str = Field("", description="Center point for radius-aware optimization")
-    max_distance_km: Optional[float] = Field(None, ge=0, description="Optional discovery radius in kilometers")
+    max_distance_km: float | None = Field(None, ge=0, description="Optional discovery radius in kilometers")
 
 
 class SchemaSuggestionRequest(BaseModel):
@@ -142,12 +144,15 @@ class SelectorMap(BaseModel):
     @model_validator(mode="after")
     def validate_fields(self):
         if len(self.fields) > 50:
-            raise ValueError("selectors_map.fields must have at most 50 entries")
+            msg = "selectors_map.fields must have at most 50 entries"
+            raise ValueError(msg)
         for name, selector in self.fields.items():
             if not isinstance(name, str) or not name.strip():
-                raise ValueError("selectors_map.fields keys must be non-empty strings")
+                msg = "selectors_map.fields keys must be non-empty strings"
+                raise ValueError(msg)
             if not isinstance(selector, str) or len(selector) > 500:
-                raise ValueError("selectors_map field selectors must be strings up to 500 characters")
+                msg = "selectors_map field selectors must be strings up to 500 characters"
+                raise ValueError(msg)
         return self
 
 
@@ -166,7 +171,7 @@ class JobCreate(BaseModel):
     source_policy: SourcePolicy = Field(SourcePolicy.ALL_SOURCES, description="Controls which source types are included")
     max_per_domain: int = Field(4, ge=1, le=25, description="Maximum discovered URLs per domain")
     origin_location: str = Field("", description="Center location for distance optimization")
-    max_distance_km: Optional[float] = Field(None, ge=0, description="Keep records within this radius in km")
+    max_distance_km: float | None = Field(None, ge=0, description="Keep records within this radius in km")
     # Schema & Filters
     schema_fields: list[SchemaField] = Field(default_factory=list, max_length=50, description="Data schema to extract")
     filters: list[FilterRule] = Field(default_factory=list, max_length=100, description="Post-processing filters")
@@ -185,7 +190,8 @@ class JobCreate(BaseModel):
         if self.mode == ScrapeMode.MANUAL:
             cleaned_urls = [u.strip() for u in self.urls if str(u or "").strip()]
             if not cleaned_urls:
-                raise ValueError("Manual mode requires at least one URL")
+                msg = "Manual mode requires at least one URL"
+                raise ValueError(msg)
             from app.url_safety import validate_public_http_url
 
             for u in cleaned_urls:
@@ -197,14 +203,17 @@ class JobCreate(BaseModel):
                         or "scheme" in str(e)
                         or not u.startswith(("http://", "https://"))
                     ):
-                        raise ValueError("Manual mode requires valid http(s) URLs")
-                    raise ValueError(f"URL '{u}' failed security check: {e}")
+                        msg = "Manual mode requires valid http(s) URLs"
+                        raise ValueError(msg)
+                    msg = f"URL '{u}' failed security check: {e}"
+                    raise ValueError(msg)
             self.urls = cleaned_urls
 
         if self.mode == ScrapeMode.AUTO:
             self.topic = self.topic.strip()
             if not self.topic:
-                raise ValueError("Auto mode requires a non-empty topic")
+                msg = "Auto mode requires a non-empty topic"
+                raise ValueError(msg)
             # Auto mode always discovers URLs itself.
             self.urls = []
 
@@ -212,20 +221,25 @@ class JobCreate(BaseModel):
         # API as a dict.
         if self.selectors_map:
             if not isinstance(self.selectors_map, dict):
-                raise ValueError("selectors_map must be an object")
+                msg = "selectors_map must be an object"
+                raise ValueError(msg)
             if len(self.selectors_map) > 20:
-                raise ValueError("selectors_map must have at most 20 keys")
+                msg = "selectors_map must have at most 20 keys"
+                raise ValueError(msg)
             self.selectors_map = SelectorMap.model_validate(self.selectors_map).model_dump()
 
         # ── search_params limits ──────────────────────────────────────────
         if self.search_params is not None:
             if len(self.search_params) > 50:
-                raise ValueError("search_params must have at most 50 keys")
+                msg = "search_params must have at most 50 keys"
+                raise ValueError(msg)
             for k, v in self.search_params.items():
                 if not isinstance(k, str) or len(k) > 100:
-                    raise ValueError(f"search_params key '{k}' exceeds max length of 100")
+                    msg = f"search_params key '{k}' exceeds max length of 100"
+                    raise ValueError(msg)
                 if not isinstance(v, str) or len(v) > 500:
-                    raise ValueError(f"search_params value for '{k}' exceeds max length of 500")
+                    msg = f"search_params value for '{k}' exceeds max length of 500"
+                    raise ValueError(msg)
 
         return self
 
@@ -263,7 +277,7 @@ class Job(BaseModel):
     source_policy: SourcePolicy = SourcePolicy.ALL_SOURCES
     max_per_domain: int = 4
     origin_location: str = ""
-    max_distance_km: Optional[float] = None
+    max_distance_km: float | None = None
     schema_fields: list[SchemaField] = Field(default_factory=list)
     filters: list[FilterRule] = Field(default_factory=list)
     pagination: bool = False
@@ -277,13 +291,13 @@ class Job(BaseModel):
     cancel_requested: bool = False
     status: JobStatus = JobStatus.PENDING
     created_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
+    started_at: str | None = None
+    completed_at: str | None = None
     total_records: int = 0
     filtered_records: int = 0
-    error: Optional[str] = None
+    error: str | None = None
     results: list[dict] = Field(default_factory=list)
-    analysis: Optional[str] = None
+    analysis: str | None = None
     discovered_urls: list[dict] = Field(default_factory=list)
     quality_report: dict = Field(default_factory=dict)
     estimated_cost_usd: float = 0.0
@@ -292,6 +306,6 @@ class Job(BaseModel):
     progress_current: int = 0
     progress_total: int = 0
     results_on_disk: bool = Field(default=False, description="Whether results are stored in a compressed disk file")
-    results_file_path: Optional[str] = Field(default=None, description="Path to the compressed results file")
+    results_file_path: str | None = Field(default=None, description="Path to the compressed results file")
     warnings: list[str] = Field(default_factory=list, description="Job warning logs and anomaly reports")
     acquisition_mode: str = Field(default="standard", description="Acquisition mode: standard, aggressive, or deep_scan")

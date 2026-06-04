@@ -593,14 +593,14 @@ def _collect_card_pattern_matches(
     date_patterns = [
         re.compile(r"\d{4}-\d{2}-\d{2}"),
         re.compile(r"\d{1,2}/\d{1,2}/\d{2,4}"),
-        re.compile(r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}", re.I),
+        re.compile(r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}", re.IGNORECASE),
     ]
     for dp in date_patterns:
         for m in dp.finditer(full_text):
             matches["date"].append((m.group(0), m.start(), m.end()))
 
     # ── Time ──────────────────────────────────────────────────
-    for m in re.finditer(r"\d{1,2}:\d{2}\s*(?:am|pm)?", full_text, re.I):
+    for m in re.finditer(r"\d{1,2}:\d{2}\s*(?:am|pm)?", full_text, re.IGNORECASE):
         matches["time"].append((m.group(0), m.start(), m.end()))
 
     # ── Location codes ────────────────────────────────────────
@@ -689,14 +689,14 @@ def _extract_card_field_stateful(
                 if not _is_span_used(start, end):
                     matches.pop(i)
                     used_spans.append((start, end))
-                    return val
+                    return val  # type: ignore[no-any-return]
         else:
             for i in range(len(matches)):
                 val, start, end = matches[i]
                 if not _is_span_used(start, end):
                     matches.pop(i)
                     used_spans.append((start, end))
-                    return val
+                    return val  # type: ignore[no-any-return]
         return None
 
     def _is_span_used(start: int, end: int) -> bool:
@@ -737,7 +737,7 @@ def _extract_card_field_stateful(
         if result:
             return result
         # Fallback: named price
-        m = re.search(r"(?:price|total|fare|cost|amount)\s*:?\s*[\$\€\£\¥\₹]?\s*(\d+[\d,.]*)", full_text, re.I)
+        m = re.search(r"(?:price|total|fare|cost|amount)\s*:?\s*[\$\€\£\¥\₹]?\s*(\d+[\d,.]*)", full_text, re.IGNORECASE)
         if m and not _is_span_used(m.start(), m.end()):
             used_spans.append((m.start(), m.end()))
             val = m.group(1)
@@ -768,7 +768,7 @@ def _extract_card_field_stateful(
         if result:
             return result
         # Broader: location-like name
-        loc_pattern = re.compile(r"(?:at|from|to|in|near)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)", re.I)
+        loc_pattern = re.compile(r"(?:at|from|to|in|near)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)", re.IGNORECASE)
         m = loc_pattern.search(full_text)
         if m and not _is_span_used(m.start(), m.end()):
             used_spans.append((m.start(), m.end()))
@@ -812,10 +812,9 @@ def _extract_card_field_stateful(
                 continue
             if not ptype:
                 text_lower = text.lower()
-                if search_words and any(w in text_lower for w in search_words):
-                    if len(text) < 200:
-                        used_snippet_indices.add(i)
-                        return text.strip()
+                if search_words and any(w in text_lower for w in search_words) and len(text) < 200:
+                    used_snippet_indices.add(i)
+                    return text.strip()
 
         best = _consume_snippet()
         if best:

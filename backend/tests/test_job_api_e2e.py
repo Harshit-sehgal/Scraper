@@ -4,7 +4,6 @@ Submits a session-bound URL to the public jobs REST API, executes it with the re
 worker flow, and verifies the final results utilize the network_payload source
 with safe, token-free provenance.
 """
-# ruff: noqa: E402 — imports after sys.path.insert are intentional
 
 import sys
 from pathlib import Path
@@ -54,7 +53,7 @@ PIPELINE_JSON = json.dumps(
             {"carrier": "E2E Route Jet", "fare": 1200},
         ],
         "session_secret_token": "highly_sensitive_browser_token_should_not_leak",
-    }
+    },
 )
 
 

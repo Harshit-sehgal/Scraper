@@ -21,15 +21,18 @@ Alerts:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Optional
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+# Hold references to background tasks to prevent GC (RUF006).
+_background_tasks: set[asyncio.Task] = set()
 
 
 class DomainHealthLevel(str, Enum):
@@ -71,7 +74,7 @@ class DomainHealthMetrics:
     failure_count: int = 0
     last_success_time: float = 0.0
     last_failure_time: float = 0.0
-    last_failure_category: Optional[str] = None
+    last_failure_category: str | None = None
 
     # Time-series data for trend analysis
     recent_attempts: deque = field(default_factory=lambda: deque(maxlen=50))  # Last 50 attempts
@@ -146,7 +149,7 @@ class DomainHealthMonitor:
         self._alert_cooldown_seconds = 300  # Min 5 minutes between alerts per domain
         self.alert_callback = alert_callback
 
-    def record_attempt(self, url: str, success: bool, failure_category: Optional[str] = None):
+    def record_attempt(self, url: str, success: bool, failure_category: str | None = None):
         """Record a scrape attempt for a domain.
 
         Args:
@@ -176,7 +179,7 @@ class DomainHealthMonitor:
                 "timestamp": now,
                 "success": success,
                 "category": failure_category,
-            }
+            },
         )
 
         # Update hourly stats
@@ -233,7 +236,9 @@ class DomainHealthMonitor:
             import asyncio
 
             try:
-                asyncio.create_task(self.alert_callback(alert))
+                _task = asyncio.create_task(self.alert_callback(alert))
+                _background_tasks.add(_task)
+                _task.add_done_callback(_background_tasks.discard)
             except Exception as e:
                 logger.error("Alert callback failed: %s", e)
 
@@ -324,7 +329,7 @@ class DomainHealthMonitor:
 
         return recommendations
 
-    def get_domain_health(self, url: str) -> Optional[dict]:
+    def get_domain_health(self, url: str) -> dict | None:
         """Get current health status for a domain.
 
         Returns:
@@ -359,7 +364,8 @@ class DomainHealthMonitor:
             health = {
                 "domain": domain,
                 "health_level": self._determine_health_level(
-                    self._calculate_health_score(self._domains[domain]), self._domains[domain]
+                    self._calculate_health_score(self._domains[domain]),
+                    self._domains[domain],
                 ).value,
                 "health_score": self._calculate_health_score(self._domains[domain]),
             }
@@ -367,7 +373,7 @@ class DomainHealthMonitor:
         return sorted(health_statuses, key=lambda x: x["health_score"])
 
     @staticmethod
-    def _extract_domain(url: str) -> Optional[str]:
+    def _extract_domain(url: str) -> str | None:
         """Extract domain from URL."""
         try:
             parsed = urlparse(url)

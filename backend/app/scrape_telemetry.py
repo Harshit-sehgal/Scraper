@@ -18,7 +18,6 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Optional
 
 from app.anti_bot_engine import get_anti_bot_engine
 
@@ -60,13 +59,13 @@ class ScrapeTelemetry:
     # Per-field extraction confidence scores
     confidence_map: dict = field(default_factory=dict)
     # "critical" | "high" | "low" | "info"
-    regression_severity: Optional[str] = None
-    failure_category: Optional[str] = None
-    extraction_method: Optional[str] = None
+    regression_severity: str | None = None
+    failure_category: str | None = None
+    extraction_method: str | None = None
     motifs_generated: int = 0
     motifs_used: int = 0
 
-    error: Optional[str] = None
+    error: str | None = None
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict:
@@ -125,7 +124,7 @@ class ScrapeTelemetryCollector:
 
         return telemetry
 
-    def get_last_for_url(self, url: str) -> Optional[ScrapeTelemetry]:
+    def get_last_for_url(self, url: str) -> ScrapeTelemetry | None:
         """Return the most recent telemetry event for a specific URL."""
         for t in reversed(self._history):
             if t.url == url:

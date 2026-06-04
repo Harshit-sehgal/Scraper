@@ -22,7 +22,7 @@ import logging
 import time
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from app.config import settings
 
@@ -273,13 +273,13 @@ RECOVERY_STRATEGIES: dict[FailureCategory, dict] = {
 
 
 def classify_failure(
-    telemetry: Optional[dict] = None,
-    html: Optional[str] = None,
-    extraction_result: Optional[dict] = None,
-    domain_intel: Optional[dict] = None,
-    status_code: Optional[int] = None,
-    error_message: Optional[str] = None,
-    fetch_method: Optional[str] = None,
+    telemetry: dict | None = None,
+    html: str | None = None,
+    extraction_result: dict | None = None,
+    domain_intel: dict | None = None,
+    status_code: int | None = None,
+    error_message: str | None = None,
+    fetch_method: str | None = None,
 ) -> FailureClassification:
     """Classify an extraction failure based on available signals.
 
@@ -692,5 +692,5 @@ def translate_exception_to_friendly_message(error: Exception | str) -> str:
         )
 
     return (
-        f"❌ [Extraction Impediment] A system error occurred: {error}. Classifying root cause and scheduled for dynamic recovery."  # noqa: E501
+        f"❌ [Extraction Impediment] A system error occurred: {error}. Classifying root cause and scheduled for dynamic recovery."
     )

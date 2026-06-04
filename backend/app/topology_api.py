@@ -5,7 +5,6 @@ No subsystem should call topology_state.add() directly — use TopologyAPI inste
 """
 
 import logging
-from typing import List, Optional, Set
 
 from app.core_types import FieldConflictRegion
 from app.topology_state import RegionSnapshot
@@ -30,7 +29,7 @@ class TopologyAPI:
 
     # ─── Query Operations (read-only) ────────────────────────────────────
 
-    def find_region(self, token: str, roles: Set[str], domain: str = "") -> Optional[RegionSnapshot]:
+    def find_region(self, token: str, roles: set[str], domain: str = "") -> RegionSnapshot | None:
         return self._topology.find(token, roles, domain)
 
     def region_count(self) -> int:
@@ -39,7 +38,12 @@ class TopologyAPI:
     # ─── Mutation Operations (state-changing) ────────────────────────────
 
     def add_region(
-        self, competing_roles: List[str], token: str, instability: float = 0.5, integrity: float = 0.5, domain: str = ""
+        self,
+        competing_roles: list[str],
+        token: str,
+        instability: float = 0.5,
+        integrity: float = 0.5,
+        domain: str = "",
     ) -> FieldConflictRegion:
         return self._topology.add(competing_roles, token, instability, integrity, domain)
 

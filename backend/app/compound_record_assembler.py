@@ -183,7 +183,7 @@ def _detect_repeated_groups(text: str) -> list[dict[str, Any]]:
                         "label": f"Part {i + 1}",
                         "lines": [block],
                         "raw_text": block,
-                    }
+                    },
                 )
             return segments
 
@@ -193,7 +193,7 @@ def _detect_repeated_groups(text: str) -> list[dict[str, Any]]:
         r"(?:(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|"  # date
         r"(?:\d{1,2}:\d{2}\s*(?:am|pm)?))"  # or time
         r"[\s\S]{10,100}?"  # intervening text
-        r"(?:[\$\€\£\¥\₹]\s*\d+|\d{1,3}(?:,\d{3})*(?:\.\d{2})?)"  # price
+        r"(?:[\$\€\£\¥\₹]\s*\d+|\d{1,3}(?:,\d{3})*(?:\.\d{2})?)",  # price
     )
     matches = list(date_value_pattern.finditer(text))
     if len(matches) >= 2:
@@ -209,7 +209,7 @@ def _detect_repeated_groups(text: str) -> list[dict[str, Any]]:
                         "label": label,
                         "lines": [context],
                         "raw_text": context,
-                    }
+                    },
                 )
         if len(segments) >= 2:
             return segments
@@ -246,7 +246,7 @@ def _extract_segment_fields(raw_text: str) -> dict[str, str]:
         fields["organization"] = org_match.group(1).strip()
 
     # Time patterns (start and end times)
-    times = re.findall(r"\d{1,2}:\d{2}\s*(?:am|pm)?", raw_text, re.I)
+    times = re.findall(r"\d{1,2}:\d{2}\s*(?:am|pm)?", raw_text, re.IGNORECASE)
     if len(times) >= 2:
         fields["time_start"] = times[0]
         fields["time_end"] = times[1]
@@ -294,12 +294,12 @@ def _extract_shared_fields(segments: list[dict[str, Any]], full_text: str) -> di
         shared["price"] = prices_with_values[0][0]
 
     # Rating
-    rating_match = re.search(r"(?:rating|score|stars?)\s*:?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*\d+)?", full_text, re.I)
+    rating_match = re.search(r"(?:rating|score|stars?)\s*:?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*\d+)?", full_text, re.IGNORECASE)
     if rating_match:
         shared["rating"] = rating_match.group(1)
 
     # Status / availability
-    status_match = re.search(r"\b(available|sold\s*out|in\s*stock|out\s*of\s*stock|pending)\b", full_text, re.I)
+    status_match = re.search(r"\b(available|sold\s*out|in\s*stock|out\s*of\s*stock|pending)\b", full_text, re.IGNORECASE)
     if status_match:
         shared["status"] = status_match.group(1)
 
@@ -365,9 +365,8 @@ def assemble_compound_records(
                 # Also copy any record fields that look like they belong to a
                 # segment
                 for k, v in record.items():
-                    if k in ("organization", "name", "price", "date", "code"):
-                        if k not in seg_fields:
-                            seg_fields[k] = str(v)
+                    if k in ("organization", "name", "price", "date", "code") and k not in seg_fields:
+                        seg_fields[k] = str(v)
 
                 segment = Segment(
                     index=seg.get("index", 0),

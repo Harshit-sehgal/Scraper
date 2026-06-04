@@ -20,7 +20,6 @@ import logging
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -137,14 +136,14 @@ class RegressionCapture:
     def maybe_capture(
         self,
         url: str,
-        html: Optional[str],
+        html: str | None,
         failure_category: str = "",
         failure_confidence: float = 0.0,
         records_count: int = 0,
-        schema_fields: Optional[list[str]] = None,
-        telemetry: Optional[dict] = None,
+        schema_fields: list[str] | None = None,
+        telemetry: dict | None = None,
         force: bool = False,
-    ) -> Optional[RegressionEntry]:
+    ) -> RegressionEntry | None:
         """Evaluate and potentially capture a regression case.
 
         Args:
@@ -219,7 +218,7 @@ class RegressionCapture:
 
         return entry
 
-    def generate_replay_test(self, entry_id: str) -> Optional[str]:
+    def generate_replay_test(self, entry_id: str) -> str | None:
         """Generate a pytest replay test for a captured regression.
 
         Args:
@@ -383,13 +382,13 @@ class RegressionCapture:
                 sorted(
                     self._registry.domain_coverage.items(),
                     key=lambda x: -x[1],
-                )[:20]
+                )[:20],
             ),
             "category_coverage": dict(
                 sorted(
                     self._registry.category_coverage.items(),
                     key=lambda x: -x[1],
-                )
+                ),
             ),
             "recent_captures": [
                 {
@@ -468,14 +467,14 @@ class RegressionCapture:
             encoding="utf-8",
         )
 
-    def _get_entry(self, entry_id: str) -> Optional[RegressionEntry]:
+    def _get_entry(self, entry_id: str) -> RegressionEntry | None:
         """Look up an entry by ID."""
         for e in self._registry.entries:
             if e.id == entry_id:
                 return e
         return None
 
-    def _build_replay_test(self, entry: RegressionEntry) -> Optional[str]:
+    def _build_replay_test(self, entry: RegressionEntry) -> str | None:
         """Build a pytest test function for replaying this regression."""
         fixture_path = self._fixtures_dir / entry.fixture_filename
         if not fixture_path.exists():

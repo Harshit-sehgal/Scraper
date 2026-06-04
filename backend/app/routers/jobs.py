@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import logging
 import threading
-from typing import Callable
+from collections.abc import Callable
 
 from app.config import settings
 from app.discovery import DiscoveryDependencyError, discover_urls, infer_source_metadata
@@ -103,14 +103,14 @@ def create_jobs_router(
                         return fresh
                 except Exception:
                     logging.getLogger(__name__).debug("Failed to refresh job %s from repo", job_id)
-            return job
+            return job  # type: ignore[no-any-return]
 
     def _pop_job(job_id: str) -> Job:
         """Thread-safe pop from jobs_store, raising 404 if missing."""
         with _store_lock:
             if job_id not in jobs_store:
                 raise HTTPException(status_code=404, detail="Job not found")
-            return jobs_store.pop(job_id)
+            return jobs_store.pop(job_id)  # type: ignore[no-any-return]
 
     def _move_to_recycle_bin(job: Job) -> None:
         """Thread-safe move from jobs_store to recycle_bin_store."""
@@ -123,7 +123,7 @@ def create_jobs_router(
         with _store_lock:
             if job_id not in recycle_bin_store:
                 raise HTTPException(status_code=404, detail="Job not in recycle bin")
-            return recycle_bin_store.pop(job_id)
+            return recycle_bin_store.pop(job_id)  # type: ignore[no-any-return]
 
     @router.post("/api/discover")
     async def discover(req: DiscoveryRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
@@ -157,7 +157,8 @@ def create_jobs_router(
 
     @router.post("/api/schema/suggest")
     async def suggest_schema(
-        req: SchemaSuggestionRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
+        req: SchemaSuggestionRequest,
+        _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
     ):
         """Infer topic + schema fields from plain-language user intent."""
         from app.insight_engine import suggest_schema_from_intent  # research-shell, lazy
@@ -449,7 +450,7 @@ def create_jobs_router(
         except asyncio.TimeoutError:
             cleaned_rows = working_rows
             reclean_warnings.append(
-                f"AI re-clean timed out after {config['ai_structuring_timeout_seconds']}s; used deterministic post-processing."
+                f"AI re-clean timed out after {config['ai_structuring_timeout_seconds']}s; used deterministic post-processing.",
             )
         except Exception as e:
             logging.exception(e)
@@ -578,7 +579,8 @@ def create_jobs_router(
 
     @router.delete("/api/jobs/cleanup/terminal")
     async def clear_terminal_jobs(
-        keep_recent: int = Query(5, ge=0, le=5000), _role: UserRole = Depends(require_role([UserRole.ADMIN]))
+        keep_recent: int = Query(5, ge=0, le=5000),
+        _role: UserRole = Depends(require_role([UserRole.ADMIN])),
     ):
         terminal_statuses = {
             JobStatus.COMPLETED,

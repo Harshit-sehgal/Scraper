@@ -11,7 +11,6 @@ metrics: diversity, fragmentation, drift, and oscillation frequency.
 import json
 import random
 import time
-from typing import List, Set
 
 from app.semantic_ir import SemanticToken, SemanticType, Span
 from app.semantic_world_state import SemanticWorldState
@@ -21,11 +20,11 @@ class EcologyAnalyzer:
     """Utility to track emergent ecological metrics over massive horizons."""
 
     def __init__(self):
-        self.diversity_history: List[float] = []
-        self.fragmentation_history: List[float] = []
-        self.entropy_history: List[float] = []
+        self.diversity_history: list[float] = []
+        self.fragmentation_history: list[float] = []
+        self.entropy_history: list[float] = []
         self.oscillation_counts: int = 0
-        self.dead_regions: Set[str] = set()
+        self.dead_regions: set[str] = set()
         self.start_time = time.time()
 
     def record_pulse(self, ws: SemanticWorldState):
@@ -126,7 +125,7 @@ def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.
             stats = analyzer.summarize()
             print(
                 f"  [{i}] Diversity: {stats['avg_diversity']:.2f}, Frag: {stats['avg_fragmentation']:.2f}, "
-                f"Oscillations: {stats['oscillation_events']}"
+                f"Oscillations: {stats['oscillation_events']}",
             )
 
     print("\n--- Initiating Stabilization Phase (2000 cycles, no new signals) ---")

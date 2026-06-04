@@ -14,8 +14,8 @@ import json
 import logging
 import threading
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -35,24 +35,23 @@ class _CheckpointIndex:
     def __init__(self):
         # entries: list of (global_idx, segment_path, segment_offset,
         # snapshot_dict)
-        self.entries: List[Tuple[int, str, int, dict]] = []
+        self.entries: list[tuple[int, str, int, dict]] = []
 
     def add(self, global_idx: int, segment_path: str, offset: int, snapshot: dict):
         self.entries.append((global_idx, segment_path, offset, snapshot))
 
-    def find_nearest(self, target_idx: int) -> Optional[Tuple[int, str, int, dict]]:
+    def find_nearest(self, target_idx: int) -> tuple[int, str, int, dict] | None:
         """Find the nearest checkpoint at or before target_idx."""
         best = None
         for entry in self.entries:
-            if entry[0] <= target_idx:
-                if best is None or entry[0] > best[0]:
-                    best = entry
+            if entry[0] <= target_idx and (best is None or entry[0] > best[0]):
+                best = entry
         return best
 
     def clear(self):
         self.entries.clear()
 
-    def to_dict_list(self) -> List[dict]:
+    def to_dict_list(self) -> list[dict]:
         return [{"idx": idx, "segment": seg, "offset": off} for idx, seg, off, _ in self.entries]
 
 
@@ -80,14 +79,14 @@ class ReplayBuffer:
         # Current segment tracking
         self._current_segment_idx = 0
         self._current_segment_count = 0
-        self._current_segment_file: Optional[Path] = None  # Lazy-opened
+        self._current_segment_file: Path | None = None  # Lazy-opened
         self._next_global_idx = 0
 
         # Checkpoint index
         self._checkpoints = _CheckpointIndex()
 
         # Segment inventory
-        self._segments: List[str] = []  # sorted list of segment filenames
+        self._segments: list[str] = []  # sorted list of segment filenames
 
         # Metrics
         self._total_entries = 0
@@ -201,11 +200,10 @@ class ReplayBuffer:
         checkpoint = self._checkpoints.find_nearest(start_idx)
         if checkpoint is None:
             # No checkpoints — start from beginning of first segment
-            checkpoint_idx = -1
             segment_name = self._segments[0] if self._segments else None
             segment_offset = 0
         else:
-            checkpoint_idx, segment_name, segment_offset, _ = checkpoint
+            _checkpoint_idx, segment_name, segment_offset, _ = checkpoint
 
         if segment_name is None:
             return
@@ -247,7 +245,7 @@ class ReplayBuffer:
                         continue
                     yield entry
 
-    def reconstruct_state_at(self, target_idx: int) -> Optional[dict]:
+    def reconstruct_state_at(self, target_idx: int) -> dict | None:
         """Reconstruct full state at a specific index via checkpoint + replay.
 
         Uses the nearest preceding checkpoint and applies deltas forward.
@@ -299,14 +297,14 @@ class ReplayBuffer:
 
         return state
 
-    def get_entry(self, idx: int) -> Optional[dict]:
+    def get_entry(self, idx: int) -> dict | None:
         """Get a single entry by index (expensive — scans from nearest checkpoint)."""
         for entry in self.stream_from(idx):
             if entry.get("idx") == idx:
                 return entry
         return None
 
-    def get_segment_info(self) -> List[dict]:
+    def get_segment_info(self) -> list[dict]:
         """Return information about all segments for observability."""
         result = []
         with self._lock:
@@ -318,7 +316,7 @@ class ReplayBuffer:
                         "segment": seg_name,
                         "size_bytes": size_bytes,
                         "size_mb": round(size_bytes / (1024 * 1024), 2),
-                    }
+                    },
                 )
         return result
 
@@ -407,7 +405,7 @@ class ReplayBuffer:
         if self._segments:
             self._current_segment_file = self._base_dir / self._segments[-1]
 
-    def _get_subsequent_segments(self, current_seg: str) -> List[str]:
+    def _get_subsequent_segments(self, current_seg: str) -> list[str]:
         """Return segments that come after current_seg in sorted order."""
         with self._lock:
             sorted_segs = sorted(self._segments)
@@ -431,7 +429,7 @@ class ReplayBuffer:
 
     # ─── Causal Chain Reconstruction ────────────────────────────
 
-    def get_causal_chains(self, limit: int = 20) -> List[dict]:
+    def get_causal_chains(self, limit: int = 20) -> list[dict]:
         """Reconstruct causal chains from the replay buffer.
 
         Groups related entries into causal chains based on:
@@ -455,8 +453,8 @@ class ReplayBuffer:
             - trace_id: common trace identifier if available
         """
         # Scan the most recent entries for trace-based grouping
-        chains: Dict[str, List[dict]] = {}
-        chain_order: List[str] = []
+        chains: dict[str, list[dict]] = {}
+        chain_order: list[str] = []
 
         # Stream from the latest checkpoint backward (or forward from a recent point)
         # We stream from near the end for efficiency
@@ -519,7 +517,7 @@ class ReplayBuffer:
 
         return result
 
-    def get_event_range(self, start_idx: int, end_idx: int) -> List[dict]:
+    def get_event_range(self, start_idx: int, end_idx: int) -> list[dict]:
         """Get all events within a specific index range.
 
         Uses streaming to avoid loading the full buffer into memory.
@@ -541,10 +539,10 @@ class ReplayBuffer:
 
 
 # Global singleton
-_buffer: Optional[ReplayBuffer] = None
+_buffer: ReplayBuffer | None = None
 
 
-def get_replay_buffer(base_dir: Optional[str] = None) -> ReplayBuffer:
+def get_replay_buffer(base_dir: str | None = None) -> ReplayBuffer:
     """Get or create the global ReplayBuffer instance."""
     global _buffer
     if _buffer is None:

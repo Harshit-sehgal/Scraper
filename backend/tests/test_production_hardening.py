@@ -173,7 +173,9 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch) -> None:
     from app import discovery
 
     monkeypatch.setattr(
-        discovery, "infer_source_metadata", lambda url: {"source_type": "inferred_type", "source_trust_score": 0.85}
+        discovery,
+        "infer_source_metadata",
+        lambda url: {"source_type": "inferred_type", "source_trust_score": 0.85},
     )
 
     # Seed a job with unknown source_type
@@ -213,7 +215,8 @@ def test_create_job_enqueue_failure_cleanup(client, monkeypatch) -> None:
     # Mock enqueue to raise an error
     class FailingQueue:
         async def enqueue(self, *args, **kwargs):
-            raise Exception("Queue is dead")
+            msg = "Queue is dead"
+            raise Exception(msg)
 
     monkeypatch.setattr("app.worker_queue.get_worker_queue", lambda: FailingQueue())
 
@@ -281,7 +284,9 @@ async def test_search_form_recovery_ssrf_blocking(monkeypatch) -> None:
     """
 
     res = await _try_form_search_recovery(
-        landing_page_html=landing_page_html, landing_page_url="https://example.com", search_params={"q": "test-search"}
+        landing_page_html=landing_page_html,
+        landing_page_url="https://example.com",
+        search_params={"q": "test-search"},
     )
 
     assert res["success"] is False
@@ -357,7 +362,9 @@ def test_body_size_limit_oversized_payload(client, monkeypatch) -> None:
     large_data = "a" * (6 * 1024 * 1024)
 
     resp = client.post(
-        "/api/jobs", content=large_data.encode("utf-8"), headers={"X-API-Key": "testkey", "Content-Type": "application/json"}
+        "/api/jobs",
+        content=large_data.encode("utf-8"),
+        headers={"X-API-Key": "testkey", "Content-Type": "application/json"},
     )
     assert resp.status_code == 413
     assert "too large" in resp.json()["detail"]
@@ -375,7 +382,9 @@ def test_body_size_limit_chunked_normal(client, monkeypatch) -> None:
         yield b'"urls": ["https://example.com"]}'
 
     resp = client.post(
-        "/api/jobs", content=chunk_generator(), headers={"X-API-Key": "testkey", "Content-Type": "application/json"}
+        "/api/jobs",
+        content=chunk_generator(),
+        headers={"X-API-Key": "testkey", "Content-Type": "application/json"},
     )
     assert resp.status_code != 413
 
@@ -393,7 +402,9 @@ def test_body_size_limit_chunked_oversized(client, monkeypatch) -> None:
             yield chunk
 
     resp = client.post(
-        "/api/jobs", content=chunk_generator(), headers={"X-API-Key": "testkey", "Content-Type": "application/octet-stream"}
+        "/api/jobs",
+        content=chunk_generator(),
+        headers={"X-API-Key": "testkey", "Content-Type": "application/octet-stream"},
     )
     assert resp.status_code == 413
     assert "too large" in resp.json()["detail"]

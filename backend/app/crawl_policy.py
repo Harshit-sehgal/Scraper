@@ -23,7 +23,6 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional
 from urllib.parse import urlparse
 
 from app.config import settings
@@ -68,7 +67,7 @@ class CrawlPolicyEngine:
 
     # ─── Public API ────────────────────────────────────────────────────
 
-    async def check_domain(self, url: str) -> Optional[str]:
+    async def check_domain(self, url: str) -> str | None:
         """Check whether a URL can be fetched under crawl policy.
 
         Returns:
@@ -163,7 +162,7 @@ class CrawlPolicyEngine:
                     self._cooldown_seconds,
                 )
 
-    def get_domain_state(self, domain: str) -> Optional[dict]:
+    def get_domain_state(self, domain: str) -> dict | None:
         """Get the current state for a domain (for observability)."""
         state = self._domains.get(domain)
         if not state:
@@ -221,7 +220,7 @@ class CrawlPolicyEngine:
         return self._domains[domain]
 
     @staticmethod
-    def _extract_domain(url: str) -> Optional[str]:
+    def _extract_domain(url: str) -> str | None:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None

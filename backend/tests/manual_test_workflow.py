@@ -19,7 +19,8 @@ def main():
     }
     r1 = requests.post(f"{API}/api/jobs", json=payload)
     if r1.status_code != 200:
-        raise SystemExit(f"Error: {r1.text}")
+        msg = f"Error: {r1.text}"
+        raise SystemExit(msg)
     job_id = r1.json()["job_id"]
     print("Created job:", job_id)
 

@@ -91,7 +91,8 @@ class TestTransactionContextExceptionSafety:
         with pytest.raises(RuntimeError, match="test error"):
             with ws.transaction("test_exception"):
                 assert get_active_transaction() is not None
-                raise RuntimeError("test error")
+                msg = "test error"
+                raise RuntimeError(msg)
         assert get_active_transaction() is None
 
     def test_nested_transaction_does_not_set_new_context(self) -> None:
@@ -114,7 +115,8 @@ class TestTransactionContextExceptionSafety:
         original_begin = ws._manifold.begin_transaction
 
         def failing_begin():
-            raise RuntimeError("begin_transaction simulated failure")
+            msg = "begin_transaction simulated failure"
+            raise RuntimeError(msg)
 
         ws._manifold.begin_transaction = failing_begin
 
@@ -235,14 +237,16 @@ class TestBestEffortRollback:
         original_rollback = ws._manifold.rollback
 
         def failing_rollback():
-            raise RuntimeError("rollback simulated failure")
+            msg = "rollback simulated failure"
+            raise RuntimeError(msg)
 
         ws._manifold.rollback = failing_rollback
 
         try:
             with pytest.raises(RuntimeError, match="original error"):
                 with ws.transaction("test_best_effort"):
-                    raise RuntimeError("original error")
+                    msg = "original error"
+                    raise RuntimeError(msg)
         finally:
             ws._manifold.rollback = original_rollback
 
@@ -275,7 +279,8 @@ class TestBestEffortRollback:
 
                 def make_failing(name_):
                     def failing():
-                        raise RuntimeError(f"rollback failed for {name_}")
+                        msg = f"rollback failed for {name_}"
+                        raise RuntimeError(msg)
 
                     return failing
 
@@ -284,7 +289,8 @@ class TestBestEffortRollback:
         try:
             with pytest.raises(RuntimeError, match="test all fail"):
                 with ws.transaction("test_all_fail"):
-                    raise RuntimeError("test all fail")
+                    msg = "test all fail"
+                    raise RuntimeError(msg)
         finally:
             for name, obj in state_attrs.items():
                 if name in originals:
@@ -305,7 +311,8 @@ class TestBestEffortRollback:
         def failing_commit():
             nonlocal commit_called
             commit_called = True
-            raise RuntimeError("commit simulated failure")
+            msg = "commit simulated failure"
+            raise RuntimeError(msg)
 
         ws._manifold.commit = failing_commit
 
@@ -331,10 +338,12 @@ class TestBestEffortRollback:
         original_rollback = ws._manifold.rollback
 
         def failing_commit():
-            raise RuntimeError("COMMIT_ERROR")
+            msg = "COMMIT_ERROR"
+            raise RuntimeError(msg)
 
         def failing_rollback():
-            raise RuntimeError("ROLLBACK_ERROR")
+            msg = "ROLLBACK_ERROR"
+            raise RuntimeError(msg)
 
         ws._manifold.commit = failing_commit
         ws._manifold.rollback = failing_rollback
@@ -375,7 +384,8 @@ class TestBestEffortRollback:
                         rollback_called[name_] = True
                         # Make the second subsystem fail
                         if name_ == list(state_attrs.keys())[1]:
-                            raise RuntimeError(f"rollback failed for {name_}")
+                            msg = f"rollback failed for {name_}"
+                            raise RuntimeError(msg)
                         return originals[name_]() if callable(originals[name_]) else None
 
                     return tracked_rollback
@@ -385,7 +395,8 @@ class TestBestEffortRollback:
         try:
             with pytest.raises(RuntimeError, match="original body error"):
                 with ws.transaction("test_all_attempted"):
-                    raise RuntimeError("original body error")
+                    msg = "original body error"
+                    raise RuntimeError(msg)
         finally:
             for name, obj in state_attrs.items():
                 if name in originals:

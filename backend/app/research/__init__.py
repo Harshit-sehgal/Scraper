@@ -48,8 +48,6 @@ the product kernel.
 
 from __future__ import annotations
 
-from typing import FrozenSet
-
 # ─── Research module registry ──────────────────────────────────────────────
 #
 # Module names are bare basenames (no package prefix). They are matched
@@ -61,7 +59,7 @@ from typing import FrozenSet
 # lazy-load gate that references it. The change must be intentional
 # and code-reviewed.
 
-RESEARCH_MODULES: FrozenSet[str] = frozenset(
+RESEARCH_MODULES: frozenset[str] = frozenset(
     {
         # ── Semantic world state and friends ────────────────────────────
         "semantic_world_state",  # package (submodules: core, events, locks, etc.)
@@ -126,7 +124,7 @@ RESEARCH_MODULES: FrozenSet[str] = frozenset(
         "trend_analyzer",
         "vector_clock",
         "insight_engine",
-    }
+    },
 )
 
 
@@ -136,7 +134,7 @@ RESEARCH_MODULES: FrozenSet[str] = frozenset(
 # (a) a dedicated audit, (b) removal from this set, and (c) updating
 # the lazy-load gates that currently guard their import.
 
-_EXTRA_RESEARCH_MODULES: FrozenSet[str] = frozenset(
+_EXTRA_RESEARCH_MODULES: frozenset[str] = frozenset(
     {
         # ── Recovery strategies (the experimental recovery framework) ──
         # `recovery_handlers` is part of the product kernel (it is
@@ -177,7 +175,7 @@ _EXTRA_RESEARCH_MODULES: FrozenSet[str] = frozenset(
         "patch_status",
         # ── Visualization (used only by experimental dashboard) ───────
         "visualization",
-    }
+    },
 )
 
 RESEARCH_MODULES = RESEARCH_MODULES | _EXTRA_RESEARCH_MODULES

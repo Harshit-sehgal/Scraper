@@ -8,8 +8,8 @@ from pathlib import Path
 backend_dir = Path(__file__).resolve().parent.parent / "backend"
 sys.path.insert(0, str(backend_dir))
 
-from app.models import FieldType, SchemaField  # noqa: E402
-from app.scraper_recovery_integration import scrape_url_with_recovery  # noqa: E402
+from app.models import FieldType, SchemaField
+from app.scraper_recovery_integration import scrape_url_with_recovery
 
 # Default sandbox targets
 DEFAULT_TARGETS = [
@@ -60,7 +60,11 @@ async def run_benchmark(targets, min_score, max_attempts):
         start_time = time.time()
         try:
             records, stats = await scrape_url_with_recovery(
-                url=url, schema_fields=schema, min_record_score=min_score, user_intent=intent, max_recovery_attempts=max_attempts
+                url=url,
+                schema_fields=schema,
+                min_record_score=min_score,
+                user_intent=intent,
+                max_recovery_attempts=max_attempts,
             )
             elapsed = time.time() - start_time
 
@@ -77,7 +81,7 @@ async def run_benchmark(targets, min_score, max_attempts):
                     "attempts": attempts,
                     "recoveries": recoveries,
                     "error": stats.get("final_failure_category") or "None",
-                }
+                },
             )
 
             status_str = "\033[92mSUCCESS\033[0m" if success else "\033[91mFAILED\033[0m"
@@ -94,7 +98,7 @@ async def run_benchmark(targets, min_score, max_attempts):
                     "attempts": 1,
                     "recoveries": 0,
                     "error": str(e),
-                }
+                },
             )
             print(f"      \033[91mError occurred: {e}\033[0m")
         print("-" * 70)
@@ -146,7 +150,7 @@ if __name__ == "__main__":
                 "url": args.url,
                 "intent": args.intent,
                 "schema": [{"name": "title", "field_type": "string", "description": "Title or main text"}],
-            }
+            },
         ]
     else:
         targets = DEFAULT_TARGETS

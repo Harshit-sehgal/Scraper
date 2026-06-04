@@ -13,7 +13,6 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
-from typing import Optional
 
 from forge_kernel.config import settings
 from forge_kernel.contracts.job import Job, JobStatus
@@ -34,13 +33,13 @@ class JobService:
 
     # ─── Queries ────────────────────────────────────────────────────────
 
-    def get(self, job_id: str) -> Optional[Job]:
+    def get(self, job_id: str) -> Job | None:
         return self._jobs.get(job_id)
 
     def list_all(self) -> list[Job]:
         return list(self._jobs.values())
 
-    def get_recycle(self, job_id: str) -> Optional[Job]:
+    def get_recycle(self, job_id: str) -> Job | None:
         return self._recycle_bin.get(job_id)
 
     def list_recycle(self) -> list[Job]:
@@ -53,7 +52,7 @@ class JobService:
         self._persist()
         return job
 
-    def cancel(self, job_id: str) -> Optional[Job]:
+    def cancel(self, job_id: str) -> Job | None:
         job = self._jobs.get(job_id)
         if not job:
             return None
@@ -78,7 +77,7 @@ class JobService:
         self._recycle_bin.pop(job_id, None)
         return repo.hard_delete(job_id)
 
-    def restore(self, job_id: str) -> Optional[Job]:
+    def restore(self, job_id: str) -> Job | None:
         job = self._recycle_bin.pop(job_id, None)
         if job:
             self._jobs[job_id] = job

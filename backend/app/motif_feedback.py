@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from app.models import SchemaField
 
@@ -29,9 +29,9 @@ class MotifFeedbackEngine:
 
     @staticmethod
     def extract_field_hints_from_motifs(
-        solidified_motifs: List[Tuple[str, ...]],
-        schema_fields: List[SchemaField],
-    ) -> Dict[str, str]:
+        solidified_motifs: list[tuple[str, ...]],
+        schema_fields: list[SchemaField],
+    ) -> dict[str, str]:
         """Extract field hints from solidified motifs.
 
         A solidified motif is a tuple of field names that frequently co-occur.
@@ -70,9 +70,9 @@ class MotifFeedbackEngine:
 
     @staticmethod
     def build_motif_context(
-        solidified_motifs: List[Tuple[str, ...]],
-        schema_fields: List[SchemaField],
-    ) -> Optional[str]:
+        solidified_motifs: list[tuple[str, ...]],
+        schema_fields: list[SchemaField],
+    ) -> str | None:
         """Build a context string about learned patterns for the selector discovery prompt.
 
         Args:
@@ -110,10 +110,10 @@ This can help with relative selector selection (e.g., if you find the price, the
 
     @staticmethod
     def extract_motifs_from_results(
-        results: List[Dict[str, Any]],
-        schema_fields: List[SchemaField],
+        results: list[dict[str, Any]],
+        schema_fields: list[SchemaField],
         min_cooccurrence: int = 2,
-    ) -> List[Tuple[str, ...]]:
+    ) -> list[tuple[str, ...]]:
         """Extract field co-occurrence motifs from extraction results.
 
         Scans results for fields that frequently appear together and returns
@@ -154,7 +154,7 @@ This can help with relative selector selection (e.g., if you find the price, the
 
         # Group field pairs into motifs: fields that co-occur frequently
         # Fields that share many connections form a motif
-        field_connections: Dict[str, set] = {}
+        field_connections: dict[str, set] = {}
         for (f1, f2), count in field_pairs.items():
             if count >= min_cooccurrence:
                 field_connections.setdefault(f1, set()).add(f2)
@@ -162,7 +162,7 @@ This can help with relative selector selection (e.g., if you find the price, the
 
         # Build motifs from connected components (greedy clustering)
         assigned = set()
-        motifs: List[Tuple[str, ...]] = []
+        motifs: list[tuple[str, ...]] = []
 
         for fname, neighbors in sorted(field_connections.items(), key=lambda x: -len(x[1])):
             if fname in assigned:

@@ -12,7 +12,6 @@ This test suite validates:
 
 import ast
 from pathlib import Path
-from typing import Dict, List, Set
 
 import pytest
 
@@ -22,8 +21,8 @@ class ArchitecturalValidator:
 
     def __init__(self):
         self.app_dir = Path(__file__).resolve().parent.parent / "app"
-        self.imports_map: Dict[str, Set[str]] = {}
-        self.layer_map: Dict[str, str] = {}
+        self.imports_map: dict[str, set[str]] = {}
+        self.layer_map: dict[str, str] = {}
         self._parse_all_modules()
 
     def _detect_layer(self, module_name: str) -> str:
@@ -32,7 +31,7 @@ class ArchitecturalValidator:
             return "Extract"
         elif any(
             x in module_name for x in ["memory", "state_", "cache_", "checkpoint", "graph_state", "persistent", "world_snapshot"]
-        ):  # noqa: E501
+        ):
             return "Memory"
         elif any(
             x in module_name
@@ -48,7 +47,7 @@ class ArchitecturalValidator:
                 "strategy_",
                 "domain_evolution",
             ]
-        ):  # noqa: E501
+        ):
             return "Intelligence"
         elif any(x in module_name for x in ["browser", "proxy", "rate_limiter", "fetch_"]):
             return "Fetch"
@@ -103,11 +102,11 @@ class ArchitecturalValidator:
         """Get the layer of a module"""
         return self.layer_map.get(module, "Utility")
 
-    def get_imports(self, module: str) -> Set[str]:
+    def get_imports(self, module: str) -> set[str]:
         """Get imports of a module"""
         return self.imports_map.get(module, set())
 
-    def get_dependents(self, module: str) -> Set[str]:
+    def get_dependents(self, module: str) -> set[str]:
         """Get modules that import the given module"""
         deps = set()
         for mod, imports in self.imports_map.items():
@@ -244,7 +243,7 @@ class TestCircularDependencies:
     def setup(self):
         self.validator = ArchitecturalValidator()
 
-    def _find_cycles(self, start: str, visited: Set[str], path: List[str]) -> List[List[str]]:
+    def _find_cycles(self, start: str, visited: set[str], path: list[str]) -> list[list[str]]:
         """Find cycles using DFS"""
         cycles = []
         current_imports = self.validator.get_imports(start)
@@ -349,7 +348,7 @@ class TestStateOwnership:
         # Just verify it's not too many (no single Intelligence module dominates)
         for intel_mod in intel_modules:
             count = len(
-                [imp for m, imp in intelligence_state_access if m == intel_mod and self.validator.get_layer(imp) == "Memory"]
+                [imp for m, imp in intelligence_state_access if m == intel_mod and self.validator.get_layer(imp) == "Memory"],
             )
             assert count <= 5, f"{intel_mod} accesses {count} Memory modules (max 5)"
 
@@ -502,10 +501,9 @@ class TestIntegrationPoints:
                 tgt_layer = self.validator.get_layer(imp)
 
                 # Major layer jump
-                if src_layer == "Extract" and tgt_layer == "Intelligence":
-                    if (module, imp) not in justified:
-                        # Might be new violation
-                        pass  # Report but don't fail (known architectural debt)
+                if src_layer == "Extract" and tgt_layer == "Intelligence" and (module, imp) not in justified:
+                    # Might be new violation
+                    pass  # Report but don't fail (known architectural debt)
 
     def test_hub_module_responsibilities(self) -> None:
         """Hub modules should have clear, focused responsibilities"""
@@ -547,7 +545,8 @@ class TestIntegrationPoints:
             for imp in imports:
                 if imp in dependents:
                     # Circular dependency detected
-                    raise AssertionError(f"ML module {ml_mod} has circular dependency with {imp}")
+                    msg = f"ML module {ml_mod} has circular dependency with {imp}"
+                    raise AssertionError(msg)
 
 
 # ============================================================================

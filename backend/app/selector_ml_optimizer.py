@@ -24,7 +24,7 @@ import logging
 import re
 import time
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class SelectorFeatures:
     has_nth_child: bool  # Positional selector
     has_attribute_match: bool  # [attr~=value] style
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -58,16 +58,16 @@ class SelectorPrediction:
     selector: str
     predicted_quality: float  # 0 - 1: predicted success rate
     confidence: float  # 0 - 1: confidence in prediction
-    feature_importance: Dict[str, float]  # Which features matter most
+    feature_importance: dict[str, float]  # Which features matter most
     recommendation: str  # "keep", "improve", "replace"
-    suggested_mutations: List[str]  # Alternative selectors to try
+    suggested_mutations: list[str]  # Alternative selectors to try
 
 
 class SelectorFeatureExtractor:
     """Extract features from CSS selectors for ML."""
 
     @staticmethod
-    def extract_features(selector: str, _dom_context: Optional[str] = None) -> SelectorFeatures:
+    def extract_features(selector: str, _dom_context: str | None = None) -> SelectorFeatures:
         """Extract ML features from a CSS selector.
 
         Args:
@@ -135,7 +135,7 @@ class SelectorFeatureExtractor:
         )
 
     @staticmethod
-    def extract_batch(selectors: List[str]) -> List[SelectorFeatures]:
+    def extract_batch(selectors: list[str]) -> list[SelectorFeatures]:
         """Extract features for multiple selectors."""
         return [SelectorFeatureExtractor.extract_features(sel) for sel in selectors]
 
@@ -179,7 +179,7 @@ class SelectorQualityPredictor:
         """
         # Weighted sum of features
         score = 0.4  # Lower base score
-        feature_dict: Dict[str, Any] = asdict(features)
+        feature_dict: dict[str, Any] = asdict(features)
 
         for feature_name, weight in self.feature_weights.items():
             if feature_name == "selector":
@@ -221,7 +221,7 @@ class SelectorQualityPredictor:
             recommendation = "replace"
 
         # Calculate feature importance
-        feature_importance: Dict[str, float] = {}
+        feature_importance: dict[str, float] = {}
         for feature_name, weight in self.feature_weights.items():
             if feature_name != "selector":
                 raw = feature_dict.get(feature_name, 0)
@@ -244,7 +244,7 @@ class SelectorQualityPredictor:
             suggested_mutations=self._generate_mutations(features),
         )
 
-    def _generate_mutations(self, features: SelectorFeatures) -> List[str]:
+    def _generate_mutations(self, features: SelectorFeatures) -> list[str]:
         """Generate alternative selectors to try.
 
         Args:
@@ -285,11 +285,11 @@ class SelectorQualityPredictor:
 
         return mutations[:3]  # Return top 3 mutations
 
-    def predict_batch(self, features_list: List[SelectorFeatures]) -> List[SelectorPrediction]:
+    def predict_batch(self, features_list: list[SelectorFeatures]) -> list[SelectorPrediction]:
         """Predict quality for multiple selectors."""
         return [self.predict(features) for features in features_list]
 
-    def update_weights(self, feedback: List[tuple], learning_rate: float = 0.01):
+    def update_weights(self, feedback: list[tuple], learning_rate: float = 0.01):
         """Update model weights based on feedback.
 
         Args:
@@ -304,7 +304,7 @@ class SelectorQualityPredictor:
             error = actual_quality - prediction.predicted_quality
 
             # Adjust weights based on error
-            feature_dict: Dict[str, Any] = asdict(features)
+            feature_dict: dict[str, Any] = asdict(features)
             for feature_name in self.feature_weights.keys():
                 if feature_name == "selector":
                     continue
@@ -330,14 +330,14 @@ class SelectorOptimizationEngine:
         """Initialize optimizer with quality predictor."""
         self.predictor = SelectorQualityPredictor()
         self.feature_extractor = SelectorFeatureExtractor()
-        self.optimization_history: Dict[str, List[Dict[str, Any]]] = {}
+        self.optimization_history: dict[str, list[dict[str, Any]]] = {}
 
     def optimize_selectors(
         self,
         domain: str,
-        selectors: Dict[str, str],
-        context: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        selectors: dict[str, str],
+        context: str | None = None,
+    ) -> dict[str, Any]:
         """Optimize selectors for a domain.
 
         Args:
@@ -348,7 +348,7 @@ class SelectorOptimizationEngine:
         Returns:
             Optimization report with recommendations
         """
-        report: Dict[str, Any] = {
+        report: dict[str, Any] = {
             "domain": domain,
             "timestamp": time.time(),
             "original_count": len(selectors),
@@ -389,7 +389,7 @@ class SelectorOptimizationEngine:
 
         return report
 
-    def get_optimization_history(self, domain: str, limit: int = 10) -> List[dict]:
+    def get_optimization_history(self, domain: str, limit: int = 10) -> list[dict]:
         """Get recent optimization reports for a domain."""
         hist: list = self.optimization_history.get(domain, [])
         return hist[-limit:]

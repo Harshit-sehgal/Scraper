@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from forge_kernel.contracts.analysis import ExtractionAttempt
 from forge_kernel.contracts.result import ResultRecord
@@ -28,7 +28,7 @@ class PipelineResult:
     quality_report: dict[str, Any]
     attempts: list[ExtractionAttempt] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
-    failure: Optional[dict[str, Any]] = None
+    failure: dict[str, Any] | None = None
 
 
 class ExtractionPipeline:
@@ -42,7 +42,7 @@ class ExtractionPipeline:
         url: str,
         schema_fields: list[dict[str, Any]],
         min_record_score: float = 0.35,
-        selectors_map: Optional[dict[str, Any]] = None,
+        selectors_map: dict[str, Any] | None = None,
     ) -> PipelineResult:
         """Run the full extraction pipeline on a URL.
 
@@ -89,7 +89,7 @@ class ExtractionPipeline:
                         field_type=ft,
                         description=sf.get("description", ""),
                         required=sf.get("required", True),
-                    )
+                    ),
                 )
 
             from app.extraction_provenance import ProvenanceBuilder, enrich_records_with_provenance
@@ -140,7 +140,7 @@ class ExtractionPipeline:
                         provenance=rec_prov,
                         record_score=score,
                         scraped_at=now,
-                    )
+                    ),
                 )
 
             self._attempts.append(
@@ -150,7 +150,7 @@ class ExtractionPipeline:
                     success=True,
                     records_count=len(records),
                     duration_ms=duration,
-                )
+                ),
             )
 
             # Stage 3: Quality
@@ -171,7 +171,7 @@ class ExtractionPipeline:
                     success=False,
                     duration_ms=duration,
                     failure={"error": str(e)},
-                )
+                ),
             )
             return PipelineResult(
                 records=[],

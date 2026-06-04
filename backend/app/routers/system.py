@@ -41,10 +41,12 @@ class AcquisitionMode(str, Enum):
 class URLPreviewRequest(BaseModel):
     url: str = Field(..., description="The URL to analyze for data extraction")
     search_params: dict[str, str] | None = Field(
-        default=None, description="Optional search parameters to submit to the site's search form"
+        default=None,
+        description="Optional search parameters to submit to the site's search form",
     )
     acquisition_mode: AcquisitionMode = Field(
-        default=AcquisitionMode.STANDARD, description="Acquisition mode: standard, aggressive, or deep_scan"
+        default=AcquisitionMode.STANDARD,
+        description="Acquisition mode: standard, aggressive, or deep_scan",
     )
 
 
@@ -412,12 +414,13 @@ async def metrics(request: Request):
         if auth_header.startswith("Bearer "):
             bearer_token = auth_header[7:]
         if not secrets.compare_digest(bearer_token, settings.METRICS_TOKEN) and not secrets.compare_digest(
-            api_key_header, settings.METRICS_TOKEN
+            api_key_header,
+            settings.METRICS_TOKEN,
         ):
             return JSONResponse(
                 status_code=403,
                 content={
-                    "detail": "Invalid or missing metrics token. Provide Authorization: Bearer <token> or X-API-Key header."
+                    "detail": "Invalid or missing metrics token. Provide Authorization: Bearer <token> or X-API-Key header.",
                 },
             )
 
@@ -467,7 +470,9 @@ async def metrics(request: Request):
         logger.error("Metrics: backend collection failed: %s", e)
 
     backend_ok_gauge = Gauge(
-        "dataforge_backend_collection_ok", "Whether storage backend metrics collected successfully", registry=registry
+        "dataforge_backend_collection_ok",
+        "Whether storage backend metrics collected successfully",
+        registry=registry,
     )
     backend_ok_gauge.set(backend_ok)
 
@@ -490,7 +495,9 @@ async def metrics(request: Request):
         logger.error("Metrics: queue collection failed: %s", e)
 
     queue_ok_gauge = Gauge(
-        "dataforge_queue_collection_ok", "Whether worker queue metrics collected successfully", registry=registry
+        "dataforge_queue_collection_ok",
+        "Whether worker queue metrics collected successfully",
+        registry=registry,
     )
     queue_ok_gauge.set(queue_ok)
 
@@ -500,7 +507,10 @@ async def metrics(request: Request):
     failures = get_worker_failures()
     if failures:
         failure_gauge = Gauge(
-            "dataforge_worker_failures_total", "Total worker failures by task type", ["task_type"], registry=registry
+            "dataforge_worker_failures_total",
+            "Total worker failures by task type",
+            ["task_type"],
+            registry=registry,
         )
         for task_type, count in failures.items():
             failure_gauge.labels(task_type=task_type).set(count)
@@ -537,7 +547,9 @@ async def metrics(request: Request):
 
     # Cumulative collection errors
     error_total_gauge = Gauge(
-        "dataforge_metrics_collection_error_total", "Total collection errors encountered", registry=registry
+        "dataforge_metrics_collection_error_total",
+        "Total collection errors encountered",
+        registry=registry,
     )
     error_total_gauge.set(METRICS_COLLECTION_ERRORS)
 

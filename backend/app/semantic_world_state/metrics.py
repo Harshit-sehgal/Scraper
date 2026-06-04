@@ -47,9 +47,8 @@ class MetricsMixin:
         # 3. Topology persistence: stable field regions reduce exclusion
         view = self._topology.get_view()
         for region in view.all_regions():
-            if role_a in region.competing_roles and role_b in region.competing_roles:
-                if region.instability < 0.3:
-                    baseline -= 0.05
+            if role_a in region.competing_roles and role_b in region.competing_roles and region.instability < 0.3:
+                baseline -= 0.05
 
         # 4. Learned exclusion (symbolic bridge, secondary cache — 0.1x weight)
         key = tuple(sorted([role_a, role_b]))
@@ -101,7 +100,7 @@ class MetricsMixin:
                     # is contradictory
                     if exclusion > 0.7:
                         contradictions.append(
-                            {"envelope": eid, "pair": (r1, r2), "exclusion": exclusion, "type": "internal_repulsion"}
+                            {"envelope": eid, "pair": (r1, r2), "exclusion": exclusion, "type": "internal_repulsion"},
                         )
 
         consistency_score = 1.0 - (len(contradictions) / max(len(envelopes), 1))

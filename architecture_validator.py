@@ -125,7 +125,7 @@ def check_metric_ownership(filepath):
             if isinstance(node, ast.AnnAssign):
                 if isinstance(node.target, ast.Name) and node.target.id in FORBIDDEN_FIELDS:
                     errors.append(
-                        f"Illegal direct storage of derived metric '{node.target.id}' in class '{cls.name}' ({filepath})"
+                        f"Illegal direct storage of derived metric '{node.target.id}' in class '{cls.name}' ({filepath})",
                     )
 
     return errors

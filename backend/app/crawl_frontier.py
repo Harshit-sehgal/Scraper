@@ -16,7 +16,6 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set
 from urllib.parse import urlparse
 
 from app.config import settings
@@ -30,7 +29,7 @@ class CrawlItem:
     priority: int
     url: str = field(compare=False)
     depth: int = field(compare=False)
-    source_url: Optional[str] = field(default=None, compare=False)
+    source_url: str | None = field(default=None, compare=False)
     added_at: float = field(default_factory=time.time, compare=False)
 
 
@@ -38,17 +37,17 @@ class CrawlFrontier:
     """Manages the lifecycle of URLs in a large-scale crawl."""
 
     def __init__(self) -> None:
-        self._queue: List[CrawlItem] = []
-        self._pending: Set[str] = set()
-        self._completed: Set[str] = set()
-        self._failed: Dict[str, int] = {}
+        self._queue: list[CrawlItem] = []
+        self._pending: set[str] = set()
+        self._completed: set[str] = set()
+        self._failed: dict[str, int] = {}
         self._lock = asyncio.Lock()
         self._policy = get_crawl_policy()
         self._max_discovery_depth: int = 3
         # Whether we're integrated with the scraper
         self._integrated_frontier: bool = True
 
-        self._domain_page_counts: Dict[str, int] = {}
+        self._domain_page_counts: dict[str, int] = {}
 
         # Persistent SQLite storage
         # Resolve path relative to the backend directory (project_root / backend/)
@@ -116,7 +115,7 @@ class CrawlFrontier:
         except Exception as e:
             logger.error("Failed to load frontier state from SQLite: %s", e)
 
-    async def add_url(self, url: str, priority: int = 10, depth: int = 0, source_url: Optional[str] = None) -> bool:
+    async def add_url(self, url: str, priority: int = 10, depth: int = 0, source_url: str | None = None) -> bool:
         """Add a URL to the frontier if it hasn't been crawled yet."""
         if not url or not url.startswith("http"):
             return False
@@ -163,9 +162,9 @@ class CrawlFrontier:
             logger.debug("[Frontier] Added URL: %s (depth: %d, priority: %d)", url, depth, item_priority)
             return True
 
-    async def get_next_url(self) -> Optional[str]:
+    async def get_next_url(self) -> str | None:
         """Get the next URL available for crawling, respecting policy."""
-        tried: List[CrawlItem] = []
+        tried: list[CrawlItem] = []
 
         while True:
             # 1. Pop a candidate item under the lock
@@ -341,7 +340,7 @@ class CrawlFrontier:
                     except Exception as e:
                         logger.error("Failed to finalize failed URL as completed in SQLite: %s", e)
 
-    async def add_discovered_links(self, links: List[str], source_url: str, source_depth: int = 0) -> int:
+    async def add_discovered_links(self, links: list[str], source_url: str, source_depth: int = 0) -> int:
         """Add links discovered during extraction back to the frontier.
 
         This implements the crawl orchestration loop:
@@ -370,7 +369,7 @@ class CrawlFrontier:
             logger.debug("[Frontier] Added %d discovered links from %s (depth %d)", added, source_url, source_depth)
         return added
 
-    async def get_next_urls(self, count: int = 5) -> List[str]:
+    async def get_next_urls(self, count: int = 5) -> list[str]:
         """Get multiple URLs available for crawling.
 
         Useful for batch processing — returns up to `count` URLs
@@ -385,7 +384,7 @@ class CrawlFrontier:
                 break
         return urls
 
-    async def get_frontier_for_domain(self, domain: str, max_urls: int = 10) -> List[str]:
+    async def get_frontier_for_domain(self, domain: str, max_urls: int = 10) -> list[str]:
         """Get next URLs for a specific domain.
 
         Useful for domain-priority crawling where a single domain

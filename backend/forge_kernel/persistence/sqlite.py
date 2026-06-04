@@ -6,7 +6,6 @@ with minimal changes, wrapped in the clean JobRepository contract.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from forge_kernel.contracts.job import Job
 from forge_kernel.persistence import JobRepository
@@ -29,7 +28,8 @@ def _get_store():
                 "persist_state_single": persist_state_single,
             }
         except ImportError:
-            raise RuntimeError("Cannot import app.job_store — ensure PYTHONPATH includes backend/")
+            msg = "Cannot import app.job_store — ensure PYTHONPATH includes backend/"
+            raise RuntimeError(msg)
     return _job_store
 
 
@@ -38,7 +38,7 @@ class SQLiteJobRepository(JobRepository):
 
     backend = "sqlite"
 
-    def load_all(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+    def load_all(self) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         store = _get_store()
         jobs, recycle, ws = store["load_state"](recover_in_progress=False)
         return jobs, recycle, ws

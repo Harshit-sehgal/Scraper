@@ -16,8 +16,8 @@ import datetime
 import json
 import logging
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator, Optional
 
 import psycopg2
 from psycopg2 import pool as pg_pool
@@ -34,7 +34,7 @@ _CURRENT_SCHEMA_VERSION = 3
 # Connection pool (thread-safe, synchronous)
 # ───────────────────────────────────────────────────────────────────────
 
-_pool: Optional[pg_pool.ThreadedConnectionPool] = None
+_pool: pg_pool.ThreadedConnectionPool | None = None
 _pool_lock = threading.Lock()
 
 
@@ -59,8 +59,9 @@ def _get_database_url() -> str:
     env = settings.ENV.strip().lower()
     if env == "development":
         return "postgresql://dataforge:dataforge@localhost:5432/dataforge"
+    msg = "DATAFORGE_DATABASE_URL is required in non-development environments. Set it to a valid Postgres connection string."
     raise RuntimeError(
-        "DATAFORGE_DATABASE_URL is required in non-development environments. Set it to a valid Postgres connection string."
+        msg,
     )
 
 
@@ -120,7 +121,7 @@ def _fetch_all(conn, sql: str, params=None) -> list[dict]:
         return [dict(r) for r in cur.fetchall()]
 
 
-def _fetch_one(conn, sql: str, params=None) -> Optional[dict]:
+def _fetch_one(conn, sql: str, params=None) -> dict | None:
     """Execute a query and return the first row as a dict, or None."""
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(sql, params or ())
@@ -384,7 +385,7 @@ def _job_to_row(job: Job) -> dict:
     }
 
 
-def _row_to_job(row: dict) -> Optional[Job]:
+def _row_to_job(row: dict) -> Job | None:
     """Convert a Postgres row dict back to a Job model."""
     try:
         from app.models import SourcePolicy
@@ -439,7 +440,7 @@ def _row_to_job(row: dict) -> Optional[Job]:
                 "results_file_path": row.get("results_file_path") if row.get("results_file_path") else None,
                 "warnings": json.loads(row.get("warnings", "[]")),
                 "acquisition_mode": row.get("acquisition_mode", "standard"),
-            }
+            },
         )
     except Exception as e:
         logger.warning("Failed to deserialize Postgres job row: %s", e)
@@ -493,7 +494,7 @@ class PostgresJobRepository(JobRepository):
                     jobs[job.id] = job
             return jobs
 
-    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         self._ensure()
         with _conn() as conn:
             # Load jobs
@@ -540,7 +541,7 @@ class PostgresJobRepository(JobRepository):
 
             # Load world state
             ws_row = _fetch_one(conn, "SELECT payload FROM world_state WHERE id = 'default'")
-            world_state_data: Optional[dict] = None
+            world_state_data: dict | None = None
             if ws_row and ws_row.get("payload"):
                 try:
                     world_state_data = json.loads(ws_row["payload"])
@@ -697,9 +698,9 @@ class PostgresJobRepository(JobRepository):
             cur = _execute(conn, "DELETE FROM jobs WHERE id = %s", (job_id,))
             deleted = cur.rowcount
             _execute(conn, "DELETE FROM recycle_bin WHERE id = %s", (job_id,))
-            return deleted > 0
+            return deleted > 0  # type: ignore[no-any-return]
 
-    def clear_terminal_jobs(self, older_than: Optional[str] = None) -> int:
+    def clear_terminal_jobs(self, older_than: str | None = None) -> int:
         """Remove terminal-status jobs older than the given timestamp.
         Only removes jobs that are completed, failed, canceled, degraded, or empty_result.
         Moves them to recycle_bin before deletion."""
@@ -727,14 +728,14 @@ class PostgresJobRepository(JobRepository):
 
     # ─── World state persistence ────────────────────────────────────────
 
-    def load_world_state(self) -> Optional[dict]:
+    def load_world_state(self) -> dict | None:
         """Load semantic world state from Postgres."""
         self._ensure()
         with _conn() as conn:
             row = _fetch_one(conn, "SELECT payload FROM world_state WHERE id = 'default'")
             if row and row.get("payload"):
                 try:
-                    return json.loads(row["payload"])
+                    return json.loads(row["payload"])  # type: ignore[no-any-return]
                 except Exception as e:
                     logger.warning("Failed to deserialize world_state payload: %s", e)
             return None

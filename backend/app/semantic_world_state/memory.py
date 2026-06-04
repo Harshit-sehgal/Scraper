@@ -1,17 +1,16 @@
 # mypy: ignore-errors
 # type: ignore
-from typing import Tuple
 
 from app.invariant_firewall import requires_invariants
 
 
 class MemoryMixin:
     @requires_invariants
-    def reinforce_motif(self, motif: Tuple[str, ...]):
+    def reinforce_motif(self, motif: tuple[str, ...]):
         """Reinforce a structural motif with temporal awareness."""
         self._motif.reinforce(motif, self.metrics.total_records_processed)
 
-    def get_motif_stability(self, motif: Tuple[str, ...]) -> float:
+    def get_motif_stability(self, motif: tuple[str, ...]) -> float:
         """Get temporal stability score for a motif (0 - 1)."""
         return self._motif.compute_stability(motif, self.metrics.total_records_processed)
 

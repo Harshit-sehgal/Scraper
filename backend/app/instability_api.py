@@ -7,7 +7,7 @@ High-entropy data sources are quarantined before they can affect stable basins.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING
 
 
 def get_world_state() -> "SemanticWorldState":
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 class InstabilityAPI:
     """Hardened interface for controlled exclusion and tension mutations."""
 
-    def __init__(self, ws: Optional[SemanticWorldState] = None):
+    def __init__(self, ws: SemanticWorldState | None = None):
         self.ws: SemanticWorldState = ws or get_world_state()
 
     # ─── Query Operations ────────────────────────────────────────────────
@@ -55,10 +55,10 @@ class InstabilityAPI:
 class ImmunityLayer:
     """Governs semantic data ingestion and protects against adversarial perturbations."""
 
-    def __init__(self, ws: Optional[SemanticWorldState] = None):
+    def __init__(self, ws: SemanticWorldState | None = None):
         self.ws = ws or get_world_state()
         # Quarantine Registry: domain / source -> trust_score
-        self._quarantined_sources: Dict[str, float] = {}
+        self._quarantined_sources: dict[str, float] = {}
 
     # ─── Query Operations ────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ class ImmunityLayer:
 
     # ─── Mutation Operations ─────────────────────────────────────────────
 
-    def validate_perturbation(self, source: str, token: str, roles: List[str]) -> bool:
+    def validate_perturbation(self, source: str, token: str, roles: list[str]) -> bool:
         """Evaluate if a data source is safe to perturb the field (Phase 42)."""
         trust = self._quarantined_sources.get(source, 1.0)
 
@@ -80,14 +80,13 @@ class ImmunityLayer:
         # If any target roles are "Crystalline", check system energy
         for role in roles:
             level = self.ws.get_role_level(role)
-            if level > 0 or self.ws.is_role_anchored(role):
-                if self.ws.metrics.global_energy > 7.0:
-                    # System is too hot to allow mutation of high-level
-                    # concepts
-                    logging.getLogger(__name__).info(
-                        f"IMMUNITY: Shielded high-integrity role [{role}] from mutation (Energy too high)"
-                    )
-                    return False
+            if (level > 0 or self.ws.is_role_anchored(role)) and self.ws.metrics.global_energy > 7.0:
+                # System is too hot to allow mutation of high-level
+                # concepts
+                logging.getLogger(__name__).info(
+                    f"IMMUNITY: Shielded high-integrity role [{role}] from mutation (Energy too high)",
+                )
+                return False
 
         # 3. Adversarial Pressure Detection (Phase 42)
         # Check if this source is repeatedly causing high energy spikes
@@ -104,10 +103,10 @@ class ImmunityLayer:
         self._quarantined_sources[source] = max(0.0, current - penalty)
 
 
-_immune_system: Optional[ImmunityLayer] = None
+_immune_system: ImmunityLayer | None = None
 
 
-def get_immune_system(ws: Optional[SemanticWorldState] = None) -> ImmunityLayer:
+def get_immune_system(ws: SemanticWorldState | None = None) -> ImmunityLayer:
     global _immune_system
     if _immune_system is None:
         _immune_system = ImmunityLayer(ws=ws)

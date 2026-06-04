@@ -14,7 +14,6 @@ product kernel at startup.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from app.browser_pool import get_browser_pool
 from app.config import settings
@@ -274,7 +273,8 @@ async def get_regression_detail(entry_id: str):
 
 @router.post("/regressions/{entry_id}/generate-test")
 async def generate_regression_replay_test(
-    entry_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))
+    entry_id: str,
+    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
 ):
     """Generate a pytest replay test for a captured regression."""
     capture = get_regression_capture()
@@ -543,7 +543,7 @@ async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)
                     "success_count": entry.get("success_count", 0),
                     "failure_count": entry.get("failure_count", 0),
                     "reason": confidence.reason,
-                }
+                },
             )
 
     # Sort by score (worst first)
@@ -562,7 +562,7 @@ async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)
 @router.post("/ml/optimize/domain/{domain}")
 async def optimize_domain_selectors(
     domain: str,
-    selectors: Optional[dict] = None,
+    selectors: dict | None = None,
     _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
 ):
     """Optimize selectors for a domain using ML predictions.
@@ -686,7 +686,7 @@ async def record_strategy_attempt(
     success: bool,
     time_ms: float = Query(0, ge=0),
     quality: float = Query(0.5, ge=0, le=1),
-    failure_reason: Optional[str] = None,
+    failure_reason: str | None = None,
     _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
 ):
     """Record a strategy attempt for learning.

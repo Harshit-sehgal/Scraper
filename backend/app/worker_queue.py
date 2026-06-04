@@ -24,9 +24,10 @@ import sqlite3
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from enum import IntEnum, StrEnum
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 from app.config import settings
 
@@ -57,30 +58,30 @@ class QueueTask:
     """A single task in the worker queue."""
 
     __slots__ = (
+        "attempts",
+        "completed_at",
+        "created_at",
         "id",
-        "type",
+        "last_error",
+        "max_attempts",
         "payload",
         "priority",
-        "status",
-        "created_at",
-        "started_at",
-        "completed_at",
-        "attempts",
-        "max_attempts",
-        "last_error",
         "scheduled_at",
+        "started_at",
+        "status",
         "timeout_seconds",
+        "type",
     )
 
     def __init__(
         self,
         task_type: str,
-        payload: Optional[dict] = None,
+        payload: dict | None = None,
         priority: Priority = Priority.NORMAL,
         max_attempts: int = 3,
         timeout_seconds: int = 300,
-        task_id: Optional[str] = None,
-        scheduled_at: Optional[str] = None,
+        task_id: str | None = None,
+        scheduled_at: str | None = None,
     ):
         self.id = task_id or str(uuid.uuid4())
         self.type = task_type
@@ -88,11 +89,11 @@ class QueueTask:
         self.priority = priority
         self.status = TaskStatus.PENDING
         self.created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.started_at: Optional[str] = None
-        self.completed_at: Optional[str] = None
+        self.started_at: str | None = None
+        self.completed_at: str | None = None
         self.attempts = 0
         self.max_attempts = max_attempts
-        self.last_error: Optional[str] = None
+        self.last_error: str | None = None
         self.scheduled_at = scheduled_at or self.created_at
         self.timeout_seconds = timeout_seconds
 
@@ -161,7 +162,7 @@ def _get_db_path() -> Path:
 _DB_LOCK = threading.Lock()
 
 
-def _get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
+def _get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     """Get a SQLite connection with WAL mode."""
     path = db_path or _get_db_path()
     conn = sqlite3.connect(str(path), timeout=10)
@@ -174,7 +175,7 @@ def _get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
 _CURRENT_QUEUE_SCHEMA_VERSION = 2
 
 
-def _ensure_schema(db_path: Optional[Path] = None):
+def _ensure_schema(db_path: Path | None = None):
     """Create the queue tables if they don't exist and run migrations."""
     with _DB_LOCK:
         conn = _get_connection(db_path=db_path)
@@ -264,12 +265,12 @@ def _ensure_schema(db_path: Optional[Path] = None):
 class WorkerQueue:
     """Persistent worker queue with priority, retries, and dead letter support."""
 
-    def __init__(self, max_concurrency: int = 5, poll_interval: float = 1.0, db_path: Optional[Path] = None):
+    def __init__(self, max_concurrency: int = 5, poll_interval: float = 1.0, db_path: Path | None = None):
         self._max_concurrency = max_concurrency
         self._poll_interval = poll_interval
         self._db_path = db_path
         self._running = False
-        self._worker_task: Optional[asyncio.Task] = None
+        self._worker_task: asyncio.Task | None = None
         self._in_flight: dict[str, asyncio.Task] = {}
         self._handlers: dict[str, Callable] = {}
         self._in_flight_lock = asyncio.Lock()
@@ -293,12 +294,12 @@ class WorkerQueue:
     async def enqueue(
         self,
         task_type: str,
-        payload: Optional[dict] = None,
+        payload: dict | None = None,
         priority: Priority = Priority.NORMAL,
         max_attempts: int = 3,
         timeout_seconds: int = 300,
-        task_id: Optional[str] = None,
-        scheduled_at: Optional[str] = None,
+        task_id: str | None = None,
+        scheduled_at: str | None = None,
     ) -> str:
         """Add a new task to the queue. Returns the task ID."""
         task = QueueTask(
@@ -338,7 +339,7 @@ class WorkerQueue:
 
         return task.id
 
-    async def dequeue(self, timeout: float = 5.0) -> Optional[QueueTask]:
+    async def dequeue(self, timeout: float = 5.0) -> QueueTask | None:
         """Dequeue the highest-priority pending task.
 
         Blocks up to *timeout* seconds if the queue is empty.
@@ -352,7 +353,7 @@ class WorkerQueue:
             await asyncio.sleep(0.25)
         return None
 
-    def _dequeue_one(self) -> Optional[QueueTask]:
+    def _dequeue_one(self) -> QueueTask | None:
         """Synchronous dequeue from SQLite with priority ordering."""
         with _DB_LOCK:
             conn = self._conn()
@@ -371,7 +372,7 @@ class WorkerQueue:
                     {
                         **task_data,
                         "payload": json.loads(task_data["payload"]),
-                    }
+                    },
                 )
                 task.status = TaskStatus.RUNNING
                 task.started_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -387,7 +388,7 @@ class WorkerQueue:
             finally:
                 conn.close()
 
-    async def complete(self, task_id: str, result: Optional[dict] = None):
+    async def complete(self, task_id: str, result: dict | None = None):
         """Mark a task as completed successfully."""
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         async with self._in_flight_lock:
@@ -433,8 +434,8 @@ class WorkerQueue:
         task_id: str,
         error: str,
         retry: bool = True,
-        retry_after: Optional[float] = None,
-        task_type: Optional[str] = None,
+        retry_after: float | None = None,
+        task_type: str | None = None,
     ):
         """Mark a task as failed. Retries if attempts remain.
 
@@ -647,7 +648,7 @@ class WorkerQueue:
                     conn.execute(
                         "UPDATE tasks SET status = 'pending', started_at = NULL, "
                         "last_error = 'Recovered after worker restart' "
-                        "WHERE status = 'running'"
+                        "WHERE status = 'running'",
                     )
                     conn.commit()
                     logger.info("Recovered %d stuck task(s) from previous worker crash", stuck)
@@ -770,7 +771,7 @@ class WorkerQueue:
 
     # ─── Observability ─────────────────────────────────────────────────
 
-    def get_task_state(self, task_id: str) -> Optional[dict]:
+    def get_task_state(self, task_id: str) -> dict | None:
         """Return the current state of a specific task by ID.
 
         Checks the active queue first, then falls back to task_history.
@@ -898,13 +899,13 @@ class WorkerQueue:
 # Global singleton & factory dispatch
 # ───────────────────────────────────────────────────────────────────────
 
-_queue_instance: Optional[WorkerQueue] = None
+_queue_instance: WorkerQueue | None = None
 _queue_lock = threading.Lock()
 
 
 def get_worker_queue(
-    db_path: Optional[Path] = None,
-    backend: Optional[str] = None,
+    db_path: Path | None = None,
+    backend: str | None = None,
 ) -> Any:
     """Get or create the global WorkerQueue instance.
 
@@ -935,9 +936,8 @@ def get_worker_queue(
         with _queue_lock:
             if _queue_instance is None:
                 _queue_instance = WorkerQueue(db_path=db_path)
-    elif db_path is not None:
-        if _queue_instance._db_path != db_path:
-            return WorkerQueue(db_path=db_path)
+    elif db_path is not None and _queue_instance._db_path != db_path:
+        return WorkerQueue(db_path=db_path)
     return _queue_instance
 
 

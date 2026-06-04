@@ -13,7 +13,7 @@ Owns:
 import logging
 import math
 from collections import Counter
-from typing import Callable, Dict, Optional, Tuple
+from collections.abc import Callable
 
 from app.transaction_context import active_transaction
 
@@ -21,21 +21,21 @@ from app.transaction_context import active_transaction
 class MotifState:
     """Sole owner of the semantic field's motif structures."""
 
-    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
         self._delta_callback = delta_callback
         self._motif_counts: Counter = Counter()
-        self._motif_timestamps: Dict[Tuple[str, ...], int] = {}
-        self._motif_stability: Dict[Tuple[str, ...], float] = {}
+        self._motif_timestamps: dict[tuple[str, ...], int] = {}
+        self._motif_stability: dict[tuple[str, ...], float] = {}
 
     @property
-    def _staging(self) -> Optional[dict]:
+    def _staging(self) -> dict | None:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"motif_staging_{id(self)}")
         return None
 
     @_staging.setter
-    def _staging(self, value: Optional[dict]):
+    def _staging(self, value: dict | None):
         tx = active_transaction.get()
         if tx is not None:
             tx[f"motif_staging_{id(self)}"] = value
@@ -93,28 +93,28 @@ class MotifState:
         return Counter(self._get_struct("motif_counts"))
 
     @property
-    def motif_timestamps(self) -> Dict[Tuple[str, ...], int]:
+    def motif_timestamps(self) -> dict[tuple[str, ...], int]:
         return dict(self._get_struct("motif_timestamps"))
 
     @property
-    def motif_stability(self) -> Dict[Tuple[str, ...], float]:
+    def motif_stability(self) -> dict[tuple[str, ...], float]:
         return dict(self._get_struct("motif_stability"))
 
-    def get_count(self, motif: Tuple[str, ...]) -> int:
-        return self._get_struct("motif_counts").get(motif, 0)
+    def get_count(self, motif: tuple[str, ...]) -> int:
+        return self._get_struct("motif_counts").get(motif, 0)  # type: ignore[no-any-return]
 
-    def get_timestamp(self, motif: Tuple[str, ...]) -> int:
-        return self._get_struct("motif_timestamps").get(motif, 0)
+    def get_timestamp(self, motif: tuple[str, ...]) -> int:
+        return self._get_struct("motif_timestamps").get(motif, 0)  # type: ignore[no-any-return]
 
-    def get_stability(self, motif: Tuple[str, ...]) -> float:
-        return self._get_struct("motif_stability").get(motif, 0.0)
+    def get_stability(self, motif: tuple[str, ...]) -> float:
+        return self._get_struct("motif_stability").get(motif, 0.0)  # type: ignore[no-any-return]
 
     def count(self) -> int:
         return len(self._get_struct("motif_counts"))
 
     # ─── Controlled Mutations ───────────────────────────────────────────
 
-    def reinforce(self, motif: Tuple[str, ...], current_record: int):
+    def reinforce(self, motif: tuple[str, ...], current_record: int):
         """Reinforce a structural motif with temporal awareness."""
         counts = self._get_struct("motif_counts")
         counts[motif] += 1
@@ -129,7 +129,7 @@ class MotifState:
         self._set_struct("motif_stability", stabs)
         self._record("reinforce", {"motif": motif, "current_record": current_record})
 
-    def compute_stability(self, motif: Tuple[str, ...], total_records: int) -> float:
+    def compute_stability(self, motif: tuple[str, ...], total_records: int) -> float:
         """Compute temporal stability score for a motif (0 - 1)."""
         if total_records == 0:
             return 0.0
@@ -140,7 +140,7 @@ class MotifState:
         age = total_records - last_seen
         decay_factor = math.exp(-age / 2000.0)
         base_stability = count / max(total_records, 1)
-        return min(base_stability * decay_factor, 1.0)
+        return min(base_stability * decay_factor, 1.0)  # type: ignore[no-any-return]
 
     def prune_weak(self, threshold: float = 0.05):
         """Remove motifs that have decayed below threshold."""
@@ -170,7 +170,7 @@ class MotifState:
         self._set_struct("motif_timestamps", times)
         self._set_struct("motif_stability", stabs)
 
-    def remove(self, motif: Tuple[str, ...]):
+    def remove(self, motif: tuple[str, ...]):
         """Remove a specific motif from all stores."""
         counts = self._get_struct("motif_counts")
         times = self._get_struct("motif_timestamps")

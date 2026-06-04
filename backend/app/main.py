@@ -57,16 +57,16 @@ _persist_single_wrapper = persist_single_wrapper
 run_job = run_job
 
 __all__ = [
-    "app",
-    "lifespan",
-    "get_job_repository",
-    "jobs_store",
-    "recycle_bin_store",
     "CONFIG",
+    "_persist_single_wrapper",
     "_persist_state_wrapper",
     "_run_job_wrapper",
     "_schedule_background_task",
-    "_persist_single_wrapper",
+    "app",
+    "get_job_repository",
+    "jobs_store",
+    "lifespan",
+    "recycle_bin_store",
     "run_job",
 ]
 
@@ -115,7 +115,7 @@ def configure_routes(app: FastAPI):
             schedule_task_fn=lambda *args, **kwargs: _schedule_background_task(*args, **kwargs),
             run_job_coro_fn=lambda *args, **kwargs: _run_job_wrapper(*args, **kwargs),
             config=CONFIG,
-        )
+        ),
     )
     app.include_router(create_exports_router(jobs_store=jobs_store))
     app.include_router(scraper_router)
@@ -130,7 +130,7 @@ def configure_routes(app: FastAPI):
     if settings.ENABLE_EXPERIMENTAL_ROUTES:
         if settings.ENV.lower() == "production":
             logger.warning(
-                "EXPERIMENTAL ROUTES ENABLED IN PRODUCTION — research-only endpoints are exposed. This is not recommended."
+                "EXPERIMENTAL ROUTES ENABLED IN PRODUCTION — research-only endpoints are exposed. This is not recommended.",
             )
         # Lazy import: the experimental router module and its transitive
         # research dependencies are only loaded when we are actually

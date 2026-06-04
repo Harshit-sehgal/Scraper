@@ -185,7 +185,7 @@ class TrendAnalyzer:
                     ),
                     "health_score": trend.health_score,
                     "failure_rate": trend.failure_rate,
-                }
+                },
             )
 
         # Alerts for accelerating selector decay
@@ -197,7 +197,7 @@ class TrendAnalyzer:
                         "domain": domain,
                         "message": (f"Selector decay accelerating on {domain} — consider forced rediscovery"),
                         "health_score": trend.health_score,
-                    }
+                    },
                 )
 
         # Alerts for anti-bot intensification
@@ -209,7 +209,7 @@ class TrendAnalyzer:
                         "domain": domain,
                         "message": (f"Anti-bot pressure increasing on {domain} — may need proxy rotation or reduced frequency"),
                         "health_score": trend.health_score,
-                    }
+                    },
                 )
 
         # Sort alerts by severity (high first), then by health score ascending

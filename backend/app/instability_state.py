@@ -4,7 +4,7 @@ True ownership boundary: NO external code should mutate learned_exclusions direc
 All tension changes go through this state object, which validates invariants.
 """
 
-from typing import Callable, Dict, Optional
+from collections.abc import Callable
 
 from app.transaction_context import active_transaction
 
@@ -12,19 +12,19 @@ from app.transaction_context import active_transaction
 class InstabilityState:
     """Sole owner of the semantic field's tension / exclusion structure."""
 
-    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
         self._delta_callback = delta_callback
-        self._exclusions: Dict[tuple, float] = {}
+        self._exclusions: dict[tuple, float] = {}
 
     @property
-    def _staging(self) -> Optional[Dict[tuple, float]]:
+    def _staging(self) -> dict[tuple, float] | None:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"instability_staging_{id(self)}")
         return None
 
     @_staging.setter
-    def _staging(self, value: Optional[Dict[tuple, float]]):
+    def _staging(self, value: dict[tuple, float] | None):
         tx = active_transaction.get()
         if tx is not None:
             tx[f"instability_staging_{id(self)}"] = value
@@ -56,7 +56,7 @@ class InstabilityState:
     # ─── Read-Only Accessors ─────────────────────────────────────────────
 
     @property
-    def exclusions(self) -> Dict[tuple, float]:
+    def exclusions(self) -> dict[tuple, float]:
         """Return a copy of the exclusions dict to prevent reference aliasing."""
         source = self._staging if self._staging is not None else self._exclusions
         return dict(source)

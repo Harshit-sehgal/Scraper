@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class RegressionStateAdapter:
         # Maps domain -> failure count per category
         self._counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
-    def record_failure(self, domain: str, failure_type: str, severity: str = "medium", context: Optional[dict] = None) -> None:
+    def record_failure(self, domain: str, failure_type: str, severity: str = "medium", context: dict | None = None) -> None:
         """Record and log a new classified regression / failure event."""
         import time
 
@@ -61,7 +61,7 @@ class RegressionStateAdapter:
         self._counts.clear()
 
 
-_regression_state: Optional[RegressionStateAdapter] = None
+_regression_state: RegressionStateAdapter | None = None
 
 
 def get_regression_state() -> RegressionStateAdapter:

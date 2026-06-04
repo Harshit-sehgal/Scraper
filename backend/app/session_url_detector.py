@@ -18,28 +18,30 @@ from app.config import settings
 # for session tokens, tracking IDs, and other transient values.
 SESSION_PARAM_PATTERNS: list[re.Pattern] = [
     # Session tokens
-    re.compile(r"^(session|sess|sid|sessionid|session_id|jsessionid)$", re.I),
+    re.compile(r"^(session|sess|sid|sessionid|session_id|jsessionid)$", re.IGNORECASE),
     # Authentication tokens
-    re.compile(r"^(token|tok|auth|csrf|xsrf|_token|_csrf|csrf_token|csrfmiddlewaretoken)$", re.I),
+    re.compile(r"^(token|tok|auth|csrf|xsrf|_token|_csrf|csrf_token|csrfmiddlewaretoken)$", re.IGNORECASE),
     # Tracking / analytics parameters
-    re.compile(r"^(utm_[a-z]+|fbclid|gclid|gclsrc|dclid|msclkid|mc_eid|mc_cid|_ga|_gl|_hsenc|hssc|hsCtaTracking)$", re.I),
+    re.compile(
+        r"^(utm_[a-z]+|fbclid|gclid|gclsrc|dclid|msclkid|mc_eid|mc_cid|_ga|_gl|_hsenc|hssc|hsCtaTracking)$", re.IGNORECASE
+    ),
     # Cache-busting / timestamp parameters
-    re.compile(r"^(_|cache|nocache|nocache|rand|random|r|t|ts|timestamp|_t|_ts|v|ver|version)$", re.I),
+    re.compile(r"^(_|cache|nocache|nocache|rand|random|r|t|ts|timestamp|_t|_ts|v|ver|version)$", re.IGNORECASE),
     # OAuth / SSO state parameters
-    re.compile(r"^(state|code|oauth_token|access_token|refresh_token|id_token)$", re.I),
+    re.compile(r"^(state|code|oauth_token|access_token|refresh_token|id_token)$", re.IGNORECASE),
     # Platform-specific ephemeral params
-    re.compile(r"^(ref|referrer|source|src|click|clickid|affiliate|aff|campaign|medium)$", re.I),
+    re.compile(r"^(ref|referrer|source|src|click|clickid|affiliate|aff|campaign|medium)$", re.IGNORECASE),
     # Hash-like tokens (long hex or base64 strings as values)
-    re.compile(r"^(hash|h|key|k|sig|signature|sign|checksum)$", re.I),
+    re.compile(r"^(hash|h|key|k|sig|signature|sign|checksum)$", re.IGNORECASE),
 ]
 
 # Parameters that look like session tokens based on their VALUES
 # (long hex strings, base64-like strings, UUIDs, etc.)
 SESSION_VALUE_PATTERNS: list[re.Pattern] = [
     # UUIDs: 8 - 4-4 - 4-12 hex chars
-    re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I),
+    re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE),
     # Long hex strings (32+ chars, like MD5 / SHA hashes)
-    re.compile(r"^[0-9a-f]{32,}$", re.I),
+    re.compile(r"^[0-9a-f]{32,}$", re.IGNORECASE),
     # Base64-like strings (long, with +/ and = padding)
     re.compile(r"^[A-Za-z0-9+/]{40,}={0,2}$"),
     # Numeric IDs that are very long (10+ digits, likely internal tracking)
@@ -78,7 +80,7 @@ def _looks_like_opaque_path_token(segment: str) -> bool:
     """Return True when a path segment looks like a transient opaque token."""
     if len(segment) < 8:
         return False
-    if re.fullmatch(r"[0-9a-f]{16,}", segment, re.I):
+    if re.fullmatch(r"[0-9a-f]{16,}", segment, re.IGNORECASE):
         return True
     if re.fullmatch(r"[A-Za-z0-9_-]{10,}", segment):
         has_alpha = bool(re.search(r"[A-Za-z]", segment))
@@ -128,7 +130,7 @@ def detect_session_params(url: str) -> dict:
                     (
                         param_name,
                         f"param name matches pattern: {pattern.pattern}",
-                    )
+                    ),
                 )
                 confidence_score = max(confidence_score, settings.SESSION_PARAM_NAME_CONFIDENCE)
                 name_matched = True
@@ -146,7 +148,7 @@ def detect_session_params(url: str) -> dict:
                         (
                             param_name,
                             f"value matches session token pattern: {pattern.pattern}",
-                        )
+                        ),
                     )
                     confidence_score = max(confidence_score, settings.SESSION_PARAM_VALUE_CONFIDENCE)
                     break
@@ -159,7 +161,7 @@ def detect_session_params(url: str) -> dict:
     ephemeral_path_indexes: set[int] = set()
     for idx, segment in enumerate(path_segments):
         # Long hex-like path segments (e.g., /search / abc123def456ghi)
-        if re.match(r"^[0-9a-f]{16,}$", segment, re.I):
+        if re.match(r"^[0-9a-f]{16,}$", segment, re.IGNORECASE):
             confidence_score = max(confidence_score, settings.SESSION_PATH_HASH_CONFIDENCE)
             ephemeral_params.append(f"path:/{segment}")
             details.append((f"path:/{segment}", "path segment looks like a session hash"))
@@ -198,7 +200,7 @@ def detect_session_params(url: str) -> dict:
             parsed.params,
             canonical_query,
             parsed.fragment,
-        )
+        ),
     )
 
     # If no ephemeral params found but URL has query params, low confidence
@@ -227,4 +229,4 @@ def strip_session_params(url: str) -> str:
         The URL with ephemeral parameters removed
     """
     result = detect_session_params(url)
-    return result["canonical_url"]
+    return result["canonical_url"]  # type: ignore[no-any-return]

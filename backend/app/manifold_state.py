@@ -14,7 +14,8 @@ Owns:
 - total_co_occurrences: total co-occurrence observations
 """
 
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from collections.abc import Callable
+from typing import Any
 
 from app.transaction_context import active_transaction
 
@@ -22,22 +23,22 @@ from app.transaction_context import active_transaction
 class ManifoldState:
     """Sole owner of the semantic role manifold and compatibility structures."""
 
-    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
         self._delta_callback = delta_callback
         # Role embeddings: name -> 16-dim vector
-        self._role_manifold: Dict[str, list] = {}
+        self._role_manifold: dict[str, list] = {}
         # Legacy symbolic compatibility cache: (role, type_str) -> confidence
-        self._role_compatibility: Dict[Tuple[str, str], float] = {}
+        self._role_compatibility: dict[tuple[str, str], float] = {}
         # Position distributions per role
-        self._role_position_memory: Dict[str, List[float]] = {}
+        self._role_position_memory: dict[str, list[float]] = {}
         # Co-occurrence: (role_a, type_a, role_b, type_b) -> count
-        self._role_co_occurrence: Dict[Tuple[str, str, str, str], int] = {}
+        self._role_co_occurrence: dict[tuple[str, str, str, str], int] = {}
         # Role anchors: core semantic invariants (protected from drift)
-        self._role_anchors: Set[str] = set()
+        self._role_anchors: set[str] = set()
         # Semantic Resolution (Phase 34)
         self.dimension: int = 16
         # Sharding support (Phase 35)
-        self._role_shards: Dict[str, str] = {}
+        self._role_shards: dict[str, str] = {}
 
         # Counters
         self.learning_count: int = 0
@@ -50,14 +51,14 @@ class ManifoldState:
         # ─── Transaction Staging ──────────────────────────────────────
 
     @property
-    def _staging(self) -> Optional[dict]:
+    def _staging(self) -> dict | None:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"manifold_staging_{id(self)}")
         return None
 
     @_staging.setter
-    def _staging(self, value: Optional[dict]):
+    def _staging(self, value: dict | None):
         tx = active_transaction.get()
         if tx is not None:
             tx[f"manifold_staging_{id(self)}"] = value
@@ -133,7 +134,7 @@ class ManifoldState:
     # ─── Role Manifold ───────────────────────────────────────────────────
 
     @property
-    def role_manifold(self) -> Dict[str, list]:
+    def role_manifold(self) -> dict[str, list]:
         return {k: list(v) for k, v in self._get_struct("role_manifold").items()}
 
     def get_manifold_vector(self, role: str) -> list:
@@ -207,7 +208,7 @@ class ManifoldState:
         # Calibration (Phase 34): scale by dimensionality
         dim = self.dimension
         neutral = dim * 0.25
-        return max(0.0, min(1.0, (sim - neutral) / (dim * 0.1)))
+        return max(0.0, min(1.0, (sim - neutral) / (dim * 0.1)))  # type: ignore[no-any-return]
 
     def blend_manifold_vector(self, role: str, other_vector: list, alpha: float = 0.7, beta: float = 0.3):
         """Blend an external vector into the role's manifold vector with drift tracking (Phase 63)."""
@@ -244,7 +245,7 @@ class ManifoldState:
     def has_manifold_role(self, role: str) -> bool:
         return role in self._get_struct("role_manifold")
 
-    def get_manifold_roles(self) -> List[str]:
+    def get_manifold_roles(self) -> list[str]:
         return list(self._get_struct("role_manifold").keys())
 
     def remove_manifold_role(self, role: str):
@@ -264,10 +265,9 @@ class ManifoldState:
         for role in list(manifold.keys()):
             if self.is_role_anchored(role):
                 continue
-            if role.startswith("hypo_") or role == "_unidentified":
-                if instability_map.get(role, 0.0) > threshold:
-                    del manifold[role]
-                    pruned += 1
+            if (role.startswith("hypo_") or role == "_unidentified") and instability_map.get(role, 0.0) > threshold:
+                del manifold[role]
+                pruned += 1
         if pruned > 0:
             self._set_struct("role_manifold", manifold)
             self._record("prune_manifold", {"pruned": pruned})
@@ -276,7 +276,7 @@ class ManifoldState:
     # ─── Invariant Anchoring (Phase 30) ──────────────────────────────────
 
     @property
-    def role_anchors(self) -> Set[str]:
+    def role_anchors(self) -> set[str]:
         return set(self._get_struct("role_anchors"))
 
     def anchor_role(self, role: str):
@@ -297,7 +297,7 @@ class ManifoldState:
 
     # ─── Semantic Sharding (Phase 35) ────────────────────────────────────
 
-    def shard_manifold(self, community_list: List[Set[str]]):
+    def shard_manifold(self, community_list: list[set[str]]):
         """Assign roles to shards based on community clusters (Phase 35)."""
         shards = self._get_struct("role_shards")
         shards.clear()
@@ -310,20 +310,20 @@ class ManifoldState:
         self._set_struct("role_shards", shards)
         self._record("shard_manifold", {"shard_count": len(community_list)})
 
-    def get_shards(self) -> Set[str]:
+    def get_shards(self) -> set[str]:
         return set(self._get_struct("role_shards").values())
 
-    def get_shard_roles(self, shard_id: str) -> List[str]:
+    def get_shard_roles(self, shard_id: str) -> list[str]:
         shards = self._get_struct("role_shards")
         return [r for r, s in shards.items() if s == shard_id]
 
-    def get_role_shard(self, role: str) -> Optional[str]:
-        return self._get_struct("role_shards").get(role)
+    def get_role_shard(self, role: str) -> str | None:
+        return self._get_struct("role_shards").get(role)  # type: ignore[no-any-return]
 
     def rebalance_shards(self, max_shard_size: int = 50):
         """Monitor shard density and split oversized shards (Phase 35)."""
         shards = self._get_struct("role_shards")
-        shard_counts: Dict[str, List[str]] = {}
+        shard_counts: dict[str, list[str]] = {}
         for role, sid in shards.items():
             shard_counts.setdefault(sid, []).append(role)
 
@@ -379,11 +379,11 @@ class ManifoldState:
     # ─── Role Compatibility (Legacy Cache) ───────────────────────────────
 
     @property
-    def role_compatibility(self) -> Dict[Tuple[str, str], float]:
+    def role_compatibility(self) -> dict[tuple[str, str], float]:
         return dict(self._get_struct("role_compatibility"))
 
     def get_compatibility(self, role: str, type_str: str) -> float:
-        return self._get_struct("role_compatibility").get((role, type_str), 0.5)
+        return self._get_struct("role_compatibility").get((role, type_str), 0.5)  # type: ignore[no-any-return]
 
     def set_compatibility(self, role: str, type_str: str, value: float):
         compat = self._get_struct("role_compatibility")
@@ -404,11 +404,11 @@ class ManifoldState:
     # ─── Role Position Memory ────────────────────────────────────────────
 
     @property
-    def role_position_memory(self) -> Dict[str, List[float]]:
+    def role_position_memory(self) -> dict[str, list[float]]:
         return {k: list(v) for k, v in self._get_struct("role_position_memory").items()}
 
     @role_position_memory.setter
-    def role_position_memory(self, value: Dict[str, List[float]]):
+    def role_position_memory(self, value: dict[str, list[float]]):
         self._set_struct("role_position_memory", {k: list(v) for k, v in value.items()})
 
     # ─── Controlled Setters for Counters ──────────────────────────────────
@@ -427,7 +427,7 @@ class ManifoldState:
     # ─── Co-Occurrence ───────────────────────────────────────────────────
 
     @property
-    def role_co_occurrence(self) -> Dict[Tuple[str, str, str, str], int]:
+    def role_co_occurrence(self) -> dict[tuple[str, str, str, str], int]:
         return dict(self._get_struct("role_co_occurrence"))
 
     def increment_co_occurrence(self, key: tuple, delta: int = 1):
@@ -441,7 +441,7 @@ class ManifoldState:
             self.total_co_occurrences += delta
 
     def get_co_occurrence(self, key: tuple) -> int:
-        return self._get_struct("role_co_occurrence").get(key, 0)
+        return self._get_struct("role_co_occurrence").get(key, 0)  # type: ignore[no-any-return]
 
     def get_role_certainty(self, role: str) -> float:
         """Compute the stability of a specific role vector based on variance (Phase 52)."""
@@ -452,7 +452,7 @@ class ManifoldState:
         avg = sum(vec) / n_vec
         var = sum((x - avg) ** 2 for x in vec) / n_vec
         # Scale variance to [0,1] stability. High variance = lower stability.
-        return max(0.0, min(1.0, 1.0 - var * 4.0))
+        return max(0.0, min(1.0, 1.0 - var * 4.0))  # type: ignore[no-any-return]
 
     def get_certainty(self) -> float:
         """Global manifold certainty score."""

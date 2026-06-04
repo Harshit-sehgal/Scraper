@@ -5,7 +5,7 @@ Job routes — job lifecycle endpoints for the kernel API.
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -32,7 +32,7 @@ def _get_service(
 
 @router.get("")
 async def list_jobs(
-    status: Optional[str] = Query(None, description="Filter by status"),
+    status: str | None = Query(None, description="Filter by status"),
     service: JobService = Depends(_get_service),
     _=Depends(require_viewer),
 ):

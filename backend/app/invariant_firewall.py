@@ -8,7 +8,7 @@ from a pre-mutation snapshot.
 
 import functools
 import logging
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from app.field_validator import validate_world_state
 
@@ -38,7 +38,7 @@ def requires_invariants(mutation_fn: Callable):
         if ws is not None and getattr(ws, _ROLLBACK_GUARD_ATTR, False):
             return mutation_fn(*args, **kwargs)
 
-        snapshot: Optional[dict] = None
+        snapshot: dict | None = None
 
         # Save snapshot for potential rollback
         if ws is not None:
@@ -99,9 +99,12 @@ def requires_invariants(mutation_fn: Callable):
                         )
                     except Exception:  # nosec B110
                         pass
-                raise RuntimeError(
+                msg = (
                     f"Invariant violation in {mutation_fn.__name__}: "
                     f"{post_issues[0]}{' (+' + str(len(post_issues) - 1) + ' more)' if len(post_issues) > 1 else ''}"
+                )
+                raise RuntimeError(
+                    msg,
                 )
 
         return result

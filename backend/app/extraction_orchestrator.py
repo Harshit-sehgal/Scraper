@@ -475,7 +475,7 @@ async def orchestrate_extraction(
                 memory.record_success(url, provided_selectors)
                 _record_field_provenance(provided_results, ExtractionMethod.DISCOVERY, provided_selectors)
                 return _arbitrate_and_return(
-                    ExtractionResult(provided_results, "discovery", selector_success=True, selectors=provided_selectors)
+                    ExtractionResult(provided_results, "discovery", selector_success=True, selectors=provided_selectors),
                 )
             else:
                 logger.info("[Orchestrator] Provided selectors LOW QUALITY (avg score: %.2f), falling through", avg_score)
@@ -496,7 +496,7 @@ async def orchestrate_extraction(
             or provided_selectors.get("bypass_selector_memory")
             or provided_selectors.get("force_llm_discovery")
             or force_container_discovery
-        )
+        ),
     )
     remembered_selectors = None if skip_memory else memory.get_selectors(url)
     if force_container_discovery:
@@ -575,7 +575,7 @@ async def orchestrate_extraction(
                             event_type=SemanticEventType.SELECTOR_FAILURE,
                             source="extraction_orchestrator",
                             payload={"url": url, "avg_score": avg_score},
-                        )
+                        ),
                     )
                 except Exception as e:
                     logger.warning("[Orchestrator] Failed to dispatch selector failure event: %s", e)
@@ -649,7 +649,7 @@ async def orchestrate_extraction(
                 memory.record_success(url, discovered_selectors)
                 _record_field_provenance(raw_results, ExtractionMethod.DISCOVERY, discovered_selectors)
                 return _arbitrate_and_return(
-                    ExtractionResult(raw_results, "discovery", selector_success=True, selectors=discovered_selectors)
+                    ExtractionResult(raw_results, "discovery", selector_success=True, selectors=discovered_selectors),
                 )
             else:
                 logger.info("[Orchestrator] Discovery LOW QUALITY (avg score: %.2f)", avg_score)
@@ -677,7 +677,7 @@ async def orchestrate_extraction(
                 "container_discovery",
                 selector_success=True,
                 selectors={"item_container": container_result.best_selector},
-            )
+            ),
         )
     elif container_result.final_records:
         logger.info(

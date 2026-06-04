@@ -53,7 +53,7 @@ _MAX_STORAGE_NAME_CHARS: int = 128
 """Maximum key / name length retained for browser state evidence."""
 
 _SESSION_STATE_KEY_PATTERNS: tuple[re.Pattern, ...] = tuple(
-    re.compile(pattern, re.I)
+    re.compile(pattern, re.IGNORECASE)
     for pattern in (
         r"session",
         r"\bsid\b",
@@ -177,7 +177,7 @@ def _sanitize_cookies(cookies: Any) -> list[dict[str, Any]]:
                 "http_only": bool(cookie.get("httpOnly")),
                 "secure": bool(cookie.get("secure")),
                 "same_site": cookie.get("sameSite", ""),
-            }
+            },
         )
         sanitized.append(entry)
     return sanitized

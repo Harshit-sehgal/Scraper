@@ -4,7 +4,7 @@ Returns immutable snapshots (RegionSnapshots, dicts) instead of live
 FieldConflictRegion objects. No mutation is possible through this interface.
 """
 
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from collections.abc import Callable
 
 from app.core_types import FieldConflictRegion
 from app.topology_state_types import (
@@ -24,7 +24,7 @@ class TopologyView:
 
     def __init__(
         self,
-        regions: List[FieldConflictRegion],
+        regions: list[FieldConflictRegion],
         global_communities,
         schema_patterns,
         topological_laws,
@@ -38,7 +38,7 @@ class TopologyView:
         cohesion_split_attempts,
         meso_clusters=None,
         macro_continents=None,
-        read_callback: Optional[Callable[[str, int], None]] = None,
+        read_callback: Callable[[str, int], None] | None = None,
     ):
         self._regions = list(regions)
         self._communities = [set(c) for c in global_communities]
@@ -102,11 +102,11 @@ class TopologyView:
 
     # ─── Region Access ────────────────────────────────────────────────
 
-    def all_regions(self) -> List[RegionSnapshot]:
+    def all_regions(self) -> list[RegionSnapshot]:
         """Return immutable snapshots of all regions."""
         return [self._snapshot(r) for r in self._regions]
 
-    def get_topology_edges(self) -> List[dict]:
+    def get_topology_edges(self) -> list[dict]:
         """Return dashboard-compatible topology edges from the unified edge field."""
         edges = []
         for edge in self.get_edge_fields():
@@ -121,11 +121,11 @@ class TopologyView:
                         "uncertainty": edge.uncertainty,
                         "pressure": edge.pressure,
                         "semantics": edge.semantics,
-                    }
+                    },
                 )
         return edges
 
-    def get_edge_fields(self) -> List[EdgeFieldSnapshot]:
+    def get_edge_fields(self) -> list[EdgeFieldSnapshot]:
         """Return one bounded edge field model for all topology-owned edges."""
         pairs = set(self._cohesion) | set(self._laws)
         impossible_pairs = set()
@@ -134,7 +134,7 @@ class TopologyView:
                 impossible_pairs.add(tuple(sorted(item)))
         pairs |= impossible_pairs
 
-        region_instability: Dict[Tuple[str, str], List[float]] = {}
+        region_instability: dict[tuple[str, str], list[float]] = {}
         for region in self._regions:
             roles = sorted(set(region.competing_roles))
             for i, ra in enumerate(roles):
@@ -180,36 +180,36 @@ class TopologyView:
                     cohesion=round(cohesion, 3),
                     impossible=impossible,
                     semantics=semantics,
-                )
+                ),
             )
         return edges
 
-    def all_region_dicts(self) -> List[dict]:
+    def all_region_dicts(self) -> list[dict]:
         """Return all regions as plain dicts (for serialization / display)."""
         return [self._snapshot_dict(r) for r in self._regions]
 
     def region_count(self) -> int:
         return len(self._regions)
 
-    def find(self, token: str, roles: Set[str]) -> Optional[RegionSnapshot]:
+    def find(self, token: str, roles: set[str]) -> RegionSnapshot | None:
         for r in self._regions:
             if r.token == token and set(r.competing_roles) == roles:
                 return self._snapshot(r)
         return None
 
-    def find_by_token_and_roles(self, token: str, sorted_roles: tuple) -> Optional[RegionSnapshot]:
+    def find_by_token_and_roles(self, token: str, sorted_roles: tuple) -> RegionSnapshot | None:
         for r in self._regions:
             if r.token == token and tuple(sorted(r.competing_roles)) == sorted_roles:
                 return self._snapshot(r)
         return None
 
-    def find_by_token(self, token: str) -> List[RegionSnapshot]:
+    def find_by_token(self, token: str) -> list[RegionSnapshot]:
         return [self._snapshot(r) for r in self._regions if r.token == token]
 
-    def get_all_tokens(self) -> List[str]:
+    def get_all_tokens(self) -> list[str]:
         return list(set(r.token for r in self._regions))
 
-    def get_regions_for_role(self, role: str) -> List[RegionSnapshot]:
+    def get_regions_for_role(self, role: str) -> list[RegionSnapshot]:
         return [self._snapshot(r) for r in self._regions if role in r.competing_roles]
 
     def aggregate_metrics(self) -> dict:
@@ -235,16 +235,16 @@ class TopologyView:
         attractor_strength = 1.0 / (1.0 + 2.718 ** (-15 * (convergence - 0.6)))
         attractor_pull = min(attractor_strength * convergence * 2.0, 2.0)
         target_energy = max(0.0, avg_energy - attractor_pull)
-        return target_energy
+        return target_energy  # type: ignore[no-any-return]
 
     # ─── Topology Structure Access ────────────────────────────────────
 
     @property
-    def global_communities(self) -> List[Set[str]]:
+    def global_communities(self) -> list[set[str]]:
         return [set(c) for c in self._communities]
 
     @property
-    def schema_patterns(self) -> Dict[Tuple[str, str], float]:
+    def schema_patterns(self) -> dict[tuple[str, str], float]:
         return dict(self._schema_patterns)
 
     @property
@@ -252,27 +252,27 @@ class TopologyView:
         return dict(self._laws)
 
     @property
-    def neighborhood_cohesion(self) -> Dict[Tuple[str, str], float]:
+    def neighborhood_cohesion(self) -> dict[tuple[str, str], float]:
         return dict(self._cohesion)
 
     @property
-    def global_centrality(self) -> Dict[str, float]:
+    def global_centrality(self) -> dict[str, float]:
         return dict(self._centrality)
 
     @property
-    def impossible_neighborhoods(self) -> List[Set[str]]:
+    def impossible_neighborhoods(self) -> list[set[str]]:
         return [set(c) for c in self._impossible]
 
     @property
-    def restructuring_queue(self) -> Set[Tuple[str, str]]:
+    def restructuring_queue(self) -> set[tuple[str, str]]:
         return set(self._restructuring)
 
     # ─── Multi-Scale Access ──────────────────────────────────────────
 
-    def get_meso_clusters(self) -> List[dict]:
+    def get_meso_clusters(self) -> list[dict]:
         """Return meso clusters as active entity dicts."""
         return list(self._meso_clusters)
 
-    def get_macro_continents(self) -> List[dict]:
+    def get_macro_continents(self) -> list[dict]:
         """Return macro continents as active entity dicts."""
         return list(self._macro_continents)

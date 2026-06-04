@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +24,17 @@ class AccuracyMetrics:
     schema_conformity: float = 0.0
     duplicate_rate: float = 0.0
     hallucination_rate: float = 0.0
-    field_accuracy: Dict[str, float] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    field_accuracy: dict[str, float] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
 
 
 def calculate_extraction_accuracy(
-    extracted: List[Dict[str, Any]], expected: List[Dict[str, Any]], domain: str = "unknown"
+    extracted: list[dict[str, Any]],
+    expected: list[dict[str, Any]],
+    domain: str = "unknown",
 ) -> AccuracyMetrics:
     """Calculate deep accuracy metrics for a set of extracted records."""
     if not expected:
@@ -150,19 +152,18 @@ def _values_match(v1: Any, v2: Any) -> bool:
         return True
 
     # Partial match for longer strings
-    if len(s1) > 10 and len(s2) > 10:
-        if s1 in s2 or s2 in s1:
-            return True
+    if len(s1) > 10 and len(s2) > 10 and (s1 in s2 or s2 in s1):
+        return True
 
     return False
 
 
-def _record_hash(record: Dict[str, Any]) -> str:
+def _record_hash(record: dict[str, Any]) -> str:
     """Stable hash for a record to detect duplicates."""
     data = _data_fields(record)
     return str(sorted(data.items()))
 
 
-def _data_fields(record: Dict[str, Any]) -> Dict[str, Any]:
+def _data_fields(record: dict[str, Any]) -> dict[str, Any]:
     """Return fields that should count toward extraction quality metrics."""
     return {k: v for k, v in record.items() if not k.startswith("_") and k != "record_score"}

@@ -6,7 +6,6 @@ in the clean JobRepository contract.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from forge_kernel.contracts.job import Job
 from forge_kernel.persistence import JobRepository
@@ -24,7 +23,8 @@ def _get_pg_repo():
 
             _postgres_repo = _PG()
         except ImportError as e:
-            raise RuntimeError(f"Cannot import app.postgres_repository: {e}. Install psycopg2-binary.")
+            msg = f"Cannot import app.postgres_repository: {e}. Install psycopg2-binary."
+            raise RuntimeError(msg)
     return _postgres_repo
 
 
@@ -33,7 +33,7 @@ class PostgresJobRepository(JobRepository):
 
     backend = "postgres"
 
-    def load_all(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+    def load_all(self) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         repo = _get_pg_repo()
         return repo.load_all(recover_in_progress=False)
 

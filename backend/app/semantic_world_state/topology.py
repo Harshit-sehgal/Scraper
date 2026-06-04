@@ -1,7 +1,7 @@
 # mypy: ignore-errors
 # type: ignore
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core_types import FieldConflictRegion
 from app.invariant_firewall import requires_invariants
@@ -76,7 +76,7 @@ class TopologyMixin:
             from app.field_laws import ROLE_EXCLUSIVITY
 
             captured = 0
-            value_roles: Dict[str, List[str]] = {}
+            value_roles: dict[str, list[str]] = {}
             for t in tokens:
                 if not t.raw or not t.source_field:
                     continue
@@ -341,7 +341,8 @@ class TopologyMixin:
             health = self.get_cognitive_health()
             if health["system_energy"] > 8.0:
                 self._observability.emit_telemetry(
-                    "health_alert", {"reason": "critical_energy", "value": health["system_energy"]}
+                    "health_alert",
+                    {"reason": "critical_energy", "value": health["system_energy"]},
                 )
                 logger.warning("COGNITIVE HEALTH ALERT: Critical Energy Level Detected")
 
@@ -521,7 +522,7 @@ class TopologyMixin:
                         "pressure": round(r.semantic_pressure, 3),
                         "recurrence": round(r.recurrence_score, 3),
                         "persistence": round(r.persistence, 3),
-                    }
+                    },
                 )
             chain["regions_by_token"] = regions_by_token
         return chain
@@ -557,12 +558,12 @@ class TopologyMixin:
                     "stability": cluster.get("stability", 0.5),
                     "boundary_strength": cluster.get("boundary_strength", 0.5),
                     "interaction_policy": cluster.get("interaction_policy", "neutral"),
-                }
+                },
             )
 
         macro_continents = view.get_macro_continents()
-        continents_list: List[dict] = []
-        macro: Dict[str, Any] = {
+        continents_list: list[dict] = []
+        macro: dict[str, Any] = {
             "total_regions": view.region_count(),
             "meso_clusters": len(meso),
             "macro_continents": len(macro_continents),
@@ -584,7 +585,7 @@ class TopologyMixin:
                     "diversity_pressure": continent.get("diversity_pressure", 0.0),
                     "meso_cluster_count": len(continent.get("meso_cluster_ids", [])),
                     "all_roles": continent.get("all_roles", []),
-                }
+                },
             )
 
         return {"micro": micro, "meso": meso, "macro": macro}
@@ -763,7 +764,7 @@ class TopologyMixin:
         self._topology.induce_topological_laws(min_success_rate=min_success_rate, min_attempts=min_attempts)
 
     @requires_invariants
-    def relax_topology(self, budget: Optional[Any] = None):
+    def relax_topology(self, budget: Any | None = None):
         """Gradual erosion of weak structures."""
         from app.runtime_budget import get_default_budget
 
@@ -824,7 +825,7 @@ class TopologyMixin:
             return 0
 
     @requires_invariants
-    def dream(self, cycles: int = 1, budget: Optional[Any] = None) -> dict:
+    def dream(self, cycles: int = 1, budget: Any | None = None) -> dict:
         dreams = []
         from app.runtime_budget import CognitiveBudget
 
@@ -854,7 +855,7 @@ class TopologyMixin:
                                 "type": "exclusion",
                                 "roles": region.competing_roles,
                                 "token": region.token,
-                            }
+                            },
                         )
             self._topology.update_local_memory_from_instability()
             self.record_delta(

@@ -7,24 +7,23 @@ when worker_queue.py or other modules need to record metrics.
 """
 
 import threading
-from typing import Dict, List
 
 _MAX_METRIC_SAMPLES = 1000
 
 # Ring buffer for API request durations (seconds)
-_request_latencies: List[float] = []
+_request_latencies: list[float] = []
 _request_latencies_lock = threading.Lock()
 
 # Worker failure counters: task_type -> count
-_worker_failures: Dict[str, int] = {}
+_worker_failures: dict[str, int] = {}
 _worker_failures_lock = threading.Lock()
 
 # Backend health check durations (seconds) — ring buffer
-_health_check_latencies: List[float] = []
+_health_check_latencies: list[float] = []
 _health_check_latencies_lock = threading.Lock()
 
 # Generic error counters: type -> count (e.g. database, network, scraper)
-_errors_total: Dict[str, int] = {}
+_errors_total: dict[str, int] = {}
 _errors_total_lock = threading.Lock()
 
 # LLM call counters
@@ -78,22 +77,22 @@ def record_llm_call():
         _llm_calls_total += 1
 
 
-def get_request_latencies() -> List[float]:
+def get_request_latencies() -> list[float]:
     with _request_latencies_lock:
         return list(_request_latencies)
 
 
-def get_worker_failures() -> Dict[str, int]:
+def get_worker_failures() -> dict[str, int]:
     with _worker_failures_lock:
         return dict(_worker_failures)
 
 
-def get_health_check_latencies() -> List[float]:
+def get_health_check_latencies() -> list[float]:
     with _health_check_latencies_lock:
         return list(_health_check_latencies)
 
 
-def get_errors() -> Dict[str, int]:
+def get_errors() -> dict[str, int]:
     with _errors_total_lock:
         return dict(_errors_total)
 

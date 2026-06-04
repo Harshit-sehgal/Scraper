@@ -31,7 +31,8 @@ def _row_by_method_path(rows, method: str, path: str):
     for row in rows:
         if row.method == method and row.path == path:
             return row
-    raise AssertionError(f"route not found: {method} {path}")
+    msg = f"route not found: {method} {path}"
+    raise AssertionError(msg)
 
 
 def test_route_auth_matrix_classifies_core_route_tiers(monkeypatch, tmp_path) -> None:

@@ -4,7 +4,8 @@ Re-exports types / helpers from topology_state_types and TopologyView from
 topology_view for backward compatibility.
 """
 
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from collections.abc import Callable
+from typing import Any
 
 from app.core_types import MAX_COUPLING_TRANSFER, FieldConflictRegion
 from app.topology_clustering import (
@@ -84,16 +85,16 @@ from app.topology_view import TopologyView
 from app.transaction_context import active_transaction
 
 __all__ = [
+    "ConflictError",
+    "EdgeFieldSnapshot",
+    "MacroContinentSnapshot",
+    "MesoClusterSnapshot",
+    "RegionSnapshot",
     "TopologyState",
     "TopologyView",
-    "RegionSnapshot",
-    "EdgeFieldSnapshot",
-    "MesoClusterSnapshot",
-    "MacroContinentSnapshot",
-    "ConflictError",
-    "parse_topology_key",
     "_clamp01",
     "_clamp_signed",
+    "parse_topology_key",
 ]
 
 
@@ -101,14 +102,14 @@ class TopologyState:
     """Sole owner of the semantic field's topology structure."""
 
     @property
-    def _tombstones(self) -> Set[str]:
+    def _tombstones(self) -> set[str]:
         tx = self._staging
         if tx is not None:
-            return tx["tombstones"]
-        return self.__dict__.get("_tombstones_real", set())
+            return tx["tombstones"]  # type: ignore[no-any-return]
+        return self.__dict__.get("_tombstones_real", set())  # type: ignore[no-any-return]
 
     @_tombstones.setter
-    def _tombstones(self, value: Set[str]):
+    def _tombstones(self, value: set[str]):
         tx = self._staging
         if tx is not None:
             tx["tombstones"] = value
@@ -119,7 +120,7 @@ class TopologyState:
     def _structural_change(self) -> bool:
         tx = self._staging
         if tx is not None:
-            return tx["structural_change"]
+            return tx["structural_change"]  # type: ignore[no-any-return]
         return False
 
     @_structural_change.setter
@@ -130,34 +131,34 @@ class TopologyState:
 
     def __init__(
         self,
-        delta_callback: Optional[Callable[[str, str, dict], None]] = None,
-        read_callback: Optional[Callable[[str, int], None]] = None,
+        delta_callback: Callable[[str, str, dict], None] | None = None,
+        read_callback: Callable[[str, int], None] | None = None,
     ):
         self._delta_callback = delta_callback
         self._read_callback = read_callback
         # ─── Region Graph ──────────────────────────────────────────────
-        self._regions: List[FieldConflictRegion] = []
+        self._regions: list[FieldConflictRegion] = []
 
         # ─── Topology-Derived Structures ───────────────────────────────
-        self._communities: List[Set[str]] = []
-        self._schema_patterns: Dict[Tuple[str, str], float] = {}
+        self._communities: list[set[str]] = []
+        self._schema_patterns: dict[tuple[str, str], float] = {}
         self._topological_laws: dict = {}
-        self._neighborhood_cohesion: Dict[Tuple[str, str], float] = {}
-        self._centrality: Dict[str, float] = {}
-        self._impossible_neighborhoods: List[Set[str]] = []
-        self._restructuring_queue: Set[Tuple[str, str]] = set()
-        self._cohesion_merge_success: Dict[Tuple[str, str], float] = {}
-        self._cohesion_merge_attempts: Dict[Tuple[str, str], float] = {}
-        self._cohesion_split_success: Dict[Tuple[str, str], float] = {}
-        self._cohesion_split_attempts: Dict[Tuple[str, str], float] = {}
-        self._anchors: Set[Tuple[str, str]] = set()
-        self._crystalline_atoms: List[dict] = []
+        self._neighborhood_cohesion: dict[tuple[str, str], float] = {}
+        self._centrality: dict[str, float] = {}
+        self._impossible_neighborhoods: list[set[str]] = []
+        self._restructuring_queue: set[tuple[str, str]] = set()
+        self._cohesion_merge_success: dict[tuple[str, str], float] = {}
+        self._cohesion_merge_attempts: dict[tuple[str, str], float] = {}
+        self._cohesion_split_success: dict[tuple[str, str], float] = {}
+        self._cohesion_split_attempts: dict[tuple[str, str], float] = {}
+        self._anchors: set[tuple[str, str]] = set()
+        self._crystalline_atoms: list[dict] = []
 
         # ─── Meso Clusters (Multi-Scale Topology) ────────────────────
-        self._meso_clusters: List[dict] = []
+        self._meso_clusters: list[dict] = []
 
         # ─── Macro Continents (Multi-Scale Topology) ──────────────────
-        self._macro_continents: List[dict] = []
+        self._macro_continents: list[dict] = []
         self._last_pressure_flow_time: float = 0.0
 
         # ─── Distributed Recovery (Phase 60) ──────────────────────────
@@ -166,26 +167,26 @@ class TopologyState:
         # ─── Transaction Staging ──────────────────────────────────────
 
     @property
-    def _staging(self) -> Optional[dict]:
+    def _staging(self) -> dict | None:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"topology_staging_{id(self)}")
         return None
 
     @_staging.setter
-    def _staging(self, value: Optional[dict]):
+    def _staging(self, value: dict | None):
         tx = active_transaction.get()
         if tx is not None:
             tx[f"topology_staging_{id(self)}"] = value
 
     @property
-    def _modified_regions(self) -> Set[str]:
+    def _modified_regions(self) -> set[str]:
         tx = active_transaction.get()
         if tx is not None:
             key = f"topology_modified_{id(self)}"
             if key not in tx:
                 tx[key] = set()
-            return tx[key]
+            return tx[key]  # type: ignore[no-any-return]
         return set()
 
     def _record(self, action: str, details: dict):
@@ -223,7 +224,7 @@ class TopologyState:
             "structural_change": False,
         }
 
-    def commit(self, expected_versions: Optional[Dict[str, int]] = None):
+    def commit(self, expected_versions: dict[str, int] | None = None):
         """Apply staged changes to the active state with MVCC validation."""
         if self._staging is not None:
             # 1. Optimistic Validation (Phase 51)
@@ -232,7 +233,8 @@ class TopologyState:
                     # Find live region
                     live = next((r for r in self._regions if r.region_id == rid), None)
                     if live and live.version != expected:
-                        raise ConflictError(f"MVCC CONFLICT: Region [{rid}] version {live.version} != expected {expected}")
+                        msg = f"MVCC CONFLICT: Region [{rid}] version {live.version} != expected {expected}"
+                        raise ConflictError(msg)
 
             # 2. Increment versions for all modified regions
             for rid in self._modified_regions:
@@ -271,7 +273,7 @@ class TopologyState:
         self._modified_regions.clear()
         self._structural_change = False
 
-    def restructure_topology(self, target_region_ids: Optional[List[str]] = None):
+    def restructure_topology(self, target_region_ids: list[str] | None = None):
         """Forcibly rewire the substrate to escape metastable locks (Phase 52).
 
         Breaks strong cohesion edges and increases regional temperature to
@@ -293,14 +295,14 @@ class TopologyState:
 
         self._record("restructure_topology", {"count": len(targets)})
 
-    def shard_topology(self) -> Dict[str, List[str]]:
+    def shard_topology(self) -> dict[str, list[str]]:
         """Assign every region to a shard based on community membership (Phase 53). Delegates to topology_clustering."""
         return shard_topology_regions(self)
 
-    def _get_regions(self) -> List[FieldConflictRegion]:
+    def _get_regions(self) -> list[FieldConflictRegion]:
         return self._staging["regions"] if self._staging is not None else self._regions
 
-    def _set_regions(self, regions: List[FieldConflictRegion]):
+    def _set_regions(self, regions: list[FieldConflictRegion]):
         if self._staging is not None:
             self._staging["regions"] = regions
         else:
@@ -355,7 +357,7 @@ class TopologyState:
     # ─── Read-Only View — Regions ──────────────────────────────────────
 
     @property
-    def regions(self) -> List[RegionSnapshot]:
+    def regions(self) -> list[RegionSnapshot]:
         return self.get_view().all_regions()
 
     def iterate_regions(self):
@@ -367,7 +369,7 @@ class TopologyState:
     def region_count(self) -> int:
         return len(self._get_regions())
 
-    def find(self, token: str, roles: Set[str], domain: str = "") -> Optional[RegionSnapshot]:
+    def find(self, token: str, roles: set[str], domain: str = "") -> RegionSnapshot | None:
         view = self.get_view()
         for r in self._get_regions():
             if r.token == token and set(r.competing_roles) == roles and getattr(r, "domain", "") == domain:
@@ -393,13 +395,13 @@ class TopologyState:
             read_callback=self._read_callback,
         )
 
-    def find_region_for_mutation(self, token: str, sorted_roles: tuple) -> Optional[str]:
+    def find_region_for_mutation(self, token: str, sorted_roles: tuple) -> str | None:
         for r in self._get_regions():
             if r.token == token and tuple(sorted(r.competing_roles)) == sorted_roles:
                 return r.region_id
         return None
 
-    def neighbors_of(self, region_id: Any) -> List[RegionSnapshot]:
+    def neighbors_of(self, region_id: Any) -> list[RegionSnapshot]:
         target = self.get_region(region_id)
         if not target:
             return []
@@ -411,17 +413,17 @@ class TopologyState:
                 result.append(view._snapshot(r))
         return result
 
-    def get_all_tokens(self) -> List[str]:
+    def get_all_tokens(self) -> list[str]:
         return list(set(r.token for r in self._get_regions()))
 
     # ─── Read-Only Accessors — Topology Structures ─────────────────────
 
     @property
-    def global_communities(self) -> List[Set[str]]:
+    def global_communities(self) -> list[set[str]]:
         return [set(c) for c in self._get_struct("communities")]
 
     @property
-    def schema_patterns(self) -> Dict[Tuple[str, str], float]:
+    def schema_patterns(self) -> dict[tuple[str, str], float]:
         return dict(self._get_struct("schema_patterns"))
 
     @property
@@ -429,26 +431,26 @@ class TopologyState:
         return dict(self._get_struct("topological_laws"))
 
     @property
-    def neighborhood_cohesion(self) -> Dict[Tuple[str, str], float]:
+    def neighborhood_cohesion(self) -> dict[tuple[str, str], float]:
         return dict(self._get_struct("neighborhood_cohesion"))
 
     @property
-    def impossible_neighborhoods(self) -> List[Set[str]]:
+    def impossible_neighborhoods(self) -> list[set[str]]:
         return [set(c) for c in self._get_struct("impossible_neighborhoods")]
 
     @property
-    def restructuring_queue(self) -> Set[Tuple[str, str]]:
+    def restructuring_queue(self) -> set[tuple[str, str]]:
         return set(self._get_struct("restructuring_queue"))
 
     @property
-    def global_centrality(self) -> Dict[str, float]:
+    def global_centrality(self) -> dict[str, float]:
         return dict(self._get_struct("centrality"))
 
     @property
-    def anchors(self) -> Set[Tuple[str, str]]:
+    def anchors(self) -> set[tuple[str, str]]:
         return set(self._get_struct("anchors"))
 
-    def record_anchor(self, pair: Tuple[str, str]):
+    def record_anchor(self, pair: tuple[str, str]):
         struct = self._get_struct("anchors")
         struct.add(tuple(sorted(pair)))
         self._set_struct("anchors", struct)
@@ -458,17 +460,17 @@ class TopologyState:
         """Distill stable regions into atoms (Phase 34). Delegates to topology_metrics."""
         return _metrics_distill(self, integrity_threshold, instability_threshold)
 
-    def get_cohesion_merge_success(self) -> Dict[Tuple[str, str], float]:
-        return self._get_struct("merge_success")
+    def get_cohesion_merge_success(self) -> dict[tuple[str, str], float]:
+        return self._get_struct("merge_success")  # type: ignore[no-any-return]
 
-    def get_cohesion_merge_attempts(self) -> Dict[Tuple[str, str], float]:
-        return self._get_struct("merge_attempts")
+    def get_cohesion_merge_attempts(self) -> dict[tuple[str, str], float]:
+        return self._get_struct("merge_attempts")  # type: ignore[no-any-return]
 
-    def get_cohesion_split_success(self) -> Dict[Tuple[str, str], float]:
-        return self._get_struct("split_success")
+    def get_cohesion_split_success(self) -> dict[tuple[str, str], float]:
+        return self._get_struct("split_success")  # type: ignore[no-any-return]
 
-    def get_cohesion_split_attempts(self) -> Dict[Tuple[str, str], float]:
-        return self._get_struct("split_attempts")
+    def get_cohesion_split_attempts(self) -> dict[tuple[str, str], float]:
+        return self._get_struct("split_attempts")  # type: ignore[no-any-return]
 
     def record_cohesion_merge_attempt(self, pair: tuple):
         struct = self._get_struct("merge_attempts")
@@ -513,7 +515,7 @@ class TopologyState:
         """Set a topological law for a role pair. Delegates to topology_clustering."""
         _cluster_set_law(self, pair, value)
 
-    def add_impossible_neighborhood(self, item: Set[str]):
+    def add_impossible_neighborhood(self, item: set[str]):
         """Add an impossible neighborhood. Delegates to topology_clustering."""
         _cluster_add_impossible(self, item)
 
@@ -524,7 +526,12 @@ class TopologyState:
     # ─── Controlled Mutations — Region Lifecycle ───────────────────────
 
     def add(
-        self, competing_roles: List[str], token: str, instability: float = 0.5, integrity: float = 0.5, domain: str = ""
+        self,
+        competing_roles: list[str],
+        token: str,
+        instability: float = 0.5,
+        integrity: float = 0.5,
+        domain: str = "",
     ) -> FieldConflictRegion:
         region = FieldConflictRegion(
             competing_roles=list(competing_roles),
@@ -618,7 +625,7 @@ class TopologyState:
 
     # ─── Controlled Mutations — Region Attributes ──────────────────────
 
-    def get_region(self, region_id: Any) -> Optional[FieldConflictRegion]:
+    def get_region(self, region_id: Any) -> FieldConflictRegion | None:
         """Internal helper to get a mutable region reference by ID or object."""
         rid = region_id
         if hasattr(region_id, "region_id"):
@@ -722,7 +729,7 @@ class TopologyState:
 
     # ─── Edge Field Forces ──────────────────────────────────────────
 
-    def _compute_edge_field_forces(self) -> Dict[Tuple[str, str], Dict[str, float]]:
+    def _compute_edge_field_forces(self) -> dict[tuple[str, str], dict[str, float]]:
         """Compute force vectors from the unified edge field for each role pair.
 
         Returns a dict mapping (role_a, role_b) -> {
@@ -737,7 +744,7 @@ class TopologyState:
         No external code should recompute forces from raw cohesion / law data.
         """
         view = self.get_view()
-        forces: Dict[Tuple[str, str], Dict[str, float | str]] = {}
+        forces: dict[tuple[str, str], dict[str, float | str]] = {}
         for edge in view.get_edge_fields():
             pair = (edge.source, edge.target) if edge.source < edge.target else (edge.target, edge.source)
             forces[pair] = {
@@ -1167,7 +1174,7 @@ class TopologyState:
     # ─── Multi-Scale Topology (Micro / Meso / Macro) ────────────────────
 
     @property
-    def meso_clusters(self) -> List[dict]:
+    def meso_clusters(self) -> list[dict]:
         """Read-only access to meso cluster data."""
         return list(self._get_struct("meso_clusters"))
 
@@ -1229,7 +1236,7 @@ class TopologyState:
                 source=f"region:{source_region_id}",
                 payload={"intensity": intensity, "source_id": source_region_id},
                 instability_delta=intensity * 0.1,
-            )
+            ),
         )
 
     def process_field_wave(self, source_region_id: str, intensity: float):

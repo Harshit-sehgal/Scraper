@@ -14,7 +14,7 @@ import os
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +49,14 @@ class SystemGovernorDashboard:
         self.last_map_update = 0.0
         self._apply_mode_settings(mode)
 
-    def set_operator_mode(self, mode: OperatorMode) -> Dict[str, Any]:
+    def set_operator_mode(self, mode: OperatorMode) -> dict[str, Any]:
         """Dynamically adjust system settings to enforce the target operational profile."""
         self.active_mode = mode
         adjustments = self._apply_mode_settings(mode)
         logger.info("[Governance] Switched operator mode to '%s': %s", mode.value, adjustments)
         return adjustments
 
-    def _apply_mode_settings(self, mode: OperatorMode) -> Dict[str, Any]:
+    def _apply_mode_settings(self, mode: OperatorMode) -> dict[str, Any]:
         """Modify runtime settings configurations based on the selected mode profile."""
         from app.config import settings
 
@@ -100,7 +100,7 @@ class SystemGovernorDashboard:
             f.write(
                 f"> **Governance Layer**: Live architectural status. Last refreshed: {
                     time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
-                }\n\n"
+                }\n\n",
             )
 
             f.write("## 1. Active Operator Profile\n\n")
@@ -137,7 +137,7 @@ class SystemGovernorDashboard:
 
         self.last_map_update = time.time()
 
-    def get_governance_summary(self) -> Dict[str, Any]:
+    def get_governance_summary(self) -> dict[str, Any]:
         """Collate the complete governance, resource, and synchronization metrics."""
         from app.resource_governor import get_resource_governor
 
@@ -152,7 +152,7 @@ class SystemGovernorDashboard:
 
 
 # Global singleton
-_governance_dashboard: Optional[SystemGovernorDashboard] = None
+_governance_dashboard: SystemGovernorDashboard | None = None
 
 
 def get_governance_dashboard() -> SystemGovernorDashboard:

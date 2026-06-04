@@ -21,7 +21,7 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 from app.config import settings
@@ -145,14 +145,14 @@ class SelectorMemory:
             getattr(settings, "SELECTOR_CONFIDENCE_THRESHOLD", DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD)
             or DEFAULT_SELECTOR_CONFIDENCE_THRESHOLD
         )
-        stats: Dict[str, Any] = {
+        stats: dict[str, Any] = {
             "domains_checked": 0,
             "selectors_deleted": 0,
             "deleted_domains": [],
             "low_confidence_selectors": [],
         }
 
-        domains_to_delete: List[str] = []
+        domains_to_delete: list[str] = []
 
         for domain, entry in self._memory.items():
             stats["domains_checked"] = int(stats["domains_checked"]) + 1
@@ -168,7 +168,7 @@ class SelectorMemory:
                 stats["selectors_deleted"] = int(stats["selectors_deleted"]) + 1
                 stats["deleted_domains"].append(domain)
                 stats["low_confidence_selectors"].append(
-                    {"domain": domain, "score": confidence.final_score, "reason": confidence.reason}
+                    {"domain": domain, "score": confidence.final_score, "reason": confidence.reason},
                 )
                 domains_to_delete.append(domain)
 
@@ -190,7 +190,7 @@ class SelectorMemory:
 
         return stats
 
-    def get_selector_confidence(self, url: str) -> Optional[SelectorConfidenceScore]:
+    def get_selector_confidence(self, url: str) -> SelectorConfidenceScore | None:
         """Get confidence score for selectors of a domain."""
         domain = self._extract_domain(url)
         if not domain:
@@ -202,7 +202,7 @@ class SelectorMemory:
 
         return self._compute_confidence(entry)
 
-    def get_selectors(self, url: str) -> Optional[dict]:
+    def get_selectors(self, url: str) -> dict | None:
         """Get remembered selectors for a domain with aging and trust decay.
 
         Also triggers cleanup if it's time.
@@ -287,7 +287,7 @@ class SelectorMemory:
         self._memory[domain] = entry
         self._save()
 
-    def get_memory_stats(self) -> Dict[str, Any]:
+    def get_memory_stats(self) -> dict[str, Any]:
         """Get current selector memory statistics.
 
         Returns:
@@ -304,7 +304,7 @@ class SelectorMemory:
                 "by_confidence": {},
             }
 
-        stats: Dict[str, Any] = {
+        stats: dict[str, Any] = {
             "total_domains": len(self._memory),
             "avg_confidence": 0.0,
             "total_selectors": len(self._memory),
@@ -339,7 +339,7 @@ class SelectorMemory:
         return self._auto_cleanup(force=True)
 
     @staticmethod
-    def _extract_domain(url: str) -> Optional[str]:
+    def _extract_domain(url: str) -> str | None:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None

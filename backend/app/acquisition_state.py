@@ -9,7 +9,6 @@ redirect_info with typed, testable models.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -86,10 +85,10 @@ class AcquisitionLineage(BaseModel):
     fetch_method: str = ""
 
     # If recovery was attempted, what method was used
-    recovery_method: Optional[str] = None
+    recovery_method: str | None = None
 
     # The fresh URL obtained after recovery (if any)
-    recovered_url: Optional[str] = None
+    recovered_url: str | None = None
 
     # Whether the original URL had session-bound parameters
     session_bound: bool = False
@@ -220,9 +219,9 @@ class AcquisitionLineage(BaseModel):
         original_url: str,
         final_url: str,
         fetch_method: str = "",
-        search_recovery: Optional[dict] = None,
-        search_form: Optional[dict] = None,
-        search_params: Optional[dict] = None,
+        search_recovery: dict | None = None,
+        search_form: dict | None = None,
+        search_params: dict | None = None,
     ) -> AcquisitionLineage:
         """Build an AcquisitionLineage from the legacy redirect_info dict.
 

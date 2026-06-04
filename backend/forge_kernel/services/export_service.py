@@ -10,7 +10,7 @@ import csv
 import io
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from forge_kernel.contracts.export import ExportArtifact
 
@@ -28,7 +28,7 @@ except ImportError:  # pragma: no cover - optional dependency
 class ExportService:
     """Service for generating export artifacts from job results."""
 
-    def to_csv(self, records: list[dict[str, Any]], field_names: Optional[list[str]] = None) -> str:
+    def to_csv(self, records: list[dict[str, Any]], field_names: list[str] | None = None) -> str:
         """Convert records to CSV string."""
         if not records:
             return ""
@@ -47,7 +47,7 @@ class ExportService:
         """Convert records to pretty-printed JSON string."""
         return json.dumps(records, indent=2, default=str)
 
-    def to_xlsx(self, records: list[dict[str, Any]], field_names: Optional[list[str]] = None) -> Optional[bytes]:
+    def to_xlsx(self, records: list[dict[str, Any]], field_names: list[str] | None = None) -> bytes | None:
         """Convert records to XLSX bytes. Returns None if openpyxl is not installed."""
         if not HAS_OPENPYXL or openpyxl is None:
             return None
@@ -77,7 +77,7 @@ class ExportService:
         output.seek(0)
         return output.getvalue()
 
-    async def export(self, fmt: str, records: list[dict], field_names: Optional[list[str]] = None) -> ExportArtifact:
+    async def export(self, fmt: str, records: list[dict], field_names: list[str] | None = None) -> ExportArtifact:
         """Generate an export in the specified format."""
         if fmt == "csv":
             self.to_csv(records, field_names)
@@ -88,7 +88,9 @@ class ExportService:
         elif fmt == "xlsx":
             xlsx_content = self.to_xlsx(records, field_names)
             if xlsx_content is None:
-                raise ValueError("XLSX export requires openpyxl: pip install openpyxl")
+                msg = "XLSX export requires openpyxl: pip install openpyxl"
+                raise ValueError(msg)
             return ExportArtifact(format="xlsx", row_count=len(records), generated_at="", byte_size=len(xlsx_content))
         else:
-            raise ValueError(f"Unsupported export format: {fmt}")
+            msg = f"Unsupported export format: {fmt}"
+            raise ValueError(msg)

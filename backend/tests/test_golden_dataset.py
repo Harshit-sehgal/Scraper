@@ -152,7 +152,7 @@ async def test_golden_dataset_site(site_def, monkeypatch) -> None:
                 name=field_name,
                 field_type=field_type,
                 required=field_info.get("required", False),
-            )
+            ),
         )
 
     if not schema_fields:
@@ -167,7 +167,7 @@ async def test_golden_dataset_site(site_def, monkeypatch) -> None:
 
     # Run extraction with a per-site timeout so live validation cannot hang the
     # entire suite on a single slow or unreachable website.
-    from app.scraper import scrape_url  # noqa: E402 — lazy import for network tests
+    from app.scraper import scrape_url
 
     try:
         results = await asyncio.wait_for(
@@ -223,12 +223,12 @@ async def test_golden_dataset_site(site_def, monkeypatch) -> None:
             f"(precision={f1_result['precision']:.3f}, "
             f"recall={f1_result['recall']:.3f}, "
             f"extracted={f1_result['extracted_count']}, "
-            f"expected={f1_result['expected_count']})"
+            f"expected={f1_result['expected_count']})",
         )
         min_f1 = site_def.get("min_f1")
         assert min_f1 is not None, f"{site_id}: expected output exists but min_f1 is not configured"
         assert f1_result["f1"] >= float(
-            min_f1
+            min_f1,
         ), f"{site_id}: F1 {f1_result['f1']:.3f} is below configured threshold {float(min_f1):.3f}"
     else:
         print(f"\n  [{site_id}] {len(results)} records extracted (no expected output file)")

@@ -152,7 +152,7 @@ os.environ.pop("DATAFORGE_DATABASE_URL", None)
 
 main_mod: ModuleType | None = None
 try:
-    import app.main  # noqa: E402
+    import app.main
 
     main_mod = app.main
 except ImportError as e:

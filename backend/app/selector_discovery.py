@@ -60,30 +60,30 @@ from app.url_value_classification import (
 )
 
 __all__ = [
+    "_analyze_page_data_type",
+    "_assess_content_quality",
+    "_build_absolute_url",
+    "_build_css_for_element",
+    "_classify_value",
+    "_compute_ui_noise_score",
+    "_detect_redirect",
+    "_detect_search_form",
+    "_discover_direct_repeating_elements",
+    "_discover_selectors_from_dom",
+    "_extract_container_text_values",
+    "_fallback_parent_child_discovery",
+    "_infer_field_name",
+    "_infer_field_selectors_from_container",
+    "_map_search_params_to_fields",
+    "_rename_generic_fields",
+    "_try_form_search_recovery",
+    "_value_patterns_to_field_types",
     "analyze_url_for_fields",
+    "build_redirect_info",
+    "build_selector_prompt",
+    "build_url_analysis_prompt",
     "clean_html_for_selectors",
     "discover_selectors",
-    "_analyze_page_data_type",
-    "build_selector_prompt",
-    "_discover_selectors_from_dom",
-    "_compute_ui_noise_score",
-    "_discover_direct_repeating_elements",
-    "_fallback_parent_child_discovery",
-    "_build_css_for_element",
-    "_infer_field_selectors_from_container",
-    "_detect_redirect",
-    "build_redirect_info",
-    "_assess_content_quality",
-    "_extract_container_text_values",
-    "_classify_value",
-    "_value_patterns_to_field_types",
-    "build_url_analysis_prompt",
-    "_detect_search_form",
-    "_build_absolute_url",
-    "_map_search_params_to_fields",
-    "_try_form_search_recovery",
-    "_rename_generic_fields",
-    "_infer_field_name",
 ]
 
 from typing import TYPE_CHECKING
@@ -200,7 +200,10 @@ async def analyze_url_for_fields(
                     validate_public_http_url(redirect_target)
                 except ValueError as e:
                     logger.warning(
-                        "[URLAnalyzer] Redirect target blocked by SSRF validation: %s → %s: %s", url, redirect_target, e
+                        "[URLAnalyzer] Redirect target blocked by SSRF validation: %s → %s: %s",
+                        url,
+                        redirect_target,
+                        e,
                     )
                     break
 
@@ -235,8 +238,9 @@ async def analyze_url_for_fields(
 
     # ── Step 2: Fetch the URL with anti-bot stealth ──────────────────
     try:
-        html, js_render_delay, fetch_method, retry_count = await _fetch_page_content(
-            url, preferred_method=FetchStrategy.PLAYWRIGHT_FULL
+        html, _js_render_delay, fetch_method, _retry_count = await _fetch_page_content(
+            url,
+            preferred_method=FetchStrategy.PLAYWRIGHT_FULL,
         )
     except Exception as e:
         logger.error("[URLAnalyzer] Failed to fetch %s: %s", url, e)
@@ -249,9 +253,9 @@ async def analyze_url_for_fields(
                 original_url=url,
                 final_url=final_url,
                 state=AcquisitionState.DIRECT,
-                message=f"Failed to fetch URL: {str(e)}",
+                message=f"Failed to fetch URL: {e!s}",
             ).model_dump(mode="json"),
-            "user_message": f"Failed to fetch the URL: {str(e)}",
+            "user_message": f"Failed to fetch the URL: {e!s}",
             "session_detection": session_detection,
             "canonical_url": session_detection.get("canonical_url", url),
             "content_quality": None,
@@ -264,7 +268,7 @@ async def analyze_url_for_fields(
             },
             "search_form": None,
             "search_recovery": None,
-            "error": f"Failed to fetch URL: {str(e)}",
+            "error": f"Failed to fetch URL: {e!s}",
             "page_structure": "unknown",
             "structure_confidence": 0.0,
             "estimated_record_count": 0,
@@ -478,7 +482,7 @@ async def analyze_url_for_fields(
                         "example_value": f.get("example_value", ""),
                         "confidence": min(float(f.get("confidence", 0.5)), 1.0),
                         "description": str(f.get("description", "")),
-                    }
+                    },
                 )
 
     # If LLM returned no fields, use pattern analysis as fallback
@@ -492,7 +496,7 @@ async def analyze_url_for_fields(
                     "example_value": hint.get("example", ""),
                     "confidence": hint["confidence"],
                     "description": hint.get("description", ""),
-                }
+                },
             )
 
     # Post-processing: rename generic type-name fields to more descriptive
@@ -550,7 +554,7 @@ async def analyze_url_for_fields(
         round(
             1.0
             if content_quality.get("has_data_containers")
-            else 0.0 + (0.5 if not empty_check.is_empty else 0.0) - anti_bot_score * 0.3
+            else 0.0 + (0.5 if not empty_check.is_empty else 0.0) - anti_bot_score * 0.3,
         )
         / 1.5
     )

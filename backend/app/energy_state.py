@@ -12,7 +12,7 @@ _convergence, _temperature, _integrity, _smoothed_* smoothing caches.
 """
 
 import math
-from typing import Callable, Dict, Optional
+from collections.abc import Callable
 
 from app.transaction_context import active_transaction
 
@@ -20,7 +20,7 @@ from app.transaction_context import active_transaction
 class EnergyState:
     """Sole owner of the semantic field's energy / macro-state variables."""
 
-    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
         self._delta_callback = delta_callback
         # ─── Canonical State Variables ───────────────────────────────
         self._global_energy: float = 5.0
@@ -49,14 +49,14 @@ class EnergyState:
         # ─── Transaction Staging ──────────────────────────────────────
 
     @property
-    def _staging(self) -> Optional[dict]:
+    def _staging(self) -> dict | None:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"energy_staging_{id(self)}")
         return None
 
     @_staging.setter
-    def _staging(self, value: Optional[dict]):
+    def _staging(self, value: dict | None):
         tx = active_transaction.get()
         if tx is not None:
             tx[f"energy_staging_{id(self)}"] = value
@@ -130,7 +130,7 @@ class EnergyState:
 
     @property
     def stability_debt(self) -> float:
-        return self._get_val("stability_debt")
+        return self._get_val("stability_debt")  # type: ignore[no-any-return]
 
     @stability_debt.setter
     def stability_debt(self, value: float):
@@ -140,7 +140,7 @@ class EnergyState:
         self.stability_debt = self.stability_debt + delta
         self._record("adjust_stability_debt", {"delta": delta})
 
-    def rebalance_attractors(self, role_stabilities: Dict[str, float], threshold: float = 0.8):
+    def rebalance_attractors(self, role_stabilities: dict[str, float], threshold: float = 0.8):
         """Dissipate energy from monopolistic semantic basins (Phase 52).
 
         If a role becomes too dominant (stability > threshold), we siphons
@@ -168,7 +168,7 @@ class EnergyState:
 
     @property
     def global_energy(self) -> float:
-        return self._get_val("global_energy")
+        return self._get_val("global_energy")  # type: ignore[no-any-return]
 
     @global_energy.setter
     def global_energy(self, value: float):
@@ -176,7 +176,7 @@ class EnergyState:
 
     @property
     def global_entropy(self) -> float:
-        return self._get_val("global_entropy")
+        return self._get_val("global_entropy")  # type: ignore[no-any-return]
 
     @global_entropy.setter
     def global_entropy(self, value: float):
@@ -184,7 +184,7 @@ class EnergyState:
 
     @property
     def exclusion_count(self) -> int:
-        return self._get_val("exclusion_count")
+        return self._get_val("exclusion_count")  # type: ignore[no-any-return]
 
     @exclusion_count.setter
     def exclusion_count(self, value: int):
@@ -192,7 +192,7 @@ class EnergyState:
 
     @property
     def total_records_processed(self) -> int:
-        return self._get_val("total_records_processed")
+        return self._get_val("total_records_processed")  # type: ignore[no-any-return]
 
     @total_records_processed.setter
     def total_records_processed(self, value: int):
@@ -200,7 +200,7 @@ class EnergyState:
 
     @property
     def cumulative_density(self) -> float:
-        return self._get_val("cumulative_density")
+        return self._get_val("cumulative_density")  # type: ignore[no-any-return]
 
     @cumulative_density.setter
     def cumulative_density(self, value: float):
@@ -208,7 +208,7 @@ class EnergyState:
 
     @property
     def cumulative_uncertainty(self) -> float:
-        return self._get_val("cumulative_uncertainty")
+        return self._get_val("cumulative_uncertainty")  # type: ignore[no-any-return]
 
     @cumulative_uncertainty.setter
     def cumulative_uncertainty(self, value: float):
@@ -216,7 +216,7 @@ class EnergyState:
 
     @property
     def dataset_coherence(self) -> float:
-        return self._get_val("dataset_coherence")
+        return self._get_val("dataset_coherence")  # type: ignore[no-any-return]
 
     @dataset_coherence.setter
     def dataset_coherence(self, value: float):
@@ -226,15 +226,15 @@ class EnergyState:
 
     @property
     def convergence(self) -> float:
-        return self._get_val("_convergence")
+        return self._get_val("_convergence")  # type: ignore[no-any-return]
 
     @property
     def temperature(self) -> float:
-        return self._get_val("_temperature")
+        return self._get_val("_temperature")  # type: ignore[no-any-return]
 
     @property
     def integrity(self) -> float:
-        return self._get_val("_integrity")
+        return self._get_val("_integrity")  # type: ignore[no-any-return]
 
     @property
     def energy_balance(self) -> float:
@@ -247,7 +247,7 @@ class EnergyState:
         """
         source = self._get_val("_total_energy_source")
         sink = self._get_val("_total_energy_sink")
-        return round(source - sink, 4)
+        return round(source - sink, 4)  # type: ignore[no-any-return]
 
     def record_energy_flow(self, source_delta: float, sink_delta: float):
         """Record a redistribution flow for energy conservation tracking.
@@ -276,36 +276,36 @@ class EnergyState:
 
     @property
     def semantic_temperature(self) -> float:
-        return self._get_val("_temperature")
+        return self._get_val("_temperature")  # type: ignore[no-any-return]
 
     @property
     def integrity_score(self) -> float:
-        return self._get_val("_integrity")
+        return self._get_val("_integrity")  # type: ignore[no-any-return]
 
     @property
     def convergence_score(self) -> float:
-        return self._get_val("_convergence")
+        return self._get_val("_convergence")  # type: ignore[no-any-return]
 
     @property
     def maturity(self) -> float:
         total = self._get_val("total_records_processed")
         if total == 0:
             return 0.5
-        return min(total / 100.0, 1.0)
+        return min(total / 100.0, 1.0)  # type: ignore[no-any-return]
 
     @property
     def average_uncertainty(self) -> float:
         total = self._get_val("total_records_processed")
         if total <= 0:
             return 0.5
-        return self._get_val("cumulative_uncertainty") / total
+        return self._get_val("cumulative_uncertainty") / total  # type: ignore[no-any-return]
 
     @property
     def average_density(self) -> float:
         total = self._get_val("total_records_processed")
         if total <= 0:
             return 0.5
-        return self._get_val("cumulative_density") / total
+        return self._get_val("cumulative_density") / total  # type: ignore[no-any-return]
 
     # ─── Controlled Mutations — Scalars ──────────────────────────────────
 
@@ -373,7 +373,7 @@ class EnergyState:
     # ─── Controlled Mutations — Schema Instability ───────────────────────
 
     def get_schema_instability(self, role: str) -> float:
-        return self._get_val("_schema_instability").get(role, 0.5)
+        return self._get_val("_schema_instability").get(role, 0.5)  # type: ignore[no-any-return]
 
     def set_schema_instability(self, role: str, value: float):
         inst = self._get_val("_schema_instability")
@@ -383,7 +383,7 @@ class EnergyState:
 
     # ─── Bulk / Derived Setters ────────────────────────────────────────────
 
-    def update_from_regions(self, regions: list, region_count: Optional[int] = None):
+    def update_from_regions(self, regions: list, region_count: int | None = None):
         if not regions:
             return
         n = region_count if region_count else len(regions)
@@ -400,7 +400,7 @@ class EnergyState:
         self.set_entropy(avg_instability)
         self._set_val("cumulative_uncertainty", sum(r.instability for r in regions))
 
-    def evolve_from_regions(self, regions: list, region_count: Optional[int] = None):
+    def evolve_from_regions(self, regions: list, region_count: int | None = None):
         if not regions:
             return
         n = region_count if region_count else len(regions)

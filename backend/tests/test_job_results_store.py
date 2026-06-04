@@ -98,7 +98,8 @@ class TestSaveJobResultsToDisk:
                 pass
 
             def write(self_, _data):
-                raise OSError("Disk full")
+                msg = "Disk full"
+                raise OSError(msg)
 
         with patch("gzip.open", return_value=FailingWriter()):
             with pytest.raises(OSError, match="Disk full"):

@@ -8,7 +8,7 @@ Owns:
 - transition_observations: int — total observations made
 """
 
-from typing import Callable, Dict, Optional, Tuple
+from collections.abc import Callable
 
 from app.transaction_context import active_transaction
 
@@ -16,20 +16,20 @@ from app.transaction_context import active_transaction
 class TransitionState:
     """Sole owner of the semantic field's transition probability structures."""
 
-    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
         self._delta_callback = delta_callback
-        self._transition_probs: Dict[Tuple[str, str], float] = {}
+        self._transition_probs: dict[tuple[str, str], float] = {}
         self.transition_observations: int = 0
 
     @property
-    def _staging(self) -> Optional[dict]:
+    def _staging(self) -> dict | None:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"transition_staging_{id(self)}")
         return None
 
     @_staging.setter
-    def _staging(self, value: Optional[dict]):
+    def _staging(self, value: dict | None):
         tx = active_transaction.get()
         if tx is not None:
             tx[f"transition_staging_{id(self)}"] = value
@@ -79,11 +79,11 @@ class TransitionState:
     # ─── Read-Only Accessors ─────────────────────────────────────────────
 
     @property
-    def transition_probs(self) -> Dict[Tuple[str, str], float]:
+    def transition_probs(self) -> dict[tuple[str, str], float]:
         return dict(self._get_struct("transition_probs"))
 
     def get_prob(self, type_a: str, type_b: str) -> float:
-        return self._get_struct("transition_probs").get((type_a, type_b), 0.4)
+        return self._get_struct("transition_probs").get((type_a, type_b), 0.4)  # type: ignore[no-any-return]
 
     def get_high_transition_types(self, threshold: float = 0.6) -> list:
         probs = self._get_struct("transition_probs")
@@ -98,7 +98,7 @@ class TransitionState:
 
     def get_transition_observations(self) -> int:
         """Get transition observation count from staging-aware API."""
-        return self._get_struct("transition_observations")
+        return self._get_struct("transition_observations")  # type: ignore[no-any-return]
 
     def set_prob(self, type_a: str, type_b: str, value: float):
         clamped = max(0.0, min(1.0, value))

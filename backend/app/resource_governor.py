@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.config import settings
 
@@ -33,7 +33,7 @@ class ResourceBudgets:
 class ResourceGovernor:
     """Enforces boundaries and resource economics across DataForge processes."""
 
-    def __init__(self, budgets: Optional[ResourceBudgets] = None) -> None:
+    def __init__(self, budgets: ResourceBudgets | None = None) -> None:
         self.budgets = budgets or ResourceBudgets()
         self.accumulated_tokens = 0
         self.token_spend = 0.0
@@ -44,7 +44,7 @@ class ResourceGovernor:
             "throttled_cycles": 0,
         }
 
-    async def check_browser_memory(self) -> Dict[str, Any]:
+    async def check_browser_memory(self) -> dict[str, Any]:
         """Inspect and prune the browser pool context pool if memory limits are exceeded."""
         from app.browser_pool import get_browser_pool
 
@@ -83,7 +83,7 @@ class ResourceGovernor:
             "pruned": pruned,
         }
 
-    def enforce_queue_limits(self, queue: List[Any]) -> List[Any]:
+    def enforce_queue_limits(self, queue: list[Any]) -> list[Any]:
         """Shed lower-priority seeds when queue capacity is saturated."""
         if len(queue) > self.budgets.max_queue_size:
             logger.warning(
@@ -141,7 +141,7 @@ class ResourceGovernor:
             return False  # Throttle / block further calls
         return True
 
-    def get_governance_report(self) -> Dict[str, Any]:
+    def get_governance_report(self) -> dict[str, Any]:
         """Aggregate the status report of the resource governor."""
         return {
             "accumulated_tokens": self.accumulated_tokens,
@@ -152,7 +152,7 @@ class ResourceGovernor:
 
 
 # Global singleton
-_resource_governor: Optional[ResourceGovernor] = None
+_resource_governor: ResourceGovernor | None = None
 
 
 def get_resource_governor() -> ResourceGovernor:

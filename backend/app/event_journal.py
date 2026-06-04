@@ -14,7 +14,6 @@ large-scale ReplayBuffer for streaming replay from persistent storage.
 
 import logging
 import time
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ class EventJournal:
         self._checkpoints: dict[int, dict] = {}  # event_idx -> full_snapshot
         self._current_idx = 0
 
-    def record(self, source: str, mutation_type: str, before: dict, after: dict, metadata: Optional[dict] = None):
+    def record(self, source: str, mutation_type: str, before: dict, after: dict, metadata: dict | None = None):
         """Record a mutation event using delta-encoding (Phase 57).
 
         Also persists to the large-scale ReplayBuffer for streaming replay
@@ -88,7 +87,7 @@ class EventJournal:
                         "trace_id": (metadata or {}).get("trace_id"),
                         **({k: v for k, v in (metadata or {}).items() if k != "trace_id"}),
                     },
-                }
+                },
             )
         except Exception as e:
             # ReplayBuffer failure is non-fatal — journal continues normally
@@ -125,7 +124,7 @@ class EventJournal:
                     if idx < latest_valid_checkpoint:
                         del self._checkpoints[idx]
 
-    def get_snapshot_at(self, idx: int) -> Optional[dict]:
+    def get_snapshot_at(self, idx: int) -> dict | None:
         """Reconstruct the state snapshot at a specific event index."""
         if not self._entries:
             return None
@@ -151,7 +150,7 @@ class EventJournal:
         """Return journal entries from index `start` onward for replay."""
         return list(self._entries[start:])
 
-    def get_causality_chain(self, mutation_type: Optional[str] = None) -> list:
+    def get_causality_chain(self, mutation_type: str | None = None) -> list:
         """Return the chain of events by type, showing causal relationships."""
         chain = []
         for e in self._entries:
@@ -163,7 +162,7 @@ class EventJournal:
                     "source": e["source"],
                     "timestamp": e["timestamp"],
                     "delta": e.get("delta", {}),
-                }
+                },
             )
         return chain
 
@@ -204,9 +203,8 @@ def _compute_delta(before: dict, after: dict) -> dict:
 
         if bv != av:
             # Phase 61: Ignore minute floating point drift
-            if isinstance(bv, float) and isinstance(av, float):
-                if abs(bv - av) < 1e-4:
-                    continue
+            if isinstance(bv, float) and isinstance(av, float) and abs(bv - av) < 1e-4:
+                continue
 
             delta[k] = {"from": bv, "to": av}
     return delta

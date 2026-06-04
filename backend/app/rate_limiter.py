@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -254,7 +254,7 @@ class DatabaseSlidingWindowCounter:
                     min_ts = row["min_ts"] if row and row.get("min_ts") is not None else None
                     if min_ts is None:
                         return 0.0
-                    return max(0.0, self.window_seconds - (now - min_ts))
+                    return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
             except Exception:
                 return self._fallback_counter.reset_in()
         else:
@@ -265,12 +265,13 @@ class DatabaseSlidingWindowCounter:
                     conn = _get_connection()
                     try:
                         row = conn.execute(
-                            "SELECT MIN(timestamp) AS min_ts FROM rate_limits WHERE key = ?", (self.key,)
+                            "SELECT MIN(timestamp) AS min_ts FROM rate_limits WHERE key = ?",
+                            (self.key,),
                         ).fetchone()
                         min_ts = row["min_ts"] if row and row[0] is not None else None
                         if min_ts is None:
                             return 0.0
-                        return max(0.0, self.window_seconds - (now - min_ts))
+                        return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
                     finally:
                         conn.close()
             except Exception:
@@ -283,7 +284,7 @@ class DatabaseSlidingWindowCounter:
 class SlidingWindowCounter:
     """Sliding window rate limit counter for a single key."""
 
-    __slots__ = ("max_requests", "window_seconds", "_timestamps")
+    __slots__ = ("_timestamps", "max_requests", "window_seconds")
 
     def __init__(self, max_requests: int, window_seconds: float) -> None:
         self.max_requests = max_requests
@@ -436,14 +437,14 @@ class RateLimiterMiddleware:
     async def middleware(self, request: Request, call_next: Callable) -> Response:
         """ASGI middleware dispatch."""
         if self._global_max <= 0:
-            return await call_next(request)
+            return await call_next(request)  # type: ignore[no-any-return]
 
         path = request.url.path
         if not path.startswith("/api/"):
-            return await call_next(request)
+            return await call_next(request)  # type: ignore[no-any-return]
 
         if "/docs" in path or "/openapi" in path:
-            return await call_next(request)
+            return await call_next(request)  # type: ignore[no-any-return]
 
         # Prune expired counters periodically
         self._prune_expired_counters()
@@ -460,7 +461,7 @@ class RateLimiterMiddleware:
         # Get limits for this route (stricter of global and route-specific)
         max_req, window_sec = self._get_limits_for_path(path)
         if max_req <= 0:
-            return await call_next(request)
+            return await call_next(request)  # type: ignore[no-any-return]
 
         # Get or create counter
         if key not in self._counters:
@@ -503,7 +504,7 @@ class RateLimiterMiddleware:
         response.headers["X-RateLimit-Remaining"] = str(counter.remaining())
         response.headers["X-RateLimit-Reset"] = str(int(time.time() + counter.reset_in()))
 
-        return response
+        return response  # type: ignore[no-any-return]
 
     def get_stats(self) -> dict:
         """Return current rate limiter stats (for observability)."""

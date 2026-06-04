@@ -11,7 +11,7 @@ def test_pollinations_api() -> None:
     - Soumission. Price: £50.10. Rating: One. Out of stock.
     """
 
-    prompt = f"Extract the following fields from this text:\nbook_title (string), price (currency), rating (string), availability (string).\nText: {markdown}"  # noqa: E501
+    prompt = f"Extract the following fields from this text:\nbook_title (string), price (currency), rating (string), availability (string).\nText: {markdown}"
 
     try:
         response = requests.post(
@@ -21,7 +21,7 @@ def test_pollinations_api() -> None:
                     {
                         "role": "system",
                         "content": "You are a precise data extraction assistant. Output ONLY valid JSON array and nothing else.",
-                    },  # noqa: E501
+                    },
                     {"role": "user", "content": prompt},
                 ],
                 "model": "openai",

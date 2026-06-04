@@ -34,7 +34,7 @@ def _detect_table_headers(html: str) -> list[dict]:
                     "text": text,
                     "class": cls_str,
                     "id": id_str,
-                }
+                },
             )
 
     for header in soup.find_all(["h1", "h2", "h3", "h4"])[:5]:
@@ -44,7 +44,7 @@ def _detect_table_headers(html: str) -> list[dict]:
                 {
                     "text": text,
                     "is_heading": True,
-                }
+                },
             )
 
     return headers_info
@@ -233,7 +233,7 @@ def _extract_field_by_pattern(
                 r"\d{4}-\d{2}-\d{2}",
                 r"\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}",
                 r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}",
-                r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}\s*[-–]\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}",  # noqa: E501
+                r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}\s*[-–]\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}",
             ]
         elif ftype == FieldType.NUMBER:
             patterns = [r"-?\d+(?:\.\d+)?"]
@@ -293,9 +293,8 @@ def _extract_field_by_pattern(
                 return ct.strip()
 
     # Strategy 3: Search for the example value literally
-    if example and len(example) > 2:
-        if example.lower() in full_text.lower():
-            return example.strip()
+    if example and len(example) > 2 and example.lower() in full_text.lower():
+        return example.strip()
 
     # Strategy 4: Fuzzy example match
     if example and len(example) > 2:
@@ -404,7 +403,7 @@ def _extract_context_window(text: str, keywords: list[str], max_len: int | None 
 
 def _read_node_value(target, field_type: FieldType | None = None, field_name: str = "") -> str | None:
     if field_type == FieldType.URL:
-        return target.get("href")
+        return target.get("href")  # type: ignore[no-any-return]
     text_val = target.get_text(separator=" ", strip=True)
     title_val = target.get("title")
     alt_val = target.get("alt")
@@ -421,10 +420,10 @@ def _read_node_value(target, field_type: FieldType | None = None, field_name: st
                 # Prefer title attribute if it's longer
                 use_title = True
     if use_title and title_val:
-        return title_val.strip()
+        return title_val.strip()  # type: ignore[no-any-return]
     if alt_val and not text_val:
-        return alt_val.strip()
-    return text_val
+        return alt_val.strip()  # type: ignore[no-any-return]
+    return text_val  # type: ignore[no-any-return]
 
 
 def extract_raw_from_selectors(
@@ -593,7 +592,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
 
     # Priority 1: Common data container classes
     containers = list(
-        soup.find_all(["article", "li", "tr", "div"], class_=re.compile(r"item|card|listing|row|result|entry", re.I))
+        soup.find_all(["article", "li", "tr", "div"], class_=re.compile(r"item|card|listing|row|result|entry", re.IGNORECASE)),
     )
 
     # Priority 2: Headings and their parents
@@ -630,7 +629,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
         if re.search(
             r"subscribe|newsletter|sign.?up|advertisement|ad[-_]?banner|sidebar|sponsored|cookie",
             f"{classes} {id_attr} {noise_text}",
-            re.I,
+            re.IGNORECASE,
         ):
             continue
         seen_texts.add(text)
@@ -646,14 +645,14 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 val = _sanitize_field_value(field, link.get("href") if link else None, base_url=base_url)
 
             elif ft == FieldType.EMAIL:
-                link = container.find("a", href=re.compile(r"mailto:", re.I))
+                link = container.find("a", href=re.compile(r"mailto:", re.IGNORECASE))
                 href_val = link.get("href") if link else None
                 href = href_val[0] if isinstance(href_val, list) else str(href_val) if href_val else None
                 val = href.split("mailto:", 1)[1].split("?")[0] if href else text
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.PHONE:
-                link = container.find("a", href=re.compile(r"tel:", re.I))
+                link = container.find("a", href=re.compile(r"tel:", re.IGNORECASE))
                 href_val = link.get("href") if link else None
                 href = href_val[0] if isinstance(href_val, list) else str(href_val) if href_val else None
                 val = href.split("tel:", 1)[1].split("?")[0] if href else text
@@ -661,7 +660,8 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
 
             elif ft == FieldType.CURRENCY:
                 price_node = container.find(
-                    True, class_=re.compile(r"price|amount|cost|amt|fare|mrp|discount|total|sale|offer", re.I)
+                    True,
+                    class_=re.compile(r"price|amount|cost|amt|fare|mrp|discount|total|sale|offer", re.IGNORECASE),
                 )
                 if price_node:
                     val = price_node.get_text()
@@ -671,7 +671,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.PERCENTAGE:
-                pct_node = container.find(True, class_=re.compile(r"percent|discount|saving|off|tax|vat", re.I))
+                pct_node = container.find(True, class_=re.compile(r"percent|discount|saving|off|tax|vat", re.IGNORECASE))
                 if pct_node:
                     val = pct_node.get_text()
                 else:
@@ -680,35 +680,38 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.RATING:
-                rating_node = container.find(True, class_=re.compile(r"rating|stars|score|review", re.I))
+                rating_node = container.find(True, class_=re.compile(r"rating|stars|score|review", re.IGNORECASE))
                 if rating_node:
                     val = rating_node.get_text()
                 else:
-                    match = re.search(r"(\d+\.?\d*/\d+|\d+\.?\d*\s*stars?|★+)", text, re.I)
+                    match = re.search(r"(\d+\.?\d*/\d+|\d+\.?\d*\s*stars?|★+)", text, re.IGNORECASE)
                     val = match.group(1) if match else None
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.BOOLEAN:
-                bool_node = container.find(True, class_=re.compile(r"stock|available|status|active", re.I))
+                bool_node = container.find(True, class_=re.compile(r"stock|available|status|active", re.IGNORECASE))
                 if bool_node:
                     val = bool_node.get_text()
                 else:
-                    match = re.search(r"\b(In Stock|Out of Stock|Available|Unavailable|Sold Out|Yes|No)\b", text, re.I)
+                    match = re.search(r"\b(In Stock|Out of Stock|Available|Unavailable|Sold Out|Yes|No)\b", text, re.IGNORECASE)
                     val = match.group(1) if match else None
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.CODE:
-                code_node = container.find(True, class_=re.compile(r"sku|product-code|barcode|isbn|model-number|part", re.I))
+                code_node = container.find(
+                    True, class_=re.compile(r"sku|product-code|barcode|isbn|model-number|part", re.IGNORECASE)
+                )
                 if code_node:
                     val = code_node.get_text()
                 else:
-                    match = re.search(r"(SKU[-:\s]*[A-Za-z0-9-]+|\b[0-9]{12,13}\b)", text, re.I)
+                    match = re.search(r"(SKU[-:\s]*[A-Za-z0-9-]+|\b[0-9]{12,13}\b)", text, re.IGNORECASE)
                     val = match.group(1) if match else None
                 val = _sanitize_field_value(field, val)
 
             elif ft == FieldType.LOCATION:
                 loc_node = container.find(
-                    True, class_=re.compile(r"origin|destination|city|location|airport|from|to|station", re.I)
+                    True,
+                    class_=re.compile(r"origin|destination|city|location|airport|from|to|station", re.IGNORECASE),
                 )
                 if loc_node:
                     val = loc_node.get_text()
@@ -718,7 +721,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                 val = _sanitize_field_value(field, val)
 
             elif ft in (FieldType.NUMBER, FieldType.INTEGER, FieldType.FLOAT):
-                num_node = container.find(True, class_=re.compile(r"number|count|amount|value|qty|quantity", re.I))
+                num_node = container.find(True, class_=re.compile(r"number|count|amount|value|qty|quantity", re.IGNORECASE))
                 if num_node:
                     val = num_node.get_text()
                 else:
@@ -734,7 +737,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                     heading = container.find(["h1", "h2", "h3", "h4", "strong"])
                     if not heading:
                         link = container.find("a")
-                        if link and not re.search(r"visit|click|more|details|select|here|book", link.get_text(), re.I):
+                        if link and not re.search(r"visit|click|more|details|select|here|book", link.get_text(), re.IGNORECASE):
                             heading = link
                     if not heading and container.name == "tr":
                         heading = container.find("td")
@@ -751,7 +754,7 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                     # Strategy 3: Look for elements with identifying class
                     # patterns
                     if not heading:
-                        named_el = container.find(class_=re.compile(r"name|title|brand|company|org", re.I))
+                        named_el = container.find(class_=re.compile(r"name|title|brand|company|org", re.IGNORECASE))
                         if named_el:
                             heading = named_el
 

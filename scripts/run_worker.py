@@ -40,14 +40,16 @@ async def scrape_job_handler(task) -> dict:
 
     job_id = task.payload.get("job_id")
     if not job_id:
-        raise ValueError(f"No job_id in task payload: {task}")
+        msg = f"No job_id in task payload: {task}"
+        raise ValueError(msg)
 
     repo = get_job_repository()
     jobs_store, recycle_bin_store, _ = repo.load_all(recover_in_progress=False)
 
     job = jobs_store.get(job_id)
     if not job:
-        raise ValueError(f"Job not found: {job_id}")
+        msg = f"Job not found: {job_id}"
+        raise ValueError(msg)
 
     logger.info("Worker picked up job: %s (%s)", job.name, job_id)
 
@@ -108,7 +110,8 @@ async def main():
         # Single-task mode: enqueue one specific job and wait for completion
         job_id = os.getenv("DATAFORGE_JOB_ID")
         if not job_id:
-            raise SystemExit("DATAFORGE_JOB_ID is required when using --once")
+            msg = "DATAFORGE_JOB_ID is required when using --once"
+            raise SystemExit(msg)
         task_id = await queue.enqueue(
             "scrape_job",
             {"job_id": job_id},

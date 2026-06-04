@@ -9,7 +9,6 @@ import concurrent.futures
 import logging
 import threading
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
 from app.semantic_ir import (
     SemanticGraph,
@@ -25,7 +24,7 @@ class RoleEmbeddingEngine:
     def __init__(self):
         self._ws = None
         # Ephemeral force buffer for manifold relaxation
-        self.force_buffer: Dict[str, List[float]] = {}
+        self.force_buffer: dict[str, list[float]] = {}
         # Thread-safety lock for shared manifold_copy mutations across shards
         self._relax_lock = threading.Lock()
         self._seed_baseline_manifold()
@@ -70,35 +69,35 @@ class RoleEmbeddingEngine:
                     self.ws.set_manifold_vector(role, vec)
 
     @property
-    def manifold(self) -> Dict[str, List[float]]:
-        return self.ws.role_manifold
+    def manifold(self) -> dict[str, list[float]]:
+        return self.ws.role_manifold  # type: ignore[no-any-return]
 
     @property
     def learning_count(self) -> int:
-        return self.ws.learning_count
+        return self.ws.learning_count  # type: ignore[no-any-return]
 
     @learning_count.setter
     def learning_count(self, value: int):
         self.ws.learning_count = value
 
     @property
-    def compatibility_cache(self) -> Dict[Tuple[str, str], float]:
+    def compatibility_cache(self) -> dict[tuple[str, str], float]:
         """Legacy access to symbolic compatibility dict."""
-        return self.ws.role_compatibility
+        return self.ws.role_compatibility  # type: ignore[no-any-return]
 
     @property
-    def co_occurrence(self) -> Dict[Tuple[str, str, str, str], int]:
-        return self.ws.role_co_occurrence
+    def co_occurrence(self) -> dict[tuple[str, str, str, str], int]:
+        return self.ws.role_co_occurrence  # type: ignore[no-any-return]
 
     @property
     def total_co_occurrences(self) -> int:
-        return self.ws.total_co_occurrences
+        return self.ws.total_co_occurrences  # type: ignore[no-any-return]
 
     @total_co_occurrences.setter
     def total_co_occurrences(self, value: int):
         self.ws.total_co_occurrences = value
 
-    def get_compatibility(self, role: str, stype: SemanticType, token: Optional[SemanticToken] = None) -> float:
+    def get_compatibility(self, role: str, stype: SemanticType, token: SemanticToken | None = None) -> float:
         """Geometric compatibility: dot product in the role manifold."""
         role_vec = self.manifold.get(role)
         if not role_vec:
@@ -150,7 +149,7 @@ class RoleEmbeddingEngine:
 
     def get_learned_exclusion(self, role_a: str, role_b: str) -> float:
         """Topological exclusion: delegates to WorldState geometry."""
-        return self.ws.get_derived_exclusion(role_a, role_b)
+        return self.ws.get_derived_exclusion(role_a, role_b)  # type: ignore[no-any-return]
 
     def get_role_similarity(self, role_a: str, role_b: str) -> float:
         """Geometric similarity between two roles in the manifold."""
@@ -168,9 +167,9 @@ class RoleEmbeddingEngine:
 
     @property
     def dimension(self) -> int:
-        return self.ws.manifold_dimension
+        return self.ws.manifold_dimension  # type: ignore[no-any-return]
 
-    def _get_type_vector(self, stype: SemanticType) -> List[float]:
+    def _get_type_vector(self, stype: SemanticType) -> list[float]:
         """Returns a canonical vector representing a SemanticType."""
         dim = self.dimension
         vec = [0.5] * dim
@@ -357,7 +356,7 @@ class RoleEmbeddingEngine:
 
         self.detect_dimensionality_need()
 
-    def _relax_roles(self, roles: List[str], manifold_full: dict, base_rate: float):
+    def _relax_roles(self, roles: list[str], manifold_full: dict, base_rate: float):
         """Internal helper for localized relaxation of a subset of roles."""
         # 1. Filter out anchored roles
         roles = [r for r in roles if not self.ws.is_role_anchored(r)]
@@ -460,8 +459,8 @@ class RoleEmbeddingEngine:
             return 0.0
         return max(-0.1, min(0.1, count / self.total_co_occurrences))
 
-    def propagate_co_occurrence(self, assignments: Dict[str, Tuple[str, str]]) -> Dict[str, float]:
-        boosts: Dict[str, float] = {}
+    def propagate_co_occurrence(self, assignments: dict[str, tuple[str, str]]) -> dict[str, float]:
+        boosts: dict[str, float] = {}
         items = list(assignments.items())
         for i in range(len(items)):
             role_i, (type_i, _) = items[i]
@@ -538,7 +537,7 @@ class RoleEmbeddingEngine:
 
 @dataclass
 class RelationshipEmbeddingSpace:
-    def compute_embedding(self, node_idx: int, graph: SemanticGraph) -> List[float]:
+    def compute_embedding(self, node_idx: int, graph: SemanticGraph) -> list[float]:
         ws = get_world_state()
         dim = ws.manifold_dimension
 

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import enum
 import secrets
-from typing import Optional
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -24,7 +23,7 @@ class UserRole(str, enum.Enum):
     VIEWER = "viewer"
 
 
-def _resolve_role(api_key: str) -> Optional[UserRole]:
+def _resolve_role(api_key: str) -> UserRole | None:
     """Resolve a role from an API key. Returns None if key is invalid."""
     sec = settings.security
     if not api_key:
@@ -40,8 +39,8 @@ def _resolve_role(api_key: str) -> Optional[UserRole]:
 
 def get_current_role(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
-) -> Optional[UserRole]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> UserRole | None:
     """Extract the current user role from the request (API key or Bearer token)."""
     # Check X-API-Key header first
     api_key = request.headers.get("X-API-Key", "")
@@ -62,7 +61,7 @@ def get_current_role(
 def require_role(allowed_roles: list[UserRole]):
     """FastAPI dependency that requires one of the specified roles."""
 
-    def _check(role: Optional[UserRole] = Depends(get_current_role)) -> UserRole:
+    def _check(role: UserRole | None = Depends(get_current_role)) -> UserRole:
         if role is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

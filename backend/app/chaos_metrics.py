@@ -8,7 +8,7 @@ Extracted from chaos_simulator.py for modularity (see REFACTOR_PLAN.md).
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from app.chaos_scenarios import FailureMode, FailureScenario, FailureScenarios
 
@@ -18,9 +18,9 @@ class ChaosTestSuite:
 
     def __init__(self):
         self.logger = logging.getLogger("chaos_test_suite")
-        self.results: List[Dict[str, Any]] = []
+        self.results: list[dict[str, Any]] = []
 
-    async def run_all_scenarios(self) -> Dict[str, Any]:
+    async def run_all_scenarios(self) -> dict[str, Any]:
         """Run all chaos scenarios"""
         scenarios = FailureScenarios.get_all_scenarios()
         self.logger.info(f"Running {len(scenarios)} chaos scenarios...")
@@ -45,7 +45,7 @@ class ChaosTestSuite:
             "results": self.results,
         }
 
-    async def _run_scenario(self, scenario: FailureScenario) -> Dict[str, Any]:
+    async def _run_scenario(self, scenario: FailureScenario) -> dict[str, Any]:
         """Run a single scenario"""
         self.logger.info(f"Running scenario: {scenario.name}")
 
@@ -111,7 +111,7 @@ class OperationalPlaybooks:
     """Playbooks for operational responses to failures"""
 
     @staticmethod
-    def get_playbook(failure_mode: FailureMode) -> Dict[str, Any]:
+    def get_playbook(failure_mode: FailureMode) -> dict[str, Any]:
         """Get the playbook for a specific failure mode"""
         playbooks = {
             FailureMode.NETWORK_TIMEOUT: {
@@ -241,7 +241,7 @@ class OperationalPlaybooks:
         )
 
     @staticmethod
-    def get_all_playbooks() -> Dict[str, Dict[str, Any]]:
+    def get_all_playbooks() -> dict[str, dict[str, Any]]:
         """Get all playbooks"""
         playbooks = {}
         for mode in FailureMode:
@@ -254,7 +254,7 @@ class OperationalPlaybooks:
 # ============================================================================
 
 
-async def run_chaos_test(scenario: FailureScenario) -> Dict[str, Any]:
+async def run_chaos_test(scenario: FailureScenario) -> dict[str, Any]:
     """Run a chaos test scenario using the ChaosSimulator."""
     from app.chaos_simulator import ChaosSimulator
 
@@ -263,7 +263,7 @@ async def run_chaos_test(scenario: FailureScenario) -> Dict[str, Any]:
     return result
 
 
-async def run_all_chaos_tests() -> Dict[str, Any]:
+async def run_all_chaos_tests() -> dict[str, Any]:
     """Run all chaos tests and generate report"""
     suite = ChaosTestSuite()
     results = await suite.run_all_scenarios()

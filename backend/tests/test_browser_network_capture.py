@@ -96,7 +96,7 @@ async def test_browser_state_capture_redacts_session_storage_values() -> None:
                 "domain": "example.com",
                 "path": "/",
             },
-        ]
+        ],
     )
     page.context = context
     page.evaluate = AsyncMock(
@@ -110,7 +110,7 @@ async def test_browser_state_capture_redacts_session_storage_values() -> None:
             },
             "indexedDbDatabases": [{"name": "search-cache", "version": 1}],
             "cacheStorageKeys": ["runtime-cache-v1"],
-        }
+        },
     )
 
     state = await browser_network_capture.collect_browser_state(page)
@@ -133,6 +133,6 @@ def test_build_cookie_header_uses_raw_cookie_values_for_in_memory_reuse() -> Non
             {"name": "session_id", "value": "abc123"},
             {"name": "empty", "value": ""},
             {"name": "", "value": "ignored"},
-        ]
+        ],
     )
     assert header == "session_id=abc123"

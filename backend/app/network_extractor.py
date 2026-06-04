@@ -794,19 +794,18 @@ def _extract_from_apollo_state(
 
     # Also extract from ROOT_QUERY values
     for key, value in apollo_data.items():
-        if key.startswith("ROOT_QUERY"):
-            if isinstance(value, list):
-                for item in value:
-                    if isinstance(item, dict):
-                        # Check for __ref references
-                        ref = item.get("__ref", "")
-                        if ref and ref not in seen_refs:
-                            seen_refs.add(ref)
-                            ref_data = apollo_data.get(ref, {})
-                            if isinstance(ref_data, dict) and ref_data not in entities:
-                                entities.append(ref_data)
-                        elif item not in entities:
-                            entities.append(item)
+        if key.startswith("ROOT_QUERY") and isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    # Check for __ref references
+                    ref = item.get("__ref", "")
+                    if ref and ref not in seen_refs:
+                        seen_refs.add(ref)
+                        ref_data = apollo_data.get(ref, {})
+                        if isinstance(ref_data, dict) and ref_data not in entities:
+                            entities.append(ref_data)
+                    elif item not in entities:
+                        entities.append(item)
 
     for entity in entities:
         record = _map_json_keys_to_schema(entity, schema_fields)
@@ -861,11 +860,10 @@ def _extract_records_from_payloads(
 
         elif isinstance(body, list):
             for item in body:
-                if isinstance(item, dict):
-                    if _is_record_like(item, schema_fields):
-                        record = _map_json_keys_to_schema(item, schema_fields)
-                        if record and any(v for v in record.values() if v not in (None, "", [])):
-                            records.append(record)
+                if isinstance(item, dict) and _is_record_like(item, schema_fields):
+                    record = _map_json_keys_to_schema(item, schema_fields)
+                    if record and any(v for v in record.values() if v not in (None, "", [])):
+                        records.append(record)
 
     # Deduplicate
     return _deduplicate_records(records)

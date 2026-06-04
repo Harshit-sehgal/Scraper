@@ -7,7 +7,6 @@ Meaning is a geometric distance in the Role Manifold.
 
 import uuid
 from dataclasses import dataclass, field
-from typing import List
 
 from app.field_laws import (
     MAX_COUPLING_TRANSFER,
@@ -21,7 +20,7 @@ from app.field_laws import (
 class FieldConflictRegion:
     """A metastable region in the semantic field where multiple roles compete."""
 
-    competing_roles: List[str]
+    competing_roles: list[str]
     token: str
     instability: float = 1.0  # [0, 1] entropy / tension level
     region_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
@@ -41,7 +40,7 @@ class FieldConflictRegion:
     energy_reservoir: float = 0.0
     version: int = 1  # MVCC monotonic version counter
     semantic_pressure: float = 0.5
-    topology_neighbors: List[str] = field(default_factory=list)
+    topology_neighbors: list[str] = field(default_factory=list)
 
     def __post_init__(self):
         if not hasattr(self, "_propagation_count"):

@@ -12,7 +12,8 @@ Owns:
 """
 
 import math
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from app.transaction_context import active_transaction
 
@@ -20,7 +21,7 @@ from app.transaction_context import active_transaction
 class HistoryState:
     """Sole owner of the semantic field's diagnostic / history structures."""
 
-    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
         self._delta_callback = delta_callback
         self._decision_history: list = []
         self._topology_snapshots: list = []
@@ -31,14 +32,14 @@ class HistoryState:
         self._field_activation_count: int = 0
 
     @property
-    def _staging(self) -> Optional[dict]:
+    def _staging(self) -> dict | None:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"history_staging_{id(self)}")
         return None
 
     @_staging.setter
-    def _staging(self, value: Optional[dict]):
+    def _staging(self, value: dict | None):
         tx = active_transaction.get()
         if tx is not None:
             tx[f"history_staging_{id(self)}"] = value
@@ -133,7 +134,7 @@ class HistoryState:
 
     @property
     def field_activation_count(self) -> int:
-        return self._get_val("field_activation_count")
+        return self._get_val("field_activation_count")  # type: ignore[no-any-return]
 
     @field_activation_count.setter
     def field_activation_count(self, value: int):

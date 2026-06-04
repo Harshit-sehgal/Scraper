@@ -134,7 +134,7 @@ class TestSecretsNotPersisted:
                 "name": "Test Co",
                 "price": "$10",
                 **{s: f"fake_{s}_value" for s in FAKE_SECRETS},
-            }
+            },
         ]
         schema = [
             SchemaField(name="name", field_type=FieldType.STRING, description="", required=False),
@@ -323,8 +323,8 @@ FAKE_NETWORK_JSON = json.dumps(
         "results": [
             {"carrier": "TestAir", "fare": 100, "currency": "USD"},
             {"carrier": "DemoJet", "fare": 200, "currency": "USD"},
-        ]
-    }
+        ],
+    },
 )
 
 
@@ -396,7 +396,7 @@ class TestFakeDynamicSessionBoundWebsite:
                     "mapped_from": item.get("carrier", ""),
                     "source": "network_payload",
                     "confidence": 0.9,
-                }
+                },
             )
         assert len(extracted) == 2
         assert extracted[0]["source"] == "network_payload"
@@ -436,8 +436,8 @@ class _SessionBoundHandler(http.server.BaseHTTPRequestHandler):
             "results": [
                 {"carrier": "TestAir", "fare": 100},
                 {"carrier": "DemoJet", "fare": 200},
-            ]
-        }
+            ],
+        },
     ).encode()
 
     def do_GET(self):
@@ -556,7 +556,7 @@ class TestLocalSessionBoundServer:
                     "mapped_from": item["carrier"],
                     "source": "network_payload",
                     "confidence": 0.9,
-                }
+                },
             )
         assert len(extracted) == 2
         assert all(e["source"] == "network_payload" for e in extracted)

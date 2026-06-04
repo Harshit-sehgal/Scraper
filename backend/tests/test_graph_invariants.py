@@ -111,7 +111,7 @@ def test_event_dispatcher_dispatch_does_not_raise() -> None:
                     source="test",
                     payload={"test": True},
                     instability_delta=0.5,
-                )
+                ),
             )
         except Exception as e:
             pytest.fail(f"Dispatch of {event_type.value} raised: {e}")
@@ -147,7 +147,7 @@ def test_graph_register_region_preserves_invariants() -> None:
                 tokens=[],
                 start_position=0,
                 end_position=1,
-            )
+            ),
         )
     # Verify no duplicate IDs
     all_ids = [r.region_id for r in g.regions]

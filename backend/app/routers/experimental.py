@@ -275,7 +275,7 @@ async def system_topology_history(limit: int = 20):
                     "timestamp": entry["timestamp"],
                     "type": entry["type"],
                     "topology": snapshot["topology"],
-                }
+                },
             )
 
     return {"history": history}

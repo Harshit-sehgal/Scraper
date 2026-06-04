@@ -8,7 +8,6 @@ Extracted from chaos_simulator.py for modularity (see REFACTOR_PLAN.md).
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
 
 
 class FailureMode(Enum):
@@ -77,16 +76,16 @@ class FailureScenario:
     expected_impact: str
     expected_recovery_time_seconds: float
     expected_success_rate: float  # After recovery
-    triggers: List[str]  # What triggers this failure
-    recovery_actions: List[str]  # Actions system should take
-    validation_checks: List[str]  # How to verify recovery
+    triggers: list[str]  # What triggers this failure
+    recovery_actions: list[str]  # Actions system should take
+    validation_checks: list[str]  # How to verify recovery
 
 
 class FailureScenarios:
     """Collection of predefined failure scenarios"""
 
     @staticmethod
-    def get_all_scenarios() -> List[FailureScenario]:
+    def get_all_scenarios() -> list[FailureScenario]:
         """Get all failure scenarios"""
         return [
             # ===== FETCH LAYER FAILURES (5 scenarios) =====
@@ -531,7 +530,7 @@ class FailureScenarios:
         ]
 
     @staticmethod
-    def get_scenario_by_mode(mode: FailureMode) -> Optional[FailureScenario]:
+    def get_scenario_by_mode(mode: FailureMode) -> FailureScenario | None:
         """Get a scenario by failure mode"""
         for scenario in FailureScenarios.get_all_scenarios():
             if scenario.failure_mode == mode:

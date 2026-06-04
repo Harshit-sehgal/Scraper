@@ -8,8 +8,9 @@ import heapq
 import logging
 import time
 from collections import Counter
+from collections.abc import Callable
 from enum import IntEnum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from app.event_dispatcher import get_dispatcher
 from app.semantic_events import SemanticEvent, SemanticEventType
@@ -34,8 +35,8 @@ class CognitiveTask:
         task_id: str,
         priority: TaskPriority,
         handler: Callable,
-        args: Optional[tuple] = None,
-        kwargs: Optional[dict] = None,
+        args: tuple | None = None,
+        kwargs: dict | None = None,
     ):
         self.task_id = task_id
         self.priority = priority
@@ -53,10 +54,10 @@ class CognitiveTask:
 class GlobalCognitiveScheduler:
     def __init__(self, ws: Any = None) -> None:
         self.ws = ws
-        self._task_queue: List[CognitiveTask] = []
+        self._task_queue: list[CognitiveTask] = []
         self._is_paused = False
         self._preemption_threshold = 1.8
-        self._execution_stats: Dict[str, Any] = {
+        self._execution_stats: dict[str, Any] = {
             "tasks_completed": 0,
             "total_execution_time": 0.0,
             "priority_counts": Counter(),
@@ -149,7 +150,7 @@ class GraphUpdateScheduler:
                 "source": event.source,
                 "delta": event.instability_delta,
                 "timestamp": event.timestamp or 0,
-            }
+            },
         )
         ws.trim_decision_history()
 
@@ -193,7 +194,7 @@ class GraphUpdateScheduler:
                     "pressure_drop": pressure_before - pressure_after,
                 },
                 instability_delta=-0.05,
-            )
+            ),
         )
 
     def schedule(self, task_id: str, priority: TaskPriority, handler: Callable, *args: Any, **kwargs: Any) -> None:
@@ -214,7 +215,7 @@ def get_scheduler() -> GraphUpdateScheduler:
     if _scheduler is None:
         _scheduler = object()
         _scheduler = GraphUpdateScheduler()
-    return _scheduler
+    return _scheduler  # type: ignore[no-any-return]
 
 
 def reset_scheduler() -> None:

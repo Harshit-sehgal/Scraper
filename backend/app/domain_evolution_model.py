@@ -20,15 +20,18 @@ The architecture must model and anticipate these changes.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
-from typing import Dict, Optional
 
 from app.selector_memory import get_selector_memory
 
 logger = logging.getLogger(__name__)
+
+# Hold references to background webhook tasks to prevent GC (RUF006).
+_background_tasks: set[asyncio.Task] = set()
 
 
 async def _trigger_webhook(url: str, payload: dict):
@@ -91,7 +94,7 @@ class DomainEvolutionModel:
     """
 
     def __init__(self) -> None:
-        self._domains: Dict[str, DomainEvolutionMetrics] = {}
+        self._domains: dict[str, DomainEvolutionMetrics] = {}
 
         # Anti-bot level thresholds for escalation detection
         self._anti_bot_levels = {
@@ -169,7 +172,7 @@ class DomainEvolutionModel:
                     "old_level": old_level,
                     "new_level": new_level,
                     "score": new_anti_bot_score,
-                }
+                },
             )
             logger.info(
                 "Anti-bot escalation detected for %s: %s → %s (score=%.2f)",
@@ -196,7 +199,9 @@ class DomainEvolutionModel:
 
                     loop = asyncio.get_running_loop()
                     if loop.is_running():
-                        loop.create_task(_trigger_webhook(webhook_url, payload))
+                        _task = loop.create_task(_trigger_webhook(webhook_url, payload))
+                        _background_tasks.add(_task)
+                        _task.add_done_callback(_background_tasks.discard)
                 except RuntimeError:
                     # No running event loop, send in background thread
                     import threading
@@ -279,7 +284,7 @@ class DomainEvolutionModel:
         metrics.mutation_frequency = round(mutation_rate, 3)
         metrics.layout_drift_rate = round(drift_rate, 3)
 
-    def get_domain_evolution(self, domain: str) -> Optional[DomainEvolutionMetrics]:
+    def get_domain_evolution(self, domain: str) -> DomainEvolutionMetrics | None:
         """Get evolution metrics for a domain."""
         return self._domains.get(domain)
 

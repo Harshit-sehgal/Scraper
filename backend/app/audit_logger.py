@@ -16,7 +16,7 @@ import logging
 import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 # ─── Constants ─────────────────────────────────────────────────────────────
 AUDIT_LOG_DIR = "logs"
@@ -25,7 +25,7 @@ AUDIT_LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 AUDIT_LOG_BACKUP_COUNT = 5
 
 # ─── Module-level state ───────────────────────────────────────────────────
-_logger: Optional[logging.Logger] = None
+_logger: logging.Logger | None = None
 
 
 def _get_audit_logger() -> logging.Logger:
@@ -83,7 +83,7 @@ class AuditEvent:
         actor: str,
         action: str,
         resource: str,
-        details: Optional[dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
         outcome: str = "success",
     ):
         self.timestamp = time.time()
@@ -119,7 +119,7 @@ def log_auth_event(
     action: str,
     resource: str = "",
     outcome: str = "success",
-    details: Optional[dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
 ) -> None:
     """Log an authentication-related event.
 
@@ -147,7 +147,7 @@ def log_rbac_event(
     resource: str,
     role: str,
     outcome: str = "denied",
-    details: Optional[dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
 ) -> None:
     """Log an RBAC authorization event.
 
@@ -174,7 +174,7 @@ def log_admin_action(
     actor: str,
     action: str,
     resource: str,
-    details: Optional[dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
 ) -> None:
     """Log an administrative action.
 
@@ -199,7 +199,7 @@ def log_data_access(
     actor: str,
     action: str,
     resource: str,
-    details: Optional[dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
 ) -> None:
     """Log a data access event (exports, sensitive reads).
 
@@ -225,7 +225,7 @@ def log_job_event(
     action: str,
     job_id: str,
     outcome: str = "success",
-    details: Optional[dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
 ) -> None:
     """Log a job lifecycle event.
 
@@ -251,7 +251,7 @@ def log_system_event(
     action: str,
     resource: str = "",
     outcome: str = "success",
-    details: Optional[dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
 ) -> None:
     """Log a system-level event (startup, shutdown, config change).
 
@@ -275,7 +275,7 @@ def log_system_event(
 # ─── Validation ───────────────────────────────────────────────────────────
 
 
-def _parse_audit_log_line(line: str) -> Optional[dict[str, Any]]:
+def _parse_audit_log_line(line: str) -> dict[str, Any] | None:
     """Parse a single audit log line back into a dictionary.
 
     Useful for testing and log analysis.
@@ -285,8 +285,8 @@ def _parse_audit_log_line(line: str) -> Optional[dict[str, Any]]:
         # Format: "2026 - 05 - 30T12:00:00 [AUDIT] {...json...}"
         if "[AUDIT]" in line:
             json_start = line.index("[AUDIT]") + len("[AUDIT] ")
-            return json.loads(line[json_start:])
-        return json.loads(line)
+            return json.loads(line[json_start:])  # type: ignore[no-any-return]
+        return json.loads(line)  # type: ignore[no-any-return]
     except (ValueError, json.JSONDecodeError):
         return None
 

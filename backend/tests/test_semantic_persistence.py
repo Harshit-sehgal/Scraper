@@ -40,7 +40,7 @@ def test_persistence_round_trip() -> None:
             merged=True,
             coherence_after=0.9,
             success=True,
-        )
+        ),
     )
     # Motif observation
     from app.semantic_boundary_engine import record_motif_observation

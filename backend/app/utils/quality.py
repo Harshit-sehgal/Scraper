@@ -69,9 +69,8 @@ def _value_quality(field: SchemaField, value) -> float:
     field_name_lower = field.name.lower()
 
     # Strict airport / IATA code validation
-    if "airport_code" in field_name_lower or "iata" in field_name_lower:
-        if not re.match(r"^[A-Z]{3}$", text):
-            return 0.0
+    if ("airport_code" in field_name_lower or "iata" in field_name_lower) and not re.match(r"^[A-Z]{3}$", text):
+        return 0.0
 
     is_identity_field = any(k in field_name_lower for k in ["name", "title", "company"])
     is_status_field = any(k in field_name_lower for k in ["availability", "stock", "status", "condition"])
@@ -125,9 +124,8 @@ def _value_quality(field: SchemaField, value) -> float:
     elif field.field_type == FieldType.NUMBER:
         if re.match(r"^-?\d+(\.\d+)?$", text):
             score += 0.5
-    elif field.field_type == FieldType.DATE:
-        if any(c.isdigit() for c in text) and len(text) >= 6:
-            score += 0.4
+    elif field.field_type == FieldType.DATE and any(c.isdigit() for c in text) and len(text) >= 6:
+        score += 0.4
 
     return min(score, 1.0)
 
@@ -224,7 +222,7 @@ def build_quality_report(
             (avg_final_score * settings.SCORE_QUALITY_WEIGHT)
             + (coverage_ratio * settings.SCORE_COVERAGE_WEIGHT)
             + (avg_source_trust * settings.SCORE_SOURCE_TRUST_WEIGHT)
-            + ((1.0 - clamp01(mismatch_ratio)) * settings.SCORE_TYPE_INTEGRITY_WEIGHT)
+            + ((1.0 - clamp01(mismatch_ratio)) * settings.SCORE_TYPE_INTEGRITY_WEIGHT),
         ),
         3,
     )
@@ -281,7 +279,9 @@ def build_quality_report(
 
 
 def post_extract_validate_records(
-    results: list[dict], schema_fields: list[SchemaField], warnings: list[str] | None = None
+    results: list[dict],
+    schema_fields: list[SchemaField],
+    warnings: list[str] | None = None,
 ) -> list[dict]:
     """Validate extracted records against semantic field rules.
 
@@ -319,8 +319,7 @@ def post_extract_validate_records(
         if not discard:
             valid_records.append(validated)
 
-    if airport_failed and warnings is not None:
-        if "Airport-code fields failed semantic validation" not in warnings:
-            warnings.append("Airport-code fields failed semantic validation")
+    if airport_failed and warnings is not None and "Airport-code fields failed semantic validation" not in warnings:
+        warnings.append("Airport-code fields failed semantic validation")
 
     return valid_records

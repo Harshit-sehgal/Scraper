@@ -32,15 +32,15 @@ class TestDetectSemanticType:
         assert conf >= 0.9
 
     def test_date_slash_format(self) -> None:
-        stype, conf = detect_semantic_type("22/05/2026")
+        stype, _conf = detect_semantic_type("22/05/2026")
         assert stype == SemanticType.DATE
 
     def test_date_dash_format(self) -> None:
-        stype, conf = detect_semantic_type("2026-05-22")
+        stype, _conf = detect_semantic_type("2026-05-22")
         assert stype == SemanticType.DATE
 
     def test_date_text_format(self) -> None:
-        stype, conf = detect_semantic_type("May 22, 2026")
+        stype, _conf = detect_semantic_type("May 22, 2026")
         assert stype == SemanticType.DATE
 
     def test_email(self) -> None:
@@ -49,23 +49,23 @@ class TestDetectSemanticType:
         assert conf >= 0.9
 
     def test_phone(self) -> None:
-        stype, conf = detect_semantic_type("+1-555-0101")
+        stype, _conf = detect_semantic_type("+1-555-0101")
         assert stype == SemanticType.PHONE
 
     def test_rating_x_out_of_5(self) -> None:
-        stype, conf = detect_semantic_type("4.5 / 5")
+        stype, _conf = detect_semantic_type("4.5 / 5")
         assert stype == SemanticType.RATING
 
     def test_rating_with_stars(self) -> None:
-        stype, conf = detect_semantic_type("4 stars")
+        stype, _conf = detect_semantic_type("4 stars")
         assert stype == SemanticType.RATING
 
     def test_url(self) -> None:
-        stype, conf = detect_semantic_type("https://example.com/page")
+        stype, _conf = detect_semantic_type("https://example.com/page")
         assert stype == SemanticType.URL
 
     def test_identifier_code(self) -> None:
-        stype, conf = detect_semantic_type("BA123")
+        stype, _conf = detect_semantic_type("BA123")
         assert stype == SemanticType.IDENTIFIER
 
     def test_duration(self) -> None:
@@ -76,15 +76,15 @@ class TestDetectSemanticType:
         assert not pattern.search("hello")
 
     def test_code_uppercase(self) -> None:
-        stype, conf = detect_semantic_type("LHR")
+        stype, _conf = detect_semantic_type("LHR")
         assert stype == SemanticType.CODE
 
     def test_organization_multi_word_title(self) -> None:
-        stype, conf = detect_semantic_type("British Airways")
+        stype, _conf = detect_semantic_type("British Airways")
         assert stype == SemanticType.ORGANIZATION
 
     def test_text_default(self) -> None:
-        stype, conf = detect_semantic_type("some random text")
+        stype, _conf = detect_semantic_type("some random text")
         assert stype == SemanticType.TEXT
 
     def test_empty_value(self) -> None:
@@ -93,23 +93,23 @@ class TestDetectSemanticType:
         assert conf == 0.0
 
     def test_numeric_field_name_hint_price(self) -> None:
-        stype, conf = detect_semantic_type("500", field_name="price")
+        stype, _conf = detect_semantic_type("500", field_name="price")
         assert stype == SemanticType.PRICE
 
     def test_numeric_field_name_hint_date(self) -> None:
-        stype, conf = detect_semantic_type("0500", field_name="start_time")
+        stype, _conf = detect_semantic_type("0500", field_name="start_time")
         assert stype == SemanticType.DATE
 
     def test_numeric_field_name_hint_value(self) -> None:
-        stype, conf = detect_semantic_type("42", field_name="quantity")
+        stype, _conf = detect_semantic_type("42", field_name="quantity")
         assert stype == SemanticType.NUMBER
 
     def test_product_like_brand_naming(self) -> None:
-        stype, conf = detect_semantic_type("iPhone 15")
+        _stype, conf = detect_semantic_type("iPhone 15")
         assert conf >= 0.5  # Should detect as ORGANIZATION or similar
 
     def test_ui_noise_words(self) -> None:
-        stype, conf = detect_semantic_type("click here")
+        _stype, conf = detect_semantic_type("click here")
         assert conf <= 0.5  # Low confidence for noise
 
     def test_lru_cache_works(self) -> None:

@@ -9,7 +9,6 @@ from __future__ import annotations
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -49,7 +48,7 @@ class SlidingWindowCounter:
         )
 
 
-_global_limiter: Optional[SlidingWindowCounter] = None
+_global_limiter: SlidingWindowCounter | None = None
 
 
 def get_global_limiter() -> SlidingWindowCounter:

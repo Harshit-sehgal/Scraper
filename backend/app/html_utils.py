@@ -562,7 +562,8 @@ async def fetch_page_content(
                         wait_until,
                         url,
                     )
-                    raise ValueError(f"Anti-bot challenge detected during {wait_until}: {e}")
+                    msg = f"Anti-bot challenge detected during {wait_until}: {e}"
+                    raise ValueError(msg)
             except ValueError:
                 raise  # Re-raise anti-bot detection so scraper records the proper failure reason
             except Exception:  # nosec B110
@@ -636,7 +637,8 @@ async def fetch_page_content(
                 strategy.value,
                 url,
             )
-            raise ValueError(f"Anti-bot challenge detected: {e}")
+            msg = f"Anti-bot challenge detected: {e}"
+            raise ValueError(msg)
 
         logger.error("[Scraper] %s failed for %s: %s. Final fallback to httpx_basic", strategy.value, url, e)
         return await _fetch_with_httpx(
@@ -720,7 +722,8 @@ async def _fetch_with_httpx(
                     if resp.is_redirect:
                         redirects_followed += 1
                         if redirects_followed > max_redirects:
-                            raise ValueError(f"Too many redirects (max {max_redirects})")
+                            msg = f"Too many redirects (max {max_redirects})"
+                            raise ValueError(msg)
 
                         redirect_target = resp.headers.get("location", "")
                         if not redirect_target:

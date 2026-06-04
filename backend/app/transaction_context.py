@@ -1,12 +1,12 @@
 from contextvars import ContextVar
-from typing import Any, Dict, Optional
+from typing import Any
 
 # Canonical transaction context for the semantic substrate
 # Maps state_object_id -> staging_dict
-active_transaction: ContextVar[Optional[Dict[str, Any]]] = ContextVar("active_transaction", default=None)
+active_transaction: ContextVar[dict[str, Any] | None] = ContextVar("active_transaction", default=None)
 
 
-def get_active_transaction() -> Optional[Dict[str, Any]]:
+def get_active_transaction() -> dict[str, Any] | None:
     return active_transaction.get()
 
 

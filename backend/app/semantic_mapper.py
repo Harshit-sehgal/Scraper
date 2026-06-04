@@ -11,7 +11,6 @@ regardless of whether it was found on a flight site or a product page.
 import re
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Dict, List, Optional, Tuple
 
 from app.intent_parser import SEMANTIC_NEED_KEYWORDS, IntentSchema
 from app.page_profiler import StructureProfile, ValuePatterns
@@ -29,17 +28,17 @@ class FieldMapping:
     confidence: float
     matched_by: str  # "pattern", "header", "llm", "position"
     evidence: str = ""
-    signals: List[str] = field(default_factory=list)
+    signals: list[str] = field(default_factory=list)
 
 
 @dataclass
 class RecordMapping:
     """Full mapping of an extracted record to user intent."""
 
-    original_data: Dict[str, str]
-    mapped_fields: Dict[str, str]
-    confidence_scores: Dict[str, float]
-    unmatched_values: List[str] = field(default_factory=list)
+    original_data: dict[str, str]
+    mapped_fields: dict[str, str]
+    confidence_scores: dict[str, float]
+    unmatched_values: list[str] = field(default_factory=list)
 
 
 # Consolidated Semantic Patterns (raw patterns)
@@ -83,7 +82,7 @@ _SEMANTIC_PATTERNS_RAW = {
 
 # Pre-compile all regex patterns at module load (O(1) per call instead of
 # O(n) recompilation)
-SEMANTIC_PATTERNS: Dict[SemanticType, List[Tuple[re.Pattern, int]]] = {}
+SEMANTIC_PATTERNS: dict[SemanticType, list[tuple[re.Pattern, int]]] = {}
 for stype, patterns in _SEMANTIC_PATTERNS_RAW.items():
     flags = 0 if stype == SemanticType.CODE else re.IGNORECASE
     SEMANTIC_PATTERNS[stype] = [(re.compile(p, flags), flags) for p in patterns]
@@ -95,7 +94,7 @@ _NUMERIC_PATTERN = re.compile(r"^\d+\.?\d*$")
 
 
 @lru_cache(maxsize=4096)
-def detect_semantic_type(value: str, field_name: str = "") -> Tuple[SemanticType, float]:
+def detect_semantic_type(value: str, field_name: str = "") -> tuple[SemanticType, float]:
     """Detect semantic type of a value using regex patterns and field name hints.
 
     Results are cached with LRU (max 4096 entries) to avoid re-processing
@@ -253,12 +252,12 @@ def is_child_fragment(value: str, seen_values: set) -> bool:
 
 
 def match_values_to_intent(
-    extracted_records: List[Dict[str, str]],
+    extracted_records: list[dict[str, str]],
     intent: IntentSchema,
     page_profile: StructureProfile,
     value_patterns: ValuePatterns,
-    headers: Optional[List[str]] = None,
-) -> List[RecordMapping]:
+    headers: list[str] | None = None,
+) -> list[RecordMapping]:
     """
     Match extracted values to user intent by WHAT THEY ARE, not where they came from.
 
@@ -278,7 +277,10 @@ def match_values_to_intent(
 
 
 def _map_single_record(
-    record: Dict[str, str], intent: IntentSchema, headers: List[str], value_patterns: ValuePatterns
+    record: dict[str, str],
+    intent: IntentSchema,
+    headers: list[str],
+    value_patterns: ValuePatterns,
 ) -> RecordMapping:
     """Map a single record's values to user intent."""
     mapped_fields = {}
@@ -317,9 +319,8 @@ def _map_single_record(
     # Also track any values we couldn't map to a need
     mapped_values = set(m.mapped_value for m in field_mappings)
     for value in all_values:
-        if value and value not in mapped_values:
-            if not _is_noise_value(value):
-                unmatched_values.append(value)
+        if value and value not in mapped_values and not _is_noise_value(value):
+            unmatched_values.append(value)
 
     return RecordMapping(
         original_data=record,
@@ -330,12 +331,12 @@ def _map_single_record(
 
 
 def _find_best_value_for_need(
-    values: List[str],
+    values: list[str],
     semantic_need: str,
-    headers: List[str],
+    headers: list[str],
     value_patterns: ValuePatterns,
-    used_values: Optional[set] = None,
-) -> Optional[FieldMapping]:
+    used_values: set | None = None,
+) -> FieldMapping | None:
     """
     Find the best value that matches a semantic need.
 
@@ -382,7 +383,7 @@ def _find_best_value_for_need(
                             matched_by="pattern",
                             evidence=f"Matched pattern {snippet}...",
                             signals=[f"pattern_match:{snippet[:40]}", "high_confidence"],
-                        )
+                        ),
                     )
                     break
 
@@ -443,7 +444,7 @@ def _find_best_value_for_need(
     return None
 
 
-def _detect_value_type(values: List[str], value_patterns: ValuePatterns) -> Optional[str]:
+def _detect_value_type(values: list[str], value_patterns: ValuePatterns) -> str | None:
     """Detect what type most values in the list are."""
     if not values:
         return None

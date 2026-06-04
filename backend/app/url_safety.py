@@ -29,15 +29,18 @@ def validate_public_http_url(url: str) -> None:
     Allows configured internal hosts via settings.ALLOWED_INTERNAL_HOSTS (e.g. 'nginx' for compose tests).
     """
     if not url:
-        raise ValueError("URL cannot be empty")
+        msg = "URL cannot be empty"
+        raise ValueError(msg)
 
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"}:
-        raise ValueError(f"URL scheme '{parsed.scheme}' is not supported. Only http and https are allowed.")
+        msg = f"URL scheme '{parsed.scheme}' is not supported. Only http and https are allowed."
+        raise ValueError(msg)
 
     hostname = parsed.hostname
     if not hostname:
-        raise ValueError(f"URL '{url}' does not contain a valid hostname.")
+        msg = f"URL '{url}' does not contain a valid hostname."
+        raise ValueError(msg)
 
     # Lowercase for safe comparison
     hostname_lower = hostname.lower()
@@ -50,12 +53,14 @@ def validate_public_http_url(url: str) -> None:
 
     # 2. Reject explicit loopback / internal names
     if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):  # nosec B104 — rejecting 0.0.0.0, not binding to it
-        raise ValueError(f"URL hostname '{hostname}' is a restricted local loopback target.")
+        msg = f"URL hostname '{hostname}' is a restricted local loopback target."
+        raise ValueError(msg)
 
     # 3. Reject cloud metadata endpoints specifically (check BEFORE generic internal TLDs
     #    so metadata.google.internal gets a specific error message)
     if hostname_lower in ("169.254.169.254", "metadata.google.internal", "instance-data"):
-        raise ValueError(f"URL hostname '{hostname}' is a restricted cloud metadata endpoint.")
+        msg = f"URL hostname '{hostname}' is a restricted cloud metadata endpoint."
+        raise ValueError(msg)
 
     # 4. Reject direct IP literals without depending on DNS.
     try:
@@ -64,8 +69,9 @@ def validate_public_http_url(url: str) -> None:
         ip_literal = None
     if ip_literal is not None:
         if not is_safe_ip(str(ip_literal)):
+            msg = f"URL hostname '{hostname}' resolves to restricted IP {ip_literal} — rejected for security (SSRF protection)."
             raise ValueError(
-                f"URL hostname '{hostname}' resolves to restricted IP {ip_literal} — rejected for security (SSRF protection)."
+                msg,
             )
         return
 
@@ -73,7 +79,8 @@ def validate_public_http_url(url: str) -> None:
     internal_tlds = (".local", ".internal", ".lan", ".corp")
     for tld in internal_tlds:
         if hostname_lower.endswith(tld):
-            raise ValueError(f"URL hostname '{hostname}' uses internal TLD '{tld}' which is restricted for security.")
+            msg = f"URL hostname '{hostname}' uses internal TLD '{tld}' which is restricted for security."
+            raise ValueError(msg)
 
     # 6. Try DNS resolution to check resolved IPs.
     try:
@@ -81,14 +88,16 @@ def validate_public_http_url(url: str) -> None:
         for addr in addrs:
             ip = str(addr[4][0])
             if not is_safe_ip(ip):
+                msg = f"URL hostname '{hostname}' resolves to restricted IP {ip} — rejected for security (SSRF protection)."
                 raise ValueError(
-                    f"URL hostname '{hostname}' resolves to restricted IP {ip} — rejected for security (SSRF protection)."
+                    msg,
                 )
     except (socket.gaierror, OSError) as e:
         is_production = settings.ENV.lower() in ("production", "staging")
         if is_production and not settings.SMOKE_TEST_MODE:
+            msg = f"URL hostname '{hostname}' could not be resolved (DNS failure) — rejected in production for security."
             raise ValueError(
-                f"URL hostname '{hostname}' could not be resolved (DNS failure) — rejected in production for security."
+                msg,
             )
         else:
             logger.warning("DNS resolution failed for hostname '%s': %s", hostname, e)

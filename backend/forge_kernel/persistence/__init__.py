@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 from forge_kernel.contracts.job import Job
 
@@ -20,7 +20,7 @@ class JobRepository(ABC):
     """Abstract repository interface for job state persistence."""
 
     @abstractmethod
-    def load_all(self) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+    def load_all(self) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         """Load active jobs, recycled jobs, and world state."""
         pass
 
@@ -71,14 +71,16 @@ def get_job_repository() -> "JobRepository":
     if backend == "postgres":
         database_url = settings.storage.DATABASE_URL
         if not database_url:
-            raise RuntimeError("Postgres backend requires DATAFORGE_DATABASE_URL")
+            msg = "Postgres backend requires DATAFORGE_DATABASE_URL"
+            raise RuntimeError(msg)
         try:
             from forge_kernel.persistence.postgres import PostgresJobRepository
 
             _repository_instance = PostgresJobRepository()
             return _repository_instance
         except Exception as e:
-            raise RuntimeError(f"Failed to create PostgresJobRepository: {e}")
+            msg = f"Failed to create PostgresJobRepository: {e}"
+            raise RuntimeError(msg)
 
     from forge_kernel.persistence.sqlite import SQLiteJobRepository
 

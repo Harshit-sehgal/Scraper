@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 from app.semantic_ir import SemanticType
 
@@ -18,10 +18,10 @@ if TYPE_CHECKING:
 class TopologicalQuery:
     """Evaluates geometric and relational queries against the semantic field."""
 
-    def __init__(self, ws: Optional[SemanticWorldState] = None):
+    def __init__(self, ws: SemanticWorldState | None = None):
         self.ws: SemanticWorldState = ws or get_world_state()
 
-    def find_roles_near(self, role_name: str, radius: float = 0.5) -> List[dict]:
+    def find_roles_near(self, role_name: str, radius: float = 0.5) -> list[dict]:
         """Find roles within geometric radius in the manifold."""
         target_vec = self.ws.get_manifold_vector(role_name)
         if not target_vec:
@@ -29,7 +29,7 @@ class TopologicalQuery:
 
         return self._find_near_vec(target_vec, radius, exclude_role=role_name)
 
-    def find_roles_near_type(self, stype: SemanticType, radius: float = 0.4) -> List[dict]:
+    def find_roles_near_type(self, stype: SemanticType, radius: float = 0.4) -> list[dict]:
         """Find roles geometrically near a canonical type vector (Phase 34)."""
         from app.semantic_inference_engine import RoleEmbeddingEngine
 
@@ -37,7 +37,7 @@ class TopologicalQuery:
         target_vec = reng._get_type_vector(stype)
         return self._find_near_vec(target_vec, radius)
 
-    def _find_near_vec(self, target_vec: list, radius: float, exclude_role: Optional[str] = None) -> List[dict]:
+    def _find_near_vec(self, target_vec: list, radius: float, exclude_role: str | None = None) -> list[dict]:
         results = []
         for role in self.ws.get_manifold_roles():
             if role == exclude_role:
@@ -51,11 +51,11 @@ class TopologicalQuery:
                         "role": role,
                         "distance": round(dist, 4),
                         "instability": self.ws.metrics.get_schema_instability(role),
-                    }
+                    },
                 )
         return sorted(results, key=lambda x: x["distance"])
 
-    def find_stable_anchors(self) -> List[tuple]:
+    def find_stable_anchors(self) -> list[tuple]:
         """Return all protected relational anchors."""
         return list(self.ws.topology_anchors)
 
@@ -93,5 +93,5 @@ class TopologicalQuery:
         return {"error": f"Unknown TQL command: {cmd}"}
 
 
-def get_tql_engine(ws: Optional[SemanticWorldState] = None) -> TopologicalQuery:
+def get_tql_engine(ws: SemanticWorldState | None = None) -> TopologicalQuery:
     return TopologicalQuery(ws=ws)

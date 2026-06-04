@@ -62,32 +62,32 @@ DATA_SIGNAL_PATTERNS: list[re.Pattern] = [
 # Patterns that indicate an empty / unhelpful page — checked against RAW HTML
 EMPTY_PAGE_SIGNALS: dict[str, list[re.Pattern]] = {
     "cookie_wall": [
-        re.compile(r"cookie\s*(consent|banner|notice|policy|preferences)", re.I),
-        re.compile(r"accept\s+all\s+cookies", re.I),
-        re.compile(r"we\s+use\s+cookies", re.I),
+        re.compile(r"cookie\s*(consent|banner|notice|policy|preferences)", re.IGNORECASE),
+        re.compile(r"accept\s+all\s+cookies", re.IGNORECASE),
+        re.compile(r"we\s+use\s+cookies", re.IGNORECASE),
     ],
     "login_wall": [
-        re.compile(r"sign\s*in\s+to\s+(continue|view|access)", re.I),
-        re.compile(r"log\s*in\s+to\s+(continue|view|access)", re.I),
-        re.compile(r"please\s+(log|sign)\s*in", re.I),
-        re.compile(r"create\s+(an?\s+)?account\s+to\s+continue", re.I),
+        re.compile(r"sign\s*in\s+to\s+(continue|view|access)", re.IGNORECASE),
+        re.compile(r"log\s*in\s+to\s+(continue|view|access)", re.IGNORECASE),
+        re.compile(r"please\s+(log|sign)\s*in", re.IGNORECASE),
+        re.compile(r"create\s+(an?\s+)?account\s+to\s+continue", re.IGNORECASE),
     ],
     "captcha": [
-        re.compile(r"captcha", re.I),
-        re.compile(r"recaptcha", re.I),
-        re.compile(r"hcaptcha", re.I),
-        re.compile(r"cloudflare.*challenge", re.I),
-        re.compile(r"verify\s+you\s+are\s+human", re.I),
+        re.compile(r"captcha", re.IGNORECASE),
+        re.compile(r"recaptcha", re.IGNORECASE),
+        re.compile(r"hcaptcha", re.IGNORECASE),
+        re.compile(r"cloudflare.*challenge", re.IGNORECASE),
+        re.compile(r"verify\s+you\s+are\s+human", re.IGNORECASE),
     ],
     "redirect_meta": [
-        re.compile(r'<meta[^>]*http-equiv\s*=\s*["\']?refresh["\']?', re.I),
-        re.compile(r"redirecting\s+to", re.I),
-        re.compile(r"you\s+will\s+be\s+redirected", re.I),
+        re.compile(r'<meta[^>]*http-equiv\s*=\s*["\']?refresh["\']?', re.IGNORECASE),
+        re.compile(r"redirecting\s+to", re.IGNORECASE),
+        re.compile(r"you\s+will\s+be\s+redirected", re.IGNORECASE),
     ],
     "js_shell": [
-        re.compile(r"<noscript>.*?please\s+enable\s+javascript.*?</noscript>", re.I | re.S),
-        re.compile(r"you\s+need\s+to\s+enable\s+javascript", re.I),
-        re.compile(r"javascript\s+is\s+required", re.I),
+        re.compile(r"<noscript>.*?please\s+enable\s+javascript.*?</noscript>", re.IGNORECASE | re.DOTALL),
+        re.compile(r"you\s+need\s+to\s+enable\s+javascript", re.IGNORECASE),
+        re.compile(r"javascript\s+is\s+required", re.IGNORECASE),
     ],
 }
 

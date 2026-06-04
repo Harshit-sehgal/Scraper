@@ -1,12 +1,10 @@
-from typing import Optional
-
 from app.core_types import FieldConflictRegion
 from app.semantic_world_state.core import SemanticWorldState
 
-__all__ = ["SemanticWorldState", "get_world_state", "reset_world_state", "FieldConflictRegion"]
+__all__ = ["FieldConflictRegion", "SemanticWorldState", "get_world_state", "reset_world_state"]
 
 # Global Singleton
-_world_state: Optional[SemanticWorldState] = None
+_world_state: SemanticWorldState | None = None
 
 
 def get_world_state() -> SemanticWorldState:

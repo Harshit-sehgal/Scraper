@@ -5,7 +5,7 @@ All changes go through this state object, which supports transactions.
 """
 
 import time
-from typing import Callable, Dict, List, Optional
+from collections.abc import Callable
 
 from app.transaction_context import active_transaction
 
@@ -13,23 +13,23 @@ from app.transaction_context import active_transaction
 class ActionState:
     """Sole owner of the semantic field's executable actions and their anchors."""
 
-    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
         self._delta_callback = delta_callback
         # Active Actions: action_id -> {target_vec, handler_name, threshold,
         # last_run}
-        self._active_actions: Dict[str, dict] = {}
+        self._active_actions: dict[str, dict] = {}
         # Action Log: history of triggered actions
-        self._action_history: List[dict] = []
+        self._action_history: list[dict] = []
 
     @property
-    def _staging(self) -> Optional[dict]:
+    def _staging(self) -> dict | None:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"action_staging_{id(self)}")
         return None
 
     @_staging.setter
-    def _staging(self, value: Optional[dict]):
+    def _staging(self, value: dict | None):
         tx = active_transaction.get()
         if tx is not None:
             tx[f"action_staging_{id(self)}"] = value
@@ -72,7 +72,7 @@ class ActionState:
 
     # ─── Controlled Mutations ────────────────────────────────────────────
 
-    def register_action(self, action_id: str, target_vec: List[float], handler_name: str, threshold: float = 0.3):
+    def register_action(self, action_id: str, target_vec: list[float], handler_name: str, threshold: float = 0.3):
         """Register a new active dispatcher (Phase 37)."""
         actions = self._get_struct("active_actions")
         actions[action_id] = {
@@ -94,7 +94,7 @@ class ActionState:
             },
         )
 
-    def log_execution(self, action_id: str, success: bool, details: Optional[dict] = None):
+    def log_execution(self, action_id: str, success: bool, details: dict | None = None):
         """Record the outcome of an action execution."""
         actions = self._get_struct("active_actions")
         if action_id in actions:
@@ -115,15 +115,15 @@ class ActionState:
     # ─── Read-Only Accessors ─────────────────────────────────────────────
 
     @property
-    def active_actions(self) -> Dict[str, dict]:
+    def active_actions(self) -> dict[str, dict]:
         return {k: dict(v) for k, v in self._get_struct("active_actions").items()}
 
     @property
-    def action_history(self) -> List[dict]:
+    def action_history(self) -> list[dict]:
         return list(self._get_struct("action_history"))
 
-    def get_action(self, action_id: str) -> Optional[dict]:
-        return self._get_struct("active_actions").get(action_id)
+    def get_action(self, action_id: str) -> dict | None:
+        return self._get_struct("active_actions").get(action_id)  # type: ignore[no-any-return]
 
     # ─── Serialization ───────────────────────────────────────────────────
 

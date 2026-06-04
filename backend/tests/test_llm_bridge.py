@@ -244,7 +244,11 @@ class TestCallOpenaiCompatibleJson:
 
         with patch("app.llm_bridge.httpx.AsyncClient", return_value=mock_client):
             result = await _call_openai_compatible_json(
-                "http://endpoint", {"model": "test"}, timeout=10, max_attempts=2, backoff_seconds=0.01
+                "http://endpoint",
+                {"model": "test"},
+                timeout=10,
+                max_attempts=2,
+                backoff_seconds=0.01,
             )
             assert result == {"ok": True}
             assert mock_client.call_count == 2
@@ -444,7 +448,8 @@ class TestSubstratePluginManager:
         mgr = SubstratePluginManager()
 
         def handler(**kwargs):
-            raise ValueError("oops")
+            msg = "oops"
+            raise ValueError(msg)
 
         mgr.register_handler("failing", handler)
         with pytest.raises(ValueError):

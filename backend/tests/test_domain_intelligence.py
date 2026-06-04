@@ -35,7 +35,7 @@ def test_strategy_preference(registry) -> None:
 
     # Successful regex fallback
     registry.update_from_telemetry(
-        {"url": url, "js_render_delay_ms": 100.0, "anti_bot_score": 0.1, "fallback_usage": "regex", "error": None}
+        {"url": url, "js_render_delay_ms": 100.0, "anti_bot_score": 0.1, "fallback_usage": "regex", "error": None},
     )
 
     intel = registry.get_intelligence(url)
@@ -49,7 +49,7 @@ def test_strategy_preference(registry) -> None:
             "anti_bot_score": 0.9,  # Heavy anti-bot
             "fallback_usage": "none",
             "error": "Blocked",
-        }
+        },
     )
 
     assert intel.anti_bot_risk == 0.3 * 0.9 + 0.7 * 0.03  # smoothed risk

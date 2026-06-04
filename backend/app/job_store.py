@@ -13,7 +13,6 @@ import logging
 import sqlite3
 from pathlib import Path
 from threading import Lock
-from typing import Optional
 
 from app.models import Job, JobStatus, SourcePolicy
 
@@ -216,7 +215,7 @@ def _row_to_job(row: dict) -> Job | None:
                 "results_file_path": row.get("results_file_path") if row.get("results_file_path") else None,
                 "warnings": json.loads(row.get("warnings", "[]")),
                 "acquisition_mode": row.get("acquisition_mode", "standard"),
-            }
+            },
         )
     except Exception as e:
         logger.warning("Failed to deserialize job row: %s", e)
@@ -439,7 +438,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
         logger.info("SQLite schema migrated to version %d", current)
 
 
-def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
     """Load jobs and recycle bin from SQLite.
 
     Args:

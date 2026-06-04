@@ -77,7 +77,7 @@ def _degrading_history(count: int = 10) -> list[dict]:
                 anti_bot_score=min(1.0, ratio * 0.8),
                 fallback_triggered=ratio > 0.5,
                 estimated_cost_usd=0.05 + ratio * 0.15,
-            )
+            ),
         )
     return events
 
@@ -93,7 +93,7 @@ def _multi_domain_history() -> list[dict]:
                 selector_hit_rate=0.95,
                 fetch_ms=800.0,
                 records_final=20,
-            )
+            ),
         )
     # Mediocre domain (6 events with some failures)
     for i in range(6):
@@ -106,7 +106,7 @@ def _multi_domain_history() -> list[dict]:
                 fallback_triggered=i >= 3,
                 error="partial extraction" if i >= 3 else None,
                 failure_category="partial_extraction" if i >= 3 else None,
-            )
+            ),
         )
     # Bad domain (8 events, all failing with zero quality)
     for i in range(8):
@@ -120,7 +120,7 @@ def _multi_domain_history() -> list[dict]:
                 error="timeout",
                 anti_bot_score=0.9,
                 estimated_cost_usd=0.15,
-            )
+            ),
         )
     return events
 
@@ -512,7 +512,7 @@ class TestEconomicTrackerEmpty:
                 url="https://example.com/page",
                 estimated_cost_usd=0.05,
                 records_final=10,
-            )
+            ),
         ]
         report = tracker.analyze(history)
         assert report.total_scrapes == 1
@@ -553,7 +553,7 @@ class TestEconomicTrackerCostAnalysis:
                 fetch_ms=3000.0,
                 fetch_method="playwright",
                 records_final=10,
-            )
+            ),
         ]
         report = tracker.analyze(history)
         summary = report.cost_by_domain["components.example.com"]
@@ -575,7 +575,7 @@ class TestEconomicTrackerCostAnalysis:
                 fetch_ms=500.0,
                 llm_calls_count=2,
                 records_final=10,
-            )
+            ),
         ]
         playwright_history = [
             _make_telemetry(
@@ -585,7 +585,7 @@ class TestEconomicTrackerCostAnalysis:
                 fetch_ms=3000.0,
                 llm_calls_count=2,
                 records_final=10,
-            )
+            ),
         ]
         httpx_report = tracker.analyze(httpx_history)
         pw_report = tracker.analyze(playwright_history)
@@ -613,7 +613,7 @@ class TestEconomicTrackerMultiDomain:
                 llm_calls_count=10,
                 fetch_ms=2000.0,
                 fetch_method="playwright",
-            )
+            ),
         ]
         report = tracker.analyze(history)
         assert "llm" in report.cost_by_category
@@ -653,7 +653,7 @@ class TestEconomicTrackerEfficiency:
                 url="https://cheap.example.com/page",
                 estimated_cost_usd=0.02,
                 records_final=20,
-            )
+            ),
         ]
         report = tracker.analyze(history)
         # 0.02 / 20 = 0.001 per record = excellent
@@ -679,7 +679,7 @@ class TestEconomicTrackerDomainSorting:
                 url="https://summary.example.com/page",
                 estimated_cost_usd=0.10,
                 records_final=5,
-            )
+            ),
         ]
         report = tracker.analyze(history)
         summary = report.cost_by_domain["summary.example.com"]

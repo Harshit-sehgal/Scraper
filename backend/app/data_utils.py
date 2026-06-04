@@ -1,5 +1,3 @@
-from typing import Optional
-
 from app.models import SchemaField
 
 
@@ -63,7 +61,7 @@ def _dedupe_records(records: list[dict], schema_fields: list[SchemaField]) -> li
     return unique
 
 
-def _limit_source_records(records: list[dict], schema_fields: list[SchemaField], max_records: Optional[int] = None) -> list[dict]:
+def _limit_source_records(records: list[dict], schema_fields: list[SchemaField], max_records: int | None = None) -> list[dict]:
     """Limit the number of records from a single source, prioritizing those with contacts."""
     if max_records is None:
         from app.config import settings

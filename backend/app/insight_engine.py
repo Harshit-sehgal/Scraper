@@ -55,24 +55,21 @@ Maximum number of fields: {max_fields}
         {"role": "system", "content": "You are a schema architect. Return only JSON."},
         {"role": "user", "content": prompt},
     ]
-    return await _llm_json(messages, temperature=settings.LLM_TEMPERATURE, timeout=settings.LLM_TIMEOUT)
+    return await _llm_json(messages, temperature=settings.LLM_TEMPERATURE, timeout=settings.LLM_TIMEOUT)  # type: ignore[no-any-return]
 
 
 def suggest_schema_from_intent_sync(intent: str, max_fields: int | None = None) -> dict:
-    """Sync version of suggest_schema_from_intent."""
+    """Sync version of suggest_schema_from_intent.
+
+    Runs the async coroutine in a dedicated event loop on a background
+    thread to avoid conflicts with any already-running event loop.
+    """
     import asyncio
+    import concurrent.futures
 
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    def _run():
+        return asyncio.run(suggest_schema_from_intent(intent, max_fields))
 
-    if loop.is_running():
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(asyncio.run, suggest_schema_from_intent(intent, max_fields))
-            return future.result()
-    else:
-        return loop.run_until_complete(suggest_schema_from_intent(intent, max_fields))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_run)
+        return future.result()

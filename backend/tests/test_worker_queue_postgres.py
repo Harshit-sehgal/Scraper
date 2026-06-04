@@ -83,7 +83,7 @@ class TestPostgresQueueImports:
     def test_import_postgres_queue_module(self) -> None:
         """The worker_queue_postgres module imports without error."""
         _require_psycopg2()
-        from app.worker_queue_postgres import PostgresWorkerQueue  # noqa: F811
+        from app.worker_queue_postgres import PostgresWorkerQueue
 
         assert PostgresWorkerQueue is not None
 
@@ -111,7 +111,7 @@ class TestPostgresQueueImports:
         """Priority and QueueTask are imported from the base worker_queue module."""
         _require_psycopg2()
         from app.worker_queue import Priority, QueueTask, TaskStatus
-        from app.worker_queue_postgres import PostgresWorkerQueue  # noqa: F811
+        from app.worker_queue_postgres import PostgresWorkerQueue
 
         _ = PostgresWorkerQueue  # use import to suppress pyflakes
 
