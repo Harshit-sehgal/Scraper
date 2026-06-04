@@ -361,9 +361,9 @@ def _extract_by_pattern(text: str) -> list[CandidateIR]:
 
     for ctype, patterns in DETECTION_PATTERNS.items():
         for pattern in patterns:
-            # Code patterns need case-sensitive matching (only ALL-CAPS =
-            # codes)
-            flags = re.IGNORECASE if ctype != "code" else 0
+            # Code and organization patterns need case-sensitive matching:
+            # codes need ALL-CAPS, organizations need Title Case
+            flags = re.IGNORECASE if ctype not in ("code", "organization") else 0
             for match in re.finditer(pattern, text, flags):
                 start, end = match.start(), match.end()
                 span_key = (start, end)
@@ -377,8 +377,8 @@ def _extract_by_pattern(text: str) -> list[CandidateIR]:
                 if not raw:
                     continue
 
-                # Filter common words from code type
-                if ctype == SemanticType.CODE and raw.upper() in COMMON_ENGLISH_WORDS:
+                # Filter common words from code type (ctype is a string "code")
+                if ctype == "code" and raw.upper() in COMMON_ENGLISH_WORDS:
                     continue
 
                 # Build type distribution (ambiguity)
