@@ -121,3 +121,28 @@ def test_api_middleware_accepts_bearer_tokens_before_rbac(client, monkeypatch) -
         headers={"Authorization": "Bearer admin-secret"},
     )
     assert admin_resp.status_code in (200, 400)
+
+
+def test_rbac_development_fallback(monkeypatch) -> None:
+    """Verify that development fallback behavior requires ALLOW_INSECURE_DEV_AUTH."""
+    from typing import Any
+
+    class MockRequest:
+        def __init__(self, headers: dict[str, str]):
+            self.headers = headers
+
+    # 1. Dev mode but ALLOW_INSECURE_DEV_AUTH is False -> Should raise 403
+    monkeypatch.setattr(settings, "ENV", "development")
+    monkeypatch.setattr(settings, "ALLOW_INSECURE_DEV_AUTH", False)
+    monkeypatch.setattr(settings, "API_KEY", "")
+    monkeypatch.setattr(settings, "ADMIN_API_KEY", "")
+    monkeypatch.setattr(settings, "OPERATOR_API_KEY", "")
+
+    req: Any = MockRequest({})
+    with pytest.raises(HTTPException) as exc_info:
+        get_current_role(req)
+    assert exc_info.value.status_code == 403
+
+    # 2. Dev mode and ALLOW_INSECURE_DEV_AUTH is True -> Should grant ADMIN
+    monkeypatch.setattr(settings, "ALLOW_INSECURE_DEV_AUTH", True)
+    assert get_current_role(req) == UserRole.ADMIN

@@ -240,10 +240,10 @@ class CrawlPolicyEngine:
         state.robots_checked = True
 
         try:
-            import httpx
+            from app.url_safety import get_safe_async_client
 
             url = f"https://{domain}/robots.txt"
-            async with httpx.AsyncClient(
+            async with get_safe_async_client(
                 timeout=settings.ROBOTS_TIMEOUT,
                 headers={"User-Agent": settings.USER_AGENT},
             ) as client:

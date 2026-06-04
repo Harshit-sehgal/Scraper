@@ -329,7 +329,7 @@ def get_recent_events(count: int = 50) -> list[dict[str, Any]]:
         logging.getLogger(__name__).warning("Failed to read audit log: %s", e)
         return []
 
-    return events[-count:]
+    return list(reversed(events[-count:]))
 
 
 # ─── Integration with main.py ─────────────────────────────────────────────

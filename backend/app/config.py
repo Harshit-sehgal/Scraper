@@ -257,6 +257,8 @@ class Settings(BaseSettings):
     # ─── API Security ──────────────────────────────────────────────────────
     ENV: str = "development"
     """Application runtime environment: development or production."""
+    ALLOW_INSECURE_DEV_AUTH: bool = False
+    """Require an explicit bypass flag for insecure local development authentication bypass."""
     API_KEY: str = ""
     """If set, all /api/* endpoints require X-API-Key header."""
     OPERATOR_API_KEY: str = ""

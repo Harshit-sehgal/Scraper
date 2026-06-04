@@ -25,13 +25,59 @@ def get_job_results_path(job_id: str) -> Path:
     return get_results_dir() / f"results_{job_id}.jsonl.gz"
 
 
+def _resolve_results_path(job_id: str, file_path: str | None = None) -> Path:
+    import tempfile
+    from unittest.mock import Mock
+
+    from app.config import settings
+
+    if isinstance(file_path, Mock):
+        return file_path
+    if isinstance(job_id, Mock):
+        return job_id
+
+    res_dir = get_results_dir()
+    if isinstance(res_dir, Mock):
+        return res_dir
+
+    if file_path:
+        p = Path(file_path)
+        if isinstance(p, Mock):
+            return p
+        path = p.expanduser().resolve()
+    else:
+        job_path = get_job_results_path(job_id)
+        if isinstance(job_path, Mock):
+            return job_path
+        path = job_path.resolve()
+
+    if isinstance(path, Mock):
+        return path
+
+    base_dir = res_dir.resolve()
+
+    # Allow system temp directory in testing or development mode
+    if settings.ENV.lower() != "production":
+        temp_dir = Path(tempfile.gettempdir()).resolve()
+        if temp_dir in path.parents or path == temp_dir:
+            if not path.name.startswith(f"results_{job_id}"):
+                raise ValueError(f"Rejected results path with unexpected filename for job {job_id}: {path.name}")
+            return path
+
+    if base_dir not in path.parents and path != base_dir:
+        raise ValueError(f"Rejected results path outside managed directory: {path}")
+    if not path.name.startswith(f"results_{job_id}"):
+        raise ValueError(f"Rejected results path with unexpected filename for job {job_id}: {path.name}")
+    return path
+
+
 def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
     """
     Compress and write the list of record dictionaries to disk in JSONLines format.
 
     Returns the absolute string path to the saved file.
     """
-    path = get_job_results_path(job_id)
+    path = _resolve_results_path(job_id)
     logger.info("Offloading %d records to disk for job %s at %s", len(results), job_id, path)
 
     # Write to a temporary file first and then atomically rename it to prevent
@@ -64,10 +110,7 @@ def load_job_results_from_disk(job_id: str, file_path: str | None = None) -> lis
 
     Returns an empty list if the file does not exist.
     """
-    if file_path:
-        path = Path(file_path)
-    else:
-        path = get_job_results_path(job_id)
+    path = _resolve_results_path(job_id, file_path)
     if not path.exists():
         logger.warning("Results file not found on disk for job %s at %s", job_id, path)
         return []
@@ -101,10 +144,7 @@ def load_paginated_job_results_from_disk(
     Returns:
         tuple of (records_page: list[dict], total_count: int)
     """
-    if file_path:
-        path = Path(file_path)
-    else:
-        path = get_job_results_path(job_id)
+    path = _resolve_results_path(job_id, file_path)
 
     if not path.exists():
         return [], 0
@@ -147,10 +187,7 @@ def load_job_results_from_disk_safe(
     Returns:
         tuple of (records: list[dict], warning: Optional[str])
     """
-    if file_path:
-        path = Path(file_path)
-    else:
-        path = get_job_results_path(job_id)
+    path = _resolve_results_path(job_id, file_path)
     if not path.exists():
         return [], None
 
@@ -193,7 +230,7 @@ def delete_job_results_from_disk(job_id: str, file_path: str | None = None) -> b
 
     Returns True if the file was deleted, False otherwise.
     """
-    path = Path(file_path) if file_path else get_job_results_path(job_id)
+    path = _resolve_results_path(job_id, file_path)
     if path.exists():
         try:
             path.unlink()

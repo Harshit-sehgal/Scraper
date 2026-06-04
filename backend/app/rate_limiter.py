@@ -19,6 +19,7 @@ Usage:
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import time
 from collections.abc import Callable
@@ -33,9 +34,6 @@ class RateLimitExceeded(Exception):
     """Raised when a client exceeds their rate limit."""
 
 
-# ─── Route-specific rate limits ───────────────────────────────────────
-# Expensive endpoints that trigger browser, LLM, or network work get
-# stricter limits than general read-only API routes.
 _ROUTE_LIMITS: dict[str, tuple[int, float]] = {
     # Format: prefix -> (max_requests, window_seconds)
     # 10 per minute — expensive browser + LLM
@@ -54,6 +52,22 @@ _ROUTE_LIMITS: dict[str, tuple[int, float]] = {
     # 30 per minute — recycle bin mutations
     "/api/recycle_bin": (30, 60.0),
 }
+
+
+def _get_effective_route_limits(method: str | None = None) -> dict[str, tuple[int, float]]:
+    from app.config import settings
+
+    limits = dict(_ROUTE_LIMITS)
+    if hasattr(settings, "RATE_LIMIT_JOB_CREATE") and settings.RATE_LIMIT_JOB_CREATE:
+        if method is None or method.upper() == "POST":
+            parsed = _parse_rate_limit(settings.RATE_LIMIT_JOB_CREATE)
+            if parsed != (0, 0):
+                limits["/api/jobs"] = parsed
+    if hasattr(settings, "RATE_LIMIT_DISCOVER") and settings.RATE_LIMIT_DISCOVER:
+        parsed = _parse_rate_limit(settings.RATE_LIMIT_DISCOVER)
+        if parsed != (0, 0):
+            limits["/api/discover"] = parsed
+    return limits
 
 
 def _parse_rate_limit(limit_str: str) -> tuple[int, float]:
@@ -86,13 +100,14 @@ def _parse_rate_limit(limit_str: str) -> tuple[int, float]:
         return 0, 0
 
 
-def _get_route_key(path: str) -> str:
+def _get_route_key(path: str, method: str | None = None) -> str:
     """Determine the per-route rate limit key from an API path.
 
     Matches against known route prefixes, returning the most specific match.
     Falls back to the default key for unmapped routes.
     """
-    for prefix in sorted(_ROUTE_LIMITS.keys(), key=len, reverse=True):
+    limits = _get_effective_route_limits(method)
+    for prefix in sorted(limits.keys(), key=len, reverse=True):
         if path.startswith(prefix):
             return prefix
     return "default"
@@ -378,15 +393,11 @@ class RateLimiterMiddleware:
             return "unknown"
 
         # Only trust X-Forwarded-For when the immediate peer is internal
-        is_trusted_proxy = client_host in (
-            "127.0.0.1",
-            "::1",
-            "localhost",
-            "172.16.0.0",
-            "172.17.0.0",
-            "172.18.0.0",
-            "10.0.0.0",
-        ) or client_host.startswith(("172.16.", "172.17.", "172.18.", "10.", "192.168."))
+        try:
+            peer_ip = ipaddress.ip_address(client_host)
+            is_trusted_proxy = peer_ip.is_private or peer_ip.is_loopback
+        except ValueError:
+            is_trusted_proxy = client_host in {"localhost"}
 
         if is_trusted_proxy:
             forwarded = request.headers.get("X-Forwarded-For", "")
@@ -396,20 +407,24 @@ class RateLimiterMiddleware:
 
         return client_host
 
-    def _get_client_key(self, path: str, client_ip: str) -> str:
+    def _get_client_key(self, path: str, method: str, client_ip: str | None = None) -> str:
         """Build a composite key from client identity and route pattern."""
-        route_key = _get_route_key(path)
-        return f"{route_key}:{client_ip}"
+        if client_ip is None:
+            client_ip = method
+            method = "POST"
+        route_key = _get_route_key(path, method)
+        return f"{route_key}:{method}:{client_ip}"
 
-    def _get_limits_for_path(self, path: str) -> tuple[int, float]:
+    def _get_limits_for_path(self, path: str, method: str = "POST") -> tuple[int, float]:
         """Determine the most restrictive limits for a path.
 
         Uses the global limit as a baseline, then applies route-specific
         limits if they are stricter (smaller max or same max with shorter window).
         """
-        route_key = _get_route_key(path)
-        if route_key in _ROUTE_LIMITS:
-            route_max, route_window = _ROUTE_LIMITS[route_key]
+        route_key = _get_route_key(path, method)
+        limits = _get_effective_route_limits(method)
+        if route_key in limits:
+            route_max, route_window = limits[route_key]
             if self._global_max <= 0:
                 return route_max, route_window
             # Use the stricter of global vs route-specific limits
@@ -451,15 +466,16 @@ class RateLimiterMiddleware:
 
         # Determine client identity
         client_ip = self._extract_client_ip(request)
+        method = request.method
 
         # Build per-route, per-IP limit key
         if self._per_ip:
-            key = self._get_client_key(path, client_ip)
+            key = self._get_client_key(path, method, client_ip)
         else:
-            key = _get_route_key(path)
+            key = f"{_get_route_key(path, method)}:{method}"
 
         # Get limits for this route (stricter of global and route-specific)
-        max_req, window_sec = self._get_limits_for_path(path)
+        max_req, window_sec = self._get_limits_for_path(path, method)
         if max_req <= 0:
             return await call_next(request)  # type: ignore[no-any-return]
 
@@ -513,7 +529,7 @@ class RateLimiterMiddleware:
             "limit_per_window": self._global_max,
             "window_seconds": self._global_window,
             "active_keys": len(self._counters),
-            "route_limits": {k: {"max_requests": v[0], "window_seconds": v[1]} for k, v in _ROUTE_LIMITS.items()},
+            "route_limits": {k: {"max_requests": v[0], "window_seconds": v[1]} for k, v in _get_effective_route_limits().items()},
         }
 
     def reset(self):

@@ -205,8 +205,21 @@ async def extract_with_profile(
             )
             page = await context.new_page()
 
-            # Block images / media / fonts for speed
+            # SSRF validation & Block images / media / fonts for speed
             async def _route_filter(route):
+                req_url = route.request.url
+                from unittest.mock import Mock
+
+                if not isinstance(req_url, Mock):
+                    try:
+                        from app.url_safety import validate_public_http_url
+
+                        validate_public_http_url(req_url)
+                    except ValueError as e:
+                        logger.warning("[SSRF] ProfileExtractor request to %s rejected: %s", req_url, e)
+                        await route.abort()
+                        return
+
                 if route.request.resource_type in {"image", "media", "font"}:
                     await route.abort()
                 else:

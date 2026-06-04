@@ -398,11 +398,11 @@ class TestExportResultsOnDisk:
 
 
 class TestExportResultsOnDiskExcelSafeLoading:
-    """Excel export uses ``load_job_results_from_disk_safe`` for corruption-tolerant loading."""
+    """Excel export uses paginated loader to avoid memory overhead."""
 
     @pytest.mark.asyncio
-    async def test_excel_uses_safe_loader(self) -> None:
-        """Excel should call load_job_results_from_disk_safe, not load_job_results_from_disk."""
+    async def test_excel_uses_paginated_loader(self) -> None:
+        """Excel should call load_paginated_job_results_from_disk."""
         from httpx import ASGITransport, AsyncClient
 
         jobs_store: dict[str, Job] = {}
@@ -417,38 +417,12 @@ class TestExportResultsOnDiskExcelSafeLoading:
         test_app.include_router(router)
 
         with patch(
-            "app.utils.job_results_store.load_job_results_from_disk_safe",
-            return_value=([{"x": "1"}], None),
+            "app.utils.job_results_store.load_paginated_job_results_from_disk",
+            return_value=([{"x": "1"}], 1),
         ):
             transport = ASGITransport(app=test_app)
             async with AsyncClient(transport=transport, base_url="http://testserver") as c:
                 resp = await c.get("/api/jobs/safe-excel/export/excel")
-        assert resp.status_code == 200
-        assert resp.content[:2] == b"PK"
-
-    @pytest.mark.asyncio
-    async def test_excel_handles_corrupt_data_via_safe_loader(self) -> None:
-        """With a corruption warning from safe loader, Excel should still produce output."""
-        from httpx import ASGITransport, AsyncClient
-
-        jobs_store: dict[str, Job] = {}
-        router = create_exports_router(jobs_store)
-        jobs_store["corrupt-excel"] = _make_job(
-            "corrupt-excel",
-            name="corrupt-test",
-            results=[],
-            results_on_disk=True,
-        )
-        test_app = FastAPI()
-        test_app.include_router(router)
-
-        with patch(
-            "app.utils.job_results_store.load_job_results_from_disk_safe",
-            return_value=([{"x": "partial"}], "Corrupt record at line 2"),
-        ):
-            transport = ASGITransport(app=test_app)
-            async with AsyncClient(transport=transport, base_url="http://testserver") as c:
-                resp = await c.get("/api/jobs/corrupt-excel/export/excel")
         assert resp.status_code == 200
         assert resp.content[:2] == b"PK"
 

@@ -20,3 +20,6 @@ pytest-timeout>=2.3.0
 # ─── Linting & Code Quality ──────────────────────────────────────────────
 pyflakes>=3.2.0
 PyYAML>=6.0.0
+ruff>=0.1.0
+mypy>=1.0.0
+bandit>=1.7.0

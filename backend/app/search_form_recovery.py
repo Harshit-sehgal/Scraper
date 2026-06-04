@@ -341,7 +341,9 @@ async def _try_form_search_recovery(
 
     # Step 3: Submit the form
     try:
-        async with httpx.AsyncClient(
+        from app.url_safety import get_safe_async_client
+
+        async with get_safe_async_client(
             follow_redirects=False,
             timeout=httpx.Timeout(30.0),
         ) as client:

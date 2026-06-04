@@ -90,7 +90,9 @@ async def _call_openai_compatible_json(
     last_error: Exception | None = None
     for attempt in range(1, max(1, max_attempts) + 1):
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
+            from app.url_safety import get_safe_async_client
+
+            async with get_safe_async_client(timeout=timeout) as client:
                 response = await client.post(endpoint, json=payload, headers=headers or {})
                 response.raise_for_status()
                 data = response.json()
@@ -136,7 +138,9 @@ async def _call_openai_compatible_text(
     last_error: Exception | None = None
     for attempt in range(1, max(1, max_attempts) + 1):
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
+            from app.url_safety import get_safe_async_client
+
+            async with get_safe_async_client(timeout=timeout) as client:
                 response = await client.post(endpoint, json=payload, headers=headers or {})
                 response.raise_for_status()
                 data = response.json()
