@@ -1,5 +1,4 @@
-"""
-Unit Tests for Semantic Mapper.
+"""Unit Tests for Semantic Mapper.
 Tests type detection, value matching, noise filtering, and fragment
 suppression — the core "semantic physics" of the system.
 """

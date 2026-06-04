@@ -1,5 +1,4 @@
-"""
-Insight Engine — data analysis, insight generation, and schema suggestion.
+"""Insight Engine — data analysis, insight generation, and schema suggestion.
 
 Extracted from scraper.py to reduce the god-object size.
 """

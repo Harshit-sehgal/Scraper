@@ -1,4 +1,5 @@
 import socket
+from typing import Never
 
 import httpx
 import pytest
@@ -21,7 +22,7 @@ def test_is_safe_ip() -> None:
     # Loopback/Reserved/Link-local/Multicast should be unsafe
     assert is_safe_ip("127.0.0.1") is False
     assert is_safe_ip("::1") is False
-    assert is_safe_ip("0.0.0.0") is False
+    assert is_safe_ip("0.0.0.0") is False  # nosec B104 - string literal under test, not actual network bind
     assert is_safe_ip("169.254.169.254") is False
     assert is_safe_ip("224.0.0.1") is False
     assert is_safe_ip("240.0.0.0") is False
@@ -39,7 +40,7 @@ def test_validate_public_http_url_basic_safety() -> None:
         validate_public_http_url("file:///etc/passwd")
 
     # Unsafe explicit hosts should fail
-    for host in ("localhost", "127.0.0.1", "[::1]", "0.0.0.0", "host.docker.internal"):
+    for host in ("localhost", "127.0.0.1", "[::1]", "0.0.0.0", "host.docker.internal"):  # nosec B104 - string literal under test, not actual network bind
         with pytest.raises(ValueError, match="restricted local loopback target"):
             validate_public_http_url(f"http://{host}")
 
@@ -76,7 +77,7 @@ def test_validate_public_http_url_dns_resolution(monkeypatch) -> None:
 
     # Verify DNS failure fails closed in production
     # Mock socket.getaddrinfo to raise gaierror for unresolvable domain
-    def mock_getaddrinfo_fail(host, port, *args, **kwargs):
+    def mock_getaddrinfo_fail(host, port, *args, **kwargs) -> Never:
         raise socket.gaierror(-2, "Name or service not known")
 
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_fail)
@@ -93,7 +94,7 @@ def test_validate_public_http_url_allowlist(monkeypatch) -> None:
     monkeypatch.setenv("DATAFORGE_SMOKE_TEST_MODE", "false")
     # Mock socket.getaddrinfo to simulate unresolvable hosts for internal network names
 
-    def mock_getaddrinfo_fail(host, port, *args, **kwargs):
+    def mock_getaddrinfo_fail(host, port, *args, **kwargs) -> Never:
         raise socket.gaierror(-2, "Name or service not known")
 
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_fail)
@@ -195,7 +196,7 @@ def test_validate_unresolved_host_in_dev(monkeypatch) -> None:
     """Unresolvable hostnames pass through in development mode."""
     monkeypatch.setattr(settings, "ENV", "development")
 
-    def mock_getaddrinfo_fail(host, port, *args, **kwargs):
+    def mock_getaddrinfo_fail(host, port, *args, **kwargs) -> Never:
         raise socket.gaierror(-2, "Name or service not known")
 
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_fail)
@@ -280,13 +281,13 @@ def test_validate_redirect_to_private_ranges(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_fetch_redirect_to_private_ip(monkeypatch) -> None:
     class MockResponse:
-        def __init__(self, url, status_code, headers, is_redirect=False):
+        def __init__(self, url, status_code, headers, is_redirect=False) -> None:
             self.url = httpx.URL(url)
             self.status_code = status_code
             self.headers = headers
             self.is_redirect = is_redirect
 
-        def raise_for_status(self):
+        def raise_for_status(self) -> None:
             pass
 
     async def mock_get(self, url, *args, **kwargs):
@@ -311,13 +312,13 @@ async def test_fetch_redirect_to_cloud_metadata(monkeypatch) -> None:
     """Redirect to 169.254.169.254 (cloud metadata) is caught."""
 
     class MockResponse:
-        def __init__(self, url, status_code, headers, is_redirect=False):
+        def __init__(self, url, status_code, headers, is_redirect=False) -> None:
             self.url = httpx.URL(url)
             self.status_code = status_code
             self.headers = headers
             self.is_redirect = is_redirect
 
-        def raise_for_status(self):
+        def raise_for_status(self) -> None:
             pass
 
     async def mock_get(self, url, *args, **kwargs):
@@ -392,4 +393,4 @@ async def test_get_safe_async_client_blocks_unix_socket() -> None:
 
     backend = SafeAsyncNetworkBackend(AutoBackend())
     with pytest.raises(ValueError, match="UNIX socket connections are disabled"):
-        await backend.connect_unix_socket("/tmp/some.sock")
+        await backend.connect_unix_socket("/tmp/some.sock")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code

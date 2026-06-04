@@ -1,5 +1,4 @@
-"""
-forge-kernel — CLI entry point.
+"""forge-kernel — CLI entry point.
 
 Run with::
 

@@ -11,13 +11,15 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from bs4 import BeautifulSoup
 
 from app.config import settings
-from app.models import SchemaField
 from app.page_profiler import detect_page_structure, detect_value_patterns
+
+if TYPE_CHECKING:
+    from app.models import SchemaField
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +76,7 @@ def build_selector_prompt(
         schema_fields: Target schema fields
         page_analysis: Optional page structure analysis
         solidified_motifs: Optional learned structural patterns for adaptive hints
+
     """
     page_analysis = page_analysis or {}
 
@@ -160,6 +163,7 @@ async def discover_selectors(
         html: Page HTML content
         schema_fields: Target schema fields to extract
         solidified_motifs: Optional learned structural patterns for adaptive hints
+
     """
     # Lazy imports to respect test patching at app.selector_discovery.*
     from app.selector_discovery import clean_html_for_selectors as _clean_html
@@ -184,8 +188,8 @@ async def discover_selectors(
             ],
             timeout=settings.LLM_SELECTOR_TIMEOUT,
         )
-    except Exception as e:
-        logger.exception("[SelectorDiscovery] LLM extraction failed: %s", e)
+    except Exception:
+        logger.exception("[SelectorDiscovery] LLM extraction failed: %s")
 
     if not isinstance(selectors, dict):
         selectors = {}
@@ -332,7 +336,7 @@ def _compute_ui_noise_score(elements: list, texts: list[str]) -> float:
     form_ratio = sum(1 for el in elements if el.name in ("input", "select", "button", "textarea")) / max(n, 1)
     short_text_ratio = sum(1 for t in texts if len(t) < 15) / max(n, 1)
     price_or_date_ratio = sum(1 for t in texts if _re.search(r"[\$£€¥₹]\s*\d+|\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t)) / max(n, 1)
-    low_diversity = 1.0 if len(set(t[:20] for t in texts)) < max(n * 0.3, 2) else 0.0
+    low_diversity = 1.0 if len({t[:20] for t in texts}) < max(n * 0.3, 2) else 0.0
     near_chrome = 0
     for el in elements:
         p = el.parent
@@ -407,7 +411,7 @@ def _discover_direct_repeating_elements(soup) -> list[dict]:
         avg_text_len = sum(len(t) for t in texts) / max(len(texts), 1)
         data_signals = sum(1 for t in non_empty if _re.search(r"[\$£€¥₹]\s*\d+", t))
         date_signals = sum(1 for t in non_empty if _re.search(r"\d{2,4}[-/]\d{2,4}[-/]\d{2,4}", t))
-        text_diversity = len(set(t[:40] for t in non_empty))
+        text_diversity = len({t[:40] for t in non_empty})
         ui_noise_score = _compute_ui_noise_score(elements, non_empty)
         if ui_noise_score > 0.6:
             continue
@@ -479,7 +483,7 @@ def _fallback_parent_child_discovery(soup) -> list[dict]:
         )
         if data_signals < 2:
             continue
-        diversity = len(set(t[:30] for t in non_empty))
+        diversity = len({t[:30] for t in non_empty})
         score = len(children) + (data_signals * 2) + diversity
         if parent.name == "tr" and parent.parent and parent.parent.name == "tbody":
             score += 5

@@ -23,11 +23,10 @@ def env_file():
     os.unlink(f.name)
 
 
-def _write_env(path: Path, vars: dict[str, str]):
+def _write_env(path: Path, vars: dict[str, str]) -> None:
     """Write variables to an env file."""
     with open(path, "w") as f:
-        for key, value in vars.items():
-            f.write(f'{key}="{value}"\n')
+        f.writelines(f'{key}="{value}"\n' for key, value in vars.items())
 
 
 class TestCheckProdEnvCore:
@@ -85,7 +84,7 @@ class TestCheckProdEnvCore:
         """A variable that passes validation should succeed."""
         mod = self._import_module()
 
-        def always_true(v):
+        def always_true(v) -> bool:
             return True
 
         assert mod.check_var({"MY_VAR": "ok"}, "MY_VAR", validator=always_true)
@@ -94,7 +93,7 @@ class TestCheckProdEnvCore:
         """A variable that fails validation should fail."""
         mod = self._import_module()
 
-        def always_false(v):
+        def always_false(v) -> bool:
             return False
 
         assert not mod.check_var({"MY_VAR": "bad"}, "MY_VAR", validator=always_false)

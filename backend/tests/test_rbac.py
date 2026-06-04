@@ -1,5 +1,4 @@
-"""
-Unit Tests for Role-Based Access Control (RBAC) — DataForge Scraper.
+"""Unit Tests for Role-Based Access Control (RBAC) — DataForge Scraper.
 Verifies that route guards correctly allow/reject requests based on configured keys and roles.
 """
 
@@ -19,7 +18,7 @@ def test_role_resolution_with_keys(monkeypatch) -> None:
     monkeypatch.setattr(settings, "ENV", "production")
 
     class MockRequest:
-        def __init__(self, headers: dict[str, str]):
+        def __init__(self, headers: dict[str, str]) -> None:
             self.headers = headers
 
     req: Any
@@ -128,7 +127,7 @@ def test_rbac_development_fallback(monkeypatch) -> None:
     from typing import Any
 
     class MockRequest:
-        def __init__(self, headers: dict[str, str]):
+        def __init__(self, headers: dict[str, str]) -> None:
             self.headers = headers
 
     # 1. Dev mode but ALLOW_INSECURE_DEV_AUTH is False -> Should raise 403

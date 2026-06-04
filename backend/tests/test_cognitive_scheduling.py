@@ -11,7 +11,7 @@ def test_priority_ordering() -> None:
     # 1. Schedule tasks in reverse priority order
     results = []
 
-    def handler(label):
+    def handler(label) -> None:
         results.append(label)
 
     sos.schedule_task("t_bg", "background", handler, "background")
@@ -31,7 +31,7 @@ def test_budgeted_execution() -> None:
 
     results = []
 
-    def slow_handler(label):
+    def slow_handler(label) -> None:
         time.sleep(0.05)  # 50ms
         results.append(label)
 
@@ -61,7 +61,7 @@ def test_pressure_preemption() -> None:
 
     results = []
 
-    def handler(label):
+    def handler(label) -> None:
         results.append(label)
 
     # 2. Schedule Critical and Background tasks

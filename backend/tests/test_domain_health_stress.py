@@ -1,5 +1,4 @@
-"""
-Stress Tests for Domain Health System
+"""Stress Tests for Domain Health System.
 
 Tests the domain health monitoring system under high load:
 - Rapid failure/success updates
@@ -115,7 +114,7 @@ class TestDomainHealthStress:
         monitor = DomainHealthMonitor()
         alert_count = 0
 
-        def dummy_alert_handler(alert):
+        def dummy_alert_handler(alert) -> None:
             nonlocal alert_count
             alert_count += 1
 

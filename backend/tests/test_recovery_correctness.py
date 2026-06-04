@@ -1,5 +1,7 @@
 """Regression tests for recovery flag and acquisition-lineage correctness."""
 
+from typing import Never
+
 import pytest
 from app.acquisition_state import AcquisitionLineage, AcquisitionState
 from app.models import FieldType, JobCreate, SchemaField
@@ -7,10 +9,10 @@ from app.recovery_strategies import AttemptContext
 
 
 class _AllowAllCrawlPolicy:
-    async def check_domain(self, url):
+    async def check_domain(self, url) -> None:
         return None
 
-    def record_result(self, url, success=True):
+    def record_result(self, url, success=True) -> None:
         return None
 
 
@@ -31,7 +33,7 @@ async def test_attempt_context_does_not_skip_profiles_by_default(monkeypatch) ->
         called["fetch"] += 1
         return "<html></html>", 0.0, "playwright_full", 0
 
-    monkeypatch.setattr(scraper, "get_crawl_policy", lambda: _AllowAllCrawlPolicy())
+    monkeypatch.setattr(scraper, "get_crawl_policy", _AllowAllCrawlPolicy)
     monkeypatch.setattr(scraper, "match_profile_for_url", lambda url: {"fields": {"company_name": ".name"}})
     monkeypatch.setattr(scraper, "try_profile_extraction", fake_profile)
     monkeypatch.setattr(scraper, "process_raw_records", fake_process)
@@ -66,7 +68,7 @@ async def test_force_llm_discovery_skips_profiles_and_passes_recovery_flags(monk
         called["provided_selectors"] = kwargs.get("provided_selectors")
         return ExtractionResult([], "regex")
 
-    monkeypatch.setattr(scraper, "get_crawl_policy", lambda: _AllowAllCrawlPolicy())
+    monkeypatch.setattr(scraper, "get_crawl_policy", _AllowAllCrawlPolicy)
     monkeypatch.setattr(scraper, "try_profile_extraction", fake_profile)
     monkeypatch.setattr(scraper, "fetch_page_content", fake_fetch)
     monkeypatch.setattr(scraper, "orchestrate_extraction", fake_orchestrate)
@@ -119,7 +121,7 @@ def test_acquisition_lineage_to_dict_contains_quality_and_action_fields() -> Non
 async def test_failed_lineage_uses_computed_anti_bot_state(monkeypatch) -> None:
     import app.scraper_recovery_integration as recovery
 
-    async def fake_scrape_url(*args, **kwargs):
+    async def fake_scrape_url(*args, **kwargs) -> Never:
         msg = "captcha challenge blocked"
         raise RuntimeError(msg)
 
@@ -145,12 +147,12 @@ async def test_skip_url_stops_recovery_loop(monkeypatch) -> None:
         return []
 
     class FakeExecutor:
-        async def execute(self, plan, context, attempt_ctx=None):
+        async def execute(self, plan, context, attempt_ctx=None) -> bool:
             attempt_ctx.skip_url = True
             return True
 
     monkeypatch.setattr("app.scraper.scrape_url", fake_scrape_url)
-    monkeypatch.setattr(recovery, "get_recovery_executor", lambda: FakeExecutor())
+    monkeypatch.setattr(recovery, "get_recovery_executor", FakeExecutor)
 
     _results, stats = await recovery.scrape_url_with_recovery(
         "https://example.com/empty",
@@ -213,7 +215,7 @@ async def test_force_container_discovery_skips_llm_and_memory(monkeypatch) -> No
         called["container"] += 1
         return FakeContainerResult()
 
-    monkeypatch.setattr(orchestrator, "get_selector_memory", lambda: FakeMemory())
+    monkeypatch.setattr(orchestrator, "get_selector_memory", FakeMemory)
     monkeypatch.setattr(orchestrator, "discover_selectors", fake_discover)
     monkeypatch.setattr(orchestrator, "extract_from_network", lambda *args, **kwargs: [])
     monkeypatch.setattr(orchestrator, "multi_pass_container_extraction", fake_container)
@@ -262,7 +264,7 @@ async def test_crawl_policy_active_counter_never_leaks_on_fetch_failure(monkeypa
     assert policy._domains["example.com"].active_fetches == 0
 
     # Simulate fetch throwing an exception
-    async def fake_fetch(*args, **kwargs):
+    async def fake_fetch(*args, **kwargs) -> Never:
         msg = "simulated fetch crash"
         raise RuntimeError(msg)
 

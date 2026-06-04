@@ -1,9 +1,8 @@
-"""
-Unit Tests for Phase 90 System Governance & Visualization.
-"""
+"""Unit Tests for Phase 90 System Governance & Visualization."""
 
 from __future__ import annotations
 
+import contextlib
 import os
 
 import pytest
@@ -15,17 +14,13 @@ from app.visualization import MAP_PATH, OperatorMode, SystemGovernorDashboard
 def clean_gov_env():
     # Remove existing files if any
     if os.path.exists(MAP_PATH):
-        try:
+        with contextlib.suppress(Exception):
             os.remove(MAP_PATH)
-        except Exception:
-            pass
     yield
     # Cleanup files after test run
     if os.path.exists(MAP_PATH):
-        try:
+        with contextlib.suppress(Exception):
             os.remove(MAP_PATH)
-        except Exception:
-            pass
 
 
 def test_operator_mode_adjustments() -> None:
@@ -50,7 +45,7 @@ def test_system_map_generation() -> None:
     dashboard.generate_system_map()
     assert os.path.exists(MAP_PATH)
 
-    with open(MAP_PATH, "r", encoding="utf-8") as f:
+    with open(MAP_PATH, encoding="utf-8") as f:
         content = f.read()
 
     assert "DataForge Visual System" in content

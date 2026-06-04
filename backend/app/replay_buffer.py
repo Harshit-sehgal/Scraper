@@ -32,12 +32,12 @@ class _CheckpointIndex:
 
     __slots__ = ("entries",)
 
-    def __init__(self):
+    def __init__(self) -> None:
         # entries: list of (global_idx, segment_path, segment_offset,
         # snapshot_dict)
         self.entries: list[tuple[int, str, int, dict]] = []
 
-    def add(self, global_idx: int, segment_path: str, offset: int, snapshot: dict):
+    def add(self, global_idx: int, segment_path: str, offset: int, snapshot: dict) -> None:
         self.entries.append((global_idx, segment_path, offset, snapshot))
 
     def find_nearest(self, target_idx: int) -> tuple[int, str, int, dict] | None:
@@ -48,7 +48,7 @@ class _CheckpointIndex:
                 best = entry
         return best
 
-    def clear(self):
+    def clear(self) -> None:
         self.entries.clear()
 
     def to_dict_list(self) -> list[dict]:
@@ -70,7 +70,7 @@ class ReplayBuffer:
     - Backward iteration for reverse causal chain analysis
     """
 
-    def __init__(self, base_dir: str = "replay_buffer", max_segments: int = 50):
+    def __init__(self, base_dir: str = "replay_buffer", max_segments: int = 50) -> None:
         self._base_dir = Path(base_dir)
         self._base_dir.mkdir(parents=True, exist_ok=True)
         self._max_segments = max_segments
@@ -104,6 +104,7 @@ class ReplayBuffer:
 
         Returns:
             The global index assigned to this entry.
+
         """
         with self._lock:
             idx = self._next_global_idx
@@ -120,7 +121,7 @@ class ReplayBuffer:
             # Write to current segment
             filepath = self._ensure_segment()
             line = json.dumps(entry, separators=(",", ":"))
-            with open(filepath, "a") as f:
+            with open(filepath, "a") as f:  # noqa: PTH123
                 f.write(line + "\n")
 
             self._current_segment_count += 1
@@ -160,7 +161,7 @@ class ReplayBuffer:
             return filepath
         return self._current_segment_file
 
-    def _rotate_segment(self):
+    def _rotate_segment(self) -> None:
         """Rotate to a new segment file."""
         self._current_segment_idx += 1
         self._current_segment_count = 0
@@ -195,6 +196,7 @@ class ReplayBuffer:
 
         Yields:
             Delta entries in sequential order.
+
         """
         # 1. Find nearest checkpoint <= start_idx
         checkpoint = self._checkpoints.find_nearest(start_idx)
@@ -214,7 +216,7 @@ class ReplayBuffer:
             return
 
         # 3. Stream forward from checkpoint, skipping entries < start_idx
-        with open(segment_path, "r") as f:
+        with open(segment_path) as f:  # noqa: PTH123
             f.seek(segment_offset)
             for line in f:
                 line = line.strip()
@@ -234,7 +236,7 @@ class ReplayBuffer:
             seg_path = self._base_dir / seg_name
             if not seg_path.exists():
                 continue
-            with open(seg_path, "r") as f:
+            with open(seg_path) as f:  # noqa: PTH123
                 for line in f:
                     line = line.strip()
                     if not line:
@@ -255,6 +257,7 @@ class ReplayBuffer:
 
         Returns:
             Reconstructed state dict, or None if cannot reconstruct.
+
         """
         checkpoint = self._checkpoints.find_nearest(target_idx)
         if checkpoint is None:
@@ -276,7 +279,7 @@ class ReplayBuffer:
         if not seg_path.exists():
             return None
 
-        with open(seg_path, "r") as f:
+        with open(seg_path) as f:  # noqa: PTH123
             f.seek(offset)
             for line in f:
                 line = line.strip()
@@ -334,7 +337,7 @@ class ReplayBuffer:
                 "segment_capacity": _SEGMENT_CAPACITY,
             }
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear all stored data and reset state."""
         with self._lock:
             for seg_name in self._segments:
@@ -350,13 +353,13 @@ class ReplayBuffer:
             self._total_entries = 0
             self._total_checkpoints = 0
 
-    def close(self):
+    def close(self) -> None:
         """Close the buffer, ensuring all data is flushed."""
         self._current_segment_file = None
 
     # ─── Internal Helpers ──────────────────────────────────────────
 
-    def _load_existing_segments(self):
+    def _load_existing_segments(self) -> None:
         """Load existing segments from disk on initialization."""
         if not self._base_dir.exists():
             return
@@ -366,7 +369,7 @@ class ReplayBuffer:
             self._segments.append(seg_path.name)
             total_lines = 0
             # Rebuild checkpoint index by scanning this segment
-            with open(seg_path, "r") as f:
+            with open(seg_path) as f:  # noqa: PTH123
                 while True:
                     pos = f.tell()
                     line = f.readline()
@@ -419,11 +422,11 @@ class ReplayBuffer:
         """Count non-empty lines in a segment file."""
         count = 0
         try:
-            with open(seg_path, "r") as f:
+            with open(seg_path) as f:  # noqa: PTH123
                 for line in f:
                     if line.strip():
                         count += 1
-        except Exception:  # nosec B110
+        except Exception:  # nosec B110  # noqa: BLE001
             pass
         return count
 
@@ -451,6 +454,7 @@ class ReplayBuffer:
             - events: list of events in the chain
             - summary: human-readable summary of the chain
             - trace_id: common trace identifier if available
+
         """
         # Scan the most recent entries for trace-based grouping
         chains: dict[str, list[dict]] = {}
@@ -528,6 +532,7 @@ class ReplayBuffer:
 
         Returns:
             List of events in the range.
+
         """
         events = []
         for entry in self.stream_from(start_idx):
@@ -550,7 +555,7 @@ def get_replay_buffer(base_dir: str | None = None) -> ReplayBuffer:
     return _buffer
 
 
-def reset_replay_buffer():
+def reset_replay_buffer() -> None:
     """Reset the global replay buffer (for testing)."""
     global _buffer
     if _buffer is not None:

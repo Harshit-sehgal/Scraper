@@ -14,7 +14,7 @@ def get_world_state() -> SemanticWorldState:
     return _world_state
 
 
-def reset_world_state():
+def reset_world_state() -> None:
     """Reset the global world state singleton (for testing)."""
     global _world_state
     if _world_state is not None:

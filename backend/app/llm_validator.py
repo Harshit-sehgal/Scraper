@@ -1,5 +1,4 @@
-"""
-LLM Output Validator — structured output validation for LLM responses.
+"""LLM Output Validator — structured output validation for LLM responses.
 
 Ensures LLM JSON outputs conform to expected schemas with automatic
 retries on malformed or type-mismatched responses.
@@ -14,10 +13,12 @@ Reduces the risk of:
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.config import settings
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ def validate_llm_json(
 
     Returns:
         Tuple of (is_valid, error_message).
+
     """
     if raw is None:
         return False, "Response is None"
@@ -134,6 +136,7 @@ def llm_call_with_validation(
 
     Returns:
         Validated LLM output, or None if all retries exhausted.
+
     """
     if not settings.LLM_VALIDATE_JSON:
         return call_fn()
@@ -153,7 +156,7 @@ def llm_call_with_validation(
                     effective_retries + 1,
                     error,
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(
                 "LLM call failed (attempt %d/%d): %s",
                 attempt + 1,
@@ -204,7 +207,7 @@ async def llm_call_with_validation_async(
                     effective_retries + 1,
                     error,
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(
                 "LLM call failed (attempt %d/%d): %s",
                 attempt + 1,

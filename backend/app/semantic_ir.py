@@ -1,5 +1,4 @@
-"""
-Semantic Intermediate Representation (IR)
+"""Semantic Intermediate Representation (IR).
 ============================================
 Single source of truth for ALL semantic data in the extraction pipeline.
 
@@ -7,7 +6,8 @@ ALL stages operate on IR objects, NOT raw strings.
 This prevents direct regex-to-schema coupling and enables
 probabilistic reasoning at every level.
 
-Core principle: Everything is a relationship, nothing is an island."""
+Core principle: Everything is a relationship, nothing is an island.
+"""
 
 from __future__ import annotations
 
@@ -71,13 +71,13 @@ class Span:
     start: int
     end: int
 
-    def overlaps_with(self, other: "Span") -> bool:
+    def overlaps_with(self, other: Span) -> bool:
         return self.start < other.end and other.start < self.end
 
-    def contains(self, other: "Span") -> bool:
+    def contains(self, other: Span) -> bool:
         return self.start <= other.start and other.end <= self.end
 
-    def distance_to(self, other: "Span") -> int:
+    def distance_to(self, other: Span) -> int:
         if self.overlaps_with(other):
             return 0
         if self.end <= other.start:
@@ -119,9 +119,9 @@ class SemanticToken:
     signals: list[str] = field(default_factory=list)
 
     # Neighbors (populated by relationship_inference)
-    left_neighbor: "SemanticToken" | None = None
-    right_neighbor: "SemanticToken" | None = None
-    neighborhood: list["SemanticToken"] = field(default_factory=list)
+    left_neighbor: SemanticToken | None = None
+    right_neighbor: SemanticToken | None = None
+    neighborhood: list[SemanticToken] = field(default_factory=list)
 
     # DOM context
     dom_path: str = ""
@@ -211,7 +211,7 @@ class SemanticRegion:
     confidence: float = 0.0
 
     # Relationships to other regions
-    relationships: list["RelationshipEdge"] = field(default_factory=list)
+    relationships: list[RelationshipEdge] = field(default_factory=list)
 
     # Ownership
     owned_by: int | None = None  # region_id of owner
@@ -270,7 +270,7 @@ class ExclusionEdge:
         strength: float = 1.0,
         confidence: float | None = None,
         evidence: list[str] | None = None,
-    ):
+    ) -> None:
         self.source_id = source_id
         self.target_id = target_id
         self.strength = strength
@@ -299,7 +299,7 @@ class SemanticGraph:
     uncertainty_field: dict[int, float] = field(default_factory=dict)  # node_id -> uncertainty
 
     # Sub-graphs
-    sub_graphs: list["SemanticGraph"] = field(default_factory=list)
+    sub_graphs: list[SemanticGraph] = field(default_factory=list)
 
     def get_region(self, region_id: int) -> SemanticRegion | None:
         for r in self.regions:
@@ -364,7 +364,7 @@ class DatasetIR:
     structural_memory: dict[tuple[str, ...], int] = field(default_factory=dict)  # pattern -> count
     global_coherence: float = 0.0
 
-    def add_record(self, record: SemanticRecord):
+    def add_record(self, record: SemanticRecord) -> None:
         self.records.append(record)
         sig = record.structural_signature
         self.structural_memory[sig] = self.structural_memory.get(sig, 0) + 1
@@ -400,7 +400,7 @@ def create_token(
     return tok
 
 
-def populate_type_vector(token: SemanticToken, primary_type: SemanticType, graph: SemanticGraph | None = None):
+def populate_type_vector(token: SemanticToken, primary_type: SemanticType, graph: SemanticGraph | None = None) -> None:
     """Populate the 16-dimensional embedding from graph context."""
     if graph:
         from app.semantic_inference_engine import RelationshipEmbeddingSpace
@@ -420,7 +420,7 @@ def compute_type_signature(tokens: list[SemanticToken]) -> tuple[str, ...]:
     return tuple(t.primary_type.value for t in tokens)
 
 
-def semantic_to_field_type(st: SemanticType) -> "FieldType":
+def semantic_to_field_type(st: SemanticType) -> FieldType:
     """Convert a SemanticType to its nearest FieldType equivalent."""
     _map = {
         SemanticType.PRICE: FieldType.CURRENCY,
@@ -441,7 +441,7 @@ def semantic_to_field_type(st: SemanticType) -> "FieldType":
     return _map.get(st, FieldType.STRING)
 
 
-def field_type_to_semantic(ft: "FieldType") -> SemanticType:
+def field_type_to_semantic(ft: FieldType) -> SemanticType:
     """Convert a FieldType to its nearest SemanticType equivalent."""
     _map = {
         FieldType.STRING: SemanticType.TEXT,

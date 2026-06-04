@@ -15,6 +15,7 @@ have no effect.  We must use monkeypatch.setattr() on the singleton.
 """
 
 import asyncio
+import contextlib
 
 import httpx
 import pytest
@@ -23,7 +24,7 @@ import pytest
 class LocalASGIClient:
     """Small sync wrapper around httpx ASGITransport."""
 
-    def __init__(self, app):
+    def __init__(self, app) -> None:
         self.app = app
 
     async def _request(self, method: str, url: str, **kwargs):
@@ -148,7 +149,7 @@ def expected_status(method: str, path: str, auth_level: str, min_role: str) -> i
 
 
 @pytest.fixture(autouse=True)
-def _setup_settings(monkeypatch):
+def _setup_settings(monkeypatch) -> None:
     """Patch the module-level Settings singleton directly.
 
     pydantic-settings reads env vars at construction time.  Once the
@@ -177,8 +178,8 @@ def client(monkeypatch):
     import sys
 
     mp = pytest.MonkeyPatch()
-    mp.setenv("DATAFORGE_STATE_FILE", "/tmp/test_auth_state.json")
-    mp.setenv("DATAFORGE_SEMANTIC_STATE_PATH", "/tmp/test_auth_semantic.json")
+    mp.setenv("DATAFORGE_STATE_FILE", "/tmp/test_auth_state.json")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
+    mp.setenv("DATAFORGE_SEMANTIC_STATE_PATH", "/tmp/test_auth_semantic.json")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
 
     # Force ENABLE_EXPERIMENTAL_ROUTES = True
     from app.config import settings
@@ -199,11 +200,9 @@ def client(monkeypatch):
         pytest.skip(f"Could not initialize app for auth tests: {e}")
     finally:
         mp.undo()
-        for f in ["/tmp/test_auth_state.json", "/tmp/test_auth_semantic.json"]:
-            try:
+        for f in ["/tmp/test_auth_state.json", "/tmp/test_auth_semantic.json"]:  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
+            with contextlib.suppress(OSError):
                 os.remove(f)
-            except OSError:
-                pass
         # Restore sys.modules
         for m in modules_to_pop:
             sys.modules.pop(m, None)
@@ -214,7 +213,7 @@ def client(monkeypatch):
 # ── Parameterized route auth tests ─────────────────────────────────────
 
 
-@pytest.mark.parametrize("method,path,min_role", ROUTE_MATRIX)
+@pytest.mark.parametrize(("method", "path", "min_role"), ROUTE_MATRIX)
 def test_route_auth_no_key(client, method, path, min_role) -> None:
     """Without any API key, public routes work but /api/* returns 403."""
     expected = expected_status(method, path, "none", min_role)
@@ -224,7 +223,7 @@ def test_route_auth_no_key(client, method, path, min_role) -> None:
     assert response.status_code == expected, f"{method} {path} (no auth): expected {expected}, got {response.status_code}"
 
 
-@pytest.mark.parametrize("method,path,min_role", ROUTE_MATRIX)
+@pytest.mark.parametrize(("method", "path", "min_role"), ROUTE_MATRIX)
 def test_route_auth_user_key(client, method, path, min_role) -> None:
     """With a USER-level API key, user routes work; operator/admin routes blocked."""
     expected = expected_status(method, path, "user", min_role)
@@ -234,7 +233,7 @@ def test_route_auth_user_key(client, method, path, min_role) -> None:
     assert response.status_code == expected, f"{method} {path} (user auth): expected {expected}, got {response.status_code}"
 
 
-@pytest.mark.parametrize("method,path,min_role", ROUTE_MATRIX)
+@pytest.mark.parametrize(("method", "path", "min_role"), ROUTE_MATRIX)
 def test_route_auth_operator_key(client, method, path, min_role) -> None:
     """With an OPERATOR-level API key, user + operator routes work; admin routes blocked."""
     expected = expected_status(method, path, "operator", min_role)
@@ -244,7 +243,7 @@ def test_route_auth_operator_key(client, method, path, min_role) -> None:
     assert response.status_code == expected, f"{method} {path} (operator auth): expected {expected}, got {response.status_code}"
 
 
-@pytest.mark.parametrize("method,path,min_role", ROUTE_MATRIX)
+@pytest.mark.parametrize(("method", "path", "min_role"), ROUTE_MATRIX)
 def test_route_auth_admin_key(client, method, path, min_role) -> None:
     """With an ADMIN-level API key, all routes work."""
     expected = expected_status(method, path, "admin", min_role)

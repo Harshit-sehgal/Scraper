@@ -16,7 +16,7 @@ class EnergyAPI:
     NEVER accesses ws.metrics directly.
     """
 
-    def __init__(self, ws):
+    def __init__(self, ws) -> None:
         from app.energy_state import EnergyState
 
         if isinstance(ws, EnergyState):
@@ -31,7 +31,7 @@ class EnergyAPI:
 
     # ─── Mutation Operations (state-changing) ────────────────────────────
 
-    def set_global_energy(self, value: float):
+    def set_global_energy(self, value: float) -> None:
         self._energy.set_energy(value)
 
     # Region energy mutations belong to TopologyState — use TopologyAPI instead.

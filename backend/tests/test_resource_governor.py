@@ -1,6 +1,4 @@
-"""
-Unit Tests for Phase 89 Resource Governance.
-"""
+"""Unit Tests for Phase 89 Resource Governance."""
 
 from __future__ import annotations
 
@@ -69,14 +67,14 @@ def test_token_tracking_and_throttling() -> None:
 @pytest.mark.asyncio
 async def test_check_browser_memory_pruning(monkeypatch) -> None:
     class MockContext:
-        def __init__(self):
+        def __init__(self) -> None:
             self.closed = False
 
-        async def close(self):
+        async def close(self) -> None:
             self.closed = True
 
     class MockPool:
-        def __init__(self):
+        def __init__(self) -> None:
             self._contexts = {
                 "domain-1": MockContext(),
                 "domain-2": MockContext(),

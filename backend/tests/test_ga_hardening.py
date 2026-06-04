@@ -112,14 +112,14 @@ async def test_browser_pool_hard_recycling(monkeypatch) -> None:
     pool._active_fetches = 1
 
     # Simulate a background method that decreases active fetches after a delay
-    async def simulate_active_fetches_drain():
+    async def simulate_active_fetches_drain() -> None:
         await asyncio.sleep(0.1)
         pool._active_fetches = 0
 
     # Mock hard_recycle to avoid launching/interacting with real Playwright in unit tests
     recycle_called = False
 
-    async def fake_hard_recycle():
+    async def fake_hard_recycle() -> None:
         nonlocal recycle_called
         recycle_called = True
 
@@ -170,7 +170,7 @@ def test_diagnostics_exporter_endpoint(client, monkeypatch) -> None:
 
             return FakeConfidence()
 
-    monkeypatch.setattr("app.selector_memory.get_selector_memory", lambda: FakeSelectorMemory())
+    monkeypatch.setattr("app.selector_memory.get_selector_memory", FakeSelectorMemory)
 
     # Setup world state/observability telemetry mock
     class FakeObservability:
@@ -185,7 +185,7 @@ def test_diagnostics_exporter_endpoint(client, monkeypatch) -> None:
     class FakeWorldState:
         _observability = FakeObservability()
 
-    monkeypatch.setattr("app.semantic_world_state.get_world_state", lambda: FakeWorldState())
+    monkeypatch.setattr("app.semantic_world_state.get_world_state", FakeWorldState)
 
     # Set config settings values (use ADMIN_API_KEY since endpoint requires ADMIN role)
     monkeypatch.setattr(settings, "API_KEY", "super_secret_api_key_123")

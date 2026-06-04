@@ -1,5 +1,4 @@
-"""
-Benchmark Reporter — continuous operational intelligence for tracking precision / recall regressions.
+"""Benchmark Reporter — continuous operational intelligence for tracking precision / recall regressions.
 
 Provides:
   - SQLite persistence for historical benchmark runs.
@@ -11,7 +10,6 @@ Provides:
 from __future__ import annotations
 
 import logging
-import os
 import sqlite3
 import time
 from dataclasses import dataclass, field
@@ -43,7 +41,7 @@ class BenchmarkReporter:
 
     def __init__(self, db_path: str = DB_PATH) -> None:
         self.db_path = db_path
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
     def _init_db(self) -> None:
@@ -84,7 +82,7 @@ class BenchmarkReporter:
         # Update the visual regression dashboard
         try:
             self.generate_dashboard()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning("[Reporter] Failed to update regression dashboard: %s", e)
 
         return comparison
@@ -96,7 +94,7 @@ class BenchmarkReporter:
             cursor.execute("SELECT AVG(precision), AVG(recall) FROM benchmark_runs")
             row = cursor.fetchone()
 
-        avg_precision, avg_recall = row if row else (None, None)
+        avg_precision, avg_recall = row or (None, None)
         if avg_precision is None or avg_recall is None:
             return {
                 "status": "stable",
@@ -158,9 +156,9 @@ class BenchmarkReporter:
         if not history:
             return
 
-        os.makedirs(os.path.dirname(DASHBOARD_PATH), exist_ok=True)
+        Path(DASHBOARD_PATH).parent.mkdir(parents=True, exist_ok=True)
 
-        with open(DASHBOARD_PATH, "w", encoding="utf-8") as f:
+        with open(DASHBOARD_PATH, "w", encoding="utf-8") as f:  # noqa: PTH123
             f.write("# 📊 DataForge Regression Trends & Benchmarks Dashboard\n\n")
             f.write("> **Continuous Operational Intelligence**: Auto-updating regression trends tracker.\n\n")
             f.write("## 1. Recent Execution Runs\n\n")

@@ -1,5 +1,4 @@
-"""
-Tests for the research-shell quarantine in app/url_redirects.py.
+"""Tests for the research-shell quarantine in app/url_redirects.py.
 
 `url_redirects.py` historically imported `app.acquisition_state` at
 module top level, which forced the research shell into the product

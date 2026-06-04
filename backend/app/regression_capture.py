@@ -1,5 +1,4 @@
-"""
-Regression Capture — Self-growing benchmark system.
+"""Regression Capture — Self-growing benchmark system.
 
 Automatically captures extraction failures, archives failing HTML pages as
 named fixtures, manages a registry of regressions, and can regenerate the
@@ -114,7 +113,7 @@ class RegressionCapture:
         min_confidence: float = 0.5,
         min_html_length: int = 100,
         auto_archive: bool = True,
-    ):
+    ) -> None:
         if fixtures_dir is None:
             fixtures_dir = str(Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "pages")
         if registry_path is None:
@@ -158,6 +157,7 @@ class RegressionCapture:
 
         Returns:
             A RegressionEntry if captured, None otherwise.
+
         """
         # Determine if capture is warranted
         if not force:
@@ -226,6 +226,7 @@ class RegressionCapture:
 
         Returns:
             Generated test code as a string, or None if entry not found.
+
         """
         entry = self._get_entry(entry_id)
         if not entry:
@@ -249,6 +250,7 @@ class RegressionCapture:
 
         Returns:
             Concatenated test code as a single string.
+
         """
         all_tests = []
         for entry in self._registry.entries:
@@ -315,6 +317,7 @@ class RegressionCapture:
 
         Returns:
             Number of fixtures pruned
+
         """
         if not self._fixtures_dir.exists():
             return 0
@@ -340,7 +343,7 @@ class RegressionCapture:
         # If still over limit, remove oldest
         remaining = len(fixtures) - len(to_remove)
         if remaining > max_fixtures:
-            keep_set = set(f for _, f in fixtures[-max_fixtures:])
+            keep_set = {f for _, f in fixtures[-max_fixtures:]}
             extra_fixtures = [f for _, f in fixtures if f not in keep_set and f not in to_remove]
             to_remove.extend(extra_fixtures)
 
@@ -511,7 +514,7 @@ def {safe_name}(hostile_base_url):
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
-        except Exception:
+        except Exception:  # noqa: BLE001
             return "unknown"
 
 

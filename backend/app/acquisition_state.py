@@ -8,12 +8,12 @@ redirect_info with typed, testable models.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class AcquisitionState(str, Enum):
+class AcquisitionState(StrEnum):
     """Lifecycle states for URL acquisition.
 
     Tracks the full journey from initial URL request through any

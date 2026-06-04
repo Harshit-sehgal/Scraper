@@ -6,7 +6,7 @@ from app.invariant_firewall import requires_invariants
 
 class MemoryMixin:
     @requires_invariants
-    def reinforce_motif(self, motif: tuple[str, ...]):
+    def reinforce_motif(self, motif: tuple[str, ...]) -> None:
         """Reinforce a structural motif with temporal awareness."""
         self._motif.reinforce(motif, self.metrics.total_records_processed)
 
@@ -15,7 +15,7 @@ class MemoryMixin:
         return self._motif.compute_stability(motif, self.metrics.total_records_processed)
 
     @requires_invariants
-    def apply_memory_decay(self, rate: float = 0.01):
+    def apply_memory_decay(self, rate: float = 0.01) -> None:
         """Globally decay old or weak semantic structures to reduce entropy.
 
         LAW 5: No fixed evolution cadence. Decay is triggered by field demand

@@ -1,14 +1,16 @@
-"""
-Postgres persistence adapter — wraps the existing app.postgres_repository
+"""Postgres persistence adapter — wraps the existing app.postgres_repository
 in the clean JobRepository contract.
 """
 
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from forge_kernel.contracts.job import Job
 from forge_kernel.persistence import JobRepository
+
+if TYPE_CHECKING:
+    from forge_kernel.contracts.job import Job
 
 logger = logging.getLogger(__name__)
 

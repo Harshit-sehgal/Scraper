@@ -16,7 +16,7 @@ from app.transaction_context import active_transaction
 class TransitionState:
     """Sole owner of the semantic field's transition probability structures."""
 
-    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None) -> None:
         self._delta_callback = delta_callback
         self._transition_probs: dict[tuple[str, str], float] = {}
         self.transition_observations: int = 0
@@ -29,32 +29,32 @@ class TransitionState:
         return None
 
     @_staging.setter
-    def _staging(self, value: dict | None):
+    def _staging(self, value: dict | None) -> None:
         tx = active_transaction.get()
         if tx is not None:
             tx[f"transition_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict):
+    def _record(self, action: str, details: dict) -> None:
         if self._delta_callback:
             self._delta_callback("transition", action, details)
 
     # ─── Transaction Support ─────────────────────────────────────────────
 
-    def begin_transaction(self):
+    def begin_transaction(self) -> None:
         """Snapshot current state for staging."""
         self._staging = {
             "transition_probs": dict(self._transition_probs),
             "transition_observations": self.transition_observations,
         }
 
-    def commit(self):
+    def commit(self) -> None:
         """Apply staged changes."""
         if self._staging is not None:
             self._transition_probs = self._staging["transition_probs"]
             self.transition_observations = self._staging["transition_observations"]
             self._staging = None
 
-    def rollback(self):
+    def rollback(self) -> None:
         self._staging = None
 
     def _get_struct(self, key: str):
@@ -66,7 +66,7 @@ class TransitionState:
         }
         return getattr(self, attr_map[key])
 
-    def _set_struct(self, key: str, val):
+    def _set_struct(self, key: str, val) -> None:
         if self._staging is not None:
             self._staging[key] = val
         else:
@@ -91,7 +91,7 @@ class TransitionState:
 
     # ─── Controlled Mutations ────────────────────────────────────────────
 
-    def set_transition_observations(self, value: int):
+    def set_transition_observations(self, value: int) -> None:
         """Set transition observation count through staging-aware API."""
         self._set_struct("transition_observations", max(0, value))
         self._record("set_transition_observations", {"value": value})
@@ -100,7 +100,7 @@ class TransitionState:
         """Get transition observation count from staging-aware API."""
         return self._get_struct("transition_observations")  # type: ignore[no-any-return]
 
-    def set_prob(self, type_a: str, type_b: str, value: float):
+    def set_prob(self, type_a: str, type_b: str, value: float) -> None:
         clamped = max(0.0, min(1.0, value))
         probs = self._get_struct("transition_probs")
         if clamped <= 0.0:
@@ -110,11 +110,11 @@ class TransitionState:
         self._set_struct("transition_probs", probs)
         self._record("set_prob", {"type_a": type_a, "type_b": type_b, "value": value})
 
-    def adjust_prob(self, type_a: str, type_b: str, delta: float):
+    def adjust_prob(self, type_a: str, type_b: str, delta: float) -> None:
         current = self.get_prob(type_a, type_b)
         self.set_prob(type_a, type_b, current + delta)
 
-    def observe(self, type_a: str, type_b: str, is_role_boundary: bool):
+    def observe(self, type_a: str, type_b: str, is_role_boundary: bool) -> None:
         """Observe whether a transition was a role boundary or entity continuation."""
         delta = 0.05 if is_role_boundary else -0.05
         self.adjust_prob(type_a, type_b, delta)
@@ -122,7 +122,7 @@ class TransitionState:
         self._set_struct("transition_observations", obs + 1)
         self._record("observe", {"type_a": type_a, "type_b": type_b, "is_role_boundary": is_role_boundary})
 
-    def update_seed(self, data: dict):
+    def update_seed(self, data: dict) -> None:
         """Seed bootstrap transitions (overwrites only if empty)."""
         probs = self._get_struct("transition_probs")
         if not probs:
@@ -138,7 +138,7 @@ class TransitionState:
             "transition_observations": self.transition_observations,
         }
 
-    def from_dict(self, data: dict):
+    def from_dict(self, data: dict) -> None:
         self.clear()
         for k, v in data.get("transition_probs", {}).items():
             if "|" in k:
@@ -146,6 +146,6 @@ class TransitionState:
                 self._transition_probs[tuple(parts)] = v
         self.transition_observations = data.get("transition_observations", 0)
 
-    def clear(self):
+    def clear(self) -> None:
         self._set_struct("transition_probs", {})
         self._set_struct("transition_observations", 0)

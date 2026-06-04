@@ -14,16 +14,16 @@ from app.chaos_scenarios import FailureMode, FailureScenario, FailureScenarios
 
 
 class ChaosTestSuite:
-    """Runs chaos engineering tests"""
+    """Runs chaos engineering tests."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = logging.getLogger("chaos_test_suite")
         self.results: list[dict[str, Any]] = []
 
     async def run_all_scenarios(self) -> dict[str, Any]:
-        """Run all chaos scenarios"""
+        """Run all chaos scenarios."""
         scenarios = FailureScenarios.get_all_scenarios()
-        self.logger.info(f"Running {len(scenarios)} chaos scenarios...")
+        self.logger.info("Running %d chaos scenarios...", len(scenarios))
 
         passed = 0
         failed = 0
@@ -46,8 +46,8 @@ class ChaosTestSuite:
         }
 
     async def _run_scenario(self, scenario: FailureScenario) -> dict[str, Any]:
-        """Run a single scenario"""
-        self.logger.info(f"Running scenario: {scenario.name}")
+        """Run a single scenario."""
+        self.logger.info("Running scenario: %s", scenario.name)
 
         try:
             result: dict[str, Any] = {
@@ -62,7 +62,7 @@ class ChaosTestSuite:
             return result
 
         except Exception as e:
-            self.logger.error(f"Error running scenario {scenario.name}: {e}")
+            self.logger.exception("Error running scenario %s", scenario.name)
             return {
                 "scenario": scenario.name,
                 "failure_mode": scenario.failure_mode.value,
@@ -71,7 +71,7 @@ class ChaosTestSuite:
             }
 
     def generate_report(self) -> str:
-        """Generate chaos test report"""
+        """Generate chaos test report."""
         total = len(self.results)
         passed = sum(1 for r in self.results if r.get("passed", False))
 
@@ -108,11 +108,11 @@ DETAILED RESULTS:
 
 
 class OperationalPlaybooks:
-    """Playbooks for operational responses to failures"""
+    """Playbooks for operational responses to failures."""
 
     @staticmethod
     def get_playbook(failure_mode: FailureMode) -> dict[str, Any]:
-        """Get the playbook for a specific failure mode"""
+        """Get the playbook for a specific failure mode."""
         playbooks = {
             FailureMode.NETWORK_TIMEOUT: {
                 "name": "Network Timeout Recovery",
@@ -242,7 +242,7 @@ class OperationalPlaybooks:
 
     @staticmethod
     def get_all_playbooks() -> dict[str, dict[str, Any]]:
-        """Get all playbooks"""
+        """Get all playbooks."""
         playbooks = {}
         for mode in FailureMode:
             playbooks[mode.value] = OperationalPlaybooks.get_playbook(mode)
@@ -259,12 +259,11 @@ async def run_chaos_test(scenario: FailureScenario) -> dict[str, Any]:
     from app.chaos_simulator import ChaosSimulator
 
     simulator = ChaosSimulator()
-    result = await simulator.inject_failure(scenario.failure_mode, duration=scenario.duration_seconds)
-    return result
+    return await simulator.inject_failure(scenario.failure_mode, duration=scenario.duration_seconds)
 
 
 async def run_all_chaos_tests() -> dict[str, Any]:
-    """Run all chaos tests and generate report"""
+    """Run all chaos tests and generate report."""
     suite = ChaosTestSuite()
     results = await suite.run_all_scenarios()
     report = suite.generate_report()

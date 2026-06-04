@@ -1,5 +1,4 @@
-"""
-Application services — job lifecycle orchestration, extraction, and export.
+"""Application services — job lifecycle orchestration, extraction, and export.
 
 Services encapsulate business logic and are consumed by the API layer.
 """

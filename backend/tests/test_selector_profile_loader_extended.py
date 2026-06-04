@@ -25,10 +25,10 @@ from app.selector_profiles.loader import (
 
 
 class TestRealProfileLoading:
-    def setup_method(self):
+    def setup_method(self) -> None:
         reload_profiles()
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         reload_profiles()
 
     def test_load_from_temp_profile_dir(self) -> None:
@@ -82,7 +82,7 @@ class TestRealProfileLoading:
 
     def test_load_profiles_dir_not_found(self) -> None:
         """When profiles dir does not exist, returns empty cache (lines 71-72)."""
-        with patch("app.selector_profiles.loader._PROFILES_DIR", Path("/tmp/nonexistent_profiles_dir_xyz")):
+        with patch("app.selector_profiles.loader._PROFILES_DIR", Path("/tmp/nonexistent_profiles_dir_xyz")):  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
             reload_profiles()
             profiles = _load_all_profiles()
             assert len(profiles) == 0
@@ -108,10 +108,10 @@ class TestRealProfileLoading:
 
 
 class TestMatchDomainWithProfiles:
-    def setup_method(self):
+    def setup_method(self) -> None:
         reload_profiles()
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         reload_profiles()
 
     def test_match_exact_domain(self) -> None:
@@ -285,7 +285,7 @@ class AsyncPWCtx:
     Python's `async with` protocol to discover them on the type.
     """
 
-    def __init__(self, mock_playwright):
+    def __init__(self, mock_playwright) -> None:
         self._pw = mock_playwright
 
     async def __aenter__(self):

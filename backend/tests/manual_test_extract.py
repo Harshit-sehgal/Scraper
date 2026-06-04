@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 """Standalone regex extraction test — no Playwright, no g4f, just BS4."""
 
-import json
 import re
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 
 
-def main():
+def main() -> None:
     with open(Path(__file__).parent / "test_page.html") as f:
         html = f.read()
-    print(f"HTML length: {len(html)}")
 
     soup = BeautifulSoup(html, "html.parser")
 
     # Find articles with class product
     containers = soup.find_all("article", class_=re.compile(r"product", re.IGNORECASE))
-    print(f"Found {len(containers)} product containers")
 
     results = []
     for c in containers:
@@ -54,9 +51,8 @@ def main():
             },
         )
 
-    print(f"\n=== RESULTS: {len(results)} records ===\n")
-    for r in results:
-        print(json.dumps(r, indent=2))
+    for _r in results:
+        pass
 
 
 if __name__ == "__main__":

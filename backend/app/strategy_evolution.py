@@ -1,5 +1,4 @@
-"""
-Strategy Evolution Engine — adaptive selection of fetch strategies.
+"""Strategy Evolution Engine — adaptive selection of fetch strategies.
 
 Provides:
   - Multiple fetch strategies (Playwright, httpx, JavaScript-based, etc.)
@@ -25,12 +24,12 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
 
-class FetchStrategy(str, Enum):
+class FetchStrategy(StrEnum):
     """Available fetch strategies."""
 
     PLAYWRIGHT_FULL = "playwright_full"  # Full browser render
@@ -100,7 +99,7 @@ class StrategyRecommendation:
 class DomainStrategyState:
     """Tracks strategy performance per domain."""
 
-    def __init__(self, domain: str):
+    def __init__(self, domain: str) -> None:
         self.domain = domain
         self.strategies: dict[FetchStrategy, StrategyPerformance] = {}
         self.current_strategy: FetchStrategy = FetchStrategy.PLAYWRIGHT_FULL
@@ -122,7 +121,7 @@ class DomainStrategyState:
         time_ms: float,
         quality: float = 0.0,
         failure_reason: str | None = None,
-    ):
+    ) -> None:
         """Record a fetch attempt result."""
         perf = self.strategies[strategy]
 
@@ -186,7 +185,7 @@ class DomainStrategyState:
 class StrategyEvolutionEngine:
     """Adjusts fetch strategies per domain based on observed outcomes."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize strategy evolution engine."""
         self.domain_states: dict[str, DomainStrategyState] = {}
 
@@ -209,7 +208,7 @@ class StrategyEvolutionEngine:
         time_ms: float,
         quality: float = 0.0,
         failure_reason: str | None = None,
-    ):
+    ) -> None:
         """Record a fetch strategy attempt."""
         # Convert string to enum if needed
         if isinstance(strategy, str):
@@ -268,7 +267,7 @@ class StrategyEvolutionEngine:
                         confidence=0.7,
                         estimated_success_rate=0.5,
                     )
-            except Exception:  # nosec B110
+            except Exception:  # nosec B110  # noqa: BLE001
                 pass
 
             return StrategyRecommendation(
@@ -307,7 +306,7 @@ class StrategyEvolutionEngine:
                     confidence=0.8,
                     estimated_success_rate=0.6,
                 )
-        except Exception:  # nosec B110
+        except Exception:  # nosec B110  # noqa: BLE001
             pass
 
         best_strategy = state.get_best_strategy()

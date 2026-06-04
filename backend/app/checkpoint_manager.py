@@ -13,7 +13,7 @@ def get_world_state():
 class CheckpointManager:
     """Manages persistent, versioned snapshots of the entire world state."""
 
-    def __init__(self, base_dir: str = "checkpoints"):
+    def __init__(self, base_dir: str = "checkpoints") -> None:
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
@@ -27,23 +27,23 @@ class CheckpointManager:
         filepath = self.base_dir / filename
 
         try:
-            with open(filepath, "w") as f:
+            with open(filepath, "w") as f:  # noqa: PTH123
                 json.dump(state_dict, f, indent=2)
-            logging.getLogger(__name__).info(f"Created checkpoint: {filename}")
+            logging.getLogger(__name__).info("Created checkpoint: %s", filename)
             return str(filepath)
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Failed to create checkpoint: {e}")
+        except Exception:
+            logging.getLogger(__name__).exception("Failed to create checkpoint")
             raise
 
-    def load_checkpoint(self, filepath: str):
+    def load_checkpoint(self, filepath: str) -> None:
         """Restore world state from a checkpoint file."""
         try:
-            with open(filepath, "r") as f:
+            with open(filepath) as f:  # noqa: PTH123
                 state_dict = json.load(f)
             get_world_state().from_dict(state_dict)
-            logging.getLogger(__name__).info(f"Restored from checkpoint: {filepath}")
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Failed to load checkpoint: {e}")
+            logging.getLogger(__name__).info("Restored from checkpoint: %s", filepath)
+        except Exception:
+            logging.getLogger(__name__).exception("Failed to load checkpoint")
             raise
 
     def list_checkpoints(self) -> list[dict]:

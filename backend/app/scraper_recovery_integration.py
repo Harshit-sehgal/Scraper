@@ -1,5 +1,4 @@
-"""
-Scraper Recovery Integration — Wraps scrape_url with intelligent recovery.
+"""Scraper Recovery Integration — Wraps scrape_url with intelligent recovery.
 
 Provides a recovery-aware wrapper around scrape_url that:
   1. Executes the initial scrape_url call
@@ -24,11 +23,11 @@ from typing import TYPE_CHECKING, Any
 from app.config import settings
 from app.domain_intelligence import get_domain_intelligence
 from app.failure_classification import FailureCategory, classify_failure
-from app.models import SchemaField
 from app.selector_memory import get_selector_memory
 
 if TYPE_CHECKING:
     from app.acquisition_state import AcquisitionLineage, AcquisitionState
+    from app.models import SchemaField
     from app.recovery_strategies import AttemptContext, get_recovery_executor, get_recovery_strategist
 else:
     # --- Dynamic delegation to research-shell modules to keep imports lazy but mockable ---
@@ -120,6 +119,7 @@ async def scrape_url_with_recovery(
         Tuple of (results, recovery_stats) where:
             - results: Extracted records (empty list if all attempts failed)
             - recovery_stats: Dictionary with recovery information
+
     """
     from app.scraper import scrape_url_attempt
 
@@ -256,7 +256,7 @@ async def scrape_url_with_recovery(
             )
             return results, recovery_stats
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             last_error = e
             error_msg = str(e)
 

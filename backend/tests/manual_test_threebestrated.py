@@ -5,14 +5,13 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 
-async def scrape_threebest():
+async def scrape_threebest() -> None:
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         )
         page = await context.new_page()
-        print("Navigating to Three Best Rated...")
         await page.goto("https://threebestrated.in/interior-designers-in-chennai", wait_until="networkidle")
 
         # Scrape content
@@ -30,7 +29,6 @@ async def scrape_threebest():
             businesses = soup.select("div.col-md-4")
 
         # Let's try broad selection if class names change
-        print(f"Discovered {len(businesses)} potential elements. Refining...")
 
         # We can also just read the raw text block if classes fail
         soup.get_text(separator="\n").split("\n")
@@ -79,8 +77,6 @@ async def scrape_threebest():
                 seen.add(b["company_name"])
                 unique_designers.append(b)
 
-        print(f"Extracted {len(unique_designers)} verified designers.")
-
         with open(
             "/home/harshit/Documents/Work/Money/scraper/chennai_interior_designers.csv",
             "w",
@@ -90,7 +86,6 @@ async def scrape_threebest():
             writer = csv.DictWriter(f, fieldnames=["company_name", "phone", "address_or_location", "rating"])
             writer.writeheader()
             writer.writerows(unique_designers)
-        print("Saved to CSV.")
 
 
 if __name__ == "__main__":

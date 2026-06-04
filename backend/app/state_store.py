@@ -52,9 +52,7 @@ def _validate_payload(payload: dict) -> bool:
         return False
     if "jobs" in payload and not isinstance(payload["jobs"], list):
         return False
-    if "recycle_bin" in payload and not isinstance(payload["recycle_bin"], list):
-        return False
-    return True
+    return not ("recycle_bin" in payload and not isinstance(payload["recycle_bin"], list))
 
 
 def _try_load_from(path: Path) -> dict | None:
@@ -67,12 +65,12 @@ def _try_load_from(path: Path) -> dict | None:
         logging.error("State file %s failed structural validation", path)
     except FileNotFoundError:
         logging.warning("State file not found: %s", path)
-    except json.JSONDecodeError as e:
-        logging.error("State file %s contains invalid JSON: %s", path, e)
+    except json.JSONDecodeError:
+        logging.exception("State file %s contains invalid JSON", path)
     except PermissionError:
-        logging.error("Permission denied reading state file: %s", path)
-    except OSError as e:
-        logging.error("OS error reading state file %s: %s", path, e)
+        logging.exception("Permission denied reading state file: %s", path)
+    except OSError:
+        logging.exception("OS error reading state file %s", path)
     return None
 
 
@@ -164,10 +162,9 @@ def _write_state_to_disk(path: Path, payload: dict) -> None:
                 )
             else:
                 logging.exception(
-                    "Failed to persist state after %d attempts to %s: %s",
+                    "Failed to persist state after %d attempts to %s",
                     _SAVE_RETRIES,
                     path,
-                    e,
                 )
 
 
@@ -182,8 +179,8 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
 
         ws = get_world_state()
         world_state_data = ws.to_dict()
-    except Exception as e:
-        logging.exception("Failed to serialize semantic world state: %s", e)
+    except Exception:
+        logging.exception("Failed to serialize semantic world state: %s")
 
     payload = {
         "saved_at": _now_iso(),
@@ -195,7 +192,7 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
     _SAVE_EXECUTOR.submit(_write_state_to_disk, path, payload)
 
 
-def flush_state_writes():
+def flush_state_writes() -> None:
     """Wait for all pending background state writes to complete.
 
     Should be called during graceful shutdown to ensure no state is lost.

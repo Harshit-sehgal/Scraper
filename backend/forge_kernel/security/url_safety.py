@@ -1,5 +1,4 @@
-"""
-URL safety — SSRF-oriented validation for public HTTP URLs.
+"""URL safety — SSRF-oriented validation for public HTTP URLs.
 
 Ported from the existing app.url_safety module with minimal changes.
 """
@@ -20,9 +19,7 @@ def _is_safe_ip(ip_str: str) -> bool:
     """Return True if the IP address is a public, routable IP address."""
     try:
         ip = ipaddress.ip_address(ip_str)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
-            return False
-        return True
+        return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified)
     except ValueError:
         return False
 

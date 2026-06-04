@@ -13,7 +13,7 @@ from app.transaction_context import active_transaction
 class AbstractionState:
     """Sole owner of the semantic field's hierarchical abstractions."""
 
-    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None) -> None:
         self._delta_callback = delta_callback
         # Envelopes: envelope_id -> {constituents: Set[str], manifold_vec:
         # list, level: int}
@@ -29,32 +29,32 @@ class AbstractionState:
         return None
 
     @_staging.setter
-    def _staging(self, value: dict | None):
+    def _staging(self, value: dict | None) -> None:
         tx = active_transaction.get()
         if tx is not None:
             tx[f"abstraction_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict):
+    def _record(self, action: str, details: dict) -> None:
         if self._delta_callback:
             self._delta_callback("abstraction", action, details)
 
     # ─── Transaction Support ─────────────────────────────────────────────
 
-    def begin_transaction(self):
+    def begin_transaction(self) -> None:
         """Snapshot current state for staging."""
         self._staging = {
             "envelopes": {k: dict(v) for k, v in self._envelopes.items()},
             "role_levels": dict(self._role_levels),
         }
 
-    def commit(self):
+    def commit(self) -> None:
         """Apply staged changes."""
         if self._staging is not None:
             self._envelopes = self._staging["envelopes"]
             self._role_levels = self._staging["role_levels"]
             self._staging = None
 
-    def rollback(self):
+    def rollback(self) -> None:
         self._staging = None
 
     def _get_struct(self, key: str):
@@ -63,7 +63,7 @@ class AbstractionState:
         attr_map = {"envelopes": "_envelopes", "role_levels": "_role_levels"}
         return getattr(self, attr_map[key])
 
-    def _set_struct(self, key: str, val):
+    def _set_struct(self, key: str, val) -> None:
         if self._staging is not None:
             self._staging[key] = val
         else:
@@ -72,7 +72,7 @@ class AbstractionState:
 
     # ─── Controlled Mutations ────────────────────────────────────────────
 
-    def create_envelope(self, envelope_id: str, constituents: list[str], manifold_vec: list[float], level: int = 1):
+    def create_envelope(self, envelope_id: str, constituents: list[str], manifold_vec: list[float], level: int = 1) -> None:
         """Distill a set of roles into a singular higher-order envelope (Phase 38)."""
         envelopes = self._get_struct("envelopes")
         levels = self._get_struct("role_levels")
@@ -97,7 +97,7 @@ class AbstractionState:
             },
         )
 
-    def dissolve_envelope(self, envelope_id: str):
+    def dissolve_envelope(self, envelope_id: str) -> None:
         """Dissolve a higher-order concept back into its constituents."""
         envelopes = self._get_struct("envelopes")
         levels = self._get_struct("role_levels")
@@ -139,7 +139,7 @@ class AbstractionState:
             },
         }
 
-    def from_dict(self, data: dict):
+    def from_dict(self, data: dict) -> None:
         self.clear()
         abs_data = data.get("abstraction", {})
         raw_envelopes = abs_data.get("envelopes", {})
@@ -149,6 +149,6 @@ class AbstractionState:
         }
         self._role_levels = dict(abs_data.get("role_levels", {}))
 
-    def clear(self):
+    def clear(self) -> None:
         self._set_struct("envelopes", {})
         self._set_struct("role_levels", {})

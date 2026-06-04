@@ -21,7 +21,7 @@ from app.transaction_context import active_transaction
 class HistoryState:
     """Sole owner of the semantic field's diagnostic / history structures."""
 
-    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None) -> None:
         self._delta_callback = delta_callback
         self._decision_history: list = []
         self._topology_snapshots: list = []
@@ -39,14 +39,14 @@ class HistoryState:
         return None
 
     @_staging.setter
-    def _staging(self, value: dict | None):
+    def _staging(self, value: dict | None) -> None:
         tx = active_transaction.get()
         if tx is not None:
             tx[f"history_staging_{id(self)}"] = value
 
     # ─── Transaction Support ─────────────────────────────────────────────
 
-    def begin_transaction(self):
+    def begin_transaction(self) -> None:
         """Snapshot current state for staging."""
         self._staging = {
             "decision_history": list(self._decision_history),
@@ -58,7 +58,7 @@ class HistoryState:
             "field_activation_count": self._field_activation_count,
         }
 
-    def commit(self):
+    def commit(self) -> None:
         """Apply staged changes to the active state."""
         if self._staging is not None:
             self._decision_history = self._staging["decision_history"]
@@ -70,7 +70,7 @@ class HistoryState:
             self._field_activation_count = self._staging["field_activation_count"]
             self._staging = None
 
-    def rollback(self):
+    def rollback(self) -> None:
         """Discard staged changes."""
         self._staging = None
 
@@ -88,7 +88,7 @@ class HistoryState:
         }
         return getattr(self, attr_map[key])
 
-    def _set_val(self, key: str, val: Any):
+    def _set_val(self, key: str, val: Any) -> None:
         if self._staging is not None:
             self._staging[key] = val
         else:
@@ -117,7 +117,7 @@ class HistoryState:
         return list(self._get_val("decision_history"))
 
     @decision_history.setter
-    def decision_history(self, value: list):
+    def decision_history(self, value: list) -> None:
         self._set_val("decision_history", list(value))
 
     @property
@@ -125,7 +125,7 @@ class HistoryState:
         return list(self._get_val("topology_snapshots"))
 
     @topology_snapshots.setter
-    def topology_snapshots(self, value: list):
+    def topology_snapshots(self, value: list) -> None:
         self._set_val("topology_snapshots", list(value))
 
     @property
@@ -137,7 +137,7 @@ class HistoryState:
         return self._get_val("field_activation_count")  # type: ignore[no-any-return]
 
     @field_activation_count.setter
-    def field_activation_count(self, value: int):
+    def field_activation_count(self, value: int) -> None:
         self._set_val("field_activation_count", int(value))
 
     def crystalline_count(self) -> int:
@@ -182,21 +182,21 @@ class HistoryState:
 
     # ─── Resource Management ────────────────────────────────────────────
 
-    def trim_journal(self, max_entries: int = 500):
+    def trim_journal(self, max_entries: int = 500) -> None:
         """Trim the transaction journal to free memory (Phase 47)."""
         journal = self._get_val("transaction_journal")
         if len(journal) > max_entries:
             self._set_val("transaction_journal", journal[-max_entries:])
             self._record("trim_journal", {"kept": max_entries})
 
-    def trim_snapshots(self, max_size: int = 100, keep: int = 50):
+    def trim_snapshots(self, max_size: int = 100, keep: int = 50) -> None:
         """Trim the topology snapshots to free memory (Phase 47)."""
         snapshots = self._get_val("topology_snapshots")
         if len(snapshots) > max_size:
             self._set_val("topology_snapshots", snapshots[-keep:])
             self._record("trim_snapshots", {"max_size": max_size, "keep": keep})
 
-    def merge_journal(self, remote_journal: list):
+    def merge_journal(self, remote_journal: list) -> None:
         """Merge a remote transaction journal into local history (Phase 67).
 
         Identifies missing transactions using trace_id and inserts them in
@@ -222,24 +222,24 @@ class HistoryState:
 
     # ─── Controlled Mutations: Decision History ─────────────────────────
 
-    def _record(self, action: str, details: dict):
+    def _record(self, action: str, details: dict) -> None:
         if self._delta_callback:
             self._delta_callback("history", action, details)
 
-    def record_decision(self, entry: dict):
+    def record_decision(self, entry: dict) -> None:
         dh = self._get_val("decision_history")
         dh.append(entry)
         self._set_val("decision_history", dh)
         self._record("record_decision", {"entry": entry})
 
-    def trim_decision_history(self, max_size: int = 1000, keep: int = 500):
+    def trim_decision_history(self, max_size: int = 1000, keep: int = 500) -> None:
         dh = self._get_val("decision_history")
         if len(dh) > max_size:
             dh = dh[-keep:]
             self._set_val("decision_history", dh)
         self._record("trim_decision_history", {"max_size": max_size, "keep": keep})
 
-    def clear_decision_history(self):
+    def clear_decision_history(self) -> None:
         self._set_val("decision_history", [])
         self._record("clear_decision_history", {})
 
@@ -249,7 +249,7 @@ class HistoryState:
         recent = dh[-n:]
         return [dict(d) if isinstance(d, dict) else d for d in recent]
 
-    def update_recent_decision_metadata(self, recent_copy: list, coherence: float, threshold: float):
+    def update_recent_decision_metadata(self, recent_copy: list, coherence: float, threshold: float) -> None:
         """Update matching recent decisions in the real history.
 
         Takes a COPY previously returned by get_recent_decisions, updates
@@ -276,7 +276,7 @@ class HistoryState:
 
     # ─── Controlled Mutations: Topology Snapshots ────────────────────────
 
-    def add_snapshot(self, snapshot: dict):
+    def add_snapshot(self, snapshot: dict) -> None:
         ts = self._get_val("topology_snapshots")
         ts.append(snapshot)
         self._set_val("topology_snapshots", ts)
@@ -307,7 +307,7 @@ class HistoryState:
 
     # ─── Controlled Mutations: Crystalline Records ───────────────────────
 
-    def synthesize_crystalline(self, record: dict, current_record: int):
+    def synthesize_crystalline(self, record: dict, current_record: int) -> None:
         """Synthesize a high-integrity knowledge record with temporal awareness."""
         record["_record_index"] = current_record
         cr = self._get_val("crystalline_records")
@@ -343,7 +343,7 @@ class HistoryState:
                 score += weight
         return min(1.0, score)
 
-    def record_transaction(self, tx: dict, capacity: int = 1000):
+    def record_transaction(self, tx: dict, capacity: int = 1000) -> None:
         tj = self._get_val("transaction_journal")
         tj.append(tx)
         if len(tj) > capacity:
@@ -375,7 +375,7 @@ class HistoryState:
             "field_activation_count": self.field_activation_count,
         }
 
-    def from_dict(self, data: dict):
+    def from_dict(self, data: dict) -> None:
         self.clear()
         self._set_val("decision_history", list(data.get("decision_history", [])))
         self._set_val("topology_snapshots", list(data.get("topology_snapshots", [])))
@@ -385,7 +385,7 @@ class HistoryState:
         self._set_val("solidified_motifs", list(data.get("solidified_motifs", [])))
         self._set_val("field_activation_count", data.get("field_activation_count", 0))
 
-    def clear(self):
+    def clear(self) -> None:
         self._set_val("decision_history", [])
         self._set_val("topology_snapshots", [])
         self._set_val("transaction_journal", [])

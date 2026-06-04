@@ -14,7 +14,7 @@ from app.main import app
 class LocalASGIClient:
     """Small sync wrapper around httpx ASGITransport that avoids TestClient threads."""
 
-    def __init__(self, app):
+    def __init__(self, app) -> None:
         self.app = app
 
     async def _request(self, method: str, url: str, **kwargs):
@@ -57,11 +57,11 @@ class TestHealthEndpoint:
 class TestReadyEndpoint:
     """Tests for the /ready readiness probe."""
 
-    def _mock_sqlite_backend(self, monkeypatch):
+    def _mock_sqlite_backend(self, monkeypatch) -> None:
         """Force SQLite backend for tests that assert sqlite-specific behavior."""
         from app.storage_interface import SQLiteJobRepository
 
-        monkeypatch.setattr("app.main.get_job_repository", lambda: SQLiteJobRepository())
+        monkeypatch.setattr("app.main.get_job_repository", SQLiteJobRepository)
 
     def test_ready_returns_storage_ok(self) -> None:
         """/ready should check SQLite and return status."""
@@ -143,7 +143,7 @@ class TestDomainPolicyEndpoint:
         policy.record_success("https://test-fields-ok.com/page")
         response = client.get("/api/system/domain-policy")
         data = response.json()
-        for domain_key, entry in data.items():
+        for entry in data.values():
             assert "max_parallel" in entry
             assert "cooldown_remaining" in entry
             assert "recent_failures" in entry
@@ -154,11 +154,11 @@ class TestDomainPolicyEndpoint:
 class TestStorageStatusEndpoint:
     """Tests for the /api/system/storage/status endpoint."""
 
-    def _mock_sqlite_backend(self, monkeypatch):
+    def _mock_sqlite_backend(self, monkeypatch) -> None:
         """Force SQLite backend for tests that assert sqlite-specific behavior."""
         from app.storage_interface import SQLiteJobRepository
 
-        monkeypatch.setattr("app.main.get_job_repository", lambda: SQLiteJobRepository())
+        monkeypatch.setattr("app.main.get_job_repository", SQLiteJobRepository)
 
     def test_storage_status_returns_200(self, monkeypatch) -> None:
         """Storage status should return 200 with SQLite backend info."""

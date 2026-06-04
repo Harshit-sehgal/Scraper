@@ -1,5 +1,4 @@
-"""
-Unit Tests for the JSON State Store.
+"""Unit Tests for the JSON State Store.
 Tests state persistence: loading, saving, path resolution, and recovery of
 in-progress jobs after restart.
 """
@@ -70,9 +69,9 @@ class TestGetStateFilePath:
         """With env override, returns the configured path."""
         old = os.environ.get("DATAFORGE_STATE_FILE")
         try:
-            os.environ["DATAFORGE_STATE_FILE"] = "/tmp/test_state.json"
+            os.environ["DATAFORGE_STATE_FILE"] = "/tmp/test_state.json"  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
             path = get_state_file_path()
-            assert str(path) == "/tmp/test_state.json"
+            assert str(path) == "/tmp/test_state.json"  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
         finally:
             if old is not None:
                 os.environ["DATAFORGE_STATE_FILE"] = old
@@ -88,7 +87,7 @@ class TestLoadState:
         """When the state file doesn't exist, returns empty stores."""
         # Use a path that doesn't exist
         old = os.environ.get("DATAFORGE_STATE_FILE")
-        os.environ["DATAFORGE_STATE_FILE"] = "/tmp/nonexistent-state-file.json"
+        os.environ["DATAFORGE_STATE_FILE"] = "/tmp/nonexistent-state-file.json"  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
         try:
             jobs, recycle, world_state = load_state()
             assert jobs == {}

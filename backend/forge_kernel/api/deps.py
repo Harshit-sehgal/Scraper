@@ -1,16 +1,19 @@
-"""
-FastAPI dependencies — RBAC, rate limiting, and shared state.
+"""FastAPI dependencies — RBAC, rate limiting, and shared state.
 
 Provides dependency injection for the kernel's API layer.
 """
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from fastapi import HTTPException, Request, status
 
-from forge_kernel.contracts.job import Job
 from forge_kernel.security.rate_limiter import get_global_limiter
 from forge_kernel.security.rbac import UserRole, require_role
+
+if TYPE_CHECKING:
+    from forge_kernel.contracts.job import Job
 
 # ─── Shared stores ───────────────────────────────────────────────────────
 # These are the authoritative in-memory stores for the kernel.
@@ -31,7 +34,7 @@ def get_recycle_bin_store() -> dict[str, Job]:
 # ─── Rate limiting dependency ───────────────────────────────────────────
 
 
-async def check_global_rate_limit(request: Request):
+async def check_global_rate_limit(request: Request) -> bool:
     """FastAPI middleware/ dependency for global rate limiting."""
     limiter = get_global_limiter()
     client_ip = request.client.host if request.client else "unknown"

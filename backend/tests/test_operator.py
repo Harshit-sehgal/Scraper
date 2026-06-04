@@ -19,7 +19,7 @@ from fastapi import FastAPI
 class LocalASGIClient:
     """Small sync wrapper around httpx ASGITransport that avoids TestClient threads."""
 
-    def __init__(self, app):
+    def __init__(self, app) -> None:
         self.app = app
 
     async def _request(self, method: str, url: str, **kwargs):

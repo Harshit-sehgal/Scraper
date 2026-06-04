@@ -1,5 +1,4 @@
-"""
-Quality scoring — record quality assessment and quality report generation.
+"""Quality scoring — record quality assessment and quality report generation.
 
 Ported from existing app.utils.quality and app.content_quality modules.
 """

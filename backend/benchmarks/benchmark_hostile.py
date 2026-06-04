@@ -1,5 +1,4 @@
-"""
-Hostile Benchmarks — Stress testing the scraper against malformed and dynamic content.
+"""Hostile Benchmarks — Stress testing the scraper against malformed and dynamic content.
 
 Targets:
   - Broken HTML (missing tags, malformed attributes)
@@ -31,7 +30,7 @@ app = FastAPI()
 
 
 @app.get("/broken", response_class=HTMLResponse)
-async def broken_html():
+async def broken_html() -> str:
     return """
     <html><body>
     <div id="content">
@@ -48,7 +47,7 @@ async def broken_html():
 
 
 @app.get("/dynamic", response_class=HTMLResponse)
-async def dynamic_html():
+async def dynamic_html() -> str:
     return """
     <html><body>
     <div id="root">Loading records...</div>
@@ -66,7 +65,7 @@ async def dynamic_html():
 
 
 @app.get("/anti-bot", response_class=HTMLResponse)
-async def anti_bot():
+async def anti_bot() -> str:
     return """
     <html><head><title>Just a moment...</title></head>
     <body>
@@ -81,7 +80,7 @@ async def anti_bot():
 
 
 @app.get("/lazy", response_class=HTMLResponse)
-async def lazy_load():
+async def lazy_load() -> str:
     return """
     <html><body>
     <div id="list" style="height: 2000px;">
@@ -104,7 +103,7 @@ async def lazy_load():
 
 
 @app.get("/infinite", response_class=HTMLResponse)
-async def infinite_scroll():
+async def infinite_scroll() -> str:
     return """
     <html><body style="min-height: 200vh;">
     <div id="content">
@@ -133,7 +132,7 @@ async def infinite_scroll():
 
 
 @app.get("/malformed", response_class=HTMLResponse)
-async def malformed_dom():
+async def malformed_dom() -> str:
     return """
     <html><body>
     <div class="container">
@@ -153,11 +152,11 @@ async def malformed_dom():
 # ─── Benchmark Runner ───────────────────────────────────────────────────
 
 
-def start_server():
+def start_server() -> None:
     uvicorn.run(app, host="127.0.0.1", port=8888, log_level="warning")
 
 
-async def run_benchmarks():
+async def run_benchmarks() -> None:
     fields = [
         SchemaField(name="item_name", field_type=FieldType.STRING, description="", required=True),
         SchemaField(name="price", field_type=FieldType.CURRENCY, description="", required=False),
@@ -173,19 +172,14 @@ async def run_benchmarks():
         ("Malformed DOM", f"{base_url}/malformed", 2),
     ]
 
-    print("\n" + "=" * 60)
-    print(" DATAFORGE SCRAPER HOSTILE BENCHMARKS")
-    print("=" * 60 + "\n")
-
     telemetry = get_scrape_telemetry()
 
     for name, url, expected in tests:
-        print(f"Testing: {name:20} ... ", end="", flush=True)
         start = time.time()
 
         try:
             results = await scrape_url(url, fields, min_record_score=0.2)
-            elapsed = time.time() - start
+            time.time() - start
 
             # Check telemetry for this URL
             recent = telemetry.get_recent(1)
@@ -197,19 +191,11 @@ async def run_benchmarks():
             elif name == "Anti-Bot Detection" and len(results) == 0:
                 status = "PASSED (Blocked)"
 
-            print(f"{status:15} | Records: {len(results):2} | Time: {elapsed:5.2f}s")
+            if status.startswith("FAILED") and results:
+                pass
 
-            if status.startswith("FAILED"):
-                print(f"  -> Error/Telemetry: {t_data.get('error') or 'None'}")
-                if results:
-                    print(f"  -> Sample: {results[0]}")
-
-        except Exception as e:
-            print(f"ERROR: {e}")
-
-    print("\n" + "=" * 60)
-    print(" BENCHMARKS COMPLETE")
-    print("=" * 60 + "\n")
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

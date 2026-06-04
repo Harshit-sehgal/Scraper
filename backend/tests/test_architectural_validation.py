@@ -1,6 +1,5 @@
-"""
-DataForge Architectural Validation Tests
-Phase 5 Week 3-4: Enforce layer boundaries and architectural rules
+"""DataForge Architectural Validation Tests
+Phase 5 Week 3-4: Enforce layer boundaries and architectural rules.
 
 This test suite validates:
 1. Layer boundary compliance (no backward dependencies)
@@ -17,23 +16,23 @@ import pytest
 
 
 class ArchitecturalValidator:
-    """Core validator for architectural rules"""
+    """Core validator for architectural rules."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.app_dir = Path(__file__).resolve().parent.parent / "app"
         self.imports_map: dict[str, set[str]] = {}
         self.layer_map: dict[str, str] = {}
         self._parse_all_modules()
 
     def _detect_layer(self, module_name: str) -> str:
-        """Detect which architectural layer a module belongs to"""
+        """Detect which architectural layer a module belongs to."""
         if any(x in module_name for x in ["selector", "extraction", "dom_", "xpath", "css_", "cleaning"]):
             return "Extract"
-        elif any(
+        if any(
             x in module_name for x in ["memory", "state_", "cache_", "checkpoint", "graph_state", "persistent", "world_snapshot"]
         ):
             return "Memory"
-        elif any(
+        if any(
             x in module_name
             for x in [
                 "llm",
@@ -49,21 +48,20 @@ class ArchitecturalValidator:
             ]
         ):
             return "Intelligence"
-        elif any(x in module_name for x in ["browser", "proxy", "rate_limiter", "fetch_"]):
+        if any(x in module_name for x in ["browser", "proxy", "rate_limiter", "fetch_"]):
             return "Fetch"
-        elif any(x in module_name for x in ["crawl_", "seedlist"]):
+        if any(x in module_name for x in ["crawl_", "seedlist"]):
             return "Crawl"
-        elif any(x in module_name for x in ["gossip", "heartbeat", "transactional_", "distributed_"]):
+        if any(x in module_name for x in ["gossip", "heartbeat", "transactional_", "distributed_"]):
             return "Distributed"
-        elif any(x in module_name for x in ["telemetry", "observability", "event_", "metrics_"]):
+        if any(x in module_name for x in ["telemetry", "observability", "event_", "metrics_"]):
             return "Telemetry"
-        elif any(x in module_name for x in ["ml_optimizer", "decay_", "self_tuning"]):
+        if any(x in module_name for x in ["ml_optimizer", "decay_", "self_tuning"]):
             return "ML"
-        else:
-            return "Utility"
+        return "Utility"
 
-    def _parse_all_modules(self):
-        """Parse all Python modules and extract dependencies"""
+    def _parse_all_modules(self) -> None:
+        """Parse all Python modules and extract dependencies."""
         files = list(self.app_dir.glob("*.py"))
         ws_pkg = self.app_dir / "semantic_world_state"
         if ws_pkg.is_dir():
@@ -95,19 +93,19 @@ class ArchitecturalValidator:
                                     imports.add(imported)
 
                 self.imports_map[module_name] = imports
-            except Exception as e:
-                print(f"Warning: Failed to parse {py_file}: {e}")
+            except Exception:
+                pass
 
     def get_layer(self, module: str) -> str:
-        """Get the layer of a module"""
+        """Get the layer of a module."""
         return self.layer_map.get(module, "Utility")
 
     def get_imports(self, module: str) -> set[str]:
-        """Get imports of a module"""
+        """Get imports of a module."""
         return self.imports_map.get(module, set())
 
     def get_dependents(self, module: str) -> set[str]:
-        """Get modules that import the given module"""
+        """Get modules that import the given module."""
         deps = set()
         for mod, imports in self.imports_map.items():
             if module in imports:
@@ -121,17 +119,17 @@ class ArchitecturalValidator:
 
 
 class TestLayerBoundaries:
-    """Test that architectural layer boundaries are respected"""
+    """Test that architectural layer boundaries are respected."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def setup(self) -> None:
         self.validator = ArchitecturalValidator()
         # Layer ordering (layer index determines hierarchy)
         self.layer_order = ["Utility", "Fetch", "Crawl", "Distributed", "Telemetry", "Memory", "Extract", "ML", "Intelligence"]
         self.layer_index = {layer: i for i, layer in enumerate(self.layer_order)}
 
     def test_no_backward_dependencies(self) -> None:
-        """FAIL: Lower layers should never import from higher layers"""
+        """FAIL: Lower layers should never import from higher layers."""
         backward_deps = []
 
         for module, imports in self.validator.imports_map.items():
@@ -152,7 +150,7 @@ class TestLayerBoundaries:
         )
 
     def test_utility_isolation(self) -> None:
-        """PASS: Utility layer should not import from any other layer"""
+        """PASS: Utility layer should not import from any other layer."""
         utility_modules = [m for m, layer in self.validator.layer_map.items() if layer == "Utility"]
         utility_imports_higher = []
 
@@ -167,7 +165,7 @@ class TestLayerBoundaries:
         assert len(utility_imports_higher) == 0, f"Utility layer has {len(utility_imports_higher)} imports from higher layers"
 
     def test_layer_import_rules(self) -> None:
-        """Test specific layer import rules"""
+        """Test specific layer import rules."""
         violations = []
 
         # Rule 1: Fetch layer only imports Utility
@@ -198,7 +196,7 @@ class TestLayerBoundaries:
         assert len(violations) == 0, f"Found {len(violations)} layer import rule violations:\n" + "\n".join(violations[:5])
 
     def test_extract_layer_dependencies(self) -> None:
-        """Extract layer should primarily depend on Memory, not Intelligence"""
+        """Extract layer should primarily depend on Memory, not Intelligence."""
         extract_modules = [m for m, layer in self.validator.layer_map.items() if layer == "Extract"]
         intelligence_deps = []
 
@@ -215,7 +213,7 @@ class TestLayerBoundaries:
         )
 
     def test_intelligence_import_boundaries(self) -> None:
-        """Intelligence layer can import from all lower layers"""
+        """Intelligence layer can import from all lower layers."""
         intelligence_modules = [m for m, layer in self.validator.layer_map.items() if layer == "Intelligence"]
         invalid_imports = []
 
@@ -223,7 +221,7 @@ class TestLayerBoundaries:
             for imp in self.validator.get_imports(intel_mod):
                 imp_layer = self.validator.get_layer(imp)
                 # Intelligence should NOT import from higher layers
-                if imp_layer in ["Intelligence"]:  # Allow self-imports
+                if imp_layer == "Intelligence":  # Allow self-imports
                     pass
                 elif imp_layer not in ["Utility", "Fetch", "Crawl", "Memory", "Extract", "ML", "Distributed", "Telemetry"]:
                     invalid_imports.append((intel_mod, imp, imp_layer))
@@ -237,14 +235,14 @@ class TestLayerBoundaries:
 
 
 class TestCircularDependencies:
-    """Test circular dependency constraints"""
+    """Test circular dependency constraints."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def setup(self) -> None:
         self.validator = ArchitecturalValidator()
 
     def _find_cycles(self, start: str, visited: set[str], path: list[str]) -> list[list[str]]:
-        """Find cycles using DFS"""
+        """Find cycles using DFS."""
         cycles = []
         current_imports = self.validator.get_imports(start)
 
@@ -252,21 +250,21 @@ class TestCircularDependencies:
             if imp in path:
                 # Found cycle
                 cycle_start = path.index(imp)
-                cycle = path[cycle_start:] + [imp]
+                cycle = [*path[cycle_start:], imp]
                 cycles.append(cycle)
             elif imp not in visited:
                 visited.add(imp)
-                cycles.extend(self._find_cycles(imp, visited, path + [imp]))
+                cycles.extend(self._find_cycles(imp, visited, [*path, imp]))
 
         return cycles
 
     def test_no_cycles_in_foundation(self) -> None:
-        """PASS: Foundation layers (Utility, Fetch, Crawl) should have no cycles"""
+        """PASS: Foundation layers (Utility, Fetch, Crawl) should have no cycles."""
         foundation_modules = [m for m, layer in self.validator.layer_map.items() if layer in ["Utility", "Fetch", "Crawl"]]
 
         cycles = []
         for mod in foundation_modules:
-            found = self._find_cycles(mod, set([mod]), [mod])
+            found = self._find_cycles(mod, {mod}, [mod])
             cycles.extend(found)
 
         # Allow config self-import (known bug), but no others
@@ -275,15 +273,15 @@ class TestCircularDependencies:
         assert len(non_config_cycles) == 0, f"Found {len(non_config_cycles)} cycles in foundation layers"
 
     def test_cycles_contained_in_layers(self) -> None:
-        """Test that cycles are contained within layers"""
+        """Test that cycles are contained within layers."""
         cycles_found = []
 
         # Do a simple cycle detection
         visited_global = set()
-        for module in self.validator.imports_map.keys():
+        for module in self.validator.imports_map:
             if module in visited_global:
                 continue
-            visited = set([module])
+            visited = {module}
             cycles = self._find_cycles(module, visited, [module])
             for cycle in cycles:
                 cycles_found.append(cycle)
@@ -292,7 +290,7 @@ class TestCircularDependencies:
         # Check that cycles don't cross layer boundaries (mostly)
         cross_layer_cycles = []
         for cycle in cycles_found:
-            layers = set(self.validator.get_layer(m) for m in cycle)
+            layers = {self.validator.get_layer(m) for m in cycle}
             if len(layers) > 1:
                 # Allow some cross-layer cycles, but document them
                 if "Intelligence" not in layers:  # Intelligence allowed to have cross-layer
@@ -303,7 +301,7 @@ class TestCircularDependencies:
         ), f"Found {len(cross_layer_cycles)} cross-layer cycles (cycles should stay within layer)"
 
     def test_cycle_intentionality(self) -> None:
-        """Cycles should be intentional (learning loops, etc.)"""
+        """Cycles should be intentional (learning loops, etc.)."""
         # Known intentional cycles in system (for documentation):
         # 'selector_engine', 'selector_memory', 'domain_evolution_model'
         # This test is mostly documentary - cycles exist but are understood
@@ -317,14 +315,14 @@ class TestCircularDependencies:
 
 
 class TestStateOwnership:
-    """Test that state management follows clear ownership rules"""
+    """Test that state management follows clear ownership rules."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def setup(self) -> None:
         self.validator = ArchitecturalValidator()
 
     def test_semantic_world_state_dependencies(self) -> None:
-        """semantic_world_state should not have more than 30 dependents (already too high)"""
+        """semantic_world_state should not have more than 30 dependents (already too high)."""
         dependents = self.validator.get_dependents("semantic_world_state")
 
         # Current: 25 dependents (high but acceptable for now)
@@ -332,7 +330,7 @@ class TestStateOwnership:
         assert len(dependents) <= 30, f"semantic_world_state has {len(dependents)} dependents (target: <15)"
 
     def test_memory_layer_state_ownership(self) -> None:
-        """Memory layer modules should own state, not Intelligence"""
+        """Memory layer modules should own state, not Intelligence."""
         intelligence_state_access = []
 
         # Intelligence should READ from memory, not WRITE state
@@ -353,7 +351,7 @@ class TestStateOwnership:
             assert count <= 5, f"{intel_mod} accesses {count} Memory modules (max 5)"
 
     def test_no_state_leakage_between_layers(self) -> None:
-        """State should not leak between non-adjacent layers"""
+        """State should not leak between non-adjacent layers."""
         violations = []
 
         for module, imports in self.validator.imports_map.items():
@@ -368,7 +366,7 @@ class TestStateOwnership:
         assert len(violations) == 0, f"Found {len(violations)} state leakage violations between non-adjacent layers"
 
     def test_consistent_state_access_patterns(self) -> None:
-        """State access should follow consistent patterns"""
+        """State access should follow consistent patterns."""
         # Pattern 1: Memory state always queried before used (no direct modification without query)
         # Pattern 2: State updates logged (for auditability)
         # Pattern 3: Concurrent state access protected
@@ -384,14 +382,14 @@ class TestStateOwnership:
 
 
 class TestAsyncBoundaries:
-    """Test that async boundaries are properly enforced"""
+    """Test that async boundaries are properly enforced."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def setup(self) -> None:
         self.validator = ArchitecturalValidator()
 
     def test_no_blocking_in_async_paths(self) -> None:
-        """Async functions should not have blocking I/O"""
+        """Async functions should not have blocking I/O."""
         # Check source code for blocking patterns in async functions
         async_violations = []
 
@@ -410,7 +408,7 @@ class TestAsyncBoundaries:
         assert len(async_violations) == 0, f"Found {len(async_violations)} async functions with blocking I/O"
 
     def test_scheduler_update_guards(self) -> None:
-        """graph_update_scheduler should have guards preventing infinite updates"""
+        """graph_update_scheduler should have guards preventing infinite updates."""
         scheduler_file = Path(__file__).resolve().parent.parent / "app" / "graph_update_scheduler.py"
 
         if scheduler_file.exists():
@@ -427,7 +425,7 @@ class TestAsyncBoundaries:
             pytest.skip("graph_update_scheduler not found")
 
     def test_callback_stack_depth_limits(self) -> None:
-        """Callback chains should have depth limits to prevent stack overflow"""
+        """Callback chains should have depth limits to prevent stack overflow."""
         # Check for recursive callback patterns with guards
         violations = []
 
@@ -466,14 +464,14 @@ class TestAsyncBoundaries:
 
 
 class TestIntegrationPoints:
-    """Test that integration points between layers are well-defined"""
+    """Test that integration points between layers are well-defined."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def setup(self) -> None:
         self.validator = ArchitecturalValidator()
 
     def test_layer_interfaces_documented(self) -> None:
-        """Each layer should have documented interfaces"""
+        """Each layer should have documented interfaces."""
         layer_docs = {
             "Extract": "selector_engine",  # Primary public interface
             "Memory": "selector_memory",
@@ -486,7 +484,7 @@ class TestIntegrationPoints:
             assert primary_interface in self.validator.imports_map, f"Layer {layer} missing primary interface {primary_interface}"
 
     def test_cross_layer_dependency_justification(self) -> None:
-        """Major cross-layer dependencies should be justified"""
+        """Major cross-layer dependencies should be justified."""
         # Known justified dependencies:
         justified = {
             ("scraper", "semantic_world_state"),  # Orchestration
@@ -506,13 +504,13 @@ class TestIntegrationPoints:
                     pass  # Report but don't fail (known architectural debt)
 
     def test_hub_module_responsibilities(self) -> None:
-        """Hub modules should have clear, focused responsibilities"""
+        """Hub modules should have clear, focused responsibilities."""
         hubs = {
             "semantic_world_state": "Intelligence",  # 25 dependents (documented)
             "config": "Utility",  # 23 dependents (documented)
         }
 
-        for hub, expected_layer in hubs.items():
+        for hub in hubs:
             actual_layer = self.validator.get_layer(hub)
             # Allow hub to be in actual layer if it exists
             if hub in self.validator.layer_map:
@@ -522,7 +520,7 @@ class TestIntegrationPoints:
         assert "semantic_world_state" in self.validator.layer_map, "semantic_world_state should exist"
 
     def test_isolated_module_independence(self) -> None:
-        """Isolated modules should have minimal dependencies"""
+        """Isolated modules should have minimal dependencies."""
         isolated = ["selector_ml_optimizer", "trend_analyzer", "transactional_priority_queue"]
 
         for mod in isolated:
@@ -533,7 +531,7 @@ class TestIntegrationPoints:
                 assert imports <= 2, f"Isolated module {mod} has {imports} imports (max 2)"
 
     def test_plugin_interface_compliance(self) -> None:
-        """Plugin modules should implement expected interfaces"""
+        """Plugin modules should implement expected interfaces."""
         # ML modules should have standard inputs/outputs
         ml_modules = [m for m, layer in self.validator.layer_map.items() if layer == "ML"]
 

@@ -3,13 +3,16 @@ from __future__ import annotations
 import logging
 import secrets
 import time
+from typing import TYPE_CHECKING
 
-from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from app.audit_logger import log_auth_event
 from app.config import settings
 from app.rate_limiter import RateLimiterMiddleware
+
+if TYPE_CHECKING:
+    from fastapi import Request
 
 logger = logging.getLogger(__name__)
 
@@ -111,8 +114,7 @@ async def api_key_middleware(request: Request, call_next):
                     outcome="success",
                     details={"role": matched_role, "method": request.method},
                 )
-    response = await call_next(request)
-    return response
+    return await call_next(request)
 
 
 async def latency_tracking_middleware(request: Request, call_next):
@@ -121,8 +123,7 @@ async def latency_tracking_middleware(request: Request, call_next):
     if path.startswith("/api/") or path == "/metrics" or path in ("/health", "/ready"):
         start = time.time()
         try:
-            response = await call_next(request)
-            return response
+            return await call_next(request)
         finally:
             duration = time.time() - start
             from app.metrics_collector import record_request_latency

@@ -1,5 +1,4 @@
-"""
-Network / XHR Extractor — Extracts structured records from network JSON payloads,
+"""Network / XHR Extractor — Extracts structured records from network JSON payloads,
 hydration data, and script state objects.
 
 Priority order (highest first):
@@ -46,6 +45,7 @@ def extract_from_network(
 
     Returns:
         List of extracted records aligned to schema fields, or empty list.
+
     """
     if not schema_fields:
         return []
@@ -527,13 +527,13 @@ def _extract_from_nested_json(
 
     candidates: list[list[dict]] = []
 
-    def _walk(obj: Any, depth: int = 0):
+    def _walk(obj: Any, depth: int = 0) -> None:
         if depth > max_depth:
             return
 
         if isinstance(obj, dict):
             # Check if this dict has any key that looks like a record
-            for key, value in obj.items():
+            for value in obj.values():
                 if isinstance(value, list) and value:
                     # Check if this list contains structured records
                     records = []
@@ -835,6 +835,7 @@ def _extract_records_from_payloads(
 
     Returns:
         List of extracted records, or empty list.
+
     """
     if not payloads or not schema_fields:
         return []

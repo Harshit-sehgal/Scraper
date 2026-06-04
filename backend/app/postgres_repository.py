@@ -81,7 +81,7 @@ def _get_pool() -> pg_pool.ThreadedConnectionPool:
     return _pool
 
 
-def _close_pool():
+def _close_pool() -> None:
     """Close the connection pool."""
     global _pool
     if _pool is not None:
@@ -101,13 +101,13 @@ def _conn() -> Iterator[psycopg2.extensions.connection]:
     try:
         yield conn
         conn.commit()
-    except Exception:
+    except BaseException:
         conn.rollback()
         try:
             from app.metrics_collector import record_error
 
             record_error("database")
-        except Exception:  # nosec B110
+        except Exception:  # noqa: BLE001, nosec B110 - metrics must never break the caller
             pass
         raise
     finally:
@@ -224,7 +224,7 @@ def _build_create_recycle_bin_sql() -> str:
     return _RECYCLE_BIN_SQL.format(recycle_cols=cols)
 
 
-def _ensure_required_tables(conn):
+def _ensure_required_tables(conn) -> None:
     """Create required tables if they do not exist. Runs on every schema check."""
     _execute(conn, _build_create_jobs_sql())
 
@@ -236,9 +236,8 @@ def _ensure_required_tables(conn):
             _execute(conn, "SAVEPOINT alter_jobs_col")
             _execute(conn, f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col_def}")
             _execute(conn, "RELEASE SAVEPOINT alter_jobs_col")
-        except Exception:
+        except Exception:  # noqa: BLE001
             _execute(conn, "ROLLBACK TO SAVEPOINT alter_jobs_col")
-            pass
 
     _execute(conn, _build_create_recycle_bin_sql())
 
@@ -247,9 +246,8 @@ def _ensure_required_tables(conn):
             _execute(conn, "SAVEPOINT alter_recycle_col")
             _execute(conn, f"ALTER TABLE recycle_bin ADD COLUMN IF NOT EXISTS {col_def}")
             _execute(conn, "RELEASE SAVEPOINT alter_recycle_col")
-        except Exception:
+        except Exception:  # noqa: BLE001
             _execute(conn, "ROLLBACK TO SAVEPOINT alter_recycle_col")
-            pass
 
     for idx_sql in [
         "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
@@ -259,12 +257,11 @@ def _ensure_required_tables(conn):
             _execute(conn, "SAVEPOINT create_index")
             _execute(conn, idx_sql)
             _execute(conn, "RELEASE SAVEPOINT create_index")
-        except Exception:
+        except Exception:  # noqa: BLE001
             _execute(conn, "ROLLBACK TO SAVEPOINT create_index")
-            pass
 
 
-def _ensure_schema():
+def _ensure_schema() -> None:
     """Run schema migrations to ensure tables exist and are up to date.
 
     Always runs _ensure_required_tables() to repair missing tables even when
@@ -312,7 +309,6 @@ def _ensure_schema():
                     )
                 """,
                 )
-                pass
 
             _execute(conn, "DELETE FROM schema_version")
             _execute(conn, "INSERT INTO schema_version (version) VALUES (%s)", (_CURRENT_SCHEMA_VERSION,))
@@ -393,7 +389,7 @@ def _row_to_job(row: dict) -> Job | None:
         source_policy_str = row.get("source_policy", "all_sources")
         try:
             sp = SourcePolicy(source_policy_str)
-        except Exception:
+        except (ValueError, KeyError):
             sp = SourcePolicy.ALL_SOURCES
 
         return Job.model_validate(
@@ -435,14 +431,14 @@ def _row_to_job(row: dict) -> Job | None:
                 "pagination": bool(row.get("pagination", False)),
                 "deduplicate": bool(row.get("deduplicate", True)),
                 "deduplicate_field": row.get("deduplicate_field", ""),
-                "started_at": row.get("started_at") if row.get("started_at") else None,
+                "started_at": row.get("started_at") or None,
                 "results_on_disk": bool(row.get("results_on_disk", False)),
-                "results_file_path": row.get("results_file_path") if row.get("results_file_path") else None,
+                "results_file_path": row.get("results_file_path") or None,
                 "warnings": json.loads(row.get("warnings", "[]")),
                 "acquisition_mode": row.get("acquisition_mode", "standard"),
             },
         )
-    except Exception as e:
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
         logger.warning("Failed to deserialize Postgres job row: %s", e)
         return None
 
@@ -461,11 +457,11 @@ class PostgresJobRepository(JobRepository):
 
     backend = "postgres"
 
-    def __init__(self, auto_ensure_schema: bool = True):
+    def __init__(self, auto_ensure_schema: bool = True) -> None:
         self._auto_ensure_schema = auto_ensure_schema
         self._schema_ensured = False
 
-    def _ensure(self):
+    def _ensure(self) -> None:
         if self._auto_ensure_schema and not self._schema_ensured:
             _ensure_schema()
             self._schema_ensured = True
@@ -545,7 +541,7 @@ class PostgresJobRepository(JobRepository):
             if ws_row and ws_row.get("payload"):
                 try:
                     world_state_data = json.loads(ws_row["payload"])
-                except Exception as e:
+                except (json.JSONDecodeError, TypeError) as e:
                     logger.warning("Failed to deserialize world_state payload: %s", e)
 
             return jobs_store, recycle_store, world_state_data
@@ -569,9 +565,10 @@ class PostgresJobRepository(JobRepository):
             # Row keys come from the internal _job_to_row serializer and
             # should never contain user input, but we verify anyway.
             def _safe_cols(row):
-                for k in row.keys():
+                for k in row:
                     if not k.isidentifier():
-                        raise ValueError(f"Unsafe column name in _job_to_row: {k!r}")
+                        msg = f"Unsafe column name in _job_to_row: {k!r}"
+                        raise ValueError(msg)
                 return list(row.keys())
 
             for job in jobs.values():
@@ -632,7 +629,7 @@ class PostgresJobRepository(JobRepository):
             row = _job_to_row(job)
             cols = ", ".join(row.keys())
             ph = ", ".join("%s" for _ in row)
-            update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in row.keys() if k != "id")
+            update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in row if k != "id")
             _execute(
                 conn,
                 f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608 — cols/update_cols are model field names, not user input
@@ -669,7 +666,7 @@ class PostgresJobRepository(JobRepository):
             now = datetime.datetime.now().isoformat()
             _execute(conn, "UPDATE jobs SET deleted_at = %s WHERE id = %s", (now, job_id))
             # Upsert into recycle_bin
-            cols_to_copy = [k for k in row.keys() if k != "deleted_at"]
+            cols_to_copy = [k for k in row if k != "deleted_at"]
             insert_cols = ", ".join(cols_to_copy)
             insert_vals = ", ".join("%s" for _ in cols_to_copy)
             params = [row[k] for k in cols_to_copy] + [now]
@@ -690,7 +687,7 @@ class PostgresJobRepository(JobRepository):
             # Remove from recycle_bin and restore to jobs
             _execute(conn, "DELETE FROM recycle_bin WHERE id = %s", (job_id,))
             # Restore with deleted_at=NULL
-            cols = [k for k in row.keys() if k != "deleted_at"]
+            cols = [k for k in row if k != "deleted_at"]
             col_list = ", ".join(cols)
             ph = ", ".join("%s" for _ in cols)
             update_parts = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "id")
@@ -713,7 +710,8 @@ class PostgresJobRepository(JobRepository):
     def clear_terminal_jobs(self, older_than: str | None = None) -> int:
         """Remove terminal-status jobs older than the given timestamp.
         Only removes jobs that are completed, failed, canceled, degraded, or empty_result.
-        Moves them to recycle_bin before deletion."""
+        Moves them to recycle_bin before deletion.
+        """
         self._ensure()
         terminal_statuses = ("completed", "failed", "canceled", "degraded", "empty_result")
         with _conn() as conn:
@@ -726,7 +724,7 @@ class PostgresJobRepository(JobRepository):
             for row in rows:
                 now = datetime.datetime.now().isoformat()
                 _execute(conn, "UPDATE jobs SET deleted_at = %s WHERE id = %s", (now, row["id"]))
-                cols = [k for k in row.keys() if k != "deleted_at"]
+                cols = [k for k in row if k != "deleted_at"]
                 col_list = ", ".join(cols)
                 ph = ", ".join("%s" for _ in cols)
                 _execute(
@@ -746,7 +744,7 @@ class PostgresJobRepository(JobRepository):
             if row and row.get("payload"):
                 try:
                     return json.loads(row["payload"])  # type: ignore[no-any-return]
-                except Exception as e:
+                except (json.JSONDecodeError, TypeError) as e:
                     logger.warning("Failed to deserialize world_state payload: %s", e)
             return None
 
@@ -784,7 +782,7 @@ class PostgresJobRepository(JobRepository):
                     "recycle_bin_count": recycle_count or 0,
                 }
         except Exception as e:
-            logger.error("Postgres health check failed: %s", e)
+            logger.exception("Postgres health check failed: %s")
             return {
                 "ok": False,
                 "backend": "postgres",
@@ -801,7 +799,7 @@ def create_postgres_repository() -> PostgresJobRepository:
     return repo
 
 
-def shutdown_postgres():
+def shutdown_postgres() -> None:
     """Close the Postgres connection pool."""
     _close_pool()
 
@@ -829,5 +827,5 @@ def verify_postgres_connectivity() -> dict:
             conn.close()
     except ImportError as e:
         return {"ok": False, "error": f"psycopg2 not installed: {e}"}
-    except Exception as e:
+    except (psycopg2.OperationalError, psycopg2.ProgrammingError) as e:
         return {"ok": False, "error": str(e)}

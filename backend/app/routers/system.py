@@ -1,17 +1,17 @@
-"""
-System Router — endpoints for metrics, health, system status, diagnostics, and URL analysis.
-"""
+"""System Router — endpoints for metrics, health, system status, diagnostics, and URL analysis."""
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import io
 import json
 import logging
 import re
 import secrets
 import zipfile
-from enum import Enum
+from enum import StrEnum
+from typing import Annotated
 
 from app.config import settings
 from app.globals import CONFIG, jobs_store, recycle_bin_store
@@ -32,7 +32,7 @@ def get_job_repository():
     return app.main.get_job_repository()
 
 
-class AcquisitionMode(str, Enum):
+class AcquisitionMode(StrEnum):
     STANDARD = "standard"
     AGGRESSIVE = "aggressive"
     DEEP_SCAN = "deep_scan"
@@ -118,7 +118,7 @@ async def system_status():
 
 
 @router.get("/api/system/diagnostics/export")
-async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN]))):
+async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN]))):  # noqa: B008
     """Generates and exports an authenticated and sanitized system diagnostics ZIP bundle."""
     # Regular expressions for PII sanitization
     email_regex = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
@@ -149,9 +149,8 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
             return val
         if isinstance(val, str):
             val = email_regex.sub("<redacted_email>", val)
-            val = phone_regex.sub("<redacted_phone>", val)
-            return val
-        elif isinstance(val, dict):
+            return phone_regex.sub("<redacted_phone>", val)
+        if isinstance(val, dict):
             return {
                 k: (
                     "********"
@@ -160,10 +159,9 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
                 )
                 for k, v in val.items()
             }
-        elif isinstance(val, list):
+        if isinstance(val, list):
             return [sanitize_value(item, _depth=_depth + 1, _max_depth=_max_depth) for item in val]
-        else:
-            return val
+        return val
 
     # 1. anonymized_state.json
     anonymized_jobs = {}
@@ -228,7 +226,7 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
                     },
                 }
     except Exception as e:
-        logger.exception("Failed to build selector decay snapshots for diagnostics: %s", e)
+        logger.exception("Failed to build selector decay snapshots for diagnostics: %s")
         selector_decay_snapshots = {"error": {"message": str(e)}}
 
     # 4. telemetry_snapshots.json
@@ -240,7 +238,7 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
         if hasattr(ws, "_observability") and ws._observability:
             telemetry_snapshots = sanitize_value(ws._observability.telemetry)
     except Exception as e:
-        logger.exception("Failed to build telemetry snapshots for diagnostics: %s", e)
+        logger.exception("Failed to build telemetry snapshots for diagnostics: %s")
         telemetry_snapshots = [{"error": str(e)}]
 
     # Create ZIP archive in memory
@@ -260,7 +258,10 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
 
 
 @router.post("/api/url/analyze")
-async def analyze_url(req: URLPreviewRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+async def analyze_url(
+    req: URLPreviewRequest,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
     """Analyze a URL and auto-detect what data fields can be extracted."""
     try:
         validate_public_http_url(req.url)
@@ -286,7 +287,7 @@ async def analyze_url(req: URLPreviewRequest, _role: UserRole = Depends(require_
             analyze_url_for_fields(url=req.url, search_params=req.search_params, acquisition_mode=req.acquisition_mode),
             timeout=URL_ANALYZER_TIMEOUT,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.warning("[URLAnalyzer] Timeout after %ds analyzing %s", URL_ANALYZER_TIMEOUT, req.url)
         return JSONResponse(
             status_code=408,
@@ -307,7 +308,7 @@ async def analyze_url(req: URLPreviewRequest, _role: UserRole = Depends(require_
             },
         )
 
-    if "error" in result and result["error"]:
+    if result.get("error"):
         return JSONResponse(status_code=422, content=result)
 
     return result
@@ -325,7 +326,7 @@ def _prometheus_label_text(labels: dict[str, str]) -> str:
     return "{" + ",".join(f'{key}="{value}"' for key, value in escaped.items()) + "}"
 
 
-def _basic_metric_line(name: str, value: float | int, labels: dict[str, str] | None = None) -> str:
+def _basic_metric_line(name: str, value: float, labels: dict[str, str] | None = None) -> str:
     return f"{name}{_prometheus_label_text(labels or {})} {value}"
 
 
@@ -357,9 +358,9 @@ def _render_basic_metrics_text() -> str:
         repo = get_job_repository()
         backend = getattr(repo, "backend", "sqlite")
         lines.append(_basic_metric_line("dataforge_backend", 1, {"backend": backend}))
-    except Exception as e:
+    except Exception:
         backend_ok = 0
-        logger.error("Metrics fallback: backend collection failed: %s", e)
+        logger.exception("Metrics fallback: backend collection failed: %s")
     lines.append(_basic_metric_line("dataforge_backend_collection_ok", backend_ok))
 
     queue_ok = 1
@@ -370,9 +371,9 @@ def _render_basic_metrics_text() -> str:
         lines.append(_basic_metric_line("dataforge_queue_pending", q_status.get("pending", 0)))
         lines.append(_basic_metric_line("dataforge_queue_running", q_status.get("running", 0)))
         lines.append(_basic_metric_line("dataforge_queue_dead_letter", q_status.get("dead_letter", 0)))
-    except Exception as e:
+    except Exception:
         queue_ok = 0
-        logger.error("Metrics fallback: queue collection failed: %s", e)
+        logger.exception("Metrics fallback: queue collection failed: %s")
     lines.append(_basic_metric_line("dataforge_queue_collection_ok", queue_ok))
 
     for task_type, count in get_worker_failures().items():
@@ -452,10 +453,8 @@ async def metrics(request: Request):
     # Runtime limits
     for key, val in CONFIG.items():
         g = Gauge(f"dataforge_config_{key}", f"Config value for {key}", registry=registry)
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             g.set(float(val))
-        except (TypeError, ValueError):
-            pass
 
     # Repository backend
     backend_ok = 1
@@ -464,10 +463,10 @@ async def metrics(request: Request):
         backend = getattr(repo, "backend", "sqlite")
         backend_gauge = Gauge("dataforge_backend", "Storage backend type", ["backend"], registry=registry)
         backend_gauge.labels(backend=backend).set(1)
-    except Exception as e:
+    except Exception:
         backend_ok = 0
         METRICS_COLLECTION_ERRORS += 1
-        logger.error("Metrics: backend collection failed: %s", e)
+        logger.exception("Metrics: backend collection failed: %s")
 
     backend_ok_gauge = Gauge(
         "dataforge_backend_collection_ok",
@@ -489,10 +488,10 @@ async def metrics(request: Request):
         queue_running.set(q_status.get("running", 0))
         queue_dead_letter = Gauge("dataforge_queue_dead_letter", "Dead letter queue size", registry=registry)
         queue_dead_letter.set(q_status.get("dead_letter", 0))
-    except Exception as e:
+    except Exception:
         queue_ok = 0
         METRICS_COLLECTION_ERRORS += 1
-        logger.error("Metrics: queue collection failed: %s", e)
+        logger.exception("Metrics: queue collection failed: %s")
 
     queue_ok_gauge = Gauge(
         "dataforge_queue_collection_ok",

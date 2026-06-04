@@ -41,8 +41,7 @@ def compute_macro_energy(state: "TopologyState", convergence: float) -> float:
     avg_energy = sum(r.local_energy for r in regs) / len(regs)
     attractor_strength = 1.0 / (1.0 + 2.718 ** (-15 * (convergence - 0.6)))
     attractor_pull = min(attractor_strength * convergence * 2.0, 2.0)
-    target_energy = max(0.0, avg_energy - attractor_pull)
-    return target_energy  # type: ignore[no-any-return]
+    return max(0.0, avg_energy - attractor_pull)
 
 
 def distill_crystalline_atoms(

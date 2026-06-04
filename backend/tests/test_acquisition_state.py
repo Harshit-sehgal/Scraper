@@ -181,7 +181,8 @@ class TestAcquisitionLineage:
 
     def test_from_redirect_info_recovery_message_in_non_redirected(self) -> None:
         """When redirect_info says not redirected but message mentions recovery,
-        infer RECOVERED state."""
+        infer RECOVERED state.
+        """
         redirect_info = {
             "redirected": False,
             "redirect_type": "none",

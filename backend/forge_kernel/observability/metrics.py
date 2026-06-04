@@ -1,5 +1,4 @@
-"""
-Metrics — Prometheus-compatible metrics collector for the kernel.
+"""Metrics — Prometheus-compatible metrics collector for the kernel.
 
 Provides minimal counter/histogram/timer for core operations.
 Full Prometheus integration uses the existing app.metrics_collector.
@@ -15,15 +14,15 @@ from typing import Any
 class KernelMetrics:
     """Lightweight metrics collector for the kernel."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._counters: dict[str, int] = defaultdict(int)
         self._histograms: dict[str, list[float]] = defaultdict(list)
 
-    def inc(self, name: str, count: int = 1):
+    def inc(self, name: str, count: int = 1) -> None:
         """Increment a counter."""
         self._counters[name] += count
 
-    def record(self, name: str, value: float):
+    def record(self, name: str, value: float) -> None:
         """Record a value in a histogram."""
         self._histograms[name].append(value)
         # Cap histogram storage to prevent unbounded memory growth
@@ -34,7 +33,7 @@ class KernelMetrics:
         """Context manager for timing operations."""
 
         class _Timer:
-            def __init__(self, metrics: KernelMetrics, name: str):
+            def __init__(self, metrics: KernelMetrics, name: str) -> None:
                 self.metrics = metrics
                 self.name = name
                 self.start = 0.0
@@ -43,7 +42,7 @@ class KernelMetrics:
                 self.start = time.monotonic()
                 return self
 
-            def __exit__(self, *args: Any):
+            def __exit__(self, *args: object):
                 duration = (time.monotonic() - self.start) * 1000
                 self.metrics.record(self.name, duration)
 

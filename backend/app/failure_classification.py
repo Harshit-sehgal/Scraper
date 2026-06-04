@@ -1,5 +1,4 @@
-"""
-Failure Classification — Ontology-driven extraction failure analysis.
+"""Failure Classification — Ontology-driven extraction failure analysis.
 
 Provides:
   - A formal failure ontology (FailureCategory enum) covering all known
@@ -21,7 +20,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from app.config import settings
@@ -34,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════════════
 
 
-class FailureCategory(str, Enum):
+class FailureCategory(StrEnum):
     """Formal ontology of all known extraction failure modes.
 
     Each category maps to a distinct physical root cause in the
@@ -295,6 +294,7 @@ def classify_failure(
     Returns:
         A FailureClassification with the best-guess category, confidence,
         and recommended recovery strategy.
+
     """
     signals: list[dict] = []
     error_text = (error_message or "").lower()
@@ -541,10 +541,7 @@ _CHALLENGE_PATTERNS = [
 def _has_challenge_patterns(html: str) -> bool:
     """Check if the HTML contains anti-bot challenge patterns."""
     html_lower = html.lower()
-    for pattern in _CHALLENGE_PATTERNS:
-        if pattern in html_lower:
-            return True
-    return False
+    return any(pattern in html_lower for pattern in _CHALLENGE_PATTERNS)
 
 
 _CAPTCHA_PATTERNS = [
@@ -565,10 +562,7 @@ _CAPTCHA_PATTERNS = [
 def _has_captcha_patterns(html: str) -> bool:
     """Check if the HTML contains CAPTCHA patterns."""
     html_lower = html.lower()
-    for pattern in _CAPTCHA_PATTERNS:
-        if pattern in html_lower:
-            return True
-    return False
+    return any(pattern in html_lower for pattern in _CAPTCHA_PATTERNS)
 
 
 def _is_malformed_dom(html: str) -> bool:

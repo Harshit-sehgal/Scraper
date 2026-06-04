@@ -1,5 +1,6 @@
 import socket
 from pathlib import Path
+from typing import Never
 
 import app.main as main_mod
 import pytest
@@ -7,7 +8,7 @@ from app.models import Job, JobStatus, ScrapeMode
 
 
 @pytest.fixture(autouse=True)
-def mock_dns_resolution(monkeypatch):
+def mock_dns_resolution(monkeypatch) -> None:
     """Mock socket.getaddrinfo to make tests DNS-independent and prevent external lookups,
     while correctly simulating public IP resolution for test domains.
     """
@@ -158,12 +159,12 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch) -> None:
     saved_jobs = []
 
     # Mock _save_job to track what gets saved
-    monkeypatch.setattr("app.routers.jobs._save_job", lambda job: saved_jobs.append(job))
+    monkeypatch.setattr("app.routers.jobs._save_job", saved_jobs.append)
 
     # Track if persist_state gets called
     persist_called = False
 
-    def mock_persist_state(**kwargs):
+    def mock_persist_state(**kwargs) -> None:
         nonlocal persist_called
         persist_called = True
 
@@ -214,11 +215,11 @@ def test_create_job_enqueue_failure_cleanup(client, monkeypatch) -> None:
 
     # Mock enqueue to raise an error
     class FailingQueue:
-        async def enqueue(self, *args, **kwargs):
+        async def enqueue(self, *args, **kwargs) -> Never:
             msg = "Queue is dead"
             raise Exception(msg)
 
-    monkeypatch.setattr("app.worker_queue.get_worker_queue", lambda: FailingQueue())
+    monkeypatch.setattr("app.worker_queue.get_worker_queue", FailingQueue)
 
     payload = {
         "name": "cleanup-on-enqueue-failure",

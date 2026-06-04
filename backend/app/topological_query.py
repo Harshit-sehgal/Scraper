@@ -2,23 +2,22 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.semantic_ir import SemanticType
 
-
-def get_world_state() -> "SemanticWorldState":
+def get_world_state() -> SemanticWorldState:
     import app.semantic_world_state
 
     return app.semantic_world_state.get_world_state()
 
 
 if TYPE_CHECKING:
+    from app.semantic_ir import SemanticType
     from app.semantic_world_state import SemanticWorldState
 
 
 class TopologicalQuery:
     """Evaluates geometric and relational queries against the semantic field."""
 
-    def __init__(self, ws: SemanticWorldState | None = None):
+    def __init__(self, ws: SemanticWorldState | None = None) -> None:
         self.ws: SemanticWorldState = ws or get_world_state()
 
     def find_roles_near(self, role_name: str, radius: float = 0.5) -> list[dict]:
@@ -44,7 +43,7 @@ class TopologicalQuery:
                 continue
             vec = self.ws.get_manifold_vector(role)
             # Distance: sum of squared differences
-            dist = sum((a - b) ** 2 for a, b in zip(target_vec, vec)) ** 0.5
+            dist = sum((a - b) ** 2 for a, b in zip(target_vec, vec, strict=False)) ** 0.5
             if dist <= radius:
                 results.append(
                     {

@@ -11,7 +11,7 @@ from app.transactional_priority_queue import (
 
 
 @pytest.fixture(autouse=True)
-def reset():
+def reset() -> None:
     reset_priority_queue()
 
 

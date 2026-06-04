@@ -1,6 +1,4 @@
-"""
-Export contract — canonical model for export artifacts.
-"""
+"""Export contract — canonical model for export artifacts."""
 
 from __future__ import annotations
 

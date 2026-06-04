@@ -58,7 +58,7 @@ PIPELINE_JSON = json.dumps(
 
 
 class _E2EBrowserTestHandler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
+    def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/search/id/e2e_pipeline_token_xyz":
             self.send_response(200)
@@ -74,7 +74,7 @@ class _E2EBrowserTestHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format, *args):
+    def log_message(self, format, *args) -> None:
         pass
 
 
@@ -92,7 +92,7 @@ def e2e_browser_server():
 
 
 class LocalASGIClient:
-    def __init__(self, app):
+    def __init__(self, app) -> None:
         self.app = app
 
     async def post(self, url: str, **kwargs):
@@ -109,8 +109,7 @@ class LocalASGIClient:
 @pytest.mark.postgres
 @pytest.mark.asyncio
 async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, monkeypatch) -> None:
-    """
-    Submits a mock session-bound URL to the public jobs REST API,
+    """Submits a mock session-bound URL to the public jobs REST API,
     runs the worker, and asserts the results have correct provenance and no leaked secrets.
     """
     # 1. Bypass local loopback URL validation for E2E testing
@@ -124,7 +123,7 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
     monkeypatch.setattr(settings, "ALLOWED_INTERNAL_HOSTS", "127.0.0.1,localhost")
 
     # Mock LLM insights to avoid external API calls
-    async def mock_generate_data_insight(results):
+    async def mock_generate_data_insight(results) -> str:
         return "Mock insight for E2E test."
 
     monkeypatch.setattr("app.scraper.generate_data_insight", mock_generate_data_insight)

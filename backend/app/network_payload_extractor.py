@@ -128,7 +128,7 @@ def _extract_nested_value(val: Any) -> Any:
             if k in val and val[k] is not None and not isinstance(val[k], (dict, list)):
                 return val[k]
         if len(val) == 1:
-            sub_val = list(val.values())[0]
+            sub_val = next(iter(val.values()))
             if not isinstance(sub_val, (dict, list)):
                 return sub_val
     return val
@@ -141,7 +141,7 @@ def _extract_nested_value_with_suffix(val: Any) -> tuple[Any, str]:
             if k in val and val[k] is not None and not isinstance(val[k], (dict, list)):
                 return val[k], f".{k}"
         if len(val) == 1:
-            k = list(val.keys())[0]
+            k = next(iter(val.keys()))
             sub_val = val[k]
             if not isinstance(sub_val, (dict, list)):
                 return sub_val, f".{k}"
@@ -177,7 +177,7 @@ def _sanitize_payload(obj: Any, _depth: int = 0, _max_depth: int = 50) -> Any:
                 continue
             sanitized[k] = _sanitize_payload(v, _depth=_depth + 1, _max_depth=_max_depth)
         return sanitized
-    elif isinstance(obj, list):
+    if isinstance(obj, list):
         return [_sanitize_payload(item, _depth=_depth + 1, _max_depth=_max_depth) for item in obj]
     return obj
 
@@ -208,11 +208,8 @@ def _is_candidate_secret_heavy(candidate: RecordArrayCandidate) -> bool:
     if not isinstance(first_record, dict) or not first_record:
         return False
 
-    sensitive_count = sum(1 for k in first_record.keys() if any(pat in k.lower() for pat in sensitive_patterns))
-    if len(first_record) > 0 and (sensitive_count >= 3 or (sensitive_count / len(first_record)) > 0.30):
-        return True
-
-    return False
+    sensitive_count = sum(1 for k in first_record if any(pat in k.lower() for pat in sensitive_patterns))
+    return bool(len(first_record) > 0 and (sensitive_count >= 3 or sensitive_count / len(first_record) > 0.3))
 
 
 def _value_matches_type(value: Any, field_type: FieldType) -> bool:
@@ -225,7 +222,7 @@ def _value_matches_type(value: Any, field_type: FieldType) -> bool:
         return False
     if field_type == FieldType.CURRENCY:
         return bool(re.search(r"[\d.,]+", s))
-    if field_type == FieldType.NUMBER or field_type == FieldType.INTEGER or field_type == FieldType.FLOAT:
+    if field_type in (FieldType.NUMBER, FieldType.INTEGER, FieldType.FLOAT):
         return bool(re.match(r"^-?\d+(\.\d+)?$", s))
     if field_type == FieldType.EMAIL:
         return bool(re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", s))
@@ -299,8 +296,7 @@ def score_record_array(candidate: RecordArrayCandidate, schema: list[SchemaField
         best = 0.0
         for key in first_keys:
             match = _key_matches_field(key, field)
-            if match > best:
-                best = match
+            best = max(best, match)
         if best > 0.5:
             mapped_count += 1
             mapped_ratio = mapped_count / len(schema)
@@ -361,7 +357,7 @@ def map_json_records_to_schema(
                 mapped[field.name] = val_extracted
                 if field.name not in field_map:
                     # Construct exact path
-                    if candidate_path.endswith(".node") or candidate_path.endswith("[*].node"):
+                    if candidate_path.endswith((".node", "[*].node")):
                         exact_path = f"{candidate_path}.{key}{suffix}"
                     elif candidate_path == "$":
                         exact_path = f"$[*].{key}{suffix}"
@@ -397,11 +393,8 @@ def extract_from_network_payloads(
 
     for raw in payloads:
         try:
-            if isinstance(raw, str):
-                payload = json.loads(raw)
-            else:
-                payload = raw
-        except Exception:  # nosec B112
+            payload = json.loads(raw) if isinstance(raw, str) else raw
+        except Exception:  # nosec B112  # noqa: BLE001
             continue
 
         candidates = find_record_arrays(payload)

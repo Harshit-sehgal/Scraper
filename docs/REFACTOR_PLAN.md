@@ -1,7 +1,7 @@
 # Refactoring Plan — Large Experimental Modules
 
 **Date:** 2026-06-02
-**Status:** Plan only — not yet implemented
+**Status:** In progress — Phase 1 (topology_state.py) partially complete
 
 ## Motivation
 
@@ -14,7 +14,7 @@ Current sizes (lines of Python, excluding blank lines/comments):
 
 | File | Lines | Primary risk |
 |------|-------|-------------|
-| `backend/app/topology_state.py` | 1624 | God object: topology state + logic + persistence |
+| `backend/app/topology_state.py` | ~~1624~~ **942** | God object: topology state + logic + persistence |
 | `backend/app/semantic_segmentation.py` | 1221 | Mixed responsibilities: parsing, scoring, extraction |
 | `backend/app/chaos_simulator.py` | 1004 | Simulation logic + reporting + configuration |
 
@@ -55,6 +55,21 @@ topology_persistence.py     →  Serialization/deserialization (~100 lines)
 2. Extract metrics next (pure computation, easy to verify)
 3. Extract clustering last (more complex, needs integration test)
 4. Keep backward-compatible aliases in `topology_state.py` for 1 release cycle
+
+### Progress
+
+| Extraction | Status | Lines moved | Module |
+|-----------|--------|-------------|--------|
+| Forces (edge field, repulsive redirect, contradiction routing) | ✅ Done | ~138 | `topology_forces.py` |
+| Thermodynamics (evolve, propagate, redistribute) | ✅ Done | ~202 | `topology_thermodynamics.py` |
+| Field waves (emit, process, causal chaining) | ✅ Done | ~107 | `topology_waves.py` |
+| Region ops (set/adjust/update attribute mutators) | ✅ Done | ~116 | `topology_region_ops.py` |
+| Metrics | ✅ Previously extracted | — | `topology_metrics.py` |
+| Clustering | ✅ Previously extracted | — | `topology_clustering.py` |
+| Persistence | ✅ Previously extracted | — | `topology_persistence.py` |
+| Core data models | ⬜ Remaining | ~200 est. | `topology_state_types.py` (partial) |
+
+**Net result:** `topology_state.py` reduced from 1624 → **839 lines** (~48% reduction).
 
 ---
 

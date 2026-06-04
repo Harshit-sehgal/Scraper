@@ -1,5 +1,4 @@
-"""
-Semantic OS — Official Engine Interface
+"""Semantic OS — Official Engine Interface.
 ======================================
 The production-hardened API for interacting with the Semantic Field Dynamics.
 Provides high-level orchestration, state governance, and topological search.
@@ -15,7 +14,7 @@ from app.semantic_world_state import get_world_state
 class SemanticOS:
     """The official gateway to the semantic cognitive substrate."""
 
-    def __init__(self, ws=None):
+    def __init__(self, ws=None) -> None:
         self.ws = ws or get_world_state()
         self.checkpoints = get_checkpoint_manager()
 
@@ -30,7 +29,7 @@ class SemanticOS:
         """Combine the base schema with any field-evolved roles (Phase 29)."""
         evolved = self.ws.evolved_schema
         # Return merged set as a sorted list for predictability
-        return sorted(list(set(base_schema) | set(evolved)))
+        return sorted(set(base_schema) | set(evolved))
 
     def evolve_field(self, cycles: int = 1):
         """Standard entry point for cognitive evolution."""
@@ -44,7 +43,7 @@ class SemanticOS:
         """Create a versioned persistent checkpoint."""
         return self.checkpoints.create_checkpoint(label=label)
 
-    def restore_snapshot(self, filepath: str):
+    def restore_snapshot(self, filepath: str) -> None:
         """Restore engine state from a checkpoint."""
         self.checkpoints.load_checkpoint(filepath)
 
@@ -56,13 +55,13 @@ class SemanticOS:
         """Return a cryptographic checksum of the current manifold geometry (Phase 31)."""
         return self.ws.get_manifold_checksum()
 
-    def reset_engine(self):
+    def reset_engine(self) -> None:
         """Clear the entire semantic world state."""
         self.ws.clear()
 
     # ─── Multi-Node Consensus (Phase 32) ─────────────────────────────────
 
-    def sync_node(self, remote_state: dict, trace_id: str | None = None):
+    def sync_node(self, remote_state: dict, trace_id: str | None = None) -> None:
         """Synchronize with another Semantic OS node."""
         self.ws.merge_state(remote_state, trace_id=trace_id)
 
@@ -70,13 +69,13 @@ class SemanticOS:
         """Return the current vector clock."""
         return self.ws.get_vector_clock()
 
-    def register_with_network(self):
+    def register_with_network(self) -> None:
         """Register this OS node with the virtual gossip network."""
         from app.gossip_substrate import get_gossip_substrate
 
         get_gossip_substrate().register_node(self.ws.node_id, self.ws)
 
-    def perform_gossip(self):
+    def perform_gossip(self) -> None:
         """Perform a gossip cycle with a random peer and send heartbeat."""
         from app.gossip_substrate import get_gossip_substrate
         from app.heartbeat_manager import get_heartbeat_manager
@@ -103,7 +102,7 @@ class SemanticOS:
         """Export learned role meanings for other instances."""
         return self.ws.export_manifold()
 
-    def absorb_knowledge(self, federation_data: dict):
+    def absorb_knowledge(self, federation_data: dict) -> None:
         """Import role meanings from another instance."""
         self.ws.import_federated_manifold(federation_data)
 
@@ -115,24 +114,24 @@ class SemanticOS:
         target_vec: list[float],
         strength: float = 0.5,
         target_roles: list[str] | None = None,
-    ):
+    ) -> None:
         """Inject a high-level goal to bias the semantic field (Phase 36)."""
         with self.ws.transaction(f"set_intent:{intent_id}"):
             self.ws.set_intent(intent_id, target_vec, strength, target_roles)
 
-    def remove_cognitive_intent(self, intent_id: str):
+    def remove_cognitive_intent(self, intent_id: str) -> None:
         """Remove a specific cognitive goal."""
         with self.ws.transaction(f"remove_intent:{intent_id}"):
             self.ws.remove_intent(intent_id)
 
-    def clear_all_intents(self):
+    def clear_all_intents(self) -> None:
         """Clear all active cognitive steering."""
         with self.ws.transaction("clear_intents"):
             self.ws.clear_intents()
 
     # ─── Cognitive Agency (Phase 37) ─────────────────────────────────────
 
-    def register_action(self, action_id: str, target_vec: list[float], handler_name: str, threshold: float = 0.3):
+    def register_action(self, action_id: str, target_vec: list[float], handler_name: str, threshold: float = 0.3) -> None:
         """Map executable logic into the semantic field (Phase 37)."""
         with self.ws.transaction(f"register_action:{action_id}"):
             self.ws.register_action(action_id, target_vec, handler_name, threshold)
@@ -141,7 +140,7 @@ class SemanticOS:
         """Manually trigger registered dispatchers."""
         return self.ws.dispatch_actions()
 
-    def report_outcome(self, action_id: str, success: bool, details: dict | None = None):
+    def report_outcome(self, action_id: str, success: bool, details: dict | None = None) -> None:
         """Feed action outcomes back into the manifold (Feedback Loop)."""
         with self.ws.transaction(f"action_outcome:{action_id}"):
             self.ws.log_action_execution(action_id, success, details)
@@ -153,11 +152,11 @@ class SemanticOS:
                     # Reward successful interpretation by pulling role toward
                     # action anchor
                     self.ws.blend_manifold_vector(role, target_vec, alpha=0.9, beta=0.1)
-                    logging.getLogger(__name__).info(f"FEEDBACK REINFORCED: Role [{role}] rewarded by Action [{action_id}]")
+                    logging.getLogger(__name__).info("FEEDBACK REINFORCED: Role [%s] rewarded by Action [%s]", role, action_id)
 
     # ─── Hierarchical Synthesis (Phase 38) ───────────────────────────────
 
-    def perform_hierarchical_synthesis(self):
+    def perform_hierarchical_synthesis(self) -> None:
         """Manually trigger distillation of higher-order role envelopes."""
         self.ws.synthesize_hierarchical_envelopes()
 
@@ -172,7 +171,7 @@ class SemanticOS:
         child_ws = self.ws.branch(label)
         return SemanticOS(ws=child_ws)
 
-    def merge_substrate(self, branch_os: "SemanticOS", alpha: float = 0.5):
+    def merge_substrate(self, branch_os: "SemanticOS", alpha: float = 0.5) -> None:
         """Merge an experimental branch back into the main OS consensus."""
         self.ws.merge_branch(branch_os.ws, alpha=alpha)
 
@@ -182,7 +181,7 @@ class SemanticOS:
 
     # ─── Cognitive Scheduling (Phase 40) ─────────────────────────────────
 
-    def schedule_task(self, task_id: str, priority_level: str, handler: Callable, *args, **kwargs):
+    def schedule_task(self, task_id: str, priority_level: str, handler: Callable, *args, **kwargs) -> None:
         """Register an automated cognitive task (Phase 40)."""
         from app.graph_update_scheduler import TaskPriority
 
@@ -213,7 +212,7 @@ class SemanticOS:
         """Query historical manifold drift for a specific role."""
         return self.ws.get_role_drift(role)
 
-    def log_manual_telemetry(self, event_type: str, details: dict):
+    def log_manual_telemetry(self, event_type: str, details: dict) -> None:
         """Inject a manual telemetry event into the stream."""
         with self.ws.transaction("manual_telemetry"):
             self.ws.emit_telemetry(event_type, details)
@@ -225,7 +224,7 @@ class SemanticOS:
         cause: str,
         topology_state: str | None = None,
         semantic_entropy: float | None = None,
-    ):
+    ) -> None:
         """Record a structured degradation event with causality tracking."""
         self.ws.record_degradation(
             subsystem=subsystem,
@@ -246,7 +245,7 @@ def get_semantic_os() -> SemanticOS:
     return _os_instance
 
 
-def reset_semantic_os():
+def reset_semantic_os() -> None:
     """Reset the global Semantic OS instance (for testing)."""
     global _os_instance
     _os_instance = None

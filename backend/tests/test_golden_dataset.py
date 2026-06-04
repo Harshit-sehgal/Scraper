@@ -32,7 +32,7 @@ def load_sites() -> list[dict]:
     """
     if not SITES_FILE.exists():
         return []
-    with open(SITES_FILE, "r") as f:
+    with open(SITES_FILE) as f:
         data = json.load(f)
     return data.get("sites", [])
 
@@ -42,7 +42,7 @@ def load_expected(site_id: str) -> list[dict] | None:
     expected_path = EXPECTED_DIR / f"{site_id}.json"
     if not expected_path.exists():
         return None
-    with open(expected_path, "r") as f:
+    with open(expected_path) as f:
         return json.load(f)
 
 
@@ -174,7 +174,7 @@ async def test_golden_dataset_site(site_def, monkeypatch) -> None:
             scrape_url(url, schema_fields, min_record_score=0.0),
             timeout=timeout_seconds,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pytest.skip(f"Skipping {site_id} ({url}) because the connection timed out after {timeout_seconds:g}s")
     except Exception as e:
         err_msg = str(e).lower()
@@ -218,20 +218,13 @@ async def test_golden_dataset_site(site_def, monkeypatch) -> None:
         key_fields = list(fields_def.keys())[:2]  # First 2 fields as key
         f1_result = compute_f1(results, expected, key_fields=key_fields)
         # Log but don't fail — golden dataset thresholds are being refined
-        print(
-            f"\n  [{site_id}] F1={f1_result['f1']:.3f} "
-            f"(precision={f1_result['precision']:.3f}, "
-            f"recall={f1_result['recall']:.3f}, "
-            f"extracted={f1_result['extracted_count']}, "
-            f"expected={f1_result['expected_count']})",
-        )
         min_f1 = site_def.get("min_f1")
         assert min_f1 is not None, f"{site_id}: expected output exists but min_f1 is not configured"
         assert f1_result["f1"] >= float(
             min_f1,
         ), f"{site_id}: F1 {f1_result['f1']:.3f} is below configured threshold {float(min_f1):.3f}"
     else:
-        print(f"\n  [{site_id}] {len(results)} records extracted (no expected output file)")
+        pass
 
 
 @pytest.mark.golden_dataset

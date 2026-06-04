@@ -1,5 +1,4 @@
-"""
-Tests for Selector Decay Predictor — Predictive selector failure detection.
+"""Tests for Selector Decay Predictor — Predictive selector failure detection.
 
 Tests:
   - Decay prediction for stable vs degrading selectors
@@ -9,6 +8,7 @@ Tests:
   - Report generation
 """
 
+import contextlib
 import time
 
 from app.selector_decay_predictor import (
@@ -44,7 +44,7 @@ class TestSelectorDecayPredictor:
     def test_observation_capped_at_100(self) -> None:
         """Test that observations are capped at 100."""
         predictor = SelectorDecayPredictor()
-        for i in range(150):
+        for _i in range(150):
             predictor.record_observation("example.com", 0.5)
         assert len(predictor._confidence_snapshots["example.com"]) == 100
 
@@ -203,7 +203,5 @@ class TestSelectorDecayPredictorGlobal:
         assert "persistent.com" in predictor2._confidence_snapshots
         assert predictor2._confidence_snapshots["persistent.com"][0][1] == 0.88
 
-        try:
+        with contextlib.suppress(Exception):
             os.remove("backend/data/selector_decay_snapshots.json")
-        except Exception:
-            pass

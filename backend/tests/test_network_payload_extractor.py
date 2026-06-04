@@ -542,7 +542,7 @@ class TestSourceArbitration:
 
         monkeypatch.setattr("app.extraction_orchestrator.apply_selectors", mock_apply_selectors)
 
-        async def no_discovered_selectors(*args, **kwargs):
+        async def no_discovered_selectors(*args, **kwargs) -> None:
             return None
 
         async def no_container_records(*args, **kwargs):

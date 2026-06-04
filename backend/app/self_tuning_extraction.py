@@ -1,5 +1,4 @@
-"""
-Self-Tuning Extraction — Automatically adjusts extraction parameters based on runtime telemetry.
+"""Self-Tuning Extraction — Automatically adjusts extraction parameters based on runtime telemetry.
 
 Provides:
   - Dynamic timeout adjustment based on observed fetch times
@@ -103,6 +102,7 @@ class SelfTuningController:
         Args:
             domain: The domain the telemetry is for
             telemetry: ScrapeTelemetry dict
+
         """
         if domain not in self._telemetry:
             self._telemetry[domain] = []

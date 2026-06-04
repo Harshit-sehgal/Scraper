@@ -1,4 +1,5 @@
 import builtins
+from typing import Never
 
 import pytest
 from app.discovery import DiscoveryDependencyError, get_ddgs_class
@@ -28,7 +29,7 @@ def test_discover_endpoint_returns_503_when_discovery_dependency_missing(client,
     monkeypatch.setattr(settings, "ADMIN_API_KEY", "")
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "")
 
-    async def missing_discovery(**kwargs):
+    async def missing_discovery(**kwargs) -> Never:
         msg = "Discovery requires ddgs or duckduckgo_search."
         raise DiscoveryDependencyError(msg)
 

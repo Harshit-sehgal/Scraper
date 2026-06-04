@@ -1,5 +1,4 @@
-"""
-Experimental Subsystem Initialization (EXPERIMENTAL / RESEARCH ONLY).
+"""Experimental Subsystem Initialization (EXPERIMENTAL / RESEARCH ONLY).
 
 Centralizes the startup and shutdown of experimental subsystems that were
 previously initialized inline in main.py's lifespan function.
@@ -47,8 +46,8 @@ def experimental_subsystems_enabled() -> bool:
         from app.config import settings
 
         return bool(getattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", False))
-    except Exception as e:  # pragma: no cover - defensive only
-        logger.warning("Could not read ENABLE_EXPERIMENTAL_ROUTES: %s", e)
+    except (ImportError, AttributeError, ValueError):
+        logger.warning("Could not read ENABLE_EXPERIMENTAL_ROUTES")
         return False
 
 
@@ -62,8 +61,8 @@ def init_graph_scheduler() -> None:
 
         get_scheduler()
         logger.debug("Graph update scheduler initialized")
-    except Exception as e:
-        logger.warning("Failed to initialize graph update scheduler: %s", e)
+    except ImportError:
+        logger.warning("Failed to initialize graph update scheduler (module not available)")
 
 
 def init_recovery_framework() -> None:
@@ -76,8 +75,8 @@ def init_recovery_framework() -> None:
 
         register_all_recovery_handlers()
         logger.debug("Recovery handlers registered")
-    except Exception as e:
-        logger.warning("Failed to register recovery handlers: %s", e)
+    except ImportError:
+        logger.warning("Failed to register recovery handlers (module not available)")
 
 
 def init_domain_health_monitor() -> None:
@@ -90,8 +89,8 @@ def init_domain_health_monitor() -> None:
 
         get_domain_health_monitor()
         logger.debug("Domain health monitor initialized")
-    except Exception as e:
-        logger.warning("Failed to initialize domain health monitor: %s", e)
+    except ImportError:
+        logger.warning("Failed to initialize domain health monitor (module not available)")
 
 
 def init_gossip_and_heartbeat() -> tuple[Any, Any]:
@@ -100,6 +99,7 @@ def init_gossip_and_heartbeat() -> tuple[Any, Any]:
     Returns:
         Tuple of (gossip_substrate, heartbeat_manager), or (None, None) if
         initialization fails OR if experimental subsystems are disabled.
+
     """
     if not experimental_subsystems_enabled():
         logger.debug("init_gossip_and_heartbeat: skipped (experimental subsystems disabled)")
@@ -117,8 +117,8 @@ def init_gossip_and_heartbeat() -> tuple[Any, Any]:
             "Gossip substrate integrated with heartbeat: %d peers registered",
             len(gossip.known_nodes),
         )
-    except Exception as e:
-        logger.warning("Failed to initialize gossip / heartbeat: %s", e)
+    except ImportError:
+        logger.warning("Failed to initialize gossip / heartbeat (module not available)")
     return gossip, heartbeat_mgr
 
 
@@ -133,8 +133,8 @@ def restore_semantic_world_state(world_state_data: dict | None, state_file_path:
 
         get_world_state().from_dict(world_state_data)
         logger.info("Restored semantic world state from %s", state_file_path)
-    except Exception as e:
-        logger.exception("Failed to restore semantic world state: %s", e)
+    except Exception:
+        logger.exception("Failed to restore semantic world state: %s")
 
 
 def persist_semantic_world_state() -> None:
@@ -152,9 +152,9 @@ def persist_semantic_world_state() -> None:
             try:
                 repo.save_world_state(ws.to_dict())
                 logger.info("Semantic world state persisted to repository on shutdown")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Failed to persist world state on shutdown: %s", e)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("Failed to check repository support for world state during shutdown: %s", e)
 
 
@@ -172,7 +172,7 @@ def close_postgres_pool() -> None:
         shutdown_postgres()
     except ImportError:
         logger.debug("Postgres support is not installed; no Postgres pool to close")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("Failed to close Postgres connection pool during shutdown: %s", e)
 
 
@@ -187,7 +187,7 @@ async def schedule_gossip_propagation(gossip: Any, heartbeat_mgr: Any, interval:
     if gossip is None:
         return None
 
-    async def _propagate():
+    async def _propagate() -> None:
         while True:
             await asyncio.sleep(interval)
             try:
@@ -195,7 +195,7 @@ async def schedule_gossip_propagation(gossip: Any, heartbeat_mgr: Any, interval:
                     propagated = gossip.propagate_state_via_gossip(heartbeat_manager=heartbeat_mgr)
                     if propagated:
                         logger.debug("Propagated gossip state to %d peers", propagated)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug("Gossip propagation skipped: %s", e)
 
     task = asyncio.create_task(_propagate())

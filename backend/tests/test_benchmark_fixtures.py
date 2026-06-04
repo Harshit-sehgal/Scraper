@@ -39,7 +39,7 @@ def _load_fixture(name: str) -> str:
 
 
 @pytest.mark.parametrize(
-    "fixture_name,schema_fields,min_expected_records,required_fields",
+    ("fixture_name", "schema_fields", "min_expected_records", "required_fields"),
     [
         (
             "messy_blog",
@@ -107,7 +107,7 @@ async def test_fixture_extraction_yields_records(
 
 
 @pytest.mark.parametrize(
-    "fixture_name,expected_block_type",
+    ("fixture_name", "expected_block_type"),
     [
         ("8f2aabc1ca59", "anti_bot_or_challenge"),
         ("ce3c5249ec43", "empty_or_shell"),
@@ -165,7 +165,7 @@ async def test_blocked_fixture_does_not_produce_false_records(
 
 
 @pytest.mark.parametrize(
-    "fixture_name,expected_state",
+    ("fixture_name", "expected_state"),
     [
         ("messy_blog", "direct"),
         ("travel_site", "direct"),

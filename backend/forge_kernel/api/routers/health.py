@@ -1,6 +1,4 @@
-"""
-Health router — liveness, readiness, and root path probes for the kernel.
-"""
+"""Health router — liveness, readiness, and root path probes for the kernel."""
 
 from __future__ import annotations
 

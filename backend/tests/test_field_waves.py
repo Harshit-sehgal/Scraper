@@ -1,6 +1,4 @@
-"""
-Test Decentralized Field Waves — Phase 71 Verification.
-"""
+"""Test Decentralized Field Waves — Phase 71 Verification."""
 
 import asyncio
 
@@ -11,7 +9,7 @@ from app.semantic_world_state import get_world_state, reset_world_state
 
 
 @pytest.fixture(autouse=True)
-def clean_state():
+def clean_state() -> None:
     reset_world_state()
     # Ensure dispatcher starts clean but allow new world state to subscribe
     dispatcher = get_dispatcher()

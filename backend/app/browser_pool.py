@@ -1,5 +1,4 @@
-"""
-Browser Pool — Persistent Chromium management and context pooling.
+"""Browser Pool — Persistent Chromium management and context pooling.
 
 LAW: Browser instances are heavy. Contexts are light.
 Reuse browsers to minimize startup latency; rotate contexts to maintain stealth.
@@ -8,6 +7,7 @@ Reuse browsers to minimize startup latency; rotate contexts to maintain stealth.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from typing import TYPE_CHECKING, Any
@@ -74,9 +74,9 @@ class BrowserPool:
                 logger.info("[BrowserPool] Launching new Chromium instance")
                 try:
                     self._browser = await self._playwright.chromium.launch(headless=settings.PLAYWRIGHT_HEADLESS)
-                except Exception as e:
+                except Exception:
                     self.crash_count += 1
-                    logger.error("[BrowserPool] Failed to launch browser: %s", e)
+                    logger.exception("[BrowserPool] Failed to launch browser: %s")
                     raise
 
                 # Ensure background cleanup is running
@@ -95,10 +95,9 @@ class BrowserPool:
                     self.reused_fetches += 1
                     self.context_reuse_rate = self.reused_fetches / self.total_fetches
                     return context
-                else:
-                    logger.debug("[BrowserPool] Context for %s reached lifetime, rotating", context_key)
-                    await context.close()
-                    self._contexts.pop(context_key, None)
+                logger.debug("[BrowserPool] Context for %s reached lifetime, rotating", context_key)
+                await context.close()
+                self._contexts.pop(context_key, None)
 
             # Create new context with optional proxy configuration
             from app.strategy_evolution import FetchStrategy
@@ -141,13 +140,13 @@ class BrowserPool:
                     proxy_config = proxy_mgr.get_proxy_for_playwright()
                     if proxy_config:
                         context_options["proxy"] = proxy_config
-                        logger.debug(f"[BrowserPool] Creating context for {domain} with proxy: {proxy_config['server']}")
+                        logger.debug("[BrowserPool] Creating context for %s with proxy: %s", domain, proxy_config["server"])
 
             context = await self._browser.new_context(**context_options)
 
             # Register page tracking
-            def register_page_tracking(ctx):
-                def on_page(page):
+            def register_page_tracking(ctx) -> None:
+                def on_page(page) -> None:
                     self._active_fetches += 1
                     self._cumulative_fetches += 1
                     logger.debug(
@@ -156,7 +155,7 @@ class BrowserPool:
                         self._cumulative_fetches,
                     )
 
-                    def on_close(p):
+                    def on_close(p) -> None:
                         self._active_fetches = max(0, self._active_fetches - 1)
                         logger.debug("[BrowserPool] Page closed. Active: %d", self._active_fetches)
                         task = asyncio.create_task(self._check_and_trigger_recycle())
@@ -234,7 +233,7 @@ class BrowserPool:
             await page.close()
             await ctx.close()
             return True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning("[BrowserPool] Health check failed: %s", e)
             return False
 
@@ -255,7 +254,7 @@ class BrowserPool:
             for ctx in list(self._contexts.values()):
                 try:
                     await ctx.close()
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.debug("[BrowserPool] Failed to close context during close(): %s", e)
             self._contexts.clear()
             self._context_use_count.clear()
@@ -263,22 +262,20 @@ class BrowserPool:
             if self._browser:
                 try:
                     await self._browser.close()
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.debug("[BrowserPool] Failed to close browser during close(): %s", e)
                 self._browser = None
 
             if self._cleanup_task and not self._cleanup_task.done():
                 self._cleanup_task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError, Exception):
                     await self._cleanup_task
-                except (asyncio.CancelledError, Exception):
-                    pass
                 self._cleanup_task = None
 
             if self._playwright:
                 try:
                     await self._playwright.stop()
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.debug("[BrowserPool] Failed to stop playwright during close(): %s", e)
                 self._playwright = None
 
@@ -291,8 +288,8 @@ class BrowserPool:
 
         try:
             return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
-        except Exception as e:
-            logger.debug("[BrowserPool] Failed to get RSS memory: %s", e)
+        except (AttributeError, OSError, ValueError):
+            logger.debug("[BrowserPool] Failed to get RSS memory")
             return 0
 
     def _should_recycle(self) -> bool:
@@ -305,7 +302,7 @@ class BrowserPool:
             return True
         return False
 
-    async def _check_and_trigger_recycle(self):
+    async def _check_and_trigger_recycle(self) -> None:
         if not self._should_recycle() or self._recycling:
             return
 
@@ -319,8 +316,8 @@ class BrowserPool:
         logger.info("[BrowserPool] Active fetches drained to 0. Performing hard browser process recycle.")
         try:
             await self._hard_recycle()
-        except Exception as e:
-            logger.error("[BrowserPool] Hard recycle failed: %s", e)
+        except Exception:
+            logger.exception("[BrowserPool] Hard recycle failed: %s")
         finally:
             self._recycling = False
             self._recycle_event.set()
@@ -329,7 +326,7 @@ class BrowserPool:
         for ctx in list(self._contexts.values()):
             try:
                 await ctx.close()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug("[BrowserPool] Failed to close context during hard recycle: %s", e)
         self._contexts.clear()
         self._context_use_count.clear()
@@ -337,14 +334,14 @@ class BrowserPool:
         if self._browser:
             try:
                 await self._browser.close()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug("[BrowserPool] Failed to close browser during hard recycle: %s", e)
             self._browser = None
 
         if self._playwright:
             try:
                 await self._playwright.stop()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug("[BrowserPool] Failed to stop playwright during hard recycle: %s", e)
             self._playwright = None
 
@@ -371,7 +368,7 @@ class BrowserPool:
                         break
             except asyncio.CancelledError:
                 raise
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 # Don't let a transient cleanup failure (e.g. ``check_health``
                 # raising) kill the watchdog loop — log and try again on the
                 # next tick.

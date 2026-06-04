@@ -1,5 +1,4 @@
-"""
-Domain Behavior Intelligence — learning of site-specific patterns.
+"""Domain Behavior Intelligence — learning of site-specific patterns.
 
 Domains have different behavioral signatures such as hydration, scrolling, and
 anti-bot signals. The system records these signals to adjust strategy choices.
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 class DomainIntelligence:
     """Aggregated behavioral metrics for a single domain."""
 
-    def __init__(self, domain: str, data: dict | None = None):
+    def __init__(self, domain: str, data: dict | None = None) -> None:
         self.domain = domain
         self.hydration_delay_ms = data.get("hydration_delay_ms", 0.0) if data else 0.0
         self.infinite_scroll_required = data.get("infinite_scroll_required", False) if data else False
@@ -51,7 +50,7 @@ class DomainIntelligence:
 class DomainIntelligenceRegistry:
     """Persistent registry of domain intelligence."""
 
-    def __init__(self, storage_path: str | None = None):
+    def __init__(self, storage_path: str | None = None) -> None:
         if storage_path is None:
             storage_path = str(Path(__file__).resolve().parent.parent / "data" / "domain_intelligence.json")
         self.path = Path(storage_path)
@@ -59,22 +58,22 @@ class DomainIntelligenceRegistry:
         self._registry: dict[str, DomainIntelligence] = {}
         self._load()
 
-    def _load(self):
+    def _load(self) -> None:
         if self.path.exists():
             try:
-                with open(self.path, "r") as f:
+                with open(self.path) as f:  # noqa: PTH123
                     data = json.load(f)
                     for domain, metrics in data.items():
                         self._registry[domain] = DomainIntelligence(domain, metrics)
-            except Exception as e:
-                logger.error("Failed to load domain intelligence: %s", e)
+            except Exception:
+                logger.exception("Failed to load domain intelligence: %s")
 
-    def _save(self):
+    def _save(self) -> None:
         try:
-            with open(self.path, "w") as f:
+            with open(self.path, "w") as f:  # noqa: PTH123
                 json.dump({d: i.to_dict() for d, i in self._registry.items()}, f, indent=2)
-        except Exception as e:
-            logger.error("Failed to save domain intelligence: %s", e)
+        except Exception:
+            logger.exception("Failed to save domain intelligence: %s")
 
     def get_intelligence(self, url: str) -> DomainIntelligence:
         """Get or create intelligence for a domain."""
@@ -83,7 +82,7 @@ class DomainIntelligenceRegistry:
             self._registry[domain] = DomainIntelligence(domain)
         return self._registry[domain]
 
-    def update_from_telemetry(self, telemetry: dict):
+    def update_from_telemetry(self, telemetry: dict) -> None:
         """Update domain intelligence based on a recent scrape telemetry snapshot."""
         url = telemetry.get("url", "")
         domain = self._extract_domain(url)
@@ -117,10 +116,7 @@ class DomainIntelligenceRegistry:
                 intel.preferred_strategy = strategy
 
         # 5. Selector Decay Rate
-        if telemetry.get("fallback_triggered"):
-            decay_signal = 1.0
-        else:
-            decay_signal = 0.0
+        decay_signal = 1.0 if telemetry.get("fallback_triggered") else 0.0
         intel.selector_decay_rate = (intel.selector_decay_rate * (1 - alpha)) + (decay_signal * alpha)
 
         # 6. Infinite Scroll (Observation)
@@ -138,7 +134,7 @@ class DomainIntelligenceRegistry:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
-        except Exception:
+        except Exception:  # noqa: BLE001
             return "unknown"
 
 

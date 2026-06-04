@@ -1,5 +1,4 @@
-"""
-DataForge Chaos Engineering Test Suite
+"""DataForge Chaos Engineering Test Suite.
 
 Verifies system resilience, automated failure classification, recovery planning,
 and execution SLAs under injected chaos failure scenarios.

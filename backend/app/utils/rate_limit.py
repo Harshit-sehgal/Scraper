@@ -44,6 +44,7 @@ def is_rate_limit_error(
 
     Returns:
         True if the error looks like a rate limit.
+
     """
     if status_code is not None and status_code in _RATE_LIMIT_STATUS_CODES:
         return True
@@ -85,9 +86,9 @@ def parse_retry_after(headers: dict | None = None) -> float | None:
         from email.utils import parsedate_to_datetime
 
         retry_dt = parsedate_to_datetime(raw)
-        delta = (retry_dt - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+        delta = (retry_dt - datetime.datetime.now(datetime.UTC)).total_seconds()
         return max(0.0, delta)
-    except Exception:  # nosec B110
+    except Exception:  # nosec B110  # noqa: BLE001
         pass
 
     return None
@@ -123,6 +124,7 @@ def mark_rate_limited(
         retry_after: Explicit retry-after seconds (e.g. from Retry-After header).
             If None, uses exponential backoff based on existing cooldown.
         max_cooldown: Maximum cooldown in seconds (default 5 minutes).
+
     """
     now = time.time()
     if retry_after is not None:

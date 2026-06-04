@@ -1,5 +1,4 @@
-"""
-Tests for Strategy Evolution Engine
+"""Tests for Strategy Evolution Engine.
 
 Tests the autonomous fetch strategy selection and evolution system:
 - Per-domain strategy performance tracking

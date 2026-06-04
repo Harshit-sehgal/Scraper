@@ -1,5 +1,4 @@
-"""
-Experimental / Research Router — semantic, topology, replay, and adaptive endpoints.
+"""Experimental / Research Router — semantic, topology, replay, and adaptive endpoints.
 
 EXPERIMENTAL / RESEARCH ONLY — These endpoints expose experimental semantic,
 topology, replay, and adaptive modules. They are NOT production-validated
@@ -21,7 +20,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 
-def verify_experimental_enabled():
+def verify_experimental_enabled() -> None:
     if not settings.ENABLE_EXPERIMENTAL_ROUTES:
         raise HTTPException(
             status_code=404,
@@ -51,7 +50,7 @@ class KnowledgeMergeRequest(BaseModel):
     )
 
     @classmethod
-    def validate_payload(cls, data: dict) -> "KnowledgeMergeRequest":
+    def validate_payload(cls, data: dict) -> KnowledgeMergeRequest:
         """Validate and cap payload size."""
         max_roles = 500
         max_exclusions = 500
@@ -63,7 +62,7 @@ class KnowledgeMergeRequest(BaseModel):
         return cls(**data)
 
 
-def _require_admin_key(request: Request):
+def _require_admin_key(request: Request) -> None:
     """Check admin API key for powerful system routes."""
     if not settings.ADMIN_API_KEY:
         return  # No admin key configured — fall back to regular API key
@@ -144,7 +143,7 @@ async def export_knowledge():
 
 
 @router.post("/api/system/merge/knowledge")
-async def merge_knowledge(request: Request, data: dict, _role=Depends(require_role([UserRole.ADMIN]))):
+async def merge_knowledge(request: Request, data: dict, _role=Depends(require_role([UserRole.ADMIN]))):  # noqa: B008
     """Merge an external knowledge manifold into the current field.
 
     Validated with size caps: max 500 roles, max 500 exclusions.
@@ -154,7 +153,7 @@ async def merge_knowledge(request: Request, data: dict, _role=Depends(require_ro
     # Validate payload with size caps
     try:
         req = KnowledgeMergeRequest.validate_payload(data)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return JSONResponse(
             status_code=422,
             content={"detail": f"Invalid merge payload: {e}"},
@@ -287,7 +286,7 @@ async def system_topology_history(limit: int = 20):
 
 
 @router.post("/api/system/scheduler/step")
-async def process_cognitive_tasks(budget_ms: float = 100.0, _role=Depends(require_role([UserRole.ADMIN]))):
+async def process_cognitive_tasks(budget_ms: float = 100.0, _role=Depends(require_role([UserRole.ADMIN]))):  # noqa: B008
     """Manually trigger processing of the cognitive task queue."""
     from app.semantic_world_state import get_world_state
 
@@ -368,7 +367,7 @@ async def system_replay_events(start_idx: int = 0, end_idx: int = -1):
 
 
 @router.post("/api/system/refactor/compress")
-async def trigger_manifold_compression(_role=Depends(require_role([UserRole.ADMIN]))):
+async def trigger_manifold_compression(_role=Depends(require_role([UserRole.ADMIN]))):  # noqa: B008
     """Trigger a manifold compression cycle."""
     from app.llm_bridge import get_plugin_manager
     from app.semantic_world_state import get_world_state

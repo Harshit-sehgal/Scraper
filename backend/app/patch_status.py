@@ -17,26 +17,26 @@ def check_all_fixes() -> dict:
     """Check if all tracked-file fixes are currently applied."""
     results = {}
 
-    # Helper to find file path relative to this script
     import os
+    from pathlib import Path
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = Path(__file__).resolve().parent
 
     # 1. ROLE_EXCLUSIVITY has price / cost (moved to field_laws.py)
-    path_laws = os.path.join(base_dir, "field_laws.py")
-    with open(path_laws) as f:
+    path_laws = Path(base_dir) / "field_laws.py"
+    with open(path_laws) as f:  # noqa: PTH123
         content_laws = f.read()
     results["ROLE_EXCLUSIVITY price / cost (field_laws.py)"] = 'price", "cost"' in content_laws
 
     # 2. create_token has source_field
-    path_ir = os.path.join(base_dir, "semantic_ir.py")
-    with open(path_ir) as f:
+    path_ir = Path(base_dir) / "semantic_ir.py"
+    with open(path_ir) as f:  # noqa: PTH123
         content_ir = f.read()
     results["create_token source_field"] = "source_field=source," in content_ir or "source_field=primary_type" in content_ir
 
     # 3. schema_instability is in EnergyState (via energy_state.py)
-    path_energy = os.path.join(base_dir, "energy_state.py")
-    with open(path_energy) as f:
+    path_energy = Path(base_dir) / "energy_state.py"
+    with open(path_energy) as f:  # noqa: PTH123
         content_energy = f.read()
     results["schema_instability property (energy_state.py)"] = (
         "def schema_instability" in content_energy and "dict(self._schema_instability)" in content_energy
@@ -46,18 +46,18 @@ def check_all_fixes() -> dict:
     results["integrity_score property (energy_state.py)"] = "def integrity_score" in content_energy
 
     # 5. capture_pre_allocation_field has schema expansion
-    ws_dir = os.path.join(base_dir, "semantic_world_state")
+    ws_dir = Path(base_dir) / "semantic_world_state"
     content_ws = ""
-    if os.path.isdir(ws_dir):
+    if os.path.isdir(ws_dir):  # noqa: PTH112
         for root, _, files in os.walk(ws_dir):
             for fname in files:
                 if fname.endswith(".py"):
-                    with open(os.path.join(root, fname)) as f:
+                    with open(Path(root) / fname) as f:  # noqa: PTH123
                         content_ws += f.read() + "\n"
     else:
-        path_ws = os.path.join(base_dir, "semantic_world_state.py")
-        if os.path.exists(path_ws):
-            with open(path_ws) as f:
+        path_ws = Path(base_dir) / "semantic_world_state.py"
+        if Path(path_ws).exists():
+            with open(path_ws) as f:  # noqa: PTH123
                 content_ws = f.read()
     results["capture schema expansion"] = "ROLE_EXCLUSIVITY" in content_ws and "for ra, rb in ROLE_EXCLUSIVITY" in content_ws
 
@@ -79,8 +79,8 @@ def check_all_fixes() -> dict:
         results[f"field: {field}"] = f"self.{field}" in content_ws or f"def {field}" in content_ws
 
     # 8. Pipeline is clean of dead imports
-    path_pipe = os.path.join(base_dir, "semantic_pipeline.py")
-    with open(path_pipe) as f:
+    path_pipe = Path(base_dir) / "semantic_pipeline.py"
+    with open(path_pipe) as f:  # noqa: PTH123
         content_pipe = f.read()
     results["pipeline clean"] = "semantic_contradiction_engine" not in content_pipe
 

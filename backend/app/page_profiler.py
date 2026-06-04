@@ -1,5 +1,4 @@
-"""
-Layer 2: Page Profiler
+"""Layer 2: Page Profiler.
 ======================
 Universal page structure detection that works for ANY data type.
 
@@ -31,7 +30,7 @@ class ValuePatterns:
 
     currencies: list[str] = field(default_factory=list)  # ["£", "$", "€", "₹"]
     dates: list[str] = field(default_factory=list)  # date format samples
-    # ["4.5 / 5", "★★★", "8.5"]
+    # ["4.5 / 5", "★★★", "8.5"]  # noqa: ERA001
     ratings: list[str] = field(default_factory=list)
     codes_3letter: list[str] = field(default_factory=list)  # ["LON", "PAR", "BOM"]
     phones: list[str] = field(default_factory=list)
@@ -39,20 +38,20 @@ class ValuePatterns:
     numbers: list[str] = field(default_factory=list)
     durations: list[str] = field(default_factory=list)
     urls: list[str] = field(default_factory=list)
-    # ["250g", "1kg", "500 g", "2lb"]
+    # ["250g", "1kg", "500 g", "2lb"]  # noqa: ERA001
     weights: list[str] = field(default_factory=list)
     percentages: list[str] = field(default_factory=list)  # ["8%", "20% off", "0.5%"]
-    # ["14:30", "2:30 PM", "08:00"]
+    # ["14:30", "2:30 PM", "08:00"]  # noqa: ERA001
     times: list[str] = field(default_factory=list)
-    # ["Available", "In Stock", "Yes", "No"]
+    # ["Available", "In Stock", "Yes", "No"]  # noqa: ERA001
     booleans: list[str] = field(default_factory=list)
-    # ["10x15cm", "5\"x7\"", "A4"]
+    # ["10x15cm", "5\"x7\"", "A4"]  # noqa: ERA001
     dimensions: list[str] = field(default_factory=list)
-    # ["Pack of 6", "12 pieces", "500ml"]
+    # ["Pack of 6", "12 pieces", "500ml"]  # noqa: ERA001
     quantities: list[str] = field(default_factory=list)
-    # ["SKU-12345", "#ABC123", "EAN 123456789"]
+    # ["SKU-12345", "#ABC123", "EAN 123456789"]  # noqa: ERA001
     product_codes: list[str] = field(default_factory=list)
-    # ["per kg", "per item", "each", "dozen"]
+    # ["per kg", "per item", "each", "dozen"]  # noqa: ERA001
     units: list[str] = field(default_factory=list)
     address_fragments: list[str] = field(default_factory=list)  # ["123 Main St", "New York, NY"]
 
@@ -155,8 +154,7 @@ VALUE_PATTERNS = {
 
 
 def detect_page_structure(html: str) -> StructureProfile:
-    """
-    Detect the page structure type: table, cards, list, key_value, or mixed.
+    """Detect the page structure type: table, cards, list, key_value, or mixed.
 
     This is domain-agnostic - a flight page and a product page might both
     use "cards" structure, and the system should handle both the same way.
@@ -267,7 +265,7 @@ def _detect_cards_structure(soup: BeautifulSoup) -> StructureProfile | None:
 
             if item_count > max_items:
                 max_items = item_count
-                best_container = containers[0].parent if containers[0].parent else containers[0]
+                best_container = containers[0].parent or containers[0]
                 # Try to extract headers from first card
                 headers = []
                 if containers:
@@ -369,8 +367,7 @@ def _generate_container_selector(element) -> str:
 
 
 def detect_value_patterns(html: str) -> ValuePatterns:
-    """
-    Detect what types of values the page contains using broad patterns.
+    """Detect what types of values the page contains using broad patterns.
 
     This is domain-agnostic - it just looks for patterns like currency symbols,
     date formats, weights, times, etc., regardless of whether it's a flight,

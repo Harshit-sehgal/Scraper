@@ -1,5 +1,4 @@
-"""
-Semantic Boundary Engine
+"""Semantic Boundary Engine.
 =========================
 Determines whether adjacent tokens should merge or stay separate.
 
@@ -101,7 +100,7 @@ _BOOTSTRAP_TRANSITIONS = {
 class RoleTransitionDetector:
     """Learns which type transitions likely mark a semantic role boundary."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Ensure bootstrap transitions are present in the world state
         ws = get_world_state()
         ws.update_seed_transition(_BOOTSTRAP_TRANSITIONS)
@@ -120,7 +119,7 @@ class RoleTransitionDetector:
         return self._ws.transition_observations  # type: ignore[no-any-return]
 
     @observation_count.setter
-    def observation_count(self, value: int):
+    def observation_count(self, value: int) -> None:
         self._ws.transition_observations = value
 
     def score_transition(self, type_a: str, type_b: str) -> TransitionScore:
@@ -128,7 +127,7 @@ class RoleTransitionDetector:
         prob = self._ws.get_transition_prob(type_a, type_b)
         return TransitionScore(probability=prob, type_pair=f"{type_a}→{type_b}")
 
-    def observe_transition(self, type_a: str, type_b: str, is_role_boundary: bool):
+    def observe_transition(self, type_a: str, type_b: str, is_role_boundary: bool) -> None:
         """Observe whether a transition was a role boundary or entity continuation."""
         self._ws.observe_transition(type_a, type_b, is_role_boundary)
 
@@ -165,7 +164,7 @@ class CohesionModel:
     def split_attempts(self) -> dict[tuple[str, str], float]:
         return get_world_state().cohesion_split_attempts  # type: ignore[no-any-return]
 
-    def record(self, type_a: str, type_b: str, did_merge: bool, success: bool):
+    def record(self, type_a: str, type_b: str, did_merge: bool, success: bool) -> None:
         """Record whether a merge or split decision was successful."""
         pair = (type_a, type_b)
         ws = get_world_state()
@@ -219,10 +218,10 @@ class MotifLearner:
         return get_world_state().metrics.total_records_processed  # type: ignore[no-any-return]
 
     @total_records.setter
-    def total_records(self, value: int):
+    def total_records(self, value: int) -> None:
         get_world_state().metrics.total_records_processed = value
 
-    def observe_types(self, types: list[str]):
+    def observe_types(self, types: list[str]) -> None:
         # Identity Protection: filter out known-noisy motifs
         if any(t == "text" for t in types) and len(types) > 4:
             return
@@ -249,7 +248,7 @@ class MotifLearner:
 class SemanticBoundaryEngine:
     """Scores adjacent token pairs for cohesion vs separation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.cohesion_model = CohesionModel()
         self.transition_detector = RoleTransitionDetector()
         self.motif_learner = MotifLearner()
@@ -336,7 +335,7 @@ class SemanticBoundaryEngine:
         """Export learned memory for persistence."""
         return get_world_state().to_dict()  # type: ignore[no-any-return]
 
-    def load_state(self, state: dict):
+    def load_state(self, state: dict) -> None:
         """Import learned memory from persistence."""
         get_world_state().from_dict(state)
 
@@ -344,14 +343,14 @@ class SemanticBoundaryEngine:
         score = self.score_pair(type_a, type_b, value_a, value_b, position_a, position_b)
         return score.should_merge()
 
-    def record_decision(self, decision: MergeDecision):
+    def record_decision(self, decision: MergeDecision) -> None:
         decision_dict = decision.__dict__ if hasattr(decision, "__dict__") else {}
         get_world_state().record_decision(decision_dict)
         self.cohesion_model.record(decision.type_a, decision.type_b, decision.merged, decision.success)
         is_role_boundary = not decision.merged and decision.success
         self.transition_detector.observe_transition(decision.type_a, decision.type_b, is_role_boundary)
 
-    def update_recent_decisions(self, coherence: float, threshold: float):
+    def update_recent_decisions(self, coherence: float, threshold: float) -> None:
         """Update the most recent decisions with coherence / success metadata.
 
         Uses controlled access through HistoryState to avoid in-place
@@ -427,9 +426,8 @@ def group_adjacent_entities(records: list) -> list:
                 if h_start > 0 or n_start > 0:
                     if n_start - h_end > 3:
                         break
-                else:
-                    if n_idx - h_idx > 1:
-                        break
+                elif n_idx - h_idx > 1:
+                    break
 
                 # Extract types from key names
                 parts_h = k_head.split("_")
@@ -483,7 +481,7 @@ def get_boundary_engine() -> SemanticBoundaryEngine:
     return _boundary_engine
 
 
-def reset_boundary_engine():
+def reset_boundary_engine() -> None:
     """Reset the global boundary engine (for testing)."""
     global _boundary_engine
     _boundary_engine = None
@@ -494,6 +492,6 @@ def score_boundary(type_a: str, type_b: str, value_a: str, value_b: str, pos_a: 
     return engine.decide_merge(type_a, type_b, value_a, value_b, pos_a, pos_b)
 
 
-def record_motif_observation(types: list[str]):
+def record_motif_observation(types: list[str]) -> None:
     engine = get_boundary_engine()
     engine.motif_learner.observe_types(types)

@@ -1,5 +1,4 @@
-"""
-Fetch abstraction — HTTP fetch and Playwright browser-assisted fetch.
+"""Fetch abstraction — HTTP fetch and Playwright browser-assisted fetch.
 
 Ported from the existing async_utils, html_utils, and browser_pool.
 """
@@ -8,14 +7,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 from forge_kernel.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-class FetchStrategy(str, Enum):
+class FetchStrategy(StrEnum):
     HTTP = "http"
     BROWSER = "browser"
     BROWSER_FALLBACK = "browser_fallback"
@@ -45,6 +44,7 @@ async def fetch_page_content(url: str, use_browser: bool = False) -> FetchResult
 
     Returns:
         FetchResult with HTML content and metadata.
+
     """
     if use_browser:
         return await _fetch_with_browser(url)

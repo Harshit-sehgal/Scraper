@@ -1,5 +1,4 @@
-"""
-Post-Processing Engine: Type coercion, Geospatial distance calculation, and Data Filtering.
+"""Post-Processing Engine: Type coercion, Geospatial distance calculation, and Data Filtering.
 Uses geopy (free OpenStreetMap Nominatim geocoder) for distance calculations.
 """
 
@@ -56,15 +55,14 @@ async def geocode_address(address: str) -> tuple[float, float] | None:
                 await asyncio.sleep(backoff)
                 backoff *= 2.0  # Exponential backoff
             else:
-                logging.exception("Geocode error for %s after %d attempts: %s", address, max_retries, e)
+                logging.exception("Geocode error for %s after %d attempts", address, max_retries)
 
     cache.set_negative(address)
     return None
 
 
 def calculate_distance(point1: tuple[float, float], point2: tuple[float, float], unit: str = "km") -> float:
-    """
-    Calculate straight-line (geodesic) distance between two lat / lng points.
+    """Calculate straight-line (geodesic) distance between two lat / lng points.
     Returns distance in km or miles.
     """
     dist_km = geodesic(point1, point2).kilometers
@@ -79,9 +77,8 @@ def calculate_distance(point1: tuple[float, float], point2: tuple[float, float],
 
 
 def coerce_value(value: Any, field_type: FieldType):
-    """
-    Coerce a raw value to its declared type.
-    e.g., "18 years old" → 18 (integer), "true" → True (boolean)
+    """Coerce a raw value to its declared type.
+    e.g., "18 years old" → 18 (integer), "true" → True (boolean).
     """
     if value is None:
         return None
@@ -94,52 +91,51 @@ def coerce_value(value: Any, field_type: FieldType):
             match = re.search(r"-?\d+", str(value))
             return int(match.group()) if match else None
 
-        elif field_type == FieldType.FLOAT:
+        if field_type == FieldType.FLOAT:
             if isinstance(value, (int, float)):
                 return float(value)
             match = re.search(r"-?\d+\.?\d*", str(value))
             return float(match.group()) if match else None
 
-        elif field_type == FieldType.BOOLEAN:
+        if field_type == FieldType.BOOLEAN:
             if isinstance(value, bool):
                 return value
             s = str(value).lower().strip()
             if s in ("true", "yes", "1", "y"):
                 return True
-            elif s in ("false", "no", "0", "n"):
+            if s in ("false", "no", "0", "n"):
                 return False
             return None
 
-        elif field_type == FieldType.EMAIL:
+        if field_type == FieldType.EMAIL:
             match = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", str(value))
             return match.group() if match else str(value)
 
-        elif field_type == FieldType.PHONE:
+        if field_type == FieldType.PHONE:
             # Keep digits, +, -, (, ), spaces
             cleaned = re.sub(r"[^\d+\-() ]", "", str(value))
-            return cleaned if cleaned else str(value)
+            return cleaned or str(value)
 
-        elif field_type == FieldType.LIST_STRING:
+        if field_type == FieldType.LIST_STRING:
             if isinstance(value, list):
                 return [str(v) for v in value]
             return [str(value)]
 
-        elif field_type == FieldType.CURRENCY:
+        if field_type == FieldType.CURRENCY:
             # Extract number from currency strings like "$1,200.50" or "₹5000"
             cleaned = re.sub(r"[^\d.\-]", "", str(value))
             match = re.search(r"-?\d+\.?\d*", cleaned)
             return float(match.group()) if match else None
 
-        elif field_type == FieldType.PERCENTAGE:
+        if field_type == FieldType.PERCENTAGE:
             # Extract number from "85%" or "85 percent"
             match = re.search(r"-?\d+\.?\d*", str(value))
             return float(match.group()) if match else None
 
-        else:
-            return str(value) if value is not None else None
+        return str(value) if value is not None else None
 
-    except Exception as e:
-        logging.exception(e)
+    except Exception:
+        logging.exception("Failed to coerce value")
         return str(value) if value is not None else None
 
 
@@ -205,10 +201,7 @@ def enforce_schema_integrity(record: dict, schema_fields: list[SchemaField]) -> 
         if value is None:
             continue
 
-        if isinstance(value, list):
-            value_text = ", ".join(str(v) for v in value if v is not None)
-        else:
-            value_text = str(value).strip()
+        value_text = ", ".join(str(v) for v in value if v is not None) if isinstance(value, list) else str(value).strip()
 
         if not value_text:
             continue
@@ -265,8 +258,7 @@ def enforce_schema_integrity(record: dict, schema_fields: list[SchemaField]) -> 
 
 
 async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[SchemaField]) -> bool:
-    """
-    Check if a single record passes a filter rule.
+    """Check if a single record passes a filter rule.
     Returns True if the record should be KEPT.
     """
     value = record.get(rule.field_name)
@@ -299,11 +291,11 @@ async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[Schem
 
             if rule.operator == FilterOperator.GREATER_THAN:
                 return num_val > num_compare
-            elif rule.operator == FilterOperator.LESS_THAN:
+            if rule.operator == FilterOperator.LESS_THAN:
                 return num_val < num_compare
-            elif rule.operator == FilterOperator.GREATER_EQUAL:
+            if rule.operator == FilterOperator.GREATER_EQUAL:
                 return num_val >= num_compare
-            elif rule.operator == FilterOperator.LESS_EQUAL:
+            if rule.operator == FilterOperator.LESS_EQUAL:
                 return num_val <= num_compare
 
         # Regex matching
@@ -316,17 +308,17 @@ async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[Schem
 
         if rule.operator == FilterOperator.EQUALS:
             return str_val == str_compare
-        elif rule.operator == FilterOperator.NOT_EQUALS:
+        if rule.operator == FilterOperator.NOT_EQUALS:
             return str_val != str_compare
-        elif rule.operator == FilterOperator.CONTAINS:
+        if rule.operator == FilterOperator.CONTAINS:
             return str_compare in str_val
-        elif rule.operator == FilterOperator.NOT_CONTAINS:
+        if rule.operator == FilterOperator.NOT_CONTAINS:
             return str_compare not in str_val
-        elif rule.operator == FilterOperator.STARTS_WITH:
+        if rule.operator == FilterOperator.STARTS_WITH:
             return str_val.startswith(str_compare)
-        elif rule.operator == FilterOperator.ENDS_WITH:
+        if rule.operator == FilterOperator.ENDS_WITH:
             return str_val.endswith(str_compare)
-        elif rule.operator == FilterOperator.IN_LIST:
+        if rule.operator == FilterOperator.IN_LIST:
             allowed = [v.strip().lower() for v in compare_value.split(",")]
             return str_val in allowed
 
@@ -338,8 +330,7 @@ async def apply_filter(record: dict, rule: FilterRule, schema_fields: list[Schem
 
 
 async def _apply_distance_filter(location_value, rule: FilterRule) -> bool:
-    """
-    Special distance filter: geocodes both the record's location and the
+    """Special distance filter: geocodes both the record's location and the
     origin address, then checks if the distance is within the threshold.
     """
     if not location_value or not rule.origin_address:
@@ -405,8 +396,7 @@ async def apply_location_radius(
     max_distance_km: float | None,
     preferred_location_field: str = "",
 ) -> tuple[list[dict], dict]:
-    """
-    Filter records to those within the given km radius from origin_address.
+    """Filter records to those within the given km radius from origin_address.
     Adds distance_km field to kept records when distance can be computed.
     """
     report = {
@@ -476,11 +466,10 @@ async def process_results(
     schema_fields: list[SchemaField],
     filters: list[FilterRule],
 ) -> tuple[list[dict], int, int, dict]:
-    """
-    Full post-processing pipeline:
+    """Full post-processing pipeline:
     1. Coerce types
     2. Apply all filters
-    3. Return (filtered_results, total_count, filtered_count)
+    3. Return (filtered_results, total_count, filtered_count).
     """
     total = len(raw_results)
 

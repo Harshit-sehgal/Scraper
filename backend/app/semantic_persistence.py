@@ -1,5 +1,4 @@
-"""
-Semantic Persistence Hub
+"""Semantic Persistence Hub.
 =========================
 Single orchestrator for all semantic memory and learned state.
 Unifies:
@@ -12,6 +11,7 @@ import fcntl
 import json
 import logging
 import os
+from pathlib import Path
 
 from app.config import settings
 
@@ -32,8 +32,8 @@ def get_canonical_cache_path() -> str:
 
 def _acquire_lock():
     path = _get_lock_path()
-    if os.path.dirname(path):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+    if os.path.dirname(path):  # noqa: PTH120
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX)
@@ -43,7 +43,7 @@ def _acquire_lock():
     return fd
 
 
-def _release_lock(fd):
+def _release_lock(fd) -> None:
     try:
         fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
@@ -51,27 +51,27 @@ def _release_lock(fd):
         pass
 
 
-def load_semantic_state():
+def load_semantic_state() -> None:
     path = get_canonical_cache_path()
-    if not os.path.exists(path):
+    if not Path(path).exists():
         return
 
     lock_fd = _acquire_lock()
     try:
-        with open(path, "r") as f:
+        with open(path) as f:  # noqa: PTH123
             full_state = json.load(f)
         import app.semantic_world_state
 
         ws = app.semantic_world_state.get_world_state()
         ws.from_dict(full_state)
         logging.getLogger(__name__).info("Loaded unified semantic state from %s", path)
-    except Exception as e:
-        logging.getLogger(__name__).error("Failed to load semantic state: %s", e)
+    except Exception:
+        logging.getLogger(__name__).exception("Failed to load semantic state")
     finally:
         _release_lock(lock_fd)
 
 
-def save_semantic_state():
+def save_semantic_state() -> None:
     path = get_canonical_cache_path()
     lock_fd = _acquire_lock()
     try:
@@ -80,22 +80,22 @@ def save_semantic_state():
         ws = app.semantic_world_state.get_world_state()
         full_state = ws.to_dict()
         full_state["version"] = "3.0"
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        with open(path, "w") as f:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:  # noqa: PTH123
             json.dump(full_state, f, indent=2)
         logging.getLogger(__name__).info("Saved unified semantic state to %s", path)
-    except Exception as e:
-        logging.getLogger(__name__).error("Failed to save semantic state: %s", e)
+    except Exception:
+        logging.getLogger(__name__).exception("Failed to save semantic state")
     finally:
         _release_lock(lock_fd)
 
 
-def clear_semantic_state(clear_file: bool = True):
+def clear_semantic_state(clear_file: bool = True) -> None:
     """Reset all learned semantic state."""
     if clear_file:
         path = get_canonical_cache_path()
-        if os.path.exists(path):
-            os.remove(path)
+        if Path(path).exists():
+            Path(path).unlink()
 
     # Reset unified world state
     import app.semantic_world_state

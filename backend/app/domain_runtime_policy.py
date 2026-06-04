@@ -1,5 +1,4 @@
-"""
-Domain Runtime Policy — per-domain concurrency, cooldown, and failure tracking.
+"""Domain Runtime Policy — per-domain concurrency, cooldown, and failure tracking.
 
 When recovery handlers set ``reduce_concurrency`` or ``abort_domain``, this
 module translates those signals into actionable runtime policy that affects
@@ -199,9 +198,7 @@ class DomainRuntimePolicy:
     def can_fetch(self, url: str) -> bool:
         """Return True if the domain is not in cooldown."""
         entry = self.get_or_create(url)
-        if entry.cooldown_until > time.monotonic():
-            return False
-        return True
+        return not entry.cooldown_until > time.monotonic()
 
     def remaining_cooldown(self, url: str) -> float:
         """Seconds remaining in cooldown (0 if not cooling)."""

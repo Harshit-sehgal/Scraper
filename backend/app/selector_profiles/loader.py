@@ -1,5 +1,4 @@
-"""
-Selector Profile Loader — domain-specific extraction via JSON configs.
+"""Selector Profile Loader — domain-specific extraction via JSON configs.
 
 Design:
   Instead of hardcoding CSS selectors in Python for each site, store them
@@ -73,7 +72,7 @@ def _load_all_profiles() -> dict[str, dict]:
 
     for fpath in sorted(profiles_dir.glob("*.json")):
         try:
-            with open(fpath, "r") as f:
+            with open(fpath) as f:  # noqa: PTH123
                 profile = json.load(f)
             domain = profile.get("domain", "").strip().lower()
             if not domain:
@@ -110,7 +109,7 @@ def _match_domain(url: str) -> dict | None:
     return None
 
 
-def reload_profiles():
+def reload_profiles() -> None:
     """Force reload profiles from disk. Call when profiles are added / updated at runtime."""
     global _profile_cache
     _profile_cache = None
@@ -144,8 +143,8 @@ def _postprocess_field(value, field_config: dict) -> str | None:
 
     if field_type == "currency":
         parsed = _parse_currency(text)
-        return parsed if parsed else text
-    elif field_type == "number":
+        return parsed or text
+    if field_type == "number":
         try:
             cleaned = text.replace(",", "").replace("£", "").replace("$", "").replace("€", "")
             return str(float(cleaned))
@@ -175,6 +174,7 @@ async def extract_with_profile(
 
     Returns:
         List of dicts with keys matching the profile's field definitions.
+
     """
     if max_wait is None:
         max_wait = settings.PROFILE_MAX_WAIT
@@ -206,7 +206,7 @@ async def extract_with_profile(
             page = await context.new_page()
 
             # SSRF validation & Block images / media / fonts for speed
-            async def _route_filter(route):
+            async def _route_filter(route) -> None:
                 req_url = route.request.url
                 from unittest.mock import Mock
 
@@ -229,7 +229,7 @@ async def extract_with_profile(
 
             try:
                 await page.goto(url, wait_until="networkidle", timeout=settings.PLAYWRIGHT_TIMEOUT)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.warning("[ProfileExtractor] networkidle timeout, trying domcontentloaded")
                 await page.goto(url, wait_until="domcontentloaded", timeout=settings.PLAYWRIGHT_FALLBACK_TIMEOUT)
 
@@ -237,7 +237,7 @@ async def extract_with_profile(
             if wait_for_sel:
                 try:
                     await page.wait_for_selector(wait_for_sel, timeout=max_wait * 1000)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     logger.warning(
                         "[ProfileExtractor] Selector '%s' not found within %ds",
                         wait_for_sel,
@@ -253,7 +253,7 @@ async def extract_with_profile(
                 await asyncio.sleep(settings.PAGE_SETTLE_DELAY / 2)
                 try:
                     count = await container_locator.count()
-                except Exception:
+                except Exception:  # noqa: BLE001
                     count = 0
                 if count > 0 and count == prev_count:
                     stable_polls += 1
@@ -304,19 +304,19 @@ async def extract_with_profile(
             logger.info("[ProfileExtractor] Extracted %d records", len(records))
             return records  # type: ignore[no-any-return]
 
-    except Exception as e:
-        logger.exception("[ProfileExtractor] Fatal error for %s: %s", url, e)
+    except Exception:
+        logger.exception("[ProfileExtractor] Fatal error for %s", url)
         return []
     finally:
         if context is not None:
             try:
                 await context.close()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.debug("[ProfileExtractor] Failed to close browser context gracefully")
         if browser is not None:
             try:
                 await browser.close()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.debug("[ProfileExtractor] Failed to close browser gracefully")
 
 
@@ -333,6 +333,7 @@ async def try_profile_extraction(url: str, max_wait: int | None = None) -> list[
     Returns:
         List of records if a profile matched and extraction succeeded.
         None if no profile matches the URL domain.
+
     """
     if max_wait is None:
         max_wait = settings.PROFILE_MAX_WAIT

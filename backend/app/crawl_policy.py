@@ -1,5 +1,4 @@
-"""
-Crawl Policy Engine — operational governance for the scraper.
+"""Crawl Policy Engine — operational governance for the scraper.
 
 Provides:
   - Per-domain concurrency budgets
@@ -19,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from collections import defaultdict
@@ -72,6 +72,7 @@ class CrawlPolicyEngine:
 
         Returns:
             None if allowed, or an error message string if blocked.
+
         """
         domain = self._extract_domain(url)
         if not domain:
@@ -224,14 +225,14 @@ class CrawlPolicyEngine:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     @staticmethod
     def _extract_path(url: str) -> str:
         try:
             return urlparse(url).path or "/"
-        except Exception:
+        except Exception:  # noqa: BLE001
             return "/"
 
     async def _check_robots_txt(self, domain: str) -> None:
@@ -275,10 +276,8 @@ class CrawlPolicyEngine:
                             disallowed_paths.add(path)
 
                     if line.lower().startswith("crawl-delay:"):
-                        try:
+                        with contextlib.suppress(ValueError):
                             crawl_delay = float(line.split(":", 1)[1].strip())
-                        except ValueError:
-                            pass
 
                 state.robots_disallowed = disallowed_paths
                 state.crawl_delay = crawl_delay
@@ -291,7 +290,7 @@ class CrawlPolicyEngine:
                         crawl_delay,
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug("Failed to fetch robots.txt for %s: %s", domain, e)
             # Non-fatal — proceed without robots.txt constraints
 

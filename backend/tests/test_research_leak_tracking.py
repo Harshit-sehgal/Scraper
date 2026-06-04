@@ -1,5 +1,4 @@
-"""
-Tests for the research-shell boundary gate.
+"""Tests for the research-shell boundary gate.
 
 The full quarantine of research modules from the product-kernel import
 graph is the work of Phase R2-R5 (see docs/REFACTOR_PLAN.md). Phase R1
@@ -81,7 +80,7 @@ _IMPORT_CHAIN_MODULES: tuple[str, ...] = (
 )
 
 
-def _clean_import_app_main():
+def _clean_import_app_main() -> None:
     """Force a fresh import of app.main with the experimental gate off.
 
     This is tricky because pytest, conftest.py, and earlier test files

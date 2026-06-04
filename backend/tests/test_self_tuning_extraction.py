@@ -1,5 +1,4 @@
-"""
-Tests for Self-Tuning Extraction — Automatic parameter adjustment.
+"""Tests for Self-Tuning Extraction — Automatic parameter adjustment.
 
 Tests:
   - Tuning parameter creation and defaults
@@ -80,7 +79,7 @@ class TestSelfTuningController:
     def test_history_capped_at_50(self) -> None:
         """Test that history is capped at 50 records."""
         controller = SelfTuningController()
-        for i in range(100):
+        for _i in range(100):
             controller.record_telemetry(
                 "example.com",
                 {
@@ -116,7 +115,7 @@ class TestSelfTuningController:
         controller = SelfTuningController()
 
         # Record extremely fast fetches
-        for i in range(10):
+        for _i in range(10):
             controller.record_telemetry(
                 "fast-domain.com",
                 {
@@ -135,7 +134,7 @@ class TestSelfTuningController:
         controller = SelfTuningController()
 
         # High anti-bot domain
-        for i in range(5):
+        for _i in range(5):
             controller.record_telemetry(
                 "anti-bot-domain.com",
                 {
@@ -190,7 +189,7 @@ class TestSelfTuningController:
         domain = "quality-domain.com"
 
         # Record high quality extractions
-        for i in range(10):
+        for _i in range(10):
             controller.record_telemetry(
                 domain,
                 {

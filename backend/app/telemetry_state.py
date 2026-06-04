@@ -1,6 +1,4 @@
-"""
-Telemetry State Adapter — isolated state management for runtime performance metrics.
-"""
+"""Telemetry State Adapter — isolated state management for runtime performance metrics."""
 
 from __future__ import annotations
 

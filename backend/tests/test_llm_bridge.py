@@ -7,6 +7,7 @@ call counting, and the SubstratePluginManager.
 from __future__ import annotations
 
 import os
+from typing import Never
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -168,7 +169,7 @@ class TestRecordLlmDegradation:
 
 
 class TestCallCounting:
-    def setup_method(self):
+    def setup_method(self) -> None:
         reset_llm_call_count()
 
     def test_initial_count_is_zero(self) -> None:
@@ -190,7 +191,7 @@ class TestCallCounting:
 class _MockAsyncClient:
     """Helper: creates an async client mock whose post() returns awaitable responses."""
 
-    def __init__(self, response_sequence=None):
+    def __init__(self, response_sequence=None) -> None:
         # response_sequence: list of response objects or callables that return responses
         self.response_sequence = response_sequence or []
         self.call_count = 0
@@ -405,13 +406,13 @@ class TestLlmText:
 
 
 class TestSubstratePluginManager:
-    def setup_method(self):
+    def setup_method(self) -> None:
         reset_plugin_manager()
 
     def test_register_handler(self) -> None:
         mgr = SubstratePluginManager()
 
-        def handler(**kwargs):
+        def handler(**kwargs) -> str:
             return "ok"
 
         mgr.register_handler("test_handler", handler)
@@ -420,7 +421,7 @@ class TestSubstratePluginManager:
     def test_call_tool_executes_handler(self) -> None:
         mgr = SubstratePluginManager()
 
-        def handler(**kwargs):
+        def handler(**kwargs) -> str:
             return f"processed {kwargs.get('x')}"
 
         mgr.register_handler("echo", handler)
@@ -435,7 +436,7 @@ class TestSubstratePluginManager:
     def test_call_tool_records_execution_history(self) -> None:
         mgr = SubstratePluginManager()
 
-        def handler(**kwargs):
+        def handler(**kwargs) -> str:
             return "done"
 
         mgr.register_handler("h1", handler)
@@ -447,7 +448,7 @@ class TestSubstratePluginManager:
     def test_call_tool_records_failure_in_history(self) -> None:
         mgr = SubstratePluginManager()
 
-        def handler(**kwargs):
+        def handler(**kwargs) -> Never:
             msg = "oops"
             raise ValueError(msg)
 
@@ -462,7 +463,7 @@ class TestSubstratePluginManager:
 
         mgr = SubstratePluginManager(ws=ws_mock)
 
-        def handler(**kwargs):
+        def handler(**kwargs) -> str:
             return "should not reach"
 
         mgr.register_handler("blocked", handler)
@@ -533,7 +534,7 @@ class TestSubstratePluginManager:
 
 
 class TestGetPluginManager:
-    def setup_method(self):
+    def setup_method(self) -> None:
         reset_plugin_manager()
 
     def test_singleton_behavior(self) -> None:

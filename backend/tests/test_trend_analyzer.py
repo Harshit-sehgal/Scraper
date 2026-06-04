@@ -1,5 +1,4 @@
-"""
-Tests for Trend Analyzer — telemetry intelligence and economic tracking.
+"""Tests for Trend Analyzer — telemetry intelligence and economic tracking.
 
 Tests cover:
   - TrendAnalyzer: empty history, domain grouping, trend detection, health scoring, alerts
@@ -565,7 +564,7 @@ class TestEconomicTrackerCostAnalysis:
         assert summary.total_cost_usd == pytest.approx(expected, 0.01)
 
     def test_httpx_lower_cost(self) -> None:
-        """httpx (no browser) should cost less than playwright."""
+        """Httpx (no browser) should cost less than playwright."""
         tracker = EconomicTracker()
         httpx_history = [
             _make_telemetry(

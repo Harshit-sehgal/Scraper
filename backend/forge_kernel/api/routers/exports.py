@@ -1,18 +1,19 @@
-"""
-Export routes — CSV, JSON, and Excel export endpoints for the kernel.
-"""
+"""Export routes — CSV, JSON, and Excel export endpoints for the kernel."""
 
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
 from forge_kernel.api.deps import get_jobs_store, get_recycle_bin_store, require_viewer
-from forge_kernel.contracts.job import Job
 from forge_kernel.services.export_service import ExportService
 from forge_kernel.services.job_service import JobService
+
+if TYPE_CHECKING:
+    from forge_kernel.contracts.job import Job
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["exports"])
@@ -30,7 +31,7 @@ def _get_service(
 @router.get("/api/jobs/{job_id}/export/csv")
 async def export_csv(
     job_id: str,
-    service: JobService = Depends(_get_service),
+    service: Annotated[JobService, Depends(_get_service)],
     _=Depends(require_viewer),
 ):
     """Export job results as CSV."""
@@ -52,7 +53,7 @@ async def export_csv(
 @router.get("/api/jobs/{job_id}/export/json")
 async def export_json(
     job_id: str,
-    service: JobService = Depends(_get_service),
+    service: Annotated[JobService, Depends(_get_service)],
     _=Depends(require_viewer),
 ):
     """Export job results as JSON."""
@@ -72,7 +73,7 @@ async def export_json(
 @router.get("/api/jobs/{job_id}/export/xlsx")
 async def export_xlsx(
     job_id: str,
-    service: JobService = Depends(_get_service),
+    service: Annotated[JobService, Depends(_get_service)],
     _=Depends(require_viewer),
 ):
     """Export job results as Excel (XLSX)."""

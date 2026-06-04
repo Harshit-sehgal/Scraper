@@ -12,7 +12,7 @@ from app.transaction_context import active_transaction
 class IntentState:
     """Sole owner of the semantic field's cognitive intents and goal attractors."""
 
-    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None) -> None:
         self._delta_callback = delta_callback
         # Active Intents: intent_id -> details {target_vec, strength,
         # target_roles}
@@ -26,28 +26,28 @@ class IntentState:
         return None
 
     @_staging.setter
-    def _staging(self, value: dict | None):
+    def _staging(self, value: dict | None) -> None:
         tx = active_transaction.get()
         if tx is not None:
             tx[f"intent_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict):
+    def _record(self, action: str, details: dict) -> None:
         if self._delta_callback:
             self._delta_callback("intent", action, details)
 
     # ─── Transaction Support ─────────────────────────────────────────────
 
-    def begin_transaction(self):
+    def begin_transaction(self) -> None:
         """Snapshot current state for staging."""
         self._staging = {"active_intents": {k: dict(v) for k, v in self._active_intents.items()}}
 
-    def commit(self):
+    def commit(self) -> None:
         """Apply staged changes."""
         if self._staging is not None:
             self._active_intents = self._staging["active_intents"]
             self._staging = None
 
-    def rollback(self):
+    def rollback(self) -> None:
         self._staging = None
 
     def _get_struct(self, key: str):
@@ -56,7 +56,7 @@ class IntentState:
         attr_map = {"active_intents": "_active_intents"}
         return getattr(self, attr_map[key])
 
-    def _set_struct(self, key: str, val):
+    def _set_struct(self, key: str, val) -> None:
         if self._staging is not None:
             self._staging[key] = val
         else:
@@ -71,7 +71,7 @@ class IntentState:
         target_vec: list[float],
         strength: float = 0.5,
         target_roles: list[str] | None = None,
-    ):
+    ) -> None:
         """Define a new cognitive intent (Phase 36)."""
         intents = self._get_struct("active_intents")
         intents[intent_id] = {
@@ -90,7 +90,7 @@ class IntentState:
             },
         )
 
-    def remove_intent(self, intent_id: str):
+    def remove_intent(self, intent_id: str) -> None:
         intents = self._get_struct("active_intents")
         if intent_id in intents:
             del intents[intent_id]
@@ -112,9 +112,9 @@ class IntentState:
     def to_dict(self) -> dict:
         return {"active_intents": self.active_intents}
 
-    def from_dict(self, data: dict):
+    def from_dict(self, data: dict) -> None:
         self.clear()
         self._set_struct("active_intents", {k: dict(v) for k, v in data.get("active_intents", {}).items()})
 
-    def clear(self):
+    def clear(self) -> None:
         self._set_struct("active_intents", {})

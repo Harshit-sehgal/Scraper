@@ -20,7 +20,7 @@ from app.transaction_context import active_transaction
 class EnergyState:
     """Sole owner of the semantic field's energy / macro-state variables."""
 
-    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None) -> None:
         self._delta_callback = delta_callback
         # ─── Canonical State Variables ───────────────────────────────
         self._global_energy: float = 5.0
@@ -56,18 +56,18 @@ class EnergyState:
         return None
 
     @_staging.setter
-    def _staging(self, value: dict | None):
+    def _staging(self, value: dict | None) -> None:
         tx = active_transaction.get()
         if tx is not None:
             tx[f"energy_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict):
+    def _record(self, action: str, details: dict) -> None:
         if self._delta_callback:
             self._delta_callback("energy", action, details)
 
     # ─── Transaction Support ─────────────────────────────────────────────
 
-    def begin_transaction(self):
+    def begin_transaction(self) -> None:
         """Snapshot current state for staging."""
         self._staging = {
             "_global_energy": self._global_energy,
@@ -89,7 +89,7 @@ class EnergyState:
             "_stability_debt": self._stability_debt,
         }
 
-    def commit(self):
+    def commit(self) -> None:
         """Apply staged changes."""
         if self._staging is not None:
             self._global_energy = self._staging["_global_energy"]
@@ -111,7 +111,7 @@ class EnergyState:
             self._stability_debt = self._staging["_stability_debt"]
             self._staging = None
 
-    def rollback(self):
+    def rollback(self) -> None:
         self._staging = None
 
     def _get_val(self, key: str):
@@ -121,7 +121,7 @@ class EnergyState:
             return self._staging[k]
         return getattr(self, k)
 
-    def _set_val(self, key: str, val):
+    def _set_val(self, key: str, val) -> None:
         k = key if key.startswith("_") else f"_{key}"
         if self._staging is not None:
             self._staging[k] = val
@@ -133,14 +133,14 @@ class EnergyState:
         return self._get_val("stability_debt")  # type: ignore[no-any-return]
 
     @stability_debt.setter
-    def stability_debt(self, value: float):
+    def stability_debt(self, value: float) -> None:
         self._set_val("stability_debt", max(0.0, value))
 
-    def adjust_stability_debt(self, delta: float):
+    def adjust_stability_debt(self, delta: float) -> None:
         self.stability_debt = self.stability_debt + delta
         self._record("adjust_stability_debt", {"delta": delta})
 
-    def rebalance_attractors(self, role_stabilities: dict[str, float], threshold: float = 0.8):
+    def rebalance_attractors(self, role_stabilities: dict[str, float], threshold: float = 0.8) -> None:
         """Dissipate energy from monopolistic semantic basins (Phase 52).
 
         If a role becomes too dominant (stability > threshold), we siphons
@@ -159,7 +159,7 @@ class EnergyState:
                 self.set_entropy(min(1.0, self.global_entropy + dissipation * 0.05))
                 self._record("rebalance_attractor", {"role": role, "stability": stability, "dissipation": dissipation})
 
-    def inject_diversification_entropy(self, scale: float = 0.05):
+    def inject_diversification_entropy(self, scale: float = 0.05) -> None:
         """Inject directed entropy into the field to prevent freezing (Phase 55)."""
         cur = self.global_entropy
         boost = scale * (1.0 - cur)
@@ -171,7 +171,7 @@ class EnergyState:
         return self._get_val("global_energy")  # type: ignore[no-any-return]
 
     @global_energy.setter
-    def global_energy(self, value: float):
+    def global_energy(self, value: float) -> None:
         self.set_energy(value)
 
     @property
@@ -179,7 +179,7 @@ class EnergyState:
         return self._get_val("global_entropy")  # type: ignore[no-any-return]
 
     @global_entropy.setter
-    def global_entropy(self, value: float):
+    def global_entropy(self, value: float) -> None:
         self.set_entropy(value)
 
     @property
@@ -187,7 +187,7 @@ class EnergyState:
         return self._get_val("exclusion_count")  # type: ignore[no-any-return]
 
     @exclusion_count.setter
-    def exclusion_count(self, value: int):
+    def exclusion_count(self, value: int) -> None:
         self.set_exclusion_count(value)
 
     @property
@@ -195,7 +195,7 @@ class EnergyState:
         return self._get_val("total_records_processed")  # type: ignore[no-any-return]
 
     @total_records_processed.setter
-    def total_records_processed(self, value: int):
+    def total_records_processed(self, value: int) -> None:
         self._set_val("total_records_processed", value)
 
     @property
@@ -203,7 +203,7 @@ class EnergyState:
         return self._get_val("cumulative_density")  # type: ignore[no-any-return]
 
     @cumulative_density.setter
-    def cumulative_density(self, value: float):
+    def cumulative_density(self, value: float) -> None:
         self.set_cumulative_density(value)
 
     @property
@@ -211,7 +211,7 @@ class EnergyState:
         return self._get_val("cumulative_uncertainty")  # type: ignore[no-any-return]
 
     @cumulative_uncertainty.setter
-    def cumulative_uncertainty(self, value: float):
+    def cumulative_uncertainty(self, value: float) -> None:
         self.set_cumulative_uncertainty(value)
 
     @property
@@ -219,7 +219,7 @@ class EnergyState:
         return self._get_val("dataset_coherence")  # type: ignore[no-any-return]
 
     @dataset_coherence.setter
-    def dataset_coherence(self, value: float):
+    def dataset_coherence(self, value: float) -> None:
         self._set_val("dataset_coherence", value)
 
     # ─── Properties (canonical derived metrics) ───────────────────────────
@@ -249,7 +249,7 @@ class EnergyState:
         sink = self._get_val("_total_energy_sink")
         return round(source - sink, 4)  # type: ignore[no-any-return]
 
-    def record_energy_flow(self, source_delta: float, sink_delta: float):
+    def record_energy_flow(self, source_delta: float, sink_delta: float) -> None:
         """Record a redistribution flow for energy conservation tracking.
 
         source_delta: amount of energy that flowed OUT of source regions
@@ -309,60 +309,60 @@ class EnergyState:
 
     # ─── Controlled Mutations — Scalars ──────────────────────────────────
 
-    def set_energy(self, value: float):
+    def set_energy(self, value: float) -> None:
         if math.isnan(value) or math.isinf(value):
             return
         self._set_val("global_energy", max(0.0, min(10.0, value)))
         self._record("set_energy", {"value": value})
 
-    def adjust_energy(self, delta: float):
+    def adjust_energy(self, delta: float) -> None:
         self.set_energy(self._get_val("global_energy") + delta)
 
-    def set_entropy(self, value: float):
+    def set_entropy(self, value: float) -> None:
         if math.isnan(value) or math.isinf(value):
             return
         self._set_val("global_entropy", max(0.0, min(1.0, value)))
         self._record("set_entropy", {"value": value})
 
-    def set_convergence(self, value: float):
+    def set_convergence(self, value: float) -> None:
         if math.isnan(value) or math.isinf(value):
             return
         self._set_val("_convergence", max(0.0, min(1.0, value)))
         self._record("set_convergence", {"value": value})
 
-    def set_temperature(self, value: float):
+    def set_temperature(self, value: float) -> None:
         if math.isnan(value) or math.isinf(value):
             return
         self._set_val("_temperature", max(0.0, min(1.0, value)))
         self._record("set_temperature", {"value": value})
 
-    def set_integrity(self, value: float):
+    def set_integrity(self, value: float) -> None:
         if math.isnan(value) or math.isinf(value):
             return
         self._set_val("_integrity", max(0.0, min(1.0, value)))
         self._record("set_integrity", {"value": value})
 
-    def set_exclusion_count(self, value: int):
+    def set_exclusion_count(self, value: int) -> None:
         self._set_val("exclusion_count", max(0, value))
         self._record("set_exclusion_count", {"value": value})
 
-    def set_cumulative_uncertainty(self, value: float):
+    def set_cumulative_uncertainty(self, value: float) -> None:
         if math.isnan(value) or math.isinf(value):
             return
         self._set_val("cumulative_uncertainty", max(0.0, value))
         self._record("set_cumulative_uncertainty", {"value": value})
 
-    def increment_records(self, n: int = 1):
+    def increment_records(self, n: int = 1) -> None:
         self._set_val("total_records_processed", self._get_val("total_records_processed") + n)
         self._record("increment_records", {"n": n})
 
-    def set_cumulative_density(self, value: float):
+    def set_cumulative_density(self, value: float) -> None:
         if math.isnan(value) or math.isinf(value):
             return
         self._set_val("cumulative_density", max(0.0, value))
         self._record("set_cumulative_density", {"value": value})
 
-    def accumulate_density(self, delta: float):
+    def accumulate_density(self, delta: float) -> None:
         self._set_val("cumulative_density", max(0.0, self._get_val("cumulative_density") + delta))
         self._record("accumulate_density", {"delta": delta})
 
@@ -375,7 +375,7 @@ class EnergyState:
     def get_schema_instability(self, role: str) -> float:
         return self._get_val("_schema_instability").get(role, 0.5)  # type: ignore[no-any-return]
 
-    def set_schema_instability(self, role: str, value: float):
+    def set_schema_instability(self, role: str, value: float) -> None:
         inst = self._get_val("_schema_instability")
         inst[role] = max(0.0, min(1.0, value))
         self._set_val("_schema_instability", inst)
@@ -383,10 +383,10 @@ class EnergyState:
 
     # ─── Bulk / Derived Setters ────────────────────────────────────────────
 
-    def update_from_regions(self, regions: list, region_count: int | None = None):
+    def update_from_regions(self, regions: list, region_count: int | None = None) -> None:
         if not regions:
             return
-        n = region_count if region_count else len(regions)
+        n = region_count or len(regions)
         if n <= 0:
             return
         avg_convergence = sum(r.local_convergence for r in regions) / n
@@ -400,10 +400,10 @@ class EnergyState:
         self.set_entropy(avg_instability)
         self._set_val("cumulative_uncertainty", sum(r.instability for r in regions))
 
-    def evolve_from_regions(self, regions: list, region_count: int | None = None):
+    def evolve_from_regions(self, regions: list, region_count: int | None = None) -> None:
         if not regions:
             return
-        n = region_count if region_count else len(regions)
+        n = region_count or len(regions)
         if n <= 0:
             return
         avg_convergence = sum(getattr(r, "integrity", 0.5) for r in regions) / n
@@ -431,7 +431,7 @@ class EnergyState:
         cur_energy = self._get_val("global_energy")
         self._set_val("global_energy", cur_energy * 0.8 + target_energy * 0.2)
 
-    def from_dict(self, data: dict):
+    def from_dict(self, data: dict) -> None:
         self.clear()
         self._set_val("global_energy", data.get("global_energy", 5.0))
         self._set_val("global_entropy", data.get("global_entropy", 0.5))
@@ -472,7 +472,7 @@ class EnergyState:
             "schema_instability": self.schema_instability,
         }
 
-    def clear(self):
+    def clear(self) -> None:
         self._set_val("global_energy", 5.0)
         self._set_val("global_entropy", 0.5)
         self._set_val("exclusion_count", 0)
@@ -491,10 +491,10 @@ class EnergyState:
         self._set_val("stability_debt", 0.0)
         self._set_val("_schema_instability", {})
 
-    def merge(self, other_data: dict, alpha: float = 0.5):
+    def merge(self, other_data: dict, alpha: float = 0.5) -> None:
         """Merge remote energy state into local (Phase 32)."""
 
-        def merge_field(field: str, remote_val: float, mode: str = "avg"):
+        def merge_field(field: str, remote_val: float, mode: str = "avg") -> None:
             # All internal keys in EnergyState use underscores
             k = field if field.startswith("_") else f"_{field}"
             local_val = self._get_val(k)

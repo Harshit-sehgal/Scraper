@@ -1,5 +1,4 @@
-"""
-E. Job lifecycle — Comprehensive lifecycle transition tests.
+"""E. Job lifecycle — Comprehensive lifecycle transition tests.
 
 Covers:
 - Double cancel on terminal job returns early
@@ -13,6 +12,8 @@ Covers:
 - Restore and re-delete round-trip
 - Enqueue failure rollback in production mode cleans up job + repository
 """
+
+from typing import Never
 
 from app.models import JobStatus
 
@@ -290,11 +291,11 @@ def test_enqueue_failure_rollback_in_production(client, monkeypatch) -> None:
     # Patch get_worker_queue to return a broken queue
 
     class BrokenQueue:
-        async def enqueue(self, **kwargs):
+        async def enqueue(self, **kwargs) -> Never:
             msg = "Worker queue is down"
             raise RuntimeError(msg)
 
-        async def cancel(self, task_id):
+        async def cancel(self, task_id) -> None:
             pass
 
     def fake_broken_queue():
@@ -310,13 +311,13 @@ def test_enqueue_failure_rollback_in_production(client, monkeypatch) -> None:
     deleted_jobs = []
 
     class TrackingRepo:
-        def hard_delete(self, job_id):
+        def hard_delete(self, job_id) -> None:
             deleted_jobs.append(job_id)
 
-        def save_single(self, job):
+        def save_single(self, job) -> None:
             pass
 
-    monkeypatch.setattr("app.routers.jobs.get_job_repository", lambda: TrackingRepo())
+    monkeypatch.setattr("app.routers.jobs.get_job_repository", TrackingRepo)
 
     # Attempt to create a job — should get 503 because enqueue raises in production
     payload = {

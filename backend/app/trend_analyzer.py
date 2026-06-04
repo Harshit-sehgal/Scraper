@@ -1,5 +1,4 @@
-"""
-Trend Analyzer — Telemetry intelligence that detects degradation patterns.
+"""Trend Analyzer — Telemetry intelligence that detects degradation patterns.
 
 Analyses accumulated scrape telemetry to identify:
   - Degrading domains (increasing failures, decreasing quality)
@@ -109,10 +108,10 @@ class TrendAnalyzer:
     to be called periodically (e.g., every N scrapes or on demand via API).
     """
 
-    def __init__(self, history_window: int = 100):
-        """
-        Args:
-            history_window: Number of most recent telemetry events to analyze.
+    def __init__(self, history_window: int = 100) -> None:
+        """Args:
+        history_window: Number of most recent telemetry events to analyze.
+
         """
         self._history_window = history_window
 
@@ -124,6 +123,7 @@ class TrendAnalyzer:
 
         Returns:
             A TrendReport with domain trends, global metrics, and alerts.
+
         """
         if not telemetry_history:
             return TrendReport()
@@ -330,10 +330,7 @@ class TrendAnalyzer:
         early_mean = sum(early) / len(early)
         late_mean = sum(late) / len(late)
 
-        if early_mean == 0:
-            delta = late_mean
-        else:
-            delta = (late_mean - early_mean) / abs(early_mean)
+        delta = late_mean if early_mean == 0 else (late_mean - early_mean) / abs(early_mean)
 
         threshold = 0.15  # 15% change required to register as a trend
 
@@ -343,9 +340,8 @@ class TrendAnalyzer:
         if higher_is_worse:
             # Higher values are bad (e.g., latency, anti-bot score)
             return "degrading" if delta > 0 else "improving"
-        else:
-            # Higher values are good (e.g., quality score)
-            return "improving" if delta > 0 else "degrading"
+        # Higher values are good (e.g., quality score)
+        return "improving" if delta > 0 else "degrading"
 
     def _compute_health_score(self, trend: DomainTrend) -> float:
         """Compute a 0 - 100 health score from trend metrics.
@@ -402,7 +398,7 @@ class TrendAnalyzer:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
-        except Exception:
+        except Exception:  # noqa: BLE001
             return "unknown"
 
 
@@ -552,9 +548,8 @@ class EconomicTracker:
         """Rate cost efficiency based on cost per record."""
         if cost_per_record <= 0.01:
             return "excellent"
-        elif cost_per_record <= 0.03:
+        if cost_per_record <= 0.03:
             return "good"
-        elif cost_per_record <= 0.10:
+        if cost_per_record <= 0.10:
             return "fair"
-        else:
-            return "poor"
+        return "poor"

@@ -11,7 +11,7 @@ def test_plugin_registration_and_execution() -> None:
     plugins = get_plugin_manager(ws=ws)
 
     # 1. Define and register a mock handler
-    def mock_handler(role, token):
+    def mock_handler(role, token) -> str:
         return f"Processed {role} for {token}"
 
     plugins.register_handler("test_handler", mock_handler)
@@ -39,7 +39,7 @@ def test_plugin_policy_restriction() -> None:
     ws.clear()
     plugins = get_plugin_manager(ws=ws)
 
-    def mock_handler(role, token):
+    def mock_handler(role, token) -> str:
         return "ok"
 
     plugins.register_handler("p1", mock_handler)

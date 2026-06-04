@@ -1,5 +1,4 @@
-"""
-Crawl Frontier — Priority-based URL management for large-scale crawling.
+"""Crawl Frontier — Priority-based URL management for large-scale crawling.
 
 Responsible for:
 - Prioritizing URLs based on domain reputation and depth.
@@ -59,10 +58,9 @@ class CrawlFrontier:
         self._load_from_db()
 
     def _init_db(self) -> None:
-        import os
         import sqlite3
 
-        os.makedirs(os.path.dirname(self._db_path), exist_ok=True)
+        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self._db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS queue (
@@ -112,8 +110,8 @@ class CrawlFrontier:
 
                 # Heapify to establish priority invariant
                 heapq.heapify(self._queue)
-        except Exception as e:
-            logger.error("Failed to load frontier state from SQLite: %s", e)
+        except Exception:
+            logger.exception("Failed to load frontier state from SQLite: %s")
 
     async def add_url(self, url: str, priority: int = 10, depth: int = 0, source_url: str | None = None) -> bool:
         """Add a URL to the frontier if it hasn't been crawled yet."""
@@ -156,8 +154,8 @@ class CrawlFrontier:
                         (item_priority, url, depth, source_url, item.added_at),
                     )
                     conn.commit()
-            except Exception as e:
-                logger.error("Failed to insert URL into SQLite: %s", e)
+            except Exception:
+                logger.exception("Failed to insert URL into SQLite: %s")
 
             logger.debug("[Frontier] Added URL: %s (depth: %d, priority: %d)", url, depth, item_priority)
             return True
@@ -174,7 +172,7 @@ class CrawlFrontier:
             async with self._lock:
                 if not self._queue:
                     # No more items in queue! Restore tried items before
-                    # returning
+                    # returning  # noqa: ERA001
                     for item in tried:
                         if item.url not in self._completed:
                             heapq.heappush(self._queue, item)
@@ -188,8 +186,8 @@ class CrawlFrontier:
                                         (item.priority, item.url, item.depth, item.source_url, item.added_at),
                                     )
                                     conn.commit()
-                            except Exception as e:
-                                logger.error("Failed to restore URL to SQLite: %s", e)
+                            except Exception:
+                                logger.exception("Failed to restore URL to SQLite: %s")
                     return None
 
                 item = heapq.heappop(self._queue)
@@ -202,8 +200,8 @@ class CrawlFrontier:
                     with sqlite3.connect(self._db_path) as conn:
                         conn.execute("DELETE FROM queue WHERE url = ?", (item.url,))
                         conn.commit()
-                except Exception as e:
-                    logger.error("Failed to delete URL from SQLite queue: %s", e)
+                except Exception:
+                    logger.exception("Failed to delete URL from SQLite queue: %s")
 
             # 2. Release lock and evaluate policy check asynchronously outside
             # the lock
@@ -222,8 +220,8 @@ class CrawlFrontier:
                                 (item.priority, item.url, item.depth, item.source_url, item.added_at),
                             )
                             conn.commit()
-                    except Exception as e:
-                        logger.error("Failed to restore URL to SQLite: %s", e)
+                    except Exception:
+                        logger.exception("Failed to restore URL to SQLite: %s")
                     # Restore other tried items under the lock
                     for t_item in tried:
                         if t_item.url not in self._completed:
@@ -236,28 +234,27 @@ class CrawlFrontier:
                                         (t_item.priority, t_item.url, t_item.depth, t_item.source_url, t_item.added_at),
                                     )
                                     conn.commit()
-                            except Exception as e:
-                                logger.error("Failed to restore tried URL to SQLite: %s", e)
+                            except Exception:
+                                logger.exception("Failed to restore tried URL to SQLite: %s")
                 return item.url
-            else:
-                # Blocked! Restore pending status and track in tried list
-                async with self._lock:
-                    self._pending.add(item.url)
-                    import sqlite3
+            # Blocked! Restore pending status and track in tried list
+            async with self._lock:
+                self._pending.add(item.url)
+                import sqlite3
 
-                    try:
-                        with sqlite3.connect(self._db_path) as conn:
-                            conn.execute(
-                                "INSERT OR REPLACE INTO queue VALUES (?, ?, ?, ?, ?)",
-                                (item.priority, item.url, item.depth, item.source_url, item.added_at),
-                            )
-                            conn.commit()
-                    except Exception as e:
-                        logger.error("Failed to save blocked URL: %s", e)
-                tried.append(item)
+                try:
+                    with sqlite3.connect(self._db_path) as conn:
+                        conn.execute(
+                            "INSERT OR REPLACE INTO queue VALUES (?, ?, ?, ?, ?)",
+                            (item.priority, item.url, item.depth, item.source_url, item.added_at),
+                        )
+                        conn.commit()
+                except Exception:
+                    logger.exception("Failed to save blocked URL: %s")
+            tried.append(item)
 
-                if len(tried) > 20:  # Don't look too deep
-                    break
+            if len(tried) > 20:  # Don't look too deep
+                break
 
         # 3. If we searched too deep and didn't find any eligible URL,
         # restore all tried items to the heap under the lock.
@@ -275,11 +272,11 @@ class CrawlFrontier:
                                 (item.priority, item.url, item.depth, item.source_url, item.added_at),
                             )
                             conn.commit()
-                    except Exception as e:
-                        logger.error("Failed to restore tried URLs: %s", e)
+                    except Exception:
+                        logger.exception("Failed to restore tried URLs: %s")
         return None
 
-    async def mark_completed(self, url: str, success: bool = True):
+    async def mark_completed(self, url: str, success: bool = True) -> None:
         """Mark a URL as completed or failed."""
         async with self._lock:
             if url in self._pending:
@@ -300,8 +297,8 @@ class CrawlFrontier:
                         conn.execute("DELETE FROM failed WHERE url = ?", (url,))
                         conn.execute("INSERT OR REPLACE INTO completed VALUES (?)", (url,))
                         conn.commit()
-                except Exception as e:
-                    logger.error("Failed to mark completed in SQLite: %s", e)
+                except Exception:
+                    logger.exception("Failed to mark completed in SQLite: %s")
             else:
                 count = self._failed.get(url, 0) + 1
                 self._failed[url] = count
@@ -310,8 +307,8 @@ class CrawlFrontier:
                         conn.execute("DELETE FROM queue WHERE url = ?", (url,))
                         conn.execute("INSERT OR REPLACE INTO failed VALUES (?, ?)", (url, count))
                         conn.commit()
-                except Exception as e:
-                    logger.error("Failed to update failed count in SQLite: %s", e)
+                except Exception:
+                    logger.exception("Failed to update failed count in SQLite: %s")
 
                 # Retry logic: if not too many failures, put back in queue with
                 # lower priority
@@ -326,8 +323,8 @@ class CrawlFrontier:
                                 (item.priority, url, item.depth, item.source_url, item.added_at),
                             )
                             conn.commit()
-                    except Exception as e:
-                        logger.error("Failed to insert retry URL in SQLite: %s", e)
+                    except Exception:
+                        logger.exception("Failed to insert retry URL in SQLite: %s")
                 else:
                     # Move to completed to stop retrying
                     self._completed.add(url)
@@ -340,8 +337,8 @@ class CrawlFrontier:
                             conn.execute("DELETE FROM failed WHERE url = ?", (url,))
                             conn.execute("INSERT OR REPLACE INTO completed VALUES (?)", (url,))
                             conn.commit()
-                    except Exception as e:
-                        logger.error("Failed to finalize failed URL as completed in SQLite: %s", e)
+                    except Exception:
+                        logger.exception("Failed to finalize failed URL as completed in SQLite: %s")
 
     async def add_discovered_links(self, links: list[str], source_url: str, source_depth: int = 0) -> int:
         """Add links discovered during extraction back to the frontier.
@@ -356,6 +353,7 @@ class CrawlFrontier:
 
         Returns:
             Number of new URLs added (after dedup)
+
         """
         if not self._integrated_frontier:
             return 0
@@ -411,8 +409,8 @@ class CrawlFrontier:
                         with sqlite3.connect(self._db_path) as conn:
                             conn.execute("DELETE FROM queue WHERE url = ?", (item.url,))
                             conn.commit()
-                    except Exception as e:
-                        logger.error("Failed to delete domain URL from SQLite: %s", e)
+                    except Exception:
+                        logger.exception("Failed to delete domain URL from SQLite: %s")
                 else:
                     remaining.append(item)
             # Re-push non-domain items

@@ -140,7 +140,7 @@ class TestRateLimiting:
             limiter = DatabaseSlidingWindowCounter(max_requests=5, window_seconds=10, key=test_key)
 
             # First 5 requests should succeed
-            for i in range(5):
+            for _i in range(5):
                 result = limiter.allow()
                 assert result is True
 
@@ -232,7 +232,7 @@ class TestConcurrentJobLoad:
         loaded, _, _ = load_state(recover_in_progress=False)
 
         # Verify our jobs are present (may have others from other tests)
-        for job_id in jobs.keys():
+        for job_id in jobs:
             assert job_id in loaded
 
     def test_jobs_with_mixed_states_persist(self) -> None:

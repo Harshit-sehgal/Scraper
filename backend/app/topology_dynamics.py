@@ -1,5 +1,4 @@
-"""
-Topology Dynamics — multi-scale topology evolution functions.
+"""Topology Dynamics — multi-scale topology evolution functions.
 
 EXPERIMENTAL / RESEARCH ONLY — These functions implement multi-scale
 semantic topology dynamics (meso clusters, macro continents, cross-scale
@@ -20,7 +19,7 @@ if TYPE_CHECKING:
 # ─── Meso Clusters ──────────────────────────────────────────────────────
 
 
-def compute_meso_clusters(state: "TopologyState") -> None:
+def compute_meso_clusters(state: TopologyState) -> None:
     """Compute meso-scale clusters from current field regions.
 
     Meso clusters group regions that share competing roles, forming
@@ -67,7 +66,7 @@ def compute_meso_clusters(state: "TopologyState") -> None:
             list(set.intersection(*[set(r.competing_roles) for r in cluster_regions])) if len(cluster_regions) > 0 else []
         )
         all_roles = list(set.union(*[set(r.competing_roles) for r in cluster_regions]))
-        tokens = list(set(r.token for r in cluster_regions))
+        tokens = list({r.token for r in cluster_regions})
         rid_tuple = tuple(sorted([r.region_id for r in cluster_regions]))
         prev = prev_map.get(rid_tuple, {})
 
@@ -85,10 +84,7 @@ def compute_meso_clusters(state: "TopologyState") -> None:
         raw_stability = 1.0 - avg_instability
         stability = prev_stability * 0.7 + raw_stability * 0.3
 
-        if all_roles:
-            boundary_strength = len(shared_roles) / len(all_roles) if len(all_roles) > 0 else 0.0
-        else:
-            boundary_strength = 0.0
+        boundary_strength = (len(shared_roles) / len(all_roles) if len(all_roles) > 0 else 0.0) if all_roles else 0.0
         prev_boundary = prev.get("boundary_strength", boundary_strength)
         boundary_strength = prev_boundary * 0.8 + boundary_strength * 0.2
 
@@ -135,7 +131,7 @@ def compute_meso_clusters(state: "TopologyState") -> None:
 # ─── Macro Continents ───────────────────────────────────────────────────
 
 
-def compute_macro_continents(state: "TopologyState") -> None:
+def compute_macro_continents(state: TopologyState) -> None:
     """Compute macro-scale semantic continents from meso clusters.
 
     Macro continents group related meso clusters into the largest scale of
@@ -229,7 +225,7 @@ def compute_macro_continents(state: "TopologyState") -> None:
     state._record("compute_macro_continents", {"count": len(continents)})
 
 
-def compute_macro_from_meso(state: "TopologyState") -> dict:
+def compute_macro_from_meso(state: TopologyState) -> dict:
     """Compute macro-scale properties from meso clusters.
 
     Returns dict with avg_convergence, avg_instability, fragmentation,
@@ -285,7 +281,7 @@ def compute_macro_from_meso(state: "TopologyState") -> dict:
 # ─── Multi-Scale Evolution ──────────────────────────────────────────────
 
 
-def evolve_meso_clusters(state: "TopologyState") -> int:
+def evolve_meso_clusters(state: TopologyState) -> int:
     """Evolve meso clusters — apply cluster-level feedback to constituent regions."""
     clusters = state._get_struct("meso_clusters")
     if not clusters:
@@ -348,7 +344,7 @@ def evolve_meso_clusters(state: "TopologyState") -> int:
     return affected
 
 
-def evolve_macro_continents(state: "TopologyState") -> int:
+def evolve_macro_continents(state: TopologyState) -> int:
     """Evolve macro continents — apply continent-level guidance to meso clusters.
 
     LAW: Macro governance is emergent from meso cluster dynamics,
@@ -403,7 +399,7 @@ def evolve_macro_continents(state: "TopologyState") -> int:
     return affected
 
 
-def cross_scale_pressure_flow(state: "TopologyState") -> None:
+def cross_scale_pressure_flow(state: TopologyState) -> None:
     """Orchestrate bidirectional pressure flow across all three scales.
 
     Flow path:

@@ -1,5 +1,4 @@
-"""
-Resource Governor — operational economics and bounded resource budgets.
+"""Resource Governor — operational economics and bounded resource budgets.
 
 Provides:
   - Memory bounds tracking for browser pools, closing stale contexts when threshold is exceeded.
@@ -70,7 +69,7 @@ class ResourceGovernor:
                 if ctx:
                     try:
                         await ctx.close()
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         logger.debug("Failed to close context during prune: %s", e)
                     pruned += 1
 

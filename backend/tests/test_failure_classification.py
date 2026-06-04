@@ -1,5 +1,4 @@
-"""
-Tests for Failure Classification — Ontology-driven extraction failure analysis.
+"""Tests for Failure Classification — Ontology-driven extraction failure analysis.
 
 Tests cover:
   - Direct error message classification (DNS, timeout, browser crash)
@@ -35,7 +34,7 @@ def mock_domain_intel():
     """Create a minimal mock domain intelligence object."""
 
     class MockIntel:
-        def __init__(self):
+        def __init__(self) -> None:
             self.domain = "test.example.com"
             self.failure_history = {}
             self.preferred_strategy = "none"
@@ -47,7 +46,7 @@ def mock_domain_intel():
             self.selector_decay_rate = 0.0
 
     class MockRegistry:
-        def __init__(self):
+        def __init__(self) -> None:
             self._cache = {}
 
         def get_intelligence(self, url):

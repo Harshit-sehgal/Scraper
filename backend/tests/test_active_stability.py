@@ -1,5 +1,4 @@
-"""
-Active Stability Control & Value-Aware Pruning Tests
+"""Active Stability Control & Value-Aware Pruning Tests.
 ===================================================
 LAW 49/50: Adaptive systems must govern their own dynamics via active
 damping and protect high-value semantic nodes during resource shedding.
@@ -31,7 +30,6 @@ def test_active_damping_calculation(ws) -> None:
 
     damping = ws._observability.calculate_damping_factor(oscillating_snapshots)
     assert damping < 1.0
-    print(f"\nDamping factor for oscillation: {damping:.2f}")
 
 
 def test_value_aware_pruning_priority(ws) -> None:
@@ -57,7 +55,6 @@ def test_value_aware_pruning_priority(ws) -> None:
     # The high-importance region should be in the kept set
     kept_ids = [r.region_id for r in current_regions]
     assert r_high.region_id in kept_ids
-    print("\nValue-Aware Pruning: High-importance region successfully preserved.")
 
 
 def test_stability_policy_generation(ws) -> None:
@@ -66,4 +63,3 @@ def test_stability_policy_generation(ws) -> None:
     assert "propagation_damping" in policy
     assert "attractor_scaling" in policy
     assert "force_decay" in policy
-    print(f"\nStabilization Policy: {policy}")

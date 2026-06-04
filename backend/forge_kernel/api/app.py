@@ -1,5 +1,4 @@
-"""
-Kernel FastAPI app factory — creates a FastAPI application with middleware,
+"""Kernel FastAPI app factory — creates a FastAPI application with middleware,
 routers, and lifespan for the product kernel.
 
 This is the clean-room equivalent of the existing app.main.create_app().
@@ -56,7 +55,7 @@ async def lifespan(app: FastAPI):
     _background_tasks.clear()
 
 
-def configure_static(app: FastAPI):
+def configure_static(app: FastAPI) -> None:
     """Mount static frontend files if directory exists."""
     frontend_dir = Path(__file__).parent.parent.parent.parent / "frontend"
     if frontend_dir.exists():
@@ -66,7 +65,7 @@ def configure_static(app: FastAPI):
             app.mount("/dashboard", StaticFiles(directory=str(dashboard_dir), html=True), name="dashboard")
 
 
-def configure_routes(app: FastAPI):
+def configure_routes(app: FastAPI) -> None:
     """Include all kernel routers."""
     app.include_router(health_router)
     app.include_router(jobs_router)

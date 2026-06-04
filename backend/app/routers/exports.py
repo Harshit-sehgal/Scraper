@@ -25,7 +25,7 @@ def _user_fieldnames(results_list: list[dict]) -> list[str]:
     """
     if not results_list:
         return []
-    return [k for k in results_list[0].keys() if not k.startswith("_")]
+    return [k for k in results_list[0] if not k.startswith("_")]
 
 
 def _strip_system_fields(records: list[dict]) -> list[dict]:
@@ -74,7 +74,7 @@ def create_exports_router(jobs_store: dict):
 
     _store_lock = threading.Lock()
 
-    def _refresh_job_for_export(job_id: str):
+    def _refresh_job_for_export(job_id: str) -> None:
         """Refresh job from repository in worker mode to avoid stale exports."""
         if settings.WORKER_QUEUE:
             try:
@@ -85,7 +85,7 @@ def create_exports_router(jobs_store: dict):
                 if job_id in fresh_jobs:
                     with _store_lock:
                         jobs_store[job_id] = fresh_jobs[job_id]
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.debug("Failed to refresh job %s from repo for export", job_id)
 
     @router.get("/api/jobs/{job_id}/export/csv")
@@ -110,10 +110,7 @@ def create_exports_router(jobs_store: dict):
             if not first_page:
                 raise HTTPException(status_code=400, detail="No results to export")
 
-            if job.schema_fields:
-                fieldnames = [f.name for f in job.schema_fields]
-            else:
-                fieldnames = _user_fieldnames(first_page)
+            fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(first_page)
 
             async def _stream_csv_from_disk() -> AsyncIterator[str]:
                 output = io.StringIO()
@@ -159,10 +156,7 @@ def create_exports_router(jobs_store: dict):
             raise HTTPException(status_code=400, detail="No results to export")
 
         output = io.StringIO()
-        if job.schema_fields:
-            fieldnames = [f.name for f in job.schema_fields]
-        else:
-            fieldnames = _user_fieldnames(job.results)
+        fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(job.results)
         writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
         for row in job.results:
@@ -269,10 +263,7 @@ def create_exports_router(jobs_store: dict):
             if not first_page:
                 raise HTTPException(status_code=400, detail="No results to export")
 
-            if job.schema_fields:
-                fieldnames = [f.name for f in job.schema_fields]
-            else:
-                fieldnames = _user_fieldnames(first_page)
+            fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(first_page)
 
             # Write headers
             ws.append(fieldnames)
@@ -317,10 +308,7 @@ def create_exports_router(jobs_store: dict):
             if not results_list:
                 raise HTTPException(status_code=400, detail="No results to export")
 
-            if job.schema_fields:
-                fieldnames = [f.name for f in job.schema_fields]
-            else:
-                fieldnames = _user_fieldnames(results_list)
+            fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(results_list)
 
             # Write headers
             ws.append(fieldnames)

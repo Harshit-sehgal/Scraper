@@ -4,7 +4,7 @@ from app.storage_interface import SQLiteJobRepository
 
 
 @pytest.fixture(autouse=True)
-def clean_job_store():
+def clean_job_store() -> None:
     from app.job_store import _DB_LOCK, _get_connection, reset_job_store_for_tests
 
     reset_job_store_for_tests()

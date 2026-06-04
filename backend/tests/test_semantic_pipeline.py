@@ -21,7 +21,7 @@ from app.semantic_pipeline import (
 )
 
 
-def _clean_engine():
+def _clean_engine() -> None:
     clear_semantic_state(clear_file=False)
 
 
@@ -58,7 +58,7 @@ def test_pipeline_metadata_stripped() -> None:
     assert res[0].get("price") is not None
 
 
-def _check_allocation(records, schema, checks):
+def _check_allocation(records, schema, checks) -> None:
     res = run_pipeline(records, schema)
     assert len(res) > 0, f"No records returned for {schema}"
     for field, validator in checks.items():
@@ -89,8 +89,10 @@ def test_hotel_allocation() -> None:
     assert len(res) > 0
     r = res[0]
     assert r["name"] == "Marriott"
-    assert r["rating"] and any(c.isdigit() for c in r["rating"])
-    assert r["date"] and "-" in r["date"]
+    assert r["rating"]
+    assert any(c.isdigit() for c in r["rating"])
+    assert r["date"]
+    assert "-" in r["date"]
 
 
 def test_product_allocation() -> None:
@@ -102,8 +104,10 @@ def test_product_allocation() -> None:
     assert len(res) > 0
     r = res[0]
     assert r["name"]
-    assert r["price"] and any(c.isdigit() for c in r["price"])
-    assert r["rating"] and any(c.isdigit() for c in r["rating"])
+    assert r["price"]
+    assert any(c.isdigit() for c in r["price"])
+    assert r["rating"]
+    assert any(c.isdigit() for c in r["rating"])
 
 
 def test_job_allocation() -> None:

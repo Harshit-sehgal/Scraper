@@ -1,5 +1,4 @@
-"""
-Tests for Zero-Result Failure Classifier.
+"""Tests for Zero-Result Failure Classifier.
 
 Tests cover all nine failure categories, confidence range validation,
 and user message integrity.
@@ -240,12 +239,15 @@ class TestUserMessages:
 
         for fc in VALID_FAILURE_CLASSES:
             msg = _MESSAGES[fc]
-            assert isinstance(msg["user_message"], str) and len(msg["user_message"]) > 0
-            assert isinstance(msg["operator_hint"], str) and len(msg["operator_hint"]) > 0
-            assert isinstance(msg["recommended_action"], str) and len(msg["recommended_action"]) > 0
+            assert isinstance(msg["user_message"], str)
+            assert len(msg["user_message"]) > 0
+            assert isinstance(msg["operator_hint"], str)
+            assert len(msg["operator_hint"]) > 0
+            assert isinstance(msg["recommended_action"], str)
+            assert len(msg["recommended_action"]) > 0
 
     @pytest.mark.parametrize(
-        "kwargs,expected_class",
+        ("kwargs", "expected_class"),
         [
             ({"anti_bot_score": 0.90}, "anti_bot_block"),
             ({"empty_check": {"is_empty": True, "confidence": 0.90}}, "empty_response"),
@@ -264,9 +266,12 @@ class TestUserMessages:
     def test_user_messages_are_non_empty(self, kwargs, expected_class) -> None:
         result = classify_zero_result(**kwargs)
         assert result.failure_class == expected_class
-        assert isinstance(result.user_message, str) and len(result.user_message) > 0
-        assert isinstance(result.operator_hint, str) and len(result.operator_hint) > 0
-        assert isinstance(result.recommended_action, str) and len(result.recommended_action) > 0
+        assert isinstance(result.user_message, str)
+        assert len(result.user_message) > 0
+        assert isinstance(result.operator_hint, str)
+        assert len(result.operator_hint) > 0
+        assert isinstance(result.recommended_action, str)
+        assert len(result.recommended_action) > 0
 
 
 class TestHelperFunctions:

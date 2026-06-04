@@ -1,5 +1,4 @@
-"""
-Regression tests for Semantic Persistence.
+"""Regression tests for Semantic Persistence.
 Ensures that learned state survives a save/load round-trip and affects decisions.
 """
 

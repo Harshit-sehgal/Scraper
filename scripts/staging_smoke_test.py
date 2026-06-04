@@ -123,15 +123,15 @@ def run_drill():
     # 7. Confirm the interrupted job becomes FAILED with restart recovery log
     print("\n[Step 7] Confirming the interrupted job transitioned to FAILED...")
     interrupted_job = loaded_jobs.get(crash_job_id)
-    _check(interrupted_job is not None, "Interrupted job not found after reload!")
+    if interrupted_job is None:
+        raise SystemExit("DRILL CHECK FAILED: Interrupted job not found after reload!")
     _check(interrupted_job.status == JobStatus.FAILED, f"Interrupted job status is {interrupted_job.status}, expected FAILED!")
 
     # Verify the restart recovery message exists on the job error attribute
     _check(interrupted_job.error is not None, "Interrupted job did not contain an error message!")
+    error_text = (interrupted_job.error or "").lower()
     _check(
-        "restart" in interrupted_job.error.lower()
-        or "recovery" in interrupted_job.error.lower()
-        or "recovered" in interrupted_job.error.lower(),
+        "restart" in error_text or "recovery" in error_text or "recovered" in error_text,
         f"Unexpected error message: {interrupted_job.error}",
     )
     print(f"  - Verified recovery error: {interrupted_job.error}")

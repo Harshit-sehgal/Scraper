@@ -30,7 +30,6 @@ def test_pollinations_api() -> None:
             },
             timeout=30,
         )
-        print("Status code:", response.status_code)
 
         # Depending on the model, response_format might not be supported. Let's see.
         raw_text = response.json()
@@ -40,17 +39,12 @@ def test_pollinations_api() -> None:
         import re
 
         match = re.search(r"\[.*\]", content, re.DOTALL)
-        if match:
-            parsed = json.loads(match.group(0))
-        else:
-            parsed = json.loads(content)
-        print(f"Extracted json:\n{json.dumps(parsed, indent=2)}")
+        json.loads(match.group(0)) if match else json.loads(content)
 
     except Exception as e:
         import logging
 
         logging.exception(e)
-        print("Error:", e)
 
 
 if __name__ == "__main__":

@@ -31,7 +31,7 @@ def _setup_log_dir():
 
 
 @pytest.fixture(autouse=True)
-def _setup_settings(monkeypatch):
+def _setup_settings(monkeypatch) -> None:
     """Configure API keys for middleware tests."""
     from app.config import settings
 
@@ -47,13 +47,12 @@ def client(monkeypatch):
     # Isolate state files via settings
     from app.config import settings
 
-    monkeypatch.setattr(settings, "STATE_FILE_PATH", "/tmp/test_audit_e2e_state.json")
+    monkeypatch.setattr(settings, "STATE_FILE_PATH", "/tmp/test_audit_e2e_state.json")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
 
     from app.main import app
     from conftest import LocalASGIClient
 
-    client = LocalASGIClient(app)
-    yield client
+    return LocalASGIClient(app)
 
 
 def _read_audit_log(log_dir: Path) -> list[dict]:
@@ -62,7 +61,7 @@ def _read_audit_log(log_dir: Path) -> list[dict]:
     if not log_path.exists():
         return []
     events = []
-    with open(log_path, "r") as f:
+    with open(log_path) as f:
         for line in f:
             line = line.strip()
             if not line or "[AUDIT]" not in line:

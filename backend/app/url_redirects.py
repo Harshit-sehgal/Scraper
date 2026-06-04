@@ -44,6 +44,7 @@ def _detect_redirect(original_url: str, final_url: str) -> dict:
         - message: str
         - original_url: str
         - final_url: str
+
     """
     from urllib.parse import urlparse
 
@@ -164,6 +165,7 @@ def build_redirect_info(
 
     Returns:
         dict with redirected, redirect_type, message, original_url, final_url
+
     """
     redirect_info = existing_redirect_info or _detect_redirect(original_url, final_url)
 

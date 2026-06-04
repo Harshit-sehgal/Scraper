@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Comprehensive Benchmark Corpus Suite for DataForge Scraper.
+"""Comprehensive Benchmark Corpus Suite for DataForge Scraper.
 
 Validates the extraction engine across:
 - Static HTML (books, quotes, tables, cards)
@@ -44,10 +43,10 @@ logger = logging.getLogger(__name__)
 class _BenchmarkCorpusHandler(http.server.BaseHTTPRequestHandler):
     """Local HTTP Server simulating static, dynamic, bad HTML, and failure page categories."""
 
-    def log_message(self, format, *args):
+    def log_message(self, format, *args) -> None:
         pass  # silence server logs during tests
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -289,14 +288,14 @@ class _BenchmarkCorpusHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def _send_html(self, html: str):
+    def _send_html(self, html: str) -> None:
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(html.encode("utf-8"))
 
-    def _send_json(self, data: dict):
+    def _send_json(self, data: dict) -> None:
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Connection", "close")
@@ -324,7 +323,7 @@ class TestBenchmarkCorpusSuite:
         app.url_safety.validate_public_http_url = lambda url: None
         app.html_utils._validate_url_safe = lambda url: None
 
-        async def dummy_check_domain(*args, **kwargs):
+        async def dummy_check_domain(*args, **kwargs) -> None:
             return None
 
         app.crawl_policy.CrawlPolicyEngine.check_domain = dummy_check_domain
@@ -380,7 +379,7 @@ class TestBenchmarkCorpusSuite:
     # ── Test Scenarios ───────────────────────────────────────────────────────
 
     @pytest.mark.asyncio
-    async def test_comprehensive_benchmark_corpus(self):
+    async def test_comprehensive_benchmark_corpus(self) -> None:
         # 1. Books
         books_url = f"{self.base_url}/static/books"
         books_schema = [
@@ -396,8 +395,7 @@ class TestBenchmarkCorpusSuite:
         start_time = time.time()
         books_records = await scrape_url(url=books_url, schema_fields=books_schema, selectors_map=books_selectors)
         books_duration = time.time() - start_time
-        books_prec, books_rec, books_f1 = self._calculate_f1(books_records, books_expected, ["title", "price"])
-        print("BOOKS EXTRACTED:", books_records)
+        _books_prec, _books_rec, books_f1 = self._calculate_f1(books_records, books_expected, ["title", "price"])
         assert books_f1 >= 0.75, f"Static books F1 below 0.75 threshold: {books_f1:.2f}"
         assert books_duration < 10.0, f"Extraction timeout exceeded: {books_duration:.2f}s"
 
@@ -413,8 +411,7 @@ class TestBenchmarkCorpusSuite:
         ]
         quotes_selectors = {"item_container": ".quote-card", "fields": {"quote": ".quote", "author": ".author"}}
         quotes_records = await scrape_url(url=quotes_url, schema_fields=quotes_schema, selectors_map=quotes_selectors)
-        print("QUOTES EXTRACTED:", quotes_records)
-        quotes_prec, quotes_rec, quotes_f1 = self._calculate_f1(quotes_records, quotes_expected, ["quote", "author"])
+        _quotes_prec, _quotes_rec, quotes_f1 = self._calculate_f1(quotes_records, quotes_expected, ["quote", "author"])
         assert quotes_f1 >= 0.75, f"Static quotes F1 below 0.75 threshold: {quotes_f1:.2f}"
 
         # 3. Delayed JS Rendering
@@ -427,7 +424,7 @@ class TestBenchmarkCorpusSuite:
 
         delayed_selectors = {"item_container": ".item", "fields": {"title": ".title", "price": ".price"}}
         delayed_records = cast(
-            ScrapeAttemptResult,
+            "ScrapeAttemptResult",
             await scrape_url(
                 url=delayed_url,
                 schema_fields=delayed_schema,
@@ -435,10 +432,8 @@ class TestBenchmarkCorpusSuite:
                 attempt_ctx=AttemptContext(fetch_strategy="playwright_full"),
             ),
         )
-        print("DELAYED JS RECORDS:", delayed_records)
-        print("DELAYED JS HTML LENGTH:", len(delayed_records.html) if delayed_records.html is not None else 0)
         if delayed_records.html is not None:
-            print("DELAYED JS HTML:", delayed_records.html)
+            pass
         assert len(delayed_records) >= 1, "Delayed JS rendering failed to capture items"
 
         # 4. Bad HTML Robustness
@@ -449,33 +444,29 @@ class TestBenchmarkCorpusSuite:
         ]
         bad_selectors = {"item_container": ".item", "fields": {"title": ".title", "price": ".price"}}
         bad_records = await scrape_url(url=bad_url, schema_fields=bad_schema, selectors_map=bad_selectors)
-        print("BAD HTML EXTRACTED:", bad_records)
         assert len(bad_records) >= 1, "Failed to extract items from malformed HTML layout"
 
         # 5. Zero Result Failure Classification
         # 5.1. Auth Page
         auth_records = cast(
-            ScrapeAttemptResult,
+            "ScrapeAttemptResult",
             await scrape_url(f"{self.base_url}/failure/auth", [SchemaField(name="title", field_type=FieldType.STRING)]),
         )
-        print("AUTH FAILURE CLASSIFICATION:", auth_records.zero_result_classification)
         assert auth_records.zero_result_classification is not None
         assert auth_records.zero_result_classification.failure_class == "auth_required"
 
         # 5.2. CAPTCHA Block
         captcha_records = cast(
-            ScrapeAttemptResult,
+            "ScrapeAttemptResult",
             await scrape_url(f"{self.base_url}/failure/captcha", [SchemaField(name="title", field_type=FieldType.STRING)]),
         )
-        print("CAPTCHA FAILURE CLASSIFICATION:", captcha_records.zero_result_classification)
         assert captcha_records.zero_result_classification is not None
         assert captcha_records.zero_result_classification.failure_class == "anti_bot_block"
 
         # 5.3. Empty Response
         empty_records = cast(
-            ScrapeAttemptResult,
+            "ScrapeAttemptResult",
             await scrape_url(f"{self.base_url}/failure/empty", [SchemaField(name="title", field_type=FieldType.STRING)]),
         )
-        print("EMPTY FAILURE CLASSIFICATION:", empty_records.zero_result_classification)
         assert empty_records.zero_result_classification is not None
         assert empty_records.zero_result_classification.failure_class == "empty_response"

@@ -12,10 +12,10 @@ RESEARCH_MODULES = ("app.semantic_segmentation", "app.strategy_evolution")
 
 @pytest.fixture(autouse=True)
 def _clean():
-    for m in RESEARCH_MODULES + ("app.html_utils",):
+    for m in (*RESEARCH_MODULES, "app.html_utils"):
         sys.modules.pop(m, None)
     yield
-    for m in RESEARCH_MODULES + ("app.html_utils",):
+    for m in (*RESEARCH_MODULES, "app.html_utils"):
         sys.modules.pop(m, None)
 
 

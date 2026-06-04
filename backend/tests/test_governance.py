@@ -1,5 +1,4 @@
-"""
-Phase 68: Active Semantic Governance & Policy Enforcement Tests
+"""Phase 68: Active Semantic Governance & Policy Enforcement Tests.
 ==============================================================
 LAW: All cognitive cycles must be bounded by governance policies.
 """
@@ -45,8 +44,6 @@ def test_governance_guardrail_enforcement() -> None:
         # new_pressure = ws.get_system_pressure()
         # assert new_pressure <= pressure
 
-        print("\nGovernance Enforcement: Emergency stabilization successfully triggered.")
-
     finally:
         policy.critical_entropy_threshold = old_threshold
 
@@ -81,5 +78,3 @@ def test_community_density_quota() -> None:
 
     assert len(issues) > 0
     assert issues[0]["severity"] == "moderate"
-
-    print("\nCommunity Density: Quota violation correctly detected.")

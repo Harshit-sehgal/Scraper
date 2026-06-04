@@ -11,7 +11,7 @@ from enum import Enum
 
 
 class FailureMode(Enum):
-    """Types of failures that can be injected"""
+    """Types of failures that can be injected."""
 
     # Fetch Layer
     NETWORK_TIMEOUT = "network_timeout"
@@ -56,7 +56,7 @@ class FailureMode(Enum):
 
 
 class SeverityLevel(Enum):
-    """Severity of failure"""
+    """Severity of failure."""
 
     LOW = "low"  # Recoverable, <1% impact
     MEDIUM = "medium"  # Recoverable, 1 - 10% impact
@@ -66,7 +66,7 @@ class SeverityLevel(Enum):
 
 @dataclass
 class FailureScenario:
-    """Specification of a chaos test scenario"""
+    """Specification of a chaos test scenario."""
 
     name: str
     description: str
@@ -82,11 +82,11 @@ class FailureScenario:
 
 
 class FailureScenarios:
-    """Collection of predefined failure scenarios"""
+    """Collection of predefined failure scenarios."""
 
     @staticmethod
     def get_all_scenarios() -> list[FailureScenario]:
-        """Get all failure scenarios"""
+        """Get all failure scenarios."""
         return [
             # ===== FETCH LAYER FAILURES (5 scenarios) =====
             FailureScenario(
@@ -531,7 +531,7 @@ class FailureScenarios:
 
     @staticmethod
     def get_scenario_by_mode(mode: FailureMode) -> FailureScenario | None:
-        """Get a scenario by failure mode"""
+        """Get a scenario by failure mode."""
         for scenario in FailureScenarios.get_all_scenarios():
             if scenario.failure_mode == mode:
                 return scenario

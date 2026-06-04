@@ -1,5 +1,4 @@
-"""
-Domain contracts — canonical models for the product kernel.
+"""Domain contracts — canonical models for the product kernel.
 
 All cross-module data flows use these contracts.
 No experimental / research fields leak into these models.

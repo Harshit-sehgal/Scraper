@@ -24,7 +24,7 @@ from app.storage_interface import (
 # ----------------------------------------------------------------------
 
 
-@pytest.fixture()
+@pytest.fixture
 def isolated_db(tmp_path, monkeypatch):
     """Point job_store at a fresh temp DB for each test."""
     from app.config import settings
@@ -306,7 +306,7 @@ class TestPostgresSerialization:
             progress_current=42,
             progress_total=42,
             results_on_disk=True,
-            results_file_path="/tmp/results.gz",
+            results_file_path="/tmp/results.gz",  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
         )
 
         row = _job_to_row(original)
@@ -451,7 +451,7 @@ class TestPostgresIntegration:
                     os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
                     os.environ["DATAFORGE_DATABASE_URL"] = "postgresql://testuser:testpassword@127.0.0.1:5432/testdb"
                     os.environ["PGPASSWORD"] = "testpassword"
-            except (socket.timeout, ConnectionRefusedError):
+            except (TimeoutError, ConnectionRefusedError):
                 pass
 
         if use_running:
@@ -472,7 +472,7 @@ class TestPostgresIntegration:
                 os.environ.pop("DATAFORGE_DATABASE_URL", None)
                 os.environ.pop("PGPASSWORD", None)
 
-    def _setup_v1_schema(self, conn):
+    def _setup_v1_schema(self, conn) -> None:
         """Create a minimal v1 schema (jobs table but no recycle_bin)."""
         with conn.cursor() as cur:
             cur.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)")

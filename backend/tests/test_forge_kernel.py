@@ -1,6 +1,4 @@
-"""
-Tests for DataForge forge_kernel — validating settings, contracts, persistence, services, and routes.
-"""
+"""Tests for DataForge forge_kernel — validating settings, contracts, persistence, services, and routes."""
 
 from __future__ import annotations
 
@@ -177,7 +175,7 @@ def test_health_ready_endpoints(api_client, monkeypatch) -> None:
     mock_repo.backend = "mock"
     mock_repo.load_all.return_value = ({}, {}, {})
 
-    import forge_kernel.persistence as persistence
+    from forge_kernel import persistence
 
     monkeypatch.setattr(persistence, "_repository_instance", mock_repo)
 

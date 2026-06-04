@@ -1,26 +1,24 @@
-"""
-Role-Based Access Control (RBAC) Module — DataForge Scraper.
+"""Role-Based Access Control (RBAC) Module — DataForge Scraper.
 Enforces administrative, operator, and user privilege boundaries.
 """
 
 import logging
 import secrets
-from enum import Enum
+from enum import StrEnum
 
 from fastapi import HTTPException, Request
 
 logger = logging.getLogger(__name__)
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     ADMIN = "admin"
     OPERATOR = "operator"
     USER = "user"
 
 
 def get_current_role(request: Request) -> UserRole:
-    """
-    FastAPI dependency to retrieve and authenticate the active role from request headers.
+    """FastAPI dependency to retrieve and authenticate the active role from request headers.
     Supports standard X-API-Key and Bearer token mappings.
     """
     from app.config import settings
@@ -78,9 +76,7 @@ def get_current_role(request: Request) -> UserRole:
 
 
 def require_role(allowed_roles: list[UserRole]):
-    """
-    FastAPI route guard dependency to enforce role permission boundaries.
-    """
+    """FastAPI route guard dependency to enforce role permission boundaries."""
 
     async def dependency(request: Request):
         role = get_current_role(request)

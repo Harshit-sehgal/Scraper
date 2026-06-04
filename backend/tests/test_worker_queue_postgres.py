@@ -13,7 +13,7 @@ import os
 import pytest
 
 
-def _require_psycopg2():
+def _require_psycopg2() -> None:
     """Skip test if psycopg2 is not installed."""
     try:
         import psycopg2 as _pg
@@ -49,7 +49,7 @@ def module_postgres_container():
                 os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
                 os.environ["DATAFORGE_QUEUE_BACKEND"] = "postgres"
                 os.environ["DATAFORGE_DATABASE_URL"] = "postgresql://testuser:testpassword@127.0.0.1:5432/testdb"
-        except (socket.timeout, ConnectionRefusedError):
+        except (TimeoutError, ConnectionRefusedError):
             pass
 
     if use_running:
@@ -281,9 +281,8 @@ class TestPostgresQueueIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def ensure_postgres(self, module_postgres_container):
+    def ensure_postgres(self, module_postgres_container) -> None:
         """Depend on the module-scoped Postgres container."""
-        pass
 
     @pytest.fixture(autouse=True)
     def clean_queue_tables(self):
@@ -349,16 +348,20 @@ class TestPostgresQueueIntegration:
         id_critical = asyncio.run(queue.enqueue("critical", {}, priority=Priority.CRITICAL))
 
         t1 = asyncio.run(queue.dequeue(timeout=5.0))
-        assert t1 is not None and t1.id == id_critical
+        assert t1 is not None
+        assert t1.id == id_critical
 
         t2 = asyncio.run(queue.dequeue(timeout=5.0))
-        assert t2 is not None and t2.id == id_high
+        assert t2 is not None
+        assert t2.id == id_high
 
         t3 = asyncio.run(queue.dequeue(timeout=5.0))
-        assert t3 is not None and t3.id == id_normal
+        assert t3 is not None
+        assert t3.id == id_normal
 
         t4 = asyncio.run(queue.dequeue(timeout=5.0))
-        assert t4 is not None and t4.id == id_low
+        assert t4 is not None
+        assert t4.id == id_low
 
     def test_complete_task(self) -> None:
         """Completing a task removes it from the active queue."""

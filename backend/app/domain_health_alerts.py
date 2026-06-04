@@ -1,5 +1,4 @@
-"""
-Domain Health Degradation Alerts — Predictive alerts for domain failure patterns.
+"""Domain Health Degradation Alerts — Predictive alerts for domain failure patterns.
 
 Provides:
   - Health scoring for each domain based on recent failure patterns
@@ -21,13 +20,16 @@ Alerts:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
+
+if TYPE_CHECKING:
+    import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,7 @@ logger = logging.getLogger(__name__)
 _background_tasks: set[asyncio.Task] = set()
 
 
-class DomainHealthLevel(str, Enum):
+class DomainHealthLevel(StrEnum):
     """Domain health alert levels."""
 
     HEALTHY = "healthy"  # score >= 0.8
@@ -105,8 +107,7 @@ class DomainHealthMetrics:
 
         # Convert variance to consistency score (inverse relationship)
         # Max variance is 0.25 (50% success rate with equal distribution)
-        consistency = 1.0 - min(1.0, variance / 0.25)
-        return consistency
+        return 1.0 - min(1.0, variance / 0.25)
 
     def get_degradation_trend(self) -> float:
         """Get trend slope (-1 to +1).
@@ -138,24 +139,26 @@ class DomainHealthMetrics:
 class DomainHealthMonitor:
     """Monitor and alert on domain health degradation."""
 
-    def __init__(self, alert_callback=None):
+    def __init__(self, alert_callback=None) -> None:
         """Initialize health monitor.
 
         Args:
             alert_callback: Optional async callable to handle alerts
+
         """
         self._domains: dict[str, DomainHealthMetrics] = {}
         self._last_alert_time: dict[str, float] = {}  # Avoid alert spam
         self._alert_cooldown_seconds = 300  # Min 5 minutes between alerts per domain
         self.alert_callback = alert_callback
 
-    def record_attempt(self, url: str, success: bool, failure_category: str | None = None):
+    def record_attempt(self, url: str, success: bool, failure_category: str | None = None) -> None:
         """Record a scrape attempt for a domain.
 
         Args:
             url: The URL that was scraped
             success: Whether the attempt succeeded
             failure_category: Category of failure (if success=False)
+
         """
         domain = self._extract_domain(url)
         if not domain:
@@ -195,7 +198,7 @@ class DomainHealthMonitor:
         # Check if we should alert
         self._check_and_alert(domain, metrics)
 
-    def _check_and_alert(self, domain: str, metrics: DomainHealthMetrics):
+    def _check_and_alert(self, domain: str, metrics: DomainHealthMetrics) -> None:
         """Check if health alert should be triggered."""
         now = time.time()
 
@@ -239,8 +242,8 @@ class DomainHealthMonitor:
                 _task = asyncio.create_task(self.alert_callback(alert))
                 _background_tasks.add(_task)
                 _task.add_done_callback(_background_tasks.discard)
-            except Exception as e:
-                logger.error("Alert callback failed: %s", e)
+            except Exception:
+                logger.exception("Alert callback failed: %s")
 
         self._last_alert_time[domain] = now
 
@@ -264,9 +267,7 @@ class DomainHealthMonitor:
             recency_factor = 1.0
 
         # Weighted average
-        health_score = success_rate * 0.5 + consistency * 0.3 + recency_factor * 0.2
-
-        return health_score
+        return success_rate * 0.5 + consistency * 0.3 + recency_factor * 0.2
 
     def _determine_health_level(self, score: float, metrics: DomainHealthMetrics) -> DomainHealthLevel:
         """Determine health level based on score and metrics."""
@@ -334,6 +335,7 @@ class DomainHealthMonitor:
 
         Returns:
             Dictionary with health metrics or None if domain not found
+
         """
         domain = self._extract_domain(url)
         if not domain:
@@ -378,7 +380,7 @@ class DomainHealthMonitor:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
 

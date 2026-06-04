@@ -2,6 +2,7 @@ import asyncio
 import os
 
 os.environ["DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES"] = "true"
+import contextlib
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -10,38 +11,32 @@ import httpx
 import pytest
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser) -> None:
     """Register optional external-service test flags."""
-    try:
+    with contextlib.suppress(ValueError):
         parser.addoption(
             "--run-postgres",
             action="store_true",
             default=False,
             help="Run tests marked with @pytest.mark.postgres (requires Docker + testcontainers).",
         )
-    except ValueError:
-        pass
-    try:
+    with contextlib.suppress(ValueError):
         parser.addoption(
             "--run-golden-dataset",
             action="store_true",
             default=False,
             help="Run golden dataset tests against real websites (requires network).",
         )
-    except ValueError:
-        pass
-    try:
+    with contextlib.suppress(ValueError):
         parser.addoption(
             "--run-browser",
             action="store_true",
             default=False,
             help="Run tests marked with @pytest.mark.browser (requires Playwright and local socket binding).",
         )
-    except ValueError:
-        pass
 
 
-def pytest_configure(config):
+def pytest_configure(config) -> None:
     """Register custom markers to avoid PytestUnknownMarkWarning."""
     config.addinivalue_line(
         "markers",
@@ -67,7 +62,7 @@ def pytest_configure(config):
             if driver and not driver.startswith("+"):
                 driver = f"+{driver}"
             return self._create_connection_url(
-                dialect="postgresql{}".format(driver),
+                dialect=f"postgresql{driver}",
                 username=username,
                 password=password,
                 dbname=dbname,
@@ -80,7 +75,7 @@ def pytest_configure(config):
         pass
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(config, items) -> None:
     skip_postgres = pytest.mark.skip(reason="need --run-postgres to run (Postgres integration tests)")
     skip_golden = pytest.mark.skip(reason="need --run-golden-dataset to run (network-dependent golden dataset validation)")
     skip_browser = pytest.mark.skip(reason="need --run-browser to run (requires Playwright and local socket binding)")
@@ -93,7 +88,7 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_browser)
 
 
-def pytest_sessionfinish(session, exitstatus):
+def pytest_sessionfinish(session, exitstatus) -> None:
     """Drain background state writes so pytest exits cleanly after direct module tests."""
     try:
         from app.state_store import flush_state_writes
@@ -125,10 +120,8 @@ def pytest_sessionfinish(session, exitstatus):
                     ):
                         # Ensure we do not delete golden dataset files
                         if "golden_dataset" not in str(item.resolve()):
-                            try:
+                            with contextlib.suppress(OSError):
                                 item.unlink()
-                            except OSError:
-                                pass
     except Exception:
         pass
 
@@ -196,12 +189,12 @@ class LocalASGIClient:
     short-lived loop.
     """
 
-    def __init__(self, app):
+    def __init__(self, app) -> None:
         self.app = app
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
 
-    def close(self):
+    def close(self) -> None:
         """Shut down the persistent event loop and release resources.
 
         Note: ``asyncio.all_tasks()`` is deliberately not called here because
@@ -233,9 +226,9 @@ class LocalASGIClient:
         return self.request("DELETE", url, **kwargs)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client(monkeypatch):
-    async def fake_run_job(job_id: str, **kwargs):
+    async def fake_run_job(job_id: str, **kwargs) -> None:
         # Keep jobs in pending state unless a test explicitly changes them.
         await asyncio.sleep(0.01)
 

@@ -17,6 +17,7 @@ Usage:
 """
 
 import asyncio
+import contextlib
 import datetime
 import json
 import logging
@@ -82,7 +83,7 @@ class QueueTask:
         timeout_seconds: int = 300,
         task_id: str | None = None,
         scheduled_at: str | None = None,
-    ):
+    ) -> None:
         self.id = task_id or str(uuid.uuid4())
         self.type = task_type
         self.payload = payload or {}
@@ -175,7 +176,7 @@ def _get_connection(db_path: Path | None = None) -> sqlite3.Connection:
 _CURRENT_QUEUE_SCHEMA_VERSION = 2
 
 
-def _ensure_schema(db_path: Path | None = None):
+def _ensure_schema(db_path: Path | None = None) -> None:
     """Create the queue tables if they don't exist and run migrations."""
     with _DB_LOCK:
         conn = _get_connection(db_path=db_path)
@@ -243,7 +244,7 @@ def _ensure_schema(db_path: Path | None = None):
                     # successful task results)
                     try:
                         conn.execute("ALTER TABLE task_history ADD COLUMN result TEXT")
-                    except Exception:  # nosec B110
+                    except Exception:  # noqa: BLE001, nosec B110
                         pass
                     current = 2
 
@@ -265,7 +266,7 @@ def _ensure_schema(db_path: Path | None = None):
 class WorkerQueue:
     """Persistent worker queue with priority, retries, and dead letter support."""
 
-    def __init__(self, max_concurrency: int = 5, poll_interval: float = 1.0, db_path: Path | None = None):
+    def __init__(self, max_concurrency: int = 5, poll_interval: float = 1.0, db_path: Path | None = None) -> None:
         self._max_concurrency = max_concurrency
         self._poll_interval = poll_interval
         self._db_path = db_path
@@ -282,7 +283,7 @@ class WorkerQueue:
 
     # ─── Task registration ─────────────────────────────────────────────
 
-    def register_handler(self, task_type: str, handler: Callable):
+    def register_handler(self, task_type: str, handler: Callable) -> None:
         """Register an async handler function for a task type.
 
         The handler receives (task: QueueTask) and should return True on success.
@@ -388,7 +389,7 @@ class WorkerQueue:
             finally:
                 conn.close()
 
-    async def complete(self, task_id: str, result: dict | None = None):
+    async def complete(self, task_id: str, result: dict | None = None) -> None:
         """Mark a task as completed successfully."""
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         async with self._in_flight_lock:
@@ -436,7 +437,7 @@ class WorkerQueue:
         retry: bool = True,
         retry_after: float | None = None,
         task_type: str | None = None,
-    ):
+    ) -> None:
         """Mark a task as failed. Retries if attempts remain.
 
         Args:
@@ -448,6 +449,7 @@ class WorkerQueue:
                 overrides the default exponential backoff.
             task_type: The task type, used for rate-limit state tracking.
                 If omitted, inferred from the DB row.
+
         """
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         async with self._in_flight_lock:
@@ -502,7 +504,7 @@ class WorkerQueue:
                             from app.metrics_collector import record_worker_failure
 
                             record_worker_failure(actual_type)
-                        except Exception:  # nosec B110
+                        except Exception:  # noqa: BLE001, nosec B110
                             pass
                         conn.execute(
                             """INSERT OR REPLACE INTO task_history
@@ -631,7 +633,7 @@ class WorkerQueue:
 
     # ─── Worker loop ───────────────────────────────────────────────────
 
-    async def start(self):
+    async def start(self) -> None:
         """Start the background worker loop with recovery of stuck tasks."""
         if self._running:
             return
@@ -646,7 +648,7 @@ class WorkerQueue:
             self._poll_interval,
         )
 
-    def _recover_stuck_tasks(self):
+    def _recover_stuck_tasks(self) -> None:
         """Reset any tasks stuck in 'running' state back to 'pending' for retry."""
         with _DB_LOCK:
             conn = self._conn()
@@ -665,22 +667,20 @@ class WorkerQueue:
             finally:
                 conn.close()
 
-    async def stop(self, drain: bool = True):
+    async def stop(self, drain: bool = True) -> None:
         """Stop the worker loop. Optionally drain in-flight tasks."""
         self._running = False
         if self._worker_task:
             self._worker_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._worker_task
-            except asyncio.CancelledError:
-                pass
 
         if drain:
             await self._drain_in_flight()
 
         logger.info("Worker queue stopped (drained=%s)", drain)
 
-    async def _worker_loop(self):
+    async def _worker_loop(self) -> None:
         """Main worker loop: dequeue and dispatch tasks."""
         while self._running:
             try:
@@ -715,7 +715,7 @@ class WorkerQueue:
                 logger.error("Worker loop error: %s", e, exc_info=True)
                 await asyncio.sleep(1)
 
-    async def _execute_task(self, task: QueueTask):
+    async def _execute_task(self, task: QueueTask) -> None:
         """Execute a single task with timeout and rate-limit-aware retries."""
         handler = self._handlers.get(task.type)
         if handler is None:
@@ -732,9 +732,9 @@ class WorkerQueue:
                 await self.fail(task.id, "Handler returned False", retry=True)
             else:
                 await self.complete(task.id, result)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await self.fail(task.id, f"Timeout after {task.timeout_seconds}s", retry=True)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             error_msg = f"{type(e).__name__}: {e}"
             # Rate-limit-aware retry: check if the error is rate-limit related
             # and parse Retry-After from error context if available
@@ -763,16 +763,16 @@ class WorkerQueue:
                             cooldown,
                             task.type,
                         )
-            except Exception:  # nosec B110
+            except Exception:  # noqa: BLE001, nosec B110
                 pass
             await self.fail(task.id, error_msg, retry=True, retry_after=retry_after, task_type=task.type)
 
-    async def _cleanup_in_flight(self, task_id: str):
+    async def _cleanup_in_flight(self, task_id: str) -> None:
         """Remove a task from the in-flight tracker."""
         async with self._in_flight_lock:
             self._in_flight.pop(task_id, None)
 
-    async def _drain_in_flight(self):
+    async def _drain_in_flight(self) -> None:
         """Wait for all in-flight tasks to complete."""
         async with self._in_flight_lock:
             tasks = list(self._in_flight.values())
@@ -890,7 +890,7 @@ class WorkerQueue:
         finally:
             conn.close()
 
-    def clear_completed_history(self, older_than_days: int = 7):
+    def clear_completed_history(self, older_than_days: int = 7) -> None:
         """Clean up old completed task history."""
         conn = self._conn()
         try:
@@ -928,8 +928,8 @@ def get_worker_queue(
 
     Returns:
         WorkerQueue (SQLite) or PostgresWorkerQueue depending on backend.
-    """
 
+    """
     # Resolve backend: explicit param > env var (checked first so pytest
     # monkeypatch.setenv works even after pydantic-settings cached its value)
     # > default
@@ -951,7 +951,7 @@ def get_worker_queue(
     return _queue_instance
 
 
-def reset_worker_queue():
+def reset_worker_queue() -> None:
     """Reset the global queue instance (for testing)."""
     global _queue_instance
     _queue_instance = None

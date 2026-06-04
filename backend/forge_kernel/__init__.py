@@ -1,5 +1,4 @@
-"""
-forge-kernel — Clean-room product kernel for DataForge.
+"""forge-kernel — Clean-room product kernel for DataForge.
 
 Sharply scoped extraction service with explicit lifecycle states,
 deterministic extraction pipeline, and adapter-based persistence.

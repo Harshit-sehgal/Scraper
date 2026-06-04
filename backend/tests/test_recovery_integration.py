@@ -1,5 +1,4 @@
-"""
-Integration Tests for Recovery Flows
+"""Integration Tests for Recovery Flows.
 
 Tests the end-to-end recovery system including:
 - Recovery strategist generating plans per failure type

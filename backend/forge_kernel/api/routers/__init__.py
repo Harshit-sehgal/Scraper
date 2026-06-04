@@ -1,6 +1,4 @@
-"""
-Routers — API route definitions for the product kernel.
-"""
+"""Routers — API route definitions for the product kernel."""
 
 from forge_kernel.api.routers.exports import router as exports_router
 from forge_kernel.api.routers.health import router as health_router

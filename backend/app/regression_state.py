@@ -1,6 +1,4 @@
-"""
-Regression State Adapter — isolated state management for tracking archived failures and regressions.
-"""
+"""Regression State Adapter — isolated state management for tracking archived failures and regressions."""
 
 from __future__ import annotations
 

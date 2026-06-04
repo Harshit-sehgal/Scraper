@@ -15,12 +15,10 @@ class JobRepository(ABC):
     @abstractmethod
     def load_jobs(self) -> dict[str, Job]:
         """Load all active jobs from the persistent store."""
-        pass
 
     @abstractmethod
     def load_recycle_bin(self) -> dict[str, Job]:
         """Load all deleted / recycled jobs from the persistent store."""
-        pass
 
     @abstractmethod
     def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
@@ -29,8 +27,8 @@ class JobRepository(ABC):
         Args:
             recover_in_progress: When True, pending/running jobs are marked failed as
                 startup recovery. Worker hot-path reads must pass False.
+
         """
-        pass
 
     @abstractmethod
     def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job], prune_missing: bool = False) -> None:
@@ -42,13 +40,12 @@ class JobRepository(ABC):
             prune_missing: If True, delete rows from the persistent store that are not
                 present in the provided dicts before upserting. Default False — prevents
                 accidental data loss in multi-process scenarios.
+
         """
-        pass
 
     @abstractmethod
     def save_single(self, job: Job) -> None:
         """Atomically upsert or save a single job's status, progress, or logs."""
-        pass
 
     def health_check(self) -> dict:
         """Check repository health. Returns a dict with 'ok' key and backend info."""
@@ -89,7 +86,6 @@ class JobRepository(ABC):
 
     def save_world_state(self, payload: dict) -> None:
         """Save semantic world state to the persistent store."""
-        pass
 
 
 class SQLiteJobRepository(JobRepository):
@@ -170,7 +166,7 @@ class SQLiteJobRepository(JobRepository):
         ) as f:
             f.write(json.dumps(payload, ensure_ascii=False, indent=2))
             tmp_path = f.name
-        os.replace(tmp_path, str(ws_path))
+        os.replace(tmp_path, str(ws_path))  # noqa: PTH105
 
     def load_world_state(self) -> dict | None:
         """Load semantic world state from the SQLite world_state.json file."""
@@ -182,7 +178,7 @@ class SQLiteJobRepository(JobRepository):
         if ws_path.exists():
             try:
                 return json.loads(ws_path.read_text())  # type: ignore[no-any-return]
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return None
         return None
 
@@ -200,7 +196,7 @@ class SQLiteJobRepository(JobRepository):
                     return False
                 # Convert to dict
                 col_names = [description[0] for description in cursor.description]
-                row_dict = dict(zip(col_names, row))
+                row_dict = dict(zip(col_names, row, strict=False))
                 # Delete from jobs
                 conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
                 # Set deleted_at timestamp
@@ -235,13 +231,12 @@ class SQLiteJobRepository(JobRepository):
                 if not row:
                     return False
                 col_names = [description[0] for description in cursor.description]
-                row_dict = dict(zip(col_names, row))
+                row_dict = dict(zip(col_names, row, strict=False))
                 # Delete from recycle_bin
                 conn.execute("DELETE FROM recycle_bin WHERE id = ?", (job_id,))
 
                 # Exclude deleted_at as it is not present in jobs table
-                if "deleted_at" in row_dict:
-                    del row_dict["deleted_at"]
+                row_dict.pop("deleted_at", None)
 
                 # Insert into jobs
                 columns = ", ".join(row_dict.keys())
@@ -306,7 +301,7 @@ class SQLiteJobRepository(JobRepository):
 
                 now = datetime.datetime.now().isoformat()
                 for r in rows:
-                    row_dict = dict(zip(col_names, r))
+                    row_dict = dict(zip(col_names, r, strict=False))
                     jid = row_dict["id"]
                     # Delete from jobs
                     conn.execute("DELETE FROM jobs WHERE id = ?", (jid,))
@@ -343,6 +338,7 @@ def get_job_repository() -> JobRepository:
 
     The repository is cached as a module-level singleton so that
     all callers share the same instance.
+
     """
     global _repository_instance
     if _repository_instance is not None:
@@ -395,7 +391,7 @@ def get_job_repository() -> JobRepository:
 _repository_instance: JobRepository | None = None
 
 
-def reset_repository():
+def reset_repository() -> None:
     """Reset the cached repository instance (for testing).
 
     If a PostgresJobRepository was cached, also closes the psycopg2 pool
@@ -408,6 +404,6 @@ def reset_repository():
                 from app.postgres_repository import shutdown_postgres
 
                 shutdown_postgres()
-            except Exception:  # nosec B110
+            except Exception:  # nosec B110  # noqa: BLE001
                 pass
     _repository_instance = None

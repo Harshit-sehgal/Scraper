@@ -105,6 +105,7 @@ def detect_empty_response(html: str, status_code: int = 200) -> EmptyResponseChe
 
     Returns:
         EmptyResponseCheck with classification and suggestions
+
     """
     if not html or len(html.strip()) < settings.EMPTY_RESPONSE_MIN_HTML_LEN:
         return EmptyResponseCheck(

@@ -1,5 +1,4 @@
-"""
-Tests for Domain Evolution Model — Behavioral domain tracking.
+"""Tests for Domain Evolution Model — Behavioral domain tracking.
 
 Tests:
   - Mutation tracking

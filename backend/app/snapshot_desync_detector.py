@@ -36,7 +36,7 @@ class DesyncReport:
         critical: bool,
         epoch_gap: int = 0,
         recommended_action: str = "none",
-    ):
+    ) -> None:
         self.node_a = node_a
         self.node_b = node_b
         self.causal_relation = causal_relation
@@ -70,7 +70,7 @@ class SnapshotDesyncDetector:
     5. Recommended action based on divergence severity and causality
     """
 
-    def __init__(self, divergence_threshold: float = 0.15):
+    def __init__(self, divergence_threshold: float = 0.15) -> None:
         self._threshold = divergence_threshold
         self._history: list[DesyncReport] = []
 
@@ -91,6 +91,7 @@ class SnapshotDesyncDetector:
 
         Returns:
             DesyncReport with divergence metrics and recommended action.
+
         """
         # 1. Causal relation via vector clocks
         clock_a = snapshot_a.get("clock", {})
@@ -117,7 +118,7 @@ class SnapshotDesyncDetector:
         for name, fn in subsystems:
             try:
                 score = fn(snapshot_a, snapshot_b)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Desync compare failed for subsystem %s: %s", name, e)
                 score = 1.0  # Cannot compare = fully divergent
             if score > 0.0:
@@ -228,8 +229,8 @@ class SnapshotDesyncDetector:
         cohesion_div = self._dict_divergence(cohesion_a, cohesion_b)
 
         # Compare communities (multi-set structural hash)
-        comm_a = set(tuple(c) for c in topo_a.get("communities", []))
-        comm_b = set(tuple(c) for c in topo_b.get("communities", []))
+        comm_a = {tuple(c) for c in topo_a.get("communities", [])}
+        comm_b = {tuple(c) for c in topo_b.get("communities", [])}
         comm_div = 0.0
         if comm_a or comm_b:
             intersection = comm_a & comm_b
@@ -269,15 +270,15 @@ class SnapshotDesyncDetector:
             va = vec_a.get(role, [0.0] * 16)
             vb = vec_b.get(role, [0.0] * 16)
             if va and vb:
-                dist = sum(abs(x - y) for x, y in zip(va, vb[: len(va)])) / len(va)
+                dist = sum(abs(x - y) for x, y in zip(va, vb[: len(va)], strict=False)) / len(va)
                 total_dist += dist
                 shared_count += 1
 
         avg_vec_dist = total_dist / shared_count if shared_count > 0 else 0.0
 
         # Compatibility divergence
-        compat_a = set(tuple(k.split("|")) if isinstance(k, str) else k for k in man_a.get("role_compatibility", {}))
-        compat_b = set(tuple(k.split("|")) if isinstance(k, str) else k for k in man_b.get("role_compatibility", {}))
+        compat_a = {tuple(k.split("|")) if isinstance(k, str) else k for k in man_a.get("role_compatibility", {})}
+        compat_b = {tuple(k.split("|")) if isinstance(k, str) else k for k in man_b.get("role_compatibility", {})}
         compat_div = 0.0
         if compat_a or compat_b:
             compat_intersection = compat_a & compat_b
@@ -404,7 +405,7 @@ def get_desync_detector() -> SnapshotDesyncDetector:
     return _detector
 
 
-def reset_desync_detector():
+def reset_desync_detector() -> None:
     """Reset the global detector (for testing)."""
     global _detector
     _detector = None

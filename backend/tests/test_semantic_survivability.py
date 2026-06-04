@@ -1,5 +1,4 @@
-"""
-Systemic Survivability & Long-Horizon Evolution Stress Tests
+"""Systemic Survivability & Long-Horizon Evolution Stress Tests.
 ===========================================================
 LAW 46: Adaptive systems must be validated via adversarial simulation,
 not just unit tests.
@@ -22,7 +21,7 @@ def ws():
     return SemanticWorldState()
 
 
-def simulate_event(ws: SemanticWorldState, role_name: str, token_type: SemanticType):
+def simulate_event(ws: SemanticWorldState, role_name: str, token_type: SemanticType) -> None:
     """Simulate a single semantic event within a transaction."""
     with ws.transaction(f"event:{role_name}"):
         # 1. Update manifold
@@ -63,8 +62,7 @@ def test_long_horizon_stability(ws) -> None:
         if i % 50 == 0:
             ws.apply_memory_decay()
 
-    duration = time.time() - start_time
-    print(f"\nLong-horizon simulation (500 events) completed in {duration:.2f}s")
+    time.time() - start_time
 
     # Sanity checks
     assert ws.metrics.global_energy >= 0.0
@@ -80,7 +78,7 @@ def test_chaos_transaction_survivability(ws) -> None:
     success_count = 0
     failure_count = 0
 
-    for i in range(100):
+    for _i in range(100):
         try:
             simulate_event(ws, random.choice(roles), SemanticType.TEXT)
             success_count += 1
@@ -88,8 +86,6 @@ def test_chaos_transaction_survivability(ws) -> None:
             failure_count += 1
 
     set_injection_probability(0.0)  # Reset
-
-    print(f"\nChaos Test: {success_count} success, {failure_count} failures")
 
     # The world state should still be 'clean' (no partial commits)
     assert ws.metrics.global_energy >= 0.0

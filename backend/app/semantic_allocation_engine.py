@@ -1,5 +1,4 @@
-"""
-Global Semantic Allocation Engine
+"""Global Semantic Allocation Engine.
 ====================================
 Replaces local field matching with global graph-based semantic allocation.
 
@@ -42,7 +41,7 @@ def _get_role_engine():
     return _role_engine
 
 
-def reset_role_engine():
+def reset_role_engine() -> None:
     """Reset the global role engine (for testing)."""
     global _role_engine
     _role_engine = None
@@ -134,7 +133,7 @@ def _name_similarity(a: str, b: str) -> float:
     return lcs / max(m, n)
 
 
-def seed_role_engine(schema_fields: list):
+def seed_role_engine(schema_fields: list) -> None:
     """Seed the RoleEmbeddingEngine manifold with initial priors and Manifold Transfer."""
     reng = _get_role_engine()
     ws = reng.ws
@@ -186,7 +185,7 @@ def seed_role_engine(schema_fields: list):
             ws.metrics.set_schema_instability(f_name, 0.5)
 
 
-def warm_start_from_values(records: list, schema_fields: list):
+def warm_start_from_values(records: list, schema_fields: list) -> None:
     """Warm-start the Role Manifold with observed values."""
     if not records or not schema_fields:
         return
@@ -207,9 +206,8 @@ def warm_start_from_values(records: list, schema_fields: list):
 
         # Grounding check: only seed if types are near
         is_compatible = (
-            (st == expected_type)
-            or (st == SemanticType.TEXT)
-            or (expected_type == SemanticType.TEXT)
+            st in (expected_type, SemanticType.TEXT)
+            or expected_type == SemanticType.TEXT
             or (
                 st == SemanticType.CODE
                 and expected_type in [SemanticType.LOCATION, SemanticType.PRICE, SemanticType.CODE, SemanticType.IDENTIFIER]

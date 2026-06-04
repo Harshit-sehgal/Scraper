@@ -1,5 +1,4 @@
-"""
-Scraper Diagnostics — Deep introspection for extraction analysis.
+"""Scraper Diagnostics — Deep introspection for extraction analysis.
 
 Provides detailed breakdown of what happened during a scrape:
 - Fetch metadata (latency, method, headers)
@@ -13,19 +12,22 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import TYPE_CHECKING
 
 from app.data_utils import process_raw_records
 from app.extraction_orchestrator import orchestrate_extraction
 from app.html_utils import fetch_page_content
-from app.models import SchemaField
 from app.scrape_telemetry import detect_anti_bot, estimate_dom_nodes
 from app.selector_memory import get_selector_memory
+
+if TYPE_CHECKING:
+    from app.models import SchemaField
 
 logger = logging.getLogger(__name__)
 
 
 class ScraperDiagnosticReport:
-    def __init__(self, url: str):
+    def __init__(self, url: str) -> None:
         self.url = url
         self.start_time = time.time()
         self.fetch_ms: float = 0

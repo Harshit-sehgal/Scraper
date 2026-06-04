@@ -1,5 +1,4 @@
-"""
-Page Evidence Collector — Gathers all useful evidence from a rendered page.
+"""Page Evidence Collector — Gathers all useful evidence from a rendered page.
 
 Before any extraction, this module collects raw evidence from the page:
   1. Visible text blocks with positional context
@@ -117,9 +116,8 @@ class PageEvidence:
     bounding_boxes: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        result = asdict(self)
+        return asdict(self)
         # Keep it serializable
-        return result
 
 
 # ---------------------------------------------------------------------------
@@ -166,6 +164,7 @@ def collect_page_evidence(
 
     Returns:
         PageEvidence with all collected evidence.
+
     """
     evidence = PageEvidence(url=url, html_length=len(html))
 

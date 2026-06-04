@@ -7,10 +7,10 @@ class HeartbeatManager:
     LAW 11: Distributed truth requires continuous verification.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.node_registry: dict[str, dict] = {}
 
-    def record_heartbeat(self, node_id: str, clock: dict, checksum: str, energy: float):
+    def record_heartbeat(self, node_id: str, clock: dict, checksum: str, energy: float) -> None:
         """Record health metrics from a node."""
         self.node_registry[node_id] = {
             "last_seen": time.time(),

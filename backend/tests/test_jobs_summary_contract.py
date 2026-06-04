@@ -10,7 +10,7 @@ def test_list_jobs_returns_summary_only(client, monkeypatch) -> None:
         name="Contract Summary Test Job",
         urls=["https://example.com"],
         results=[{"title": "Test Title", "price": "$100"}],
-        results_file_path="/tmp/leak.gz",
+        results_file_path="/tmp/leak.gz",  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
         results_on_disk=False,
         logs=[{"timestamp": "2026-06-04T00:00:00", "message": "Scraped something", "level": "info"}],
         status=JobStatus.COMPLETED,

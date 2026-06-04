@@ -25,14 +25,14 @@ class EventJournal:
     Streams historical deltas to ReplayBuffer for persistent storage (Phase 66).
     """
 
-    def __init__(self, max_entries: int = 10000):
+    def __init__(self, max_entries: int = 10000) -> None:
         self._entries: list = []
         self._max = max_entries
         self._enabled = True
         self._checkpoints: dict[int, dict] = {}  # event_idx -> full_snapshot
         self._current_idx = 0
 
-    def record(self, source: str, mutation_type: str, before: dict, after: dict, metadata: dict | None = None):
+    def record(self, source: str, mutation_type: str, before: dict, after: dict, metadata: dict | None = None) -> None:
         """Record a mutation event using delta-encoding (Phase 57).
 
         Also persists to the large-scale ReplayBuffer for streaming replay
@@ -79,7 +79,7 @@ class EventJournal:
             rb.append(
                 {
                     "type": f"{source}.{mutation_type}",
-                    "delta": delta if delta else {"source": source, "mutation_type": mutation_type},
+                    "delta": delta or {"source": source, "mutation_type": mutation_type},
                     "metadata": {
                         "source": source,
                         "mutation_type": mutation_type,
@@ -89,14 +89,14 @@ class EventJournal:
                     },
                 },
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # ReplayBuffer failure is non-fatal — journal continues normally
             logger.debug("ReplayBuffer persist skipped: %s", e)
 
         if len(self._entries) > self._max:
             # Phase 57 / 58 / 61 / 66: Semantic Retention Prioritization
             # We keep recent entries AND historical structural transitions
-            # (Skeletonization)
+            # (Skeletonization)  # noqa: ERA001
             keep_count = self._max // 2
 
             recent = self._entries[-keep_count:]
@@ -170,7 +170,7 @@ class EventJournal:
         """Return the last N entries for debugging."""
         return self._entries[-n:]
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear all journal entries."""
         self._entries.clear()
         self._checkpoints.clear()
@@ -210,7 +210,7 @@ def _compute_delta(before: dict, after: dict) -> dict:
     return delta
 
 
-def _apply_delta(state: dict, delta: dict):
+def _apply_delta(state: dict, delta: dict) -> None:
     """Apply a delta-encoded change to a state dictionary."""
     for k, change in delta.items():
         state[k] = change["to"]

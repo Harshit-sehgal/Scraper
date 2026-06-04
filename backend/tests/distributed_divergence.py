@@ -1,5 +1,4 @@
-"""
-Distributed Replay Divergence Tester — Phase 55
+"""Distributed Replay Divergence Tester — Phase 55.
 ==============================================
 LAW: Distributed semantic systems must reach identical topological states
 when replaying identical causal journals.
@@ -24,8 +23,6 @@ def test_distributed_divergence(event_count: int = 1000) -> bool:
     ws_b.clear()
 
     roles = [f"role_{i}" for i in range(10)]
-
-    print(f"\n--- Starting Divergence Test ({event_count} events) ---")
 
     # 1. Evolve Node A
     for i in range(event_count):
@@ -52,13 +49,9 @@ def test_distributed_divergence(event_count: int = 1000) -> bool:
     energy_a = ws_a.metrics.global_energy
     energy_b = ws_b.metrics.global_energy
 
-    print(f"  Node A Checksum: {checksum_a[:16]}... Energy: {energy_a:.4f}")
-    print(f"  Node B Checksum: {checksum_b[:16]}... Energy: {energy_b:.4f}")
-
     assert checksum_a == checksum_b, "CRITICAL: Manifold checksum mismatch after distributed replay!"
     assert abs(energy_a - energy_b) < 1e-6, "CRITICAL: Thermodynamic divergence detected!"
 
-    print("  Divergence: 0.00% (Perfect Parity confirmed)")
     return True
 
 

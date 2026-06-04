@@ -15,6 +15,7 @@ env/
 .ruff_cache/
 backend/.mypy_cache/
 backend/.venv/
+backend/.pylint_venv/
 .coverage
 backend/.coverage
 

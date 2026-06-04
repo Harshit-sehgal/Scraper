@@ -1,5 +1,4 @@
-"""
-Tests for the experimental router mount gate in app/main.py.
+"""Tests for the experimental router mount gate in app/main.py.
 
 The gate at configure_routes() must:
 1. NOT include the experimental router when ENABLE_EXPERIMENTAL_ROUTES is False.

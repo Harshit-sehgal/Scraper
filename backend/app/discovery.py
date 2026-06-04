@@ -1,5 +1,4 @@
-"""
-Auto-Discovery Engine: Given a topic / query, automatically finds the best
+"""Auto-Discovery Engine: Given a topic / query, automatically finds the best
 web pages to scrape by searching the web and ranking results.
 Uses free search via DuckDuckGo.
 """
@@ -37,11 +36,11 @@ LISTING_HINTS = (
     "contact",
 )
 
-SOCIAL_ROOT_DOMAINS = set(d.strip() for d in settings.DISCOVERY_SOCIAL_DOMAINS.split(","))
+SOCIAL_ROOT_DOMAINS = {d.strip() for d in settings.DISCOVERY_SOCIAL_DOMAINS.split(",")}
 
-DIRECTORY_ROOT_DOMAINS = set(d.strip() for d in settings.DISCOVERY_DIRECTORY_DOMAINS.split(","))
+DIRECTORY_ROOT_DOMAINS = {d.strip() for d in settings.DISCOVERY_DIRECTORY_DOMAINS.split(",")}
 
-SEARCH_ROOT_DOMAINS = set(d.strip() for d in settings.DISCOVERY_SEARCH_DOMAINS.split(","))
+SEARCH_ROOT_DOMAINS = {d.strip() for d in settings.DISCOVERY_SEARCH_DOMAINS.split(",")}
 
 SOURCE_TRUST_SCORE = {
     "official": settings.SOURCE_TRUST_OFFICIAL,
@@ -124,10 +123,7 @@ def infer_source_metadata(url: str, title: str = "", body: str = "") -> dict:
         source_type = "search_result"
     else:
         blob = f"{title} {body} {(url or '').lower()}"
-        if any(h in blob for h in ["directory", "listing", "best", "top", "near me"]):
-            source_type = "directory"
-        else:
-            source_type = "official"
+        source_type = "directory" if any(h in blob for h in ["directory", "listing", "best", "top", "near me"]) else "official"
 
     return {
         "source_domain": source_domain,
@@ -267,8 +263,7 @@ async def discover_urls(
     source_policy: SourcePolicy = SourcePolicy.ALL_SOURCES,
     max_per_domain: int = 4,
 ) -> list[dict]:
-    """
-    Auto-discover the best URLs to scrape for a given query.
+    """Auto-discover the best URLs to scrape for a given query.
     Uses DDG search and lightweight ranking to prioritize high-signal pages.
     """
     data_fields = data_fields or []
@@ -345,7 +340,7 @@ async def discover_urls(
                     score += 0.2
 
             # 2. High pressure (stress) rewards high-trust markers
-            # (Stabilization)
+            # (Stabilization)  # noqa: ERA001
             if field_pressure > 0.6 and metadata["source_type"] == "official":
                 score += 0.15
 
@@ -402,9 +397,7 @@ async def discover_urls(
 
 
 async def smart_query_builder(topic: str, data_fields: list[str]) -> str:
-    """
-    Deterministically build an optimized query from topic and desired fields.
-    """
+    """Deterministically build an optimized query from topic and desired fields."""
     return _build_search_query(
         query=topic,
         location="",

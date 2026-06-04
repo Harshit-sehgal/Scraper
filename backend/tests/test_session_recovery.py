@@ -282,7 +282,8 @@ class TestSessionRecoveryMetadata:
     @pytest.mark.asyncio
     async def test_no_recovery_without_search_params(self) -> None:
         """When no search_params are provided, recovery should not be attempted
-        even if a redirect and search form are detected."""
+        even if a redirect and search form are detected.
+        """
         stale_url = "https://www.example.com/search/results/abc123session456"
 
         with (

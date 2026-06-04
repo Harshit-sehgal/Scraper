@@ -1,5 +1,4 @@
-"""
-Kernel settings — grouped configuration for the product kernel.
+"""Kernel settings — grouped configuration for the product kernel.
 
 Uses pydantic-settings with focused groups rather than one giant object.
 """

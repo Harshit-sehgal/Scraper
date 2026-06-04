@@ -1,5 +1,4 @@
-"""
-Layer 1: Intent Parser
+"""Layer 1: Intent Parser.
 ======================
 Universal intent parsing that understands what the user wants,
 regardless of domain (flight, hotel, product, job, etc.)
@@ -88,8 +87,7 @@ SEMANTIC_NEED_TO_FIELD_TYPE = {
 
 
 def parse_user_intent(query: str) -> IntentSchema:
-    """
-    Parse user query to understand what they want, regardless of domain.
+    """Parse user query to understand what they want, regardless of domain.
 
     Input: "Find cheap flights from Delhi to Mumbai with prices and duration"
     Output: IntentSchema with semantic_needs, not domain-specific fields
@@ -238,10 +236,7 @@ def semantic_needs_are_exclusive(need_a: str | None, need_b: str | None) -> bool
         return False
     from app.field_laws import SEMANTIC_NEED_EXCLUSIVITY
 
-    for a, b in SEMANTIC_NEED_EXCLUSIVITY:
-        if (need_a == a and need_b == b) or (need_a == b and need_b == a):
-            return True
-    return False
+    return any((need_a == a and need_b == b) or (need_a == b and need_b == a) for a, b in SEMANTIC_NEED_EXCLUSIVITY)
 
 
 def role_tokens_are_exclusive(tokens_a: set[str], tokens_b: set[str]) -> bool:

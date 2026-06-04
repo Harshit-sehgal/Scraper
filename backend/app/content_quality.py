@@ -36,6 +36,7 @@ def _assess_content_quality(html: str, profile) -> dict:
         - data_container_count: int
         - landing_signals: list of detected landing page indicators
         - message: str
+
     """
     soup = BeautifulSoup(html, "html.parser")
 
@@ -59,7 +60,7 @@ def _assess_content_quality(html: str, profile) -> dict:
             if soup.select(sel):
                 landing_signals.append("hero_banner")
                 break
-        except Exception:  # nosec B112
+        except Exception:  # noqa: BLE001, nosec B112
             continue
 
     # Search forms (generic — any form with text / search input)
@@ -105,7 +106,7 @@ def _assess_content_quality(html: str, profile) -> dict:
         try:
             containers = soup.select(container_selector)
             data_container_count = sum(1 for c in containers if len(c.get_text(strip=True)) > 20)
-        except Exception:  # nosec B110
+        except Exception:  # noqa: BLE001, nosec B110
             pass
 
     # ── Generic Data Container Discovery (fallback) ─────────────────
@@ -133,9 +134,8 @@ def _assess_content_quality(html: str, profile) -> dict:
                 css_sel = pattern.replace(".", ".")
                 matching = soup.select(css_sel)
                 content_count = sum(1 for m in matching if len(m.get_text(strip=True)) > 20)
-                if content_count > data_container_count:
-                    data_container_count = content_count
-            except Exception:  # nosec B112
+                data_container_count = max(data_container_count, content_count)
+            except Exception:  # nosec B112  # noqa: BLE001
                 continue
 
         # Also scan for repeating direct children of common containers

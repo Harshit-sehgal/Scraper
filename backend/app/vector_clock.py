@@ -8,15 +8,15 @@ class VectorClock:
     No state merge can occur without partial ordering of events.
     """
 
-    def __init__(self, node_id: str, clock: dict[str, int] | None = None):
+    def __init__(self, node_id: str, clock: dict[str, int] | None = None) -> None:
         self.node_id = node_id
-        self._clock = clock if clock else {node_id: 0}
+        self._clock = clock or {node_id: 0}
 
-    def increment(self):
+    def increment(self) -> None:
         """Increment the local clock value."""
         self._clock[self.node_id] = self._clock.get(self.node_id, 0) + 1
 
-    def update(self, remote_clock: dict[str, int]):
+    def update(self, remote_clock: dict[str, int]) -> None:
         """Merge a remote clock into the local clock."""
         for node, value in remote_clock.items():
             self._clock[node] = max(self._clock.get(node, 0), value)
@@ -32,6 +32,7 @@ class VectorClock:
 
         Returns:
             "equal", "ancestor", "descendant", or "concurrent"
+
         """
         self_newer = False
         other_newer = False

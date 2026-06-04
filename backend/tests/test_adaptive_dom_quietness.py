@@ -1,6 +1,4 @@
-"""
-Unit Tests for Phase 86 Adaptive DOM Quietness.
-"""
+"""Unit Tests for Phase 86 Adaptive DOM Quietness."""
 
 from __future__ import annotations
 

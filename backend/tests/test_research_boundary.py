@@ -1,5 +1,4 @@
-"""
-Unit tests for the research-shell boundary registry.
+"""Unit tests for the research-shell boundary registry.
 
 These tests pin down three contracts:
 
