@@ -159,3 +159,131 @@ def test_emit_field_wave_noop_for_tiny_intensity() -> None:
     r = ts.add(["a", "b"], "T1")
     # intensity < 0.01 should be silently ignored
     ts.emit_field_wave(r.region_id, 0.001)
+
+
+# ─── topology_forces — branch coverage ────────────────────────────────
+
+
+def test_redirect_repulsive_pressure_dissipates_when_no_routes() -> None:
+    """redirect_repulsive_pressure dissipates as heat when no routes exist."""
+    from app.topology_forces import redirect_repulsive_pressure
+
+    ts = TopologyState()
+    r = ts.add(["a", "b"], "T1", instability=0.5)
+    ts.add(["c", "d"], "T2")  # unrelated roles — no overlap
+    old_temp = r.local_temperature
+
+    # No shared roles between source_region and any edge field forces
+    redirect_repulsive_pressure(ts, r, 0.5, {})
+
+    # Should have increased temperature (dissipation)
+    assert r.local_temperature > old_temp
+
+
+def test_redirect_repulsive_pressure_routes_through_affinity() -> None:
+    """redirect_repulsive_pressure routes through high-affinity edge field."""
+    from app.topology_forces import redirect_repulsive_pressure
+
+    ts = TopologyState()
+    source = ts.add(["a"], "T1", instability=0.5)
+    target = ts.add(["b"], "T2", instability=0.1)
+
+    # Build a forces dict with a high-affinity edge a↔b
+    forces: dict[tuple[str, str], dict[str, float]] = {
+        ("a", "b"): {
+            "affinity": 0.8,
+            "repulsion": 0.1,
+            "pressure": 0.3,
+            "route_strength": 0.6,
+            "semantics": "attractive",
+        },
+    }
+    old_target_instability = target.instability
+
+    redirect_repulsive_pressure(ts, source, 1.0, forces)
+
+    # Target instability should have increased
+    assert target.instability > old_target_instability
+
+
+def test_redirect_repulsive_pressure_remainder_heats_source() -> None:
+    """Unredirected pressure heats the source region."""
+    from app.topology_forces import redirect_repulsive_pressure
+
+    ts = TopologyState()
+    source = ts.add(["a"], "T1", instability=0.5)
+    ts.add(["b"], "T2", instability=0.1)
+
+    # Low route_strength means most pressure won't be redirected
+    forces: dict[tuple[str, str], dict[str, float]] = {
+        ("a", "b"): {
+            "affinity": 0.4,
+            "repulsion": 0.1,
+            "pressure": 0.2,
+            "route_strength": 0.21,
+            "semantics": "attractive",
+        },
+    }
+    old_temp = source.local_temperature
+
+    redirect_repulsive_pressure(ts, source, 1.0, forces)
+
+    # Source temperature should increase from unredirected remainder
+    assert source.local_temperature > old_temp
+
+
+def test_route_contradiction_no_edge_field() -> None:
+    """route_contradiction without edge field data falls back to topological law.
+
+    Use separate regions with distinct roles so get_edge_fields() returns no
+    pair for ("x", "y"), triggering the fallback branch.
+    """
+    from app.topology_forces import route_contradiction
+
+    ts = TopologyState()
+    # Separate regions with NO shared role pair with 'x' or 'y'
+    ts.add(["z"], "T1")
+    ts.add(["w"], "T2")
+
+    result = route_contradiction(ts, "x", "y", strength=0.2)
+
+    assert result["redirected"] == 0.0
+    assert result["excluded"] > 0.0
+    assert result["through_edge_field"] is False
+
+
+def test_route_contradiction_repulsive_edge() -> None:
+    """route_contradiction with repulsive edge redirects pressure."""
+    from app.topology_forces import route_contradiction
+
+    ts = TopologyState()
+    ts.add(["x"], "T1", instability=0.5)
+    ts.add(["y"], "T2", instability=0.3)
+
+    # Set a repulsive topological law (negative law = repulsive)
+    ts.set_topological_law(("x", "y"), -0.5)
+
+    result = route_contradiction(ts, "x", "y", strength=0.4)
+
+    # Repulsive edge should redirect pressure
+    assert result["redirected"] > 0.0
+    assert result["through_edge_field"] is True
+
+
+def test_route_contradiction_non_repulsive_edge() -> None:
+    """route_contradiction with non-repulsive edge establishes repulsive law."""
+    from app.topology_forces import route_contradiction
+
+    ts = TopologyState()
+    ts.add(["x"], "T1", instability=0.5)
+    ts.add(["y"], "T2", instability=0.3)
+
+    # Set an attractive topological law (positive law = attractive)
+    ts.set_topological_law(("x", "y"), 0.5)
+
+    result = route_contradiction(ts, "x", "y", strength=0.4)
+
+    # Non-repulsive pair contradicting should still make it through edge field
+    assert result["redirected"] == 0.0
+    assert result["excluded"] > 0.0
+    assert result["through_edge_field"] is True

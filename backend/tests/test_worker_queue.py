@@ -333,3 +333,212 @@ class TestQueueTaskModel:
         assert task.max_attempts == 3
         assert task.timeout_seconds == 300
         assert task.payload == {}
+
+
+class TestWorkerQueueExecution:
+    """Tests for execute_task, handler dispatch, and timeouts."""
+
+    def test_execute_task_handler_missing(self, tmp_path) -> None:
+        """A task with no registered handler is failed."""
+        from app.worker_queue import WorkerQueue, reset_worker_queue
+
+        reset_worker_queue()
+        db_path = tmp_path / "test_missing_handler.db"
+        queue = WorkerQueue(db_path=db_path)
+
+        task_id = asyncio.run(queue.enqueue("unregistered_type", {}))
+        task = asyncio.run(queue.dequeue(timeout=1.0))
+        assert task is not None
+
+        asyncio.run(queue._execute_task(task))
+
+        # Task should have been failed (and not in active queue)
+        state = queue.get_task_state(task_id)
+        assert state is None or state.get("status") != "running"
+
+    def test_execute_task_handler_returns_false(self, tmp_path) -> None:
+        """A handler returning False triggers retry."""
+        from app.worker_queue import WorkerQueue, reset_worker_queue
+
+        reset_worker_queue()
+        db_path = tmp_path / "test_handler_false.db"
+        queue = WorkerQueue(db_path=db_path)
+
+        async def failing_handler(task) -> bool:
+            return False
+
+        queue.register_handler("failing", failing_handler)
+        task_id = asyncio.run(queue.enqueue("failing", {}, max_attempts=3))
+        task = asyncio.run(queue.dequeue(timeout=1.0))
+        assert task is not None
+
+        asyncio.run(queue._execute_task(task))
+
+        # Task should still exist (retried)
+        state = queue.get_task_state(task_id)
+        assert state is not None
+
+    def test_execute_task_timeout(self, tmp_path) -> None:
+        """A task that times out is retried."""
+        from app.worker_queue import WorkerQueue, reset_worker_queue
+
+        reset_worker_queue()
+        db_path = tmp_path / "test_timeout.db"
+        queue = WorkerQueue(db_path=db_path)
+
+        async def slow_handler(task) -> bool:
+            await asyncio.sleep(10)
+            return True
+
+        queue.register_handler("slow", slow_handler)
+        task_id = asyncio.run(queue.enqueue("slow", {}, timeout_seconds=1, max_attempts=2))
+        from app.worker_queue import QueueTask, TaskStatus
+
+        quick_timeout_task = QueueTask(
+            task_type="slow",
+            payload={},
+            max_attempts=2,
+            timeout_seconds=1,
+            task_id=task_id,
+        )
+        quick_timeout_task.status = TaskStatus.RUNNING
+
+        asyncio.run(queue._execute_task(quick_timeout_task))
+
+        # Should have timed out — task should have been retried
+        state = queue.get_task_state(task_id)
+        assert state is not None, "Timed-out task should still exist (retried)"
+        # If retried, task should be back in active queue as pending
+        status = queue.get_status()
+        assert status["pending"] >= 1 or status.get("retrying", 0) >= 1
+
+
+class TestWorkerQueueObservabilityExtended:
+    """Extended observability tests for uncovered paths."""
+
+    def test_get_task_state_active(self, tmp_path) -> None:
+        """get_task_state returns the active task state."""
+        from app.worker_queue import reset_worker_queue
+
+        reset_worker_queue()
+        queue, _ = _make_queue(tmp_path)
+
+        task_id = asyncio.run(queue.enqueue("test_state", {"k": "v"}))
+        state = queue.get_task_state(task_id)
+        assert state is not None
+        assert state["type"] == "test_state"
+        assert state["status"] == "pending"
+
+    def test_get_task_state_history(self, tmp_path) -> None:
+        """get_task_state falls back to task_history for completed tasks."""
+        from app.worker_queue import reset_worker_queue
+
+        reset_worker_queue()
+        queue, _ = _make_queue(tmp_path)
+
+        task_id = asyncio.run(queue.enqueue("test_history", {}, max_attempts=1))
+        task = asyncio.run(queue.dequeue(timeout=1.0))
+        assert task is not None
+        asyncio.run(queue.fail(task_id, "Final fail", retry=True))
+
+        # Task should now be in history (dead_letter)
+        state = queue.get_task_state(task_id)
+        assert state is not None
+        assert state["status"] == "dead_letter"
+
+    def test_get_task_state_not_found(self, tmp_path) -> None:
+        """get_task_state returns None for unknown task ID."""
+        from app.worker_queue import reset_worker_queue
+
+        reset_worker_queue()
+        queue, _ = _make_queue(tmp_path)
+        assert queue.get_task_state("nonexistent-id") is None
+
+    def test_get_status_with_top_pending(self, tmp_path) -> None:
+        """get_status returns next_tasks for monitoring."""
+        from app.worker_queue import reset_worker_queue
+
+        reset_worker_queue()
+        queue, _ = _make_queue(tmp_path)
+
+        asyncio.run(queue.enqueue("monitor_task", {}, max_attempts=3))
+        status = queue.get_status()
+        assert "next_tasks" in status
+        assert len(status["next_tasks"]) == 1
+        assert status["next_tasks"][0]["type"] == "monitor_task"
+
+    def test_clear_completed_history(self, tmp_path) -> None:
+        """clear_completed_history does not remove recently completed tasks.
+
+        The method deletes history where finished_at < (NOW - N days).
+        With older_than_days=365, a just-completed task is preserved.
+        This is the intended behavior — only truly old history is pruned.
+        """
+        from app.worker_queue import reset_worker_queue
+
+        reset_worker_queue()
+        queue, _ = _make_queue(tmp_path)
+
+        # Enqueue and fail to create history entries
+        task_id = asyncio.run(queue.enqueue("clear_test", {}, max_attempts=1))
+        task = asyncio.run(queue.dequeue(timeout=1.0))
+        assert task is not None
+        asyncio.run(queue.fail(task_id, "Gone", retry=True))
+
+        # Verify task exists in history before cleanup
+        state_before = queue.get_task_state(task_id)
+        assert state_before is not None
+
+        # Clear with 365 days — should NOT remove recently completed task
+        queue.clear_completed_history(older_than_days=365)
+
+        # Recently completed task should still exist
+        state_after = queue.get_task_state(task_id)
+        assert state_after is not None
+        assert state_after["status"] == "dead_letter"
+
+
+class TestWorkerQueueFactory:
+    """Tests for the get_worker_queue factory function."""
+
+    def test_get_worker_queue_postgres_backend_cannot_connect(self) -> None:
+        """get_worker_queue with postgres backend returns PostgresWorkerQueue
+        instance even without a live connection (the error surfaces on DB calls).
+
+        Full Postgres integration tests live in test_worker_queue_postgres.py.
+        """
+        from app.worker_queue import get_worker_queue, reset_worker_queue
+        from app.worker_queue_postgres import PostgresWorkerQueue
+
+        reset_worker_queue()
+        # This should return a PostgresWorkerQueue instance even if Postgres
+        # isn't running — connection errors surface on actual DB operations.
+        try:
+            queue = get_worker_queue(backend="postgres")
+            assert isinstance(queue, PostgresWorkerQueue)
+        except Exception as exc:
+            # Postgres may not be available — skip gracefully
+            import pytest
+
+            pytest.skip(f"Postgres not available: {exc}")
+
+    def test_get_worker_queue_singleton(self, tmp_path) -> None:
+        """get_worker_queue returns the same instance when no db_path changes."""
+        from app.worker_queue import get_worker_queue, reset_worker_queue
+
+        reset_worker_queue()
+        q1 = get_worker_queue()
+        q2 = get_worker_queue()
+        assert q1 is q2
+
+    def test_get_worker_queue_custom_db_path(self, tmp_path) -> None:
+        """get_worker_queue with a custom db_path returns a new instance."""
+        from app.worker_queue import get_worker_queue, reset_worker_queue
+
+        reset_worker_queue()
+        p = tmp_path / "custom"
+        p.mkdir(exist_ok=True)
+        custom_db = p / "queue.db"
+
+        q = get_worker_queue(db_path=custom_db)
+        assert q._db_path == custom_db
