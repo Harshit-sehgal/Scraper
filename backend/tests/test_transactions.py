@@ -22,7 +22,8 @@ def test_transaction_rollback() -> None:
         with ws.transaction():
             ws._energy.set_energy(9.0)
             assert ws.metrics.global_energy == 9.0
-            raise ValueError("Intentional failure")
+            msg = "Intentional failure"
+            raise ValueError(msg)
     except ValueError:
         pass
 
@@ -55,7 +56,8 @@ def test_nested_transaction_rollback() -> None:
             try:
                 with ws.transaction():
                     ws._energy.set_energy(6.0)
-                    raise ValueError("Nested failure")
+                    msg = "Nested failure"
+                    raise ValueError(msg)
             except ValueError:
                 # This should NOT trigger a global rollback yet,
                 # but because our current implementation rolls back EVERYTHING
@@ -63,7 +65,8 @@ def test_nested_transaction_rollback() -> None:
                 pass
 
             assert ws.metrics.global_energy == 6.0
-            raise ValueError("Outer failure")
+            msg = "Outer failure"
+            raise ValueError(msg)
     except ValueError:
         pass
 
@@ -87,7 +90,8 @@ def test_topology_transaction_rollback() -> None:
             staged = ws._topology.get_view().find_by_token_and_roles("test", ("role_a",))
             assert staged is not None
             assert staged.instability == 0.9
-            raise ValueError("Rollback")
+            msg = "Rollback"
+            raise ValueError(msg)
     except ValueError:
         pass
 
@@ -105,7 +109,8 @@ def test_topology_addition_rollback() -> None:
         with ws.transaction():
             ws._topology.add(["role_b"], "test2", instability=0.8)
             assert ws._topology.region_count() == 1
-            raise ValueError("Rollback")
+            msg = "Rollback"
+            raise ValueError(msg)
     except ValueError:
         pass
 

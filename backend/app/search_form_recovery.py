@@ -355,7 +355,8 @@ async def _try_form_search_recovery(
             while resp.is_redirect:
                 redirects_followed += 1
                 if redirects_followed > max_redirects:
-                    raise ValueError(f"Too many redirects (max {max_redirects})")
+                    msg = f"Too many redirects (max {max_redirects})"
+                    raise ValueError(msg)
 
                 redirect_target = resp.headers.get("location", "")
                 if not redirect_target:
@@ -408,5 +409,5 @@ async def _try_form_search_recovery(
             "fresh_html": "",
             "form_detected": True,
             "form_info": form_info,
-            "error": f"Search form submission failed: {str(e)}",
+            "error": f"Search form submission failed: {e!s}",
         }

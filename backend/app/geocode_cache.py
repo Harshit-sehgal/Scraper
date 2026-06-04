@@ -15,7 +15,6 @@ import os
 import sqlite3
 import time
 from pathlib import Path
-from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,7 @@ class GeocodeCache:
         normalized = query.strip().lower()
         return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
-    def get(self, query: str) -> Optional[Tuple[float, float, Optional[str]]]:
+    def get(self, query: str) -> tuple[float, float, str | None] | None:
         """Fetch coordinates and resolved address from the geocode cache or negative cache."""
         q_hash = self._hash_query(query)
 
@@ -98,7 +97,7 @@ class GeocodeCache:
         self.misses += 1
         return None
 
-    def set(self, query: str, lat: float, lon: float, resolved_address: Optional[str] = None) -> None:
+    def set(self, query: str, lat: float, lon: float, resolved_address: str | None = None) -> None:
         """Store coordinates in the geocoding cache."""
         q_hash = self._hash_query(query)
         with sqlite3.connect(self.db_path) as conn:
@@ -124,7 +123,7 @@ class GeocodeCache:
 
 
 # Global geocode cache singleton instances
-_geocode_cache: Optional[GeocodeCache] = None
+_geocode_cache: GeocodeCache | None = None
 
 
 def get_geocode_cache() -> GeocodeCache:

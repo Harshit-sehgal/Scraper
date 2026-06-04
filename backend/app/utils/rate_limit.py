@@ -8,7 +8,6 @@ of burning retries on transient rate-limit blocks.
 import datetime
 import re
 import time
-from typing import Optional
 
 # ── Rate-limit indicator patterns ──────────────────────────────────────
 
@@ -16,25 +15,25 @@ _RATE_LIMIT_STATUS_CODES = {429, 503}
 """HTTP status codes that commonly indicate rate limiting."""
 
 _RATE_LIMIT_HEADER_PATTERNS = [
-    re.compile(r"retry-after", re.I),
-    re.compile(r"x-ratelimit-remaining", re.I),
-    re.compile(r"x-rate-limit", re.I),
+    re.compile(r"retry-after", re.IGNORECASE),
+    re.compile(r"x-ratelimit-remaining", re.IGNORECASE),
+    re.compile(r"x-rate-limit", re.IGNORECASE),
 ]
 
 _RATE_LIMIT_BODY_PATTERNS = [
-    re.compile(r"rate.?limit", re.I),
-    re.compile(r"too many requests", re.I),
-    re.compile(r"try again later", re.I),
-    re.compile(r"quota exceeded", re.I),
-    re.compile(r"request limit", re.I),
-    re.compile(r"throttl", re.I),
+    re.compile(r"rate.?limit", re.IGNORECASE),
+    re.compile(r"too many requests", re.IGNORECASE),
+    re.compile(r"try again later", re.IGNORECASE),
+    re.compile(r"quota exceeded", re.IGNORECASE),
+    re.compile(r"request limit", re.IGNORECASE),
+    re.compile(r"throttl", re.IGNORECASE),
 ]
 
 
 def is_rate_limit_error(
-    status_code: Optional[int] = None,
-    headers: Optional[dict] = None,
-    body: Optional[str] = None,
+    status_code: int | None = None,
+    headers: dict | None = None,
+    body: str | None = None,
 ) -> bool:
     """Heuristic check for whether an error is rate-limit-related.
 
@@ -63,7 +62,7 @@ def is_rate_limit_error(
     return False
 
 
-def parse_retry_after(headers: Optional[dict] = None) -> Optional[float]:
+def parse_retry_after(headers: dict | None = None) -> float | None:
     """Parse Retry-After header into seconds.
 
     Supports both integer seconds and HTTP-date format.
@@ -111,7 +110,7 @@ def get_cooldown_seconds(domain_or_type: str, base_cooldown: float = 30.0) -> fl
 
 def mark_rate_limited(
     domain_or_type: str,
-    retry_after: Optional[float] = None,
+    retry_after: float | None = None,
     max_cooldown: float = 300.0,
 ) -> None:
     """Record that a rate limit was hit for a domain / task-type.
@@ -136,7 +135,7 @@ def mark_rate_limited(
     _RATE_LIMIT_STATE[domain_or_type] = now + cooldown
 
 
-def reset_rate_limit_state(domain_or_type: Optional[str] = None) -> None:
+def reset_rate_limit_state(domain_or_type: str | None = None) -> None:
     """Clear rate-limit cooldown state for a domain (or all domains)."""
     if domain_or_type:
         _RATE_LIMIT_STATE.pop(domain_or_type, None)

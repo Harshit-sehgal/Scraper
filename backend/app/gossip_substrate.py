@@ -15,7 +15,7 @@ import logging
 import random
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.heartbeat_manager import HeartbeatManager
@@ -28,20 +28,20 @@ class VectorClock:
 
     def __init__(self, node_id: str):
         self.node_id = node_id
-        self.clock: Dict[str, int] = defaultdict(int)
+        self.clock: dict[str, int] = defaultdict(int)
         self.clock[node_id] = 0
 
     def increment(self) -> None:
         """Increment this node's clock value."""
         self.clock[self.node_id] += 1
 
-    def update(self, other_clock: Dict[str, int]) -> None:
+    def update(self, other_clock: dict[str, int]) -> None:
         """Update this node's clock based on received clock."""
         for node_id, ts in other_clock.items():
             self.clock[node_id] = max(self.clock.get(node_id, 0), ts)
         self.increment()
 
-    def to_dict(self) -> Dict[str, int]:
+    def to_dict(self) -> dict[str, int]:
         """Export clock as dict."""
         return dict(self.clock)
 
@@ -109,12 +109,12 @@ class GossipSubstrate:
     def __init__(self, node_id: str = "default"):
         self.node_id = node_id
         self.vector_clock = VectorClock(node_id)
-        self.peers: Dict[str, Any] = {}  # node_id -> state_provider
-        self.peer_health: Dict[str, NodeHealth] = defaultdict(NodeHealth)
-        self.known_nodes: Set[str] = set()
+        self.peers: dict[str, Any] = {}  # node_id -> state_provider
+        self.peer_health: dict[str, NodeHealth] = defaultdict(NodeHealth)
+        self.known_nodes: set[str] = set()
         # Track version + clock
-        self.state_versions: Dict[str, Tuple[Any, Dict[str, int]]] = {}
-        self.conflicts: List[Dict[str, Any]] = []  # Log of detected conflicts
+        self.state_versions: dict[str, tuple[Any, dict[str, int]]] = {}
+        self.conflicts: list[dict[str, Any]] = []  # Log of detected conflicts
 
     def register_node(self, node_id: str, provider: Any) -> None:
         """Register a virtual peer in the substrate."""
@@ -122,7 +122,7 @@ class GossipSubstrate:
         self.known_nodes.add(node_id)
         logger.debug(f"[Gossip] Registered node: {node_id}")
 
-    def select_peers_for_gossip(self, count: int = 1) -> List[str]:
+    def select_peers_for_gossip(self, count: int = 1) -> list[str]:
         """Select healthy peers for gossip, preferring reliable nodes.
 
         Uses a weighted selection based on:
@@ -162,7 +162,7 @@ class GossipSubstrate:
 
         return selected
 
-    def gossip(self, local_node_id: str, peer_id: Optional[str] = None) -> bool:
+    def gossip(self, local_node_id: str, peer_id: str | None = None) -> bool:
         """Perform one gossip cycle with a peer.
 
         Args:
@@ -224,7 +224,7 @@ class GossipSubstrate:
         key = f"{local_id}:{peer_id}"
 
         if key in self.state_versions:
-            prev_state, prev_clock = self.state_versions[key]
+            prev_state, _prev_clock = self.state_versions[key]
             # If state changed but remote clock isn't strictly greater, we have
             # concurrent changes
             if prev_state != remote_state:
@@ -235,14 +235,14 @@ class GossipSubstrate:
                         "timestamp": time.time(),
                         "local_version": prev_state,
                         "remote_version": remote_state,
-                    }
+                    },
                 )
                 return True
 
         self.state_versions[key] = (remote_state, remote_clock)
         return False
 
-    def integrate_heartbeat(self, heartbeat_manager: Optional[HeartbeatManager] = None) -> None:
+    def integrate_heartbeat(self, heartbeat_manager: HeartbeatManager | None = None) -> None:
         """Push gossip substrate state into the heartbeat manager.
 
         LAW: Distributed truth requires continuous verification.
@@ -280,9 +280,9 @@ class GossipSubstrate:
 
     def propagate_state_via_gossip(
         self,
-        state_key: Optional[str] = None,
+        state_key: str | None = None,
         state_value: Any = None,
-        heartbeat_manager: Optional[HeartbeatManager] = None,
+        heartbeat_manager: HeartbeatManager | None = None,
     ) -> int:
         """Propagate a state update through the gossip network.
 
@@ -340,14 +340,14 @@ class GossipSubstrate:
         )
         return success_count
 
-    def get_state_version(self, state_key: str) -> Optional[Any]:
+    def get_state_version(self, state_key: str) -> Any | None:
         """Get local version of a propagated state key."""
         data = self.state_versions.get(f"state:{state_key}")
         if data:
             return data[0]  # Return state value (ignore clock)
         return None
 
-    def get_all_state_versions(self) -> Dict[str, Any]:
+    def get_all_state_versions(self) -> dict[str, Any]:
         """Get all propagated state versions."""
         result = {}
         for key, (value, clock) in self.state_versions.items():
@@ -359,9 +359,9 @@ class GossipSubstrate:
                 }
         return result
 
-    def get_health_report(self) -> Dict[str, Any]:
+    def get_health_report(self) -> dict[str, Any]:
         """Get health status of all peers."""
-        peers_report: Dict[str, Dict[str, Any]] = {}
+        peers_report: dict[str, dict[str, Any]] = {}
 
         for node_id in self.known_nodes:
             if node_id == self.node_id:
@@ -375,7 +375,7 @@ class GossipSubstrate:
                 "seconds_since_seen": time.time() - health.last_seen,
             }
 
-        report: Dict[str, Any] = {
+        report: dict[str, Any] = {
             "local_node": self.node_id,
             "vector_clock": self.vector_clock.to_dict(),
             "peers": peers_report,
@@ -387,7 +387,7 @@ class GossipSubstrate:
 
 
 # Global singleton - will be initialized with node ID
-_substrate: Optional[GossipSubstrate] = None
+_substrate: GossipSubstrate | None = None
 
 
 def get_gossip_substrate(node_id: str = "default") -> GossipSubstrate:

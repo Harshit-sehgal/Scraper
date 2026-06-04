@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
 from app.config import settings
 from app.domain_intelligence import get_domain_intelligence
@@ -128,7 +128,7 @@ async def scrape_url_with_recovery(
     selector_memory = get_selector_memory()
     get_domain_intelligence()
 
-    recovery_stats: Dict[str, Any] = {
+    recovery_stats: dict[str, Any] = {
         "url": url,
         "attempts": 0,
         "recovery_attempts": 0,
@@ -141,7 +141,7 @@ async def scrape_url_with_recovery(
 
     start_time = time.time()
     attempt = 0
-    last_error: Optional[Exception] = None
+    last_error: Exception | None = None
     attempt_ctx = AttemptContext()
     result: Any = None
 
@@ -164,15 +164,18 @@ async def scrape_url_with_recovery(
 
             if chaos.is_failure_active(FailureMode.NETWORK_TIMEOUT):
                 logger.warning("[Chaos Simulation] Injecting NETWORK_TIMEOUT")
-                raise Exception("Timed out waiting for response")
+                msg = "Timed out waiting for response"
+                raise Exception(msg)
 
             if chaos.is_failure_active(FailureMode.BROWSER_CRASH):
                 logger.warning("[Chaos Simulation] Injecting BROWSER_CRASH")
-                raise Exception("Browser target closed unexpectedly")
+                msg = "Browser target closed unexpectedly"
+                raise Exception(msg)
 
             if chaos.is_failure_active(FailureMode.ANTI_BOT_ESCALATION):
                 logger.warning("[Chaos Simulation] Injecting ANTI_BOT_ESCALATION")
-                raise Exception("403 Forbidden - WAF Challenge")
+                msg = "403 Forbidden - WAF Challenge"
+                raise Exception(msg)
 
             if chaos.is_failure_active(FailureMode.SELECTOR_POISONING):
                 logger.warning("[Chaos Simulation] Injecting SELECTOR_POISONING (zero records)")
@@ -203,7 +206,8 @@ async def scrape_url_with_recovery(
 
             if not results and attempt < max_recovery_attempts:
                 logger.warning("Scrape attempt %d returned 0 records, triggering recovery", attempt)
-                raise Exception("zero_records_extracted")
+                msg = "zero_records_extracted"
+                raise Exception(msg)
 
             recovery_stats["success"] = True
             if hasattr(result, "network_diagnostics"):

@@ -67,7 +67,7 @@ async def run_diagnostics(url: str, schema_fields: list[SchemaField], min_record
     try:
         # 1. Fetch
         f_start = time.time()
-        html, render_delay, method, retries = await fetch_page_content(url)
+        html, _render_delay, method, _retries = await fetch_page_content(url)
         report.fetch_ms = (time.time() - f_start) * 1000
         report.fetch_method = method
 
@@ -80,7 +80,12 @@ async def run_diagnostics(url: str, schema_fields: list[SchemaField], min_record
         report.memory_hit = memory.get_selectors(url) is not None
 
         ext_result = await orchestrate_extraction(
-            url, html, schema_fields, min_record_score, user_intent="", provided_selectors=None
+            url,
+            html,
+            schema_fields,
+            min_record_score,
+            user_intent="",
+            provided_selectors=None,
         )
         report.extraction_method = ext_result.method
         report.selector_success = ext_result.selector_success

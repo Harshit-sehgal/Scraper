@@ -234,7 +234,7 @@ class TestExtractionResultClassification:
                 "method": "memory",
                 "records": [],
                 "selector_success": False,
-            }
+            },
         )
         assert result.category == FailureCategory.SELECTOR_DECAY
         assert result.confidence >= 0.8
@@ -246,7 +246,7 @@ class TestExtractionResultClassification:
                 "method": "discovery",
                 "records": [],
                 "selector_success": False,
-            }
+            },
         )
         # discovery failure with no selector success should be malformed DOM
         assert result.category in (
@@ -260,7 +260,7 @@ class TestExtractionResultClassification:
                 "method": "regex",
                 "records": [],
                 "selector_success": True,  # doesn't matter for regex
-            }
+            },
         )
         assert result.category == FailureCategory.NO_RECORDS_EXTRACTED
         assert result.confidence >= 0.7
@@ -277,7 +277,7 @@ class TestExtractionResultClassification:
                 "records": records,
                 "selector_success": True,
                 "schema_fields": ["company_name", "email", "phone"],
-            }
+            },
         )
         # 2 records x 3 fields = 6 slots, only 2 company names filled = 33% < 30%
         assert result.category == FailureCategory.PARTIAL_EXTRACTION

@@ -62,8 +62,8 @@ API_JSON = json.dumps(
         "results": [
             {"carrier": "Test Airways", "fare": 299, "currency": "USD"},
             {"carrier": "Demo Airlines", "fare": 450, "currency": "USD"},
-        ]
-    }
+        ],
+    },
 )
 
 PIPELINE_JSON = json.dumps(
@@ -71,8 +71,8 @@ PIPELINE_JSON = json.dumps(
         "results": [
             {"carrier": "Pipeline Airways", "fare": 999},
             {"carrier": "Route Jet", "fare": 1200},
-        ]
-    }
+        ],
+    },
 )
 
 

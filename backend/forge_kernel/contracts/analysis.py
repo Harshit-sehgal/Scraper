@@ -4,7 +4,7 @@ Analysis contracts — canonical models for URL analysis and extraction attempts
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -17,7 +17,7 @@ class ExtractionAttempt(BaseModel):
     success: bool = False
     records_count: int = 0
     duration_ms: float = 0.0
-    failure: Optional[dict[str, Any]] = None
+    failure: dict[str, Any] | None = None
     telemetry: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -28,7 +28,7 @@ class AnalyzeUrlResponse(BaseModel):
     page_structure: str = Field("unknown", description="'list', 'detail', 'single', 'unknown'")
     structure_confidence: float = Field(0.0, ge=0.0, le=1.0)
     estimated_record_count: int = 0
-    item_container: Optional[str] = None
+    item_container: str | None = None
     suggested_fields: list[dict[str, str]] = Field(default_factory=list)
     anti_bot_score: float = Field(0.0, ge=0.0, le=1.0)
     errors: list[str] = Field(default_factory=list)

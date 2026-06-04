@@ -109,7 +109,7 @@ def find_record_arrays(payload: Any, path: str = "$", max_depth: int = 10) -> li
                 path=arr_path,
                 records=records,
                 source=source,
-            )
+            ),
         )
 
     # Check root-level array first
@@ -209,9 +209,8 @@ def _is_candidate_secret_heavy(candidate: RecordArrayCandidate) -> bool:
         return False
 
     sensitive_count = sum(1 for k in first_record.keys() if any(pat in k.lower() for pat in sensitive_patterns))
-    if len(first_record) > 0:
-        if sensitive_count >= 3 or (sensitive_count / len(first_record)) > 0.30:
-            return True
+    if len(first_record) > 0 and (sensitive_count >= 3 or (sensitive_count / len(first_record)) > 0.30):
+        return True
 
     return False
 
@@ -350,9 +349,8 @@ def map_json_records_to_schema(
     for key in first_keys:
         for field in schema:
             confidence = _key_matches_field(key, field)
-            if confidence > 0.4:
-                if key not in key_to_field or confidence > key_to_field[key][1]:
-                    key_to_field[key] = (field, confidence)
+            if confidence > 0.4 and (key not in key_to_field or confidence > key_to_field[key][1]):
+                key_to_field[key] = (field, confidence)
 
     # Map each record
     for record in records[:200]:

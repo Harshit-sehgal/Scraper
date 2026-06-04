@@ -20,7 +20,7 @@ FLIGHT_PAYLOAD = json.dumps(
             {"carrier": "SpiceJet", "fare": 3800, "depart": "08:15", "arrive": "10:00"},
         ],
         "meta": {"total": 3, "page": 1},
-    }
+    },
 )
 
 NESTED_PAYLOAD = json.dumps(
@@ -30,10 +30,10 @@ NESTED_PAYLOAD = json.dumps(
                 "flights": [
                     {"airlineName": "Delta", "price": {"total": "$500"}, "stops": 0},
                     {"airlineName": "United", "price": {"total": "$620"}, "stops": 1},
-                ]
-            }
-        }
-    }
+                ],
+            },
+        },
+    },
 )
 
 MIXED_PAYLOAD = json.dumps(
@@ -45,7 +45,7 @@ MIXED_PAYLOAD = json.dumps(
             {"name": "Product B", "price": "$20"},
             {"name": "Product C", "price": "$30"},
         ],
-    }
+    },
 )
 
 
@@ -116,7 +116,7 @@ class TestMapJsonRecords:
             SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
         ]
-        mapped, field_map = map_json_records_to_schema(records, schema)
+        mapped, _field_map = map_json_records_to_schema(records, schema)
         assert len(mapped) == 3
         assert mapped[0].get("airline") == "IndiGo"
         assert mapped[0].get("price") == 4500
@@ -263,10 +263,10 @@ class TestSourceArbitration:
                         "edges": [
                             {"node": {"carrier": "AirIndia", "fare": 3200}},
                             {"node": {"carrier": "GoAir", "fare": 2900}},
-                        ]
-                    }
-                }
-            }
+                        ],
+                    },
+                },
+            },
         )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
@@ -286,10 +286,10 @@ class TestSourceArbitration:
                         "results": [
                             {"carrier": "Delta", "fare": "$500"},
                             {"carrier": "United", "fare": "$600"},
-                        ]
-                    }
-                }
-            }
+                        ],
+                    },
+                },
+            },
         )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
@@ -306,8 +306,8 @@ class TestSourceArbitration:
                 "results": [
                     {"carrier": {"name": "Lufthansa"}, "fare": {"total": "$700"}},
                     {"carrier": {"name": "Emirates"}, "fare": {"total": "$950"}},
-                ]
-            }
+                ],
+            },
         )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
@@ -334,7 +334,7 @@ class TestSourceArbitration:
             [
                 {"carrier": "British Airways", "fare": 310, "depart": "11:00"},
                 {"carrier": "Lufthansa", "fare": 420, "depart": "15:30"},
-            ]
+            ],
         )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
@@ -352,7 +352,7 @@ class TestSourceArbitration:
                 "status": "success",
                 "metadata": {"user_id": 123},
                 "tags": ["tag1", "tag2", "tag3"],  # Primitive array, ignored
-            }
+            },
         )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
@@ -370,7 +370,7 @@ class TestSourceArbitration:
                     {"carrier": "IndiGo", "fare": 4500},
                     {"carrier": "Vistara", "fare": 6100},
                 ],
-            }
+            },
         )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
@@ -387,8 +387,8 @@ class TestSourceArbitration:
                 "tokens": [
                     {"session_id": "sess_1", "cookie": "abc", "token": "t1"},
                     {"session_id": "sess_2", "cookie": "def", "token": "t2"},
-                ]
-            }
+                ],
+            },
         )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
@@ -403,9 +403,9 @@ class TestSourceArbitration:
                     "flights": [
                         {"airlineName": "Qatar", "fareCost": 900},
                         {"airlineName": "Emirates", "fareCost": 950},
-                    ]
-                }
-            }
+                    ],
+                },
+            },
         )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
@@ -457,7 +457,7 @@ class TestSourceArbitration:
                     {"carrier": "Lufthansa", "fare": 400},
                     {"carrier": "KLM", "fare": 450},
                 ],
-            }
+            },
         )
         schema = [
             SchemaField(name="airline", field_type=FieldType.STRING, required=False, description=""),
@@ -480,8 +480,8 @@ class TestSourceArbitration:
                 "results": [
                     {"carrier": "Delta", "price": {"total": "$500"}},
                     {"carrier": "United", "price": {"total": "$600"}},
-                ]
-            }
+                ],
+            },
         )
         schema = [
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),

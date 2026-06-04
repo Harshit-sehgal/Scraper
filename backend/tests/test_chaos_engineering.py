@@ -79,7 +79,9 @@ async def test_network_timeout_recovery() -> None:
         ]
 
         results, stats = await scrape_url_with_recovery(
-            url="https://antigravity-solutions.com/contact", schema_fields=schema, max_recovery_attempts=3
+            url="https://antigravity-solutions.com/contact",
+            schema_fields=schema,
+            max_recovery_attempts=3,
         )
 
         # Verify success and recovery stats
@@ -130,7 +132,9 @@ async def test_browser_crash_recovery() -> None:
         schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=True)]
 
         results, stats = await scrape_url_with_recovery(
-            url="https://crashed-site.com", schema_fields=schema, max_recovery_attempts=3
+            url="https://crashed-site.com",
+            schema_fields=schema,
+            max_recovery_attempts=3,
         )
 
         assert stats["success"] is True
@@ -235,7 +239,9 @@ async def test_anti_bot_proxy_rotation() -> None:
         schema = [SchemaField(name="insight", field_type=FieldType.STRING, description="", required=True)]
 
         results, stats = await scrape_url_with_recovery(
-            url="https://bot-guarded.com/login", schema_fields=schema, max_recovery_attempts=3
+            url="https://bot-guarded.com/login",
+            schema_fields=schema,
+            max_recovery_attempts=3,
         )
 
         assert stats["success"] is True
@@ -278,8 +284,10 @@ async def test_concurrency_reduction_under_resource_exhaustion() -> None:
         schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=True)]
 
         # We need max_recovery_attempts=3 to trigger escalation to REDUCE_CONCURRENCY on attempt 2
-        results, stats = await scrape_url_with_recovery(
-            url="https://resource-exhausted-target.org", schema_fields=schema, max_recovery_attempts=3
+        _results, stats = await scrape_url_with_recovery(
+            url="https://resource-exhausted-target.org",
+            schema_fields=schema,
+            max_recovery_attempts=3,
         )
 
         assert stats["success"] is True

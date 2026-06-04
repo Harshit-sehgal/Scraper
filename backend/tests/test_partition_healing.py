@@ -60,7 +60,7 @@ def test_causal_stitching(partitioned_nodes) -> None:
 
 def test_divergence_analyzer(partitioned_nodes) -> None:
     """Verify that causal divergence is correctly quantified."""
-    ws_a, ws_b = partitioned_nodes
+    ws_a, _ws_b = partitioned_nodes
 
     # Simulate skew
     clock_a = {"node_a": 100, "node_b": 5}

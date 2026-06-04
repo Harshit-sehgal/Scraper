@@ -60,7 +60,7 @@ async def body_size_middleware(request: Request, call_next):
 
 async def api_key_middleware(request: Request, call_next):
     if (settings.API_KEY or settings.ADMIN_API_KEY or getattr(settings, "OPERATOR_API_KEY", "")) and request.url.path.startswith(
-        "/api/"
+        "/api/",
     ):
         if request.method == "OPTIONS" and request.headers.get("Origin") and request.headers.get("Access-Control-Request-Method"):
             return await call_next(request)

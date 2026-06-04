@@ -192,7 +192,7 @@ def _refine_container_score(
             container.has_location,
             container.has_organization,
             container.has_contact,
-        ]
+        ],
     )
     # More patterns = more likely a data container
     score += min(pattern_count * (WEIGHT_PATTERNS / 3), WEIGHT_PATTERNS)
@@ -562,14 +562,14 @@ def _collect_all_pattern_matches(
     date_patterns = [
         re.compile(r"\d{4}-\d{2}-\d{2}"),
         re.compile(r"\d{1,2}/\d{1,2}/\d{2,4}"),
-        re.compile(r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}", re.I),
+        re.compile(r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}", re.IGNORECASE),
     ]
     for dp in date_patterns:
         for m in dp.finditer(full_text):
             matches["date"].append((m.group(0), m.start(), m.end()))
 
     # ── Time ──────────────────────────────────────────────────
-    time_pattern = re.compile(r"\d{1,2}:\d{2}\s*(?:am|pm)?", re.I)
+    time_pattern = re.compile(r"\d{1,2}:\d{2}\s*(?:am|pm)?", re.IGNORECASE)
     for m in time_pattern.finditer(full_text):
         matches["time"].append((m.group(0), m.start(), m.end()))
 
@@ -667,7 +667,7 @@ def _extract_field_value_stateful(
                 if not _is_span_used(start, end):
                     matches.pop(i)
                     used_spans.append((start, end))
-                    return val
+                    return val  # type: ignore[no-any-return]
         else:
             # Try from start to find an unused span
             for i in range(len(matches)):
@@ -675,7 +675,7 @@ def _extract_field_value_stateful(
                 if not _is_span_used(start, end):
                     matches.pop(i)
                     used_spans.append((start, end))
-                    return val
+                    return val  # type: ignore[no-any-return]
         return None
 
     def _is_span_used(start: int, end: int) -> bool:
@@ -716,7 +716,7 @@ def _extract_field_value_stateful(
         if result:
             return result
         # Fallback: named price pattern
-        alt_pattern = re.compile(r"(?:price|total|fare|cost)\s*:?\s*[\$\€\£\¥\₹]?\s*(\d+[\d,.]*)", re.I)
+        alt_pattern = re.compile(r"(?:price|total|fare|cost)\s*:?\s*[\$\€\£\¥\₹]?\s*(\d+[\d,.]*)", re.IGNORECASE)
         m = alt_pattern.search(full_text)
         if m and not _is_span_used(m.start(), m.end()):
             used_spans.append((m.start(), m.end()))
@@ -769,10 +769,9 @@ def _extract_field_value_stateful(
             if i in used_snippet_indices:
                 continue
             s_lower = snippet.lower()
-            if any(w in s_lower for w in label_words):
-                if len(snippet) >= 3 and len(snippet) <= 200:
-                    used_snippet_indices.add(i)
-                    return snippet.strip()
+            if any(w in s_lower for w in label_words) and len(snippet) >= 3 and len(snippet) <= 200:
+                used_snippet_indices.add(i)
+                return snippet.strip()
 
         # Fallback: best remaining snippet
         best = _consume_snippet()

@@ -5,7 +5,7 @@ Telemetry State Adapter — isolated state management for runtime performance me
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.scrape_telemetry import get_scrape_telemetry
 
@@ -17,7 +17,7 @@ class TelemetryStateAdapter:
 
     def __init__(self) -> None:
         self._telemetry = get_scrape_telemetry()
-        self._domain_stabilization_times: Dict[str, List[float]] = {}
+        self._domain_stabilization_times: dict[str, list[float]] = {}
 
     def record_scrape(self, url: str, **kwargs: Any) -> None:
         """Record scrape event statistics and telemetry parameters."""
@@ -39,15 +39,15 @@ class TelemetryStateAdapter:
         # Bound between 500ms and 5000ms to avoid infinite delay or flash exits
         return max(500.0, min(5000.0, sum(times) / len(times)))
 
-    def get_recent_snapshots(self, count: int = 20) -> List[Dict[str, Any]]:
+    def get_recent_snapshots(self, count: int = 20) -> list[dict[str, Any]]:
         """Retrieve recent scrape telemetry snapshots."""
         return self._telemetry.get_recent(count)
 
-    def get_confidence_histogram(self, count: int = 100) -> Dict[str, int]:
+    def get_confidence_histogram(self, count: int = 100) -> dict[str, int]:
         """Fetch the extraction confidence histogram."""
         return self._telemetry.get_confidence_histogram(count)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Aggregate high-level scraping runtime statistics."""
         recent = self._telemetry.get_recent(100)
         if not recent:
@@ -77,7 +77,7 @@ class TelemetryStateAdapter:
         self._telemetry.clear()
 
 
-_telemetry_state: Optional[TelemetryStateAdapter] = None
+_telemetry_state: TelemetryStateAdapter | None = None
 
 
 def get_telemetry_state() -> TelemetryStateAdapter:

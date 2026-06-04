@@ -108,7 +108,7 @@ def build_matrix() -> list[RouteAuthRow]:
                     access=access,
                     enforcement=enforcement,
                     notes=notes,
-                )
+                ),
             )
     return sorted(rows, key=lambda row: (row.path, row.method))
 

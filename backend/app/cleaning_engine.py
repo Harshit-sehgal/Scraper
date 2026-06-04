@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 from app.config import settings
 from app.data_utils import _prepare_records_for_ai, normalize_scraped_record
@@ -24,14 +24,14 @@ from app.utils.quality import score_record_quality
 logger = logging.getLogger(__name__)
 
 
-def _extract_list_from_json(data: Any) -> Optional[List[dict]]:
+def _extract_list_from_json(data: Any) -> list[dict] | None:
     """Helper to extract a list of records from various JSON response shapes."""
     if isinstance(data, list):
         return data
     if isinstance(data, dict):
         for key in ["records", "items", "data", "results"]:
             if key in data and isinstance(data[key], list):
-                return data[key]
+                return data[key]  # type: ignore[no-any-return]
     return None
 
 
@@ -39,7 +39,7 @@ async def ai_clean_and_align_records(
     records: list[dict],
     schema_fields: list[SchemaField],
     min_record_score: float | None = None,
-) -> Tuple[list[dict], dict]:
+) -> tuple[list[dict], dict]:
     """Use AI to clean, structure and align records to the schema."""
     if min_record_score is None:
         min_record_score = settings.DEFAULT_MIN_RECORD_SCORE

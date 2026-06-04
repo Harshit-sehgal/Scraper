@@ -6,7 +6,7 @@ Defines the signals that propagate through the cognition architecture.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict
+from typing import Any
 
 
 class SemanticEventType(Enum):
@@ -24,7 +24,7 @@ class SemanticEvent:
 
     event_type: SemanticEventType
     source: str
-    payload: Dict[str, Any] = field(default_factory=dict)
+    payload: dict[str, Any] = field(default_factory=dict)
     instability_delta: float = 0.0  # How much this event destabilizes the graph
     # To be filled by dispatcher
     timestamp: float = field(default_factory=lambda: 0.0)

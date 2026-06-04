@@ -122,11 +122,11 @@ if TYPE_CHECKING:
 # services / job_runner.py)
 
 __all__ = [
-    "scrape_url",
-    "scrape_url_attempt",
     "ScrapeAttemptResult",
     "ai_clean_and_align_records",
     "generate_data_insight",
+    "scrape_url",
+    "scrape_url_attempt",
     "suggest_schema_from_intent",
     "suggest_schema_from_intent_sync",
 ]
@@ -451,7 +451,11 @@ async def scrape_url(
 
         # Record failure in strategy engine
         strategy_engine.record_fetch_attempt(
-            intel.domain, recommended_strategy, success=False, time_ms=fetch_ms, failure_reason=type(e).__name__
+            intel.domain,
+            recommended_strategy,
+            success=False,
+            time_ms=fetch_ms,
+            failure_reason=type(e).__name__,
         )
 
         provenance_builder.add_error(f"Fetch failed: {e}")
@@ -626,7 +630,9 @@ async def scrape_url(
 
         feedback_engine = MotifFeedbackEngine()
         new_motifs = feedback_engine.extract_motifs_from_results(
-            results, schema_fields, min_cooccurrence=settings.MOTIF_MIN_COOCCURRENCE
+            results,
+            schema_fields,
+            min_cooccurrence=settings.MOTIF_MIN_COOCCURRENCE,
         )
         if new_motifs:
             # Merge new motifs with existing solidified motifs (dedup, keep
@@ -752,7 +758,7 @@ async def scrape_url(
                 zero_classification.confidence,
             )
             provenance_builder.add_error(
-                f"Zero-result: {zero_classification.failure_class} ({zero_classification.recommended_action})"
+                f"Zero-result: {zero_classification.failure_class} ({zero_classification.recommended_action})",
             )
 
         # Capture regression candidates for future benchmark expansion

@@ -10,7 +10,6 @@ of the semantic substrate.
 
 import random
 import time
-from typing import Dict, List
 
 import pytest
 from app.semantic_ir import SemanticToken, SemanticType, Span
@@ -21,10 +20,10 @@ class DynamicalAnalyzer:
     """Utility to detect emergent risks in long-horizon simulations."""
 
     def __init__(self):
-        self.energies: List[float] = []
-        self.entropies: List[float] = []
-        self.manifold_checksums: List[str] = []
-        self.role_stabilities: Dict[str, List[float]] = {}
+        self.energies: list[float] = []
+        self.entropies: list[float] = []
+        self.manifold_checksums: list[str] = []
+        self.role_stabilities: dict[str, list[float]] = {}
 
     def record(self, ws: SemanticWorldState):
         self.energies.append(ws.metrics.global_energy)

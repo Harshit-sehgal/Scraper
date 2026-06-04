@@ -16,9 +16,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 from app.failure_classification import FailureCategory, FailureClassification
 
@@ -335,7 +336,7 @@ class RecoveryStrategist:
         self,
         failure_classification: FailureClassification,
         attempt_number: int = 1,
-        domain_info: Optional[dict] = None,
+        domain_info: dict | None = None,
     ) -> RecoveryPlan:
         """Generate a recovery plan for a classified failure.
 
@@ -409,9 +410,8 @@ class RecoveryStrategist:
                 tuned["slow_factor"] = tuned["slow_factor"] * 0.7
 
         # If domain has high failure rate, be more aggressive
-        if fail_rate > 0.5:
-            if "delay_ms" in tuned:
-                tuned["delay_ms"] = int(tuned["delay_ms"] * 0.8)
+        if fail_rate > 0.5 and "delay_ms" in tuned:
+            tuned["delay_ms"] = int(tuned["delay_ms"] * 0.8)
 
         return tuned
 

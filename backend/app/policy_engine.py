@@ -6,7 +6,7 @@ No action may be triggered if it violates system thermodynamic stability.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from weakref import WeakKeyDictionary
 
 
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 class SubstratePolicy:
     """Governs when and how automated actions and structural changes occur."""
 
-    def __init__(self, ws: Optional[SemanticWorldState] = None):
+    def __init__(self, ws: SemanticWorldState | None = None):
         self.ws: SemanticWorldState = ws or get_world_state()
         # Phase 68: Operational Guardrails
         self.max_community_density = 15  # Max roles per cluster
@@ -45,7 +45,7 @@ class SubstratePolicy:
                         "id": f"C-{i}",
                         "severity": "moderate",
                         "details": f"Density {len(c)} exceeds quota {self.max_community_density}",
-                    }
+                    },
                 )
 
         # 2. Thermodynamic Guardrails
@@ -56,7 +56,7 @@ class SubstratePolicy:
                     "policy": "thermodynamic_guardrail",
                     "severity": "critical",
                     "details": f"Field pressure {pressure:.3f} exceeds stability threshold",
-                }
+                },
             )
 
         # 3. Attractor Plasticity — capture snapshot for governance reads
@@ -69,7 +69,7 @@ class SubstratePolicy:
                     "policy": "plasticity_law",
                     "severity": "high",
                     "details": f"Attractor diversity {diversity:.3f} below plasticity floor",
-                }
+                },
             )
 
         return {"valid": len([i for i in issues if i["severity"] == "critical"]) == 0, "issues": issues}
@@ -92,9 +92,8 @@ class SubstratePolicy:
         """Check if an action is allowed under current field pressure."""
         # ─── Self-Optimization Override (Phase 44) ───
         # Native tools that reduce entropy are allowed up to higher pressure
-        if action_id in ["role_merger", "manifold_compressor"]:
-            if pressure < 1.8:
-                return True
+        if action_id in ["role_merger", "manifold_compressor"] and pressure < 1.8:
+            return True
 
         # Policy 1: Thermodynamics
         # If pressure is extremely high (> 1.5), restrict non-critical actions
@@ -115,7 +114,7 @@ class SubstratePolicy:
 _policy_instances: WeakKeyDictionary | None = None
 
 
-def get_policy_engine(ws: Optional[SemanticWorldState] = None) -> SubstratePolicy:
+def get_policy_engine(ws: SemanticWorldState | None = None) -> SubstratePolicy:
     target_ws = ws or get_world_state()
     global _policy_instances
     if _policy_instances is None:
@@ -123,4 +122,4 @@ def get_policy_engine(ws: Optional[SemanticWorldState] = None) -> SubstratePolic
     instances = _policy_instances
     if target_ws not in instances:
         instances[target_ws] = SubstratePolicy(ws=target_ws)
-    return instances[target_ws]
+    return instances[target_ws]  # type: ignore[no-any-return]

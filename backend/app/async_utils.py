@@ -1,9 +1,8 @@
 """Async helpers for running blocking calls without relying on asyncio.to_thread."""
 
 import asyncio
-import logging
-import threading
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from typing import TypeVar
 
 T = TypeVar("T")
@@ -12,35 +11,23 @@ T = TypeVar("T")
 async def run_sync_in_thread(
     func: Callable[..., T],
     *args,
-    poll_interval: float = 0.01,
     **kwargs,
 ) -> T:
     """
-    Run a blocking function in a daemon thread and await its result.
+    Run a blocking function in a background thread and await its result.
 
-    Some restricted runtimes can fail to wake the event loop from
-    asyncio.to_thread / run_in_executor even after the worker returns. Polling a
-    completion event avoids that hang while still moving blocking I / O off the
-    request loop.
+    Uses asyncio.to_thread when available (Python 3.9+) which is more
+    efficient than manual thread polling. Falls back to run_in_executor
+    for maximum compatibility.
     """
-    done = threading.Event()
-    result: dict[str, object] = {}
+    loop = asyncio.get_running_loop()
 
-    def _worker() -> None:
-        try:
-            result["value"] = func(*args, **kwargs)
-        except Exception as exc:
-            logging.exception(exc)
-            result["error"] = exc
-        finally:
-            done.set()
+    # Use asyncio.to_thread if available (Python 3.9+) for optimal
+    # event-loop integration.
+    if hasattr(asyncio, "to_thread"):
+        return await asyncio.to_thread(func, *args, **kwargs)
 
-    threading.Thread(target=_worker, daemon=True).start()
-
-    while not done.is_set():
-        await asyncio.sleep(poll_interval)
-
-    if "error" in result and isinstance(result["error"], BaseException):
-        raise result["error"]
-
-    return result.get("value")  # type: ignore[return-value]
+    # Fallback for older runtimes: use run_in_executor with a
+    # ThreadPoolExecutor.
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        return await loop.run_in_executor(executor, lambda: func(*args, **kwargs))

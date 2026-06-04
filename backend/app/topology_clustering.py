@@ -6,7 +6,7 @@ management and topological pattern discovery.
 Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
 """
 
-from typing import TYPE_CHECKING, Dict, List, Set
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.topology_state import TopologyState
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def detect_communities(state: "TopologyState") -> None:
     """Flood-fill communities from cohesion + field regions."""
-    graph: Dict[str, Set[str]] = {}
+    graph: dict[str, set[str]] = {}
     cohesion = state._get_struct("neighborhood_cohesion")
     for (ra, rb), val in cohesion.items():
         if val > 0.5:
@@ -56,7 +56,7 @@ def detect_communities(state: "TopologyState") -> None:
     state._set_struct("communities", communities)
 
 
-def shard_topology_regions(state: "TopologyState") -> Dict[str, List[str]]:
+def shard_topology_regions(state: "TopologyState") -> dict[str, list[str]]:
     """Assign every region to a shard based on community membership (Phase 53).
 
     Returns a dict mapping shard_id -> list of region_ids.
@@ -68,7 +68,7 @@ def shard_topology_regions(state: "TopologyState") -> Dict[str, List[str]]:
         for role in community:
             role_to_shard[role] = shard_id
 
-    shard_assignment: Dict[str, List[str]] = {}
+    shard_assignment: dict[str, list[str]] = {}
     for r in state._get_regions():
         primary_role = r.competing_roles[0] if r.competing_roles else "_unidentified"
         shard_id = role_to_shard.get(primary_role, "shard_default")
@@ -113,7 +113,7 @@ def set_topological_law(state: "TopologyState", pair: tuple, value: float) -> No
     state._record("set_topological_law", {"pair": pair, "value": value})
 
 
-def add_impossible_neighborhood(state: "TopologyState", item: Set[str]) -> None:
+def add_impossible_neighborhood(state: "TopologyState", item: set[str]) -> None:
     """Add an impossible neighborhood set."""
     struct = state._get_struct("impossible_neighborhoods")
     struct.append(set(item))

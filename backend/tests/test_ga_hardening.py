@@ -143,7 +143,7 @@ def test_diagnostics_exporter_endpoint(client, monkeypatch) -> None:
         status=JobStatus.COMPLETED,
         urls=["https://example.com"],
         results=[
-            {"email": "harshit.sehgal@gmail.com", "phone": "+91 98765 43210", "auth_header": "Bearer secret_jwt_token_12345"}
+            {"email": "harshit.sehgal@gmail.com", "phone": "+91 98765 43210", "auth_header": "Bearer secret_jwt_token_12345"},
         ],
     )
     main_mod.jobs_store[pii_job_id] = job
@@ -157,7 +157,7 @@ def test_diagnostics_exporter_endpoint(client, monkeypatch) -> None:
                 "failure_count": 1,
                 "first_seen": 1780000000.0,
                 "last_success": 1780000005.0,
-            }
+            },
         }
 
         def _compute_confidence(self, entry):
@@ -175,7 +175,11 @@ def test_diagnostics_exporter_endpoint(client, monkeypatch) -> None:
     # Setup world state/observability telemetry mock
     class FakeObservability:
         telemetry = [
-            {"type": "scrape", "timestamp": 1780000000.0, "details": {"url": "https://example.com/user/harshit.sehgal@gmail.com"}}
+            {
+                "type": "scrape",
+                "timestamp": 1780000000.0,
+                "details": {"url": "https://example.com/user/harshit.sehgal@gmail.com"},
+            },
         ]
 
     class FakeWorldState:

@@ -412,7 +412,7 @@ def test_run_job_source_breakdown_counts_final_records(monkeypatch) -> None:
                 "url": "https://directory.example/list",
                 "source_type": "directory",
                 "source_trust_score": 0.62,
-            }
+            },
         ]
 
     async def fake_scrape_url(url, schema_fields, **kwargs):
@@ -456,7 +456,8 @@ def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch) -> None:
 
     async def fake_scrape_url(url, schema_fields, **kwargs):
         if "bad.example" in url:
-            raise RuntimeError("synthetic scrape failure")
+            msg = "synthetic scrape failure"
+            raise RuntimeError(msg)
         return [{"company_name": "Working Source", "record_score": 0.9}], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
     async def fake_generate_data_insight(rows):

@@ -17,7 +17,7 @@ Role-type compatibility is derived geometrically from the Role Manifold.
 
 import random
 from copy import deepcopy
-from typing import List, Protocol, Set, Tuple
+from typing import Protocol
 
 from app.field_laws import ROLE_EXCLUSIVITY
 from app.semantic_ir import (
@@ -226,7 +226,7 @@ def warm_start_from_values(records: list, schema_fields: list):
             ws.blend_manifold_vector(f_name, target_vec, alpha=0.7, beta=0.3)
 
 
-def build_allocation_graph(record: SemanticRecord, schema_roles: List[str], abstraction_gradient: float = 0.0) -> AllocationGraph:
+def build_allocation_graph(record: SemanticRecord, schema_roles: list[str], abstraction_gradient: float = 0.0) -> AllocationGraph:
     """Build an allocation graph from a record and desired schema roles with Hierarchical Synthesis (Phase 38)."""
     graph = AllocationGraph()
     from app.semantic_world_state import get_world_state
@@ -456,13 +456,13 @@ def _compute_compatibility(token: SemanticToken, role_name: str, role: SemanticR
         primary_conf = dist.get(token.primary_type, 0.5)
         learned_compat *= primary_conf
 
-    return max(0.0, min(1.0, learned_compat))
+    return max(0.0, min(1.0, learned_compat))  # type: ignore[no-any-return]
 
 
 def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
     """Optimize semantic role assignment globally."""
-    assigned_candidates: Set[str] = set()
-    filled_roles: Set[str] = set()
+    assigned_candidates: set[str] = set()
+    filled_roles: set[str] = set()
     field_conflicts: list = []
 
     assignments = sorted(
@@ -474,7 +474,7 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
 
     ws = get_world_state()
     topo_view = ws.get_topology_view()
-    field_owned_roles: Set[str] = set()
+    field_owned_roles: set[str] = set()
     for region in topo_view.all_regions():
         if region.instability > 0.3:
             for role in region.competing_roles:
@@ -494,7 +494,7 @@ def optimize_semantic_assignment(graph: AllocationGraph) -> AllocationGraph:
                         break
                 if already_assigned_to_peer:
                     field_conflicts.append(
-                        {"role": role_name, "candidate": cand_key, "reason": "exclusivity:self", "score": score}
+                        {"role": role_name, "candidate": cand_key, "reason": "exclusivity:self", "score": score},
                     )
                     continue
 
@@ -552,10 +552,10 @@ def _compute_allocation_coherence(graph: AllocationGraph) -> float:
 
 def allocate_semantic_roles(
     record: SemanticRecord,
-    schema_fields: List[str],
+    schema_fields: list[str],
     learn: bool = True,
     abstraction_gradient: float = 0.0,
-) -> Tuple[SemanticRecord, AllocationGraph]:
+) -> tuple[SemanticRecord, AllocationGraph]:
     """Full semantic allocation for a record with Hierarchical support."""
     graph = build_allocation_graph(record, schema_fields, abstraction_gradient=abstraction_gradient)
     graph = optimize_semantic_assignment(graph)

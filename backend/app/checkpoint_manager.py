@@ -2,7 +2,6 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import List, Optional
 
 
 def get_world_state():
@@ -47,20 +46,20 @@ class CheckpointManager:
             logging.getLogger(__name__).error(f"Failed to load checkpoint: {e}")
             raise
 
-    def list_checkpoints(self) -> List[dict]:
+    def list_checkpoints(self) -> list[dict]:
         """List all available checkpoints."""
         checkpoints = []
         for f in self.base_dir.glob("checkpoint_*.json"):
             checkpoints.append({"filename": f.name, "path": str(f), "mtime": f.stat().st_mtime})
         return sorted(checkpoints, key=lambda x: x["mtime"], reverse=True)
 
-    def get_latest_checkpoint(self) -> Optional[str]:
+    def get_latest_checkpoint(self) -> str | None:
         """Return the path to the most recent checkpoint."""
         list_cp = self.list_checkpoints()
         return list_cp[0]["path"] if list_cp else None
 
 
-_manager: Optional[CheckpointManager] = None
+_manager: CheckpointManager | None = None
 
 
 def get_checkpoint_manager() -> CheckpointManager:

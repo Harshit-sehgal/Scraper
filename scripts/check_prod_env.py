@@ -139,12 +139,11 @@ def check_var(
             print(f"  [INFO]  {name} is not set (optional).")
             return True
 
-    if validator:
-        if not validator(value):
-            print(f"  [FAIL]  {name} = {_mask_value(name, value)!r} failed validation.")
-            if hint:
-                print(f"          Hint: {hint}")
-            return False
+    if validator and not validator(value):
+        print(f"  [FAIL]  {name} = {_mask_value(name, value)!r} failed validation.")
+        if hint:
+            print(f"          Hint: {hint}")
+        return False
 
     print(f"  [OK]    {name} = {_mask_value(name, value)}")
     return True
@@ -196,7 +195,7 @@ def check_cors_origins(value: str) -> bool:
 
     if "*" in origins:
         print(
-            "  [FAIL]  DATAFORGE_CORS_ORIGINS contains wildcard '*'. In production, CORS must be locked down to trusted domains."
+            "  [FAIL]  DATAFORGE_CORS_ORIGINS contains wildcard '*'. In production, CORS must be locked down to trusted domains.",
         )
         return False
 
@@ -238,7 +237,7 @@ def check_grafana_password(value: str) -> bool:
         print(
             f"  [FAIL]  GRAFANA_PASSWORD={_mask_value('GRAFANA_PASSWORD', value)} "
             "is a known default/placeholder value. "
-            "Set a strong, unique Grafana admin password."
+            "Set a strong, unique Grafana admin password.",
         )
         return False
     if len(value) < 8:
@@ -304,7 +303,7 @@ def _check_api_key_not_default(name: str, value: str) -> bool:
         print(
             f"  [FAIL]  {name}={_mask_value(name, value)} "
             "is a known default/placeholder value. "
-            'Generate a strong random key with: python3 -c "import secrets; print(secrets.token_hex(32))"'
+            'Generate a strong random key with: python3 -c "import secrets; print(secrets.token_hex(32))"',
         )
         return False
     if len(value) < 16:
@@ -330,7 +329,7 @@ def check_distinct_api_keys(env: dict[str, str]) -> bool:
         if previous:
             print(
                 f"  [FAIL]  {name} reuses the same secret as {previous}. "
-                "Production user, operator, and admin API keys must be distinct."
+                "Production user, operator, and admin API keys must be distinct.",
             )
             ok = False
         else:

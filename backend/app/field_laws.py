@@ -7,8 +7,6 @@ auditable and to prevent accidental modification during refactors.
 This is the foundational constants layer — zero upward dependencies.
 """
 
-from typing import List, Tuple
-
 # Propagation radius: basins propagate only to direct neighbors
 PROPAGATION_DECAY_FLOOR = 0.3
 
@@ -35,7 +33,7 @@ FREE_ENERGY_CLAMP = 2.0
 # Exclusivity constraints (bootstrap seeds, others learned dynamically)
 # Moved here from semantic_allocation_engine.py to prevent upward dependency
 # from core_types.py (the foundational type layer) to the allocation engine.
-ROLE_EXCLUSIVITY: List[Tuple[str, str]] = [
+ROLE_EXCLUSIVITY: list[tuple[str, str]] = [
     # Domain-agnostic role pairs (not transportation-specific)
     ("start", "end"),
     ("price", "cost"),
@@ -44,7 +42,7 @@ ROLE_EXCLUSIVITY: List[Tuple[str, str]] = [
 ]
 
 # Semantic needs that must not align to the same schema slot
-SEMANTIC_NEED_EXCLUSIVITY: List[Tuple[str, str]] = [
+SEMANTIC_NEED_EXCLUSIVITY: list[tuple[str, str]] = [
     ("status", "date"),
     ("seller", "location"),
 ]

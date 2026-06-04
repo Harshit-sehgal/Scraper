@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 from forge_kernel.config import settings
 
@@ -33,7 +32,7 @@ class FetchResult:
     strategy: FetchStrategy = FetchStrategy.HTTP
     headers: dict[str, str] = field(default_factory=dict)
     duration_ms: float = 0.0
-    error: Optional[str] = None
+    error: str | None = None
     anti_bot_score: float = 0.0
 
 

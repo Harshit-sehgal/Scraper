@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 from app.models import FieldType
 
@@ -104,11 +103,11 @@ class SemanticToken:
 
     # Semantic Embedding: 16-dimensional manifold point.
     # Replaces individual type_facet fields for unified geometric meaning.
-    embedding: List[float] = field(default_factory=lambda: [0.5] * 16)
+    embedding: list[float] = field(default_factory=lambda: [0.5] * 16)
 
     # Classification: primary type + ambiguity distribution
     primary_type: SemanticType = SemanticType.TEXT
-    type_distribution: Dict[SemanticType, float] = field(default_factory=dict)
+    type_distribution: dict[SemanticType, float] = field(default_factory=dict)
 
     # Provenance
     extraction_method: str = ""  # "pattern", "split", "whitespace", "dom"
@@ -116,19 +115,19 @@ class SemanticToken:
     source_field: str = ""  # which record field this came from
 
     # Evidence and traceability
-    evidence: List[str] = field(default_factory=list)
-    signals: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
+    signals: list[str] = field(default_factory=list)
 
     # Neighbors (populated by relationship_inference)
-    left_neighbor: Optional["SemanticToken"] = None
-    right_neighbor: Optional["SemanticToken"] = None
-    neighborhood: List["SemanticToken"] = field(default_factory=list)
+    left_neighbor: "SemanticToken" | None = None
+    right_neighbor: "SemanticToken" | None = None
+    neighborhood: list["SemanticToken"] = field(default_factory=list)
 
     # DOM context
     dom_path: str = ""
     dom_depth: int = 0
     tag_name: str = ""
-    css_classes: List[str] = field(default_factory=list)
+    css_classes: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -140,19 +139,19 @@ class RelationshipEdge:
     # "adjacent", "paired_codes", "date_range", "price_modifier", "same_group"
     relationship_type: str
     confidence: float
-    evidence: List[str] = field(default_factory=list)
-    signals: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
+    signals: list[str] = field(default_factory=list)
 
 
 @dataclass
 class SemanticGroup:
     """A group of tokens that form a coherent semantic unit."""
 
-    tokens: List[SemanticToken]
+    tokens: list[SemanticToken]
     cohesion_score: float = 0.0
-    primary_type: Optional[SemanticType] = None
-    relationships: List[RelationshipEdge] = field(default_factory=list)
-    structural_signature: Tuple[str, ...] = field(default_factory=tuple)
+    primary_type: SemanticType | None = None
+    relationships: list[RelationshipEdge] = field(default_factory=list)
+    structural_signature: tuple[str, ...] = field(default_factory=tuple)
     dom_region: str = ""
 
 
@@ -160,10 +159,10 @@ class SemanticGroup:
 class SemanticRecord:
     """Complete semantic representation of one extracted record."""
 
-    tokens: List[SemanticToken]
+    tokens: list[SemanticToken]
     groups: list[SemanticRegion] = field(default_factory=list)
-    relationships: List[RelationshipEdge] = field(default_factory=list)
-    structural_signature: Tuple[str, ...] = field(default_factory=tuple)
+    relationships: list[RelationshipEdge] = field(default_factory=list)
+    structural_signature: tuple[str, ...] = field(default_factory=tuple)
 
     # Confidence at multiple levels
     token_confidence: float = 0.0
@@ -174,8 +173,8 @@ class SemanticRecord:
     # Noise classification
     is_noise: bool = False
     noise_confidence: float = 0.0
-    noise_evidence: List[str] = field(default_factory=list)
-    evidence: List[str] = field(default_factory=list)
+    noise_evidence: list[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
 
     # Original data context
     source_text: str = ""
@@ -185,8 +184,8 @@ class SemanticRecord:
     row_index: int = -1
 
     # Mapped output (populated by semantic_mapper)
-    mapped_fields: Dict[str, str] = field(default_factory=dict)
-    mapped_confidences: Dict[str, float] = field(default_factory=dict)
+    mapped_fields: dict[str, str] = field(default_factory=dict)
+    mapped_confidences: dict[str, float] = field(default_factory=dict)
     is_unstable: bool = False  # Thermodynamic reasoning flag (Phase 18)
 
     # Record type classification
@@ -204,7 +203,7 @@ class SemanticRegion:
 
     region_id: int
     region_type: RegionType
-    tokens: List[SemanticToken]
+    tokens: list[SemanticToken]
     start_position: int
     end_position: int
 
@@ -212,18 +211,18 @@ class SemanticRegion:
     confidence: float = 0.0
 
     # Relationships to other regions
-    relationships: List["RelationshipEdge"] = field(default_factory=list)
+    relationships: list["RelationshipEdge"] = field(default_factory=list)
 
     # Ownership
-    owned_by: Optional[int] = None  # region_id of owner
-    owns: List[int] = field(default_factory=list)  # region_ids of owned
+    owned_by: int | None = None  # region_id of owner
+    owns: list[int] = field(default_factory=list)  # region_ids of owned
     ownership_confidence: float = 0.0
 
     # Structural
-    structural_signature: Tuple[str, ...] = field(default_factory=tuple)
+    structural_signature: tuple[str, ...] = field(default_factory=tuple)
 
     # Evidence
-    evidence: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -234,7 +233,7 @@ class AffinityEdge:
     target_id: int
     strength: float = 0.5
     confidence: float = 0.5
-    evidence: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -248,7 +247,7 @@ class OwnershipEdge:
     owned_region_id: int
     ownership_type: str  # "belongs_to", "describes", "modifies", "quantifies", "identifies"
     confidence: float
-    evidence: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -262,15 +261,15 @@ class ExclusionEdge:
     target_id: int
     strength: float = 1.0
     confidence: float = 1.0
-    evidence: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
 
     def __init__(
         self,
         source_id: int,
         target_id: int,
         strength: float = 1.0,
-        confidence: Optional[float] = None,
-        evidence: Optional[List[str]] = None,
+        confidence: float | None = None,
+        evidence: list[str] | None = None,
     ):
         self.source_id = source_id
         self.target_id = target_id
@@ -287,34 +286,34 @@ class SemanticGraph:
     Meaning emerges from graph structure, not individual heuristics.
     """
 
-    regions: List[SemanticRegion]
-    tokens: List[SemanticToken] = field(default_factory=list)
-    relationships: List[RelationshipEdge] = field(default_factory=list)
-    ownership_edges: List[OwnershipEdge] = field(default_factory=list)
-    exclusion_edges: List[ExclusionEdge] = field(default_factory=list)
-    affinity_edges: List[AffinityEdge] = field(default_factory=list)
+    regions: list[SemanticRegion]
+    tokens: list[SemanticToken] = field(default_factory=list)
+    relationships: list[RelationshipEdge] = field(default_factory=list)
+    ownership_edges: list[OwnershipEdge] = field(default_factory=list)
+    exclusion_edges: list[ExclusionEdge] = field(default_factory=list)
+    affinity_edges: list[AffinityEdge] = field(default_factory=list)
 
     # Global properties & Equilibrium metrics
     coherence_score: float = 0.0
     semantic_energy: float = 5.0
-    uncertainty_field: Dict[int, float] = field(default_factory=dict)  # node_id -> uncertainty
+    uncertainty_field: dict[int, float] = field(default_factory=dict)  # node_id -> uncertainty
 
     # Sub-graphs
-    sub_graphs: List["SemanticGraph"] = field(default_factory=list)
+    sub_graphs: list["SemanticGraph"] = field(default_factory=list)
 
-    def get_region(self, region_id: int) -> Optional[SemanticRegion]:
+    def get_region(self, region_id: int) -> SemanticRegion | None:
         for r in self.regions:
             if r.region_id == region_id:
                 return r
         return None
 
-    def get_owned_regions(self, region_id: int) -> List[SemanticRegion]:
+    def get_owned_regions(self, region_id: int) -> list[SemanticRegion]:
         owner = self.get_region(region_id)
         if not owner:
             return []
         return [r for r in self.regions if r.region_id in owner.owns]
 
-    def get_owner(self, region_id: int) -> Optional[SemanticRegion]:
+    def get_owner(self, region_id: int) -> SemanticRegion | None:
         region = self.get_region(region_id)
         if not region or region.owned_by is None:
             return None
@@ -334,7 +333,7 @@ class SemanticRole:
     required: bool = False
     # How exclusive this role is (1.0 = strictly one candidate)
     exclusivity: float = 1.0
-    filled_by: Optional[str] = None  # candidate key
+    filled_by: str | None = None  # candidate key
     fill_confidence: float = 0.0
 
 
@@ -346,23 +345,23 @@ class AllocationGraph:
     global coherence while satisfying exclusivity constraints.
     """
 
-    candidates: Dict[str, SemanticToken] = field(default_factory=dict)  # key → token
-    roles: Dict[str, SemanticRole] = field(default_factory=dict)  # role_name → role
-    compatibility: Dict[Tuple[str, str], float] = field(default_factory=dict)  # (candidate, role) → score
-    exclusivity_edges: List[Tuple[str, str]] = field(default_factory=list)  # mutually exclusive candidates
-    field_conflicts: List[dict] = field(default_factory=list)
+    candidates: dict[str, SemanticToken] = field(default_factory=dict)  # key → token
+    roles: dict[str, SemanticRole] = field(default_factory=dict)  # role_name → role
+    compatibility: dict[tuple[str, str], float] = field(default_factory=dict)  # (candidate, role) → score
+    exclusivity_edges: list[tuple[str, str]] = field(default_factory=list)  # mutually exclusive candidates
+    field_conflicts: list[dict] = field(default_factory=list)
     coherence_score: float = 0.0
     is_unstable: bool = False  # Thermodynamic reasoning flag (Phase 18)
-    assignment_history: List[Dict] = field(default_factory=list)
+    assignment_history: list[dict] = field(default_factory=list)
 
 
 @dataclass
 class DatasetIR:
     """Complete IR for a dataset (multiple records from one page)."""
 
-    records: List[SemanticRecord]
+    records: list[SemanticRecord]
     structure_type: str = ""  # "table", "cards", "list", "mixed"
-    structural_memory: Dict[Tuple[str, ...], int] = field(default_factory=dict)  # pattern -> count
+    structural_memory: dict[tuple[str, ...], int] = field(default_factory=dict)  # pattern -> count
     global_coherence: float = 0.0
 
     def add_record(self, record: SemanticRecord):
@@ -401,7 +400,7 @@ def create_token(
     return tok
 
 
-def populate_type_vector(token: SemanticToken, primary_type: SemanticType, graph: Optional[SemanticGraph] = None):
+def populate_type_vector(token: SemanticToken, primary_type: SemanticType, graph: SemanticGraph | None = None):
     """Populate the 16-dimensional embedding from graph context."""
     if graph:
         from app.semantic_inference_engine import RelationshipEmbeddingSpace
@@ -416,7 +415,7 @@ def populate_type_vector(token: SemanticToken, primary_type: SemanticType, graph
     token.embedding = [0.5] * 16
 
 
-def compute_type_signature(tokens: List[SemanticToken]) -> Tuple[str, ...]:
+def compute_type_signature(tokens: list[SemanticToken]) -> tuple[str, ...]:
     """Compute the type signature of a token sequence."""
     return tuple(t.primary_type.value for t in tokens)
 

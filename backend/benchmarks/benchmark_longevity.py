@@ -78,7 +78,7 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
             report = ws._observability.get_governance_report(ws.capture_governance_snapshot())
             print(
                 f"  [{i}] Energy: {ws.metrics.global_energy:.2f}, Entropy: {ws.metrics.global_entropy:.2f}, "
-                f"Diversity: {report['diversity']:.2f}, Elapsed: {elapsed:.1f}s"
+                f"Diversity: {report['diversity']:.2f}, Elapsed: {elapsed:.1f}s",
             )
 
     total_duration = time.time() - start_time

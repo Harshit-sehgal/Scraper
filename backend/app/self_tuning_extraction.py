@@ -24,7 +24,6 @@ import logging
 import time
 from dataclasses import asdict, dataclass
 from statistics import mean
-from typing import Dict, List, Optional
 
 from app.config import settings
 
@@ -74,8 +73,8 @@ class SelfTuningController:
     """
 
     def __init__(self) -> None:
-        self._parameters: Dict[str, TuningParameters] = {}
-        self._telemetry: Dict[str, List[TuningTelemetry]] = {}
+        self._parameters: dict[str, TuningParameters] = {}
+        self._telemetry: dict[str, list[TuningTelemetry]] = {}
 
         # Tuning bounds
         self._min_timeout = 10.0
@@ -225,7 +224,7 @@ class SelfTuningController:
             },
         }
 
-    def get_domain_report(self, domain: str) -> Optional[dict]:
+    def get_domain_report(self, domain: str) -> dict | None:
         """Get tuning report for a specific domain."""
         params = self._parameters.get(domain)
         if not params:

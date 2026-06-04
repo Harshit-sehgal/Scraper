@@ -14,8 +14,6 @@ import logging
 import os
 import sys
 import time
-
-# ruff: noqa: E501 — decorative separator lines exceed line length
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -551,8 +549,8 @@ def print_report(results: list[SiteResult]):
             fields_str += f" +{len(r.fields_found) - 4}"
 
         print(
-            f"| {i} | {r.name} | {r.category} | {r.records} | {r.extraction_method[:12]} | {r.quality:.2f} | {fields_str[:40]} | {r.fetch_time_ms / 1000:.1f} | {notes[:45]} |"
-        )  # noqa: E501
+            f"| {i} | {r.name} | {r.category} | {r.records} | {r.extraction_method[:12]} | {r.quality:.2f} | {fields_str[:40]} | {r.fetch_time_ms / 1000:.1f} | {notes[:45]} |",
+        )
 
     # Detailed per-site results
     print("\n\n## Per-Site Details\n")

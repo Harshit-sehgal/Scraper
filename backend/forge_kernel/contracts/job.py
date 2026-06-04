@@ -8,7 +8,6 @@ import datetime
 import re
 import uuid
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -23,7 +22,7 @@ RESERVED_FIELD_NAMES: frozenset = frozenset(
         "source_trust_score",
         "scraped_at",
         "record_score",
-    }
+    },
 )
 
 
@@ -87,9 +86,11 @@ class SchemaField(BaseModel):
     def validate_name(cls, v: str) -> str:
         v = v.strip().lower()
         if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", v):
-            raise ValueError("Field name must be snake_case, start with a letter, and be at most 64 characters")
+            msg = "Field name must be snake_case, start with a letter, and be at most 64 characters"
+            raise ValueError(msg)
         if v in RESERVED_FIELD_NAMES:
-            raise ValueError(f"Field name '{v}' is reserved for system use")
+            msg = f"Field name '{v}' is reserved for system use"
+            raise ValueError(msg)
         return v
 
 
@@ -99,8 +100,8 @@ class FilterRule(BaseModel):
     field_name: str = Field(..., description="Which schema field to filter on")
     operator: FilterOperator = Field(..., description="Filter operator")
     value: str = Field("", description="Value to compare against")
-    origin_address: Optional[str] = Field(None, description="Origin address for distance calculation")
-    distance_unit: Optional[str] = Field("km", description="km or miles")
+    origin_address: str | None = Field(None, description="Origin address for distance calculation")
+    distance_unit: str | None = Field("km", description="km or miles")
 
 
 class JobStatus(str, Enum):
@@ -136,7 +137,7 @@ class Job(BaseModel):
     source_policy: SourcePolicy = SourcePolicy.ALL_SOURCES
     max_per_domain: int = 4
     origin_location: str = ""
-    max_distance_km: Optional[float] = None
+    max_distance_km: float | None = None
     schema_fields: list[SchemaField] = Field(default_factory=list)
     filters: list[FilterRule] = Field(default_factory=list)
     pagination: bool = False
@@ -149,15 +150,15 @@ class Job(BaseModel):
     cancel_requested: bool = False
     status: JobStatus = JobStatus.PENDING
     created_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
+    started_at: str | None = None
+    completed_at: str | None = None
     total_records: int = 0
     filtered_records: int = 0
-    error: Optional[str] = None
+    error: str | None = None
     results: list[dict] = Field(default_factory=list)
-    analysis: Optional[str] = None
+    analysis: str | None = None
     results_on_disk: bool = False
-    results_file_path: Optional[str] = None
+    results_file_path: str | None = None
     quality_report: dict = Field(default_factory=dict)
     estimated_cost_usd: float = 0.0
     total_llm_calls: int = 0
@@ -181,7 +182,7 @@ class CreateJobRequest(BaseModel):
     source_policy: SourcePolicy = Field(SourcePolicy.ALL_SOURCES)
     max_per_domain: int = Field(4, ge=1, le=25)
     origin_location: str = Field("")
-    max_distance_km: Optional[float] = Field(None, ge=0)
+    max_distance_km: float | None = Field(None, ge=0)
     schema_fields: list[SchemaField] = Field(default_factory=list, max_length=50)
     filters: list[FilterRule] = Field(default_factory=list, max_length=100)
     pagination: bool = False

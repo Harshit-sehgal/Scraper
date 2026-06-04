@@ -9,7 +9,7 @@ async def scrape_threebest():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"  # noqa: E501
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         )
         page = await context.new_page()
         print("Navigating to Three Best Rated...")
@@ -63,7 +63,7 @@ async def scrape_threebest():
                             "phone": phone_str.strip(),
                             "address_or_location": "Chennai",  # generic
                             "rating": rating_str.strip(),
-                        }
+                        },
                     )
 
         await browser.close()
@@ -82,8 +82,11 @@ async def scrape_threebest():
         print(f"Extracted {len(unique_designers)} verified designers.")
 
         with open(
-            "/home/harshit/Documents/Work/Money/scraper/chennai_interior_designers.csv", "w", newline="", encoding="utf-8"
-        ) as f:  # noqa: E501
+            "/home/harshit/Documents/Work/Money/scraper/chennai_interior_designers.csv",
+            "w",
+            newline="",
+            encoding="utf-8",
+        ) as f:
             writer = csv.DictWriter(f, fieldnames=["company_name", "phone", "address_or_location", "rating"])
             writer.writeheader()
             writer.writerows(unique_designers)

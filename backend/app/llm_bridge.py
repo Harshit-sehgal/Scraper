@@ -8,7 +8,8 @@ import asyncio
 import json
 import logging
 import re
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 import httpx
 
@@ -42,7 +43,8 @@ def _extract_json_payload(text: str | None):
             return json.loads(match.group(0))
         except json.JSONDecodeError:
             logging.getLogger(__name__).debug(
-                "_extract_json_payload: object JSON parse failed for match of len %d", len(match.group(0))
+                "_extract_json_payload: object JSON parse failed for match of len %d",
+                len(match.group(0)),
             )
 
     match = re.search(r"\[[\s\S]*?\]", raw)
@@ -51,7 +53,8 @@ def _extract_json_payload(text: str | None):
             return json.loads(match.group(0))
         except json.JSONDecodeError:
             logging.getLogger(__name__).debug(
-                "_extract_json_payload: array JSON parse failed for match of len %d", len(match.group(0))
+                "_extract_json_payload: array JSON parse failed for match of len %d",
+                len(match.group(0)),
             )
 
     return None
@@ -251,7 +254,8 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
                     timeout=timeout,
                 )
                 if not res.choices:
-                    raise ValueError("Empty choices in LLM response")
+                    msg = "Empty choices in LLM response"
+                    raise ValueError(msg)
                 return res.choices[0].message.content.strip()
 
             content = await asyncio.to_thread(_run_g4f_json)
@@ -389,13 +393,14 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
                     timeout=timeout,
                 )
                 if not res.choices:
-                    raise ValueError("Empty choices in LLM response")
+                    msg = "Empty choices in LLM response"
+                    raise ValueError(msg)
                 return (res.choices[0].message.content or "").strip()
 
             result = await asyncio.to_thread(_run_g4f_text)
             if result is None:
                 return ""
-            return result
+            return result  # type: ignore[no-any-return]
         except Exception as e:
             logging.exception(e)
             logging.error("g4f text fallback failed: %s", e)
@@ -413,9 +418,9 @@ class SubstratePluginManager:
     def __init__(self, ws: Any = None):
         self.ws = ws
         # Handlers: handler_name -> callable
-        self._handlers: Dict[str, Callable] = {}
+        self._handlers: dict[str, Callable] = {}
         # Sandbox state (placeholders for now)
-        self._execution_history: List[dict] = []
+        self._execution_history: list[dict] = []
 
         # ─── Self-Optimization Tools (Phase 44) ───
         self._register_native_tools()
@@ -478,7 +483,7 @@ class SubstratePluginManager:
             # In a real system, we'd rebuild the manifold.
             # Here we emit telemetry and log success.
             logging.getLogger(__name__).info(
-                f"REFACTOR: Compressed manifold from {dim} to {dim - 1} (Pruned Dim {min_idx} with var {min_var:.4f})"
+                f"REFACTOR: Compressed manifold from {dim} to {dim - 1} (Pruned Dim {min_idx} with var {min_var:.4f})",
             )
             return f"Success: Pruned low-variance dimension {min_idx}"
 
@@ -493,7 +498,8 @@ class SubstratePluginManager:
         """Execute a registered handler with optional sandboxing."""
         handler = self._handlers.get(handler_name)
         if not handler:
-            raise ValueError(f"Unknown handler: {handler_name}")
+            msg = f"Unknown handler: {handler_name}"
+            raise ValueError(msg)
 
         # ─── Execution Boundary ───
         logging.getLogger(__name__).info(f"TOOL CALL: Executing [{handler_name}] with {kwargs}")
@@ -505,7 +511,8 @@ class SubstratePluginManager:
 
                 policy = get_policy_engine(ws=self.ws)
                 if not policy.can_dispatch_action(handler_name, self.ws.get_system_pressure()):
-                    raise PermissionError(f"Action [{handler_name}] blocked by substrate policy")
+                    msg = f"Action [{handler_name}] blocked by substrate policy"
+                    raise PermissionError(msg)
 
             # Actual execution
             result = handler(**kwargs)
@@ -518,11 +525,11 @@ class SubstratePluginManager:
             logging.getLogger(__name__).error(f"TOOL FAIL: [{handler_name}] - {e}")
             raise
 
-    def get_available_tools(self) -> List[str]:
+    def get_available_tools(self) -> list[str]:
         return list(self._handlers.keys())
 
 
-_manager: Optional[SubstratePluginManager] = None
+_manager: SubstratePluginManager | None = None
 _call_count = 0
 
 

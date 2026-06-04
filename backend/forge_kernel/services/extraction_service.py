@@ -5,7 +5,7 @@ Extraction service — orchestrates the extraction pipeline for a single URL.
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from forge_kernel.contracts.result import ResultRecord
 from forge_kernel.extraction.pipeline import ExtractionPipeline
@@ -24,7 +24,7 @@ class ExtractionService:
         url: str,
         schema_fields: list[dict[str, Any]],
         min_record_score: float = 0.35,
-        selectors_map: Optional[dict[str, Any]] = None,
+        selectors_map: dict[str, Any] | None = None,
     ) -> list[ResultRecord]:
         """Extract records from a single URL using the staged pipeline.
 

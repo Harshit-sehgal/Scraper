@@ -34,7 +34,7 @@ BASIC_SCHEMA = _make_fields(
         ("company_name", FieldType.STRING),
         ("email", FieldType.EMAIL),
         ("phone", FieldType.PHONE),
-    ]
+    ],
 )
 
 SIMPLE_HTML = """

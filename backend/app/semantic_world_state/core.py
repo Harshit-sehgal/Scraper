@@ -1,9 +1,10 @@
 import logging
 import time
 from collections import Counter
+from collections.abc import Callable
 from contextlib import contextmanager
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any
 
 from app.invariant_firewall import requires_invariants
 from app.semantic_world_state.events import EventMixin
@@ -39,7 +40,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     No subsystem may maintain isolated semantic truth.
     """
 
-    def __init__(self, node_id: Optional[str] = None):
+    def __init__(self, node_id: str | None = None):
         import uuid
 
         from app.abstraction_state import AbstractionState
@@ -96,18 +97,18 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         self.last_update_time: float = time.time()
         self._transaction_depth = 0
         self._replaying = False
-        self._active_trace_id: Optional[str] = None
-        self._current_journal: List[dict] = []
+        self._active_trace_id: str | None = None
+        self._current_journal: list[dict] = []
         self._journal_capacity: int = 1000  # Default (Phase 55)
-        self._evolved_schema: Set[str] = set()
+        self._evolved_schema: set[str] = set()
 
         # Idempotent close guard
         self._closed: bool = False
         self._subscribed_to_dispatcher: bool = False
 
         # Substrate Branching (Phase 39)
-        self._parent_node_id: Optional[str] = None
-        self._branch_label: Optional[str] = None
+        self._parent_node_id: str | None = None
+        self._branch_label: str | None = None
 
         # Phase 71: Decentralized Field Waves
         from app.event_dispatcher import get_dispatcher
@@ -149,7 +150,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             self._vector_clock.node_id = value
 
     @property
-    def evolved_schema(self) -> List[str]:
+    def evolved_schema(self) -> list[str]:
         return list(self._evolved_schema)
 
     # ─── Public Delegation: History Operations ────────────────────────────
@@ -215,7 +216,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     # ─── Transaction Manager (MVCC & Thread Safety) ──────────────────────
 
     @contextmanager
-    def transaction(self, label: str = "anonymous", trace_id: Optional[str] = None):
+    def transaction(self, label: str = "anonymous", trace_id: str | None = None):
         """Context manager for atomic state transactions. Supports true concurrency with MVCC."""
 
         # 1. Nested Transaction Check
@@ -243,7 +244,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
         import uuid
 
-        tx_ctx: Dict[str, Any] = {
+        tx_ctx: dict[str, Any] = {
             "label": label,
             "trace_id": trace_id or str(uuid.uuid4())[:8],
             "base_versions": {},
@@ -266,7 +267,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                 self._vector_clock.increment()
 
                 # Perform MVCC Validation
-                expected_versions: Dict[str, int] = tx_ctx["base_versions"]
+                expected_versions: dict[str, int] = tx_ctx["base_versions"]
                 val_start = time.time()
 
                 from app.topology_state import ConflictError, TopologyState
@@ -451,7 +452,11 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         from app.event_journal import get_journal
 
         get_journal().record(
-            source=subsystem, mutation_type=action, before={}, after=details, metadata={"trace_id": entry["trace_id"]}
+            source=subsystem,
+            mutation_type=action,
+            before={},
+            after=details,
+            metadata={"trace_id": entry["trace_id"]},
         )
 
         if tx is not None:
@@ -474,13 +479,13 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         if tx is not None:
             tx["base_versions"][region_id] = version
 
-    def trace_causality(self, limit: int = 100) -> List[dict]:
+    def trace_causality(self, limit: int = 100) -> list[dict]:
         history_journal = self._history.transaction_journal
         return history_journal[-limit:] if history_journal else []
 
     # ─── Distributed Consensus (Phase 32) ───────────────────────────────
 
-    def merge_state(self, remote_data: dict, trace_id: Optional[str] = None):
+    def merge_state(self, remote_data: dict, trace_id: str | None = None):
         """Merge a remote world state into the local state using vector clocks (Phase 32)."""
         remote_node = remote_data.get("node_id")
         remote_clock = remote_data.get("clock", {})
@@ -507,7 +512,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             self._evolved_schema.update(remote_schema)
 
             logger.info(
-                f"CONSENSUS: Merged state from [{remote_node}]. Relation: {relation}, Alpha: {alpha} (Trace: {active_trace})"
+                f"CONSENSUS: Merged state from [{remote_node}]. Relation: {relation}, Alpha: {alpha} (Trace: {active_trace})",
             )
             self.record_delta(
                 "global",
@@ -571,7 +576,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                     self._energy.set_schema_instability(role, 0.3)
 
             logger.info(
-                f"FEDERATION: Merged {len(remote_manifold) - filtered_count} roles. Firewall filtered {filtered_count} roles."
+                f"FEDERATION: Merged {len(remote_manifold) - filtered_count} roles. Firewall filtered {filtered_count} roles.",
             )
             self.record_delta("global", "manifold_federation", {"remote_roles": len(remote_manifold), "filtered": filtered_count})
 
@@ -685,7 +690,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def get_shard_roles(self, shard_id: str) -> list:
         return self._manifold.get_shard_roles(shard_id)
 
-    def shard_substrate(self) -> Dict[str, List[str]]:
+    def shard_substrate(self) -> dict[str, list[str]]:
         self._topology.detect_communities()
         self._manifold.shard_manifold(self._topology.global_communities)
         return self._topology.shard_topology()
@@ -712,7 +717,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def get_role_level(self, role: str) -> int:
         return self._abstraction.get_role_level(role)
 
-    def get_envelope(self, envelope_id: str) -> Optional[dict]:
+    def get_envelope(self, envelope_id: str) -> dict | None:
         return self._abstraction.get_envelope(envelope_id)
 
     @property
@@ -729,8 +734,8 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         subsystem: str,
         severity: str,
         cause: str,
-        topology_state: Optional[str] = None,
-        semantic_entropy: Optional[float] = None,
+        topology_state: str | None = None,
+        semantic_entropy: float | None = None,
     ):
         self._observability.record_degradation(
             subsystem=subsystem,
@@ -760,7 +765,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     # ─── Intent Delegation Methods ───────────────────────────────────────
 
-    def set_intent(self, intent_id: str, target_vec: list, strength: float = 0.5, target_roles: Optional[list] = None):
+    def set_intent(self, intent_id: str, target_vec: list, strength: float = 0.5, target_roles: list | None = None):
         self._intent.set_intent(intent_id, target_vec, strength, target_roles)
 
     def remove_intent(self, intent_id: str):
@@ -778,10 +783,10 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def register_action(self, action_id: str, target_vec: list, handler_name: str, threshold: float = 0.3):
         self._action.register_action(action_id, target_vec, handler_name, threshold)
 
-    def log_action_execution(self, action_id: str, success: bool, details: Optional[dict] = None):
+    def log_action_execution(self, action_id: str, success: bool, details: dict | None = None):
         self._action.log_execution(action_id, success, details)
 
-    def get_action(self, action_id: str) -> Optional[dict]:
+    def get_action(self, action_id: str) -> dict | None:
         return self._action.get_action(action_id)
 
     @property
@@ -1149,7 +1154,10 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                         new_vec = [(a + b) / 2 for a, b in zip(l_vec, r_vec)]
 
                         self._abstraction.create_envelope(
-                            lid, list(new_constituents), new_vec, level=max(l_details["level"], r_details["level"])
+                            lid,
+                            list(new_constituents),
+                            new_vec,
+                            level=max(l_details["level"], r_details["level"]),
                         )
                         self._manifold.set_manifold_vector(lid, new_vec)
 
@@ -1176,7 +1184,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         return self._history.get_crystalline_attractors(token_vals)
 
     @requires_invariants
-    def _synthesize_crystalline_record(self, record: dict, current_record: Optional[int] = None):
+    def _synthesize_crystalline_record(self, record: dict, current_record: int | None = None):
         idx = current_record if current_record is not None else self.metrics.total_records_processed
         self._history.synthesize_crystalline(record, idx)
 
@@ -1202,7 +1210,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                 "exclusions": len(self.learned_exclusions),
                 "compatibilities": len(self.role_compatibility),
                 "motifs": len(self.motif_counts),
-            }
+            },
         )
         self._history.trim_snapshots(max_size=500, keep=250)
 

@@ -4,7 +4,7 @@ True ownership boundary: NO external code should mutate active_intents directly.
 All changes go through this state object, which supports transactions.
 """
 
-from typing import Callable, Dict, List, Optional
+from collections.abc import Callable
 
 from app.transaction_context import active_transaction
 
@@ -12,21 +12,21 @@ from app.transaction_context import active_transaction
 class IntentState:
     """Sole owner of the semantic field's cognitive intents and goal attractors."""
 
-    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
         self._delta_callback = delta_callback
         # Active Intents: intent_id -> details {target_vec, strength,
         # target_roles}
-        self._active_intents: Dict[str, dict] = {}
+        self._active_intents: dict[str, dict] = {}
 
     @property
-    def _staging(self) -> Optional[dict]:
+    def _staging(self) -> dict | None:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"intent_staging_{id(self)}")
         return None
 
     @_staging.setter
-    def _staging(self, value: Optional[dict]):
+    def _staging(self, value: dict | None):
         tx = active_transaction.get()
         if tx is not None:
             tx[f"intent_staging_{id(self)}"] = value
@@ -66,7 +66,11 @@ class IntentState:
     # ─── Controlled Mutations ────────────────────────────────────────────
 
     def set_intent(
-        self, intent_id: str, target_vec: List[float], strength: float = 0.5, target_roles: Optional[List[str]] = None
+        self,
+        intent_id: str,
+        target_vec: list[float],
+        strength: float = 0.5,
+        target_roles: list[str] | None = None,
     ):
         """Define a new cognitive intent (Phase 36)."""
         intents = self._get_struct("active_intents")
@@ -96,10 +100,10 @@ class IntentState:
     # ─── Read-Only Accessors ─────────────────────────────────────────────
 
     @property
-    def active_intents(self) -> Dict[str, dict]:
+    def active_intents(self) -> dict[str, dict]:
         return {k: dict(v) for k, v in self._get_struct("active_intents").items()}
 
-    def get_intent(self, intent_id: str) -> Optional[dict]:
+    def get_intent(self, intent_id: str) -> dict | None:
         intent = self._get_struct("active_intents").get(intent_id)
         return dict(intent) if intent else None
 

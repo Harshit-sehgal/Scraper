@@ -1,5 +1,4 @@
 import time
-from typing import Dict
 
 
 class HeartbeatManager:
@@ -9,7 +8,7 @@ class HeartbeatManager:
     """
 
     def __init__(self):
-        self.node_registry: Dict[str, dict] = {}
+        self.node_registry: dict[str, dict] = {}
 
     def record_heartbeat(self, node_id: str, clock: dict, checksum: str, energy: float):
         """Record health metrics from a node."""

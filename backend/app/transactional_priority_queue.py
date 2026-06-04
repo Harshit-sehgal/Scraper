@@ -18,7 +18,7 @@ import logging
 import threading
 import time
 from enum import IntEnum
-from typing import Any, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -36,15 +36,15 @@ class PriorityLevel(IntEnum):
 class PriorityQueueEntry:
     """An entry in the transactional priority queue."""
 
-    __slots__ = ("priority", "timestamp", "aging_count", "label", "trace_id", "entry_id", "payload", "_tie_breaker")
+    __slots__ = ("_tie_breaker", "aging_count", "entry_id", "label", "payload", "priority", "timestamp", "trace_id")
 
     def __init__(
         self,
         priority: PriorityLevel,
         label: str,
         trace_id: str,
-        payload: Optional[Any] = None,
-        entry_id: Optional[int] = None,
+        payload: Any | None = None,
+        entry_id: int | None = None,
     ):
         self.priority = priority
         self.timestamp = time.time()
@@ -104,7 +104,7 @@ class TransactionalPriorityQueue:
     """
 
     def __init__(self, max_size: int = 1000, aging_interval: float = 5.0):
-        self._heap: List[PriorityQueueEntry] = []
+        self._heap: list[PriorityQueueEntry] = []
         self._lock = threading.RLock()
         self._max_size = max_size
         self._aging_interval = aging_interval
@@ -125,8 +125,8 @@ class TransactionalPriorityQueue:
         self,
         priority: PriorityLevel,
         label: str,
-        trace_id: Optional[str] = None,
-        payload: Optional[Any] = None,
+        trace_id: str | None = None,
+        payload: Any | None = None,
     ) -> str:
         """Push a new transaction onto the priority queue.
 
@@ -183,7 +183,7 @@ class TransactionalPriorityQueue:
 
         return tid
 
-    def pop(self) -> Optional[PriorityQueueEntry]:
+    def pop(self) -> PriorityQueueEntry | None:
         """Pop the highest-priority entry from the queue.
 
         Applies aging before popping if the aging interval has elapsed.
@@ -205,7 +205,7 @@ class TransactionalPriorityQueue:
             self._priority_counts[entry.priority] = max(0, self._priority_counts.get(entry.priority, 0) - 1)
             return entry
 
-    def peek(self) -> Optional[PriorityQueueEntry]:
+    def peek(self) -> PriorityQueueEntry | None:
         """Return the highest-priority entry without removing it.
 
         Skips invalid entries (lazy deletion).
@@ -321,7 +321,7 @@ class TransactionalPriorityQueue:
 
 
 # Global singleton
-_queue: Optional[TransactionalPriorityQueue] = None
+_queue: TransactionalPriorityQueue | None = None
 _queue_lock = threading.Lock()
 
 

@@ -41,9 +41,12 @@ async def lifespan(app: FastAPI):
     # Strict Production Security Check
     if settings.ENV.lower() == "production":
         if not settings.CORS_ORIGINS or "*" in settings.CORS_ORIGINS:
-            raise ValueError(
+            msg = (
                 "CORS_ORIGINS contains wildcard '*' or is empty. In production environment, "
                 "CORS_ORIGINS must be locked down to trusted domains for safety."
+            )
+            raise ValueError(
+                msg,
             )
         from app.utils.prod_security_validator import validate_production_credentials
 
@@ -71,7 +74,7 @@ async def lifespan(app: FastAPI):
     else:
         logger.info(
             "Experimental subsystems DISABLED — research shell will not initialize "
-            "(set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable)"
+            "(set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable)",
         )
         gossip, heartbeat_mgr = None, None
 
@@ -85,7 +88,7 @@ async def lifespan(app: FastAPI):
             "insight_timeout_seconds": settings.INSIGHT_TIMEOUT_SECONDS,
             "max_job_history": settings.MAX_JOB_HISTORY,
             "max_recycle_bin_history": settings.MAX_RECYCLE_BIN_HISTORY,
-        }
+        },
     )
 
     # Resolve the repository lazily

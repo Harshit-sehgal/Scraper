@@ -130,7 +130,7 @@ class TestSnapshotDesyncDetector:
         snap_a = make_snapshot()
         snap_b = make_snapshot()
         snap_b["manifold"]["role_manifold"] = {
-            "role_a": [0.9] * 16  # Very different from [0.5] * 16
+            "role_a": [0.9] * 16,  # Very different from [0.5] * 16
         }
         detector = SnapshotDesyncDetector()
         report = detector.compare(snap_a, snap_b)

@@ -44,7 +44,7 @@ class TestValidateLlmJson:
         assert "price" in (error or "")
 
     def test_all_required_keys_present(self) -> None:
-        is_valid, error = validate_llm_json(
+        is_valid, _error = validate_llm_json(
             {"name": "test", "price": 100},
             required_keys=["name", "price"],
         )
@@ -60,7 +60,7 @@ class TestValidateLlmJson:
         assert "Unexpected extra keys" in (error or "")
 
     def test_key_types_match(self) -> None:
-        is_valid, error = validate_llm_json(
+        is_valid, _error = validate_llm_json(
             {"name": "test", "count": 5},
             key_types={"name": str, "count": int},
         )
@@ -76,14 +76,14 @@ class TestValidateLlmJson:
 
     def test_key_type_none_is_skipped(self) -> None:
         """None values should not trigger key type mismatch."""
-        is_valid, error = validate_llm_json(
+        is_valid, _error = validate_llm_json(
             {"name": None},
             key_types={"name": str},
         )
         assert is_valid is True
 
     def test_list_type_validation(self) -> None:
-        is_valid, error = validate_llm_json(
+        is_valid, _error = validate_llm_json(
             [1, 2, 3],
             expected_type=list,
             list_item_type=int,
@@ -100,7 +100,7 @@ class TestValidateLlmJson:
         assert "List item 1" in (error or "")
 
     def test_list_with_dict_items(self) -> None:
-        is_valid, error = validate_llm_json(
+        is_valid, _error = validate_llm_json(
             [{"a": 1}, {"b": 2}],
             expected_type=list,
             list_item_type=dict,
@@ -114,15 +114,15 @@ class TestValidateLlmJson:
 class TestValidateLlmRecordList:
     def test_valid_record_list(self) -> None:
         data = [{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]
-        is_valid, error = validate_llm_record_list(data)
+        is_valid, _error = validate_llm_record_list(data)
         assert is_valid is True
 
     def test_not_a_list(self) -> None:
-        is_valid, error = validate_llm_record_list({"name": "test"})
+        is_valid, _error = validate_llm_record_list({"name": "test"})
         assert is_valid is False
 
     def test_list_of_non_dicts(self) -> None:
-        is_valid, error = validate_llm_record_list(["a", "b"])
+        is_valid, _error = validate_llm_record_list(["a", "b"])
         assert is_valid is False
 
     def test_required_keys_in_records(self) -> None:
@@ -136,7 +136,7 @@ class TestValidateLlmRecordList:
 
     def test_key_types_in_records(self) -> None:
         data = [{"name": "Alice", "price": "free"}]
-        is_valid, error = validate_llm_record_list(
+        is_valid, _error = validate_llm_record_list(
             data,
             record_key_types={"price": (int, float)},
         )
@@ -144,7 +144,7 @@ class TestValidateLlmRecordList:
 
     def test_all_records_pass(self) -> None:
         data = [{"name": "Alice"}, {"name": "Bob"}]
-        is_valid, error = validate_llm_record_list(
+        is_valid, _error = validate_llm_record_list(
             data,
             required_record_keys=["name"],
             record_key_types={"name": str},
@@ -214,7 +214,8 @@ class TestLlmCallWithValidation:
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise RuntimeError("transient error")
+                msg = "transient error"
+                raise RuntimeError(msg)
             return {"ok": True}
 
         with pytest.MonkeyPatch.context() as mp:
@@ -262,7 +263,7 @@ class TestValidateSelectorResponse:
                 "price": "span.price",
             },
         }
-        is_valid, error = validate_selector_response(raw)
+        is_valid, _error = validate_selector_response(raw)
         assert is_valid is True
 
     def test_missing_item_container(self) -> None:
@@ -275,17 +276,17 @@ class TestValidateSelectorResponse:
             {
                 "item_container": 42,
                 "fields": {},
-            }
+            },
         )
         assert is_valid is False
         assert "must be a string" in (error or "")
 
     def test_non_dict_fields(self) -> None:
-        is_valid, error = validate_selector_response(
+        is_valid, _error = validate_selector_response(
             {
                 "item_container": "div",
                 "fields": "not a dict",
-            }
+            },
         )
         assert is_valid is False
 
@@ -294,13 +295,13 @@ class TestValidateSelectorResponse:
             {
                 "item_container": "div",
                 "fields": {"name": 123},
-            }
+            },
         )
         assert is_valid is False
         assert "must be a string" in (error or "")
 
     def test_missing_fields_is_ok(self) -> None:
-        is_valid, error = validate_selector_response({"item_container": "div"})
+        is_valid, _error = validate_selector_response({"item_container": "div"})
         assert is_valid is True
 
 
@@ -309,19 +310,19 @@ class TestValidateSelectorResponse:
 
 class TestValidateInsightResponse:
     def test_string_is_valid(self) -> None:
-        is_valid, error = validate_insight_response("This is an insight")
+        is_valid, _error = validate_insight_response("This is an insight")
         assert is_valid is True
 
     def test_dict_with_insight_key(self) -> None:
-        is_valid, error = validate_insight_response({"insight": "key finding"})
+        is_valid, _error = validate_insight_response({"insight": "key finding"})
         assert is_valid is True
 
     def test_dict_missing_insight_key(self) -> None:
-        is_valid, error = validate_insight_response({"data": "value"})
+        is_valid, _error = validate_insight_response({"data": "value"})
         assert is_valid is False
 
     def test_dict_with_non_string_insight(self) -> None:
-        is_valid, error = validate_insight_response({"insight": 42})
+        is_valid, _error = validate_insight_response({"insight": 42})
         assert is_valid is False
 
     def test_number_is_invalid(self) -> None:

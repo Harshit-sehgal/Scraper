@@ -6,7 +6,6 @@ Uses free search via DuckDuckGo.
 
 import logging
 from collections import defaultdict
-from typing import Optional
 from urllib.parse import urlparse, urlunparse
 
 from app.async_utils import run_sync_in_thread
@@ -68,8 +67,9 @@ def get_ddgs_class():
 
             return _FallbackDDGS
         except ImportError as exc:
+            msg = "Discovery requires ddgs or duckduckgo_search. Install backend requirements first."
             raise DiscoveryDependencyError(
-                "Discovery requires ddgs or duckduckgo_search. Install backend requirements first."
+                msg,
             ) from exc
 
 
@@ -108,8 +108,8 @@ def _canonicalize_url(url: str) -> str:
             return ""
         path = (p.path or "/").rstrip("/") or "/"
         return urlunparse((p.scheme.lower(), p.netloc.lower(), path, "", "", ""))
-    except Exception as e:
-        logging.exception(e)
+    except Exception:
+        logging.exception("Failed to canonicalize URL: %s", url)
         return ""
 
 
@@ -173,7 +173,7 @@ def _build_search_query(
     domain: str,
     data_fields: list[str],
     origin_location: str,
-    max_distance_km: Optional[float],
+    max_distance_km: float | None,
 ) -> str:
     parts: list[str] = [query.strip()]
 
@@ -196,8 +196,8 @@ def _build_search_query(
 def _extract_domain(url: str) -> str:
     try:
         return urlparse(url).netloc.lower().replace("www.", "")
-    except Exception as e:
-        logging.exception(e)
+    except Exception:
+        logging.exception("Failed to extract domain from URL: %s", url)
         return ""
 
 
@@ -261,9 +261,9 @@ async def discover_urls(
     domain: str = "",
     num_results: int = 10,
     location: str = "",
-    data_fields: Optional[list[str]] = None,
+    data_fields: list[str] | None = None,
     origin_location: str = "",
-    max_distance_km: Optional[float] = None,
+    max_distance_km: float | None = None,
     source_policy: SourcePolicy = SourcePolicy.ALL_SOURCES,
     max_per_domain: int = 4,
 ) -> list[dict]:
@@ -346,9 +346,8 @@ async def discover_urls(
 
             # 2. High pressure (stress) rewards high-trust markers
             # (Stabilization)
-            if field_pressure > 0.6:
-                if metadata["source_type"] == "official":
-                    score += 0.15
+            if field_pressure > 0.6 and metadata["source_type"] == "official":
+                score += 0.15
 
             if score <= 0:
                 continue
@@ -387,7 +386,7 @@ async def discover_urls(
                         or any(h in (r.get("title", "").lower() + " " + r.get("body", "").lower()) for h in LISTING_HINTS)
                         else 1
                     ),
-                }
+                },
             )
 
             if len(results) >= num_results:
@@ -397,8 +396,8 @@ async def discover_urls(
         return results
     except DiscoveryDependencyError:
         raise
-    except Exception as e:
-        logging.exception("Discovered error: %s", e)
+    except Exception:
+        logging.exception("URL discovery failed for query: %s", query)
         return []
 
 

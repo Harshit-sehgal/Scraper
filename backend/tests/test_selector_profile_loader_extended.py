@@ -400,7 +400,7 @@ class TestExtractWithProfilePlaywright:
             evaluate_return=[
                 {"name": "Alpha", "price": "£238"},
                 {"name": "Beta", "price": "$99.50"},
-            ]
+            ],
         )
         mock_pw = _make_browser_chain(mock_page)
         mock_factory, _pw_ctx = _make_pw_mocks(mock_pw)

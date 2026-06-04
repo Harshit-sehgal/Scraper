@@ -6,7 +6,7 @@ Synchronous / Asynchronous propagation of semantic signals.
 
 import logging
 import time
-from typing import Callable, Dict, List
+from collections.abc import Callable
 
 from app.semantic_events import SemanticEvent, SemanticEventType
 
@@ -18,7 +18,7 @@ class EventDispatcher:
     """
 
     def __init__(self):
-        self.subscribers: Dict[SemanticEventType, List[Callable]] = {t: [] for t in SemanticEventType}
+        self.subscribers: dict[SemanticEventType, list[Callable]] = {t: [] for t in SemanticEventType}
 
     def subscribe(self, event_type: SemanticEventType, callback: Callable):
         """Register a callback for a specific event type."""

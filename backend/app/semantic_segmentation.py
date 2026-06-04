@@ -19,7 +19,6 @@ Core principle: WHAT values are, not WHERE they came from.
 
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple
 
 from app.semantic_ir import SemanticToken, SemanticType
 
@@ -101,17 +100,17 @@ class CandidateIR:
     primary_confidence: float = 0.5
 
     # Ambiguity distribution (multiple possible types with confidences)
-    type_distribution: Dict[SemanticType, float] = field(default_factory=dict)
+    type_distribution: dict[SemanticType, float] = field(default_factory=dict)
 
     # Evidence for classification
-    evidence: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
 
     # Extraction source
     extraction_pass: int = 1  # 1=pattern, 2=split, 3=whitespace
     extraction_method: str = "pattern"
 
     # Traceability
-    signals: List[str] = field(default_factory=list)
+    signals: list[str] = field(default_factory=list)
 
     def to_semantic_type(self) -> SemanticType:
         """Return the primary_type enum."""
@@ -135,7 +134,7 @@ class CandidateIR:
             source_field=source_field,
         )
 
-    def type_distribution_semantic(self) -> Dict[SemanticType, float]:
+    def type_distribution_semantic(self) -> dict[SemanticType, float]:
         """Return the already-semantic type distribution."""
         return dict(self.type_distribution)
 
@@ -148,16 +147,16 @@ class RelationshipIR:
     target_idx: int
     relationship_type: str  # "adjacent", "same_group", "parent_child", "repeated_pattern"
     confidence: float
-    evidence: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
 
 
 @dataclass
 class StructuralMemory:
     """Remembers repeated structural patterns across records."""
 
-    pattern_signature: Tuple[str, ...]  # e.g., ("code", "date", "price")
+    pattern_signature: tuple[str, ...]  # e.g., ("code", "date", "price")
     occurrence_count: int
-    row_indices: List[int] = field(default_factory=list)
+    row_indices: list[int] = field(default_factory=list)
     avg_confidence: float = 0.0
 
 
@@ -166,17 +165,17 @@ class SegmentedIR:
     """Complete IR for a single segmented record."""
 
     original: str
-    candidates: List[CandidateIR]
-    relationships: List[RelationshipIR] = field(default_factory=list)
-    structural_pattern: Tuple[str, ...] = ()
+    candidates: list[CandidateIR]
+    relationships: list[RelationshipIR] = field(default_factory=list)
+    structural_pattern: tuple[str, ...] = ()
     is_noise: bool = False
     noise_confidence: float = 0.0
-    noise_evidence: List[str] = field(default_factory=list)
+    noise_evidence: list[str] = field(default_factory=list)
     overall_cohesion: float = 0.0
 
     # Expanded: when composite values are expanded into the record
-    expanded_from: Optional[str] = None
-    original_field: Optional[str] = None
+    expanded_from: str | None = None
+    original_field: str | None = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -232,7 +231,7 @@ DETECTION_PATTERNS = {
     ],
 }
 
-COMMON_ENGLISH_WORDS: Set[str] = {
+COMMON_ENGLISH_WORDS: set[str] = {
     "THE",
     "AND",
     "FOR",
@@ -356,10 +355,10 @@ COMMON_ENGLISH_WORDS: Set[str] = {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def _extract_by_pattern(text: str) -> List[CandidateIR]:
+def _extract_by_pattern(text: str) -> list[CandidateIR]:
     """Pass 1: Extract all pattern-matching candidates aggressively."""
-    candidates: List[CandidateIR] = []
-    seen_spans: Set[Tuple[int, int]] = set()
+    candidates: list[CandidateIR] = []
+    seen_spans: set[tuple[int, int]] = set()
 
     for ctype, patterns in DETECTION_PATTERNS.items():
         for pattern in patterns:
@@ -407,7 +406,7 @@ def _extract_by_pattern(text: str) -> List[CandidateIR]:
     return candidates
 
 
-def _classify_with_ambiguity(raw: str, primary_type: SemanticType) -> Dict[SemanticType, float]:
+def _classify_with_ambiguity(raw: str, primary_type: SemanticType) -> dict[SemanticType, float]:
     """Build a distribution of possible types for a candidate.
 
     Example: "PAR" could be code(0.7) or text(0.3).
@@ -457,9 +456,9 @@ def _clean_value(raw: str, ctype: object) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def _extract_by_split(text: str, existing_spans: Set[Tuple[int, int]]) -> List[CandidateIR]:
+def _extract_by_split(text: str, existing_spans: set[tuple[int, int]]) -> list[CandidateIR]:
     """Pass 2: Extract values by splitting on separators."""
-    candidates: List[CandidateIR] = []
+    candidates: list[CandidateIR] = []
     position = 0
 
     segments = re.split(r"\s*[|\t]\s*", text)
@@ -498,7 +497,7 @@ def _extract_by_split(text: str, existing_spans: Set[Tuple[int, int]]) -> List[C
                     extraction_pass=2,
                     extraction_method="split",
                     signals=["pass2_split"],
-                )
+                ),
             )
             position = char_start + len(sub)
 
@@ -510,9 +509,9 @@ def _extract_by_split(text: str, existing_spans: Set[Tuple[int, int]]) -> List[C
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def _extract_by_whitespace(text: str, existing_spans: Set[Tuple[int, int]]) -> List[CandidateIR]:
+def _extract_by_whitespace(text: str, existing_spans: set[tuple[int, int]]) -> list[CandidateIR]:
     """Pass 3: Extract by whitespace splitting as last resort."""
-    candidates: List[CandidateIR] = []
+    candidates: list[CandidateIR] = []
 
     parts = re.split(r"\s{2,}", text)
     if len(parts) < 2:
@@ -546,7 +545,7 @@ def _extract_by_whitespace(text: str, existing_spans: Set[Tuple[int, int]]) -> L
                 extraction_pass=3,
                 extraction_method="whitespace",
                 signals=["pass3_whitespace"],
-            )
+            ),
         )
 
     return candidates
@@ -624,7 +623,7 @@ def _classify_fallback(text: str) -> SemanticType:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def extract_candidate_values(text: str) -> List[CandidateIR]:
+def extract_candidate_values(text: str) -> list[CandidateIR]:
     """Multi-pass extraction: maximize recall, then deduplicate.
 
     Pass 1: Aggressive pattern matching (highest confidence)
@@ -636,7 +635,7 @@ def extract_candidate_values(text: str) -> List[CandidateIR]:
     if not text:
         return []
 
-    existing_spans: Set[Tuple[int, int]] = set()
+    existing_spans: set[tuple[int, int]] = set()
 
     # Pass 1: Pattern matching
     candidates = _extract_by_pattern(text)
@@ -661,7 +660,7 @@ def extract_candidate_values(text: str) -> List[CandidateIR]:
     return candidates
 
 
-def _uncovered_ratio(text: str, spans: Set[Tuple[int, int]]) -> float:
+def _uncovered_ratio(text: str, spans: set[tuple[int, int]]) -> float:
     """Calculate what fraction of text is not covered by any span."""
     if not text:
         return 1.0
@@ -679,7 +678,7 @@ def _uncovered_ratio(text: str, spans: Set[Tuple[int, int]]) -> float:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def score_relationships(candidates: List[CandidateIR]) -> List[RelationshipIR]:
+def score_relationships(candidates: list[CandidateIR]) -> list[RelationshipIR]:
     """Score relationships between candidate values.
 
     Considers:
@@ -687,7 +686,7 @@ def score_relationships(candidates: List[CandidateIR]) -> List[RelationshipIR]:
     - Type compatibility (price near code, date near time)
     - Positional patterns (repeated type sequences)
     """
-    relationships: List[RelationshipIR] = []
+    relationships: list[RelationshipIR] = []
     if len(candidates) < 2:
         return relationships
 
@@ -706,7 +705,7 @@ def score_relationships(candidates: List[CandidateIR]) -> List[RelationshipIR]:
                         relationship_type=rel_type,
                         confidence=confidence,
                         evidence=evidence,
-                    )
+                    ),
                 )
             # Near (small gap)
             elif gap <= 10:
@@ -717,13 +716,13 @@ def score_relationships(candidates: List[CandidateIR]) -> List[RelationshipIR]:
                         relationship_type="nearby",
                         confidence=0.4,
                         evidence=[f"gap={gap}chars"],
-                    )
+                    ),
                 )
 
     return relationships
 
 
-def _infer_relationship_type(a: CandidateIR, b: CandidateIR) -> Tuple[str, float, List[str]]:
+def _infer_relationship_type(a: CandidateIR, b: CandidateIR) -> tuple[str, float, list[str]]:
     """Infer what kind of relationship exists between two adjacent candidates."""
     evidence = [f"{a.primary_type}+{b.primary_type}"]
 
@@ -765,10 +764,10 @@ class StructuralMemoryTracker:
     """
 
     def __init__(self):
-        self.patterns: Dict[Tuple[str, ...], StructuralMemory] = {}
+        self.patterns: dict[tuple[str, ...], StructuralMemory] = {}
         self.total_records = 0
 
-    def record(self, candidates: List[CandidateIR], row_index: int) -> Tuple[float, List[str]]:
+    def record(self, candidates: list[CandidateIR], row_index: int) -> tuple[float, list[str]]:
         """Record a row's structural pattern and return anomaly score."""
         self.total_records += 1
 
@@ -808,7 +807,7 @@ class StructuralMemoryTracker:
             return 0.3, ["novel_pattern"]
 
 
-def _max_pattern_similarity(signature: Tuple[str, ...], known: List[Tuple[str, ...]]) -> float:
+def _max_pattern_similarity(signature: tuple[str, ...], known: list[tuple[str, ...]]) -> float:
     """Compute max Jaccard similarity between a signature and known patterns."""
     if not known:
         return 0.0
@@ -858,12 +857,12 @@ def compute_semantic_density(text: str) -> float:
     return min(density * 0.15 + diversity_bonus, 1.0)
 
 
-def is_likely_noise(text: str) -> Tuple[bool, float, List[str]]:
+def is_likely_noise(text: str) -> tuple[bool, float, list[str]]:
     """Determine if text is likely noise / navigation using semantic analysis.
 
     Uses semantic density, not phrase lists.
     """
-    evidence: List[str] = []
+    evidence: list[str] = []
     if not text or len(text) < 3:
         return False, 0.2, ["too_short_for_noise_classification"]
 
@@ -981,7 +980,7 @@ def segment_single_text(text: str) -> SegmentedIR:
     )
 
 
-def _compute_cohesion(candidates: List[CandidateIR], relationships: List[RelationshipIR]) -> float:
+def _compute_cohesion(candidates: list[CandidateIR], relationships: list[RelationshipIR]) -> float:
     """Compute overall cohesion score for a segmented record."""
     if not candidates:
         return 0.0
@@ -1006,9 +1005,9 @@ def _compute_cohesion(candidates: List[CandidateIR], relationships: List[Relatio
 
 
 def expand_composite_records(
-    records: List[dict],
-    memory: Optional[StructuralMemoryTracker] = None,
-) -> List[dict]:
+    records: list[dict],
+    memory: StructuralMemoryTracker | None = None,
+) -> list[dict]:
     """Expand composite records by splitting blob values into candidate fields.
 
     Each composite value gets segmented; meaningful candidates become
@@ -1020,7 +1019,7 @@ def expand_composite_records(
         return records
 
     mem = memory or StructuralMemoryTracker()
-    expanded: List[dict] = []
+    expanded: list[dict] = []
 
     for row_idx, record in enumerate(records):
         new_record = dict(record)
@@ -1087,7 +1086,7 @@ DOMINANCE_HIERARCHY = {
 }
 
 
-def resolve_overlaps(tokens: List[SemanticToken]) -> List[SemanticToken]:
+def resolve_overlaps(tokens: list[SemanticToken]) -> list[SemanticToken]:
     """Resolve span overlaps and value containment.
 
     Suppresses dominated tokens:
@@ -1100,10 +1099,11 @@ def resolve_overlaps(tokens: List[SemanticToken]) -> List[SemanticToken]:
 
     # Sort by dominance then size
     sorted_tokens = sorted(
-        tokens, key=lambda t: (-DOMINANCE_HIERARCHY.get(t.primary_type, 0), -(t.span.end - t.span.start), -len(t.raw))
+        tokens,
+        key=lambda t: (-DOMINANCE_HIERARCHY.get(t.primary_type, 0), -(t.span.end - t.span.start), -len(t.raw)),
     )
 
-    suppressed: Set[int] = set()
+    suppressed: set[int] = set()
     for i in range(len(sorted_tokens)):
         if i in suppressed:
             continue
@@ -1138,7 +1138,7 @@ def resolve_overlaps(tokens: List[SemanticToken]) -> List[SemanticToken]:
     return result
 
 
-def is_likely_noise_field(name: str, value: str) -> Tuple[bool, float, List[str]]:
+def is_likely_noise_field(name: str, value: str) -> tuple[bool, float, list[str]]:
     """Check if a field value is likely noise, using semantic analysis.
 
     Field-type-aware: for name / text fields, plain text is expected.
@@ -1146,7 +1146,7 @@ def is_likely_noise_field(name: str, value: str) -> Tuple[bool, float, List[str]
 
     Replaces hardcoded phrase-list checks with broader semantic analysis.
     """
-    evidence: List[str] = []
+    evidence: list[str] = []
 
     if not value:
         return True, 1.0, ["empty_value"]

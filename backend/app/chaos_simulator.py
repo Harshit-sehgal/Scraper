@@ -22,7 +22,7 @@ are in chaos_metrics.py.
 import asyncio
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 # Import symbols used directly in this file
 from app.chaos_scenarios import FailureMode, FailureScenarios
@@ -44,7 +44,8 @@ def __getattr__(name):
     }
     if name in _re_exports:
         return getattr(_re_exports[name], name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)
 
 
 # ============================================================================
@@ -64,12 +65,12 @@ class ChaosSimulator:
                              Allows injection of failures and observation
         """
         self.system = system_interface
-        self.active_failures: Dict[str, bool] = {}
-        self.failure_history: List[Dict[str, Any]] = []
-        self.recovery_metrics: Dict[str, Dict[str, float]] = {}
+        self.active_failures: dict[str, bool] = {}
+        self.failure_history: list[dict[str, Any]] = []
+        self.recovery_metrics: dict[str, dict[str, float]] = {}
         self.logger = logging.getLogger("chaos_simulator")
 
-    async def inject_failure(self, failure_mode: FailureMode, duration: float = 10.0, intensity: float = 1.0) -> Dict[str, Any]:
+    async def inject_failure(self, failure_mode: FailureMode, duration: float = 10.0, intensity: float = 1.0) -> dict[str, Any]:
         """
         Inject a failure into the system
 

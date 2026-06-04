@@ -67,7 +67,8 @@ def get_current_role(request: Request) -> UserRole:
 
     # 6. Fallback / Unauthenticated
     raise HTTPException(
-        status_code=403, detail="Invalid or missing API credentials. Provide X-API-Key or Authorization Bearer token."
+        status_code=403,
+        detail="Invalid or missing API credentials. Provide X-API-Key or Authorization Bearer token.",
     )
 
 

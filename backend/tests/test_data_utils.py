@@ -296,8 +296,11 @@ class TestAlignProfileKeysToSchema:
             SchemaField(name="airlines_name", field_type=FieldType.STRING, description="Name of the airline", required=False),
             SchemaField(name="origin_airport", field_type=FieldType.STRING, description="Airport of origin", required=False),
             SchemaField(
-                name="destination_airport", field_type=FieldType.STRING, description="Airport of destination", required=False
-            ),  # noqa: E501
+                name="destination_airport",
+                field_type=FieldType.STRING,
+                description="Airport of destination",
+                required=False,
+            ),
             SchemaField(name="prices", field_type=FieldType.CURRENCY, description="Price of the flight", required=False),
             SchemaField(name="departure_date", field_type=FieldType.DATE, description="Date of departure", required=False),
             SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival", required=False),
@@ -321,7 +324,9 @@ class TestAlignProfileKeysToSchema:
             SchemaField(name="arrival_date", field_type=FieldType.DATE, description="Date of arrival", required=False),
         ]
         aligned = align_profile_keys_to_schema(
-            records, schema, profile_fields={"return_date": {"type": "text"}, "date": {"type": "text"}}
+            records,
+            schema,
+            profile_fields={"return_date": {"type": "text"}, "date": {"type": "text"}},
         )
         assert aligned[0]["departure_date"] == "30-05-2026"
         assert aligned[0]["arrival_date"] == "01-06-2026"

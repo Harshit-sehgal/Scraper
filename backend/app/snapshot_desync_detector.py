@@ -8,7 +8,6 @@ Phase 47: Distributed Resilience — detecting divergent state in multi-node clu
 """
 
 import logging
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +16,14 @@ class DesyncReport:
     """Frozen report of a desync detection result."""
 
     __slots__ = (
+        "causal_relation",
+        "critical",
+        "divergence_score",
+        "epoch_gap",
         "node_a",
         "node_b",
-        "causal_relation",
-        "divergence_score",
-        "subsystem_divergence",
-        "critical",
-        "epoch_gap",
         "recommended_action",
+        "subsystem_divergence",
     )
 
     def __init__(
@@ -33,7 +32,7 @@ class DesyncReport:
         node_b: str,
         causal_relation: str,
         divergence_score: float,
-        subsystem_divergence: Dict[str, float],
+        subsystem_divergence: dict[str, float],
         critical: bool,
         epoch_gap: int = 0,
         recommended_action: str = "none",
@@ -73,7 +72,7 @@ class SnapshotDesyncDetector:
 
     def __init__(self, divergence_threshold: float = 0.15):
         self._threshold = divergence_threshold
-        self._history: List[DesyncReport] = []
+        self._history: list[DesyncReport] = []
 
     def compare(
         self,
@@ -114,7 +113,7 @@ class SnapshotDesyncDetector:
             ("history", self._compare_history),
         ]
 
-        subsystem_divergence: Dict[str, float] = {}
+        subsystem_divergence: dict[str, float] = {}
         for name, fn in subsystems:
             try:
                 score = fn(snapshot_a, snapshot_b)
@@ -173,7 +172,7 @@ class SnapshotDesyncDetector:
 
         return report
 
-    def get_recent_reports(self, n: int = 10) -> List[dict]:
+    def get_recent_reports(self, n: int = 10) -> list[dict]:
         """Return the most recent desync reports."""
         return [r.to_dict() for r in self._history[-n:]]
 
@@ -394,7 +393,7 @@ class SnapshotDesyncDetector:
 
 
 # Global singleton
-_detector: Optional[SnapshotDesyncDetector] = None
+_detector: SnapshotDesyncDetector | None = None
 
 
 def get_desync_detector() -> SnapshotDesyncDetector:

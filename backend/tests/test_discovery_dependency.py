@@ -29,7 +29,8 @@ def test_discover_endpoint_returns_503_when_discovery_dependency_missing(client,
     monkeypatch.setattr(settings, "OPERATOR_API_KEY", "")
 
     async def missing_discovery(**kwargs):
-        raise DiscoveryDependencyError("Discovery requires ddgs or duckduckgo_search.")
+        msg = "Discovery requires ddgs or duckduckgo_search."
+        raise DiscoveryDependencyError(msg)
 
     monkeypatch.setattr("app.routers.jobs.discover_urls", missing_discovery)
 

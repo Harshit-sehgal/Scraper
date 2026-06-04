@@ -30,13 +30,11 @@ def test_lifecycle_hooks_exist() -> None:
     calls = set()
     tree = ast.parse(pipeline)
     for node in ast.walk(tree):
-        if isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Call):
-                name = node.func.attr
-                # Calls like get_world_state().XXXX()
-                if isinstance(node.func.value.func, ast.Attribute):
-                    if node.func.value.func.attr == "get_world_state":
-                        calls.add(name)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Call):
+            name = node.func.attr
+            # Calls like get_world_state().XXXX()
+            if isinstance(node.func.value.func, ast.Attribute) and node.func.value.func.attr == "get_world_state":
+                calls.add(name)
 
     world_state_methods = set()
     ws_dir = os.path.dirname(_app_path("app/semantic_world_state/core.py"))
@@ -89,7 +87,7 @@ def test_no_orphan_methods() -> None:
                     or f".{method})" in content
                     or f".{method}[" in content
                     or f".{method} " in content
-                ):  # noqa: E501
+                ):
                     called.add(method)
 
     uncalled = (

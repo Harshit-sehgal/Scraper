@@ -68,9 +68,12 @@ def _validate_distinct_api_keys(keys_to_check: list[tuple[str, str]]) -> None:
             continue
         previous = seen.get(val)
         if previous:
-            raise ValueError(
+            msg = (
                 f"Production check failed: {name} reuses the same secret as {previous}. "
                 "Production user, operator, and admin API keys must be distinct."
+            )
+            raise ValueError(
+                msg,
             )
         seen[val] = name
 
@@ -95,16 +98,23 @@ def validate_production_credentials(settings) -> None:
     for name, value in keys_to_check:
         val = (value or "").strip()
         if not val:
-            raise ValueError(
+            msg = (
                 f"Production check failed: {name} is empty or not configured. In production mode, all key roles must be secured."
             )
-        if _is_weak_or_placeholder(val):
             raise ValueError(
-                f"Production check failed: {name} is set to a weak/placeholder value. Please generate a strong random key."
+                msg,
+            )
+        if _is_weak_or_placeholder(val):
+            msg = f"Production check failed: {name} is set to a weak/placeholder value. Please generate a strong random key."
+            raise ValueError(
+                msg,
             )
         if len(val) < 16:
-            raise ValueError(
+            msg = (
                 f"Production check failed: {name} is too short ({len(val)} chars). Must be at least 16 characters in production."
+            )
+            raise ValueError(
+                msg,
             )
 
     _validate_distinct_api_keys(keys_to_check)
@@ -115,33 +125,44 @@ def validate_production_credentials(settings) -> None:
         # Resolve database URL
         db_url = settings.DATABASE_URL
         if not db_url:
+            msg = "Production check failed: STORAGE_BACKEND is set to postgres but DATAFORGE_DATABASE_URL is not configured."
             raise ValueError(
-                "Production check failed: STORAGE_BACKEND is set to postgres but DATAFORGE_DATABASE_URL is not configured."
+                msg,
             )
 
         try:
             parsed = urlsplit(db_url)
             password = parsed.password
         except Exception as e:
-            raise ValueError(f"Production check failed: DATAFORGE_DATABASE_URL is not parseable: {e}")
+            msg = f"Production check failed: DATAFORGE_DATABASE_URL is not parseable: {e}"
+            raise ValueError(msg)
 
         if not password:
-            raise ValueError(
+            msg = (
                 "Production check failed: DATAFORGE_DATABASE_URL does not contain a password. "
                 "A strong database password is required."
+            )
+            raise ValueError(
+                msg,
             )
 
         password = password.strip()
         if _is_weak_or_placeholder(password):
-            raise ValueError(
+            msg = (
                 "Production check failed: DATAFORGE_DATABASE_URL password is set to a weak/placeholder value. "
                 "Please configure a strong, unique database password."
             )
+            raise ValueError(
+                msg,
+            )
 
         if len(password) < 8:
-            raise ValueError(
+            msg = (
                 "Production check failed: DATAFORGE_DATABASE_URL password is too short "
                 f"({len(password)} chars). Must be at least 8 characters in production."
+            )
+            raise ValueError(
+                msg,
             )
 
     logger.info("Production security credential validation: ALL PASS")

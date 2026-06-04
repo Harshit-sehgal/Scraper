@@ -165,7 +165,7 @@ class TestPostgresJobRepositoryIntegration:
         )
 
         repo.save_single(job)
-        jobs, recycle, world_state = repo.load_all()
+        jobs, _recycle, _world_state = repo.load_all()
 
         assert job.id in jobs
         loaded = jobs[job.id]
@@ -221,7 +221,7 @@ class TestPostgresJobRepositoryIntegration:
         )
 
         repo.save_all({job.id: job}, {})
-        jobs, recycle, _ = repo.load_all()
+        jobs, _recycle, _ = repo.load_all()
 
         restored = jobs.get(job.id)
         assert restored is not None

@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
 from playwright.async_api import Browser, BrowserContext, async_playwright
 
@@ -26,13 +26,13 @@ class BrowserPool:
     """Manages a persistent Chromium instance with reusable contexts."""
 
     def __init__(self) -> None:
-        self._playwright: Optional[Any] = None
-        self._browser: Optional[Browser] = None
+        self._playwright: Any | None = None
+        self._browser: Browser | None = None
         self._contexts: dict[str, BrowserContext] = {}
         self._context_use_count: dict[str, int] = {}
         self._lock = asyncio.Lock()
         self._last_activity = time.time()
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: asyncio.Task | None = None
 
         # Hard recycling states
         self._active_fetches = 0
@@ -40,6 +40,7 @@ class BrowserPool:
         self._recycling = False
         self._recycle_event = asyncio.Event()
         self._recycle_event.set()
+        self._background_tasks: set[asyncio.Task] = set()
 
         # Metrics
         self.startup_latency_ms: float = 0.0
@@ -49,13 +50,15 @@ class BrowserPool:
         self.reused_fetches: int = 0
         self.crash_count: int = 0
 
-    async def get_context(self, domain: str, strategy: Optional[FetchStrategy] = None) -> BrowserContext:
+    async def get_context(self, domain: str, strategy: FetchStrategy | None = None) -> BrowserContext:
         """Get or create a browser context for a specific domain."""
         await self._recycle_event.wait()
 
         # Check if we should recycle before proceeding
         if self._should_recycle():
-            asyncio.create_task(self._check_and_trigger_recycle())
+            task = asyncio.create_task(self._check_and_trigger_recycle())
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
             await self._recycle_event.wait()
 
         async with self._lock:
@@ -104,7 +107,7 @@ class BrowserPool:
 
             # Use AntiBotEngine's stealth profile for enhanced fingerprint
             # randomization
-            context_options: Dict[str, Any]
+            context_options: dict[str, Any]
             if is_stealth:
                 from app.anti_bot_engine import get_anti_bot_engine
 
@@ -156,7 +159,9 @@ class BrowserPool:
                     def on_close(p):
                         self._active_fetches = max(0, self._active_fetches - 1)
                         logger.debug("[BrowserPool] Page closed. Active: %d", self._active_fetches)
-                        asyncio.create_task(self._check_and_trigger_recycle())
+                        task = asyncio.create_task(self._check_and_trigger_recycle())
+                        self._background_tasks.add(task)
+                        task.add_done_callback(self._background_tasks.discard)
 
                     page.on("close", on_close)
 

@@ -16,7 +16,7 @@ import json
 import logging
 import threading
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from app.postgres_repository import _conn, _execute, _fetch_all, _fetch_one
 from app.worker_queue import Priority, QueueTask
@@ -153,7 +153,7 @@ def _ensure_schema():
 
             _execute(
                 conn,
-                "INSERT INTO queue_schema_version (id, version) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version",  # noqa: E501
+                "INSERT INTO queue_schema_version (id, version) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version",
                 (current,),
             )
             logger.info("Postgres queue schema migrated to version %d", current)
@@ -171,7 +171,7 @@ class PostgresWorkerQueue:
         self._max_concurrency = max_concurrency
         self._poll_interval = poll_interval
         self._running = False
-        self._worker_task: Optional[asyncio.Task] = None
+        self._worker_task: asyncio.Task | None = None
         self._in_flight: dict[str, asyncio.Task] = {}
         self._handlers: dict[str, Callable] = {}
         self._in_flight_lock = asyncio.Lock()
@@ -191,12 +191,12 @@ class PostgresWorkerQueue:
     async def enqueue(
         self,
         task_type: str,
-        payload: Optional[dict] = None,
+        payload: dict | None = None,
         priority: Priority = Priority.NORMAL,
         max_attempts: int = 3,
         timeout_seconds: int = 300,
-        task_id: Optional[str] = None,
-        scheduled_at: Optional[str] = None,
+        task_id: str | None = None,
+        scheduled_at: str | None = None,
     ) -> str:
         """Add a new task to the queue. Returns the task ID."""
         task = QueueTask(
@@ -263,7 +263,7 @@ class PostgresWorkerQueue:
                 ),
             )
 
-    async def dequeue(self, timeout: float = 5.0) -> Optional[QueueTask]:
+    async def dequeue(self, timeout: float = 5.0) -> QueueTask | None:
         """Dequeue the highest-priority pending task.
 
         Blocks up to *timeout* seconds if the queue is empty.
@@ -279,7 +279,7 @@ class PostgresWorkerQueue:
             await asyncio.sleep(0.25)
         return None
 
-    def _dequeue_one(self) -> Optional[QueueTask]:
+    def _dequeue_one(self) -> QueueTask | None:
         """Synchronous dequeue from Postgres with priority ordering.
 
         This is called from an async dequeue loop wrapped via
@@ -319,14 +319,14 @@ class PostgresWorkerQueue:
                     {
                         **row,
                         "payload": json.loads(row["payload"]),
-                    }
+                    },
                 )
                 return task
         except Exception as e:
             logger.error("Postgres dequeue error: %s", e, exc_info=True)
             return None
 
-    async def complete(self, task_id: str, result: Optional[dict] = None):
+    async def complete(self, task_id: str, result: dict | None = None):
         """Mark a task as completed successfully."""
         async with self._in_flight_lock:
             await asyncio.to_thread(
@@ -335,7 +335,7 @@ class PostgresWorkerQueue:
                 json.dumps(result) if result else None,
             )
 
-    def _complete_sync(self, task_id: str, result_json: Optional[str]) -> None:
+    def _complete_sync(self, task_id: str, result_json: str | None) -> None:
         """Synchronous complete — runs in a thread to avoid blocking the event loop."""
         with _conn() as conn:
             row = _fetch_one(conn, "SELECT * FROM queue_tasks WHERE id = %s", (task_id,))
@@ -650,7 +650,7 @@ class PostgresWorkerQueue:
 
     # ─── Observability ─────────────────────────────────────────────────
 
-    def get_task_state(self, task_id: str) -> Optional[dict]:
+    def get_task_state(self, task_id: str) -> dict | None:
         """Return the current state of a specific task by ID.
 
         Checks the active queue_tasks first, then falls back to queue_task_history.
@@ -681,7 +681,7 @@ class PostgresWorkerQueue:
             logger.error("Failed to get task state for %s: %s", task_id, e)
             return None
 
-    async def get_task_state_async(self, task_id: str) -> Optional[dict]:
+    async def get_task_state_async(self, task_id: str) -> dict | None:
         """Async version of ``get_task_state`` — runs the blocking DB call in a thread."""
         return await asyncio.to_thread(self.get_task_state, task_id)
 
@@ -822,7 +822,7 @@ class PostgresWorkerQueue:
 # Factory
 # ───────────────────────────────────────────────────────────────────────
 
-_queue_instance: Optional[PostgresWorkerQueue] = None
+_queue_instance: PostgresWorkerQueue | None = None
 _queue_lock = threading.Lock()
 
 

@@ -16,8 +16,8 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parent.parent / "backend"
 sys.path.insert(0, str(BACKEND))
 
-from app.models import FieldType, SchemaField  # noqa: E402
-from app.network_payload_extractor import (  # noqa: E402
+from app.models import FieldType, SchemaField
+from app.network_payload_extractor import (
     _is_candidate_secret_heavy,
     _sanitize_payload,
     arbitrate_sources,
@@ -25,9 +25,9 @@ from app.network_payload_extractor import (  # noqa: E402
     find_record_arrays,
     score_record_array,
 )
-from app.page_evidence_collector import collect_page_evidence  # noqa: E402
-from app.selector_engine import apply_selectors  # noqa: E402
-from app.session_url_detector import detect_session_params  # noqa: E402
+from app.page_evidence_collector import collect_page_evidence
+from app.selector_engine import apply_selectors
+from app.session_url_detector import detect_session_params
 
 
 async def fetch_and_capture(url: str) -> tuple[str, list[str | dict], dict]:
@@ -95,7 +95,7 @@ async def smoke(url: str, fields_str: str | None = None):
     canonical = session.get("canonical_url", url)
 
     # 2. Fetch and capture
-    html, payloads, state = await fetch_and_capture(url)
+    html, payloads, _state = await fetch_and_capture(url)
 
     # Parse custom fields
     if fields_str:
@@ -132,7 +132,7 @@ async def smoke(url: str, fields_str: str | None = None):
             c.records = sanitized_records
             score = score_record_array(c, schema_fields)
             candidates_list.append(
-                {"path": c.path, "record_count": len(sanitized_records), "score": round(score, 1), "is_secret_heavy": is_secret}
+                {"path": c.path, "record_count": len(sanitized_records), "score": round(score, 1), "is_secret_heavy": is_secret},
             )
 
     # 3. Extract from Network Payloads

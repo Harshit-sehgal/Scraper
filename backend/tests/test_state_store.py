@@ -115,7 +115,7 @@ class TestLoadState:
         old = os.environ.get("DATAFORGE_STATE_FILE")
         try:
             os.environ["DATAFORGE_STATE_FILE"] = fpath
-            jobs, recycle, world_state = load_state()
+            jobs, recycle, _world_state = load_state()
             assert "job-1" in jobs
             assert jobs["job-1"].status == JobStatus.COMPLETED
             assert recycle == {}
@@ -141,7 +141,7 @@ class TestLoadState:
         old = os.environ.get("DATAFORGE_STATE_FILE")
         try:
             os.environ["DATAFORGE_STATE_FILE"] = fpath
-            jobs, recycle, world_state = load_state()
+            jobs, recycle, _world_state = load_state()
             assert jobs == {}
             assert "deleted-job" in recycle
         finally:
@@ -170,7 +170,7 @@ class TestLoadState:
         old = os.environ.get("DATAFORGE_STATE_FILE")
         try:
             os.environ["DATAFORGE_STATE_FILE"] = fpath
-            jobs, recycle, world_state = load_state()
+            jobs, _recycle, _world_state = load_state()
             assert jobs["pending-job"].status == JobStatus.FAILED
             assert jobs["running-job"].status == JobStatus.FAILED
             assert jobs["completed-job"].status == JobStatus.COMPLETED
@@ -190,7 +190,7 @@ class TestLoadState:
         old = os.environ.get("DATAFORGE_STATE_FILE")
         try:
             os.environ["DATAFORGE_STATE_FILE"] = fpath
-            jobs, recycle, world_state = load_state()
+            jobs, recycle, _world_state = load_state()
             assert jobs == {}
             assert recycle == {}
         finally:
@@ -218,7 +218,7 @@ class TestLoadState:
         old = os.environ.get("DATAFORGE_STATE_FILE")
         try:
             os.environ["DATAFORGE_STATE_FILE"] = fpath
-            jobs, recycle, world_state = load_state()
+            jobs, _recycle, _world_state = load_state()
             assert "bad-job" not in jobs
             assert "good-job" in jobs
         finally:
@@ -296,7 +296,7 @@ class TestSaveState:
                         break
                     time.sleep(0.1)
 
-                jobs, recycle, world_state = load_state()
+                jobs, _recycle, _world_state = load_state()
                 assert "roundtrip-job" in jobs
                 assert jobs["roundtrip-job"].results == [{"items": ["a", "b"]}]
                 assert jobs["roundtrip-job"].status == JobStatus.COMPLETED
@@ -331,7 +331,7 @@ class TestSaveState:
                         break
                     time.sleep(0.1)
 
-                jobs, recycle, world_state = load_state()
+                _jobs, recycle, _world_state = load_state()
                 assert "deleted" in recycle
             finally:
                 if old is not None:

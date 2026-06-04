@@ -26,7 +26,6 @@ import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,7 @@ class StrategyPerformance:
     last_used: float = 0.0  # Timestamp
     avg_quality: float = 0.0  # Average extraction quality
     consecutive_failures: int = 0  # Current failure streak
-    error_patterns: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    error_patterns: dict[str, int] = field(default_factory=lambda: defaultdict(int))
 
     @property
     def success_rate(self) -> float:
@@ -92,7 +91,7 @@ class StrategyRecommendation:
     """Recommendation for which strategy to use."""
 
     recommended_strategy: FetchStrategy
-    alternatives: List[FetchStrategy]
+    alternatives: list[FetchStrategy]
     reason: str
     confidence: float  # 0 - 1: how confident in recommendation
     estimated_success_rate: float  # Expected success rate
@@ -103,7 +102,7 @@ class DomainStrategyState:
 
     def __init__(self, domain: str):
         self.domain = domain
-        self.strategies: Dict[FetchStrategy, StrategyPerformance] = {}
+        self.strategies: dict[FetchStrategy, StrategyPerformance] = {}
         self.current_strategy: FetchStrategy = FetchStrategy.PLAYWRIGHT_FULL
         self.last_strategy_switch: float = 0.0
         self.strategy_switch_count: int = 0
@@ -122,7 +121,7 @@ class DomainStrategyState:
         success: bool,
         time_ms: float,
         quality: float = 0.0,
-        failure_reason: Optional[str] = None,
+        failure_reason: str | None = None,
     ):
         """Record a fetch attempt result."""
         perf = self.strategies[strategy]
@@ -189,7 +188,7 @@ class StrategyEvolutionEngine:
 
     def __init__(self):
         """Initialize strategy evolution engine."""
-        self.domain_states: Dict[str, DomainStrategyState] = {}
+        self.domain_states: dict[str, DomainStrategyState] = {}
 
         # Evolution parameters
         self.min_samples_for_recommendation = 3
@@ -209,7 +208,7 @@ class StrategyEvolutionEngine:
         success: bool,
         time_ms: float,
         quality: float = 0.0,
-        failure_reason: Optional[str] = None,
+        failure_reason: str | None = None,
     ):
         """Record a fetch strategy attempt."""
         # Convert string to enum if needed
@@ -319,7 +318,8 @@ class StrategyEvolutionEngine:
         full_perf = state.strategies.get(FetchStrategy.PLAYWRIGHT_FULL)
         if full_perf and full_perf.failure_count > 0:
             timeout_count = full_perf.error_patterns.get("TimeoutError", 0) + full_perf.error_patterns.get(
-                "asyncio.TimeoutError", 0
+                "asyncio.TimeoutError",
+                0,
             )
             if timeout_count >= 2 and best_strategy == FetchStrategy.PLAYWRIGHT_FULL:
                 lightweight_perf = state.strategies.get(FetchStrategy.PLAYWRIGHT_LIGHTWEIGHT)
@@ -395,7 +395,7 @@ class StrategyEvolutionEngine:
                         "avg_quality": round(perf.avg_quality, 3),
                         "consecutive_failures": perf.consecutive_failures,
                         "health": "healthy" if perf.is_healthy else ("degraded" if perf.is_degraded else "neutral"),
-                    }
+                    },
                 )
 
         # Include all strategies even if untried (for complete reporting)
@@ -413,7 +413,7 @@ class StrategyEvolutionEngine:
                         "avg_quality": round(perf.avg_quality, 3),
                         "consecutive_failures": perf.consecutive_failures,
                         "health": "healthy" if perf.is_healthy else ("degraded" if perf.is_degraded else "neutral"),
-                    }
+                    },
                 )
             else:
                 all_strategies_report.append(
@@ -426,7 +426,7 @@ class StrategyEvolutionEngine:
                         "avg_quality": 0.0,
                         "consecutive_failures": 0,
                         "health": "untried",
-                    }
+                    },
                 )
 
         all_strategies_report.sort(key=lambda x: x["success_rate"], reverse=True)
@@ -491,7 +491,7 @@ class StrategyEvolutionEngine:
                     "strategy_switches": state.strategy_switch_count,
                     "total_attempts": attempts,
                     "overall_success_rate": round(success_rate, 3),
-                }
+                },
             )
             total_success_rate += success_rate
 

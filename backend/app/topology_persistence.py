@@ -6,7 +6,8 @@ serialization and lifecycle operations.
 Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
 """
 
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.topology_state import TopologyState

@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -68,12 +68,12 @@ class FieldProvenance:
     field_name: str = ""
     value: Any = None
     method: str = "unknown"
-    selector: Optional[str] = None
+    selector: str | None = None
     confidence: float = 0.0
     transformed: bool = False
-    source_snippet: Optional[str] = None
+    source_snippet: str | None = None
     extraction_time_ms: float = 0.0
-    llm_hint: Optional[str] = None
+    llm_hint: str | None = None
     fallback_chain: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -171,13 +171,13 @@ class ProvenanceBuilder:
         field_name: str,
         value: Any,
         method: str = "unknown",
-        selector: Optional[str] = None,
+        selector: str | None = None,
         confidence: float = 0.0,
         transformed: bool = False,
-        source_snippet: Optional[str] = None,
+        source_snippet: str | None = None,
         extraction_time_ms: float = 0.0,
-        llm_hint: Optional[str] = None,
-        fallback_chain: Optional[list[str]] = None,
+        llm_hint: str | None = None,
+        fallback_chain: list[str] | None = None,
     ) -> None:
         """Add or update provenance for a single field in a record."""
         key = f"record_{record_idx}.{field_name}"

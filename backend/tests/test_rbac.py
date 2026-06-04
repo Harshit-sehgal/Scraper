@@ -60,7 +60,9 @@ def test_rbac_endpoint_guards(client, monkeypatch) -> None:
     # --- 1. Test create job route (Requires Admin or Operator) ---
     # Try as User (Should fail with 403)
     resp = client.post(
-        "/api/jobs", json={"name": "rbac-test", "urls": ["https://example.com"]}, headers={"X-API-Key": "user-secret"}
+        "/api/jobs",
+        json={"name": "rbac-test", "urls": ["https://example.com"]},
+        headers={"X-API-Key": "user-secret"},
     )
     assert resp.status_code == 403
     assert "Permission denied" in resp.json()["detail"]
@@ -68,13 +70,17 @@ def test_rbac_endpoint_guards(client, monkeypatch) -> None:
     # Try as Operator (Should pass validation and reach the next level)
     # Note: it might fail with other validation errors like missing schema fields, but it shouldn't fail with RBAC 403
     resp = client.post(
-        "/api/jobs", json={"name": "rbac-test", "urls": ["https://example.com"]}, headers={"X-API-Key": "operator-secret"}
+        "/api/jobs",
+        json={"name": "rbac-test", "urls": ["https://example.com"]},
+        headers={"X-API-Key": "operator-secret"},
     )
     assert resp.status_code != 403
 
     # Try as Admin (Should pass RBAC check)
     resp = client.post(
-        "/api/jobs", json={"name": "rbac-test", "urls": ["https://example.com"]}, headers={"X-API-Key": "admin-secret"}
+        "/api/jobs",
+        json={"name": "rbac-test", "urls": ["https://example.com"]},
+        headers={"X-API-Key": "admin-secret"},
     )
     assert resp.status_code != 403
 

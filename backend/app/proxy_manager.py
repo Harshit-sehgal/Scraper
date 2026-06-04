@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import List, Optional
 
 from app.config import settings
 
@@ -23,7 +22,7 @@ class ProxyManager:
     """Manages proxy rotation for anti-bot resilience."""
 
     def __init__(self) -> None:
-        self._proxy_list: List[str] = []
+        self._proxy_list: list[str] = []
         self._current_index: int = 0
         self._failure_counts: dict[str, int] = defaultdict(int)
         self._success_counts: dict[str, int] = defaultdict(int)
@@ -44,13 +43,13 @@ class ProxyManager:
         return self._enabled and bool(self._proxy_list)
 
     @property
-    def current_proxy(self) -> Optional[str]:
+    def current_proxy(self) -> str | None:
         """Get the current proxy without rotating."""
         if not self.enabled:
             return None
         return self._proxy_list[self._current_index % len(self._proxy_list)]
 
-    def record_failure(self, proxy: Optional[str] = None, domain: Optional[str] = None) -> None:
+    def record_failure(self, proxy: str | None = None, domain: str | None = None) -> None:
         """Record a failure for the given proxy (or current)."""
         if not self.enabled:
             return
@@ -72,7 +71,7 @@ class ProxyManager:
             self.rotate(domain=domain)
             self._failure_counts[proxy] = 0
 
-    def record_success(self, proxy: Optional[str] = None) -> None:
+    def record_success(self, proxy: str | None = None) -> None:
         """Record a success for the given proxy (or current)."""
         if not self.enabled:
             return
@@ -85,7 +84,7 @@ class ProxyManager:
         self._consecutive_failures = 0
         self._failure_counts[proxy] = 0
 
-    def rotate(self, domain: Optional[str] = None) -> Optional[str]:
+    def rotate(self, domain: str | None = None) -> str | None:
         """Explicitly rotate to the next proxy.
 
         If domain is provided, marks the current proxy as blocked for that domain
@@ -127,7 +126,7 @@ class ProxyManager:
         """Reset consecutive failure counter on successful request."""
         self._consecutive_failures = 0
 
-    def get_best_proxy(self, domain: Optional[str] = None) -> Optional[str]:
+    def get_best_proxy(self, domain: str | None = None) -> str | None:
         """Get the best proxy for a domain based on health stats.
 
         Selects the proxy with the highest success rate that isn't
@@ -155,7 +154,7 @@ class ProxyManager:
         candidates.sort(key=lambda x: -x[0])
         return candidates[0][1]
 
-    def get_proxy_for_playwright(self) -> Optional[dict]:
+    def get_proxy_for_playwright(self) -> dict | None:
         """Return proxy config dict for Playwright context creation.
 
         Format: {"server": "http://ip:port"} or {"server": "socks5://ip:port"}

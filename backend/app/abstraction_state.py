@@ -5,7 +5,7 @@ All changes go through this state object, which supports transactions.
 """
 
 import time
-from typing import Callable, Dict, List, Optional
+from collections.abc import Callable
 
 from app.transaction_context import active_transaction
 
@@ -13,23 +13,23 @@ from app.transaction_context import active_transaction
 class AbstractionState:
     """Sole owner of the semantic field's hierarchical abstractions."""
 
-    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
         self._delta_callback = delta_callback
         # Envelopes: envelope_id -> {constituents: Set[str], manifold_vec:
         # list, level: int}
-        self._envelopes: Dict[str, dict] = {}
+        self._envelopes: dict[str, dict] = {}
         # Abstraction Levels: role -> level (0 = base, 1 = higher-order)
-        self._role_levels: Dict[str, int] = {}
+        self._role_levels: dict[str, int] = {}
 
     @property
-    def _staging(self) -> Optional[dict]:
+    def _staging(self) -> dict | None:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"abstraction_staging_{id(self)}")
         return None
 
     @_staging.setter
-    def _staging(self, value: Optional[dict]):
+    def _staging(self, value: dict | None):
         tx = active_transaction.get()
         if tx is not None:
             tx[f"abstraction_staging_{id(self)}"] = value
@@ -72,7 +72,7 @@ class AbstractionState:
 
     # ─── Controlled Mutations ────────────────────────────────────────────
 
-    def create_envelope(self, envelope_id: str, constituents: List[str], manifold_vec: List[float], level: int = 1):
+    def create_envelope(self, envelope_id: str, constituents: list[str], manifold_vec: list[float], level: int = 1):
         """Distill a set of roles into a singular higher-order envelope (Phase 38)."""
         envelopes = self._get_struct("envelopes")
         levels = self._get_struct("role_levels")
@@ -112,15 +112,15 @@ class AbstractionState:
     # ─── Read-Only Accessors ─────────────────────────────────────────────
 
     @property
-    def envelopes(self) -> Dict[str, dict]:
+    def envelopes(self) -> dict[str, dict]:
         return {k: dict(v) for k, v in self._get_struct("envelopes").items()}
 
-    def get_envelope(self, envelope_id: str) -> Optional[dict]:
+    def get_envelope(self, envelope_id: str) -> dict | None:
         env = self._get_struct("envelopes").get(envelope_id)
         return dict(env) if env else None
 
     def get_role_level(self, role: str) -> int:
-        return self._get_struct("role_levels").get(role, 0)
+        return self._get_struct("role_levels").get(role, 0)  # type: ignore[no-any-return]
 
     # ─── Serialization ───────────────────────────────────────────────────
 
@@ -136,7 +136,7 @@ class AbstractionState:
                     for k, v in self.envelopes.items()
                 },
                 "role_levels": dict(self._role_levels),
-            }
+            },
         }
 
     def from_dict(self, data: dict):

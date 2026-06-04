@@ -96,7 +96,7 @@ def _make_parity_job() -> Job:
                 timestamp="2026-05-25T10:00:01",
                 level="info",
                 message="started",
-            )
+            ),
         ],
         progress_current=42,
         progress_total=42,

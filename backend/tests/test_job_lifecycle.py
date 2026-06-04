@@ -291,7 +291,8 @@ def test_enqueue_failure_rollback_in_production(client, monkeypatch) -> None:
 
     class BrokenQueue:
         async def enqueue(self, **kwargs):
-            raise RuntimeError("Worker queue is down")
+            msg = "Worker queue is down"
+            raise RuntimeError(msg)
 
         async def cancel(self, task_id):
             pass

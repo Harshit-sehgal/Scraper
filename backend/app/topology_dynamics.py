@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import TYPE_CHECKING, Set
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.topology_state import TopologyState
@@ -34,7 +34,7 @@ def compute_meso_clusters(state: "TopologyState") -> None:
     """
     regs = state._get_regions()
     clusters = []
-    assigned: Set[int] = set()
+    assigned: set[int] = set()
 
     # Retrieve previous clusters to carry forward their dynamic properties
     prev_clusters = state._get_struct("meso_clusters")
@@ -125,7 +125,7 @@ def compute_meso_clusters(state: "TopologyState") -> None:
                 "boundary_strength": round(boundary_strength, 3),
                 "interaction_policy": interaction_policy,
                 "centroid": centroid,
-            }
+            },
         )
 
     state._set_struct("meso_clusters", clusters)
@@ -158,7 +158,7 @@ def compute_macro_continents(state: "TopologyState") -> None:
         prev_map[cid_tuple] = pc
 
     continents = []
-    assigned: Set[int] = set()
+    assigned: set[int] = set()
     for i in range(len(clusters)):
         if i in assigned:
             continue
@@ -222,7 +222,7 @@ def compute_macro_continents(state: "TopologyState") -> None:
                 "guidance_strength": round(guidance_strength, 3),
                 "diversity_pressure": round(diversity_pressure, 3),
                 "centroid": centroid,
-            }
+            },
         )
 
     state._set_struct("macro_continents", continents)

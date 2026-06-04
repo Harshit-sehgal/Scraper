@@ -66,7 +66,10 @@ class TestAcquisitionTelemetryCollector:
     def test_mixed_acquisitions(self) -> None:
         collector = AcquisitionTelemetryCollector()
         collector.record(
-            url="https://a.com", state=AcquisitionState.DIRECT, original_url="https://a.com", final_url="https://a.com"
+            url="https://a.com",
+            state=AcquisitionState.DIRECT,
+            original_url="https://a.com",
+            final_url="https://a.com",
         )
         collector.record(
             url="https://b.com/s/abc",
@@ -115,7 +118,10 @@ class TestAcquisitionTelemetryCollector:
     def test_clear(self) -> None:
         collector = AcquisitionTelemetryCollector()
         collector.record(
-            url="https://a.com", state=AcquisitionState.DIRECT, original_url="https://a.com", final_url="https://a.com"
+            url="https://a.com",
+            state=AcquisitionState.DIRECT,
+            original_url="https://a.com",
+            final_url="https://a.com",
         )
         collector.clear()
         assert collector.get_summary()["total_acquisitions"] == 0
@@ -123,13 +129,22 @@ class TestAcquisitionTelemetryCollector:
     def test_recovery_rate_with_mixed_outcomes(self) -> None:
         collector = AcquisitionTelemetryCollector()
         collector.record(
-            url="https://a.com", state=AcquisitionState.RECOVERED, original_url="https://a.com", final_url="https://a.com/fresh"
+            url="https://a.com",
+            state=AcquisitionState.RECOVERED,
+            original_url="https://a.com",
+            final_url="https://a.com/fresh",
         )
         collector.record(
-            url="https://b.com", state=AcquisitionState.RECOVERY_FAILED, original_url="https://b.com", final_url="https://b.com/"
+            url="https://b.com",
+            state=AcquisitionState.RECOVERY_FAILED,
+            original_url="https://b.com",
+            final_url="https://b.com/",
         )
         collector.record(
-            url="https://c.com", state=AcquisitionState.RECOVERED, original_url="https://c.com", final_url="https://c.com/fresh"
+            url="https://c.com",
+            state=AcquisitionState.RECOVERED,
+            original_url="https://c.com",
+            final_url="https://c.com/fresh",
         )
         summary = collector.get_summary()
         assert summary["recovery_attempts"] == 3

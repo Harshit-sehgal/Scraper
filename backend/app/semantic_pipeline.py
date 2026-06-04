@@ -15,8 +15,9 @@ Flow:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Set
+from typing import Any
 
 from app.event_dispatcher import get_dispatcher
 
@@ -102,7 +103,7 @@ def _field_topology_delta():
     return 0.05 + p * 0.1  # range: [0.05, 0.15]
 
 
-METADATA_FIELDS: Set[str] = {
+METADATA_FIELDS: set[str] = {
     "record_score",
     "_field_confidences",
     "source_url",
@@ -122,7 +123,7 @@ class PipelineReport:
     after_allocation: int = 0
     after_validation: int = 0
     noise_removed: int = 0
-    metadata_fields_stripped: List[str] = field(default_factory=list)
+    metadata_fields_stripped: list[str] = field(default_factory=list)
 
 
 def strip_metadata(records: list | None) -> list:
@@ -138,7 +139,7 @@ def strip_metadata(records: list | None) -> list:
     return cleaned
 
 
-def filter_noise_records(records: List[dict] | None) -> list[dict]:
+def filter_noise_records(records: list[dict] | None) -> list[dict]:
     """Filter out likely noise records using graph-based relational density."""
     if not records:
         return []
@@ -297,7 +298,7 @@ def detect_role_swap_warnings(output: dict, schema_fields: list, detect_type_fn:
 
 def run_pipeline(
     records: list | None,
-    schema_fields: List[str],
+    schema_fields: list[str],
 ) -> list:
     """Run the full semantic pipeline orchestrator."""
     if not records:
@@ -333,7 +334,7 @@ def run_pipeline(
                     source="pipeline_filter",
                     payload={"removed": report.noise_removed},
                     instability_delta=_field_topology_delta(),
-                )
+                ),
             )
 
         if not records:
@@ -381,7 +382,7 @@ def run_pipeline(
                             primary_type=st,
                             type_distribution={st: conf},
                             source_field=key,
-                        )
+                        ),
                     )
                     seen_values.add(value)
                     pos += len(value) + 1
@@ -480,7 +481,7 @@ def run_pipeline(
                         source="allocation_engine",
                         payload={"instability": relative_instability},
                         instability_delta=_field_instability_delta(),
-                    )
+                    ),
                 )
 
             output["_certainty"] = reng.get_certainty()

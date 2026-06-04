@@ -20,7 +20,6 @@ import json
 import sys
 import time
 from datetime import datetime
-from typing import Optional
 
 try:
     import requests
@@ -80,7 +79,7 @@ def _print_section(title: str):
 # ─── API Calls ─────────────────────────────────────────────────────────────
 
 
-def api_get(path: str, timeout: int = 10) -> Optional[dict]:
+def api_get(path: str, timeout: int = 10) -> dict | None:
     try:
         r = requests.get(f"{API_BASE}{path}", timeout=timeout)
         r.raise_for_status()
@@ -97,7 +96,7 @@ def api_get(path: str, timeout: int = 10) -> Optional[dict]:
         return None
 
 
-def api_post(path: str, data: dict, timeout: int = 30) -> Optional[dict]:
+def api_post(path: str, data: dict, timeout: int = 30) -> dict | None:
     try:
         r = requests.post(f"{API_BASE}{path}", json=data, timeout=timeout)
         r.raise_for_status()
@@ -134,7 +133,7 @@ def check_health():
         f"  Jobs:              {jobs.get('total', 0)} total, "
         f"{jobs.get('active', 0)} active, "
         f"{jobs.get('completed', 0)} completed, "
-        f"{jobs.get('failed', 0)} failed"
+        f"{jobs.get('failed', 0)} failed",
     )
 
     config = data.get("runtime_limits", {})
@@ -174,7 +173,7 @@ def check_topology(detailed: bool = False):
     print(f"  Global Energy:       {_fmt(metrics.get('global_energy', 0))}  {_bar(metrics.get('global_energy', 0) / 10)}")
     print(
         f"  Energy Balance:      {_fmt(metrics.get('energy_balance', 0), 4)}  "
-        f"{'✅ CONSERVED' if abs(metrics.get('energy_balance', 0)) < 0.01 else '⚠️  DRIFT'}"
+        f"{'✅ CONSERVED' if abs(metrics.get('energy_balance', 0)) < 0.01 else '⚠️  DRIFT'}",
     )
     print(f"  Semantic Temp:       {_fmt(metrics.get('semantic_temperature', 0))}")
     print(f"  Global Entropy:      {_fmt(metrics.get('global_entropy', 0))}")
@@ -217,7 +216,7 @@ def check_topology(detailed: bool = False):
                 f"affinity={_fmt(e.get('affinity', 0))} "
                 f"repulsion={_fmt(e.get('repulsion', 0))} "
                 f"pressure={_fmt(e.get('pressure', 0))} "
-                f"[{e.get('semantics', '?')}]"
+                f"[{e.get('semantics', '?')}]",
             )
 
     if detailed and role_compat:
@@ -250,7 +249,7 @@ def check_observability():
         print(f"  Reliability:         {_fmt(metrics.get('reliability', 0))}")
         print(
             f"  Monoculture Risk:    {_fmt(metrics.get('monoculture_risk', 0))}  "
-            f"{'⚠️ HIGH' if metrics.get('monoculture_risk', 0) > 0.5 else 'OK'}"
+            f"{'⚠️ HIGH' if metrics.get('monoculture_risk', 0) > 0.5 else 'OK'}",
         )
 
     hierarchy = data.get("hierarchy", {})
@@ -421,7 +420,7 @@ def list_jobs(limit: int = 10):
         f"  Total: {jobs.get('total', 0)}  |  "
         f"Active: {jobs.get('active', 0)}  |  "
         f"Completed: {jobs.get('completed', 0)}  |  "
-        f"Failed: {jobs.get('failed', 0)}"
+        f"Failed: {jobs.get('failed', 0)}",
     )
 
     # Get individual jobs from the API

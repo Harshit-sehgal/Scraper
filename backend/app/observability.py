@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from app.transaction_context import active_transaction
 
@@ -66,26 +67,26 @@ class GovernanceSnapshot:
 class ObservabilityState:
     """Sole owner of the semantic field's telemetry and activity heatmaps."""
 
-    def __init__(self, delta_callback: Optional[Callable[[str, str, dict], None]] = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
         from app.config import settings
 
         self._delta_callback = delta_callback
         # Telemetry Stream: recent cognitive events (Ring buffer)
         self._telemetry_stream: deque = deque(maxlen=settings.TELEMETRY_STREAM_MAXLEN)
         # Regional Heatmaps: region_id -> activity_score
-        self._activity_heatmap: Dict[str, float] = {}
+        self._activity_heatmap: dict[str, float] = {}
         # Manifold Drift Log: role -> [drift_values]
-        self._drift_log: Dict[str, deque] = {}
+        self._drift_log: dict[str, deque] = {}
 
     @property
-    def _staging(self) -> Optional[dict]:
+    def _staging(self) -> dict | None:
         tx = active_transaction.get()
         if tx is not None:
             return tx.get(f"observability_staging_{id(self)}")
         return None
 
     @_staging.setter
-    def _staging(self, value: Optional[dict]):
+    def _staging(self, value: dict | None):
         tx = active_transaction.get()
         if tx is not None:
             tx[f"observability_staging_{id(self)}"] = value
@@ -130,7 +131,7 @@ class ObservabilityState:
 
     # ─── Controlled Mutations ────────────────────────────────────────────
 
-    def emit_telemetry(self, event_type: str, details: dict, trace_id: Optional[str] = None):
+    def emit_telemetry(self, event_type: str, details: dict, trace_id: str | None = None):
         """Record a cognitive event in the telemetry stream (Phase 41)."""
         entry = {
             "type": event_type,
@@ -154,9 +155,9 @@ class ObservabilityState:
         subsystem: str,
         severity: str,
         cause: str,
-        trace_id: Optional[str] = None,
-        topology_state: Optional[str] = None,
-        semantic_entropy: Optional[float] = None,
+        trace_id: str | None = None,
+        topology_state: str | None = None,
+        semantic_entropy: float | None = None,
     ):
         """Record a structured degradation event with causality tracking.
 
@@ -164,7 +165,7 @@ class ObservabilityState:
         enabling causal explainability for semantic drift, topology
         destabilization, and inference quality degradation.
         """
-        details: Dict[str, Any] = {
+        details: dict[str, Any] = {
             "subsystem": subsystem,
             "severity": severity,
             "cause": cause,
@@ -236,24 +237,24 @@ class ObservabilityState:
     # ─── Read-Only Accessors ─────────────────────────────────────────────
 
     @property
-    def telemetry(self) -> List[dict]:
+    def telemetry(self) -> list[dict]:
         return list(self._telemetry_stream)
 
     @property
-    def heatmap(self) -> Dict[str, float]:
+    def heatmap(self) -> dict[str, float]:
         return dict(self._get_struct("activity_heatmap"))
 
-    def get_role_drift(self, role: str) -> List[float]:
+    def get_role_drift(self, role: str) -> list[float]:
         log = self._get_struct("drift_log")
         return list(log.get(role, []))
 
-    def get_causal_telemetry(self) -> List[dict]:
+    def get_causal_telemetry(self) -> list[dict]:
         """Return formatted transaction lineages for visualization."""
         journal = self._telemetry_stream  # Using telemetry stream for now
         # Filtering for transaction-related events
         return [t for t in journal if t["type"] in ["transaction", "merge_branch", "federation", "wave_absorption"]]
 
-    def detect_oscillations(self, snapshots: List[dict], window: int = 20) -> List[dict]:
+    def detect_oscillations(self, snapshots: list[dict], window: int = 20) -> list[dict]:
         """Analyze state history for cyclic instability or energy patterns (Phase 46)."""
         if len(snapshots) < window:
             return []
@@ -291,7 +292,7 @@ class ObservabilityState:
 
         # Scale by log of number of roles to get [0, 1] range
         max_entropy = math.log2(len(snapshot.role_names)) if len(snapshot.role_names) > 1 else 1.0
-        return entropy / max_entropy
+        return entropy / max_entropy  # type: ignore[no-any-return]
 
     def get_governance_report(self, snapshot: GovernanceSnapshot) -> dict:
         """Summary of emergent systems health and governance status (Phase 56)."""
@@ -314,7 +315,7 @@ class ObservabilityState:
         }
         return report
 
-    def calculate_damping_factor(self, snapshots: List[dict]) -> float:
+    def calculate_damping_factor(self, snapshots: list[dict]) -> float:
         """Compute a global damping factor based on detected instability patterns (Phase 49).
 
         Factor 1.0 = No damping.
@@ -326,7 +327,7 @@ class ObservabilityState:
 
         # Maximum damping for strong oscillations
         max_conf = max(o["confidence"] for o in oscillations)
-        return max(0.2, 1.0 - max_conf * 0.8)
+        return max(0.2, 1.0 - max_conf * 0.8)  # type: ignore[no-any-return]
 
     def get_stability_policy(self, snapshot: GovernanceSnapshot) -> dict:
         """Return a dynamic stabilization policy for the current field state (Phase 49)."""
@@ -346,12 +347,13 @@ class ObservabilityState:
             "force_decay": snapshot.global_energy > 8.0,
             "attractor_scaling": 0.5 if runaways else 1.0,
             "lock_escape_required": self.detect_metastable_locks(
-                [s.get("energy", 0.0) for s in snapshots], [s.get("entropy", 0.0) for s in snapshots]
+                [s.get("energy", 0.0) for s in snapshots],
+                [s.get("entropy", 0.0) for s in snapshots],
             ),
         }
         return policy
 
-    def detect_runaway_attractors(self, manifold_history: Dict[str, List[float]], threshold: float = 0.95) -> List[dict]:
+    def detect_runaway_attractors(self, manifold_history: dict[str, list[float]], threshold: float = 0.95) -> list[dict]:
         """Identify roles that have become 'too stable' or dominant (Phase 48).
 
         Runaway attractors can freeze the field and prevent new learning.
@@ -368,7 +370,7 @@ class ObservabilityState:
                 runaways.append({"role": role, "stability": avg_pos, "risk": "field_freezing"})
         return runaways
 
-    def detect_metastable_locks(self, energy_history: List[float], entropy_history: List[float]) -> bool:
+    def detect_metastable_locks(self, energy_history: list[float], entropy_history: list[float]) -> bool:
         """Identify if the system is stuck in a local minimum (Phase 48)."""
         if len(energy_history) < 50:
             return False
@@ -449,7 +451,7 @@ class ObservabilityState:
 
         self._record("compress_history", {"compressed": len(to_compress)})
 
-    def _is_cyclic(self, values: List[float]) -> bool:
+    def _is_cyclic(self, values: list[float]) -> bool:
         """Simple autocorrelation-based cycle detection."""
         if not values or len(values) < 8:
             return False
@@ -467,7 +469,7 @@ class ObservabilityState:
         n = len(values)
         return flips >= (n // 4) if n > 0 else False
 
-    def _estimate_period(self, values: List[float]) -> int:
+    def _estimate_period(self, values: list[float]) -> int:
         """Estimate the period of a detected oscillation."""
         # Implementation: count distance between peaks
         peaks = []
@@ -486,7 +488,7 @@ class ObservabilityState:
                 "activity_heatmap": self.heatmap,
                 "drift_log": {k: list(v) for k, v in self._get_struct("drift_log").items()},
                 "telemetry_stream": list(self._telemetry_stream),
-            }
+            },
         }
 
     def from_dict(self, data: dict):
@@ -623,7 +625,7 @@ class ObservabilityState:
         # 3. Persistence factor
         persistence = region.persistence
 
-        return (c * 0.4) + (stability * 0.3) + (persistence * 0.3)
+        return (c * 0.4) + (stability * 0.3) + (persistence * 0.3)  # type: ignore[no-any-return]
 
     def apply_resource_shedding(self, ws: SemanticWorldState, snapshot: GovernanceSnapshot, max_bytes: int = 10000000):
         """Prune non-essential state if memory footprint exceeds threshold (Phase 47 / 50).

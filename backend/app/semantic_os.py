@@ -6,7 +6,7 @@ Provides high-level orchestration, state governance, and topological search.
 """
 
 import logging
-from typing import Callable, Dict, List, Optional
+from collections.abc import Callable
 
 from app.checkpoint_manager import get_checkpoint_manager
 from app.semantic_world_state import get_world_state
@@ -19,14 +19,14 @@ class SemanticOS:
         self.ws = ws or get_world_state()
         self.checkpoints = get_checkpoint_manager()
 
-    def ingest_records(self, records: List[dict], schema: List[str]):
+    def ingest_records(self, records: list[dict], schema: list[str]):
         """Standard entry point for new semantic data. Automatically handles schema expansion."""
         effective_schema = self.get_effective_schema(schema)
         from app.semantic_pipeline import run_pipeline
 
         return run_pipeline(records, effective_schema)
 
-    def get_effective_schema(self, base_schema: List[str]) -> List[str]:
+    def get_effective_schema(self, base_schema: list[str]) -> list[str]:
         """Combine the base schema with any field-evolved roles (Phase 29)."""
         evolved = self.ws.evolved_schema
         # Return merged set as a sorted list for predictability
@@ -48,7 +48,7 @@ class SemanticOS:
         """Restore engine state from a checkpoint."""
         self.checkpoints.load_checkpoint(filepath)
 
-    def get_causality_trace(self, limit: int = 50) -> List[dict]:
+    def get_causality_trace(self, limit: int = 50) -> list[dict]:
         """Return recent transactional history."""
         return self.ws.trace_causality(limit=limit)
 
@@ -62,7 +62,7 @@ class SemanticOS:
 
     # ─── Multi-Node Consensus (Phase 32) ─────────────────────────────────
 
-    def sync_node(self, remote_state: dict, trace_id: Optional[str] = None):
+    def sync_node(self, remote_state: dict, trace_id: str | None = None):
         """Synchronize with another Semantic OS node."""
         self.ws.merge_state(remote_state, trace_id=trace_id)
 
@@ -110,7 +110,11 @@ class SemanticOS:
     # ─── Semantic Steering (Phase 36) ────────────────────────────────────
 
     def set_cognitive_intent(
-        self, intent_id: str, target_vec: List[float], strength: float = 0.5, target_roles: Optional[List[str]] = None
+        self,
+        intent_id: str,
+        target_vec: list[float],
+        strength: float = 0.5,
+        target_roles: list[str] | None = None,
     ):
         """Inject a high-level goal to bias the semantic field (Phase 36)."""
         with self.ws.transaction(f"set_intent:{intent_id}"):
@@ -128,7 +132,7 @@ class SemanticOS:
 
     # ─── Cognitive Agency (Phase 37) ─────────────────────────────────────
 
-    def register_action(self, action_id: str, target_vec: List[float], handler_name: str, threshold: float = 0.3):
+    def register_action(self, action_id: str, target_vec: list[float], handler_name: str, threshold: float = 0.3):
         """Map executable logic into the semantic field (Phase 37)."""
         with self.ws.transaction(f"register_action:{action_id}"):
             self.ws.register_action(action_id, target_vec, handler_name, threshold)
@@ -137,7 +141,7 @@ class SemanticOS:
         """Manually trigger registered dispatchers."""
         return self.ws.dispatch_actions()
 
-    def report_outcome(self, action_id: str, success: bool, details: Optional[dict] = None):
+    def report_outcome(self, action_id: str, success: bool, details: dict | None = None):
         """Feed action outcomes back into the manifold (Feedback Loop)."""
         with self.ws.transaction(f"action_outcome:{action_id}"):
             self.ws.log_action_execution(action_id, success, details)
@@ -197,15 +201,15 @@ class SemanticOS:
 
     # ─── Cognitive Observability (Phase 41) ──────────────────────────────
 
-    def get_telemetry(self) -> List[dict]:
+    def get_telemetry(self) -> list[dict]:
         """Query the recent stream of cognitive events."""
         return self.ws.observability_telemetry
 
-    def get_activity_heatmap(self) -> Dict[str, float]:
+    def get_activity_heatmap(self) -> dict[str, float]:
         """Query the regional activity heatmap scores."""
         return self.ws.observability_heatmap
 
-    def get_manifold_drift_log(self, role: str) -> List[float]:
+    def get_manifold_drift_log(self, role: str) -> list[float]:
         """Query historical manifold drift for a specific role."""
         return self.ws.get_role_drift(role)
 
@@ -219,8 +223,8 @@ class SemanticOS:
         subsystem: str,
         severity: str,
         cause: str,
-        topology_state: Optional[str] = None,
-        semantic_entropy: Optional[float] = None,
+        topology_state: str | None = None,
+        semantic_entropy: float | None = None,
     ):
         """Record a structured degradation event with causality tracking."""
         self.ws.record_degradation(
@@ -232,7 +236,7 @@ class SemanticOS:
         )
 
 
-_os_instance: Optional[SemanticOS] = None
+_os_instance: SemanticOS | None = None
 
 
 def get_semantic_os() -> SemanticOS:

@@ -75,7 +75,7 @@ def test_regression_alert_trigger() -> None:
                 recall=0.96,
                 fallback_rate=0.02,
                 latency_ms=800.0,
-            )
+            ),
         )
 
     # Record a degraded run
@@ -97,7 +97,12 @@ def test_regression_alert_trigger() -> None:
 def test_dashboard_generation() -> None:
     reporter = BenchmarkReporter()
     run = BenchmarkRun(
-        run_id="dashboard-run", timestamp=time.time(), precision=0.92, recall=0.88, fallback_rate=0.08, latency_ms=950.0
+        run_id="dashboard-run",
+        timestamp=time.time(),
+        precision=0.92,
+        recall=0.88,
+        fallback_rate=0.08,
+        latency_ms=950.0,
     )
     reporter.record_run(run)
 

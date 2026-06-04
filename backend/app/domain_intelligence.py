@@ -11,7 +11,6 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict, Optional
 from urllib.parse import urlparse
 
 from app.config import settings
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 class DomainIntelligence:
     """Aggregated behavioral metrics for a single domain."""
 
-    def __init__(self, domain: str, data: Optional[dict] = None):
+    def __init__(self, domain: str, data: dict | None = None):
         self.domain = domain
         self.hydration_delay_ms = data.get("hydration_delay_ms", 0.0) if data else 0.0
         self.infinite_scroll_required = data.get("infinite_scroll_required", False) if data else False
@@ -57,7 +56,7 @@ class DomainIntelligenceRegistry:
             storage_path = str(Path(__file__).resolve().parent.parent / "data" / "domain_intelligence.json")
         self.path = Path(storage_path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._registry: Dict[str, DomainIntelligence] = {}
+        self._registry: dict[str, DomainIntelligence] = {}
         self._load()
 
     def _load(self):

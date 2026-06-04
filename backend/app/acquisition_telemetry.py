@@ -10,7 +10,6 @@ import logging
 import time
 from collections import Counter
 from dataclasses import asdict, dataclass, field
-from typing import Optional
 
 from app.acquisition_state import AcquisitionState
 from app.config import settings
@@ -30,8 +29,8 @@ class AcquisitionEvent:
     fetch_method: str = ""
     session_bound: bool = False
     ephemeral_params: list[str] = field(default_factory=list)
-    recovery_method: Optional[str] = None
-    recovered_url: Optional[str] = None
+    recovery_method: str | None = None
+    recovered_url: str | None = None
     fetch_time_ms: float = 0.0
     timestamp: float = field(default_factory=time.time)
 

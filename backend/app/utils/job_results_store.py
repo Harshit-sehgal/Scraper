@@ -6,7 +6,6 @@ import gzip
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
     return str(path)
 
 
-def load_job_results_from_disk(job_id: str, file_path: Optional[str] = None) -> list[dict]:
+def load_job_results_from_disk(job_id: str, file_path: str | None = None) -> list[dict]:
     """
     Decompress and load the list of record dictionaries from disk for a given job ID.
 
@@ -91,7 +90,7 @@ def load_paginated_job_results_from_disk(
     job_id: str,
     limit: int = 100,
     offset: int = 0,
-    file_path: Optional[str] = None,
+    file_path: str | None = None,
 ) -> tuple[list[dict], int]:
     """
     Decompress and load only a paginated chunk of record dictionaries from disk.
@@ -130,8 +129,8 @@ def load_paginated_job_results_from_disk(
 
 def load_job_results_from_disk_safe(
     job_id: str,
-    file_path: Optional[str] = None,
-) -> tuple[list[dict], Optional[str]]:
+    file_path: str | None = None,
+) -> tuple[list[dict], str | None]:
     """
     Load results from disk with graceful corruption handling.
 
@@ -180,7 +179,7 @@ def load_job_results_from_disk_safe(
     return results, warning
 
 
-def delete_job_results_from_disk(job_id: str, file_path: Optional[str] = None) -> bool:
+def delete_job_results_from_disk(job_id: str, file_path: str | None = None) -> bool:
     """
     Delete the compressed results file from disk for a given job ID.
 

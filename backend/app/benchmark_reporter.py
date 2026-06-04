@@ -16,7 +16,7 @@ import sqlite3
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class BenchmarkRun:
     recall: float
     fallback_rate: float
     latency_ms: float
-    failed_selectors: List[str] = field(default_factory=list)
+    failed_selectors: list[str] = field(default_factory=list)
 
 
 class BenchmarkReporter:
@@ -68,7 +68,7 @@ class BenchmarkReporter:
             """)
             conn.commit()
 
-    def record_run(self, run: BenchmarkRun) -> Dict[str, Any]:
+    def record_run(self, run: BenchmarkRun) -> dict[str, Any]:
         """Record a benchmark run and check for regressions against previous averages."""
         comparison = self.compare_against_history(run.precision, run.recall)
 
@@ -89,7 +89,7 @@ class BenchmarkReporter:
 
         return comparison
 
-    def compare_against_history(self, current_precision: float, current_recall: float) -> Dict[str, Any]:
+    def compare_against_history(self, current_precision: float, current_recall: float) -> dict[str, Any]:
         """Compare current precision / recall against historical averages."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -123,7 +123,7 @@ class BenchmarkReporter:
             "message": message,
         }
 
-    def get_history(self, limit: int = 10) -> List[BenchmarkRun]:
+    def get_history(self, limit: int = 10) -> list[BenchmarkRun]:
         """Retrieve recent benchmark runs from the persistent store."""
         runs = []
         with sqlite3.connect(self.db_path) as conn:
@@ -148,7 +148,7 @@ class BenchmarkReporter:
                         fallback_rate=row[4],
                         latency_ms=row[5],
                         failed_selectors=failures,
-                    )
+                    ),
                 )
         return runs
 
@@ -172,7 +172,7 @@ class BenchmarkReporter:
                 failed_str = ", ".join(run.failed_selectors) if run.failed_selectors else "None"
                 f.write(
                     f"| `{run.run_id}` | {date_str} | **{run.precision:.2%}** | **{run.recall:.2%}** | "
-                    f"{run.fallback_rate:.2%} | {run.latency_ms:.0f}ms | {failed_str} |\n"
+                    f"{run.fallback_rate:.2%} | {run.latency_ms:.0f}ms | {failed_str} |\n",
                 )
 
             # Add simple visual progress indicators
@@ -181,11 +181,11 @@ class BenchmarkReporter:
             f.write(
                 f"- **Latest Extraction Success (Precision)**: `{'█' * int(latest.precision * 20)}{
                     '░' * (20 - int(latest.precision * 20))
-                }` ({latest.precision:.2%})\n"
+                }` ({latest.precision:.2%})\n",
             )
             f.write(
                 f"- **Latest Capture Rate (Recall)**: `{'█' * int(latest.recall * 20)}{'░' * (20 - int(latest.recall * 20))}` ({
-                    latest.recall:.2%})\n"
+                    latest.recall:.2%})\n",
             )
             f.write(f"- **Latest Fallback Rate**: `{latest.fallback_rate:.2%}`\n")
             f.write(f"- **Latest Average Scrape Latency**: `{latest.latency_ms:.0f}ms`\n\n")

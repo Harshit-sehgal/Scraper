@@ -91,7 +91,7 @@ def test_boost_contacts_with_page_html_injects_page_contact_when_missing() -> No
             "email": None,
             "website": "https://gamma.example",
             "record_score": 0.7,
-        }
+        },
     ]
     html = """
     <html><body>

@@ -207,7 +207,12 @@ def test_progress_persistence_without_full_state_rewrite(monkeypatch) -> None:
     # Define minimal job and store
     job_id = "test-job-hot-updates"
     job = Job(
-        id=job_id, name="Hot Update Test", status=JobStatus.PENDING, urls=["https://example.com"], schema_fields=[], filters=[]
+        id=job_id,
+        name="Hot Update Test",
+        status=JobStatus.PENDING,
+        urls=["https://example.com"],
+        schema_fields=[],
+        filters=[],
     )
     jobs_store = {job_id: job}
 
@@ -238,7 +243,7 @@ def test_progress_persistence_without_full_state_rewrite(monkeypatch) -> None:
                 insight_timeout_seconds=5,
                 persist_state_single_fn=mock_persist_single,
                 persist_state_single_critical_fn=mock_persist_single,
-            )
+            ),
         )
     finally:
         reset_domain_runtime_policy()
@@ -319,7 +324,7 @@ def test_save_and_load_job_from_sqlite(monkeypatch) -> None:
 
         save_state(jobs_store, recycle_bin_store)
 
-        loaded_jobs, loaded_recycle, _ = load_state()
+        loaded_jobs, _loaded_recycle, _ = load_state()
 
         assert job.id in loaded_jobs
         loaded_job = loaded_jobs[job.id]
@@ -344,7 +349,7 @@ def test_save_and_load_job_from_sqlite(monkeypatch) -> None:
 
 
 def test_running_job_marked_failed_after_restart(monkeypatch) -> None:
-    """Verify that jobs in PENDING/DISCOVERING/RUNNING state are transitioned to FAILED with a restart error when loaded on restart."""  # noqa: E501
+    """Verify that jobs in PENDING/DISCOVERING/RUNNING state are transitioned to FAILED with a restart error when loaded on restart."""
     from app.config import settings
     from app.job_store import load_state, reset_job_store_for_tests, save_state
     from app.models import Job, JobStatus
@@ -445,7 +450,7 @@ def test_json_to_sqlite_migration_imports_existing_jobs(monkeypatch) -> None:
         # Write mock legacy JSON state
         legacy_data = {
             "jobs": [
-                {"id": "legacy-j1", "name": "Legacy 1", "status": "completed", "urls": ["https://legacy"], "schema_fields": []}
+                {"id": "legacy-j1", "name": "Legacy 1", "status": "completed", "urls": ["https://legacy"], "schema_fields": []},
             ],
             "recycle_bin": [],
         }
@@ -525,7 +530,7 @@ def test_same_domain_concurrency_respected(monkeypatch) -> None:
                 per_url_scrape_timeout_seconds=5,
                 ai_structuring_timeout_seconds=5,
                 insight_timeout_seconds=5,
-            )
+            ),
         )
     finally:
         reset_domain_runtime_policy()

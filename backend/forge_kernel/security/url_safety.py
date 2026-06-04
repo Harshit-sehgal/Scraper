@@ -30,15 +30,18 @@ def _is_safe_ip(ip_str: str) -> bool:
 def validate_public_http_url(url: str) -> None:
     """Raise ValueError if the URL is not a safe public HTTP(S) URL."""
     if not url:
-        raise ValueError("URL cannot be empty")
+        msg = "URL cannot be empty"
+        raise ValueError(msg)
 
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"}:
-        raise ValueError(f"URL scheme '{parsed.scheme}' is not supported. Only http and https are allowed.")
+        msg = f"URL scheme '{parsed.scheme}' is not supported. Only http and https are allowed."
+        raise ValueError(msg)
 
     hostname = parsed.hostname
     if not hostname:
-        raise ValueError(f"URL '{url}' does not contain a valid hostname.")
+        msg = f"URL '{url}' does not contain a valid hostname."
+        raise ValueError(msg)
 
     hostname_lower = hostname.lower()
 
@@ -51,11 +54,13 @@ def validate_public_http_url(url: str) -> None:
 
     # Reject explicit loopback / internal names
     if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):
-        raise ValueError(f"URL hostname '{hostname}' is a restricted local loopback target.")
+        msg = f"URL hostname '{hostname}' is a restricted local loopback target."
+        raise ValueError(msg)
 
     # Reject cloud metadata endpoints
     if hostname_lower in ("169.254.169.254", "metadata.google.internal", "instance-data"):
-        raise ValueError(f"URL hostname '{hostname}' is a restricted cloud metadata endpoint.")
+        msg = f"URL hostname '{hostname}' is a restricted cloud metadata endpoint."
+        raise ValueError(msg)
 
     # Reject direct IP literals
     try:
@@ -64,13 +69,15 @@ def validate_public_http_url(url: str) -> None:
         ip_literal = None
     if ip_literal is not None:
         if not _is_safe_ip(str(ip_literal)):
-            raise ValueError(f"URL resolves to restricted IP {ip_literal} — rejected for security.")
+            msg = f"URL resolves to restricted IP {ip_literal} — rejected for security."
+            raise ValueError(msg)
         return
 
     # Reject internal TLDs
     for tld in (".local", ".internal", ".lan", ".corp"):
         if hostname_lower.endswith(tld):
-            raise ValueError(f"URL hostname '{hostname}' uses internal TLD '{tld}' which is restricted.")
+            msg = f"URL hostname '{hostname}' uses internal TLD '{tld}' which is restricted."
+            raise ValueError(msg)
 
     # DNS resolution check
     try:
@@ -78,8 +85,10 @@ def validate_public_http_url(url: str) -> None:
         for addr in addrs:
             ip = str(addr[4][0])
             if not _is_safe_ip(ip):
-                raise ValueError(f"URL hostname '{hostname}' resolves to restricted IP {ip}.")
+                msg = f"URL hostname '{hostname}' resolves to restricted IP {ip}."
+                raise ValueError(msg)
     except (socket.gaierror, OSError) as e:
         if sec.ENV.lower() in ("production", "staging"):
-            raise ValueError(f"URL hostname '{hostname}' could not be resolved — rejected for security.")
+            msg = f"URL hostname '{hostname}' could not be resolved — rejected for security."
+            raise ValueError(msg)
         logger.warning("DNS resolution failed for hostname '%s': %s", hostname, e)

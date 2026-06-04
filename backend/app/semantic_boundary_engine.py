@@ -8,7 +8,6 @@ boundary decisions based on structural signals and learned history.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
 
 def get_world_state():
@@ -113,12 +112,12 @@ class RoleTransitionDetector:
         return get_world_state()
 
     @property
-    def transition_probs(self) -> Dict[Tuple[str, str], float]:
-        return self._ws.transition_probs
+    def transition_probs(self) -> dict[tuple[str, str], float]:
+        return self._ws.transition_probs  # type: ignore[no-any-return]
 
     @property
     def observation_count(self) -> int:
-        return self._ws.transition_observations
+        return self._ws.transition_observations  # type: ignore[no-any-return]
 
     @observation_count.setter
     def observation_count(self, value: int):
@@ -133,9 +132,9 @@ class RoleTransitionDetector:
         """Observe whether a transition was a role boundary or entity continuation."""
         self._ws.observe_transition(type_a, type_b, is_role_boundary)
 
-    def get_high_transition_types(self) -> List[Tuple[str, str]]:
+    def get_high_transition_types(self) -> list[tuple[str, str]]:
         """Get type pairs with high transition probability."""
-        return self._ws.get_high_transition_types()
+        return self._ws.get_high_transition_types()  # type: ignore[no-any-return]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -151,20 +150,20 @@ class CohesionModel:
     """
 
     @property
-    def merge_success(self) -> Dict[Tuple[str, str], float]:
-        return get_world_state().cohesion_merge_success
+    def merge_success(self) -> dict[tuple[str, str], float]:
+        return get_world_state().cohesion_merge_success  # type: ignore[no-any-return]
 
     @property
-    def merge_attempts(self) -> Dict[Tuple[str, str], float]:
-        return get_world_state().cohesion_merge_attempts
+    def merge_attempts(self) -> dict[tuple[str, str], float]:
+        return get_world_state().cohesion_merge_attempts  # type: ignore[no-any-return]
 
     @property
-    def split_success(self) -> Dict[Tuple[str, str], float]:
-        return get_world_state().cohesion_split_success
+    def split_success(self) -> dict[tuple[str, str], float]:
+        return get_world_state().cohesion_split_success  # type: ignore[no-any-return]
 
     @property
-    def split_attempts(self) -> Dict[Tuple[str, str], float]:
-        return get_world_state().cohesion_split_attempts
+    def split_attempts(self) -> dict[tuple[str, str], float]:
+        return get_world_state().cohesion_split_attempts  # type: ignore[no-any-return]
 
     def record(self, type_a: str, type_b: str, did_merge: bool, success: bool):
         """Record whether a merge or split decision was successful."""
@@ -217,13 +216,13 @@ class MotifLearner:
 
     @property
     def total_records(self) -> int:
-        return get_world_state().metrics.total_records_processed
+        return get_world_state().metrics.total_records_processed  # type: ignore[no-any-return]
 
     @total_records.setter
     def total_records(self, value: int):
         get_world_state().metrics.total_records_processed = value
 
-    def observe_types(self, types: List[str]):
+    def observe_types(self, types: list[str]):
         # Identity Protection: filter out known-noisy motifs
         if any(t == "text" for t in types) and len(types) > 4:
             return
@@ -237,9 +236,9 @@ class MotifLearner:
                 motif = tuple(types[start : start + size])
                 ws.reinforce_motif(motif)
 
-    def stability(self, motif: Tuple[str, ...]) -> float:
+    def stability(self, motif: tuple[str, ...]) -> float:
         """Get the stability score for a type motif (0 - 1)."""
-        return get_world_state().get_motif_stability(motif)
+        return get_world_state().get_motif_stability(motif)  # type: ignore[no-any-return]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -257,7 +256,7 @@ class SemanticBoundaryEngine:
 
     @property
     def decision_history(self) -> list:
-        return get_world_state().decision_history
+        return get_world_state().decision_history  # type: ignore[no-any-return]
 
     def score_pair(self, type_a: str, type_b: str, value_a: str, value_b: str, position_a: int, position_b: int) -> BoundaryScore:
         """Score an adjacent token pair for cohesion vs separation."""
@@ -335,7 +334,7 @@ class SemanticBoundaryEngine:
 
     def save_state(self) -> dict:
         """Export learned memory for persistence."""
-        return get_world_state().to_dict()
+        return get_world_state().to_dict()  # type: ignore[no-any-return]
 
     def load_state(self, state: dict):
         """Import learned memory from persistence."""
@@ -474,7 +473,7 @@ def group_adjacent_entities(records: list) -> list:
     return records
 
 
-_boundary_engine: Optional[SemanticBoundaryEngine] = None
+_boundary_engine: SemanticBoundaryEngine | None = None
 
 
 def get_boundary_engine() -> SemanticBoundaryEngine:
@@ -495,6 +494,6 @@ def score_boundary(type_a: str, type_b: str, value_a: str, value_b: str, pos_a: 
     return engine.decide_merge(type_a, type_b, value_a, value_b, pos_a, pos_b)
 
 
-def record_motif_observation(types: List[str]):
+def record_motif_observation(types: list[str]):
     engine = get_boundary_engine()
     engine.motif_learner.observe_types(types)

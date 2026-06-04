@@ -64,7 +64,8 @@ def test_llm_json_fast_uses_groq_fallback_model(monkeypatch) -> None:
         model = payload.get("model")
         calls.append(model)
         if model == "primary-model":
-            raise RuntimeError("429 throttled")
+            msg = "429 throttled"
+            raise RuntimeError(msg)
         if model == "fallback-model":
             return {"records": [{"company_name": "Fallback Row"}]}
         return {}
@@ -78,7 +79,7 @@ def test_llm_json_fast_uses_groq_fallback_model(monkeypatch) -> None:
             messages=[{"role": "user", "content": "test"}],
             temperature=0.0,
             timeout=3,
-        )
+        ),
     )
 
     assert out == {"records": [{"company_name": "Fallback Row"}]}

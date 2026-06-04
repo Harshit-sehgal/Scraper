@@ -42,7 +42,7 @@ class TestWorkerRecovery:
         save_state(jobs, {})
 
         # Load state (simulating restart)
-        loaded_jobs, recycle_bin, _ = load_state(recover_in_progress=False)
+        loaded_jobs, _recycle_bin, _ = load_state(recover_in_progress=False)
 
         # Verify job persisted
         assert job.id in loaded_jobs
@@ -85,7 +85,8 @@ class TestDatabaseFailure:
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise sqlite3.OperationalError("database is locked")
+                msg = "database is locked"
+                raise sqlite3.OperationalError(msg)
             return sqlite3.connect(":memory:")
 
         # Verify connection function exists

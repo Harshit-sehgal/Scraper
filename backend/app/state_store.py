@@ -16,7 +16,6 @@ import logging
 import shutil
 from pathlib import Path
 from threading import Lock
-from typing import Optional
 
 from app.models import Job, JobStatus
 
@@ -58,20 +57,20 @@ def _validate_payload(payload: dict) -> bool:
     return True
 
 
-def _try_load_from(path: Path) -> Optional[dict]:
+def _try_load_from(path: Path) -> dict | None:
     """Try to load and parse the JSON state file. Returns None on failure."""
     try:
         raw = path.read_text(encoding="utf-8")
         payload = json.loads(raw)
         if _validate_payload(payload):
-            return payload
+            return payload  # type: ignore[no-any-return]
         logging.error("State file %s failed structural validation", path)
     except Exception as e:
         logging.error("Failed to read / parse state file %s: %s", path, e)
     return None
 
 
-def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+def load_state() -> tuple[dict[str, Job], dict[str, Job], dict | None]:
     path = get_state_file_path()
     if not path.exists():
         return {}, {}, None
@@ -118,7 +117,7 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
 
     # Phase 68: Semantic field state — restore from persisted world_state if
     # present
-    world_state_data: Optional[dict] = payload.get("world_state")
+    world_state_data: dict | None = payload.get("world_state")
 
     return jobs_store, recycle_bin_store, world_state_data
 

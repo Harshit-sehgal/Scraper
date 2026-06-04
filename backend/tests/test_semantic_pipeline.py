@@ -133,13 +133,13 @@ def test_spanish_allocation() -> None:
 
 
 def test_alloc_empty_tokens() -> None:
-    result, graph = allocate_semantic_roles(SemanticRecord(tokens=[]), ["name"])
+    _result, graph = allocate_semantic_roles(SemanticRecord(tokens=[]), ["name"])
     assert graph.roles["name"].filled_by is None
 
 
 def test_alloc_empty_schema() -> None:
     t = create_token("test", 0, 4, 0, SemanticType.TEXT)
-    result, graph = allocate_semantic_roles(SemanticRecord(tokens=[t]), [])
+    _result, graph = allocate_semantic_roles(SemanticRecord(tokens=[t]), [])
     assert len(graph.roles) == 0
 
 
@@ -162,7 +162,7 @@ def test_alloc_simple() -> None:
             type_distribution={SemanticType.PRICE: 0.85},
         ),
     ]
-    result, graph = allocate_semantic_roles(SemanticRecord(tokens=tokens), ["name", "price"])
+    _result, graph = allocate_semantic_roles(SemanticRecord(tokens=tokens), ["name", "price"])
     assert graph.roles["price"].filled_by == "238"
     assert graph.roles["name"].filled_by == "Lufthansa"
 

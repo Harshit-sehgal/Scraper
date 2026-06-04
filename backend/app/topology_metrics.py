@@ -7,13 +7,13 @@ caller through TopologyState APIs.
 Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
 """
 
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.topology_state import TopologyState
 
 
-def compute_aggregate_metrics(state: "TopologyState") -> Dict:
+def compute_aggregate_metrics(state: "TopologyState") -> dict:
     """Aggregate region metrics into summary dicts."""
     regs = state._get_regions()
     if not regs:
@@ -42,7 +42,7 @@ def compute_macro_energy(state: "TopologyState", convergence: float) -> float:
     attractor_strength = 1.0 / (1.0 + 2.718 ** (-15 * (convergence - 0.6)))
     attractor_pull = min(attractor_strength * convergence * 2.0, 2.0)
     target_energy = max(0.0, avg_energy - attractor_pull)
-    return target_energy
+    return target_energy  # type: ignore[no-any-return]
 
 
 def distill_crystalline_atoms(

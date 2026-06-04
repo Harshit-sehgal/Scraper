@@ -444,8 +444,9 @@ class TestDiscoverSelectors:
             patch("app.selector_discovery.llm_json", new_callable=AsyncMock, return_value="not a dict"),
         ):
             result = await discover_selectors(
-                "<html>...</html>", [SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)]
-            )  # noqa: E501
+                "<html>...</html>",
+                [SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)],
+            )
             assert result == {}
 
     @pytest.mark.asyncio
@@ -455,8 +456,9 @@ class TestDiscoverSelectors:
             patch("app.selector_discovery.llm_json", new_callable=AsyncMock, side_effect=ValueError("API error")),
         ):
             result = await discover_selectors(
-                "<html>...</html>", [SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)]
-            )  # noqa: E501
+                "<html>...</html>",
+                [SchemaField(name="x", field_type=FieldType.STRING, description="", required=False)],
+            )
             assert result == {}
 
     @pytest.mark.asyncio

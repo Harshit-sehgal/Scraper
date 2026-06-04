@@ -120,7 +120,8 @@ async def test_failed_lineage_uses_computed_anti_bot_state(monkeypatch) -> None:
     import app.scraper_recovery_integration as recovery
 
     async def fake_scrape_url(*args, **kwargs):
-        raise RuntimeError("captcha challenge blocked")
+        msg = "captcha challenge blocked"
+        raise RuntimeError(msg)
 
     monkeypatch.setattr("app.scraper.scrape_url", fake_scrape_url)
 
@@ -262,7 +263,8 @@ async def test_crawl_policy_active_counter_never_leaks_on_fetch_failure(monkeypa
 
     # Simulate fetch throwing an exception
     async def fake_fetch(*args, **kwargs):
-        raise RuntimeError("simulated fetch crash")
+        msg = "simulated fetch crash"
+        raise RuntimeError(msg)
 
     monkeypatch.setattr(scraper, "fetch_page_content", fake_fetch)
 

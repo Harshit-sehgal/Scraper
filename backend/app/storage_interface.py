@@ -1,6 +1,5 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from app.models import Job
 
@@ -24,7 +23,7 @@ class JobRepository(ABC):
         pass
 
     @abstractmethod
-    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         """Load active jobs, recycled jobs, and world state in a single DB read pass.
 
         Args:
@@ -78,13 +77,13 @@ class JobRepository(ABC):
         """Permanently delete a job. Returns True if deleted."""
         raise NotImplementedError
 
-    def clear_terminal_jobs(self, older_than: Optional[str] = None) -> int:
+    def clear_terminal_jobs(self, older_than: str | None = None) -> int:
         """Remove terminal-status jobs older than the given timestamp. Returns count removed."""
         raise NotImplementedError
 
     # ─── World state persistence ────────────────────────────────────────
 
-    def load_world_state(self) -> Optional[dict]:
+    def load_world_state(self) -> dict | None:
         """Load semantic world state from the persistent store."""
         return None
 
@@ -113,7 +112,7 @@ class SQLiteJobRepository(JobRepository):
         _, recycle, _ = load_state(recover_in_progress=False)
         return recycle
 
-    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], Optional[dict]]:
+    def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         from app.job_store import load_state
 
         return load_state(recover_in_progress=recover_in_progress)
@@ -168,7 +167,7 @@ class SQLiteJobRepository(JobRepository):
             tmp_path = f.name
         os.replace(tmp_path, str(ws_path))
 
-    def load_world_state(self) -> Optional[dict]:
+    def load_world_state(self) -> dict | None:
         """Load semantic world state from the SQLite world_state.json file."""
         import json
 
@@ -177,7 +176,7 @@ class SQLiteJobRepository(JobRepository):
         ws_path = _get_db_path().parent / "world_state.json"
         if ws_path.exists():
             try:
-                return json.loads(ws_path.read_text())
+                return json.loads(ws_path.read_text())  # type: ignore[no-any-return]
             except Exception:
                 return None
         return None
@@ -272,7 +271,7 @@ class SQLiteJobRepository(JobRepository):
             finally:
                 conn.close()
 
-    def clear_terminal_jobs(self, older_than: Optional[str] = None) -> int:
+    def clear_terminal_jobs(self, older_than: str | None = None) -> int:
         """Remove terminal-status jobs atomically in SQLite and move them to recycle_bin."""
         from app.job_store import _DB_LOCK, _get_connection
 
@@ -345,19 +344,25 @@ def get_job_repository() -> JobRepository:
     if storage_backend == "postgres":
         database_url = settings.DATABASE_URL
         if not database_url:
-            raise RuntimeError(
+            msg = (
                 "DATAFORGE_STORAGE_BACKEND=postgres requires DATAFORGE_DATABASE_URL "
                 "to be set. Example: postgresql://user:pass@host:5432/dataforge"
+            )
+            raise RuntimeError(
+                msg,
             )
         try:
             from app.postgres_repository import PostgresJobRepository, verify_postgres_connectivity
 
             connectivity = verify_postgres_connectivity()
             if not connectivity.get("ok"):
-                raise RuntimeError(
+                msg = (
                     f"Postgres connectivity check failed: {connectivity.get('error', 'unknown error')}. "
                     "Cannot use Postgres backend. Check DATAFORGE_DATABASE_URL and ensure "
                     "the database is running."
+                )
+                raise RuntimeError(
+                    msg,
                 )
             repo: JobRepository = PostgresJobRepository()
             _repository_instance = repo
@@ -366,8 +371,9 @@ def get_job_repository() -> JobRepository:
         except RuntimeError:
             raise
         except Exception as e:
+            msg = f"Failed to create PostgresJobRepository: {e}. Install psycopg2-binary: pip install psycopg2-binary"
             raise RuntimeError(
-                f"Failed to create PostgresJobRepository: {e}. Install psycopg2-binary: pip install psycopg2-binary"
+                msg,
             ) from e
 
     repo_sqlite: JobRepository = SQLiteJobRepository()

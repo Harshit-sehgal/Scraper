@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def world_state_to_dict(ws: SemanticWorldState) -> dict:
     """Serialize the world state to a dict for JSON-compatible storage."""
-    return ws.to_dict()
+    return ws.to_dict()  # type: ignore[no-any-return]
 
 
 def world_state_from_dict(ws: SemanticWorldState, data: dict):

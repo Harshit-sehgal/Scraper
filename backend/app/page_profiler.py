@@ -8,7 +8,7 @@ Core principle: Detect structure and value patterns, not domain-specific feature
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any
 
 from bs4 import BeautifulSoup, Tag
 
@@ -20,41 +20,41 @@ class StructureProfile:
     structure_type: str  # table, cards, list, key_value, mixed
     container_selector: str  # CSS selector for data rows / cards
     # Table headers or field labels
-    headers: List[str] = field(default_factory=list)
+    headers: list[str] = field(default_factory=list)
     structure_confidence: float = 0.0  # How confident we are in detection
-    sample_containers: List[str] = field(default_factory=list)  # Sample container HTML
+    sample_containers: list[str] = field(default_factory=list)  # Sample container HTML
 
 
 @dataclass
 class ValuePatterns:
     """Represents what types of values the page contains, detected by pattern."""
 
-    currencies: List[str] = field(default_factory=list)  # ["£", "$", "€", "₹"]
-    dates: List[str] = field(default_factory=list)  # date format samples
+    currencies: list[str] = field(default_factory=list)  # ["£", "$", "€", "₹"]
+    dates: list[str] = field(default_factory=list)  # date format samples
     # ["4.5 / 5", "★★★", "8.5"]
-    ratings: List[str] = field(default_factory=list)
-    codes_3letter: List[str] = field(default_factory=list)  # ["LON", "PAR", "BOM"]
-    phones: List[str] = field(default_factory=list)
-    emails: List[str] = field(default_factory=list)
-    numbers: List[str] = field(default_factory=list)
-    durations: List[str] = field(default_factory=list)
-    urls: List[str] = field(default_factory=list)
+    ratings: list[str] = field(default_factory=list)
+    codes_3letter: list[str] = field(default_factory=list)  # ["LON", "PAR", "BOM"]
+    phones: list[str] = field(default_factory=list)
+    emails: list[str] = field(default_factory=list)
+    numbers: list[str] = field(default_factory=list)
+    durations: list[str] = field(default_factory=list)
+    urls: list[str] = field(default_factory=list)
     # ["250g", "1kg", "500 g", "2lb"]
-    weights: List[str] = field(default_factory=list)
-    percentages: List[str] = field(default_factory=list)  # ["8%", "20% off", "0.5%"]
+    weights: list[str] = field(default_factory=list)
+    percentages: list[str] = field(default_factory=list)  # ["8%", "20% off", "0.5%"]
     # ["14:30", "2:30 PM", "08:00"]
-    times: List[str] = field(default_factory=list)
+    times: list[str] = field(default_factory=list)
     # ["Available", "In Stock", "Yes", "No"]
-    booleans: List[str] = field(default_factory=list)
+    booleans: list[str] = field(default_factory=list)
     # ["10x15cm", "5\"x7\"", "A4"]
-    dimensions: List[str] = field(default_factory=list)
+    dimensions: list[str] = field(default_factory=list)
     # ["Pack of 6", "12 pieces", "500ml"]
-    quantities: List[str] = field(default_factory=list)
+    quantities: list[str] = field(default_factory=list)
     # ["SKU-12345", "#ABC123", "EAN 123456789"]
-    product_codes: List[str] = field(default_factory=list)
+    product_codes: list[str] = field(default_factory=list)
     # ["per kg", "per item", "each", "dozen"]
-    units: List[str] = field(default_factory=list)
-    address_fragments: List[str] = field(default_factory=list)  # ["123 Main St", "New York, NY"]
+    units: list[str] = field(default_factory=list)
+    address_fragments: list[str] = field(default_factory=list)  # ["123 Main St", "New York, NY"]
 
 
 # Universal patterns for value type detection (NOT domain-specific)
@@ -117,7 +117,7 @@ VALUE_PATTERNS = {
         r"\d{1,2}\s*(?:AM|PM|am|pm)",  # 2 PM, 11 AM
     ],
     "boolean": [
-        r"\b(?:Yes|No|True|False|Available|Unavailable|In\s+Stock|Out\s+of\s+Stock|Sold\s+Out|Inactive|Active|Enabled|Disabled)\b",  # noqa: E501
+        r"\b(?:Yes|No|True|False|Available|Unavailable|In\s+Stock|Out\s+of\s+Stock|Sold\s+Out|Inactive|Active|Enabled|Disabled)\b",
     ],
     "dimension": [
         # 10x15cm, 5x7
@@ -146,10 +146,10 @@ VALUE_PATTERNS = {
     ],
     "address": [
         # 123 Main St
-        r"\d+\s+[A-Za-z]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Drive|Dr|Boulevard|Blvd|Way|Circle|Cir|Court|Ct|Plaza|Square)",  # noqa: E501
+        r"\d+\s+[A-Za-z]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Drive|Dr|Boulevard|Blvd|Way|Circle|Cir|Court|Ct|Plaza|Square)",
         r"[A-Za-z ,]+\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln)\s+\d+",
         r"\b(?:P\.?\s*O\.?\s*Box)\s+\d+",
-        r"\b[\w\s]+,\s*(?:NY|CA|TX|FL|IL|OH|PA|GA|NC|MI|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|AL|SC|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|WV|ID|HI|NH|ME|RI|MT|DE|SD|ND|AK|VT|WY|DC)\b",  # noqa: E501
+        r"\b[\w\s]+,\s*(?:NY|CA|TX|FL|IL|OH|PA|GA|NC|MI|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|AL|SC|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|WV|ID|HI|NH|ME|RI|MT|DE|SD|ND|AK|VT|WY|DC)\b",
     ],
 }
 
@@ -188,7 +188,7 @@ def detect_page_structure(html: str) -> StructureProfile:
     return StructureProfile(structure_type="mixed", container_selector="body", headers=[], structure_confidence=0.3)
 
 
-def _detect_table_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
+def _detect_table_structure(soup: BeautifulSoup) -> StructureProfile | None:
     """Detect if page uses table structure."""
     tables = soup.find_all("table")
     if not tables:
@@ -227,14 +227,14 @@ def _detect_table_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
     )
 
 
-def _detect_cards_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
+def _detect_cards_structure(soup: BeautifulSoup) -> StructureProfile | None:
     """Detect if page uses card / listings structure."""
     # Card indicators (generic, not domain-specific)
     card_selectors: list[tuple[str, dict[str, Any]]] = [
-        ("div", {"class": re.compile(r"(card|item|result|listing|product)", re.I)}),
+        ("div", {"class": re.compile(r"(card|item|result|listing|product)", re.IGNORECASE)}),
         ("article", {}),
-        ("li", {"class": re.compile(r"(item|result)", re.I)}),
-        ("div", {"class": re.compile(r"(grid|grid-item|col)", re.I)}),
+        ("li", {"class": re.compile(r"(item|result)", re.IGNORECASE)}),
+        ("div", {"class": re.compile(r"(grid|grid-item|col)", re.IGNORECASE)}),
     ]
 
     best_container = None
@@ -293,7 +293,7 @@ def _detect_cards_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
     )
 
 
-def _detect_list_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
+def _detect_list_structure(soup: BeautifulSoup) -> StructureProfile | None:
     """Detect if page uses list structure."""
     # Check for ul / ol lists
     lists = soup.find_all(["ul", "ol"])
@@ -302,10 +302,9 @@ def _detect_list_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
 
     for lst in lists:
         items = lst.find_all("li")
-        if len(items) > 5:
-            if len(items) > max_items:
-                max_items = len(items)
-                best_list = lst
+        if len(items) > 5 and len(items) > max_items:
+            max_items = len(items)
+            best_list = lst
 
     if not best_list or max_items < 5:
         return None
@@ -322,7 +321,7 @@ def _detect_list_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
     )
 
 
-def _detect_key_value_structure(soup: BeautifulSoup) -> Optional[StructureProfile]:
+def _detect_key_value_structure(soup: BeautifulSoup) -> StructureProfile | None:
     """Detect if page uses key-value or definition list structure."""
     # Check for definition lists
     dl = soup.find("dl")
@@ -365,7 +364,7 @@ def _generate_container_selector(element) -> str:
         if classes:
             class_sel = ".".join(classes[:2])
             return f"{tag}.{class_sel}"
-        return tag
+        return tag  # type: ignore[no-any-return]
     return "div"
 
 

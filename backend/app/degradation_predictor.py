@@ -20,7 +20,6 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional
 
 from app.trend_analyzer import DomainTrend
 
@@ -43,7 +42,7 @@ class Prediction:
     """What kind of failure is predicted (e.g., 'selector_decay', 'anti_bot_block',
     'timeout_death_spiral', 'zero_result_drift', 'latency_collapse')."""
 
-    estimated_time_to_failure_hours: Optional[float] = None
+    estimated_time_to_failure_hours: float | None = None
     """How many hours until the predicted failure is expected to occur."""
 
     health_score_current: float = 100.0
@@ -369,7 +368,7 @@ class DegradationPredictor:
 
         return predictions
 
-    def _predict_health_failure(self, domain: str, trend: "DomainTrend") -> Optional[Prediction]:
+    def _predict_health_failure(self, domain: str, trend: "DomainTrend") -> Prediction | None:
         """Generate a general health-based prediction if health is poor or declining."""
         if trend.health_score >= self.MEDIUM_HEALTH_THRESHOLD:
             return None  # Healthy enough
@@ -449,7 +448,7 @@ class DegradationPredictor:
         adjusted = base * (0.5 + 0.5 * sample_factor)
         return max(0.1, min(1.0, adjusted))
 
-    def _estimate_selector_decay_timer(self, trend: "DomainTrend") -> Optional[float]:
+    def _estimate_selector_decay_timer(self, trend: "DomainTrend") -> float | None:
         """Estimate hours until selector decay causes significant extraction loss."""
         if trend.sample_count < 5:
             return None

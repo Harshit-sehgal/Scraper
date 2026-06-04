@@ -175,7 +175,8 @@ class TestWorkerPicksQueuedJob:
 
             job = jobs_store.get(job_id)
             if not job:
-                raise ValueError(f"Job not found: {job_id}")
+                msg = f"Job not found: {job_id}"
+                raise ValueError(msg)
 
             await run_job(
                 job_id=job_id,
@@ -221,7 +222,7 @@ class TestWorkerPicksQueuedJob:
 
         # Execute - simulate worker
         repo = get_job_repository()
-        jobs_store, recycle_bin_store, _ = repo.load_all()
+        jobs_store, _recycle_bin_store, _ = repo.load_all()
         assert job_id in jobs_store, f"Job {job_id} should be in the store"
 
         # Complete the task
@@ -365,7 +366,7 @@ class TestRealWorkerHandler:
         from app.storage_interface import get_job_repository
 
         repo = get_job_repository()
-        loaded_jobs, loaded_recycle, _ = repo.load_all()
+        loaded_jobs, _loaded_recycle, _ = repo.load_all()
         assert job_id in loaded_jobs, f"Job {job_id} should be in repository"
         assert loaded_jobs[job_id].status in (
             JobStatus.COMPLETED,

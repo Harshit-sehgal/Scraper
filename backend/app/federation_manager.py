@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +28,15 @@ class ShardStateSnapshot:
     transaction_id: int
     # Domain reputations: domain -> {consecutive_failures, total_fetches,
     # cooldown_until, last_update}
-    domain_reputation: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    domain_reputation: dict[str, dict[str, Any]] = field(default_factory=dict)
     # Learned motifs: list of field co-occurrence lists
-    motifs: List[List[str]] = field(default_factory=list)
+    motifs: list[list[str]] = field(default_factory=list)
     # Topological state: "src:tgt" -> cohesion mapping
-    topology: Dict[str, float] = field(default_factory=dict)
+    topology: dict[str, float] = field(default_factory=dict)
     # Topological metadata: "src:tgt" -> {node_id, timestamp, version, epoch}
-    topology_metadata: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    topology_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
     # Transactional delta log for replay checks
-    delta_log: List[Dict[str, Any]] = field(default_factory=list)
+    delta_log: list[dict[str, Any]] = field(default_factory=list)
 
 
 class FederationManager:
@@ -48,9 +48,9 @@ class FederationManager:
 
         self.node_id = settings.NODE_ID
         self.shard_id = settings.SHARD_ID
-        self.registered_nodes: Dict[str, Dict[str, Any]] = {}
-        self.last_sync_timestamps: Dict[str, float] = {}
-        self.divergence_metrics: Dict[str, Any] = {
+        self.registered_nodes: dict[str, dict[str, Any]] = {}
+        self.last_sync_timestamps: dict[str, float] = {}
+        self.divergence_metrics: dict[str, Any] = {
             "reconciled_merges": 0,
             "drift_warnings": 0,
             "failed_replays": 0,
@@ -127,7 +127,7 @@ class FederationManager:
             delta_log=delta_log,
         )
 
-    def merge_remote_state(self, remote: ShardStateSnapshot) -> Dict[str, Any]:
+    def merge_remote_state(self, remote: ShardStateSnapshot) -> dict[str, Any]:
         """Merge remote state snapshot into the local world state using absolute laws."""
         self.register_node(remote.node_id, remote.shard_id)
         self.last_sync_timestamps[remote.node_id] = remote.timestamp
@@ -178,7 +178,8 @@ class FederationManager:
                     # 1. Fetch remote version metadata, or default to standard
                     # LWW
                     r_meta = remote_meta_dict.get(
-                        key, {"node_id": remote.node_id, "timestamp": remote.timestamp, "version": 1, "epoch": 0}
+                        key,
+                        {"node_id": remote.node_id, "timestamp": remote.timestamp, "version": 1, "epoch": 0},
                     )
                     r_epoch = r_meta.get("epoch", 0)
                     r_ver = r_meta.get("version", 1)
@@ -228,9 +229,8 @@ class FederationManager:
                         elif r_ver == l_ver:
                             if r_ts > l_ts:
                                 remote_wins = True
-                            elif r_ts == l_ts:
-                                if r_node > l_node:
-                                    remote_wins = True
+                            elif r_ts == l_ts and r_node > l_node:
+                                remote_wins = True
 
                     # 4. If remote wins, write remote cohesion and metadata
                     # Otherwise, remote is discarded (local retains authority)
@@ -243,7 +243,7 @@ class FederationManager:
         logger.info("[Federation] Successfully merged remote state from node %s: %s", remote.node_id, merge_report)
         return merge_report
 
-    def replay_deltas(self, deltas: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def replay_deltas(self, deltas: list[dict[str, Any]]) -> dict[str, Any]:
         """Sequence and replay remote state transactions to reconcile partition drifts."""
         replay_report = {
             "received": len(deltas),
@@ -302,4 +302,4 @@ class FederationManager:
             self.divergence_metrics["drift_warnings"] += 1
             logger.warning("[Federation] Significant drift divergence detected: %.4f", avg_drift)
 
-        return avg_drift
+        return avg_drift  # type: ignore[no-any-return]

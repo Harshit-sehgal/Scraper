@@ -15,7 +15,7 @@ import logging
 import random
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.config import settings
 
@@ -77,13 +77,13 @@ class AntiBotEngine:
     """Intelligent engine for detecting and bypassing anti-bot systems."""
 
     def __init__(self) -> None:
-        self._block_history: Dict[str, List[float]] = {}
+        self._block_history: dict[str, list[float]] = {}
         # Lazy import to avoid circular dependencies
         self._proxy_manager: Any = None
-        self._cookies: Dict[str, str] = {}  # domain -> cookie_string
-        self._last_cookie_update: Dict[str, float] = {}
+        self._cookies: dict[str, str] = {}  # domain -> cookie_string
+        self._last_cookie_update: dict[str, float] = {}
         # domain -> user agents used
-        self._ua_history: Dict[str, List[str]] = {}
+        self._ua_history: dict[str, list[str]] = {}
 
     @property
     def proxy_manager(self):
@@ -94,7 +94,7 @@ class AntiBotEngine:
             self._proxy_manager = get_proxy_manager()
         return self._proxy_manager
 
-    def detect_challenges(self, html: str, headers: Optional[dict] = None) -> float:
+    def detect_challenges(self, html: str, headers: dict | None = None) -> float:
         """Score how likely the page is a challenge or block page.
 
         Returns a score from 0.0 (clean) to 1.0 (certainly blocked).
@@ -291,12 +291,12 @@ class AntiBotEngine:
         if self.proxy_manager.enabled:
             self.proxy_manager.record_success()
 
-    def rotate_proxy(self) -> Optional[str]:
+    def rotate_proxy(self) -> str | None:
         """Explicitly rotate to next proxy and return it."""
         if self.proxy_manager.enabled:
             new_proxy = self.proxy_manager.rotate()
             logger.info(f"Rotated proxy: {new_proxy}")
-            return new_proxy
+            return new_proxy  # type: ignore[no-any-return]
         return None
 
 

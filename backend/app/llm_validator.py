@@ -14,7 +14,8 @@ Reduces the risk of:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from app.config import settings
 
@@ -27,9 +28,9 @@ logger = logging.getLogger(__name__)
 def validate_llm_json(
     raw: Any,
     expected_type: type = dict,
-    required_keys: Optional[list[str]] = None,
-    key_types: Optional[dict[str, type | tuple[type, ...]]] = None,
-    list_item_type: Optional[type] = None,
+    required_keys: list[str] | None = None,
+    key_types: dict[str, type | tuple[type, ...]] | None = None,
+    list_item_type: type | None = None,
     allow_extra_keys: bool = True,
 ) -> tuple[bool, str | None]:
     """Validate that an LLM JSON response matches expected structure.
@@ -64,28 +65,26 @@ def validate_llm_json(
 
         if key_types:
             for key, expected in key_types.items():
-                if key in raw and raw[key] is not None:
-                    if not isinstance(raw[key], expected):
-                        expected_name = getattr(expected, "__name__", str(expected))
-                        return False, (
-                            f"Key '{key}' expected type {expected_name}, got {type(raw[key]).__name__}: {str(raw[key])[:100]}"
-                        )
-
-    if expected_type is list and isinstance(raw, list):
-        if list_item_type and raw:
-            for i, item in enumerate(raw):
-                if not isinstance(item, list_item_type):
+                if key in raw and raw[key] is not None and not isinstance(raw[key], expected):
+                    expected_name = getattr(expected, "__name__", str(expected))
                     return False, (
-                        f"List item {i} expected type {list_item_type.__name__}, got {type(item).__name__}: {str(item)[:100]}"
+                        f"Key '{key}' expected type {expected_name}, got {type(raw[key]).__name__}: {str(raw[key])[:100]}"
                     )
+
+    if expected_type is list and isinstance(raw, list) and list_item_type and raw:
+        for i, item in enumerate(raw):
+            if not isinstance(item, list_item_type):
+                return False, (
+                    f"List item {i} expected type {list_item_type.__name__}, got {type(item).__name__}: {str(item)[:100]}"
+                )
 
     return True, None
 
 
 def validate_llm_record_list(
     raw: Any,
-    required_record_keys: Optional[list[str]] = None,
-    record_key_types: Optional[dict[str, type | tuple[type, ...]]] = None,
+    required_record_keys: list[str] | None = None,
+    record_key_types: dict[str, type | tuple[type, ...]] | None = None,
 ) -> tuple[bool, str | None]:
     """Validate an LLM response that should be a list of dict records.
 
@@ -174,7 +173,7 @@ def llm_call_with_validation(
 async def llm_call_with_validation_async(
     call_fn: Callable[[], Any],
     validator: Callable[[Any], tuple[bool, str | None]],
-    run_in_thread_fn: Optional[Callable] = None,
+    run_in_thread_fn: Callable | None = None,
     max_retries: int = 2,
 ) -> Any:
     """Async version of llm_call_with_validation.

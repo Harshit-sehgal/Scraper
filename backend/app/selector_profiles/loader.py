@@ -36,7 +36,6 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Optional
 
 from playwright.async_api import async_playwright
 
@@ -89,12 +88,12 @@ def _load_all_profiles() -> dict[str, dict]:
     return _profile_cache
 
 
-def match_profile_for_url(url: str) -> Optional[dict]:
+def match_profile_for_url(url: str) -> dict | None:
     """Public alias for domain profile lookup."""
     return _match_domain(url)
 
 
-def _match_domain(url: str) -> Optional[dict]:
+def _match_domain(url: str) -> dict | None:
     """Find a profile that matches the URL's domain.
 
     Uses substring matching so profile domains match www. and bare hostnames.
@@ -121,7 +120,7 @@ def reload_profiles():
 # ── Field Value Post-Processing ──────────────────────────────────────────
 
 
-def _parse_currency(text: Optional[str]) -> Optional[str]:
+def _parse_currency(text: str | None) -> str | None:
     """Extract numeric price from a string like '£238', 'AED 500', or '$1,234.56'."""
     if not text:
         return None
@@ -290,7 +289,7 @@ async def extract_with_profile(
                         record[field_name] = _postprocess_field(record[field_name], field_cfg)
 
             logger.info("[ProfileExtractor] Extracted %d records", len(records))
-            return records
+            return records  # type: ignore[no-any-return]
 
     except Exception as e:
         logger.exception("[ProfileExtractor] Fatal error for %s: %s", url, e)
@@ -308,7 +307,7 @@ async def extract_with_profile(
                 logger.debug("[ProfileExtractor] Failed to close browser gracefully")
 
 
-async def try_profile_extraction(url: str, max_wait: int | None = None) -> Optional[list[dict]]:
+async def try_profile_extraction(url: str, max_wait: int | None = None) -> list[dict] | None:
     """Try to extract data from a URL using a matching selector profile.
 
     Returns extracted records if a matching profile is found, or None if no

@@ -22,7 +22,6 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
-from typing import Dict, List
 
 from app.selector_memory import SelectorConfidenceScore, get_selector_memory
 
@@ -60,9 +59,9 @@ class SelectorDecayPredictor:
     """
 
     def __init__(self) -> None:
-        self._decay_history: Dict[str, List[float]] = defaultdict(list)
+        self._decay_history: dict[str, list[float]] = defaultdict(list)
         # Track confidence snapshots over time per domain
-        self._confidence_snapshots: Dict[str, List[tuple[float, float]]] = defaultdict(list)
+        self._confidence_snapshots: dict[str, list[tuple[float, float]]] = defaultdict(list)
         self._load()
 
     @staticmethod
@@ -159,7 +158,8 @@ class SelectorDecayPredictor:
         if len(recent_window) >= 2:
             older_avg = sum(s[1] for s in recent_window[: len(recent_window) // 2]) / max(1, len(recent_window) // 2)
             newer_avg = sum(s[1] for s in recent_window[len(recent_window) // 2 :]) / max(
-                1, len(recent_window) - len(recent_window) // 2
+                1,
+                len(recent_window) - len(recent_window) // 2,
             )
             # Positive velocity = confidence dropping
             velocity = older_avg - newer_avg  # positive = getting worse
