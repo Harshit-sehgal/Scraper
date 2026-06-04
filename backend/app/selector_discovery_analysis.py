@@ -188,8 +188,8 @@ async def discover_selectors(
             ],
             timeout=settings.LLM_SELECTOR_TIMEOUT,
         )
-    except Exception:
-        logger.exception("[SelectorDiscovery] LLM extraction failed: %s")
+    except (KeyError, ValueError, RuntimeError):
+        logger.exception("[SelectorDiscovery] LLM extraction failed")
 
     if not isinstance(selectors, dict):
         selectors = {}

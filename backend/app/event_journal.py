@@ -89,7 +89,7 @@ class EventJournal:
                     },
                 },
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # ReplayBuffer failure is non-fatal — journal continues normally
             logger.debug("ReplayBuffer persist skipped: %s", e)
 

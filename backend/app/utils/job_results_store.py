@@ -93,8 +93,8 @@ def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
         if temp_path.exists():
             try:
                 temp_path.unlink()
-            except Exception:  # nosec B110  # noqa: BLE001
-                pass
+            except Exception:  # nosec B110
+                pass  # nosec B110
         raise
 
     return str(path)
@@ -212,7 +212,7 @@ def load_job_results_from_disk_safe(
     except (gzip.BadGzipFile, EOFError, OSError) as e:
         warning = f"Results file for job {job_id} is truncated or corrupt: {e}. Returned {len(results)} partial records."
         logger.warning("%s", warning)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         warning = f"Failed to read results file for job {job_id}: {e}. Returned {len(results)} partial records."
         logger.warning("%s", warning)
 

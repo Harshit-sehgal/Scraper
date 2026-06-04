@@ -42,7 +42,7 @@ def _ensure_schema() -> None:
             # Verify the table has the expected structure
             try:
                 old_row = _fetch_one(conn, "SELECT id FROM queue_schema_version LIMIT 1")
-            except Exception:  # noqa: BLE001
+            except Exception:
                 old_row = None
             if old_row is None:
                 _execute(conn, "DROP TABLE IF EXISTS queue_schema_version CASCADE")
@@ -140,7 +140,7 @@ def _ensure_schema() -> None:
                 # Add result column (used for storing successful task results)
                 try:
                     _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN result TEXT")
-                except Exception:  # noqa: BLE001
+                except Exception:
                     pass  # nosec B110
                 current = 2
 
@@ -148,7 +148,7 @@ def _ensure_schema() -> None:
                 # Add execution_time_ms column for tracking task latencies
                 try:
                     _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN execution_time_ms INTEGER")
-                except Exception:  # noqa: BLE001
+                except Exception:
                     pass  # nosec B110
                 current = 3
 
@@ -630,7 +630,7 @@ class PostgresWorkerQueue:
                 await self.complete(task.id, result)
         except TimeoutError:
             await self.fail(task.id, f"Timeout after {task.timeout_seconds}s", retry=True)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             await self.fail(task.id, f"{type(e).__name__}: {e}", retry=True)
 
     async def _cleanup_in_flight(self, task_id: str) -> None:

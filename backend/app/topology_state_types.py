@@ -17,7 +17,7 @@ def parse_topology_key(raw: str) -> tuple[str, str]:
         msg = f"Topology key too large: {len(raw)} chars"
         raise ValueError(msg)
     try:
-        value = ast.literal_eval(raw)
+        value = ast.literal_eval(raw)  # nosec
     except (SyntaxError, ValueError, TypeError):
         msg = f"Invalid topology key format: {raw!r}"
         raise ValueError(msg)

@@ -60,7 +60,7 @@ def _refresh_job_from_repo(job: Job, jobs_store: dict) -> Job:
             fresh = fresh_jobs[job.id]
             jobs_store[job.id] = fresh
             return fresh
-    except Exception:  # noqa: BLE001
+    except (AttributeError, ImportError, RuntimeError):
         logging.getLogger(__name__).debug("Failed to refresh job %s from repo, using in-memory copy", job.id)
     return job
 
@@ -102,7 +102,7 @@ def create_jobs_router(
                         fresh = fresh_jobs[job_id]
                         jobs_store[job_id] = fresh
                         return fresh
-                except Exception:  # noqa: BLE001
+                except (AttributeError, ImportError, RuntimeError):
                     logging.getLogger(__name__).debug("Failed to refresh job %s from repo", job_id)
             return job  # type: ignore[no-any-return]
 
@@ -156,7 +156,7 @@ def create_jobs_router(
                     validate_public_http_url(url)
                     safe_results.append(r)
                 except ValueError:
-                    pass
+                    pass  # nosec B110
         return {"urls": safe_results}
 
     @router.post("/api/schema/suggest")
@@ -186,7 +186,7 @@ def create_jobs_router(
                     stale_ids = [jid for jid in jobs_store if jid not in fresh_jobs]
                     for jid in stale_ids:
                         jobs_store.pop(jid, None)
-            except Exception:  # noqa: BLE001
+            except (AttributeError, ImportError, RuntimeError):
                 logging.getLogger(__name__).debug("Failed to refresh jobs list from repo")
 
         with _store_lock:
@@ -350,7 +350,7 @@ def create_jobs_router(
                     task_id=job.id,
                 )
                 logging.getLogger(__name__).info("Job %s enqueued to worker queue (task=%s)", job.id, task_id)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 if settings.ENV.lower() == "production":
                     logging.getLogger(__name__).exception(
                         "Failed to enqueue job %s to worker queue in production",
@@ -361,7 +361,7 @@ def create_jobs_router(
                     try:
                         repo = get_job_repository()
                         repo.hard_delete(job.id)
-                    except Exception:  # noqa: BLE001
+                    except (AttributeError, ImportError, RuntimeError):
                         logging.getLogger(__name__).warning("Failed to hard-delete job %s after enqueue failure", job.id)
                     raise HTTPException(
                         status_code=503,
@@ -493,7 +493,7 @@ def create_jobs_router(
                 reclean_warnings.append(
                     f"AI re-clean timed out after {timeout_s}s; used deterministic post-processing.",
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logging.exception("Re-clean failed")
                 cleaned_rows = working_rows
                 reclean_warnings.append("AI re-clean failed; used deterministic post-processing.")
@@ -596,7 +596,7 @@ def create_jobs_router(
             }
             job.quality_report = quality
             _save_job(job)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # Restore the previous (terminal) status so the job isn't
             # permanently stuck in ``RUNNING``. Log the failure prominently.
             logging.getLogger(__name__).exception(
@@ -608,7 +608,7 @@ def create_jobs_router(
             reclean_warnings.append(f"Reclean failed: {e}")
             try:
                 _save_job(job)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logging.getLogger(__name__).exception(
                     "Job %s: Failed to persist job state after reclean rollback",
                     job_id,

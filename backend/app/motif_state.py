@@ -227,7 +227,7 @@ class MotifState:
             return tuple(key.split(", "))
 
         try:
-            parsed = ast.literal_eval(key)
+            parsed = ast.literal_eval(key)  # nosec
             if isinstance(parsed, tuple):
                 return parsed
         except (ValueError, SyntaxError):

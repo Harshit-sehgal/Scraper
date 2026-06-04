@@ -349,7 +349,7 @@ async def get_operator_health_summary():
         monitor = get_domain_health_monitor()
         domains = monitor.get_all_domains_health()
         degraded = sum(1 for d in domains if d.get("health_level") in ("degrading", "unhealthy", "critical"))
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.debug("Failed to get domain health monitor stats", exc_info=True)
         domains = []
         degraded = 0

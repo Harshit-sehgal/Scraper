@@ -358,7 +358,7 @@ class RegressionCapture:
                 fpath.unlink()
                 pruned += 1
             except OSError:
-                pass
+                pass  # nosec B110
 
         if pruned > 0:
             self._save_registry()
@@ -514,7 +514,7 @@ def {safe_name}(hostile_base_url):
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
-        except Exception:  # noqa: BLE001
+        except Exception:
             return "unknown"
 
 

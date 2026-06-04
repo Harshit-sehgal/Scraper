@@ -104,7 +104,7 @@ class GlobalCognitiveScheduler:
                 task.handler(*task.args, **task.kwargs)
                 self._execution_stats["tasks_completed"] += 1
                 self._execution_stats["priority_counts"][task.priority.name] += 1
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logging.getLogger(__name__).exception("TASK FAILED: [%s]", task.task_id)
                 # Record degradation telemetry (best-effort)
                 try:
@@ -115,7 +115,7 @@ class GlobalCognitiveScheduler:
                             cause=f"Task [{task.task_id}] failed: {e}",
                         )
                 except Exception:  # nosec B110  # noqa: BLE001
-                    pass
+                    pass  # nosec B110
 
             duration = time.time() - t0
             self._execution_stats["total_execution_time"] += duration

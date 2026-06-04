@@ -75,7 +75,7 @@ async def run_job(
         """Check the persistent store for a cross-process cancellation signal."""
         try:
             return get_job_repository().is_cancel_requested(job_id)
-        except Exception:  # noqa: BLE001
+        except (AttributeError, ImportError, RuntimeError):
             return False
 
     # Optimize persistence: use single-row updates for job-local saves
@@ -163,7 +163,7 @@ async def run_job(
                         safe_discovered.append(d)
                         safe_urls.append(url)
                     except ValueError:
-                        pass
+                        pass  # nosec B110
             job.discovered_urls = safe_discovered
             job.urls = safe_urls
 
@@ -377,7 +377,7 @@ async def run_job(
                     await _safe_warning(f"URL timeout skipped ({idx}/{len(job.urls)}): {url}")
                     await _mark_completed()
                     return idx, [], False, {}
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     policy.record_failure(url, failure_type=type(e).__name__)
                     logging.exception("Job %s: URL scrape failed: %s", job_id, url)
                     await _safe_log(f"Failed to scrape {url}: {type(e).__name__}", level="warning")
@@ -495,7 +495,7 @@ async def run_job(
                 )
                 _add_job_log(job, "AI structuring timed out, using fallback", level="warning")
                 logging.warning("Job %s: AI structuring timed out", job_id)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logging.exception("Job %s: AI structuring failed", job_id)
                 warnings.append("AI structuring failed; continuing with deterministic processing.")
                 _add_job_log(job, "AI structuring failed, using fallback", level="error")
@@ -626,7 +626,7 @@ async def run_job(
                     insight_timeout_seconds,
                 )
                 job.analysis = "Insight generation timed out."
-            except Exception:
+            except Exception:  # noqa: BLE001
                 job.total_llm_calls += get_llm_call_count()
                 logging.exception("Job %s: AI insight generation failed", job_id)
                 _add_job_log(job, "AI insight generation failed", level="error")
@@ -653,7 +653,7 @@ async def run_job(
                         settings.JOB_RESULTS_DISK_OFFLOAD_THRESHOLD
                     } records).",
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logging.exception("Job %s: Failed to offload results to disk", job_id)
                 _add_job_log(job, f"Failed to offload results to disk: {e}", level="warning")
 
@@ -709,7 +709,7 @@ async def run_job(
 
         logging.info("Job %s: Completed (%s): %d total, %d after filtering", job_id, job.status.value, total, filtered_count)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logging.exception("Job %s failed", job_id)
         if job.cancel_requested:
             mark_job_canceled(job)

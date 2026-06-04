@@ -110,7 +110,7 @@ async def _call_openai_compatible_json(
                         await asyncio.sleep(float(retry_after))
                         continue
                     except (ValueError, TypeError):
-                        pass
+                        pass  # nosec B110
             await asyncio.sleep(backoff_seconds * attempt)
 
     if last_error:
@@ -157,7 +157,7 @@ async def _call_openai_compatible_text(
                         await asyncio.sleep(float(retry_after))
                         continue
                     except (ValueError, TypeError):
-                        pass
+                        pass  # nosec B110
             await asyncio.sleep(backoff_seconds * attempt)
 
     if last_error:
@@ -182,7 +182,7 @@ def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning
 
         ws = get_world_state()
         ws.record_degradation(subsystem=subsystem, severity=severity, cause=cause)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         # Fallback to debug logging if world state is unavailable
         logging.getLogger(__name__).debug("Telemetry skipped (WS unavailable): %s", e)
 
@@ -197,7 +197,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass  # nosec B110
     if temperature is None:
         temperature = settings.LLM_TEMPERATURE
@@ -280,7 +280,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass  # nosec B110
     if temperature is None:
         temperature = settings.LLM_FAST_TEMPERATURE
@@ -337,7 +337,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass  # nosec B110
     if temperature is None:
         temperature = settings.LLM_TEXT_TEMPERATURE

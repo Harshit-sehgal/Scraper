@@ -244,7 +244,7 @@ def _ensure_schema(db_path: Path | None = None) -> None:
                     # successful task results)
                     try:
                         conn.execute("ALTER TABLE task_history ADD COLUMN result TEXT")
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         pass  # nosec B110
                     current = 2
 
@@ -504,7 +504,7 @@ class WorkerQueue:
                             from app.metrics_collector import record_worker_failure
 
                             record_worker_failure(actual_type)
-                        except Exception:  # noqa: BLE001
+                        except Exception:
                             pass  # nosec B110
                         conn.execute(
                             """INSERT OR REPLACE INTO task_history
@@ -734,7 +734,7 @@ class WorkerQueue:
                 await self.complete(task.id, result)
         except TimeoutError:
             await self.fail(task.id, f"Timeout after {task.timeout_seconds}s", retry=True)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             error_msg = f"{type(e).__name__}: {e}"
             # Rate-limit-aware retry: check if the error is rate-limit related
             # and parse Retry-After from error context if available
@@ -763,7 +763,7 @@ class WorkerQueue:
                             cooldown,
                             task.type,
                         )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass  # nosec B110
             await self.fail(task.id, error_msg, retry=True, retry_after=retry_after, task_type=task.type)
 
@@ -960,4 +960,4 @@ def reset_worker_queue() -> None:
 
         reset_postgres_worker_queue()
     except ImportError:
-        pass
+        pass  # nosec B110

@@ -416,7 +416,7 @@ async def _extract_from_container(
             success=True,
         )
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.warning("[ContainerDiscovery] Extraction error for %s: %s", container.selector, e)
         return ContainerExtractionResult(
             selector=container.selector,

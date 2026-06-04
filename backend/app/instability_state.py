@@ -139,7 +139,7 @@ class InstabilityState:
     def to_dict(self) -> dict:
         return {"learned_exclusions": {f"{k[0]}|{k[1]}": v for k, v in self._exclusions.items()}}
 
-    # Maximum length for a string key before trying ast.literal_eval
+    # Maximum length for a string key before trying ast.literal_eval  # nosec
     MAX_KEY_LENGTH = 1_000_000
 
     def from_dict(self, data: dict) -> None:
@@ -165,7 +165,7 @@ class InstabilityState:
                 import ast
 
                 try:
-                    k = ast.literal_eval(k)
+                    k = ast.literal_eval(k)  # nosec
                 except (ValueError, SyntaxError):
                     continue
             if isinstance(k, (list, tuple)) and len(k) == 2:

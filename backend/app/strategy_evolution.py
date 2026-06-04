@@ -267,8 +267,8 @@ class StrategyEvolutionEngine:
                         confidence=0.7,
                         estimated_success_rate=0.5,
                     )
-            except Exception:  # nosec B110  # noqa: BLE001
-                pass
+            except Exception:  # nosec B110
+                pass  # nosec B110
 
             return StrategyRecommendation(
                 recommended_strategy=FetchStrategy.PLAYWRIGHT_FULL,
@@ -306,8 +306,8 @@ class StrategyEvolutionEngine:
                     confidence=0.8,
                     estimated_success_rate=0.6,
                 )
-        except Exception:  # nosec B110  # noqa: BLE001
-            pass
+        except Exception:  # nosec B110
+            pass  # nosec B110
 
         best_strategy = state.get_best_strategy()
         best_perf = state.strategies[best_strategy]

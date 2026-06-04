@@ -35,7 +35,7 @@ def compute_source_breakdown(results: list[dict]) -> dict:
 def safe_score(value: Any) -> float:
     try:
         return float(value)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 0.0
 
 

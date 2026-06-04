@@ -491,7 +491,7 @@ def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[s
                 if ws_path.exists():
                     world_state_data = json.loads(ws_path.read_text())
             except (json.JSONDecodeError, OSError):  # nosec B110
-                pass
+                pass  # nosec B110
 
             return jobs_store, recycle_bin_store, world_state_data
         finally:
@@ -674,7 +674,7 @@ def get_storage_status() -> dict:
             "recycle_bin_count": recycle_count,
             "wal_mode": wal_mode,
         }
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return {
             "backend": "sqlite",
             "error": str(e),

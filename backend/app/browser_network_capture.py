@@ -218,7 +218,7 @@ async def collect_browser_state(page) -> dict[str, Any]:
     raw_cookies: list[dict[str, Any]] = []
     try:
         raw_cookies = await page.context.cookies()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("[BrowserState] Could not read context cookies: %s", exc)
 
     storage_snapshot: dict[str, Any] = {}
@@ -252,7 +252,7 @@ async def collect_browser_state(page) -> dict[str, Any]:
                     cacheStorageKeys: cacheStorageKeys || []
                 };
             }""")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("[BrowserState] Could not read browser storage: %s", exc)
     if not isinstance(storage_snapshot, dict):
         storage_snapshot = {}
@@ -541,7 +541,7 @@ async def setup_network_capture(page) -> list[dict]:
                 resource_type,
             )
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug("[BrowserNetwork] Error capturing response: %s", e)
 
     page.on("response", _on_response)

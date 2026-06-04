@@ -87,8 +87,8 @@ class ScrapeTelemetryCollector:
             from app.domain_intelligence import get_domain_intelligence
 
             get_domain_intelligence().update_from_telemetry(telemetry.to_dict())
-        except Exception:  # nosec B110  # noqa: BLE001
-            pass
+        except Exception:  # nosec B110
+            pass  # nosec B110
 
         # Emit to semantic world state observability if available
         try:
@@ -118,8 +118,8 @@ class ScrapeTelemetryCollector:
                     "retries": telemetry.retry_count,
                 },
             )
-        except Exception:  # nosec B110  # noqa: BLE001
-            pass
+        except Exception:  # nosec B110
+            pass  # nosec B110
 
         return telemetry
 

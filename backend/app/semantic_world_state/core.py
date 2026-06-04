@@ -134,7 +134,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
             try:
                 self._dispatcher.unsubscribe(SemanticEventType.FIELD_WAVE, self._on_field_wave)
                 self._subscribed_to_dispatcher = False
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug("Failed to unsubscribe from dispatcher in close(): %s", exc)
 
     # ─── Public Getters & Identifiers ─────────────────────────────────────
@@ -404,7 +404,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                                 details["event_type"] = details.pop("type", None)
                             details = self._filter_replay_details(method, details)
                             method(**details)
-                        except Exception as e:  # noqa: BLE001
+                        except Exception as e:
                             logger.warning("Replay failed for %s.%s: %s", subsystem, action, e)
         finally:
             self._replaying = False
@@ -1086,7 +1086,7 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
                                 tool_result = None
                                 try:
                                     tool_result = plugins.call_tool(handler_name, role=role, token=region.token)
-                                except Exception as e:  # noqa: BLE001
+                                except Exception as e:
                                     logger.warning("Plugin execution failed for %s: %s", handler_name, e)
                                     success = False
 

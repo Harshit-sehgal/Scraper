@@ -265,7 +265,7 @@ class FederationManager:
                         if domain and fail_type:
                             self.ws.regression.record_failure(domain, fail_type)
                             replay_report["replayed"] += 1
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     replay_report["failed"] += 1
                     self.divergence_metrics["failed_replays"] += 1
                     logger.warning("[Federation] Replay delta action failed: %s", e)

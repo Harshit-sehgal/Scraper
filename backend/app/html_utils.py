@@ -476,7 +476,7 @@ async def fetch_page_content(
                 for sel in loading_selectors:
                     try:
                         await page.wait_for_selector(sel, state="hidden", timeout=2000)
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         pass  # nosec B110
 
             # Adaptive post-network buffer: check DOM stabilization
@@ -522,7 +522,7 @@ async def fetch_page_content(
                      }}""",
                     timeout=settle_timeout * 1000,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass  # nosec B110
             js_render_delay_ms = (time.time() - stabilization_start) * 1000
             telemetry.record_stabilization(domain, js_render_delay_ms)
@@ -545,7 +545,7 @@ async def fetch_page_content(
                 await page.evaluate("window.scrollTo(0, 0)")
                 await asyncio.sleep(settings.POST_SCROLL_RESET_DELAY)
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # Before falling back, check partial HTML for anti-bot signals
             try:
                 partial_html = await page.content()
@@ -561,7 +561,7 @@ async def fetch_page_content(
                     raise ValueError(msg)
             except ValueError:
                 raise  # Re-raise anti-bot detection so scraper records the proper failure reason
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass  # nosec B110
 
             logger.warning(
@@ -591,7 +591,7 @@ async def fetch_page_content(
                 from app.anti_bot_engine import get_anti_bot_engine
 
                 get_anti_bot_engine().update_cookies(domain, cookie_header)
-        except Exception as cookie_err:  # noqa: BLE001
+        except Exception as cookie_err:
             logger.debug("[BrowserState] Cookie persistence skipped for %s: %s", url, cookie_err)
 
         html = await page.content()
@@ -611,7 +611,7 @@ async def fetch_page_content(
         if page:
             try:
                 html_content = await page.content()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass  # nosec B110
 
         err_msg = str(e).lower()
@@ -644,8 +644,8 @@ async def fetch_page_content(
         if page:
             try:
                 await page.close()
-            except Exception:  # nosec B110  # noqa: BLE001
-                pass
+            except Exception:  # nosec B110
+                pass  # nosec B110
 
 
 async def _fetch_with_httpx(

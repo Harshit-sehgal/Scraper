@@ -214,7 +214,7 @@ async def analyze_url_for_fields(
             if str(resp.url) != url:
                 final_url = str(resp.url)
                 logger.info("[URLAnalyzer] URL resolved: %s → %s (after %d redirect hops)", url, final_url, hops)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug(
             "[URLAnalyzer] Could not determine final URL via httpx for %s: %s",
             url,
@@ -601,7 +601,7 @@ async def analyze_url_for_fields(
             recovered_url=acquisition_lineage.recovered_url,
             fetch_time_ms=round((time.time() - start_time) * 1000, 1),
         )
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.debug("[URLAnalyzer] Failed to record acquisition telemetry", exc_info=True)
 
     # ── Escalation Check ─────────────────────────────────────────────

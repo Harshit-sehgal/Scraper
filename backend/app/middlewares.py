@@ -34,7 +34,7 @@ async def body_size_middleware(request: Request, call_next):
                 )
             return await call_next(request)
         except (ValueError, TypeError):
-            pass
+            pass  # nosec B110
 
     chunks: list[bytes] = []
     bytes_received = 0

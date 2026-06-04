@@ -407,7 +407,7 @@ async def _try_form_search_recovery(
             "form_info": form_info,
             "error": "Search form submission timed out after 30 seconds",
         }
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return {
             "success": False,
             "fresh_url": landing_page_url,

@@ -26,7 +26,7 @@ class NonBlockingRLock:
                     # lock.
                     return self._lock.acquire(blocking=True, timeout=1.0)
             except RuntimeError:
-                pass
+                pass  # nosec B110
         return self._lock.acquire(blocking=blocking, timeout=timeout)
 
     def release(self) -> None:
