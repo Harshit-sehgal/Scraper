@@ -82,6 +82,10 @@ RESEARCH_MODULES: frozenset[str] = frozenset(
         "topology_persistence",
         "topology_metrics",
         "topology_gc",
+        "topology_forces",
+        "topology_thermodynamics",
+        "topology_waves",
+        "topology_region_ops",
         "topological_query",
         "manifold_state",
         "motif_state",
@@ -90,6 +94,13 @@ RESEARCH_MODULES: frozenset[str] = frozenset(
         "energy_api",
         "instability_state",
         "instability_api",
+        # ── Foundational research types / observability ─────────────────
+        # `core_types` and `observability` are owned by the research shell
+        # even though they sit at the bottom of the import graph. They
+        # only have research consumers, so they are classified as
+        # research for boundary purposes.
+        "core_types",
+        "observability",
         # ── Federation / gossip / heartbeat ─────────────────────────────
         "federation_manager",
         "gossip_substrate",
@@ -243,6 +254,8 @@ _FAMILY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
                     "allocation_engine",
                 )
             ),
+            "core_types",
+            "observability",
         ),
     ),
     (
@@ -257,6 +270,10 @@ _FAMILY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
             "topology_persistence",
             "topology_metrics",
             "topology_gc",
+            "topology_forces",
+            "topology_thermodynamics",
+            "topology_waves",
+            "topology_region_ops",
             "topological_query",
             "manifold_state",
             "motif_state",

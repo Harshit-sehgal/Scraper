@@ -38,6 +38,9 @@ jobs:
       - name: Run Architecture Validation
         run: PYTHONPATH=backend python architecture_validator.py
 
+      - name: Run Research-Shell Boundary Check
+        run: PYTHONPATH=backend python scripts/check_research_boundary.py
+
       - name: Install Playwright Chromium
         run: python -m playwright install --with-deps chromium
 

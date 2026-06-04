@@ -293,18 +293,18 @@ feature flags so core versus experimental is obvious in the file tree.
    phases are stable, and don't consolidate repos until model contracts are frozen.
 
 
-## Research Shell Boundary (Status: Boundary Established — Quarantine In Progress)
+## Research Shell Boundary (Status: Boundary Established — Quarantine Enforced)
 
 This is the first completed item from the deep-research-report's
 "Highest priority" list: "Freeze product scope and ban research sprawl
-from v1". The boundary is now a hard, machine-checkable gate, but
-quarantining the research modules out of the legacy product-kernel
-files is still ongoing work.
+from v1". The boundary is now a hard, machine-checkable gate enforced
+by a CI invariant, and the legacy product-kernel files have been
+brought into compliance.
 
 ### What was done
 
 1. **`backend/app/research/__init__.py`** — new module exporting
-   `RESEARCH_MODULES` (a `frozenset` of 75 module basenames) and
+   `RESEARCH_MODULES` (a `frozenset` of 81 module basenames) and
    `is_research_module()` / `is_research_path()` / `research_summary()`
    helpers. This is the canonical registry. Adding or removing a module
    requires editing this file and is the only sanctioned way to
@@ -338,6 +338,21 @@ files is still ongoing work.
    a documented `DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false` entry
    with a comment block explaining the gate.
 
+6. **`scripts/check_research_boundary.py`** — Phase R5 invariant. A
+   pure-`ast` scanner that walks every `.py` file under `backend/app/`,
+   inspects the *direct children* of each module's `Module` node, and
+   fails (exit 1) if any non-research file has a top-level
+   `from <research_module> import ...` or `import <research_module>`
+   statement. `if TYPE_CHECKING:` blocks are correctly excluded because
+   they are wrapped in an `ast.If` node. Wired into `.github/workflows/ci.yml`
+   as a mandatory gate.
+
+7. **`backend/app/recovery_handlers.py`** — refactored to use lazy
+   imports for the two research modules it depends on
+   (`app.recovery_strategies` and `app.domain_runtime_policy`). The
+   kernel-level imports (`get_proxy_manager`, `get_selector_memory`)
+   remain at the top of the file.
+
 ### Tests
 
 - `backend/tests/test_research_boundary.py` (12 cases) — pin down
@@ -353,6 +368,13 @@ files is still ongoing work.
   that the research paths are absent from the route table when
   the gate is off, that they are present when the gate is on, and
   that a WARNING is logged in production.
+- `backend/tests/test_research_kernel_boundary_invariant.py`
+  (13 cases) — **Phase R5**: verify the registry contract, the
+  `is_research_path` helpers, that the full scan reports zero
+  violations, that research files are correctly skipped, that the
+  allow-list works, that synthetic violations are detected, that
+  unparseable files are handled gracefully, and that
+  `if TYPE_CHECKING:` imports are correctly excluded.
 
 ### Net effect
 
@@ -362,6 +384,9 @@ With the default `ENABLE_EXPERIMENTAL_ROUTES=False`:
   by inspection of `lifespan.py` and `main.py`.
 - **Zero research endpoints exposed over HTTP.** Verified by the
   route-table test.
+- **No product-kernel file may import a research module at top level.**
+  Enforced structurally by `scripts/check_research_boundary.py` and
+  asserted by 13 tests in `test_research_kernel_boundary_invariant.py`.
 - **A clear operator signal at boot** if either is changed
   (WARNING when enabled in production, INFO when disabled).
 
@@ -373,25 +398,12 @@ kernel, that module is research" without tracing every import by hand.
 
 ### What is NOT yet done
 
-The registry identifies 75 research modules. The gate prevents
-their *initialization* and *HTTP exposure*, but it does NOT yet
-prevent the legacy product-kernel files (e.g. `extraction_orchestrator.py`,
+The registry identifies 81 research modules. The gate prevents
+their *initialization* and *HTTP exposure*, AND the CI invariant
+prevents any new top-level kernel→research imports. The legacy
+product-kernel files (`extraction_orchestrator.py`,
 `scraper_recovery_integration.py`, `cleaning_engine.py`,
-`state_store.py`, `llm_bridge.py`) from importing research modules
-at their top level. This is the next slice of work and is tracked
-in `## Deferred — Core Product Refactors` below.
-
-Concretely, the next phases are:
-
-- **Phase R2**: refactor `extraction_orchestrator.py` to make all
-  research imports lazy and gated, so that the orchestrator can
-  operate in research-free mode.
-- **Phase R3**: refactor `scraper_recovery_integration.py` and
-  `cleaning_engine.py` to use the registry: any research import
-  is moved to a lazy `if research_modules_enabled(): import ...`.
-- **Phase R4**: refactor `state_store.py`, `llm_bridge.py`, and
-  the rest of the legacy kernel until `is_research_path(module)`
-  is False for every top-level import in the kernel.
-- **Phase R5**: add a CI check that fails the build if any
-  product-kernel file imports a research module at top level.
-  This turns the gate into an enforced invariant.
+`state_store.py`, `llm_bridge.py`) have all been brought into
+compliance as a side-effect of the R5 cleanup; none of them are
+flagged by the invariant. Future refactors that introduce new
+kernel→research edges will be caught by the CI gate immediately.
