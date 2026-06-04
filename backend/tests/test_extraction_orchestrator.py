@@ -2,6 +2,7 @@
 
 from unittest.mock import patch
 
+import pytest
 from app.extraction_orchestrator import (
     ExtractionResult,
     _align_selectors,
@@ -10,11 +11,7 @@ from app.extraction_orchestrator import (
     _merge_composite_records,
 )
 from app.models import FieldType, SchemaField
-
-
-def _make_schema(names: list[str]) -> list[SchemaField]:
-    return [SchemaField(name=n, field_type=FieldType.STRING, required=False, description="") for n in names]
-
+from conftest import make_schema_field_list
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ExtractionResult
@@ -50,15 +47,15 @@ class TestExtractionResult:
 
 class TestMergeCompositeRecords:
     def test_returns_empty_for_empty_input(self) -> None:
-        assert _merge_composite_records([], _make_schema(["name"])) == []
+        assert _merge_composite_records([], make_schema_field_list(["name"])) == []
 
     def test_single_pass_returns_as_is(self) -> None:
         records = [[{"name": "A"}, {"name": "B"}]]
-        result = _merge_composite_records(records, _make_schema(["name"]))
+        result = _merge_composite_records(records, make_schema_field_list(["name"]))
         assert result == records[0]
 
     def test_merges_records_with_same_key(self) -> None:
-        schema = _make_schema(["name"])
+        schema = make_schema_field_list(["name"])
         pass1 = [{"name": "Product", "price": "$100", "record_score": 0.9}]
         pass2 = [{"name": "Product", "description": "Great item", "record_score": 0.7}]
         result = _merge_composite_records([pass1, pass2], schema)
@@ -67,14 +64,14 @@ class TestMergeCompositeRecords:
         assert result[0].get("description") == "Great item"
 
     def test_disjoint_records_kept_separately(self) -> None:
-        schema = _make_schema(["name"])
+        schema = make_schema_field_list(["name"])
         pass1 = [{"name": "Item A", "record_score": 0.9}]
         pass2 = [{"name": "Item B", "record_score": 0.8}]
         result = _merge_composite_records([pass1, pass2], schema)
         assert len(result) == 2
 
     def test_sorts_by_record_score_descending(self) -> None:
-        schema = _make_schema(["name"])
+        schema = make_schema_field_list(["name"])
         pass1 = [{"name": "B", "record_score": 0.5}]
         pass2 = [{"name": "A", "record_score": 0.9}]
         result = _merge_composite_records([pass1, pass2], schema)
@@ -82,7 +79,7 @@ class TestMergeCompositeRecords:
         assert result[1]["name"] == "B"
 
     def test_synthetic_key_when_no_id_field_value(self) -> None:
-        schema = _make_schema(["name"])
+        schema = make_schema_field_list(["name"])
         pass1 = [{"price": "$100", "record_score": 0.5}]
         pass2 = [{"price": "$200", "record_score": 0.6}]
         result = _merge_composite_records([pass1, pass2], schema)
@@ -236,7 +233,7 @@ class TestMultiPassExtraction:
         ]
         result = _multi_pass_extraction(
             "<html></html>",
-            _make_schema(["name"]),
+            make_schema_field_list(["name"]),
             {"item_container": ".card"},
             base_url="https://example.com",
         )
@@ -252,7 +249,7 @@ class TestMultiPassExtraction:
         ]
         result = _multi_pass_extraction(
             "<html></html>",
-            _make_schema(["name"]),
+            make_schema_field_list(["name"]),
             {"item_container": ".card"},
             base_url="https://example.com",
         )
@@ -269,8 +266,29 @@ class TestMultiPassExtraction:
         ]
         result = _multi_pass_extraction(
             "<html></html>",
-            _make_schema(["name"]),
+            make_schema_field_list(["name"]),
             {"item_container": ".card"},
             base_url="https://example.com",
         )
         assert isinstance(result, list)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Orchestrate Extraction (smoke test — no mocks)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestOrchestrateExtraction:
+    @pytest.mark.asyncio
+    async def test_returns_extraction_result(self) -> None:
+        """Smoke test: orchestrate_extraction returns an ExtractionResult."""
+        from app.extraction_orchestrator import orchestrate_extraction
+
+        schema = make_schema_field_list(["name"])
+        result = await orchestrate_extraction(
+            url="https://example.com/product",
+            html="<html>test</html>",
+            schema_fields=schema,
+            min_record_score=0.1,
+        )
+        assert isinstance(result, ExtractionResult)

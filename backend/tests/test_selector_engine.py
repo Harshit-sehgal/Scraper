@@ -341,3 +341,21 @@ class TestExtractWithRegex:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Apply Selectors (with mocked dependencies)
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Apply Selectors (simple smoke test — no mocks)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestApplySelectors:
+    def test_returns_empty_for_no_container(self) -> None:
+        """Without an item_container selector, apply_selectors returns empty list."""
+        from app.selector_engine import apply_selectors
+
+        result = apply_selectors(
+            "<html></html>",
+            {"item_container": "", "fields": {}},
+            [SchemaField(name="name", field_type=FieldType.STRING, required=False, description="")],
+        )
+        assert result == []
