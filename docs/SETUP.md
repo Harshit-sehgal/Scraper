@@ -1,5 +1,7 @@
 # Setup
 
+**Last refreshed:** 2026-06-04
+
 ## Local Python Setup
 
 ```bash
@@ -56,9 +58,21 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
   python3 -m pytest -q backend/tests -o addopts=
 
-# Lint
-python3 -m pyflakes backend/app scripts architecture_validator.py
+# Lint (ruff replaces pyflakes)
+python3 -m ruff check backend/app backend/tests scripts
+python3 -m ruff format --check backend/app backend/tests scripts
 
 # Type check (ignores missing imports for packages)
 python3 -m mypy backend/app --ignore-missing-imports
+
+# Research-shell boundary invariant (R5)
+PYTHONPATH=backend python3 scripts/check_research_boundary.py
+
+# Dependency bounds validation
+python3 scripts/validate_dependency_bounds.py
+
+# Or run the full local suite (does not require Docker)
+make validate
+# or, equivalently:
+bash scripts/verify_all.sh
 ```
