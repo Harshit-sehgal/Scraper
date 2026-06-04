@@ -1,9 +1,9 @@
 # Project Status - DataForge Scraper
 
 **Last refreshed:** 2026-06-04 (final)
-**Commit inspected:** `204b6383a6095416d29faaa621bf7266cc2cfa96`
+**Commit inspected:** `dd60d9824f882351f88db8aa6bdcefbeb0a0dc0b`
 **Working tree at refresh:** committed snapshot
-**GitHub Actions status:** CI verified manually on commit `204b638...` (Passed); pre-commit and local validation suites passing 100% cleanly.
+**GitHub Actions status:** CI verified manually on commit `dd60d98...` (Passed); pre-commit and local validation suites passing 100% cleanly.
 **Status:** CI/CD stabilized. The core CI focuses on fast correctness gates (syntax, architecture, sqlite benchmark smoke, route auth matrix). Pyflakes and mypy are advisory. Heavy test suites run in separate workflows.
 **Maturity:** about 65–70% — Local production-candidate validation passed (strongest safe claim). Public target deployment, TLS, real secrets, and infrastructure failover remain unvalidated.
 
