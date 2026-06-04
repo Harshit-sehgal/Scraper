@@ -33,27 +33,27 @@ class TestExtractFieldHintsFromMotifs:
     def test_returns_hint_for_field_in_motif(self) -> None:
         schema = [SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description="")]
         # price appears in 2 motifs, so count >= 2 threshold is met
-        motifs = [("price", "title"), ("price", "availability")]
+        motifs: list[tuple[str, ...]] = [("price", "title"), ("price", "availability")]
         hints = MotifFeedbackEngine.extract_field_hints_from_motifs(motifs, schema)
         assert "price" in hints
         assert "HINT" in hints["price"]
 
     def test_hint_includes_count(self) -> None:
         schema = [SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description="")]
-        motifs = [("price", "title"), ("price", "availability")]
+        motifs: list[tuple[str, ...]] = [("price", "title"), ("price", "availability")]
         hints = MotifFeedbackEngine.extract_field_hints_from_motifs(motifs, schema)
         assert "2" in hints["price"]
 
     def test_skips_fields_not_in_schema(self) -> None:
         schema = [SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description="")]
-        motifs = [("unknown_field", "also_unknown")]
+        motifs: list[tuple[str, ...]] = [("unknown_field", "also_unknown")]
         hints = MotifFeedbackEngine.extract_field_hints_from_motifs(motifs, schema)
         assert hints == {}
 
     def test_requires_minimum_cooccurrence_for_hint(self) -> None:
         """A field appearing only once (count=1) should not yield a hint (threshold is >=2)."""
         schema = [SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description="")]
-        motifs = [("price", "title")]
+        motifs: list[tuple[str, ...]] = [("price", "title")]
         hints = MotifFeedbackEngine.extract_field_hints_from_motifs(motifs, schema)
         assert hints == {}
 
@@ -74,7 +74,7 @@ class TestBuildMotifContext:
             SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description=""),
             SchemaField(name="title", field_type=FieldType.STRING, required=False, description=""),
         ]
-        motifs = [("price", "title")]
+        motifs: list[tuple[str, ...]] = [("price", "title")]
         context = MotifFeedbackEngine.build_motif_context(motifs, schema)
         assert context is not None
         assert "LEARNED STRUCTURAL PATTERNS" in context
@@ -83,20 +83,20 @@ class TestBuildMotifContext:
 
     def test_filters_out_unknown_fields(self) -> None:
         schema = [SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description="")]
-        motifs = [("price", "unknown_field")]
+        motifs: list[tuple[str, ...]] = [("price", "unknown_field")]
         context = MotifFeedbackEngine.build_motif_context(motifs, schema)
         assert context is not None
         assert "unknown_field" not in (context or "")
 
     def test_returns_none_when_all_fields_filtered(self) -> None:
         schema = [SchemaField(name="price", field_type=FieldType.CURRENCY, required=False, description="")]
-        motifs = [("unknown_a", "unknown_b")]
+        motifs: list[tuple[str, ...]] = [("unknown_a", "unknown_b")]
         context = MotifFeedbackEngine.build_motif_context(motifs, schema)
         assert context is None
 
     def test_limits_to_top_5_motifs(self) -> None:
         schema = [SchemaField(name=f"field{i}", field_type=FieldType.STRING, required=False, description="") for i in range(10)]
-        motifs = [
+        motifs: list[tuple[str, ...]] = [
             ("field0", "field1"),
             ("field2", "field3"),
             ("field4", "field5"),
@@ -116,7 +116,7 @@ class TestBuildMotifContext:
             SchemaField(name="title", field_type=FieldType.STRING, required=False, description=""),
             SchemaField(name="availability", field_type=FieldType.STRING, required=False, description=""),
         ]
-        motifs = [("price", "title", "availability")]
+        motifs: list[tuple[str, ...]] = [("price", "title", "availability")]
         context = MotifFeedbackEngine.build_motif_context(motifs, schema)
         assert context is not None
         assert '"price"' in context
@@ -202,7 +202,7 @@ class TestExtractMotifsFromResults:
         motifs = MotifFeedbackEngine.extract_motifs_from_results(results, schema)
         # Should find at least one motif (price+title co-occur in all results)
         assert len(motifs) >= 1
-        all_fields = set()
+        all_fields: set[str] = set()
         for m in motifs:
             all_fields.update(m)
         assert "price" in all_fields
