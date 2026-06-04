@@ -22,7 +22,7 @@ DC := docker compose
 DCF := docker compose -f docker-compose.prod.yml
 SERVICE := dataforge
 
-.PHONY: help build up down logs shell test lint prod clean ps
+.PHONY: help build up down logs shell test lint prod clean ps boundary deps-check lint-all validate
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -76,13 +76,24 @@ test-file: ## Run tests in a specific file (usage: make test-file FILE=test_foo.
 
 # ─── Linting ────────────────────────────────────────────────────────────────
 
-lint: ## Run all linters
-	$(DC) exec $(SERVICE) python -m pyflakes backend/app backend/tests
+lint: ## Run all linters (ruff lint + format)
+	$(DC) exec $(SERVICE) python -m ruff check backend/app backend/tests
+	$(DC) exec $(SERVICE) python -m ruff format --check backend/app backend/tests
 
 mypy: ## Run mypy type checker
 	$(DC) exec $(SERVICE) python -m mypy backend/app backend/tests --check-untyped-defs
 
-lint-all: lint mypy ## Run pyflakes + mypy
+boundary: ## Run the research-shell boundary check (CI invariant)
+	PYTHONPATH=backend python3 scripts/check_research_boundary.py
+
+deps-check: ## Validate pyproject.toml dependency bounds vs requirements.lock
+	python3 scripts/validate_dependency_bounds.py
+
+lint-all: lint mypy boundary deps-check ## Run full lint + type + boundary + deps suite
+
+# Local validation that mirrors CI (does not require Docker)
+validate: ## Run all CI checks locally (verify_all.sh)
+	bash scripts/verify_all.sh
 
 # ─── Production ─────────────────────────────────────────────────────────────
 
