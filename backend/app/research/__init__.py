@@ -1,5 +1,4 @@
-"""
-Research Shell Boundary — single source of truth for which modules are
+"""Research Shell Boundary — single source of truth for which modules are
 classified as experimental / research-only.
 
 This module exists for ONE reason: to give the codebase a deterministic,
@@ -209,6 +208,7 @@ def is_research_path(qualified_name: str | None) -> bool:
         False
         >>> is_research_path("backend.app.semantic_os")
         True
+
     """
     if not qualified_name:
         return False
@@ -226,21 +226,23 @@ def is_research_path(qualified_name: str | None) -> bool:
 _FAMILY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
         "semantic",
-        ("semantic_world_state",)
-        + tuple(
-            f"semantic_{s}"
-            for s in (
-                "os",
-                "ir",
-                "persistence",
-                "mapper",
-                "pipeline",
-                "events",
-                "inference_engine",
-                "segmentation",
-                "boundary_engine",
-                "allocation_engine",
-            )
+        (
+            "semantic_world_state",
+            *tuple(
+                f"semantic_{s}"
+                for s in (
+                    "os",
+                    "ir",
+                    "persistence",
+                    "mapper",
+                    "pipeline",
+                    "events",
+                    "inference_engine",
+                    "segmentation",
+                    "boundary_engine",
+                    "allocation_engine",
+                )
+            ),
         ),
     ),
     (

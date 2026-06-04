@@ -9,7 +9,7 @@ from app.utils.quality import build_quality_report
 
 
 @pytest.fixture(autouse=True)
-def mock_ai_clean_and_align(monkeypatch):
+def mock_ai_clean_and_align(monkeypatch) -> None:
     async def fake_ai_clean_and_align(records, schema, **kwargs):
         return records, {
             "applied": False,
@@ -422,7 +422,7 @@ def test_run_job_source_breakdown_counts_final_records(monkeypatch) -> None:
             {"company_name": "C Studio", "record_score": 0.82},
         ], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
-    async def fake_generate_data_insight(rows):
+    async def fake_generate_data_insight(rows) -> str:
         return "ok"
 
     monkeypatch.setattr("app.services.job_runner.discover_urls", fake_discover_urls)
@@ -460,7 +460,7 @@ def test_run_job_surfaces_scrape_failures_in_warnings(monkeypatch) -> None:
             raise RuntimeError(msg)
         return [{"company_name": "Working Source", "record_score": 0.9}], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
-    async def fake_generate_data_insight(rows):
+    async def fake_generate_data_insight(rows) -> str:
         return "ok"
 
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
@@ -491,7 +491,7 @@ def test_run_job_warns_when_contact_ai_coverage_zero_without_groq(monkeypatch) -
     async def fake_scrape_url(url, schema_fields, **kwargs):
         return [{"company_name": "Studio Zero", "record_score": 0.91}], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
-    async def fake_generate_data_insight(rows):
+    async def fake_generate_data_insight(rows) -> str:
         return "ok"
 
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
@@ -525,7 +525,7 @@ def test_run_job_creates_logs(monkeypatch) -> None:
     async def fake_scrape_url(url, schema_fields, **kwargs):
         return [{"company_name": "Log Studio", "record_score": 0.9}], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
-    async def fake_generate_data_insight(rows):
+    async def fake_generate_data_insight(rows) -> str:
         return "ok"
 
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fake_scrape_url)
@@ -584,13 +584,14 @@ def test_run_job_updates_progress(monkeypatch) -> None:
 
 def test_cancel_during_run_sets_canceled_and_persists_state(monkeypatch) -> None:
     """Regression test: cancellation during in-progress scrape tasks should
-    cancel in-flight tasks, mark the job as CANCELED, and persist the state."""
+    cancel in-flight tasks, mark the job as CANCELED, and persist the state.
+    """
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
     persist_called = [False]
 
-    def tracking_persist(*args, **kwargs):
+    def tracking_persist(*args, **kwargs) -> None:
         persist_called[0] = True
 
     # Simulate a long-running scrape that gives us time to cancel
@@ -598,7 +599,7 @@ def test_cancel_during_run_sets_canceled_and_persists_state(monkeypatch) -> None
         await asyncio.sleep(5.0)  # Long enough to be in-flight when cancel fires
         return [], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
-    async def fake_generate_data_insight(rows):
+    async def fake_generate_data_insight(rows) -> str:
         return ""
 
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", slow_scrape_url)
@@ -615,7 +616,7 @@ def test_cancel_during_run_sets_canceled_and_persists_state(monkeypatch) -> None
     )
     main_mod.jobs_store[job.id] = job
 
-    async def run_and_cancel():
+    async def run_and_cancel() -> None:
         # Start the job in a task so we can cancel while it's running
         job_task = asyncio.create_task(main_mod._run_job_wrapper(job.id))
 
@@ -655,7 +656,7 @@ def test_cancel_check_before_all_done_avoids_race(monkeypatch) -> None:
     async def fast_scrape_url(url, schema_fields, **kwargs):
         return [{"company_name": "Quick", "record_score": 0.9}], {"recovery_attempts": 0, "recovery_actions_taken": []}
 
-    async def fake_generate_data_insight(rows):
+    async def fake_generate_data_insight(rows) -> str:
         return "ok"
 
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", fast_scrape_url)
@@ -673,7 +674,7 @@ def test_cancel_check_before_all_done_avoids_race(monkeypatch) -> None:
     )
     main_mod.jobs_store[job.id] = job
 
-    async def run_and_trigger_cancel_edge():
+    async def run_and_trigger_cancel_edge() -> None:
         job_task = asyncio.create_task(main_mod._run_job_wrapper(job.id))
         # Give enough time for tasks to finish
         await asyncio.sleep(0.8)

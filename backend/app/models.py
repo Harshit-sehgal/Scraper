@@ -1,12 +1,11 @@
-"""
-Pydantic models for the scraper API.
+"""Pydantic models for the scraper API.
 Defines the data structures for jobs, schemas, filters, and results.
 """
 
 import datetime
 import re
 import uuid
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -33,7 +32,7 @@ RESERVED_FIELD_NAMES: frozenset = frozenset(
 )
 
 
-class FieldType(str, Enum):
+class FieldType(StrEnum):
     STRING = "string"
     INTEGER = "integer"
     FLOAT = "float"
@@ -51,7 +50,7 @@ class FieldType(str, Enum):
     NUMBER = "number"
 
 
-class FilterOperator(str, Enum):
+class FilterOperator(StrEnum):
     EQUALS = "equals"
     NOT_EQUALS = "not_equals"
     GREATER_THAN = "greater_than"
@@ -69,12 +68,12 @@ class FilterOperator(str, Enum):
     DISTANCE_WITHIN = "distance_within"
 
 
-class ScrapeMode(str, Enum):
+class ScrapeMode(StrEnum):
     MANUAL = "manual"  # User provides URLs
     AUTO = "auto"  # AI discovers best URLs
 
 
-class SourcePolicy(str, Enum):
+class SourcePolicy(StrEnum):
     OFFICIAL_ONLY = "official_only"
     OFFICIAL_PLUS_DIRECTORY = "official_plus_directory"
     ALL_SOURCES = "all_sources"
@@ -244,7 +243,7 @@ class JobCreate(BaseModel):
         return self
 
 
-class JobStatus(str, Enum):
+class JobStatus(StrEnum):
     PENDING = "pending"
     DISCOVERING = "discovering"
     RUNNING = "running"

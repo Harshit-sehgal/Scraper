@@ -1,5 +1,4 @@
-"""
-Basic import and sanity tests for experimental modules without dedicated test coverage.
+"""Basic import and sanity tests for experimental modules without dedicated test coverage.
 
 These are lightweight smoke tests that verify the modules can be imported,
 their core classes instantiated, and basic methods execute without errors.
@@ -46,7 +45,7 @@ class TestInvariantFirewall:
         from app.invariant_firewall import requires_invariants
 
         # Verify it's a decorator (callable that returns a wrapper)
-        def dummy_fn(ws=None):
+        def dummy_fn(ws=None) -> int:
             return 42
 
         decorated = requires_invariants(dummy_fn)
@@ -92,8 +91,8 @@ class TestGossipSubstrate:
         from app.gossip_substrate import GossipSubstrate
 
         gs = GossipSubstrate("local")
-        gs.register_node("peer-1", {"to_dict": lambda: {}, "merge_state": lambda x: None})
-        gs.register_node("peer-2", {"to_dict": lambda: {}, "merge_state": lambda x: None})
+        gs.register_node("peer-1", {"to_dict": dict, "merge_state": lambda x: None})
+        gs.register_node("peer-2", {"to_dict": dict, "merge_state": lambda x: None})
         assert "peer-1" in gs.known_nodes
         peers = gs.select_peers_for_gossip(count=2)
         assert len(peers) <= 2
@@ -109,7 +108,7 @@ class TestGossipSubstrate:
         from app.gossip_substrate import GossipSubstrate
 
         gs = GossipSubstrate("local")
-        gs.register_node("peer-1", {"to_dict": lambda: {}, "merge_state": lambda x: None})
+        gs.register_node("peer-1", {"to_dict": dict, "merge_state": lambda x: None})
         report = gs.get_health_report()
         assert report["local_node"] == "local"
         assert isinstance(report["peers"], dict)
@@ -336,7 +335,7 @@ class TestMotifState:
             "motif_stability": {"('remote',)": 0.8},
         }
         ms.merge(remote)
-        assert ms.get_count(tuple(["remote"])) == 3
+        assert ms.get_count(("remote",)) == 3
 
 
 class TestEnergyState:

@@ -1,5 +1,4 @@
-"""
-Configuration — grouped settings for the product kernel.
+"""Configuration — grouped settings for the product kernel.
 
 Settings are split into focused groups rather than one giant object.
 """

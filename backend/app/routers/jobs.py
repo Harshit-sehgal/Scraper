@@ -3,6 +3,7 @@ import datetime
 import logging
 import threading
 from collections.abc import Callable
+from typing import Annotated
 
 from app.config import settings
 from app.discovery import DiscoveryDependencyError, discover_urls, infer_source_metadata
@@ -59,7 +60,7 @@ def _refresh_job_from_repo(job: Job, jobs_store: dict) -> Job:
             fresh = fresh_jobs[job.id]
             jobs_store[job.id] = fresh
             return fresh
-    except Exception:
+    except Exception:  # noqa: BLE001
         logging.getLogger(__name__).debug("Failed to refresh job %s from repo, using in-memory copy", job.id)
     return job
 
@@ -101,7 +102,7 @@ def create_jobs_router(
                         fresh = fresh_jobs[job_id]
                         jobs_store[job_id] = fresh
                         return fresh
-                except Exception:
+                except Exception:  # noqa: BLE001
                     logging.getLogger(__name__).debug("Failed to refresh job %s from repo", job_id)
             return job  # type: ignore[no-any-return]
 
@@ -126,7 +127,10 @@ def create_jobs_router(
             return recycle_bin_store.pop(job_id)  # type: ignore[no-any-return]
 
     @router.post("/api/discover")
-    async def discover(req: DiscoveryRequest, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+    async def discover(
+        req: DiscoveryRequest,
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    ):
         """Auto-discover best URLs to scrape for a topic."""
         try:
             results = await discover_urls(
@@ -158,13 +162,12 @@ def create_jobs_router(
     @router.post("/api/schema/suggest")
     async def suggest_schema(
         req: SchemaSuggestionRequest,
-        _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
         """Infer topic + schema fields from plain-language user intent."""
         from app.insight_engine import suggest_schema_from_intent  # research-shell, lazy
 
-        suggestion = await suggest_schema_from_intent(req.intent, max_fields=req.max_fields)
-        return suggestion
+        return await suggest_schema_from_intent(req.intent, max_fields=req.max_fields)
 
     @router.get("/api/jobs")
     async def list_jobs():
@@ -183,7 +186,7 @@ def create_jobs_router(
                     stale_ids = [jid for jid in jobs_store if jid not in fresh_jobs]
                     for jid in stale_ids:
                         jobs_store.pop(jid, None)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logging.getLogger(__name__).debug("Failed to refresh jobs list from repo")
 
         with _store_lock:
@@ -207,12 +210,12 @@ def create_jobs_router(
                         "progress_current": dumped.get("progress_current", 0),
                         "progress_total": dumped.get("progress_total", 0),
                         "error": dumped.get("error"),
-                    }
+                    },
                 )
             return {"jobs": summaries}
 
     @router.get("/api/jobs/{job_id}")
-    async def get_job(job_id: str, include_results: bool = Query(False)):
+    async def get_job(job_id: str, include_results: Annotated[bool, Query()] = False):
         job = _get_job(job_id)
 
         results_list = []
@@ -229,7 +232,11 @@ def create_jobs_router(
         return dumped
 
     @router.get("/api/jobs/{job_id}/results")
-    async def get_job_results(job_id: str, limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)):
+    async def get_job_results(
+        job_id: str,
+        limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ):
         """Return a paginated slice of job results."""
         job = _get_job(job_id)
 
@@ -260,7 +267,10 @@ def create_jobs_router(
         }
 
     @router.post("/api/jobs/{job_id}/backfill-metadata")
-    async def backfill_job_metadata(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+    async def backfill_job_metadata(
+        job_id: str,
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    ):
         """Explicitly backfill source metadata for manual-mode job results."""
         job = _get_job(job_id)
 
@@ -294,7 +304,10 @@ def create_jobs_router(
         return {"message": "Metadata backfilled successfully", "updated": updated}
 
     @router.post("/api/jobs")
-    async def create_job(job_data: JobCreate, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+    async def create_job(
+        job_data: JobCreate,
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    ):
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
         urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
 
@@ -339,17 +352,16 @@ def create_jobs_router(
                 logging.getLogger(__name__).info("Job %s enqueued to worker queue (task=%s)", job.id, task_id)
             except Exception as e:
                 if settings.ENV.lower() == "production":
-                    logging.getLogger(__name__).error(
-                        "Failed to enqueue job %s to worker queue in production: %s",
+                    logging.getLogger(__name__).exception(
+                        "Failed to enqueue job %s to worker queue in production",
                         job.id,
-                        e,
                     )
                     if job.id in jobs_store:
                         del jobs_store[job.id]
                     try:
                         repo = get_job_repository()
                         repo.hard_delete(job.id)
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         logging.getLogger(__name__).warning("Failed to hard-delete job %s after enqueue failure", job.id)
                     raise HTTPException(
                         status_code=503,
@@ -371,7 +383,7 @@ def create_jobs_router(
         return {"job_id": job.id, "status": job.status.value}
 
     @router.post("/api/jobs/{job_id}/cancel")
-    async def cancel_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+    async def cancel_job(job_id: str, _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))]):
         with _store_lock:
             if job_id not in jobs_store:
                 raise HTTPException(status_code=404, detail="Job not found")
@@ -401,7 +413,7 @@ def create_jobs_router(
 
                 queue = get_worker_queue()
                 await queue.cancel(job_id)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logging.getLogger(__name__).warning(
                     "Failed to cancel queued task for job %s: %s",
                     job_id,
@@ -418,7 +430,7 @@ def create_jobs_router(
         }
 
     @router.post("/api/jobs/{job_id}/reclean")
-    async def reclean_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+    async def reclean_job(job_id: str, _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))]):
         """Re-run AI cleaning and schema alignment on existing job results without re-scraping URLs."""
         with _store_lock:
             if job_id not in jobs_store:
@@ -475,16 +487,17 @@ def create_jobs_router(
                     ),
                     timeout=config["ai_structuring_timeout_seconds"],
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 cleaned_rows = working_rows
+                timeout_s = config["ai_structuring_timeout_seconds"]
                 reclean_warnings.append(
-                    f"AI re-clean timed out after {config['ai_structuring_timeout_seconds']}s; used deterministic post-processing.",
+                    f"AI re-clean timed out after {timeout_s}s; used deterministic post-processing.",
                 )
-            except Exception as e:
-                logging.exception(e)
+            except Exception:
+                logging.exception("Re-clean failed")
                 cleaned_rows = working_rows
                 reclean_warnings.append("AI re-clean failed; used deterministic post-processing.")
-                logging.error("Job %s: Re-clean failed: %s", job_id, e)
+                logging.exception("Job %s: Re-clean failed", job_id)
 
             filtered_results, total, filtered_count, type_integrity_report = await process_results(
                 cleaned_rows,
@@ -530,13 +543,12 @@ def create_jobs_router(
                 job.results_on_disk = True
                 job.results_file_path = file_path
                 job.results = []
-            else:
-                if loaded_from_disk:
-                    from app.utils.job_results_store import delete_job_results_from_disk
+            elif loaded_from_disk:
+                from app.utils.job_results_store import delete_job_results_from_disk
 
-                    delete_job_results_from_disk(job.id, job.results_file_path)
-                    job.results_on_disk = False
-                    job.results_file_path = None
+                delete_job_results_from_disk(job.id, job.results_file_path)
+                job.results_on_disk = False
+                job.results_file_path = None
 
             prev_quality = dict(job.quality_report or {})
             existing_warnings = list(prev_quality.get("warnings") or [])
@@ -588,10 +600,9 @@ def create_jobs_router(
             # Restore the previous (terminal) status so the job isn't
             # permanently stuck in ``RUNNING``. Log the failure prominently.
             logging.getLogger(__name__).exception(
-                "Job %s: Reclean failed irrecoverably, restoring previous status %s: %s",
+                "Job %s: Reclean failed irrecoverably, restoring previous status %s",
                 job_id,
                 previous_status.value if hasattr(previous_status, "value") else previous_status,
-                e,
             )
             job.status = previous_status
             reclean_warnings.append(f"Reclean failed: {e}")
@@ -613,7 +624,7 @@ def create_jobs_router(
         }
 
     @router.delete("/api/jobs/{job_id}")
-    async def delete_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
+    async def delete_job(job_id: str, _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):
         with _store_lock:
             if job_id not in jobs_store:
                 raise HTTPException(status_code=404, detail="Job not found")
@@ -629,8 +640,8 @@ def create_jobs_router(
 
     @router.delete("/api/jobs/cleanup/terminal")
     async def clear_terminal_jobs(
-        keep_recent: int = Query(5, ge=0, le=5000),
-        _role: UserRole = Depends(require_role([UserRole.ADMIN])),
+        keep_recent: Annotated[int, Query(ge=0, le=5000)] = 5,
+        _role: UserRole = Depends(require_role([UserRole.ADMIN])),  # noqa: B008
     ):
         terminal_statuses = {
             JobStatus.COMPLETED,
@@ -698,12 +709,12 @@ def create_jobs_router(
                         "progress_current": dumped.get("progress_current", 0),
                         "progress_total": dumped.get("progress_total", 0),
                         "error": dumped.get("error"),
-                    }
+                    },
                 )
             return {"jobs": summaries}
 
     @router.post("/api/recycle_bin/{job_id}/restore")
-    async def restore_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
+    async def restore_job(job_id: str, _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):
         with _store_lock:
             if job_id not in recycle_bin_store:
                 raise HTTPException(status_code=404, detail="Job not in recycle bin")
@@ -715,7 +726,7 @@ def create_jobs_router(
         return {"message": "Job restored"}
 
     @router.delete("/api/recycle_bin/{job_id}")
-    async def hard_delete_job(job_id: str, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
+    async def hard_delete_job(job_id: str, _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):
         with _store_lock:
             if job_id not in recycle_bin_store:
                 raise HTTPException(status_code=404, detail="Job not in recycle bin")
@@ -731,7 +742,7 @@ def create_jobs_router(
         return {"message": "Job permanently deleted"}
 
     @router.delete("/api/recycle_bin")
-    async def clear_recycle_bin(_role: UserRole = Depends(require_role([UserRole.ADMIN]))):
+    async def clear_recycle_bin(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):
         from app.utils.job_results_store import delete_job_results_from_disk
 
         with _store_lock:

@@ -196,11 +196,11 @@ def test_progress_persistence_without_full_state_rewrite(monkeypatch) -> None:
     full_state_writes = 0
     single_row_writes = 0
 
-    def mock_persist_state():
+    def mock_persist_state() -> None:
         nonlocal full_state_writes
         full_state_writes += 1
 
-    def mock_persist_single():
+    def mock_persist_single() -> None:
         nonlocal single_row_writes
         single_row_writes += 1
 
@@ -220,7 +220,7 @@ def test_progress_persistence_without_full_state_rewrite(monkeypatch) -> None:
     async def mock_scrape_url_with_recovery(*args, **kwargs):
         return [{"title": "Test record"}], {"acquisition_lineage": {}, "recovery_attempts": 0}
 
-    async def mock_generate_data_insight(*args, **kwargs):
+    async def mock_generate_data_insight(*args, **kwargs) -> str:
         return "Mock insight."
 
     reset_domain_runtime_policy()
@@ -496,7 +496,7 @@ def test_same_domain_concurrency_respected(monkeypatch) -> None:
         active_scrapes -= 1
         return [{"title": "Record"}], {"acquisition_lineage": {}, "recovery_attempts": 0}
 
-    async def mock_generate_data_insight(*args, **kwargs):
+    async def mock_generate_data_insight(*args, **kwargs) -> str:
         return "Mock insight."
 
     monkeypatch.setattr("app.services.job_runner.scrape_url_with_recovery", mock_scrape_url_with_recovery)
@@ -568,7 +568,7 @@ def test_sqlite_preserves_all_job_fields(monkeypatch) -> None:
             deduplicate_field="email",
             started_at="2026-05-25T12:00:00",
             results_on_disk=True,
-            results_file_path="/tmp/results.json.gz",
+            results_file_path="/tmp/results.json.gz",  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
         )
 
         save_state({job.id: job}, {})
@@ -588,7 +588,7 @@ def test_sqlite_preserves_all_job_fields(monkeypatch) -> None:
         assert loaded.deduplicate_field == "email"
         assert loaded.started_at == "2026-05-25T12:00:00"
         assert loaded.results_on_disk is True
-        assert loaded.results_file_path == "/tmp/results.json.gz"
+        assert loaded.results_file_path == "/tmp/results.json.gz"  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
 
     finally:
         if db_path.exists():
@@ -613,7 +613,7 @@ def test_offloaded_results_survive_restart(monkeypatch) -> None:
             name="Offloaded Job",
             status=JobStatus.RUNNING,
             results_on_disk=True,
-            results_file_path="/tmp/offloaded_records.json.gz",
+            results_file_path="/tmp/offloaded_records.json.gz",  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
             results=[],
         )
 
@@ -626,7 +626,7 @@ def test_offloaded_results_survive_restart(monkeypatch) -> None:
         loaded = loaded_jobs[job.id]
         assert loaded.status == JobStatus.FAILED
         assert loaded.results_on_disk is True
-        assert loaded.results_file_path == "/tmp/offloaded_records.json.gz"
+        assert loaded.results_file_path == "/tmp/offloaded_records.json.gz"  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
 
     finally:
         if db_path.exists():

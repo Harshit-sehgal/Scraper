@@ -46,7 +46,7 @@ def _get_audit_logger() -> logging.Logger:
             from app.config import settings
 
             configured_log_dir = settings.AUDIT_LOG_DIR
-        except Exception:
+        except Exception:  # noqa: BLE001
             configured_log_dir = ""
 
         log_dir = Path(configured_log_dir or AUDIT_LOG_DIR)
@@ -85,7 +85,7 @@ class AuditEvent:
         resource: str,
         details: dict[str, Any] | None = None,
         outcome: str = "success",
-    ):
+    ) -> None:
         self.timestamp = time.time()
         self.event_type = event_type
         self.actor = actor
@@ -129,6 +129,7 @@ def log_auth_event(
         resource: Optional resource being accessed
         outcome: "success" or "failure"
         details: Optional additional context
+
     """
     event = AuditEvent(
         event_type="auth",
@@ -158,6 +159,7 @@ def log_rbac_event(
         role: The role assigned to the actor
         outcome: "granted", "denied", or "escalation"
         details: Optional additional context
+
     """
     event = AuditEvent(
         event_type="rbac",
@@ -183,6 +185,7 @@ def log_admin_action(
         action: The action performed
         resource: The resource affected
         details: Optional additional context
+
     """
     event = AuditEvent(
         event_type="admin",
@@ -208,6 +211,7 @@ def log_data_access(
         action: The access action (e.g. "export_csv", "export_json")
         resource: The resource being accessed
         details: Optional additional context
+
     """
     event = AuditEvent(
         event_type="data_access",
@@ -235,6 +239,7 @@ def log_job_event(
         job_id: The job ID
         outcome: "success" or "failure"
         details: Optional additional context
+
     """
     event = AuditEvent(
         event_type="job",
@@ -260,6 +265,7 @@ def log_system_event(
         resource: Optional resource affected
         outcome: "success" or "failure"
         details: Optional additional context
+
     """
     event = AuditEvent(
         event_type="system",
@@ -281,8 +287,6 @@ def _parse_audit_log_line(line: str) -> dict[str, Any] | None:
     Useful for testing and log analysis.
     """
     try:
-        # Extract the JSON portion after the timestamp prefix
-        # Format: "2026 - 05 - 30T12:00:00 [AUDIT] {...json...}"
         if "[AUDIT]" in line:
             json_start = line.index("[AUDIT]") + len("[AUDIT] ")
             return json.loads(line[json_start:])  # type: ignore[no-any-return]
@@ -297,7 +301,7 @@ def get_audit_log_path() -> Path:
         from app.config import settings
 
         configured_log_dir = settings.AUDIT_LOG_DIR
-    except Exception:
+    except Exception:  # noqa: BLE001
         configured_log_dir = ""
     return Path(configured_log_dir or AUDIT_LOG_DIR) / AUDIT_LOG_FILE
 
@@ -310,6 +314,7 @@ def get_recent_events(count: int = 50) -> list[dict[str, Any]]:
 
     Returns:
         List of parsed audit event dictionaries, most recent first
+
     """
     log_path = get_audit_log_path()
     if not log_path.exists():
@@ -317,7 +322,7 @@ def get_recent_events(count: int = 50) -> list[dict[str, Any]]:
 
     events: list[dict[str, Any]] = []
     try:
-        with open(log_path, "r", encoding="utf-8") as f:
+        with open(log_path, encoding="utf-8") as f:  # noqa: PTH123
             for line in f:
                 line = line.strip()
                 if not line:
@@ -325,28 +330,11 @@ def get_recent_events(count: int = 50) -> list[dict[str, Any]]:
                 parsed = _parse_audit_log_line(line)
                 if parsed:
                     events.append(parsed)
-    except (OSError, IOError) as e:
+    except OSError as e:
         logging.getLogger(__name__).warning("Failed to read audit log: %s", e)
         return []
 
     return list(reversed(events[-count:]))
-
-
-# ─── Integration with main.py ─────────────────────────────────────────────
-
-# These functions are meant to be called from middleware / hooks in main.py.
-
-# Example usage in main.py:
-#
-#   from app.audit_logger import log_auth_event, log_rbac_event
-#
-#   # Log auth failure in api_key_middleware:
-#   log_auth_event(
-#       actor=request.client.host if request.client else "unknown",
-#       action="api_key_auth",
-#       outcome="failure",
-#       details={"path": request.url.path},
-#   )
 
 
 def reset_audit_logger() -> None:

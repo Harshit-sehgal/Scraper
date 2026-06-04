@@ -1,5 +1,4 @@
-"""
-Phase 51: Topology-Partitioned Concurrency (Hybrid MVCC) Tests
+"""Phase 51: Topology-Partitioned Concurrency (Hybrid MVCC) Tests.
 ==============================================================
 LAW: Distributed semantic systems must handle concurrent evolution without
 global locking bottlenecks. MVCC ensures causality is preserved.
@@ -22,7 +21,6 @@ def ws():
 
 def test_mvcc_conflict_detection(ws) -> None:
     """Verify that concurrent modifications to the same region trigger ConflictError."""
-
     # 1. Create a region
     with ws.transaction("setup"):
         r = ws._topology.add(["role_a"], "token", instability=0.5)
@@ -30,7 +28,7 @@ def test_mvcc_conflict_detection(ws) -> None:
 
     results = []
 
-    def run_tx_A():
+    def run_tx_A() -> None:
         try:
             with ws.transaction("tx_A"):
                 # 2. Transaction A starts and reads the region (populates read_set/base_versions)
@@ -49,7 +47,7 @@ def test_mvcc_conflict_detection(ws) -> None:
         except Exception as e:
             results.append(f"A_ERROR: {e}")
 
-    def run_tx_B():
+    def run_tx_B() -> None:
         try:
             time.sleep(0.1)  # Start B after A has read
             with ws.transaction("tx_B"):
@@ -68,7 +66,6 @@ def test_mvcc_conflict_detection(ws) -> None:
     t1.join()
     t2.join()
 
-    print(f"\nMVCC Results: {results}")
     assert "B_SUCCESS" in results
     assert "A_CONFLICT" in results
     assert "A_SUCCESS" not in results
@@ -86,4 +83,3 @@ def test_version_incrementing(ws) -> None:
 
     r_live = next(r for r in ws._topology._regions if r.region_id == rid)
     assert r_live.version == v0 + 1
-    print(f"\nVersion incremented: {v0} -> {r_live.version}")

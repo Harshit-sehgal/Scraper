@@ -37,7 +37,8 @@ def _capture_last_tx(ws):
 
 def test_full_multi_subsystem_replay() -> None:
     """Execute mutations across all 10 replayable subsystems, clear,
-    replay, and verify state equivalence on every subsystem."""
+    replay, and verify state equivalence on every subsystem.
+    """
     ws = get_world_state()
     ws.clear()
 
@@ -271,7 +272,8 @@ def test_journal_entry_structure() -> None:
 
 def test_all_replayable_subsystems_record() -> None:
     """Each replayable subsystem must generate journal entries under
-    normal operation. Excludes 'global' which is orchestration-level."""
+    normal operation. Excludes 'global' which is orchestration-level.
+    """
     ws = get_world_state()
     ws.clear()
 
@@ -322,7 +324,8 @@ def test_journal_trace_id_propagation() -> None:
 
 def test_cumulative_replay_multiple_transactions() -> None:
     """Execute 3 chained transactions, clear, replay all in order,
-    verify final state matches exactly."""
+    verify final state matches exactly.
+    """
     ws = get_world_state()
     ws.clear()
 
@@ -395,7 +398,8 @@ def test_cumulative_replay_multiple_transactions() -> None:
 
 def test_replay_idempotent() -> None:
     """Replaying the same transaction twice should produce the same
-    final state as replaying it once."""
+    final state as replaying it once.
+    """
     ws = get_world_state()
     ws.clear()
 
@@ -425,7 +429,8 @@ def test_replay_idempotent() -> None:
 
 def test_direct_mutation_recorded_outside_transaction() -> None:
     """Mutations made outside a transaction must still appear in the
-    global journal (with 'direct_mutation' label)."""
+    global journal (with 'direct_mutation' label).
+    """
     ws = get_world_state()
     ws.clear()
 
@@ -453,7 +458,8 @@ def test_direct_mutation_recorded_outside_transaction() -> None:
 
 def test_topology_add_replay_structural() -> None:
     """Replaying topology.add() must restore the correct number of
-    regions with matching tokens and roles (ID-independent verification)."""
+    regions with matching tokens and roles (ID-independent verification).
+    """
     ws = get_world_state()
     ws.clear()
 
@@ -507,7 +513,8 @@ def test_topological_law_replay() -> None:
 
 def test_replay_instability_tuple_key_deserialization() -> None:
     """Tuple keys in instability entries must survive JSON serialization/
-    deserialization during replay."""
+    deserialization during replay.
+    """
     ws = get_world_state()
     ws.clear()
 
@@ -530,7 +537,8 @@ def test_replay_instability_tuple_key_deserialization() -> None:
 
 def test_long_horizon_replay_parity() -> None:
     """Execute 500 random transactions, capture the journal, and verify
-    that full replay results in identical metrics and manifold checksum."""
+    that full replay results in identical metrics and manifold checksum.
+    """
     import random
 
     ws = get_world_state()
@@ -566,4 +574,3 @@ def test_long_horizon_replay_parity() -> None:
     assert abs(ws.metrics.global_entropy - original_metrics["entropy"]) < 0.001
     assert ws.metrics.total_records_processed == original_metrics["records"]
     assert ws.get_manifold_checksum() == original_checksum
-    print("\nLong-horizon replay parity confirmed (500 transactions).")

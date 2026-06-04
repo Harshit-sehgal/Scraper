@@ -1,6 +1,4 @@
-"""
-Verify there are no unresolved pyflakes warnings across the codebase.
-"""
+"""Verify there are no unresolved pyflakes warnings across the codebase."""
 
 import subprocess
 import sys

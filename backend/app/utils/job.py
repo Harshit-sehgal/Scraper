@@ -39,7 +39,7 @@ def deduplicate_results(records: list[dict], schema_fields: list, deduplicate_fi
     return unique
 
 
-def mark_job_canceled(job, reason: str = "Canceled by user"):
+def mark_job_canceled(job, reason: str = "Canceled by user") -> None:
     from app.models import JobStatus
 
     job.status = JobStatus.CANCELED

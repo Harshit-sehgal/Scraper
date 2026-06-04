@@ -1,6 +1,4 @@
-"""
-Result contracts — canonical models for extraction results, quality, and failure states.
-"""
+"""Result contracts — canonical models for extraction results, quality, and failure states."""
 
 from __future__ import annotations
 

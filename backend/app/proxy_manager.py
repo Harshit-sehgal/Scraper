@@ -1,5 +1,4 @@
-"""
-Proxy Manager — Anti-Bot Evasion via Proxy Rotation.
+"""Proxy Manager — Anti-Bot Evasion via Proxy Rotation.
 
 Responsible for:
 - Managing a pool of proxy servers
@@ -33,7 +32,7 @@ class ProxyManager:
         # Load proxies from config if available
         if self._enabled and settings.PROXY_LIST:
             self._proxy_list = [p.strip() for p in settings.PROXY_LIST.split(",") if p.strip()]
-            logger.info(f"Proxy manager initialized with {len(self._proxy_list)} proxies")
+            logger.info("Proxy manager initialized with %d proxies", len(self._proxy_list))
         elif self._enabled:
             logger.warning("Proxy rotation enabled but PROXY_LIST is empty")
 
@@ -67,7 +66,7 @@ class ProxyManager:
 
         # Rotate if threshold exceeded
         if self._failure_counts[proxy] >= settings.PROXY_ROTATION_FAILURE_THRESHOLD:
-            logger.warning(f"Proxy {proxy} reached {self._failure_counts[proxy]} failures, rotating")
+            logger.warning("Proxy %s reached %d failures, rotating", proxy, self._failure_counts[proxy])
             self.rotate(domain=domain)
             self._failure_counts[proxy] = 0
 
@@ -119,7 +118,7 @@ class ProxyManager:
                 break
 
         new_proxy = self._proxy_list[self._current_index]
-        logger.debug(f"Rotated to proxy: {new_proxy}")
+        logger.debug("Rotated to proxy: %s", new_proxy)
         return new_proxy
 
     def reset_consecutive_failures(self) -> None:

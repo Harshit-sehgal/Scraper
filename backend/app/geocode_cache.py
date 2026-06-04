@@ -1,5 +1,4 @@
-"""
-Geocoding Cache — shared persistent geocoding index to safeguard Nominatim rate-limits.
+"""Geocoding Cache — shared persistent geocoding index to safeguard Nominatim rate-limits.
 
 Provides:
   - SQLite persistence for geocoded location coordinate mappings.
@@ -11,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import sqlite3
 import time
 from pathlib import Path
@@ -28,7 +26,7 @@ class GeocodeCache:
 
     def __init__(self, db_path: str = CACHE_DB_PATH) -> None:
         self.db_path = db_path
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
         self.hits = 0
         self.misses = 0
@@ -77,11 +75,10 @@ class GeocodeCache:
                 self.hits += 1
                 logger.info("[Geocode Cache] Negative cache HIT for query '%s' (suppressed)", query)
                 return (0.0, 0.0, "EXCLUDED_NEGATIVE_CACHE")
-            else:
-                # Expired negative cache entry
-                with sqlite3.connect(self.db_path) as conn:
-                    conn.execute("DELETE FROM negative_cache WHERE query_hash = ?", (q_hash,))
-                    conn.commit()
+            # Expired negative cache entry
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("DELETE FROM negative_cache WHERE query_hash = ?", (q_hash,))
+                conn.commit()
 
         # 2. Check primary geocoding cache
         with sqlite3.connect(self.db_path) as conn:

@@ -1,5 +1,4 @@
-"""
-Layer 3: Semantic Mapper
+"""Layer 3: Semantic Mapper.
 =========================
 Universal semantic mapping that matches values to user intent by WHAT THEY ARE,
 not by WHERE THEY CAME FROM or what DOMAIN the page is from.
@@ -174,13 +173,10 @@ def detect_semantic_type(value: str, field_name: str = "") -> tuple[SemanticType
             # Check if it's "Title Case" (all words start with upper)
             if all(w[0].isupper() for w in words if len(w) > 2):
                 return SemanticType.ORGANIZATION, 0.65
-            else:
-                return SemanticType.TEXT, 0.50
-        else:
-            if len(v_str) > 3:
-                return SemanticType.ORGANIZATION, 0.55
-            else:
-                return SemanticType.TEXT, 0.50
+            return SemanticType.TEXT, 0.50
+        if len(v_str) > 3:
+            return SemanticType.ORGANIZATION, 0.55
+        return SemanticType.TEXT, 0.50
 
     # Product-like (brand naming: starts lowercase, has internal uppercase,
     # e.g. iPhone)
@@ -258,8 +254,7 @@ def match_values_to_intent(
     value_patterns: ValuePatterns,
     headers: list[str] | None = None,
 ) -> list[RecordMapping]:
-    """
-    Match extracted values to user intent by WHAT THEY ARE, not where they came from.
+    """Match extracted values to user intent by WHAT THEY ARE, not where they came from.
 
     Input: extracted_records = [{"col1": "£238", "col2": "22 - 05 - 2026", "col3": "Lufthansa"}]
            intent = IntentSchema with semantic_needs = {"price": [...], "date": [...]}
@@ -302,7 +297,7 @@ def _map_single_record(
 
     # For each semantic need the user has, try to find a matching value
     used_values: set[str] = set()
-    for semantic_need in intent.semantic_needs.keys():
+    for semantic_need in intent.semantic_needs:
         best_mapping = _find_best_value_for_need(all_values, semantic_need, headers, value_patterns, used_values)
 
         if best_mapping:
@@ -317,7 +312,7 @@ def _map_single_record(
             unmatched_values.append(semantic_need)
 
     # Also track any values we couldn't map to a need
-    mapped_values = set(m.mapped_value for m in field_mappings)
+    mapped_values = {m.mapped_value for m in field_mappings}
     for value in all_values:
         if value and value not in mapped_values and not _is_noise_value(value):
             unmatched_values.append(value)
@@ -337,8 +332,7 @@ def _find_best_value_for_need(
     value_patterns: ValuePatterns,
     used_values: set | None = None,
 ) -> FieldMapping | None:
-    """
-    Find the best value that matches a semantic need.
+    """Find the best value that matches a semantic need.
 
     Strategy:
     1. Pattern match: does value match expected pattern for this need?
@@ -538,7 +532,4 @@ def _is_noise_value(value: str | None) -> bool:
         return True
 
     # Too long (likely not a data value)
-    if len(value_lower) > 300:
-        return True
-
-    return False
+    return len(value_lower) > 300

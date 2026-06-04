@@ -1,5 +1,4 @@
-"""
-Semantic Event Definitions
+"""Semantic Event Definitions.
 ===========================
 Defines the signals that propagate through the cognition architecture.
 """

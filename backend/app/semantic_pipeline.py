@@ -1,5 +1,4 @@
-"""
-Semantic Pipeline Orchestrator
+"""Semantic Pipeline Orchestrator.
 ================================
 Clean layered pipeline that strictly orchestrates the semantic flow.
 
@@ -442,11 +441,10 @@ def run_pipeline(
                             top_val = region.token
                             break
                     output[role_name] = top_val
+                elif role and role.filled_by:
+                    output[role_name] = role.filled_by
                 else:
-                    if role and role.filled_by:
-                        output[role_name] = role.filled_by
-                    else:
-                        output[role_name] = None
+                    output[role_name] = None
 
             output["_confidence"] = alloc_graph.coherence_score
 

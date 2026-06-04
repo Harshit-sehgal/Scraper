@@ -1,5 +1,4 @@
-"""
-FastAPI Main Server — DataForge General-Purpose Web Scraper API.
+"""FastAPI Main Server — DataForge General-Purpose Web Scraper API.
 
 Thin app factory: imports and composes middleware, routers, and lifespan
 from dedicated modules. Keeps backward-compatible re-exports so existing
@@ -73,7 +72,7 @@ __all__ = [
 # ─── App Factory and Configuration ─────────────────────────────────────────
 
 
-def configure_middleware(app: FastAPI):
+def configure_middleware(app: FastAPI) -> None:
     """Configure CORS, body size limit, API key auth, rate limiter, and latency tracking middlewares."""
     app.add_middleware(
         CORSMiddleware,
@@ -88,7 +87,7 @@ def configure_middleware(app: FastAPI):
     app.middleware("http")(latency_tracking_middleware)
 
 
-def configure_static(app: FastAPI):
+def configure_static(app: FastAPI) -> None:
     """Configure static frontend and dashboard mounts if directories exist and not in production."""
     from app.config import settings
 
@@ -103,7 +102,7 @@ def configure_static(app: FastAPI):
             app.mount("/dashboard", StaticFiles(directory=str(DASHBOARD_DIR), html=True), name="dashboard")
 
 
-def configure_routes(app: FastAPI):
+def configure_routes(app: FastAPI) -> None:
     """Include API routers.
 
     The experimental / research router is conditionally mounted: it is
@@ -116,9 +115,9 @@ def configure_routes(app: FastAPI):
         create_jobs_router(
             jobs_store=jobs_store,
             recycle_bin_store=recycle_bin_store,
-            persist_state_fn=lambda *args, **kwargs: _persist_state_wrapper(*args, **kwargs),
-            schedule_task_fn=lambda *args, **kwargs: _schedule_background_task(*args, **kwargs),
-            run_job_coro_fn=lambda *args, **kwargs: _run_job_wrapper(*args, **kwargs),
+            persist_state_fn=_persist_state_wrapper,
+            schedule_task_fn=_schedule_background_task,
+            run_job_coro_fn=_run_job_wrapper,
             config=CONFIG,
         ),
     )
@@ -149,14 +148,12 @@ def configure_routes(app: FastAPI):
         logger.info("Experimental / research router NOT mounted (set DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true to enable)")
 
 
-def configure_exception_handlers(app: FastAPI):
+def configure_exception_handlers(app: FastAPI) -> None:
     """Configure custom application exception handlers."""
-    pass
 
 
-def configure_lifespan(app: FastAPI):
+def configure_lifespan(app: FastAPI) -> None:
     """Configure lifespan settings (handled in FastAPI initialization)."""
-    pass
 
 
 def create_app() -> FastAPI:

@@ -1,11 +1,11 @@
-"""
-Role Embedding Engine
+"""Role Embedding Engine.
 =====================
 Learns and maintains geometric role embeddings within a topological manifold.
 Meaning is derived from similarity and stable field motifs.
 """
 
 import concurrent.futures
+import contextlib
 import logging
 import threading
 from dataclasses import dataclass
@@ -21,7 +21,7 @@ from app.semantic_world_state import get_world_state
 class RoleEmbeddingEngine:
     """Learns role embeddings from global field dynamics and stable motifs."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._ws = None
         # Ephemeral force buffer for manifold relaxation
         self.force_buffer: dict[str, list[float]] = {}
@@ -38,10 +38,10 @@ class RoleEmbeddingEngine:
         return app.semantic_world_state.get_world_state()
 
     @ws.setter
-    def ws(self, value):
+    def ws(self, value) -> None:
         self._ws = value
 
-    def _seed_baseline_manifold(self):
+    def _seed_baseline_manifold(self) -> None:
         if self.manifold:
             return
         from app.field_laws import ROLE_EXCLUSIVITY
@@ -77,7 +77,7 @@ class RoleEmbeddingEngine:
         return self.ws.learning_count  # type: ignore[no-any-return]
 
     @learning_count.setter
-    def learning_count(self, value: int):
+    def learning_count(self, value: int) -> None:
         self.ws.learning_count = value
 
     @property
@@ -94,7 +94,7 @@ class RoleEmbeddingEngine:
         return self.ws.total_co_occurrences  # type: ignore[no-any-return]
 
     @total_co_occurrences.setter
-    def total_co_occurrences(self, value: int):
+    def total_co_occurrences(self, value: int) -> None:
         self.ws.total_co_occurrences = value
 
     def get_compatibility(self, role: str, stype: SemanticType, token: SemanticToken | None = None) -> float:
@@ -112,7 +112,7 @@ class RoleEmbeddingEngine:
             type_vec = self._get_type_vector(stype)
 
         # Similarity = dot product
-        sim = sum(rv * tv for rv, tv in zip(role_vec, type_vec))
+        sim = sum(rv * tv for rv, tv in zip(role_vec, type_vec, strict=False))
 
         # Theoretical max sim for this specific role-type combination
         is_role_core = role_vec[-1] > 0.7
@@ -158,7 +158,7 @@ class RoleEmbeddingEngine:
         if not va or not vb:
             return 0.0
 
-        sim = sum(a * b for a, b in zip(va, vb))
+        sim = sum(a * b for a, b in zip(va, vb, strict=False))
 
         # Calibration (Phase 34): scale by dimensionality
         dim = self.dimension
@@ -212,10 +212,8 @@ class RoleEmbeddingEngine:
         Low Pressure = Slower learning (precision).
         """
         pressure = 0.5
-        try:
+        with contextlib.suppress(AttributeError):
             pressure = self.ws.get_system_pressure()
-        except AttributeError:
-            pass
 
         certainty = self.get_certainty()
         # Scale by pressure [0.5, 2.0] and stability (1.0 - certainty)
@@ -229,7 +227,7 @@ class RoleEmbeddingEngine:
         success: bool,
         delta: float = 0.05,
         coherence: float = 1.0,
-    ):
+    ) -> None:
         """Apply learning force directly to the manifold."""
         if coherence < 0.6:
             return
@@ -239,10 +237,7 @@ class RoleEmbeddingEngine:
 
         ideal_type = _infer_role_type(role)
         is_compatible = (
-            (token_type == ideal_type)
-            or (token_type == SemanticType.TEXT)
-            or (ideal_type == SemanticType.TEXT)
-            or (token_type == SemanticType.CODE)
+            token_type in (ideal_type, SemanticType.TEXT) or ideal_type == SemanticType.TEXT or token_type == SemanticType.CODE
         )
 
         if success and not is_compatible:
@@ -279,7 +274,7 @@ class RoleEmbeddingEngine:
         self.ws.set_manifold_vector(role, role_vec)
         self.learning_count += 1
 
-    def apply_motif_gravity(self, role_name: str, primary_type: SemanticType, stability: float):
+    def apply_motif_gravity(self, role_name: str, primary_type: SemanticType, stability: float) -> None:
         """Accumulate gravity force from stable motifs."""
         if stability < 0.1:
             return
@@ -301,7 +296,7 @@ class RoleEmbeddingEngine:
         for i in range(dim):
             force[i] += (type_vec[i] - role_vec[i]) * gravity
 
-    def relax_manifold(self):
+    def relax_manifold(self) -> None:
         """Geometric relaxation of the Role Manifold with Semantic Sharding (Phase 35)."""
         manifold_copy = self.manifold
         if not manifold_copy:
@@ -323,7 +318,7 @@ class RoleEmbeddingEngine:
 
         # Thread-safety lock for shared manifold_copy mutations across shards —
         # initialized in __init__
-        def _relax_roles_safe(roles, manifold_full, rate):
+        def _relax_roles_safe(roles, manifold_full, rate) -> None:
             """Wrapper that locks shared manifold mutations."""
             with self._relax_lock:
                 self._relax_roles(roles, manifold_full, rate)
@@ -356,7 +351,7 @@ class RoleEmbeddingEngine:
 
         self.detect_dimensionality_need()
 
-    def _relax_roles(self, roles: list[str], manifold_full: dict, base_rate: float):
+    def _relax_roles(self, roles: list[str], manifold_full: dict, base_rate: float) -> None:
         """Internal helper for localized relaxation of a subset of roles."""
         # 1. Filter out anchored roles
         roles = [r for r in roles if not self.ws.is_role_anchored(r)]
@@ -426,7 +421,7 @@ class RoleEmbeddingEngine:
         # Phase 5: Intent Steering (Phase 36)
         # Apply force toward user-defined cognitive goals
         active_intents = self.ws.active_intents
-        for intent_id, details in active_intents.items():
+        for details in active_intents.values():
             target_vec = details["target_vec"]
             strength = details["strength"]
             target_roles = details.get("target_roles", [])
@@ -448,7 +443,7 @@ class RoleEmbeddingEngine:
                         force = diff * strength * 0.1 * base_rate
                         role_vec[k] = max(0.0, min(1.0, role_vec[k] + force))
 
-    def learn_co_occurrence(self, assignment_a: tuple, assignment_b: tuple, success: bool):
+    def learn_co_occurrence(self, assignment_a: tuple, assignment_b: tuple, success: bool) -> None:
         key = assignment_a + assignment_b
         self.ws.increment_co_occurrence(key, 1 if success else -1)
 
@@ -473,7 +468,7 @@ class RoleEmbeddingEngine:
             boosts[role_i] = boost / max(len(items) - 1, 1)
         return boosts
 
-    def learn_contradiction(self, role_a: str, role_b: str, token_type: str):
+    def learn_contradiction(self, role_a: str, role_b: str, token_type: str) -> None:
         from app.instability_api import InstabilityAPI
 
         inst_api = InstabilityAPI(ws=self.ws)
@@ -484,7 +479,7 @@ class RoleEmbeddingEngine:
         if not self.manifold:
             return 0.0
         total_v = 0.0
-        for role, vec in self.manifold.items():
+        for vec in self.manifold.values():
             if not vec:
                 continue
             n_vec = len(vec)
@@ -503,7 +498,7 @@ class RoleEmbeddingEngine:
     def get_learning_speed(self) -> float:
         return min(self.learning_count / 100.0, 1.0)
 
-    def detect_dimensionality_need(self):
+    def detect_dimensionality_need(self) -> None:
         """Analyze if current semantic resolution is sufficient (Phase 34)."""
         if self.learning_count < 200:
             return
@@ -513,7 +508,7 @@ class RoleEmbeddingEngine:
         # it indicates a crowded manifold (Semantic Collision).
         if certainty < 0.2 and self.dimension < 64:
             new_dim = self.dimension + 8
-            logging.getLogger(__name__).info(f"DIMENSIONALITY INDUCTION: Expanding manifold resolution to {new_dim}.")
+            logging.getLogger(__name__).info("DIMENSIONALITY INDUCTION: Expanding manifold resolution to %s.", new_dim)
             self.ws.expand_dimensions(new_dim)
 
     def save_cache(self) -> dict:
@@ -524,7 +519,7 @@ class RoleEmbeddingEngine:
             cache[f"manifold:{role}"] = vec
         return cache
 
-    def load_cache(self, data: dict):
+    def load_cache(self, data: dict) -> None:
         self.ws.clear_compatibility()
         for k, v in data.items():
             if k.startswith("compat:"):
@@ -565,7 +560,7 @@ class RelationshipEmbeddingSpace:
                 vec[type_idx] = 1.0
 
             if token.span and graph.tokens:
-                node_edges = [e for e in graph.relationships if e.source_idx == node_idx or e.target_idx == node_idx]
+                node_edges = [e for e in graph.relationships if node_idx in (e.source_idx, e.target_idx)]
                 centrality = len(node_edges) / max(len(graph.relationships), 1)
                 if dim >= 2:
                     vec[-2] = centrality

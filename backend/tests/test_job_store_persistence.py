@@ -6,6 +6,7 @@ Covers:
 - Full field parity: every important Job field survives save → load
 """
 
+import enum
 import json
 
 import pytest
@@ -19,7 +20,7 @@ from app.job_store import (
 from app.models import Job, JobStatus, ScrapeMode, SourcePolicy
 
 
-@pytest.fixture()
+@pytest.fixture
 def isolated_db(tmp_path, monkeypatch):
     """Point job_store at a fresh temp DB for each test."""
     from app.config import settings
@@ -39,7 +40,7 @@ def isolated_db(tmp_path, monkeypatch):
 
 
 def _make_job(**kwargs) -> Job:
-    defaults = dict(name="test-job", urls=["https://example.com"])
+    defaults = {"name": "test-job", "urls": ["https://example.com"]}
     defaults.update(kwargs)
     return Job(**defaults)
 
@@ -101,7 +102,7 @@ def _make_parity_job() -> Job:
         progress_current=42,
         progress_total=42,
         results_on_disk=True,
-        results_file_path="/tmp/results.gz",
+        results_file_path="/tmp/results.gz",  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
         warnings=["warning1"],
         acquisition_mode="aggressive",
     )
@@ -131,7 +132,7 @@ def test_sqlite_preserves_job_warnings_with_data(isolated_db) -> None:
 
 
 def test_sqlite_preserves_job_warnings_restored(isolated_db) -> None:
-    """warnings stored in the row are restored onto the job."""
+    """Warnings stored in the row are restored onto the job."""
     job = _make_job(warnings=["w1", "w2"])
     row = _job_to_row(job)
     restored = _row_to_job(row)
@@ -171,9 +172,8 @@ def test_sqlite_preserves_acquisition_mode_custom_string(isolated_db) -> None:
 
 def test_sqlite_preserves_acquisition_mode_enum(isolated_db) -> None:
     """An enum acquisition_mode uses .value for serialization."""
-    from enum import Enum
 
-    class AcquisitionMode(str, Enum):
+    class AcquisitionMode(enum.StrEnum):
         STANDARD = "standard"
         AGGRESSIVE = "aggressive"
 

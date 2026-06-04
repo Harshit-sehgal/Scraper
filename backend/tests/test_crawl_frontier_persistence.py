@@ -1,6 +1,4 @@
-"""
-Unit Tests for SQLite Persistence and Continuity of the Crawl Frontier.
-"""
+"""Unit Tests for SQLite Persistence and Continuity of the Crawl Frontier."""
 
 from __future__ import annotations
 

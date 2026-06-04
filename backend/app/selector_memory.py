@@ -1,5 +1,4 @@
-"""
-Selector Memory — persistent learning for domain-specific extraction.
+"""Selector Memory — persistent learning for domain-specific extraction.
 
 Remembers successful CSS selectors for domains to:
   1. Skip LLM discovery on subsequent scrapes (speed & cost)
@@ -50,7 +49,7 @@ class SelectorConfidenceScore:
 class SelectorMemory:
     """Persistent memory of successful selectors per domain."""
 
-    def __init__(self, storage_path: str | None = None):
+    def __init__(self, storage_path: str | None = None) -> None:
         if storage_path is None:
             storage_path = str(Path(__file__).resolve().parent.parent / "data" / "selector_memory.json")
         self.path = Path(storage_path)
@@ -60,21 +59,21 @@ class SelectorMemory:
         self._load()
         self._auto_cleanup()  # Clean up on initialization
 
-    def _load(self):
+    def _load(self) -> None:
         if self.path.exists():
             try:
-                with open(self.path, "r") as f:
+                with open(self.path) as f:  # noqa: PTH123
                     self._memory = json.load(f)
-            except Exception as e:
-                logger.error("Failed to load selector memory: %s", e)
+            except Exception:
+                logger.exception("Failed to load selector memory: %s")
                 self._memory = {}
 
-    def _save(self):
+    def _save(self) -> None:
         try:
-            with open(self.path, "w") as f:
+            with open(self.path, "w") as f:  # noqa: PTH123
                 json.dump(self._memory, f, indent=2)
-        except Exception as e:
-            logger.error("Failed to save selector memory: %s", e)
+        except Exception:
+            logger.exception("Failed to save selector memory: %s")
 
     def _compute_confidence(self, entry: dict) -> SelectorConfidenceScore:
         """Compute confidence score for a selector entry.
@@ -135,6 +134,7 @@ class SelectorMemory:
 
         Returns:
             dict with cleanup stats (domains_checked, selectors_deleted, etc.)
+
         """
         now = time.time()
         # Only run cleanup every SELECTOR_CLEANUP_CHECK_INTERVAL seconds
@@ -235,7 +235,7 @@ class SelectorMemory:
 
         return entry.get("selectors")
 
-    def record_success(self, url: str, selectors: dict):
+    def record_success(self, url: str, selectors: dict) -> None:
         """Record a successful extraction with these selectors."""
         domain = self._extract_domain(url)
         if not domain:
@@ -272,7 +272,7 @@ class SelectorMemory:
         self._memory[domain] = entry
         self._save()
 
-    def record_failure(self, url: str):
+    def record_failure(self, url: str) -> None:
         """Record a failure of remembered selectors for a domain."""
         domain = self._extract_domain(url)
         if not domain:
@@ -292,6 +292,7 @@ class SelectorMemory:
 
         Returns:
             dict with memory stats (total domains, avg confidence, etc.)
+
         """
         if not self._memory:
             return {
@@ -315,7 +316,7 @@ class SelectorMemory:
         }
 
         total_score = 0.0
-        for domain, entry in self._memory.items():
+        for entry in self._memory.values():
             confidence = self._compute_confidence(entry)
             total_score += confidence.final_score
 
@@ -343,7 +344,7 @@ class SelectorMemory:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Manual live benchmark smoke test for the evidence-based extraction pipeline
+"""Manual live benchmark smoke test for the evidence-based extraction pipeline
 across a sample of public websites.
 
 This file is not collected by pytest under the current pytest.ini. Results are
@@ -378,9 +377,6 @@ class SiteResult:
 
 async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:
     """Run scrape_url against one site and return structured results."""
-    print(f"\n  [{index}/{total}] {site.name:25} ({site.category:15}) {site.url[:60]}...")
-    print(f"         Schema: {[f.name for f in site.schema]}")
-
     start = time.time()
     try:
         results = await scrape_url(
@@ -392,7 +388,7 @@ async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:
         fetch_time_ms = elapsed * 1000
 
         # Determine extraction method from results metadata
-        methods = set(r.get("_extraction_method", "") for r in results if isinstance(r, dict))
+        methods = {r.get("_extraction_method", "") for r in results if isinstance(r, dict)}
         method = methods.pop() if len(methods) == 1 else (methods.pop() if methods else "unknown")
 
         # Quality metrics: prefer record_score, fall back to _calibrated_confidence
@@ -439,11 +435,10 @@ async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:
         if t_data.get("fallback_usage"):
             warns.append(f"fallback={t_data['fallback_usage']}")
 
-        status = chr(0x2713) if results else chr(0x25CB)
-        print(f"         {status} {len(results):3} records | method={method:12} | quality={avg_quality:.2f} | {elapsed:.1f}s")
+        chr(0x2713) if results else chr(0x25CB)
 
         if not results and warns:
-            print(f"         {chr(0x26A0)} {'; '.join(warns[:2])}")
+            pass
 
         return SiteResult(
             name=site.name,
@@ -464,7 +459,6 @@ async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:
     except Exception as e:
         elapsed = time.time() - start
         err_str = f"{type(e).__name__}: {e}"
-        print(f"         {chr(0x2717)} ERROR: {err_str[:120]}")
 
         return SiteResult(
             name=site.name,
@@ -486,14 +480,6 @@ async def run_all_tests():
     settings.PLAYWRIGHT_TIMEOUT = 30000
     settings.REQUEST_TIMEOUT = 15
 
-    print("=" * 72)
-    print("  DATAFORGE - 15-Site Universal Extraction Smoke Test")
-    print("=" * 72)
-    print(f"  Date: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"  Sites: {len(SITES)}")
-    print(f"  Delay between sites: {settings.CRAWL_DEFAULT_DELAY_SECONDS}s")
-    print("=" * 72)
-
     results: list[SiteResult] = []
 
     for i, site in enumerate(SITES, 1):
@@ -514,104 +500,65 @@ async def run_all_tests():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def print_report(results: list[SiteResult]):
+def print_report(results: list[SiteResult]) -> None:
     """Print a detailed markdown report of all test results."""
-    total = len(results)
+    len(results)
     with_records = sum(1 for r in results if r.records > 0)
-    total_records = sum(r.records for r in results)
-
-    print("\n\n" + "=" * 72)
-    print("  SMOKE TEST REPORT")
-    print("=" * 72)
-    print(f"  Sites tested:      {total}")
-    print(f"  Sites with data:   {with_records}/{total}")
-    print(f"  Total records:     {total_records}")
-    print("=" * 72)
+    sum(r.records for r in results)
 
     # Summary Table
-    print("\n\n## Summary\n")
-    print("| # | Site | Category | Records | Method | Quality | Fields | Time (s) | Notes |")
-    print("|---|------|----------|---------|--------|---------|--------|----------|-------|")
 
-    for i, r in enumerate(results, 1):
-        notes = ""
+    for _i, r in enumerate(results, 1):
         if r.error:
-            notes = f"{chr(0x26A0)} {r.error[:40]}"
+            f"{chr(0x26A0)} {r.error[:40]}"
         elif not r.records:
-            notes = f"{chr(0x25CB)} zero records"
+            f"{chr(0x25CB)} zero records"
         elif r.warnings:
-            notes = "; ".join(r.warnings[:2])
+            "; ".join(r.warnings[:2])
         else:
-            notes = chr(0x2713)
+            chr(0x2713)
 
         fields_str = ", ".join(r.fields_found[:4])
         if len(r.fields_found) > 4:
             fields_str += f" +{len(r.fields_found) - 4}"
 
-        print(
-            f"| {i} | {r.name} | {r.category} | {r.records} | {r.extraction_method[:12]} | {r.quality:.2f} | {fields_str[:40]} | {r.fetch_time_ms / 1000:.1f} | {notes[:45]} |",
-        )
-
     # Detailed per-site results
-    print("\n\n## Per-Site Details\n")
 
-    for i, r in enumerate(results, 1):
-        print(f"### {i}. {r.name}\n")
-        print(f"- **URL:** [{r.url}]({r.url})")
-        print(f"- **Category:** {r.category}")
-        print(f"- **Records:** {r.records}")
-        print(f"- **Extraction method:** `{r.extraction_method}`")
-        print(f"- **Avg quality:** {r.quality}")
-        fields_display = ", ".join(r.fields_found) if r.fields_found else "*none*"
-        print(f"- **Fields found:** {fields_display}")
-        print(f"- **Fetch time:** {r.fetch_time_ms / 1000:.1f}s")
-        print(f"- **DOM nodes:** {r.dom_nodes}")
-        print(f"- **Anti-bot score:** {r.anti_bot_score}")
+    for _i, r in enumerate(results, 1):
+        ", ".join(r.fields_found) if r.fields_found else "*none*"
 
         if r.sample:
-            sample_display = {k: v for k, v in r.sample.items() if not k.startswith("_")}
-            print(f"- **Sample record:** `{json.dumps(sample_display)}`")
+            {k: v for k, v in r.sample.items() if not k.startswith("_")}
 
         if r.warnings:
-            for w in r.warnings:
-                print(f"- {chr(0x26A0)} {w}")
+            for _w in r.warnings:
+                pass
 
         if r.error:
-            print(f"- {chr(0x2717)} **Error:** {r.error}")
-
-        print()
+            pass
 
     # Acceptance criteria check
-    print("---\n")
-    print("## Acceptance Criteria\n")
-    print("| Criteria | Status |")
-    print("|----------|--------|")
 
     # 1. No false success for 0 records
     zero_but_success = [r for r in results if r.records == 0 and r.extraction_method not in ("", "unknown") and not r.error]
     zero_ok = len(zero_but_success) == 0
-    ok_mark = chr(0x2705) if zero_ok else chr(0x26A0)
-    print(f"| No false success for 0 records | {ok_mark} |")
+    chr(0x2705) if zero_ok else chr(0x26A0)
 
     # 2. Visible text captured when rendered
     pipeline_working = with_records >= 5
-    pw_mark = chr(0x2705) if pipeline_working else chr(0x274C)
-    print(f"| Pipeline produces records (>=5 sites) | {pw_mark} |")
+    chr(0x2705) if pipeline_working else chr(0x274C)
 
     # 3. No domain-specific hardcoded logic (verified in prior audit)
-    print(f"| No domain-specific runtime logic | {chr(0x2705)} (verified in prior audit) |")
 
     # 4. Zero-result properly classified when applicable
     zero_with_class = [r for r in results if r.records == 0 and r.warnings]
-    zrc_mark = chr(0x2705) if zero_with_class else chr(0x25CB) + " (no zero results to classify)"
-    print(f"| Zero-result classification present | {zrc_mark} |")
+    chr(0x2705) if zero_with_class else chr(0x25CB) + " (no zero results to classify)"
 
     # Overall verdict
-    verdict = chr(0x2705) + " PASS" if with_records >= 5 else chr(0x274C) + " FAIL"
-    print(f"\n**Verdict:** {verdict} - {with_records}/{total} sites produced data, {total_records} total records.")
+    chr(0x2705) + " PASS" if with_records >= 5 else chr(0x274C) + " FAIL"
 
 
-def save_report(results: list[SiteResult], path: str = "smoke_test_report.json"):
+def save_report(results: list[SiteResult], path: str = "smoke_test_report.json") -> None:
     """Save the full report as JSON for later analysis."""
     data = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -640,10 +587,9 @@ def save_report(results: list[SiteResult], path: str = "smoke_test_report.json")
     }
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
-    print(f"\nFull report saved to {path}")
 
 
-def compare_with_previous(results: list[SiteResult], history_dir: str = "smoke_test_history"):
+def compare_with_previous(results: list[SiteResult], history_dir: str = "smoke_test_history") -> None:
     """Compare current results with the most recent previous run, print trends."""
     import glob as _glob
 
@@ -651,14 +597,12 @@ def compare_with_previous(results: list[SiteResult], history_dir: str = "smoke_t
 
     history_files = sorted(_glob.glob(f"{history_dir}/smoke_*.json"), reverse=True)
     if not history_files:
-        print("\nFirst run — no previous benchmark to compare against.")
         return
 
     try:
-        with open(history_files[0], "r") as f:
+        with open(history_files[0]) as f:
             prev = json.load(f)
     except Exception:
-        print(f"\nCould not load previous benchmark from {history_files[0]}")
         return
 
     prev_results = {r["name"]: r for r in prev.get("results", [])}
@@ -682,24 +626,13 @@ def compare_with_previous(results: list[SiteResult], history_dir: str = "smoke_t
         else:
             unchanged += 1
 
-    prev_sites = prev.get("sites_with_data", 0)
-    prev_records = prev.get("total_records", 0)
-    curr_sites = sum(1 for r in results if r.records > 0)
-    curr_records = sum(r.records for r in results)
-
-    print(f"\n{'=' * 60}")
-    print("BENCHMARK TREND vs Previous Run")
-    print(f"{'=' * 60}")
-    print(f"Previous: {prev.get('timestamp', 'unknown')} — {prev_sites} sites, {prev_records} records")
-    print(f"Current:  {time.strftime('%Y-%m-%d %H:%M:%S')} — {curr_sites} sites, {curr_records} records")
-    print(f"  Improved:  +{len(improved)} sites" + (f" ({', '.join(improved[:5])})" if improved else ""))
-    print(f"  Regressed: -{len(regressed)} sites" + (f" ({', '.join(regressed[:5])})" if regressed else ""))
-    print(f"  Same:       {same} sites")
-    print(f"  Site delta: {curr_sites - prev_sites:+d}")
-    print(f"  Record delta: {curr_records - prev_records:+d}")
+    prev.get("sites_with_data", 0)
+    prev.get("total_records", 0)
+    sum(1 for r in results if r.records > 0)
+    sum(r.records for r in results)
 
 
-def save_to_history(results: list[SiteResult], history_dir: str = "smoke_test_history"):
+def save_to_history(results: list[SiteResult], history_dir: str = "smoke_test_history") -> None:
     """Save this run to the benchmark history."""
     ts = time.strftime("%Y%m%d_%H%M%S")
     path = f"{history_dir}/smoke_{ts}.json"
@@ -711,40 +644,36 @@ def save_to_history(results: list[SiteResult], history_dir: str = "smoke_test_hi
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-async def main():
-    print("Running 15-site smoke test (this will take several minutes)...")
+async def main() -> None:
     results = await run_all_tests()
     print_report(results)
     compare_with_previous(results)
     save_report(results)
     save_to_history(results)
-    print("\nDone.")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
 
 
-def test_benchmark_smoke_configuration_is_importable():
+def test_benchmark_smoke_configuration_is_importable() -> None:
     """Keep pytest collection honest without running live benchmark traffic."""
     assert SITES
     assert all(site.url.startswith(("http://", "https://")) for site in SITES)
 
 
 @pytest.mark.asyncio
-async def test_live_benchmark_extraction():
+async def test_live_benchmark_extraction() -> None:
     """Run live benchmark extraction across all defined sites if enabled by env var."""
     import os
 
     if os.environ.get("DATAFORGE_RUN_LIVE_BENCHMARKS") != "true":
         pytest.skip("need DATAFORGE_RUN_LIVE_BENCHMARKS=true to run live benchmarks")
 
-    print("\nRunning live benchmark suite...")
     results = await run_all_tests()
 
     # Enforce minimum thresholds on the live results
     successful_sites = [r for r in results if r.success and r.records > 0]
-    print(f"\nLive Benchmark Summary: {len(successful_sites)}/{len(results)} sites extracted records successfully.")
 
     # Verify that at least a basic set of sites succeeded
     assert len(successful_sites) >= 3, f"Live benchmark underperformed: only {len(successful_sites)} sites succeeded."

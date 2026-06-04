@@ -1,5 +1,4 @@
-"""
-Zero-Result Failure Classifier — Explains WHY extraction produced 0 records.
+"""Zero-Result Failure Classifier — Explains WHY extraction produced 0 records.
 
 When an extraction pipeline returns zero records, this module classifies the
 root cause across nine failure categories, providing a user-facing explanation
@@ -122,6 +121,7 @@ def classify_zero_result(
 
     Returns:
         ZeroResultClassification with failure class, confidence, and recovery hints.
+
     """
     session_detection = session_detection or {}
     empty_check = empty_check or {}
@@ -145,8 +145,7 @@ def classify_zero_result(
         has_forms = len(detected_forms) > 0
         if has_forms:
             return _build("session_bound_url", 0.80)
-        else:
-            return _build("search_replay_required", 0.75)
+        return _build("search_replay_required", 0.75)
 
     # Stage 4: Blank page (very short HTML)
     if html_length < settings.ZERO_RESULT_EMPTY_HTML_LEN:
@@ -189,12 +188,7 @@ def _has_auth_patterns(text: str) -> bool:
     import re
 
     text_lower = text.lower()
-    for pattern in settings.ZERO_RESULT_AUTH_PATTERNS:
-        # Use word boundaries to avoid false positives (e.g. "design in"
-        # matching "sign in")
-        if re.search(r"\b" + re.escape(pattern) + r"\b", text_lower):
-            return True
-    return False
+    return any(re.search(r"\b" + re.escape(pattern) + r"\b", text_lower) for pattern in settings.ZERO_RESULT_AUTH_PATTERNS)
 
 
 def _any_field_matches_page(
@@ -203,7 +197,4 @@ def _any_field_matches_page(
     visible_text: str,
 ) -> bool:
     content_lower = f"{visible_text} {html}".lower()
-    for field in schema_fields:
-        if field.lower() in content_lower:
-            return True
-    return False
+    return any(field.lower() in content_lower for field in schema_fields)

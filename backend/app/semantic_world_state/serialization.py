@@ -35,7 +35,7 @@ class SerializationMixin:
             return result
 
     @requires_invariants
-    def from_dict(self, data: dict):
+    def from_dict(self, data: dict) -> None:
         """Load state from a dictionary."""
         self.clear()
 
@@ -50,7 +50,7 @@ class SerializationMixin:
             self._vector_clock = VectorClock.from_dict(self.node_id, data["clock"])
 
         # Load EnergyState (supports nested and flat)
-        metrics_data = data.get("metrics", None)
+        metrics_data = data.get("metrics")
         if metrics_data is not None:
             self._energy.from_dict(metrics_data)
         else:

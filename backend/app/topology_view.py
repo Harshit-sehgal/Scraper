@@ -39,7 +39,7 @@ class TopologyView:
         meso_clusters=None,
         macro_continents=None,
         read_callback: Callable[[str, int], None] | None = None,
-    ):
+    ) -> None:
         self._regions = list(regions)
         self._communities = [set(c) for c in global_communities]
         self._schema_patterns = dict(schema_patterns)
@@ -61,7 +61,7 @@ class TopologyView:
             self._read_callback(r.region_id, r.version)
         # Thermodynamic free energy = internal energy - temperature * entropy
         # For field regions: local_energy (potential) - local_temperature *
-        # instability (disorder)
+        # instability (disorder)  # noqa: ERA001
         free_energy = r.local_energy - r.local_temperature * r.instability
         return RegionSnapshot(
             region_id=r.region_id,
@@ -156,7 +156,7 @@ class TopologyView:
             repulsion = _clamp01(max(-law, 1.0 if impossible else 0.0))
             route_strength = _clamp01(affinity * (1.0 - repulsion) * (1.0 - uncertainty * 0.5))
             # Thermodynamic edge pressure: field-derived from region free energy
-            # pressure = (uncertainty + repulsion) * (1.0 - affinity * 0.5)
+            # pressure = (uncertainty + repulsion) * (1.0 - affinity * 0.5)  # noqa: ERA001
             pressure = _clamp01((uncertainty + repulsion) * (1.0 - affinity * 0.5))
             if repulsion > affinity and repulsion >= 0.2:
                 semantics = "repulsive"
@@ -207,7 +207,7 @@ class TopologyView:
         return [self._snapshot(r) for r in self._regions if r.token == token]
 
     def get_all_tokens(self) -> list[str]:
-        return list(set(r.token for r in self._regions))
+        return list({r.token for r in self._regions})
 
     def get_regions_for_role(self, role: str) -> list[RegionSnapshot]:
         return [self._snapshot(r) for r in self._regions if role in r.competing_roles]
@@ -234,8 +234,7 @@ class TopologyView:
         avg_energy = sum(r.local_energy for r in self._regions) / len(self._regions)
         attractor_strength = 1.0 / (1.0 + 2.718 ** (-15 * (convergence - 0.6)))
         attractor_pull = min(attractor_strength * convergence * 2.0, 2.0)
-        target_energy = max(0.0, avg_energy - attractor_pull)
-        return target_energy  # type: ignore[no-any-return]
+        return max(0.0, avg_energy - attractor_pull)
 
     # ─── Topology Structure Access ────────────────────────────────────
 

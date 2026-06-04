@@ -1,11 +1,10 @@
 import asyncio
-import json
 
 from app.models import FieldType, SchemaField
 from app.scraper import scrape_url
 
 
-async def test():
+async def test() -> None:
     fields = [
         SchemaField(name="company_name", field_type=FieldType.STRING, description="name of the company", required=True),
         SchemaField(name="contact_phone", field_type=FieldType.PHONE, description="phone number", required=False),
@@ -14,11 +13,9 @@ async def test():
     ]
 
     url = "https://irishinterior.com/contact-us/"
-    print(f"Scraping {url}...")
     results = await scrape_url(url, fields)
-    print(f"\n=== RESULTS: {len(results)} records ===")
-    for r in results:
-        print(json.dumps(r, ensure_ascii=False, indent=2))
+    for _r in results:
+        pass
 
 
 if __name__ == "__main__":

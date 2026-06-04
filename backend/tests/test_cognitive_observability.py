@@ -75,7 +75,7 @@ def test_manifold_drift_telemetry() -> None:
     # 2. Mock RoleEmbeddingEngine.relax_manifold to simulate drift
     from unittest.mock import patch
 
-    def mock_relax(self):
+    def mock_relax(self) -> None:
         # Manually mutate the manifold in the world state
         vec = self.ws._manifold.get_manifold_vector("drifting_role")
         vec[0] += 0.1

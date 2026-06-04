@@ -1,5 +1,4 @@
-"""
-Operator Router — operational intelligence dashboard, mode switching, and degradation predictions.
+"""Operator Router — operational intelligence dashboard, mode switching, and degradation predictions.
 
 Provides:
   - System governance dashboard (health summary, domain stats, resource usage)
@@ -19,7 +18,7 @@ does not pull the research shell into the product kernel at startup.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 from app.browser_pool import get_browser_pool
 from app.scrape_telemetry import get_scrape_telemetry
@@ -97,7 +96,11 @@ async def get_current_mode():
 
 
 @router.post("/mode")
-async def set_operator_mode(request: Request, body: ModeBody, _role: UserRole = Depends(require_role([UserRole.ADMIN]))):
+async def set_operator_mode(
+    request: Request,
+    body: ModeBody,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
+):
     """Switch the system to a different operator mode.
 
     Dynamically adjusts runtime settings (timeout, settle delay,
@@ -116,6 +119,7 @@ async def set_operator_mode(request: Request, body: ModeBody, _role: UserRole = 
 
     Args:
         body.mode: One of 'production', 'benchmark', 'forensic', 'stealth', 'low_cost'.
+
     """
     from app.visualization import OperatorMode  # research-shell, lazy
 
@@ -210,8 +214,8 @@ async def get_system_dashboard():
 
 @router.get("/predictions")
 async def get_degradation_predictions(
-    window: int = Query(100, ge=10, le=500),
-    min_confidence: float = Query(0.0, ge=0.0, le=1.0),
+    window: Annotated[int, Query(ge=10, le=500)] = 100,
+    min_confidence: Annotated[float, Query(ge=0.0, le=1.0)] = 0.0,
 ):
     """Get degradation predictions for all domains.
 
@@ -224,6 +228,7 @@ async def get_degradation_predictions(
 
     Returns:
         A prediction report with per-domain predictions and system risk.
+
     """
     telemetry_history = get_scrape_telemetry().get_recent(window)
 
@@ -266,7 +271,7 @@ async def get_degradation_predictions(
 @router.get("/predictions/{domain}")
 async def get_domain_prediction(
     domain: str,
-    window: int = Query(100, ge=10, le=500),
+    window: Annotated[int, Query(ge=10, le=500)] = 100,
 ):
     """Get degradation predictions for a specific domain.
 
@@ -276,6 +281,7 @@ async def get_domain_prediction(
 
     Returns:
         Predictions for the specified domain.
+
     """
     telemetry_history = get_scrape_telemetry().get_recent(window)
 
@@ -343,7 +349,7 @@ async def get_operator_health_summary():
         monitor = get_domain_health_monitor()
         domains = monitor.get_all_domains_health()
         degraded = sum(1 for d in domains if d.get("health_level") in ("degrading", "unhealthy", "critical"))
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.debug("Failed to get domain health monitor stats", exc_info=True)
         domains = []
         degraded = 0

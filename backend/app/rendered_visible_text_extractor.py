@@ -1,5 +1,4 @@
-"""
-Rendered Visible-Text Extractor — Extracts records from visible text blocks
+"""Rendered Visible-Text Extractor — Extracts records from visible text blocks
 using DOM-order proximity grouping and pattern matching.
 
 This module works as a fallback when CSS selectors fail and the page
@@ -132,7 +131,7 @@ async def capture_bounding_boxes(page) -> list[dict]:
             return results;
         }""")
         return boxes if isinstance(boxes, list) else []
-    except Exception:
+    except Exception:  # noqa: BLE001
         return []
 
 
@@ -154,6 +153,7 @@ def extract_from_visible_blocks(
 
     Returns:
         List of extracted records, or empty list if no cards detected.
+
     """
     if not html or not schema_fields:
         return []
@@ -302,9 +302,8 @@ def _group_by_dom_structure(blocks: list[VisibleTextBlock]) -> CardGroupingResul
                 for fine_prefix, fine_group in finer_groups.items():
                     if _is_meaningful_card(fine_group):
                         cards.append(_build_card(fine_group, len(cards)))
-            else:
-                if _is_meaningful_card(sub_group):
-                    cards.append(_build_card(sub_group, len(cards)))
+            elif _is_meaningful_card(sub_group):
+                cards.append(_build_card(sub_group, len(cards)))
 
     # Third pass: if we have very few cards (0 - 1), try depth-2 prefix
     # (broader grouping) to catch cases where cards span deeper DOM
@@ -395,7 +394,7 @@ def _score_card(blocks: list[VisibleTextBlock], combined: str) -> float:
         score += 0.1
 
     # Pattern diversity
-    pattern_set = set(b.pattern_type for b in blocks if b.pattern_type)
+    pattern_set = {b.pattern_type for b in blocks if b.pattern_type}
     score += min(len(pattern_set) * 0.12, 0.3)
 
     # Has price
@@ -456,7 +455,7 @@ def _build_cluster_signature(cards: list[VisualCard]) -> str:
     # Collect all pattern types across all cards
     all_types: list[set[str]] = []
     for card in cards:
-        types = set(b.pattern_type for b in card.blocks if b.pattern_type)
+        types = {b.pattern_type for b in card.blocks if b.pattern_type}
         all_types.append(types)
 
     if not all_types:
@@ -501,10 +500,7 @@ def _extract_record_from_card(
     used_snippet_indices: set[int] = set()
 
     def _is_span_used(start: int, end: int) -> bool:
-        for us, ue in used_spans:
-            if start < ue and end > us:
-                return True
-        return False
+        return any(start < ue and end > us for us, ue in used_spans)
 
     # Priority sort: typed fields first, string / org last
     _TYPED_PRIORITY: dict = {
@@ -523,7 +519,7 @@ def _extract_record_from_card(
         ),
     )
 
-    for idx, field in sorted_fields:
+    for _idx, field in sorted_fields:
         field_type = field.field_type if hasattr(field, "field_type") else FieldType.STRING
         field_name = field.name.lower() if hasattr(field, "name") else ""
         field_desc = field.description.lower() if hasattr(field, "description") else ""
@@ -700,14 +696,11 @@ def _extract_card_field_stateful(
         return None
 
     def _is_span_used(start: int, end: int) -> bool:
-        for us, ue in used_spans:
-            if start < ue and end > us:
-                return True
-        return False
+        return any(start < ue and end > us for us, ue in used_spans)
 
     def _consume_snippet() -> str | None:
         """Pop the next unused non-noise snippet."""
-        for i, (text, ptype) in enumerate(snippets):
+        for i, (text, _ptype) in enumerate(snippets):
             if i in used_snippet_indices:
                 continue
             lower = text.lower()
@@ -759,7 +752,7 @@ def _extract_card_field_stateful(
 
     # ── Time ───────────────────────────────────────────────────────────
     time_field_names = {"time", "start_time", "end_time", "duration"}
-    if field_type in (FieldType.STRING,) and (field_name in time_field_names or field_name.endswith("_time")):
+    if field_type == FieldType.STRING and (field_name in time_field_names or field_name.endswith("_time")):
         return _consume_match(matches_by_type["time"])
 
     # ── Location / Code ────────────────────────────────────────────────

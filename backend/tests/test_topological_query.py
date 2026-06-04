@@ -13,11 +13,10 @@ from app.topological_query import TopologicalQuery, get_tql_engine
 
 
 @pytest.fixture(autouse=True)
-def clean_ws():
+def clean_ws() -> None:
     clear_semantic_state(clear_file=False)
     ws = get_world_state()
     ws.clear()
-    yield
 
 
 @pytest.fixture

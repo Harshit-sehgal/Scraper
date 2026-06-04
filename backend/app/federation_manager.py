@@ -1,5 +1,4 @@
-"""
-Federation Manager — operational governance for sharded multi-node state synchronization.
+"""Federation Manager — operational governance for sharded multi-node state synchronization.
 
 Provides:
   - Stable node registration and sharding workload boundaries.
@@ -224,13 +223,8 @@ class FederationManager:
                     if r_epoch > l_epoch:
                         remote_wins = True
                     elif r_epoch == l_epoch:
-                        if r_ver > l_ver:
+                        if r_ver > l_ver or (r_ver == l_ver and (r_ts > l_ts or (r_ts == l_ts and r_node > l_node))):
                             remote_wins = True
-                        elif r_ver == l_ver:
-                            if r_ts > l_ts:
-                                remote_wins = True
-                            elif r_ts == l_ts and r_node > l_node:
-                                remote_wins = True
 
                     # 4. If remote wins, write remote cohesion and metadata
                     # Otherwise, remote is discarded (local retains authority)
@@ -271,7 +265,7 @@ class FederationManager:
                         if domain and fail_type:
                             self.ws.regression.record_failure(domain, fail_type)
                             replay_report["replayed"] += 1
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     replay_report["failed"] += 1
                     self.divergence_metrics["failed_replays"] += 1
                     logger.warning("[Federation] Replay delta action failed: %s", e)

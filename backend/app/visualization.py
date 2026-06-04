@@ -1,5 +1,4 @@
-"""
-Visualization & Governance — live visual system mapping, operator modes, and cluster visualization.
+"""Visualization & Governance — live visual system mapping, operator modes, and cluster visualization.
 
 Provides:
   - Markdown architecture and distributed node mapping (Mermaid diagrams).
@@ -10,9 +9,8 @@ Provides:
 from __future__ import annotations
 
 import logging
-import os
 import time
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +20,7 @@ _BACKEND_ROOT = Path(__file__).resolve().parent.parent
 MAP_PATH = str(_BACKEND_ROOT / "data" / "governance" / "architecture_map.md")
 
 
-class OperatorMode(str, Enum):
+class OperatorMode(StrEnum):
     """Adaptive operational profiles for the scraper substrate."""
 
     PRODUCTION = "production"
@@ -93,9 +91,9 @@ class SystemGovernorDashboard:
         # 1. Fetch registered federated nodes
         nodes = getattr(ws.federation, "registered_nodes", {})
 
-        os.makedirs(os.path.dirname(MAP_PATH), exist_ok=True)
+        Path(MAP_PATH).parent.mkdir(parents=True, exist_ok=True)
 
-        with open(MAP_PATH, "w", encoding="utf-8") as f:
+        with open(MAP_PATH, "w", encoding="utf-8") as f:  # noqa: PTH123
             f.write("# 🗺️ DataForge Visual System & Distributed Topology Map\n\n")
             f.write(
                 f"> **Governance Layer**: Live architectural status. Last refreshed: {

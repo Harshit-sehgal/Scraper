@@ -73,7 +73,7 @@ def test_autonomous_hierarchical_synthesis() -> None:
     # 3. Verify envelope created
     envs = ws._abstraction.envelopes
     assert len(envs) == 1
-    env_id = list(envs.keys())[0]
+    env_id = next(iter(envs.keys()))
     assert envs[env_id]["constituents"] == {"r1", "r2"}
 
     # 4. Verify envelope registered in manifold and anchored

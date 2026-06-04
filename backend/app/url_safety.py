@@ -20,9 +20,7 @@ def is_safe_ip(ip_str: str) -> bool:
     try:
         ip = ipaddress.ip_address(ip_str)
         # Check standard unsafe ranges:
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
-            return False
-        return True
+        return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified)
     except ValueError:
         return False
 
@@ -103,12 +101,11 @@ def validate_public_http_url(url: str) -> None:
             raise ValueError(
                 msg,
             )
-        else:
-            logger.warning("DNS resolution failed for hostname '%s': %s", hostname, e)
+        logger.warning("DNS resolution failed for hostname '%s': %s", hostname, e)
 
 
 class SafeAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
-    def __init__(self, backend: httpcore.AsyncNetworkBackend):
+    def __init__(self, backend: httpcore.AsyncNetworkBackend) -> None:
         self._backend = backend
 
     async def connect_tcp(
@@ -124,14 +121,14 @@ class SafeAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
         loop = asyncio.get_event_loop()
         try:
             infos = await loop.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
-            for family, type, proto, canonname, sockaddr in infos:
+            for _family, _type, _proto, _canonname, sockaddr in infos:
                 ip = str(sockaddr[0])
                 if not is_safe_ip(ip):
-                    raise ValueError(f"Rejected connection to unsafe IP address: {ip}")
+                    msg = f"Rejected connection to unsafe IP address: {ip}"
+                    raise ValueError(msg)
         except Exception as e:
             if isinstance(e, ValueError):
                 raise
-            pass
 
         return await self._backend.connect_tcp(
             host,
@@ -147,7 +144,8 @@ class SafeAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
         timeout: float | None = None,
         socket_options: Any = None,
     ) -> httpcore.AsyncNetworkStream:
-        raise ValueError("UNIX socket connections are disabled for security reasons.")
+        msg = "UNIX socket connections are disabled for security reasons."
+        raise ValueError(msg)
 
     async def sleep(self, seconds: float) -> None:
         await self._backend.sleep(seconds)
@@ -186,7 +184,7 @@ def get_safe_async_client(**kwargs: Any) -> httpx.AsyncClient:
 
 
 class SafeNetworkBackend(httpcore.NetworkBackend):
-    def __init__(self, backend: httpcore.NetworkBackend):
+    def __init__(self, backend: httpcore.NetworkBackend) -> None:
         self._backend = backend
 
     def connect_tcp(
@@ -199,14 +197,14 @@ class SafeNetworkBackend(httpcore.NetworkBackend):
     ) -> httpcore.NetworkStream:
         try:
             infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
-            for family, type, proto, canonname, sockaddr in infos:
+            for _family, _type, _proto, _canonname, sockaddr in infos:
                 ip = str(sockaddr[0])
                 if not is_safe_ip(ip):
-                    raise ValueError(f"Rejected connection to unsafe IP address: {ip}")
+                    msg = f"Rejected connection to unsafe IP address: {ip}"
+                    raise ValueError(msg)
         except Exception as e:
             if isinstance(e, ValueError):
                 raise
-            pass
 
         return self._backend.connect_tcp(
             host,
@@ -222,7 +220,8 @@ class SafeNetworkBackend(httpcore.NetworkBackend):
         timeout: float | None = None,
         socket_options: Any = None,
     ) -> httpcore.NetworkStream:
-        raise ValueError("UNIX socket connections are disabled for security reasons.")
+        msg = "UNIX socket connections are disabled for security reasons."
+        raise ValueError(msg)
 
     def sleep(self, seconds: float) -> None:
         self._backend.sleep(seconds)

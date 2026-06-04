@@ -1,5 +1,4 @@
-"""
-Selector Discovery URL — re-exports from focused sub-modules for
+"""Selector Discovery URL — re-exports from focused sub-modules for
 backward compatibility.
 
 This module has been refactored into:

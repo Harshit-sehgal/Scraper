@@ -1,5 +1,4 @@
-"""
-Tests for Selector ML Optimizer
+"""Tests for Selector ML Optimizer.
 
 Tests the ML-based selector quality prediction and optimization system:
 - Selector feature extraction from CSS selectors

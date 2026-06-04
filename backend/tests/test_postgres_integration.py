@@ -34,7 +34,7 @@ def postgres_container():
                 use_running = True
                 os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
                 os.environ["DATAFORGE_DATABASE_URL"] = "postgresql://testuser:testpassword@127.0.0.1:5432/testdb"
-        except (socket.timeout, ConnectionRefusedError):
+        except (TimeoutError, ConnectionRefusedError):
             pass
 
     reset_repository()
@@ -58,7 +58,7 @@ def postgres_container():
             os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
 
 
-@pytest.fixture()
+@pytest.fixture
 def clean_db(postgres_container):
     """Clean the Postgres database between tests.
 
@@ -215,7 +215,7 @@ class TestPostgresJobRepositoryIntegration:
             progress_current=42,
             progress_total=42,
             results_on_disk=True,
-            results_file_path="/tmp/results.gz",
+            results_file_path="/tmp/results.gz",  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
             warnings=["warning1"],
             acquisition_mode="aggressive",
         )
@@ -329,7 +329,7 @@ class TestPostgresJobRepositoryIntegration:
 class TestPostgresSchemaRepairIntegration:
     """Verifies schema repair logic against a real Postgres database."""
 
-    def _setup_v1_schema_no_recycle_bin(self, conn):
+    def _setup_v1_schema_no_recycle_bin(self, conn) -> None:
         """Create a minimal v1 schema (schema_version=1, jobs table, NO recycle_bin).
 
         Drops any existing tables first so this test is order-independent.
@@ -356,8 +356,7 @@ class TestPostgresSchemaRepairIntegration:
         conn.commit()
 
     def test_recycle_bin_created_when_missing_from_v1(self, postgres_container) -> None:
-        """
-        Given: schema_version=1, jobs table exists, recycle_bin is missing.
+        """Given: schema_version=1, jobs table exists, recycle_bin is missing.
         When: PostgresJobRepository is created and health_check() called.
         Then: recycle_bin table is created, schema upgraded to version 2.
         """
@@ -420,8 +419,7 @@ class TestPostgresSchemaRepairIntegration:
         reset_repository()
 
     def test_soft_deleted_job_restored_by_save_single(self, postgres_container) -> None:
-        """
-        Given: A job exists, is soft-deleted (moved to recycle bin).
+        """Given: A job exists, is soft-deleted (moved to recycle bin).
         When: save_single is called with an active job with the same ID.
         Then: The job becomes visible again (deleted_at = NULL).
         """

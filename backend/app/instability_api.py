@@ -10,7 +10,7 @@ import logging
 from typing import TYPE_CHECKING
 
 
-def get_world_state() -> "SemanticWorldState":
+def get_world_state() -> SemanticWorldState:
     import app.semantic_world_state
 
     return app.semantic_world_state.get_world_state()
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 class InstabilityAPI:
     """Hardened interface for controlled exclusion and tension mutations."""
 
-    def __init__(self, ws: SemanticWorldState | None = None):
+    def __init__(self, ws: SemanticWorldState | None = None) -> None:
         self.ws: SemanticWorldState = ws or get_world_state()
 
     # ─── Query Operations ────────────────────────────────────────────────
@@ -37,16 +37,16 @@ class InstabilityAPI:
 
     # ─── Mutation Operations ─────────────────────────────────────────────
 
-    def set_exclusion(self, r1: str, r2: str, value: float):
+    def set_exclusion(self, r1: str, r2: str, value: float) -> None:
         with self.ws.transaction(f"api_exclusion:{r1}"):
             self.ws.set_exclusion_by_key((r1, r2), value)
 
-    def add_exclusion(self, r1: str, r2: str, delta: float):
+    def add_exclusion(self, r1: str, r2: str, delta: float) -> None:
         """Add to an existing exclusion (legacy support)."""
         current = self.get_learned_exclusion(r1, r2)
         self.set_exclusion(r1, r2, current + delta)
 
-    def decay_exclusion(self, r1: str, r2: str, rate: float = 0.9):
+    def decay_exclusion(self, r1: str, r2: str, rate: float = 0.9) -> None:
         """Decay an existing exclusion."""
         current = self.get_learned_exclusion(r1, r2)
         self.set_exclusion(r1, r2, current * rate)
@@ -55,7 +55,7 @@ class InstabilityAPI:
 class ImmunityLayer:
     """Governs semantic data ingestion and protects against adversarial perturbations."""
 
-    def __init__(self, ws: SemanticWorldState | None = None):
+    def __init__(self, ws: SemanticWorldState | None = None) -> None:
         self.ws = ws or get_world_state()
         # Quarantine Registry: domain / source -> trust_score
         self._quarantined_sources: dict[str, float] = {}
@@ -73,7 +73,7 @@ class ImmunityLayer:
 
         # 1. Source Trust
         if trust < 0.2:
-            logging.getLogger(__name__).warning(f"IMMUNITY: Blocked perturbation from untrusted source [{source}]")
+            logging.getLogger(__name__).warning("IMMUNITY: Blocked perturbation from untrusted source [%s]", source)
             return False
 
         # 2. Regional Integrity
@@ -84,20 +84,21 @@ class ImmunityLayer:
                 # System is too hot to allow mutation of high-level
                 # concepts
                 logging.getLogger(__name__).info(
-                    f"IMMUNITY: Shielded high-integrity role [{role}] from mutation (Energy too high)",
+                    "IMMUNITY: Shielded high-integrity role [%s] from mutation (Energy too high)",
+                    role,
                 )
                 return False
 
         # 3. Adversarial Pressure Detection (Phase 42)
         # Check if this source is repeatedly causing high energy spikes
         if self.ws.metrics.global_energy > 5.0 and trust < 0.6:
-            logging.getLogger(__name__).warning(f"IMMUNITY: Quarantining source [{source}] for contributing to field fever.")
+            logging.getLogger(__name__).warning("IMMUNITY: Quarantining source [%s] for contributing to field fever.", source)
             self.quarantine_source(source, penalty=0.2)
             return False
 
         return True
 
-    def quarantine_source(self, source: str, penalty: float = 0.5):
+    def quarantine_source(self, source: str, penalty: float = 0.5) -> None:
         """Lower trust score for a specific data source."""
         current = self._quarantined_sources.get(source, 1.0)
         self._quarantined_sources[source] = max(0.0, current - penalty)
@@ -113,7 +114,7 @@ def get_immune_system(ws: SemanticWorldState | None = None) -> ImmunityLayer:
     return _immune_system
 
 
-def reset_immune_system():
+def reset_immune_system() -> None:
     """Reset the global immune system (for testing)."""
     global _immune_system
     _immune_system = None

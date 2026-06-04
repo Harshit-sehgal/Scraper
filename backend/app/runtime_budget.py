@@ -8,7 +8,7 @@ class CognitiveBudget:
     cycle counts and execution time.
     """
 
-    def __init__(self, max_cycles: int = 100, max_time_ms: float = 500.0):
+    def __init__(self, max_cycles: int = 100, max_time_ms: float = 500.0) -> None:
         self.max_cycles = max_cycles
         self.max_time_ms = max_time_ms
         self.start_time = time.time()
@@ -20,6 +20,7 @@ class CognitiveBudget:
 
         Returns:
             True if budget remains, False if exceeded.
+
         """
         self.cycle_count += 1
 

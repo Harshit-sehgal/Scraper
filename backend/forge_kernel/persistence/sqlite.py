@@ -1,14 +1,16 @@
-"""
-SQLite persistence adapter — delegates to existing app.job_store functions
+"""SQLite persistence adapter — delegates to existing app.job_store functions
 with minimal changes, wrapped in the clean JobRepository contract.
 """
 
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from forge_kernel.contracts.job import Job
 from forge_kernel.persistence import JobRepository
+
+if TYPE_CHECKING:
+    from forge_kernel.contracts.job import Job
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +80,7 @@ class SQLiteJobRepository(JobRepository):
                 if not row:
                     return False
                 col_names = [d[0] for d in cursor.description]
-                row_dict = dict(zip(col_names, row))
+                row_dict = dict(zip(col_names, row, strict=False))
                 conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
                 import datetime
 
@@ -105,7 +107,7 @@ class SQLiteJobRepository(JobRepository):
                 if not row:
                     return False
                 col_names = [d[0] for d in cursor.description]
-                row_dict = dict(zip(col_names, row))
+                row_dict = dict(zip(col_names, row, strict=False))
                 conn.execute("DELETE FROM recycle_bin WHERE id = ?", (job_id,))
                 row_dict.pop("deleted_at", None)
                 cols = ", ".join(row_dict.keys())

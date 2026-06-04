@@ -26,7 +26,7 @@ from app.storage_interface import (
 class LocalASGIClient:
     """Small sync wrapper around httpx ASGITransport that avoids TestClient threads."""
 
-    def __init__(self, app):
+    def __init__(self, app) -> None:
         self.app = app
 
     async def _request(self, method: str, url: str, **kwargs):
@@ -58,22 +58,22 @@ def reset_state():
     recycle_bin_store.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def client(monkeypatch):
     """Create a test client with mocked run_job and background scheduling."""
 
     # Mock run_job to keep jobs in pending state
-    async def fake_run_job(job_id: str):
+    async def fake_run_job(job_id: str) -> None:
         await asyncio.sleep(0.01)
 
     from app import main as main_mod
 
     monkeypatch.setattr(main_mod, "run_job", fake_run_job)
     monkeypatch.setattr(main_mod, "_schedule_background_task", lambda coro: None)
-    yield LocalASGIClient(main_mod.app)
+    return LocalASGIClient(main_mod.app)
 
 
-@pytest.fixture()
+@pytest.fixture
 def tmp_queue_db(tmp_path):
     """Provide a temporary worker queue database path and reset singleton."""
     from app.worker_queue import reset_worker_queue
@@ -250,8 +250,7 @@ class TestRealWorkerHandler:
     """Tests using the actual scripts.run_worker.scrape_job_handler."""
 
     def test_real_worker_handler_executes_via_api(self, tmp_path, monkeypatch) -> None:
-        """
-        End-to-end test using the real scrape_job_handler from scripts/run_worker.
+        """End-to-end test using the real scrape_job_handler from scripts/run_worker.
 
         Flow:
         1. Import the real scrape_job_handler from scripts.run_worker
@@ -302,7 +301,7 @@ class TestRealWorkerHandler:
             mock_scrape_url_with_recovery,
         )
 
-        async def mock_generate_data_insight(results):
+        async def mock_generate_data_insight(results) -> str:
             return "Mock insight for worker integration test."
 
         monkeypatch.setattr("app.scraper.generate_data_insight", mock_generate_data_insight)

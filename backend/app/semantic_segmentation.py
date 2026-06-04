@@ -1,5 +1,4 @@
-"""
-Semantic Segmentation Layer
+"""Semantic Segmentation Layer.
 ============================
 Intermediate Representation (IR) bridge between raw extraction and semantic mapping.
 
@@ -446,8 +445,7 @@ def _clean_value(raw: str, ctype: object) -> str:
 
     if ctype_str == "price":
         cleaned = raw.strip()
-        cleaned = re.sub(r"(?i)^(price|cost|fare|amount)\s*[:\-]\s*", "", cleaned).strip()
-        return cleaned
+        return re.sub(r"(?i)^(price|cost|fare|amount)\s*[:\-]\s*", "", cleaned).strip()
     return raw.strip()
 
 
@@ -728,25 +726,25 @@ def _infer_relationship_type(a: CandidateIR, b: CandidateIR) -> tuple[str, float
 
     # Price + anything
     if a.primary_type == SemanticType.PRICE:
-        return "value_modifier", 0.6, evidence + ["price_modifier"]
+        return "value_modifier", 0.6, [*evidence, "price_modifier"]
 
     # Code + price (common pattern: destination + price)
     if a.primary_type == SemanticType.CODE and b.primary_type == SemanticType.PRICE:
-        return "location_price", 0.7, evidence + ["code_then_price"]
+        return "location_price", 0.7, [*evidence, "code_then_price"]
     if b.primary_type == SemanticType.CODE and a.primary_type == SemanticType.PRICE:
-        return "price_location", 0.7, evidence + ["price_then_code"]
+        return "price_location", 0.7, [*evidence, "price_then_code"]
 
     # Code + code (two identifiers, likely related)
     if a.primary_type == SemanticType.CODE and b.primary_type == SemanticType.CODE:
-        return "paired_codes", 0.6, evidence + ["paired_identifiers"]
+        return "paired_codes", 0.6, [*evidence, "paired_identifiers"]
 
     # Date + date (date range)
     if a.primary_type == SemanticType.DATE and b.primary_type == SemanticType.DATE:
-        return "date_range", 0.8, evidence + ["date_pair"]
+        return "date_range", 0.8, [*evidence, "date_pair"]
 
     # Same type adjacent = likely same semantic group
     if a.primary_type == b.primary_type:
-        return "same_type_group", 0.5, evidence + ["same_type_adjacent"]
+        return "same_type_group", 0.5, [*evidence, "same_type_adjacent"]
 
     return "adjacent", 0.3, evidence
 
@@ -763,7 +761,7 @@ class StructuralMemoryTracker:
     Anomalous rows get lower confidence.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.patterns: dict[tuple[str, ...], StructuralMemory] = {}
         self.total_records = 0
 
@@ -797,14 +795,13 @@ class StructuralMemoryTracker:
         # Anomaly score: lower for common patterns, higher for rare ones
         if mem.occurrence_count >= 3:
             return 0.9, [f"pattern_seen_{mem.occurrence_count}x"]
-        elif mem.occurrence_count == 2:
+        if mem.occurrence_count == 2:
             return 0.7, ["pattern_seen_2x"]
-        else:
-            # First occurrence - check similarity to known patterns
-            similarity = _max_pattern_similarity(sig_key, list(self.patterns.keys()))
-            if similarity >= 0.5:
-                return 0.6, [f"similar_to_known_pattern({similarity:.2f})"]
-            return 0.3, ["novel_pattern"]
+        # First occurrence - check similarity to known patterns
+        similarity = _max_pattern_similarity(sig_key, list(self.patterns.keys()))
+        if similarity >= 0.5:
+            return 0.6, [f"similar_to_known_pattern({similarity:.2f})"]
+        return 0.3, ["novel_pattern"]
 
 
 def _max_pattern_similarity(signature: tuple[str, ...], known: list[tuple[str, ...]]) -> float:
@@ -851,7 +848,7 @@ def compute_semantic_density(text: str) -> float:
     density = (len(meaningful) / max(len(text), 1)) * 100
 
     # Also consider type diversity
-    types = set(c.primary_type for c in meaningful)
+    types = {c.primary_type for c in meaningful}
     diversity_bonus = min(len(types) * 0.05, 0.2)
 
     return min(density * 0.15 + diversity_bonus, 1.0)
@@ -937,7 +934,7 @@ def is_composite_value(text: str) -> bool:
     if len(meaningful) < 2:
         return False
 
-    types = set(c.primary_type for c in meaningful)
+    types = {c.primary_type for c in meaningful}
 
     # Require 2+ DIFFERENT types (e.g., organization + price + code)
     # Same-type candidates (e.g., two ORGs in "British Airways") are NOT
@@ -1036,8 +1033,7 @@ def expand_composite_records(
 
             # Remove original composite field to avoid confusing the mapper
             # (the segmented parts provide cleaner candidates)
-            if key in new_record:
-                del new_record[key]
+            new_record.pop(key, None)
 
             # Add meaningful candidates as new fields
             meaningful = [c for c in ir.candidates if c.primary_type != SemanticType.TEXT]
@@ -1126,16 +1122,11 @@ def resolve_overlaps(tokens: list[SemanticToken]) -> list[SemanticToken]:
                 # - If child is a NUMBER, always suppress
                 # - If child is same type as parent, always suppress
                 # - If parent is high-dominance (EMAIL, PHONE), always suppress child
-                if (
-                    tj.primary_type == SemanticType.NUMBER
-                    or tj.primary_type == ti.primary_type
-                    or DOMINANCE_HIERARCHY.get(ti.primary_type, 0) >= 80
-                ):
+                if tj.primary_type in (SemanticType.NUMBER, ti.primary_type) or DOMINANCE_HIERARCHY.get(ti.primary_type, 0) >= 80:
                     suppressed.add(j)
                     continue
 
-    result = [t for idx, t in enumerate(sorted_tokens) if idx not in suppressed]
-    return result
+    return [t for idx, t in enumerate(sorted_tokens) if idx not in suppressed]
 
 
 def is_likely_noise_field(name: str, value: str) -> tuple[bool, float, list[str]]:

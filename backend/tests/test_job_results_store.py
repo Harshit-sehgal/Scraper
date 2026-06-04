@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import gzip
 import json
-from collections.abc import Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING, Never
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -22,6 +22,9 @@ from app.utils.job_results_store import (
     load_paginated_job_results_from_disk,
     save_job_results_to_disk,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @pytest.fixture
@@ -97,13 +100,12 @@ class TestSaveJobResultsToDisk:
             def __exit__(self_, *args):
                 pass
 
-            def write(self_, _data):
+            def write(self_, _data) -> Never:
                 msg = "Disk full"
                 raise OSError(msg)
 
-        with patch("gzip.open", return_value=FailingWriter()):
-            with pytest.raises(OSError, match="Disk full"):
-                save_job_results_to_disk("job_fail", [{"id": 1}])
+        with patch("gzip.open", return_value=FailingWriter()), pytest.raises(OSError, match="Disk full"):
+            save_job_results_to_disk("job_fail", [{"id": 1}])
 
         # Temp file should be gone
         results_dir = mock_state_path.parent / "results"

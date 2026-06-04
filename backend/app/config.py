@@ -1,5 +1,4 @@
-"""
-Centralized Configuration for DataForge Scraper.
+"""Centralized Configuration for DataForge Scraper.
 
 All hardcoded values, timeouts, thresholds, paths, and tunables
 live here — not scattered across modules. Import via:
@@ -246,7 +245,8 @@ class Settings(BaseSettings):
     @property
     def SEMANTIC_STATE_PATH_DYNAMIC(self) -> str:
         """Semantic state path (dynamic). Reads from SEMANTIC_STATE_PATH env var
-        dynamically, falls back to static SEMANTIC_STATE_PATH field."""
+        dynamically, falls back to static SEMANTIC_STATE_PATH field.
+        """
         return os.environ.get("SEMANTIC_STATE_PATH") or self.SEMANTIC_STATE_PATH
 
     STATE_FILE_PATH: str = ""
@@ -462,7 +462,8 @@ class Settings(BaseSettings):
     @property
     def QUEUE_BACKEND_DYNAMIC(self) -> str:
         """Queue backend (dynamic). Reads from DATAFORGE_QUEUE_BACKEND env var
-        dynamically, falls back to static QUEUE_BACKEND field."""
+        dynamically, falls back to static QUEUE_BACKEND field.
+        """
         return (os.environ.get("DATAFORGE_QUEUE_BACKEND") or self.QUEUE_BACKEND).strip().lower()
 
     @property
@@ -672,7 +673,8 @@ class Settings(BaseSettings):
     @property
     def TEST_SELECTOR_DECAY_PERSISTENCE(self) -> bool:
         """Whether to persist selector decay snapshots during tests. Reads from
-        TEST_SELECTOR_DECAY_PERSISTENCE env var dynamically."""
+        TEST_SELECTOR_DECAY_PERSISTENCE env var dynamically.
+        """
         return (os.environ.get("TEST_SELECTOR_DECAY_PERSISTENCE") or "").strip().lower() in ("true", "1", "yes")
 
     ENABLE_EXPERIMENTAL_ROUTES: bool = False

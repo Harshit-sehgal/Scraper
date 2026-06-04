@@ -1,5 +1,4 @@
-"""
-Semantic Event Dispatcher
+"""Semantic Event Dispatcher.
 ==========================
 Synchronous / Asynchronous propagation of semantic signals.
 """
@@ -12,25 +11,24 @@ from app.semantic_events import SemanticEvent, SemanticEventType
 
 
 class EventDispatcher:
-    """
-    Central hub for semantic event propagation.
+    """Central hub for semantic event propagation.
     Engines subscribe to specific event types to react to topological changes.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.subscribers: dict[SemanticEventType, list[Callable]] = {t: [] for t in SemanticEventType}
 
-    def subscribe(self, event_type: SemanticEventType, callback: Callable):
+    def subscribe(self, event_type: SemanticEventType, callback: Callable) -> None:
         """Register a callback for a specific event type."""
         self.subscribers[event_type].append(callback)
 
-    def unsubscribe(self, event_type: SemanticEventType, callback: Callable):
+    def unsubscribe(self, event_type: SemanticEventType, callback: Callable) -> None:
         """Remove a callback for a specific event type."""
         subs = self.subscribers.get(event_type, [])
         if callback in subs:
             subs.remove(callback)
 
-    def dispatch(self, event: SemanticEvent):
+    def dispatch(self, event: SemanticEvent) -> None:
         """Propagate an event to all interested subscribers."""
         event.timestamp = time.time()
         logging.getLogger(__name__).debug(
@@ -44,7 +42,7 @@ class EventDispatcher:
             try:
                 callback(event)
             except Exception as e:
-                logging.getLogger(__name__).error("Error in event callback: %s", e)
+                logging.getLogger(__name__).exception("Error in event callback")
                 # Record degradation telemetry (best-effort)
                 try:
                     from app.semantic_world_state import get_world_state
@@ -55,7 +53,7 @@ class EventDispatcher:
                         severity="warning",
                         cause=f"Event callback failed for {event.event_type.value} from {event.source}: {e}",
                     )
-                except Exception:  # nosec B110
+                except Exception:  # nosec B110  # noqa: BLE001
                     pass
 
 
@@ -77,7 +75,7 @@ def get_dispatcher() -> EventDispatcher:
     return _dispatcher
 
 
-def reset_dispatcher():
+def reset_dispatcher() -> None:
     """Reset the global dispatcher (for testing)."""
     global _dispatcher, _bootstrap_done
     _dispatcher = EventDispatcher()

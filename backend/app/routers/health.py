@@ -1,5 +1,4 @@
-"""
-Health Router — liveness, readiness, and root path probes.
+"""Health Router — liveness, readiness, and root path probes.
 
 Extracted from main.py as part of Phase 3 refactoring to decouple
 health-check concerns from the app factory.
@@ -83,7 +82,7 @@ async def ready():
             "job_count": health_info.get("job_count", len(jobs_store)),
             "recycle_bin_count": health_info.get("recycle_bin_count", len(recycle_bin_store)),
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         duration = time.time() - start_time
         from app.metrics_collector import record_health_check_latency
 

@@ -20,7 +20,7 @@ def world_state_to_dict(ws: SemanticWorldState) -> dict:
     return ws.to_dict()  # type: ignore[no-any-return]
 
 
-def world_state_from_dict(ws: SemanticWorldState, data: dict):
+def world_state_from_dict(ws: SemanticWorldState, data: dict) -> None:
     """Restore the world state from a serialized dict.
 
     Delegates to SemanticWorldState.from_dict() which correctly dispatches
@@ -29,5 +29,5 @@ def world_state_from_dict(ws: SemanticWorldState, data: dict):
     ws.from_dict(data)
 
 
-def clear_world_state(ws: SemanticWorldState):
+def clear_world_state(ws: SemanticWorldState) -> None:
     ws.clear()

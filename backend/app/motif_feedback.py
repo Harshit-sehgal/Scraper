@@ -1,5 +1,4 @@
-"""
-Motif Feedback System — Close the learning loop.
+"""Motif Feedback System — Close the learning loop.
 
 Feeds learned structural patterns (motifs) back into selector discovery
 to improve extraction quality over time through adaptive hints.
@@ -14,9 +13,10 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from app.models import SchemaField
+if TYPE_CHECKING:
+    from app.models import SchemaField
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ class MotifFeedbackEngine:
 
         Returns:
             Dict mapping field names to hints about their expected patterns / relationships
+
         """
         if not solidified_motifs:
             return {}
@@ -81,6 +82,7 @@ class MotifFeedbackEngine:
 
         Returns:
             Context string to prepend to selector discovery prompt, or None if no motifs
+
         """
         if not solidified_motifs:
             return None
@@ -99,14 +101,13 @@ class MotifFeedbackEngine:
             fields_str = ", ".join([f'"{f}"' for f in motif])
             motif_str_parts.append(f"  - {fields_str}")
 
-        context = f"""LEARNED STRUCTURAL PATTERNS (from previous successful extractions):
+        return f"""LEARNED STRUCTURAL PATTERNS (from previous successful extractions):
 The following field groups have been found together in stable patterns:
 {chr(10).join(motif_str_parts)}
 
 Use these patterns as hints: if you find one field from a group, look nearby for the others.
 This can help with relative selector selection (e.g., if you find the price, the title might be a sibling or parent).
 """
-        return context
 
     @staticmethod
     def extract_motifs_from_results(
@@ -129,6 +130,7 @@ This can help with relative selector selection (e.g., if you find the price, the
 
         Returns:
             List of field name tuples representing solidified motifs
+
         """
         if not results:
             return []
@@ -142,7 +144,7 @@ This can help with relative selector selection (e.g., if you find the price, the
             present_fields = []
             for field in schema_fields:
                 val = record.get(field.name)
-                if val is not None and val != "" and val != []:
+                if val is not None and val not in ("", []):
                     present_fields.append(field.name)
 
             # Record all field pairs as co-occurrences

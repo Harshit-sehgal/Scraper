@@ -1,5 +1,4 @@
-"""
-Selector Discovery — Entry point for LLM-guided CSS selector generation.
+"""Selector Discovery — Entry point for LLM-guided CSS selector generation.
 
 This module has been refactored into focused sub-modules:
 - selector_discovery_analysis: Page analysis and DOM-based selector discovery
@@ -150,6 +149,7 @@ async def analyze_url_for_fields(
         - item_container: str (CSS selector)
         - suggested_fields: list of field suggestions
         - anti_bot_score: float
+
     """
     import httpx
 
@@ -214,7 +214,7 @@ async def analyze_url_for_fields(
             if str(resp.url) != url:
                 final_url = str(resp.url)
                 logger.info("[URLAnalyzer] URL resolved: %s → %s (after %d redirect hops)", url, final_url, hops)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.debug(
             "[URLAnalyzer] Could not determine final URL via httpx for %s: %s",
             url,
@@ -228,7 +228,7 @@ async def analyze_url_for_fields(
     # Detect session-bound URL parameters
     session_detection: dict[str, Any]
     if config.detect_session_params:
-        session_detection = cast(dict[str, Any], detect_session_params(url))
+        session_detection = cast("dict[str, Any]", detect_session_params(url))
     else:
         session_detection = {
             "is_session_bound": False,
@@ -245,7 +245,7 @@ async def analyze_url_for_fields(
             preferred_method=FetchStrategy.PLAYWRIGHT_FULL,
         )
     except Exception as e:
-        logger.error("[URLAnalyzer] Failed to fetch %s: %s", url, e)
+        logger.exception("[URLAnalyzer] Failed to fetch %s", url)
         from app.acquisition_state import AcquisitionLineage, AcquisitionState
 
         return {
@@ -321,7 +321,7 @@ async def analyze_url_for_fields(
     # to generate a fresh search session.
     search_form: dict[str, Any]
     if config.attempt_search_form:
-        search_form = cast(dict[str, Any], _detect_search_form(html))
+        search_form = cast("dict[str, Any]", _detect_search_form(html))
     else:
         search_form = {"detected": False, "form_fields": [], "search_fields": [], "action": ""}
     search_recovery = None
@@ -359,14 +359,13 @@ async def analyze_url_for_fields(
                 fetch_method=fetch_method,
                 existing_redirect_info=redirect_info,
             )
-    else:
-        # If redirected but no search params provided, still detect the form
-        # to guide the user on what params are available
-        if redirect_info.get("redirected") and search_form.get("detected"):
-            logger.info(
-                "[URLAnalyzer] Redirected URL with search form detected — provide search_params to attempt recovery. Fields: %s",
-                [f["name"] or f["id"] for f in (search_form.get("search_fields") or []) if isinstance(f, dict)],
-            )
+    # If redirected but no search params provided, still detect the form
+    # to guide the user on what params are available
+    elif redirect_info.get("redirected") and search_form.get("detected"):
+        logger.info(
+            "[URLAnalyzer] Redirected URL with search form detected — provide search_params to attempt recovery. Fields: %s",
+            [f["name"] or f["id"] for f in (search_form.get("search_fields") or []) if isinstance(f, dict)],
+        )
 
     # ── Step 4: Check anti-bot score ─────────────────────────────────
     anti_bot_score = detect_anti_bot(html)
@@ -425,8 +424,8 @@ async def analyze_url_for_fields(
             temperature=settings.URL_ANALYZER_TEMPERATURE,
             timeout=settings.LLM_SELECTOR_TIMEOUT,
         )
-    except Exception as e:
-        logger.exception("[URLAnalyzer] LLM analysis failed for %s: %s", url, e)
+    except Exception:
+        logger.exception("[URLAnalyzer] LLM analysis failed for %s", url)
         result = None
 
     # ── Step 8: Build structured response ────────────────────────────
@@ -544,7 +543,7 @@ async def analyze_url_for_fields(
         final_url=final_url,
         fetch_method=fetch_method,
         search_recovery=search_recovery,
-        search_form=search_form if search_form else None,
+        search_form=search_form or None,
         search_params=search_params,
     )
     # Enrich lineage with session detection results
@@ -602,7 +601,7 @@ async def analyze_url_for_fields(
             recovered_url=acquisition_lineage.recovered_url,
             fetch_time_ms=round((time.time() - start_time) * 1000, 1),
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.debug("[URLAnalyzer] Failed to record acquisition telemetry", exc_info=True)
 
     # ── Escalation Check ─────────────────────────────────────────────

@@ -1,5 +1,4 @@
-"""
-Scrape Telemetry — per-URL observability for the scraping pipeline.
+"""Scrape Telemetry — per-URL observability for the scraping pipeline.
 
 Tracks:
   - Fetch timing (Playwright vs httpx)
@@ -88,7 +87,7 @@ class ScrapeTelemetryCollector:
             from app.domain_intelligence import get_domain_intelligence
 
             get_domain_intelligence().update_from_telemetry(telemetry.to_dict())
-        except Exception:  # nosec B110
+        except Exception:  # nosec B110  # noqa: BLE001
             pass
 
         # Emit to semantic world state observability if available
@@ -119,7 +118,7 @@ class ScrapeTelemetryCollector:
                     "retries": telemetry.retry_count,
                 },
             )
-        except Exception:  # nosec B110
+        except Exception:  # nosec B110  # noqa: BLE001
             pass
 
         return telemetry

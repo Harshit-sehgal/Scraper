@@ -45,7 +45,7 @@ class PriorityQueueEntry:
         trace_id: str,
         payload: Any | None = None,
         entry_id: int | None = None,
-    ):
+    ) -> None:
         self.priority = priority
         self.timestamp = time.time()
         self.aging_count = 0
@@ -66,7 +66,7 @@ class PriorityQueueEntry:
         """
         return max(0.0, self.priority - self.aging_count * 0.5)
 
-    def age(self):
+    def age(self) -> None:
         """Apply one aging cycle."""
         self.aging_count += 1
 
@@ -103,7 +103,7 @@ class TransactionalPriorityQueue:
         queue.mark_completed(entry)
     """
 
-    def __init__(self, max_size: int = 1000, aging_interval: float = 5.0):
+    def __init__(self, max_size: int = 1000, aging_interval: float = 5.0) -> None:
         self._heap: list[PriorityQueueEntry] = []
         self._lock = threading.RLock()
         self._max_size = max_size
@@ -119,7 +119,7 @@ class TransactionalPriorityQueue:
         self._completed_count = 0
         self._aged_count = 0
         self._starvation_warnings = 0
-        self._priority_counts = {p: 0 for p in PriorityLevel}
+        self._priority_counts = dict.fromkeys(PriorityLevel, 0)
 
     def push(
         self,
@@ -138,6 +138,7 @@ class TransactionalPriorityQueue:
 
         Returns:
             trace_id of the queued entry
+
         """
         import uuid
 
@@ -237,7 +238,7 @@ class TransactionalPriorityQueue:
                     return True
         return False
 
-    def mark_completed(self, entry: PriorityQueueEntry):
+    def mark_completed(self, entry: PriorityQueueEntry) -> None:
         """Increment completed counter (for metrics, entry already popped)."""
         self._completed_count += 1
 
@@ -247,17 +248,17 @@ class TransactionalPriorityQueue:
             # Count only valid entries
             return len(self._heap) - len(self._invalid_trace_ids)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear all queued entries."""
         with self._lock:
             self._heap.clear()
             self._invalid_trace_ids.clear()
-            self._priority_counts = {p: 0 for p in PriorityLevel}
+            self._priority_counts = dict.fromkeys(PriorityLevel, 0)
             self._counter = 0
 
     # ─── Aging ─────────────────────────────────────────────────────
 
-    def _maybe_age(self):
+    def _maybe_age(self) -> None:
         """Apply priority aging if the interval has elapsed."""
         now = time.time()
         if now - self._last_aging < self._aging_interval:
@@ -293,7 +294,7 @@ class TransactionalPriorityQueue:
                         heapq.heapify(self._heap)
                         break
 
-    def force_age_all(self):
+    def force_age_all(self) -> None:
         """Force-aging cycle for all entries (e.g., during maintenance)."""
         with self._lock:
             for entry in self._heap:
@@ -335,7 +336,7 @@ def get_priority_queue() -> TransactionalPriorityQueue:
     return _queue
 
 
-def reset_priority_queue():
+def reset_priority_queue() -> None:
     """Reset the global queue (for testing)."""
     global _queue
     _queue = None

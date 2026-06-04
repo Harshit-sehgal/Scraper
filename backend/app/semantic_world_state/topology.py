@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class TopologyMixin:
-    def detect_communities(self):
+    def detect_communities(self) -> None:
         self._topology.detect_communities()
 
     @requires_invariants
@@ -42,7 +42,7 @@ class TopologyMixin:
             return count
 
     @requires_invariants
-    def evolve_field(self):
+    def evolve_field(self) -> None:
         """Single topology-canonical entry point for field evolution."""
         with self.transaction("field_evolution"):
             effects = self._topology.evolve_all()
@@ -88,13 +88,13 @@ class TopologyMixin:
             for t in tokens:
                 if not t.raw:
                     continue
-                src = t.source_field if t.source_field else (schema_fields[0] if schema_fields else "")
+                src = t.source_field or (schema_fields[0] if schema_fields else "")
                 if t.raw in value_roles and len(value_roles[t.raw]) >= 2:
                     continue
                 for ra, rb in ROLE_EXCLUSIVITY:
                     if src in (ra, rb):
                         other = rb if src == ra else ra
-                        fnames = set(t.source_field for t in tokens if t.source_field)
+                        fnames = {t.source_field for t in tokens if t.source_field}
                         if other not in fnames:
                             if t.raw not in value_roles:
                                 value_roles[t.raw] = []
@@ -254,7 +254,7 @@ class TopologyMixin:
         )
 
     @requires_invariants
-    def redistribute_instability(self):
+    def redistribute_instability(self) -> None:
         """Govern the semantic field dynamics using adaptive policies (Phase 56)."""
         snapshot = self.capture_governance_snapshot()
         report = self._observability.get_governance_report(snapshot)
@@ -290,7 +290,7 @@ class TopologyMixin:
         self.emit_telemetry("governance_pulse", report)
 
     @requires_invariants
-    def evolve_macro_state(self):
+    def evolve_macro_state(self) -> None:
         with self.transaction("macro_evolution"):
             macro = self.compute_macro_from_meso()
             macro_pressure = 0.0
@@ -365,12 +365,12 @@ class TopologyMixin:
                     self._energy.set_schema_instability(role, 0.5)
 
                     self._observability.emit_telemetry("immune_recovery", {"role": role, "reason": "high_instability_anchor"})
-                    logger.info(f"IMMUNE RESPONSE: Recovered corrupted anchor role [{role}]")
+                    logger.info("IMMUNE RESPONSE: Recovered corrupted anchor role [%s]", role)
 
             if macro_pressure > 0.8 or self.metrics.stability_debt > 1.0:
                 self.trigger_phase_transition()
 
-    def _promote_stable_hypotheses(self):
+    def _promote_stable_hypotheses(self) -> None:
         for role in self._manifold.get_manifold_roles():
             if role.startswith("hypo_"):
                 instability = self._energy.get_schema_instability(role)
@@ -381,10 +381,10 @@ class TopologyMixin:
                     self._manifold.set_manifold_vector(clean_name, vec)
                     self._manifold.remove_manifold_role(role)
                     self._energy.set_schema_instability(role, 0.5)
-                    logger.info(f"DYNAMIC SCHEMA EXPANSION: Promoted {role} to active role: {clean_name}")
+                    logger.info("DYNAMIC SCHEMA EXPANSION: Promoted %s to active role: %s", role, clean_name)
                     self.record_delta("global", "promote_hypo", {"hypo": role, "active": clean_name})
 
-    def trigger_phase_transition(self):
+    def trigger_phase_transition(self) -> None:
         logger.info("METASTABILITY TRIGGERED: Executing Phase Transition.")
         with self.transaction("phase_transition"):
             anchors = self._topology.anchors
@@ -404,23 +404,23 @@ class TopologyMixin:
 
                 import random
 
-                for role in reng.manifold.keys():
+                for role in reng.manifold:
                     if role not in anchored_roles:
                         noise = [random.uniform(-0.1, 0.1) for _ in range(16)]  # nosec B311
                         self._manifold.apply_force_to_manifold(role, noise)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Manifold perturbation failed: %s", e)
 
             self._energy.stability_debt = 0.0
             self.record_delta("global", "phase_transition", {"debt_cleared": 1.0, "anchors_preserved": len(anchors)})
 
-    def _forecast_causal_needs(self):
+    def _forecast_causal_needs(self) -> None:
         current = self.metrics.total_records_processed
         forecast = self._motif.predict_future_motifs(current)
         for motif in forecast:
-            logger.info(f"Causal Forecast: emerging schema motif detected: {motif}")
+            logger.info("Causal Forecast: emerging schema motif detected: %s", motif)
 
-    def _self_heal_topology(self):
+    def _self_heal_topology(self) -> None:
         laws = self.topological_laws
         exclusions = self.learned_exclusions
         self._topology.clear_impossible_neighborhoods()
@@ -436,7 +436,7 @@ class TopologyMixin:
                 else:
                     self._topology.set_topological_law(key, law_val * 0.5)
 
-    def _re_seed_unstable_roles(self):
+    def _re_seed_unstable_roles(self) -> None:
         communities = self.global_communities
         if not communities:
             for (ra, rb), cohesion in self.neighborhood_cohesion.items():
@@ -463,7 +463,7 @@ class TopologyMixin:
                 self._manifold.blend_manifold_vector(role, consensus_vec, alpha=0.6, beta=0.4)
                 self._energy.set_schema_instability(role, 0.4)
 
-    def _spawn_hypo_roles(self):
+    def _spawn_hypo_roles(self) -> None:
         for region in self._topology.iterate_regions():
             if "_unidentified" in region.competing_roles and region.integrity > 0.5 and region.recurrence_score > 0.3:
                 hypo_role = f"hypo_{region.token.lower().replace(' ', '_')}"
@@ -591,7 +591,7 @@ class TopologyMixin:
         return {"micro": micro, "meso": meso, "macro": macro}
 
     @requires_invariants
-    def observe_field_perturbation(self, output: dict, tokens: list):
+    def observe_field_perturbation(self, output: dict, tokens: list) -> None:
         from app.instability_api import get_immune_system
 
         immune = get_immune_system(ws=self)
@@ -615,7 +615,7 @@ class TopologyMixin:
                     if role == ra:
                         peer = rb
                         break
-                    elif role == rb:
+                    if role == rb:
                         peer = ra
                         break
             if candidate and peer:
@@ -760,11 +760,11 @@ class TopologyMixin:
                     self._topology.set_region_energy(r.region_id, r.local_energy * scale)
         return hot_neighborhoods
 
-    def induce_topological_laws(self, min_success_rate: float = 0.8, min_attempts: int = 10):
+    def induce_topological_laws(self, min_success_rate: float = 0.8, min_attempts: int = 10) -> None:
         self._topology.induce_topological_laws(min_success_rate=min_success_rate, min_attempts=min_attempts)
 
     @requires_invariants
-    def relax_topology(self, budget: Any | None = None):
+    def relax_topology(self, budget: Any | None = None) -> int:
         """Gradual erosion of weak structures."""
         from app.runtime_budget import get_default_budget
 
@@ -798,7 +798,7 @@ class TopologyMixin:
                 for role, v_after in self.role_manifold.items():
                     v_before = before_manifold.get(role)
                     if v_before:
-                        drift = sum((a - b) ** 2 for a, b in zip(v_before, v_after)) ** 0.5
+                        drift = sum((a - b) ** 2 for a, b in zip(v_before, v_after, strict=False)) ** 0.5
                         if drift > 0.001:
                             self._observability.log_drift(role, drift)
 
@@ -809,7 +809,7 @@ class TopologyMixin:
                         "active_drift": len([r for r in self.role_manifold if r in before_manifold]),
                     },
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("RoleEmbeddingEngine.relax_manifold failed in relax_topology: %s", e)
 
             self.record_delta(

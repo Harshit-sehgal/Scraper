@@ -1,5 +1,4 @@
-"""
-Selector Decay Predictor — Predicts when selectors are likely to fail.
+"""Selector Decay Predictor — Predicts when selectors are likely to fail.
 
 Provides:
   - Decay risk scoring per domain (0.0 = fresh, 1.0 = likely failing soon)
@@ -42,8 +41,7 @@ class DecayPrediction:
     recommendations: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        d = asdict(self)
-        return d
+        return asdict(self)
 
 
 class SelectorDecayPredictor:
@@ -72,36 +70,37 @@ class SelectorDecayPredictor:
 
     def _save(self) -> None:
         import json
-        import os
+        from pathlib import Path
 
         try:
             path = self._get_snapshots_path()
-            os.makedirs(os.path.dirname(path), exist_ok=True)
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
             data = {domain: [[t, c] for t, c in snapshots] for domain, snapshots in self._confidence_snapshots.items()}
-            with open(path, "w") as f:
+            with open(path, "w") as f:  # noqa: PTH123
                 json.dump(data, f)
-        except Exception as e:
-            logger.exception("Failed to persist selector decay snapshots: %s", e)
+        except Exception:
+            logger.exception("Failed to persist selector decay snapshots: %s")
 
     def _load(self) -> None:
         import json
-        import os
         import sys
 
         from app.config import settings
 
         if "pytest" in sys.modules and not settings.TEST_SELECTOR_DECAY_PERSISTENCE:
             return
+        from pathlib import Path
+
         path = self._get_snapshots_path()
-        if os.path.exists(path):
+        if Path(path).exists():
             try:
-                with open(path, "r") as f:
+                with open(path) as f:  # noqa: PTH123
                     data = json.load(f)
                 self._confidence_snapshots.clear()
                 for domain, snapshots in data.items():
                     self._confidence_snapshots[domain] = [(float(t), float(c)) for t, c in snapshots]
-            except Exception as e:
-                logger.exception("Failed to load selector decay snapshots: %s", e)
+            except Exception:
+                logger.exception("Failed to load selector decay snapshots: %s")
 
     def record_observation(self, domain: str, confidence: float) -> None:
         """Record a confidence observation for a domain at the current time.
@@ -109,6 +108,7 @@ class SelectorDecayPredictor:
         Args:
             domain: The domain being observed
             confidence: Current selector confidence score [0, 1]
+
         """
         now = time.time()
         self._confidence_snapshots[domain].append((now, confidence))
@@ -125,6 +125,7 @@ class SelectorDecayPredictor:
 
         Returns:
             DecayPrediction with risk score and recommendations
+
         """
         memory = get_selector_memory()
         entry = memory._memory.get(domain)
@@ -243,6 +244,7 @@ class SelectorDecayPredictor:
 
         Returns:
             List of DecayPrediction for at-risk domains
+
         """
         memory = get_selector_memory()
         at_risk = []

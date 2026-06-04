@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import re
 from typing import Any
@@ -187,6 +188,7 @@ def _extract_field_by_pattern(
         field_name: Name of the field being extracted
         used_spans: List of (start, end) character ranges already consumed
         used_child_indices: Set of child text node indices already consumed
+
     """
     import re as re_mod
 
@@ -202,19 +204,14 @@ def _extract_field_by_pattern(
 
     ftype = None
     if isinstance(sel_entry, dict) and sel_entry.get("type"):
-        try:
+        with contextlib.suppress(ValueError):
             ftype = FieldType(sel_entry["type"])
-        except ValueError:
-            pass
 
     if ftype is None:
         ftype = _infer_field_type_from_name(field_name)
 
     def _is_span_used(match_start: int, match_end: int) -> bool:
-        for us, ue in used_spans:
-            if match_start < ue and match_end > us:
-                return True
-        return False
+        return any(match_start < ue and match_end > us for us, ue in used_spans)
 
     # Strategy 1: Type-based regex extraction with uniqueness
     if ftype is not None:
@@ -375,7 +372,7 @@ def _field_matches_classification(field_name: str, classification: str) -> bool:
     }
     keywords = mapping.get(classification, ())
     if classification == "code":
-        keywords = keywords + ("id", "ref")
+        keywords = (*keywords, "id", "ref")
     if not keywords and classification == "text":
         return True
     return any(kw in n for kw in keywords)
@@ -411,7 +408,7 @@ def _read_node_value(target, field_type: FieldType | None = None, field_name: st
     if title_val:
         title_clean = title_val.strip()
         if title_clean:
-            if text_val.endswith("...") or text_val.endswith("…"):
+            if text_val.endswith(("...", "…")):
                 use_title = True
             elif (
                 field_type in (None, FieldType.STRING)
@@ -468,10 +465,8 @@ def extract_raw_from_selectors(
             key, sel_entry = item
             ftype = None
             if isinstance(sel_entry, dict) and sel_entry.get("type"):
-                try:
+                with contextlib.suppress(ValueError):
                     ftype = FieldType(sel_entry["type"])
-                except ValueError:
-                    pass
             if ftype is None:
                 ftype = _infer_field_type_from_name(key)
             return _TYPED_ORDER.get(ftype, 2)
@@ -491,7 +486,7 @@ def extract_raw_from_selectors(
                             except ValueError:
                                 node_ftype = None
                         val = _read_node_value(target, node_ftype, key)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.debug("[SelectorEngine] Invalid selector '%s' for %s: %s", sel, key, e)
             else:
                 val = _extract_field_by_pattern(node, sel_entry, key, used_spans, used_child_indices)
@@ -699,7 +694,8 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
 
             elif ft == FieldType.CODE:
                 code_node = container.find(
-                    True, class_=re.compile(r"sku|product-code|barcode|isbn|model-number|part", re.IGNORECASE)
+                    True,
+                    class_=re.compile(r"sku|product-code|barcode|isbn|model-number|part", re.IGNORECASE),
                 )
                 if code_node:
                     val = code_node.get_text()
@@ -729,54 +725,53 @@ def extract_with_regex(html: str, schema_fields: list[SchemaField], base_url: st
                     val = match.group(1) if match else None
                 val = _sanitize_field_value(field, val)
 
+            # STRING, DATE, or unknown — extract the most prominent text
+            elif field.name == desc_field:
+                # Primary entity: get the most specific identifying text
+                # Strategy 1: Look for heading / link elements
+                heading = container.find(["h1", "h2", "h3", "h4", "strong"])
+                if not heading:
+                    link = container.find("a")
+                    if link and not re.search(r"visit|click|more|details|select|here|book", link.get_text(), re.IGNORECASE):
+                        heading = link
+                if not heading and container.name == "tr":
+                    heading = container.find("td")
+
+                # Strategy 2: Look for img alt text (e.g. company logo)
+                if not heading:
+                    img = container.find("img", alt=True)
+                    if img:
+                        alt_val = img.get("alt")
+                        alt_str = alt_val[0] if isinstance(alt_val, list) else str(alt_val) if alt_val else ""
+                        if alt_str.strip() and len(alt_str.strip()) > 2:
+                            heading = img
+
+                # Strategy 3: Look for elements with identifying class
+                # patterns
+                if not heading:
+                    named_el = container.find(class_=re.compile(r"name|title|brand|company|org", re.IGNORECASE))
+                    if named_el:
+                        heading = named_el
+
+                # Strategy 4: First element with short, meaningful text
+                # (not a full sentence)
+                if not heading:
+                    for child in container.find_all(["span", "div", "p", "b", "i"], recursive=True, limit=10):
+                        child_text = child.get_text(strip=True)
+                        if child_text and len(child_text) < 60 and child_text != text:
+                            if re.match(r"^[A-Za-z]\w+(\s+[A-Za-z]\w+){0,4}$", child_text):
+                                heading = child
+                                break
+
+                candidate = (
+                    heading.get("alt")
+                    if heading and heading.name == "img"
+                    else (heading.get_text(" ", strip=True) if heading else text[: settings.SELECTOR_HEADING_FALLBACK_LEN])
+                )
+                val = _sanitize_field_value(field, candidate)
             else:
-                # STRING, DATE, or unknown — extract the most prominent text
-                if field.name == desc_field:
-                    # Primary entity: get the most specific identifying text
-                    # Strategy 1: Look for heading / link elements
-                    heading = container.find(["h1", "h2", "h3", "h4", "strong"])
-                    if not heading:
-                        link = container.find("a")
-                        if link and not re.search(r"visit|click|more|details|select|here|book", link.get_text(), re.IGNORECASE):
-                            heading = link
-                    if not heading and container.name == "tr":
-                        heading = container.find("td")
-
-                    # Strategy 2: Look for img alt text (e.g. company logo)
-                    if not heading:
-                        img = container.find("img", alt=True)
-                        if img:
-                            alt_val = img.get("alt")
-                            alt_str = alt_val[0] if isinstance(alt_val, list) else str(alt_val) if alt_val else ""
-                            if alt_str.strip() and len(alt_str.strip()) > 2:
-                                heading = img
-
-                    # Strategy 3: Look for elements with identifying class
-                    # patterns
-                    if not heading:
-                        named_el = container.find(class_=re.compile(r"name|title|brand|company|org", re.IGNORECASE))
-                        if named_el:
-                            heading = named_el
-
-                    # Strategy 4: First element with short, meaningful text
-                    # (not a full sentence)
-                    if not heading:
-                        for child in container.find_all(["span", "div", "p", "b", "i"], recursive=True, limit=10):
-                            child_text = child.get_text(strip=True)
-                            if child_text and len(child_text) < 60 and child_text != text:
-                                if re.match(r"^[A-Za-z]\w+(\s+[A-Za-z]\w+){0,4}$", child_text):
-                                    heading = child
-                                    break
-
-                    candidate = (
-                        heading.get("alt")
-                        if heading and heading.name == "img"
-                        else (heading.get_text(" ", strip=True) if heading else text[: settings.SELECTOR_HEADING_FALLBACK_LEN])
-                    )
-                    val = _sanitize_field_value(field, candidate)
-                else:
-                    # Secondary fields: use container text or None
-                    val = _sanitize_field_value(field, text[:200]) if text else None
+                # Secondary fields: use container text or None
+                val = _sanitize_field_value(field, text[:200]) if text else None
 
             record[field.name] = val
 

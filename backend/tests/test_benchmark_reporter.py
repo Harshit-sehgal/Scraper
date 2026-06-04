@@ -1,9 +1,8 @@
-"""
-Unit Tests for Phase 84 Automated Benchmark Reporting.
-"""
+"""Unit Tests for Phase 84 Automated Benchmark Reporting."""
 
 from __future__ import annotations
 
+import contextlib
 import os
 import time
 
@@ -14,17 +13,13 @@ from app.benchmark_reporter import DASHBOARD_PATH, DB_PATH, BenchmarkReporter, B
 def _clean_benchmark_db_files() -> None:
     """Remove benchmark DB and dashboard files along with any WAL / SHM journal files."""
     for path in [DB_PATH, DASHBOARD_PATH]:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.remove(path)
-        except FileNotFoundError:
-            pass
     # Also clean up WAL / SHM journal files for DB_PATH
     base = DB_PATH
     for suffix in ["-wal", "-shm", "-journal"]:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.remove(base + suffix)
-        except FileNotFoundError:
-            pass
 
 
 @pytest.fixture(autouse=True)
@@ -107,7 +102,7 @@ def test_dashboard_generation() -> None:
     reporter.record_run(run)
 
     assert os.path.exists(DASHBOARD_PATH)
-    with open(DASHBOARD_PATH, "r", encoding="utf-8") as f:
+    with open(DASHBOARD_PATH, encoding="utf-8") as f:
         content = f.read()
 
     assert "dashboard-run" in content

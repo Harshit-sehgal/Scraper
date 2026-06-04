@@ -29,7 +29,8 @@ class TestDetectEmptyResponse:
         result = detect_empty_response(html)
         assert result.is_empty is True
         assert result.empty_type == "cookie_wall"
-        assert result.suggestions is not None and len(result.suggestions) > 0
+        assert result.suggestions is not None
+        assert len(result.suggestions) > 0
 
     def test_login_wall(self) -> None:
         html = """
@@ -126,5 +127,6 @@ class TestDetectEmptyResponse:
         </body></html>
         """
         result = detect_empty_response(html)
-        assert result.suggestions is not None and len(result.suggestions) > 0
+        assert result.suggestions is not None
+        assert len(result.suggestions) > 0
         assert "cookie" in result.suggestions[0].lower()

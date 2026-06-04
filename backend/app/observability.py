@@ -8,12 +8,13 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from app.transaction_context import active_transaction
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from app.semantic_world_state import SemanticWorldState
 
 from collections import deque
@@ -67,7 +68,7 @@ class GovernanceSnapshot:
 class ObservabilityState:
     """Sole owner of the semantic field's telemetry and activity heatmaps."""
 
-    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None) -> None:
         from app.config import settings
 
         self._delta_callback = delta_callback
@@ -86,18 +87,18 @@ class ObservabilityState:
         return None
 
     @_staging.setter
-    def _staging(self, value: dict | None):
+    def _staging(self, value: dict | None) -> None:
         tx = active_transaction.get()
         if tx is not None:
             tx[f"observability_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict):
+    def _record(self, action: str, details: dict) -> None:
         if self._delta_callback:
             self._delta_callback("observability", action, details)
 
     # ─── Transaction Support ─────────────────────────────────────────────
 
-    def begin_transaction(self):
+    def begin_transaction(self) -> None:
         """Snapshot current state for staging."""
         self._staging = {
             "activity_heatmap": dict(self._activity_heatmap),
@@ -105,7 +106,7 @@ class ObservabilityState:
             "telemetry_stream": list(self._telemetry_stream),
         }
 
-    def commit(self):
+    def commit(self) -> None:
         """Apply staged changes."""
         if self._staging is not None:
             self._activity_heatmap = self._staging["activity_heatmap"]
@@ -113,7 +114,7 @@ class ObservabilityState:
             self._telemetry_stream = deque(self._staging.get("telemetry_stream", self._telemetry_stream), maxlen=1000)
             self._staging = None
 
-    def rollback(self):
+    def rollback(self) -> None:
         self._staging = None
 
     def _get_struct(self, key: str):
@@ -122,7 +123,7 @@ class ObservabilityState:
         attr_map = {"activity_heatmap": "_activity_heatmap", "drift_log": "_drift_log"}
         return getattr(self, attr_map[key])
 
-    def _set_struct(self, key: str, val):
+    def _set_struct(self, key: str, val) -> None:
         if self._staging is not None:
             self._staging[key] = val
         else:
@@ -131,7 +132,7 @@ class ObservabilityState:
 
     # ─── Controlled Mutations ────────────────────────────────────────────
 
-    def emit_telemetry(self, event_type: str, details: dict, trace_id: str | None = None):
+    def emit_telemetry(self, event_type: str, details: dict, trace_id: str | None = None) -> None:
         """Record a cognitive event in the telemetry stream (Phase 41)."""
         entry = {
             "type": event_type,
@@ -158,7 +159,7 @@ class ObservabilityState:
         trace_id: str | None = None,
         topology_state: str | None = None,
         semantic_entropy: float | None = None,
-    ):
+    ) -> None:
         """Record a structured degradation event with causality tracking.
 
         This ensures silent fallback paths are visible in telemetry,
@@ -189,14 +190,14 @@ class ObservabilityState:
         else:
             logging.getLogger(__name__).info(log_msg)
 
-    def pulse_heatmap(self, region_id: str, intensity: float):
+    def pulse_heatmap(self, region_id: str, intensity: float) -> None:
         """Increase activity score for a specific region."""
         heatmap = self._get_struct("activity_heatmap")
         current = heatmap.get(region_id, 0.0)
         heatmap[region_id] = min(10.0, current + intensity)
         self._set_struct("activity_heatmap", heatmap)
 
-    def log_drift(self, role: str, drift: float):
+    def log_drift(self, role: str, drift: float) -> None:
         """Record manifold drift for a role."""
         log = self._get_struct("drift_log")
         if role not in log:
@@ -204,7 +205,7 @@ class ObservabilityState:
         log[role].append(drift)
         self._set_struct("drift_log", log)
 
-    def decay_heatmap(self, rate: float = 0.9):
+    def decay_heatmap(self, rate: float = 0.9) -> None:
         """Gradually decay heatmap scores to reflect cooling activity."""
         heatmap = self._get_struct("activity_heatmap")
         for rid in list(heatmap.keys()):
@@ -303,7 +304,7 @@ class ObservabilityState:
             if history:
                 manifold_history[r] = history
 
-        report = {
+        return {
             "diversity": round(self.calculate_attractor_diversity(snapshot), 3),
             "oscillations": self.detect_oscillations(list(snapshot.topology_snapshots)),
             "runaways": self.detect_runaway_attractors(manifold_history),
@@ -313,7 +314,6 @@ class ObservabilityState:
                 [s.get("entropy", 0.0) for s in snapshot.topology_snapshots],
             ),
         }
-        return report
 
     def calculate_damping_factor(self, snapshots: list[dict]) -> float:
         """Compute a global damping factor based on detected instability patterns (Phase 49).
@@ -342,7 +342,7 @@ class ObservabilityState:
                 manifold_history[r] = history
         runaways = self.detect_runaway_attractors(manifold_history)
 
-        policy = {
+        return {
             "propagation_damping": damping,
             "force_decay": snapshot.global_energy > 8.0,
             "attractor_scaling": 0.5 if runaways else 1.0,
@@ -351,7 +351,6 @@ class ObservabilityState:
                 [s.get("entropy", 0.0) for s in snapshots],
             ),
         }
-        return policy
 
     def detect_runaway_attractors(self, manifold_history: dict[str, list[float]], threshold: float = 0.95) -> list[dict]:
         """Identify roles that have become 'too stable' or dominant (Phase 48).
@@ -385,7 +384,7 @@ class ObservabilityState:
         # (Threshold 8.0 prevents baseline thrashing at default 5.0)
         return e_stable and s_stable and recent_e[0] > 8.0 and recent_s[0] < 0.2
 
-    def compress_causal_history(self, threshold_age_sec: float = 3600):
+    def compress_causal_history(self, threshold_age_sec: float = 3600) -> None:
         """Compress old telemetry events into causal summaries (Phase 48).
 
         Prevents causal graph explosion while maintaining long-term traceability.
@@ -443,7 +442,7 @@ class ObservabilityState:
                 "avg": sum(entropies) / len(entropies),
             }
 
-        new_stream = [summary] + to_keep
+        new_stream = [summary, *to_keep]
         if self._staging is not None:
             self._staging["telemetry_stream"] = new_stream
         else:
@@ -491,7 +490,7 @@ class ObservabilityState:
             },
         }
 
-    def from_dict(self, data: dict):
+    def from_dict(self, data: dict) -> None:
         self.clear()
         obs_data = data.get("observability", {})
         self._set_struct("activity_heatmap", dict(obs_data.get("activity_heatmap", {})))
@@ -503,7 +502,7 @@ class ObservabilityState:
         else:
             self._telemetry_stream = deque(raw_telemetry, maxlen=1000)
 
-    def clear(self):
+    def clear(self) -> None:
         if self._staging is not None:
             self._staging["telemetry_stream"] = []
         else:
@@ -522,7 +521,7 @@ class ObservabilityState:
         def estimate_dict(d: dict) -> int:
             try:
                 return len(json.dumps(d, sort_keys=True, default=str))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return 0
 
         telemetry_size = len(json.dumps(list(snapshot.telemetry_stream), sort_keys=True, default=str))
@@ -627,7 +626,7 @@ class ObservabilityState:
 
         return (c * 0.4) + (stability * 0.3) + (persistence * 0.3)  # type: ignore[no-any-return]
 
-    def apply_resource_shedding(self, ws: SemanticWorldState, snapshot: GovernanceSnapshot, max_bytes: int = 10000000):
+    def apply_resource_shedding(self, ws: SemanticWorldState, snapshot: GovernanceSnapshot, max_bytes: int = 10000000) -> bool:
         """Prune non-essential state if memory footprint exceeds threshold (Phase 47 / 50).
 
         Enhanced with Value-Aware Pruning to preserve semantic continuity.

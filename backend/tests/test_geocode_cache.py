@@ -1,9 +1,8 @@
-"""
-Unit Tests for Phase 85 Shared Geocoding Cache.
-"""
+"""Unit Tests for Phase 85 Shared Geocoding Cache."""
 
 from __future__ import annotations
 
+import contextlib
 import os
 
 import pytest
@@ -15,10 +14,8 @@ def _clean_cache_db_files() -> None:
     base = CACHE_DB_PATH
     for suffix in ["", "-wal", "-shm", "-journal"]:
         path = base + suffix
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.remove(path)
-        except FileNotFoundError:
-            pass
 
 
 @pytest.fixture(autouse=True)

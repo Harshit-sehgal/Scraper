@@ -6,6 +6,7 @@ serialization and lifecycle operations.
 Extracted from topology_state.py for modularity (see REFACTOR_PLAN.md).
 """
 
+import contextlib
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -29,10 +30,7 @@ def trim_topology(state: "TopologyState", max_size: int, keep_from_end: int = 0)
     """Trim regions to a maximum size, optionally keeping from the end."""
     regs = state._get_regions()
     if len(regs) > max_size:
-        if keep_from_end > 0:
-            regs = regs[-keep_from_end:]
-        else:
-            regs = regs[-max_size:]
+        regs = regs[-keep_from_end:] if keep_from_end > 0 else regs[-max_size:]
         state._set_regions(regs)
         if state._staging is not None:
             state._staging["structural_change"] = True
@@ -176,8 +174,7 @@ def merge_topology(state: "TopologyState", other_data: dict, alpha: float = 0.5)
     # Phase 60: Causal Reconciliation Heuristic
     state._tombstones.update(remote_tombstones)
 
-    if remote_epoch > state._topology_epoch:
-        state._topology_epoch = remote_epoch
+    state._topology_epoch = max(state._topology_epoch, remote_epoch)
 
     if remote_epoch >= state._topology_epoch:
         regs = state._get_regions()
@@ -220,10 +217,8 @@ def merge_topology(state: "TopologyState", other_data: dict, alpha: float = 0.5)
             if len(parts) == 2:
                 pair = tuple(parts)
         else:
-            try:
+            with contextlib.suppress(ValueError):
                 pair = parse_topology_key(key_str)
-            except ValueError:
-                pass
 
         if pair:
             local = state.topological_laws.get(pair, 0.0)

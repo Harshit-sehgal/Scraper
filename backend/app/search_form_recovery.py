@@ -39,6 +39,7 @@ def _detect_search_form(html: str) -> dict:
         - method: str
         - fields: list of dicts with {id, name, type, placeholder}
         - search_fields: list of field dicts identified as search-relevant
+
     """
     soup = BeautifulSoup(html, "html.parser")
     forms = soup.find_all("form")
@@ -169,7 +170,7 @@ def _build_absolute_url(base_url: str, action: str) -> str:
     """Build an absolute URL from a base URL and potentially relative action."""
     from urllib.parse import urljoin, urlparse
 
-    if action.startswith("http://") or action.startswith("https://"):
+    if action.startswith(("http://", "https://")):
         return action
     if action.startswith("/"):
         parsed = urlparse(base_url)
@@ -192,6 +193,7 @@ def _map_search_params_to_fields(
 
     Returns:
         dict mapping form field names → values
+
     """
     mapped: dict[str, str] = {}
 
@@ -232,7 +234,7 @@ def _map_search_params_to_fields(
             for kw in variant_keywords:
                 score = 0
                 kw_norm = kw.lower().replace("_", "").replace("-", "")
-                if kw_norm == field_name or kw_norm == field_id:
+                if kw_norm in (field_name, field_id):
                     score = 10
                 elif kw_norm in field_name or kw_norm in field_id:
                     score = 5
@@ -282,6 +284,7 @@ async def _try_form_search_recovery(
         - form_detected: bool
         - form_info: dict
         - error: str | None
+
     """
     import httpx
 
@@ -404,7 +407,7 @@ async def _try_form_search_recovery(
             "form_info": form_info,
             "error": "Search form submission timed out after 30 seconds",
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {
             "success": False,
             "fresh_url": landing_page_url,

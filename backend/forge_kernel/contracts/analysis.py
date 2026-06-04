@@ -1,6 +1,4 @@
-"""
-Analysis contracts — canonical models for URL analysis and extraction attempts.
-"""
+"""Analysis contracts — canonical models for URL analysis and extraction attempts."""
 
 from __future__ import annotations
 

@@ -133,7 +133,7 @@ def validate_production_credentials(settings) -> None:
         try:
             parsed = urlsplit(db_url)
             password = parsed.password
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             msg = f"Production check failed: DATAFORGE_DATABASE_URL is not parseable: {e}"
             raise ValueError(msg)
 

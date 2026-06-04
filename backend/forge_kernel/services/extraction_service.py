@@ -1,14 +1,14 @@
-"""
-Extraction service — orchestrates the extraction pipeline for a single URL.
-"""
+"""Extraction service — orchestrates the extraction pipeline for a single URL."""
 
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from forge_kernel.contracts.result import ResultRecord
 from forge_kernel.extraction.pipeline import ExtractionPipeline
+
+if TYPE_CHECKING:
+    from forge_kernel.contracts.result import ResultRecord
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class ExtractionService:
     """Service that orchestrates the extraction pipeline."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._pipeline = ExtractionPipeline()
 
     async def extract_url(

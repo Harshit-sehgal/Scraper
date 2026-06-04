@@ -19,7 +19,7 @@ class TopologyAPI:
     NEVER accesses ws.field_regions directly.
     """
 
-    def __init__(self, ws):
+    def __init__(self, ws) -> None:
         from app.topology_state import TopologyState
 
         if isinstance(ws, TopologyState):

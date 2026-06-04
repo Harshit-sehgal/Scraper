@@ -1,18 +1,17 @@
-"""
-Serialization Symmetry Verification — Phase 47
+"""Serialization Symmetry Verification — Phase 47.
 =============================================
 LAW: All state objects must support bit-for-bit parity in to_dict/from_dict
 round-trips to ensure deterministic replay and distributed consistency.
 """
 
 import json
+import sys
 
 from app.semantic_world_state import SemanticWorldState
 
 
-def verify_symmetry(subsystem_name, state_obj):
+def verify_symmetry(subsystem_name, state_obj) -> bool:
     """Verify that a subsystem's to_dict/from_dict is perfectly symmetrical."""
-    print(f"Verifying Symmetry: {subsystem_name}...")
     original_dict = state_obj.to_dict()
 
     # Round-trip
@@ -24,16 +23,14 @@ def verify_symmetry(subsystem_name, state_obj):
     new_str = json.dumps(new_dict, sort_keys=True)
 
     if orig_str != new_str:
-        print(f"  [ERROR] Asymmetry detected in {subsystem_name}!")
         # Find the difference
         orig_obj = json.loads(orig_str)
         new_obj = json.loads(new_str)
         for k in orig_obj:
             if orig_obj.get(k) != new_obj.get(k):
-                print(f"    Key '{k}' differs: {orig_obj.get(k)} != {new_obj.get(k)}")
+                pass
         return False
 
-    print(f"  [OK] {subsystem_name} is symmetrical.")
     return True
 
 
@@ -76,7 +73,5 @@ def test_all_subsystems_symmetry() -> None:
 if __name__ == "__main__":
     try:
         test_all_subsystems_symmetry()
-        print("\nSUMMARY: 100% Serialization Symmetry Confirmed across all subsystems.")
-    except Exception as e:
-        print(f"\nFATAL ERROR: {e}")
-        exit(1)
+    except Exception:
+        sys.exit(1)

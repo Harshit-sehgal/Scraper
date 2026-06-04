@@ -1,5 +1,4 @@
-"""
-Compound Record Assembler — Detects internal segments inside a result container
+"""Compound Record Assembler — Detects internal segments inside a result container
 and assembles them into structured compound records.
 
 A compound record has repeated internal segments (e.g., outbound / return legs in
@@ -110,6 +109,7 @@ def detect_segments(element_text: str) -> list[dict[str, Any]]:
 
     Returns:
         List of detected segments with their labels and text content.
+
     """
     segments: list[dict[str, Any]] = []
 
@@ -128,7 +128,7 @@ def detect_segments(element_text: str) -> list[dict[str, Any]]:
         # Check if this line is a segment separator
         matched_separator = None
         for sep in SEGMENT_SEPARATORS:
-            if line_lower == sep or line_lower.startswith(sep + ":") or line_lower.startswith(sep + " "):
+            if line_lower == sep or line_lower.startswith((sep + ":", sep + " ")):
                 matched_separator = sep.title()
                 break
 
@@ -329,6 +329,7 @@ def assemble_compound_records(
     Returns:
         List of records — some may be expanded into compound records,
         others left as-is if no segments detected.
+
     """
     if not records:
         return []
@@ -411,6 +412,7 @@ def assemble_single_container(
 
     Returns:
         CompoundRecord if segments detected, None otherwise.
+
     """
     if not element_text or len(element_text) < 50:
         return None

@@ -4,6 +4,8 @@ Each invariant validates a specific property of the semantic field system.
 If any invariant fails, the architecture is not semantically coherent.
 """
 
+import contextlib
+
 
 def get_dispatcher(*args, **kwargs):
     import app.event_dispatcher
@@ -22,7 +24,7 @@ class LazyRoleExclusivity:
 
         return app.field_laws.ROLE_EXCLUSIVITY[item]
 
-    def __len__(self):
+    def __len__(self) -> int:
         import app.field_laws
 
         return len(app.field_laws.ROLE_EXCLUSIVITY)
@@ -274,7 +276,8 @@ def test_exclusion_persistence_invariant() -> None:
     ws._instability.set_exclusion(("a", "b"), 0.75)
 
     old_path = os.environ.get("SEMANTIC_STATE_PATH")
-    tmp = tempfile.mktemp(".json")
+    fd, tmp = tempfile.mkstemp(suffix=".json")  # nosec - bandit false positive
+    os.close(fd)
     os.environ["SEMANTIC_STATE_PATH"] = tmp
 
     try:
@@ -290,10 +293,8 @@ def test_exclusion_persistence_invariant() -> None:
             os.environ["SEMANTIC_STATE_PATH"] = old_path
         else:
             os.environ.pop("SEMANTIC_STATE_PATH", None)
-        try:
+        with contextlib.suppress(OSError):
             os.remove(tmp)
-        except OSError:
-            pass
 
 
 # ─────────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ from app.snapshot_desync_detector import SnapshotDesyncDetector, reset_desync_de
 
 
 @pytest.fixture(autouse=True)
-def reset():
+def reset() -> None:
     reset_desync_detector()
 
 
@@ -111,7 +111,7 @@ class TestSnapshotDesyncDetector:
         report = detector.compare(snap_a, snap_b)
         assert report.epoch_gap == 4
         assert report.critical is True
-        assert report.recommended_action in ("full_reconciliation",)
+        assert report.recommended_action == "full_reconciliation"
 
     # ─── Manifold Divergence ────────────────────────────────────────────
 

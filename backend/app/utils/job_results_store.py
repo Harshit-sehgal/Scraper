@@ -1,6 +1,4 @@
-"""
-Job Results Store — Utility to compress and stream large record datasets to / from disk.
-"""
+"""Job Results Store — Utility to compress and stream large record datasets to / from disk."""
 
 import gzip
 import json
@@ -61,19 +59,21 @@ def _resolve_results_path(job_id: str, file_path: str | None = None) -> Path:
         temp_dir = Path(tempfile.gettempdir()).resolve()
         if temp_dir in path.parents or path == temp_dir:
             if not path.name.startswith(f"results_{job_id}"):
-                raise ValueError(f"Rejected results path with unexpected filename for job {job_id}: {path.name}")
+                msg = f"Rejected results path with unexpected filename for job {job_id}: {path.name}"
+                raise ValueError(msg)
             return path
 
     if base_dir not in path.parents and path != base_dir:
-        raise ValueError(f"Rejected results path outside managed directory: {path}")
+        msg = f"Rejected results path outside managed directory: {path}"
+        raise ValueError(msg)
     if not path.name.startswith(f"results_{job_id}"):
-        raise ValueError(f"Rejected results path with unexpected filename for job {job_id}: {path.name}")
+        msg = f"Rejected results path with unexpected filename for job {job_id}: {path.name}"
+        raise ValueError(msg)
     return path
 
 
 def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
-    """
-    Compress and write the list of record dictionaries to disk in JSONLines format.
+    """Compress and write the list of record dictionaries to disk in JSONLines format.
 
     Returns the absolute string path to the saved file.
     """
@@ -88,21 +88,20 @@ def save_job_results_to_disk(job_id: str, results: list[dict]) -> str:
             for record in results:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
         temp_path.replace(path)
-    except Exception as e:
-        logger.exception("Failed to write job results to disk for %s: %s", job_id, e)
+    except Exception:
+        logger.exception("Failed to write job results to disk for %s", job_id)
         if temp_path.exists():
             try:
                 temp_path.unlink()
-            except Exception:  # nosec B110
+            except Exception:  # nosec B110  # noqa: BLE001
                 pass
-        raise e
+        raise
 
     return str(path)
 
 
 def load_job_results_from_disk(job_id: str, file_path: str | None = None) -> list[dict]:
-    """
-    Decompress and load the list of record dictionaries from disk for a given job ID.
+    """Decompress and load the list of record dictionaries from disk for a given job ID.
 
     If *file_path* is provided, it is used directly (supporting migrated or
     externally stored result paths). Otherwise the path is recomputed from
@@ -122,9 +121,9 @@ def load_job_results_from_disk(job_id: str, file_path: str | None = None) -> lis
                 line = line.strip()
                 if line:
                     results.append(json.loads(line))
-    except Exception as e:
-        logger.exception("Failed to read job results from disk for %s: %s", job_id, e)
-        raise e
+    except Exception:
+        logger.exception("Failed to read job results from disk for %s", job_id)
+        raise
 
     return results
 
@@ -135,14 +134,14 @@ def load_paginated_job_results_from_disk(
     offset: int = 0,
     file_path: str | None = None,
 ) -> tuple[list[dict], int]:
-    """
-    Decompress and load only a paginated chunk of record dictionaries from disk.
+    """Decompress and load only a paginated chunk of record dictionaries from disk.
 
     Skips lines up to *offset*, loads up to *limit* records, and counts the remaining lines
     to return the exact total count without parsing all records.
 
     Returns:
         tuple of (records_page: list[dict], total_count: int)
+
     """
     path = _resolve_results_path(job_id, file_path)
 
@@ -164,9 +163,9 @@ def load_paginated_job_results_from_disk(
                 if total_count >= offset and len(records) < limit:
                     records.append(json.loads(line))
                 total_count += 1
-    except Exception as e:
-        logger.exception("Failed to read paginated job results from disk for %s: %s", job_id, e)
-        raise e
+    except Exception:
+        logger.exception("Failed to read paginated job results from disk for %s", job_id)
+        raise
 
     return records, total_count
 
@@ -175,8 +174,7 @@ def load_job_results_from_disk_safe(
     job_id: str,
     file_path: str | None = None,
 ) -> tuple[list[dict], str | None]:
-    """
-    Load results from disk with graceful corruption handling.
+    """Load results from disk with graceful corruption handling.
 
     Like `load_job_results_from_disk`, but instead of raising on corrupt data,
     it returns a tuple of (records, warning_message). If the file is intact,
@@ -186,6 +184,7 @@ def load_job_results_from_disk_safe(
 
     Returns:
         tuple of (records: list[dict], warning: Optional[str])
+
     """
     path = _resolve_results_path(job_id, file_path)
     if not path.exists():
@@ -213,7 +212,7 @@ def load_job_results_from_disk_safe(
     except (gzip.BadGzipFile, EOFError, OSError) as e:
         warning = f"Results file for job {job_id} is truncated or corrupt: {e}. Returned {len(results)} partial records."
         logger.warning("%s", warning)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         warning = f"Failed to read results file for job {job_id}: {e}. Returned {len(results)} partial records."
         logger.warning("%s", warning)
 
@@ -221,8 +220,7 @@ def load_job_results_from_disk_safe(
 
 
 def delete_job_results_from_disk(job_id: str, file_path: str | None = None) -> bool:
-    """
-    Delete the compressed results file from disk for a given job ID.
+    """Delete the compressed results file from disk for a given job ID.
 
     If *file_path* is provided, it is used directly (supporting migrated or
     externally stored result paths). Otherwise the path is recomputed from
@@ -236,6 +234,6 @@ def delete_job_results_from_disk(job_id: str, file_path: str | None = None) -> b
             path.unlink()
             logger.info("Successfully deleted results file from disk for job %s", job_id)
             return True
-        except Exception as e:
-            logger.error("Failed to delete results file from disk for job %s: %s", job_id, e)
+        except Exception:
+            logger.exception("Failed to delete results file from disk for job %s", job_id)
     return False

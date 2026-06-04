@@ -23,7 +23,8 @@ SESSION_PARAM_PATTERNS: list[re.Pattern] = [
     re.compile(r"^(token|tok|auth|csrf|xsrf|_token|_csrf|csrf_token|csrfmiddlewaretoken)$", re.IGNORECASE),
     # Tracking / analytics parameters
     re.compile(
-        r"^(utm_[a-z]+|fbclid|gclid|gclsrc|dclid|msclkid|mc_eid|mc_cid|_ga|_gl|_hsenc|hssc|hsCtaTracking)$", re.IGNORECASE
+        r"^(utm_[a-z]+|fbclid|gclid|gclsrc|dclid|msclkid|mc_eid|mc_cid|_ga|_gl|_hsenc|hssc|hsCtaTracking)$",
+        re.IGNORECASE,
     ),
     # Cache-busting / timestamp parameters
     re.compile(r"^(_|cache|nocache|nocache|rand|random|r|t|ts|timestamp|_t|_ts|v|ver|version)$", re.IGNORECASE),
@@ -108,6 +109,7 @@ def detect_session_params(url: str) -> dict:
         - confidence: float — 0.0 - 1.0 confidence that URL is session-bound
         - details: list of (param_name, reason) tuples explaining why each
           param was flagged
+
     """
     parsed = urlparse(url)
     params = parse_qs(parsed.query, keep_blank_values=True)
@@ -173,7 +175,7 @@ def detect_session_params(url: str) -> dict:
         if (
             previous in SESSION_PATH_MARKERS
             and _looks_like_opaque_path_token(segment)
-            and (previous not in {"id"} or bool(earlier_context & SESSION_PATH_CONTEXTS))
+            and (previous != "id" or bool(earlier_context & SESSION_PATH_CONTEXTS))
         ):
             confidence_score = max(confidence_score, settings.SESSION_PATH_HASH_CONFIDENCE)
             ephemeral_params.append(f"path:/{previous}/{segment}")
@@ -227,6 +229,7 @@ def strip_session_params(url: str) -> str:
 
     Returns:
         The URL with ephemeral parameters removed
+
     """
     result = detect_session_params(url)
     return result["canonical_url"]  # type: ignore[no-any-return]

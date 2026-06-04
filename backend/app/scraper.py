@@ -1,5 +1,4 @@
-"""
-Scraping Engine — Thin orchestration layer with failure classification
+"""Scraping Engine — Thin orchestration layer with failure classification
 and extraction provenance tracking.
 
 Delegates to specialised sub-engines:
@@ -14,6 +13,7 @@ Delegates to specialised sub-engines:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import time
 from typing import TYPE_CHECKING, Any
@@ -46,7 +46,6 @@ from app.html_utils import (
     _is_empty_value,
     fetch_page_content,
 )
-from app.models import SchemaField
 from app.page_evidence_collector import collect_page_evidence
 from app.regression_capture import get_regression_capture
 from app.scrape_telemetry import (
@@ -82,7 +81,7 @@ class ScrapeAttemptResult(list):
         recommended_next_action: str = "",
         warnings: list[str] | None = None,
         network_diagnostics: list[str] | None = None,
-    ):
+    ) -> None:
         super().__init__(records)
         self.html = html
         self.final_url = final_url
@@ -116,6 +115,7 @@ class ScrapeAttemptResult(list):
 
 
 if TYPE_CHECKING:
+    from app.models import SchemaField
     from app.recovery_strategies import AttemptContext
 
 # Re-export for backwards compatibility (used by routers / jobs.py and
@@ -132,19 +132,19 @@ __all__ = [
 ]
 
 
-async def generate_data_insight(*args, **kwargs):
+async def generate_data_insight(*args: Any, **kwargs: Any) -> Any:
     from app.insight_engine import generate_data_insight as impl
 
     return await impl(*args, **kwargs)
 
 
-async def suggest_schema_from_intent(*args, **kwargs):
+async def suggest_schema_from_intent(*args: Any, **kwargs: Any) -> Any:
     from app.insight_engine import suggest_schema_from_intent as impl
 
     return await impl(*args, **kwargs)
 
 
-def suggest_schema_from_intent_sync(*args, **kwargs):
+def suggest_schema_from_intent_sync(*args: Any, **kwargs: Any) -> Any:
     from app.insight_engine import suggest_schema_from_intent_sync as impl
 
     return impl(*args, **kwargs)
@@ -188,10 +188,9 @@ async def scrape_url_attempt(
     world_state=None,
     selectors_map: dict | None = None,
     search_params: dict[str, str] | None = None,
-    attempt_ctx: "AttemptContext | None" = None,
+    attempt_ctx: AttemptContext | None = None,
 ) -> ScrapeAttemptResult:
-    """
-    Scrape a single URL and return an enriched ScrapeAttemptResult
+    """Scrape a single URL and return an enriched ScrapeAttemptResult
     with full metadata (HTML, telemetry, acquisition lineage, zero-result
     classification, and warnings).
 
@@ -232,13 +231,13 @@ async def scrape_url_attempt(
     state = "direct"
     if result_zero_classification:
         cls = result_zero_classification.failure_class
-        if cls in ("anti_bot_block",):
+        if cls == "anti_bot_block":
             state = "anti_bot_blocked"
-        elif cls in ("empty_response",):
+        elif cls == "empty_response":
             state = "empty_response"
         elif cls in ("session_bound_url", "search_replay_required"):
             state = "session_expired"
-        elif cls in ("js_render_required",):
+        elif cls == "js_render_required":
             state = "empty_response"
     elif not records and not result_zero_classification:
         state = "empty_response"
@@ -276,7 +275,7 @@ async def scrape_url(
     world_state=None,
     selectors_map: dict | None = None,
     search_params: dict[str, str] | None = None,
-    attempt_ctx: "AttemptContext | None" = None,
+    attempt_ctx: AttemptContext | None = None,
 ) -> list[dict]:
     """Orchestrate the full extraction flow for a single URL.
 
@@ -356,9 +355,9 @@ async def scrape_url(
         matched_profile = match_profile_for_url(url)
         try:
             profile_results = await try_profile_extraction(url, max_wait=settings.PROFILE_MAX_WAIT)
-        except Exception as e:
+        except Exception:
             policy.record_result(url, success=False)
-            raise e
+            raise
     if profile_results is not None:
         logger.info(
             "Profile-based extraction returned %d records for %s",
@@ -429,10 +428,9 @@ async def scrape_url(
         fetch_start = time.time()
         fetch_strategy = recommended_strategy
         if attempt_ctx and getattr(attempt_ctx, "fetch_strategy", None):
-            try:
-                fetch_strategy = FetchStrategy(attempt_ctx.fetch_strategy)
-            except ValueError:
-                pass
+            with contextlib.suppress(ValueError):
+                if attempt_ctx.fetch_strategy is not None:
+                    fetch_strategy = FetchStrategy(attempt_ctx.fetch_strategy)
         html, js_render_delay, fetch_method, retry_count = await fetch_page_content(
             url,
             preferred_method=fetch_strategy,
@@ -447,7 +445,7 @@ async def scrape_url(
         fetch_success = True
     except Exception as e:
         fetch_ms = (time.time() - start_time) * 1000
-        logger.error("Failed to fetch %s: %s", url, e)
+        logger.exception("Failed to fetch %s", url)
 
         # Record failure in strategy engine
         strategy_engine.record_fetch_attempt(
@@ -547,7 +545,7 @@ async def scrape_url(
                         "[SessionRecovery] No search form detected on %s — proceeding with original HTML",
                         url,
                     )
-        except Exception as recovery_err:
+        except Exception as recovery_err:  # noqa: BLE001
             logger.warning(
                 "[SessionRecovery] Recovery attempt failed for %s: %s",
                 url,
@@ -563,7 +561,7 @@ async def scrape_url(
                     "[SessionRecovery] URL %s is session-bound but no search_params provided — page may be stale",
                     url,
                 )
-        except Exception:  # nosec B110
+        except Exception:  # noqa: BLE001, nosec B110
             pass
 
     anti_bot = detect_anti_bot(html)
@@ -580,7 +578,7 @@ async def scrape_url(
     if world_state and hasattr(world_state, "solidified_motifs"):
         try:
             solidified_motifs_count = len(world_state.solidified_motifs)
-        except Exception:  # nosec B110
+        except Exception:  # noqa: BLE001, nosec B110
             pass
 
     result_warnings: list[str] = []
@@ -668,7 +666,7 @@ async def scrape_url(
                 continue
             if href.startswith("http") and intel.domain in urlparse(href).netloc:
                 discovered_links.append(href)
-            elif href.startswith("/") or href.startswith("?"):
+            elif href.startswith(("/", "?")):
                 full_url = urljoin(url, href)
                 if intel.domain in urlparse(full_url).netloc:
                     discovered_links.append(full_url)
@@ -678,7 +676,7 @@ async def scrape_url(
             added = await frontier.add_discovered_links(discovered_links, url, source_depth=0)
             if added > 0:
                 logger.debug("[Scraper] Added %d/%d discovered links to frontier from %s", added, len(discovered_links), url)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.debug("[Scraper] Link discovery skipped for %s: %s", url, e)
 
     # ── Zero-Result Classification & Failure Classification ────────────
@@ -775,18 +773,17 @@ async def scrape_url(
                     "records_final": 0,
                 },
             )
-    else:
-        # Capture when quality is low (partial extraction)
-        if any(r.get("record_score", 1.0) < min_record_score * 0.5 for r in results):
-            get_regression_capture().maybe_capture(
-                url=url,
-                html=html,
-                failure_category="low_quality_extraction",
-                failure_confidence=0.6,
-                records_count=len(results),
-                schema_fields=[f.name for f in schema_fields],
-                force=True,
-            )
+    # Capture when quality is low (partial extraction)
+    elif any(r.get("record_score", 1.0) < min_record_score * 0.5 for r in results):
+        get_regression_capture().maybe_capture(
+            url=url,
+            html=html,
+            failure_category="low_quality_extraction",
+            failure_confidence=0.6,
+            records_count=len(results),
+            schema_fields=[f.name for f in schema_fields],
+            force=True,
+        )
 
     # ── Compound Record Assembly ────────────────────────────────────
     # Detect and assemble compound records if results contain internal segments.
@@ -916,7 +913,7 @@ async def scrape_url(
                 prediction.risk_level,
                 prediction.days_until_failure,
             )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.debug("[PredictiveAdaptation] Decay prediction failed: %s", e)
 
     # 2. Domain Evolution Model: Track mutations and anti-bot changes
@@ -930,7 +927,7 @@ async def scrape_url(
         if anti_bot > 0.5:
             # Anti-bot escalation detected
             evolution_model.record_anti_bot_escalation(intel.domain, anti_bot)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.debug("[PredictiveAdaptation] Evolution modeling failed: %s", e)
 
     # 3. Self-Tuning Extraction: Feed telemetry for parameter adjustment
@@ -948,7 +945,7 @@ async def scrape_url(
                 "confidence_map": confidence_map,
             },
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.debug("[PredictiveAdaptation] Self-tuning failed: %s", e)
 
     # Cleanup: Release browser network capture buffer for this URL
@@ -970,7 +967,7 @@ async def scrape_url(
         if zero_classification:
             recommended_next_action = zero_classification.recommended_action
 
-        attempt_res = ScrapeAttemptResult(
+        return ScrapeAttemptResult(
             [],
             html=html,
             final_url=url,
@@ -983,10 +980,9 @@ async def scrape_url(
             warnings=res_warnings,
             network_diagnostics=getattr(ext_result, "network_diagnostics", []),
         )
-        return attempt_res
 
     data_evidence_score = min(1.0, len(results) / 10.0) if results else 0.0
-    attempt_res = ScrapeAttemptResult(
+    return ScrapeAttemptResult(
         results,
         html=html,
         final_url=url,
@@ -999,4 +995,3 @@ async def scrape_url(
         warnings=res_warnings,
         network_diagnostics=getattr(ext_result, "network_diagnostics", []),
     )
-    return attempt_res

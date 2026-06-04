@@ -1,8 +1,8 @@
 import json
 from unittest.mock import AsyncMock, MagicMock
 
-import app.browser_network_capture as browser_network_capture
 import pytest
+from app import browser_network_capture
 
 
 @pytest.mark.asyncio
@@ -13,7 +13,7 @@ async def test_live_network_capture_limits() -> None:
     # 2. Register mock listener callback
     on_calls = {}
 
-    def fake_on(event, callback):
+    def fake_on(event, callback) -> None:
         on_calls[event] = callback
 
     page.on = fake_on
@@ -48,7 +48,7 @@ async def test_live_network_capture_byte_limit() -> None:
     # Register mock listener callback
     on_calls = {}
 
-    def fake_on(event, callback):
+    def fake_on(event, callback) -> None:
         on_calls[event] = callback
 
     page.on = fake_on

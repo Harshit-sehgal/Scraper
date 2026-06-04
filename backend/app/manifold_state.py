@@ -23,7 +23,7 @@ from app.transaction_context import active_transaction
 class ManifoldState:
     """Sole owner of the semantic role manifold and compatibility structures."""
 
-    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None) -> None:
         self._delta_callback = delta_callback
         # Role embeddings: name -> 16-dim vector
         self._role_manifold: dict[str, list] = {}
@@ -58,18 +58,18 @@ class ManifoldState:
         return None
 
     @_staging.setter
-    def _staging(self, value: dict | None):
+    def _staging(self, value: dict | None) -> None:
         tx = active_transaction.get()
         if tx is not None:
             tx[f"manifold_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict):
+    def _record(self, action: str, details: dict) -> None:
         if self._delta_callback:
             self._delta_callback("manifold", action, details)
 
     # ─── Transaction Support ─────────────────────────────────────────────
 
-    def begin_transaction(self):
+    def begin_transaction(self) -> None:
         """Snapshot current state for staging."""
         self._staging = {
             "role_manifold": {k: list(v) for k, v in self._role_manifold.items()},
@@ -83,7 +83,7 @@ class ManifoldState:
             "total_co_occurrences": self.total_co_occurrences,
         }
 
-    def commit(self):
+    def commit(self) -> None:
         """Apply staged changes."""
         if self._staging is not None:
             self._role_manifold = self._staging["role_manifold"]
@@ -97,7 +97,7 @@ class ManifoldState:
             self.total_co_occurrences = self._staging["total_co_occurrences"]
             self._staging = None
 
-    def rollback(self):
+    def rollback(self) -> None:
         self._staging = None
 
     def _get_struct(self, key: str):
@@ -115,7 +115,7 @@ class ManifoldState:
         }
         return getattr(self, attr_map[key])
 
-    def _set_struct(self, key: str, val):
+    def _set_struct(self, key: str, val) -> None:
         if self._staging is not None:
             self._staging[key] = val
         else:
@@ -144,7 +144,7 @@ class ManifoldState:
             return list(vec)
         return []
 
-    def set_manifold_vector(self, role: str, vector: list):
+    def set_manifold_vector(self, role: str, vector: list) -> None:
         """Formally set a role's manifold vector with drift tracking (Phase 63)."""
         manifold = self._get_struct("role_manifold")
 
@@ -153,7 +153,7 @@ class ManifoldState:
             old_v = manifold[role]
             import math
 
-            displacement = math.sqrt(sum((a - b) ** 2 for a, b in zip(old_v, vector)))
+            displacement = math.sqrt(sum((a - b) ** 2 for a, b in zip(old_v, vector, strict=False)))
             if displacement > 1e-4:
                 self._obs_ref.log_drift(role, displacement)
 
@@ -164,7 +164,7 @@ class ManifoldState:
             {"role": role, "vector": vector, "displacement": displacement if "displacement" in locals() else 0.0},
         )
 
-    def apply_force_to_manifold(self, role: str, deltas: list, clamp: bool = True):
+    def apply_force_to_manifold(self, role: str, deltas: list, clamp: bool = True) -> None:
         """Apply a delta array to a role's manifold vector with drift tracking (Phase 63)."""
         if self.is_role_anchored(role):
             return
@@ -188,7 +188,7 @@ class ManifoldState:
         if self._obs_ref:
             import math
 
-            displacement = math.sqrt(sum((a - b) ** 2 for a, b in zip(old_v, vec)))
+            displacement = math.sqrt(sum((a - b) ** 2 for a, b in zip(old_v, vec, strict=False)))
             if displacement > 1e-4:
                 self._obs_ref.log_drift(role, displacement)
 
@@ -203,14 +203,14 @@ class ManifoldState:
         vb = manifold.get(role_b)
         if not va or not vb:
             return 0.0
-        sim = sum(a * b for a, b in zip(va, vb))
+        sim = sum(a * b for a, b in zip(va, vb, strict=False))
 
         # Calibration (Phase 34): scale by dimensionality
         dim = self.dimension
         neutral = dim * 0.25
         return max(0.0, min(1.0, (sim - neutral) / (dim * 0.1)))  # type: ignore[no-any-return]
 
-    def blend_manifold_vector(self, role: str, other_vector: list, alpha: float = 0.7, beta: float = 0.3):
+    def blend_manifold_vector(self, role: str, other_vector: list, alpha: float = 0.7, beta: float = 0.3) -> None:
         """Blend an external vector into the role's manifold vector with drift tracking (Phase 63)."""
         if self.is_role_anchored(role):
             return
@@ -231,7 +231,7 @@ class ManifoldState:
         if self._obs_ref:
             import math
 
-            displacement = math.sqrt(sum((a - b) ** 2 for a, b in zip(existing, new_v)))
+            displacement = math.sqrt(sum((a - b) ** 2 for a, b in zip(existing, new_v, strict=False)))
             if displacement > 1e-4:
                 self._obs_ref.log_drift(role, displacement)
 
@@ -248,7 +248,7 @@ class ManifoldState:
     def get_manifold_roles(self) -> list[str]:
         return list(self._get_struct("role_manifold").keys())
 
-    def remove_manifold_role(self, role: str):
+    def remove_manifold_role(self, role: str) -> None:
         if self.is_role_anchored(role):
             return
 
@@ -279,13 +279,13 @@ class ManifoldState:
     def role_anchors(self) -> set[str]:
         return set(self._get_struct("role_anchors"))
 
-    def anchor_role(self, role: str):
+    def anchor_role(self, role: str) -> None:
         anchors = self._get_struct("role_anchors")
         anchors.add(role)
         self._set_struct("role_anchors", anchors)
         self._record("anchor_role", {"role": role})
 
-    def unanchor_role(self, role: str):
+    def unanchor_role(self, role: str) -> None:
         anchors = self._get_struct("role_anchors")
         if role in anchors:
             anchors.remove(role)
@@ -297,7 +297,7 @@ class ManifoldState:
 
     # ─── Semantic Sharding (Phase 35) ────────────────────────────────────
 
-    def shard_manifold(self, community_list: list[set[str]]):
+    def shard_manifold(self, community_list: list[set[str]]) -> None:
         """Assign roles to shards based on community clusters (Phase 35)."""
         shards = self._get_struct("role_shards")
         shards.clear()
@@ -320,7 +320,7 @@ class ManifoldState:
     def get_role_shard(self, role: str) -> str | None:
         return self._get_struct("role_shards").get(role)  # type: ignore[no-any-return]
 
-    def rebalance_shards(self, max_shard_size: int = 50):
+    def rebalance_shards(self, max_shard_size: int = 50) -> None:
         """Monitor shard density and split oversized shards (Phase 35)."""
         shards = self._get_struct("role_shards")
         shard_counts: dict[str, list[str]] = {}
@@ -342,7 +342,7 @@ class ManifoldState:
             self._set_struct("role_shards", shards)
             self._record("rebalance_shards", {"reason": "oversized"})
 
-    def expand_dimensions(self, new_dim: int):
+    def expand_dimensions(self, new_dim: int) -> None:
         """Increase the dimensionality of the manifold (Phase 34)."""
         current_dim = self.dimension
         if new_dim <= current_dim:
@@ -385,17 +385,17 @@ class ManifoldState:
     def get_compatibility(self, role: str, type_str: str) -> float:
         return self._get_struct("role_compatibility").get((role, type_str), 0.5)  # type: ignore[no-any-return]
 
-    def set_compatibility(self, role: str, type_str: str, value: float):
+    def set_compatibility(self, role: str, type_str: str, value: float) -> None:
         compat = self._get_struct("role_compatibility")
         compat[(role, type_str)] = max(0.0, min(1.0, value))
         self._set_struct("role_compatibility", compat)
         self._record("set_compatibility", {"role": role, "type_str": type_str, "value": value})
 
-    def clear_compatibility(self):
+    def clear_compatibility(self) -> None:
         self._set_struct("role_compatibility", {})
         self._record("clear_compatibility", {})
 
-    def clear_compatibility_for_key(self, key: tuple):
+    def clear_compatibility_for_key(self, key: tuple) -> None:
         compat = self._get_struct("role_compatibility")
         compat.pop(key, None)
         self._set_struct("role_compatibility", compat)
@@ -408,7 +408,7 @@ class ManifoldState:
         return {k: list(v) for k, v in self._get_struct("role_position_memory").items()}
 
     @role_position_memory.setter
-    def role_position_memory(self, value: dict[str, list[float]]):
+    def role_position_memory(self, value: dict[str, list[float]]) -> None:
         self._set_struct("role_position_memory", {k: list(v) for k, v in value.items()})
 
     # ─── Controlled Setters for Counters ──────────────────────────────────
@@ -416,11 +416,11 @@ class ManifoldState:
     # preventing external code from bypassing staging via direct attribute
     # writes.
 
-    def set_learning_count(self, value: int):
+    def set_learning_count(self, value: int) -> None:
         self._set_struct("learning_count", max(0, value))
         self._record("set_learning_count", {"value": value})
 
-    def set_total_co_occurrences(self, value: int):
+    def set_total_co_occurrences(self, value: int) -> None:
         self._set_struct("total_co_occurrences", max(0, value))
         self._record("set_total_co_occurrences", {"value": value})
 
@@ -430,7 +430,7 @@ class ManifoldState:
     def role_co_occurrence(self) -> dict[tuple[str, str, str, str], int]:
         return dict(self._get_struct("role_co_occurrence"))
 
-    def increment_co_occurrence(self, key: tuple, delta: int = 1):
+    def increment_co_occurrence(self, key: tuple, delta: int = 1) -> None:
         struct = self._get_struct("role_co_occurrence")
         struct[key] = struct.get(key, 0) + delta
         self._set_struct("role_co_occurrence", struct)
@@ -464,7 +464,7 @@ class ManifoldState:
 
     # ─── Decay ───────────────────────────────────────────────────────────
 
-    def decay_compatibilities(self, rate: float = 0.01):
+    def decay_compatibilities(self, rate: float = 0.01) -> None:
         """Decay role compatibilities toward maximum uncertainty (0.5)."""
         compat = self._get_struct("role_compatibility")
         for key in list(compat.keys()):
@@ -488,7 +488,7 @@ class ManifoldState:
             "total_co_occurrences": self.total_co_occurrences,
         }
 
-    def from_dict(self, data: dict):
+    def from_dict(self, data: dict) -> None:
         self.clear()
         self._role_manifold = {k: list(v) for k, v in data.get("role_manifold", {}).items()}
         for k, v in data.get("role_compatibility", {}).items():
@@ -506,7 +506,7 @@ class ManifoldState:
         self.learning_count = data.get("learning_count", 0)
         self.total_co_occurrences = data.get("total_co_occurrences", 0)
 
-    def clear(self):
+    def clear(self) -> None:
         self._set_struct("role_manifold", {})
         self._set_struct("role_compatibility", {})
         self._set_struct("role_position_memory", {})
@@ -520,7 +520,7 @@ class ManifoldState:
         else:
             self.dimension = 16
 
-    def merge(self, other_data: dict, alpha: float = 0.5):
+    def merge(self, other_data: dict, alpha: float = 0.5) -> None:
         """Merge remote manifold state into local (Phase 32 / 60)."""
         remote_manifold = other_data.get("role_manifold", {})
 
@@ -539,7 +539,7 @@ class ManifoldState:
                 )
                 r_inst = remote_inst.get(role, 0.5)
 
-                # reliability = 1 - instability
+                # reliability = 1 - instability  # noqa: ERA001
                 l_rel = 1.0 - l_inst
                 r_rel = 1.0 - r_inst
 

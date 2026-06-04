@@ -1,5 +1,4 @@
-"""
-Extraction Provenance — Field-level explainability for extraction.
+"""Extraction Provenance — Field-level explainability for extraction.
 
 Tracks the provenance of each extracted field value:
   - How was it extracted? (selector, LLM, regex, fallback)
@@ -63,6 +62,7 @@ class FieldProvenance:
         extraction_time_ms: Milliseconds for this field's extraction.
         llm_hint: The hint provided to LLM for extraction (if applicable).
         fallback_chain: Ordered list of methods tried before success.
+
     """
 
     field_name: str = ""
@@ -103,6 +103,7 @@ class ExtractionProvenance:
         memory_hit: Whether selector memory was used.
         fallback_path: The ordered extraction cascade that was attempted.
         errors: Any errors encountered during extraction.
+
     """
 
     url: str = ""
@@ -138,7 +139,7 @@ class ProvenanceBuilder:
         provenance = builder.build()
     """
 
-    def __init__(self, url: str, domain: str = ""):
+    def __init__(self, url: str, domain: str = "") -> None:
         self._url = url
         self._domain = domain or self._extract_domain(url)
         self._start_time = time.time()
@@ -229,7 +230,7 @@ class ProvenanceBuilder:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or "unknown"
-        except Exception:
+        except Exception:  # noqa: BLE001
             return "unknown"
 
 
@@ -254,6 +255,7 @@ def enrich_records_with_provenance(
 
     Returns:
         Records with ``_provenance`` metadata attached.
+
     """
     enriched = []
     for idx, record in enumerate(records):
@@ -261,7 +263,7 @@ def enrich_records_with_provenance(
 
         # Build a compact provenance summary for this record
         field_provenance = {}
-        for field_name in record.keys():
+        for field_name in record:
             if field_name.startswith("_"):
                 continue
             key = f"record_{idx}.{field_name}"

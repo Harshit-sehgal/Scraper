@@ -1,5 +1,4 @@
-"""
-Advanced Recovery Strategies — Intelligent failure recovery per failure type.
+"""Advanced Recovery Strategies — Intelligent failure recovery per failure type.
 
 Provides tailored recovery actions beyond simple retries:
   - Per-failure-type strategies (e.g., SELECTOR_DECAY triggers forced rediscovery)
@@ -16,17 +15,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from enum import Enum
-from typing import Any
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
 
 from app.failure_classification import FailureCategory, FailureClassification
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
 
-class RecoveryAction(str, Enum):
+class RecoveryAction(StrEnum):
     """Concrete recovery actions the executor can take."""
 
     # Fetch / Transport recovery
@@ -329,7 +330,7 @@ class RecoveryStrategist:
         },
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize recovery strategist."""
 
     def generate_recovery_plan(
@@ -347,6 +348,7 @@ class RecoveryStrategist:
 
         Returns:
             RecoveryPlan with primary and escalation actions
+
         """
         category = failure_classification.category
         path = self.RECOVERY_PATHS.get(category, self.RECOVERY_PATHS[FailureCategory.UNKNOWN])
@@ -387,6 +389,7 @@ class RecoveryStrategist:
           - If domain has high anti-bot risk, increase backoff times
           - If domain has high fail rate, reduce max retries
           - If domain is fresh, increase timeout
+
         """
         tuned = dict(params)
 
@@ -419,16 +422,17 @@ class RecoveryStrategist:
 class RecoveryExecutor:
     """Executes recovery actions with hooks for system integration."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize executor with action handlers."""
         self.action_handlers: dict[RecoveryAction, Callable] = {}
 
-    def register_handler(self, action: RecoveryAction, handler: Callable):
+    def register_handler(self, action: RecoveryAction, handler: Callable) -> None:
         """Register a handler for a specific recovery action.
 
         Args:
             action: The RecoveryAction to handle
             handler: Async callable that executes the action
+
         """
         self.action_handlers[action] = handler
 
@@ -445,6 +449,7 @@ class RecoveryExecutor:
             context: Execution context (url, html, schema_fields, etc.)
             attempt_ctx: Mutable context that handlers modify for the next attempt.
                          Changes here are consumed by the scraper before retry.
+
         """
         if attempt_ctx is None:
             attempt_ctx = AttemptContext()
@@ -468,8 +473,8 @@ class RecoveryExecutor:
                 if result:
                     logger.info("Recovery successful: %s", plan.primary_action.value)
                     return True
-            except Exception as e:
-                logger.error("Recovery action failed: %s: %s", plan.primary_action.value, e)
+            except Exception:
+                logger.exception("Recovery action failed: %s", plan.primary_action.value)
         else:
             logger.warning("No handler registered for action: %s", plan.primary_action.value)
 
@@ -484,8 +489,8 @@ class RecoveryExecutor:
                         if result:
                             logger.info("Recovery successful via escalation: %s", secondary_action.value)
                             return True
-                    except Exception as e:
-                        logger.error("Escalated recovery action failed: %s: %s", secondary_action.value, e)
+                    except Exception:
+                        logger.exception("Escalated recovery action failed: %s", secondary_action.value)
 
         logger.warning("All recovery actions failed for %s", plan.failure_category.value)
         return False

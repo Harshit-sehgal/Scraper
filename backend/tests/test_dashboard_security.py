@@ -2,7 +2,7 @@ def test_dashboard_security_headers(client) -> None:
     """Verify that static dashboard endpoints serve robust security headers."""
     # Test main dashboard route
     resp = client.get("/app/")
-    assert resp.status_code == 200 or resp.status_code == 302, f"Expected 200 or 302, got {resp.status_code}"
+    assert resp.status_code in {200, 302}, f"Expected 200 or 302, got {resp.status_code}"
 
     # If it redirects, follow it
     if resp.status_code == 302:

@@ -1,5 +1,4 @@
-"""
-Rate limiter — simple in-memory sliding window rate limiter for the kernel.
+"""Rate limiter — simple in-memory sliding window rate limiter for the kernel.
 
 Ported from the existing app.rate_limiter with a clean interface.
 """
@@ -21,7 +20,7 @@ class RateLimitResult:
 class SlidingWindowCounter:
     """In-memory sliding window rate limiter."""
 
-    def __init__(self, max_requests: int, window_seconds: float = 60.0):
+    def __init__(self, max_requests: int, window_seconds: float = 60.0) -> None:
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self._requests: dict[str, list[float]] = defaultdict(list)

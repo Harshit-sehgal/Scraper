@@ -1,5 +1,4 @@
-"""
-Phase 60: Distributed Partition Recovery & Zombie Data Prevention Tests
+"""Phase 60: Distributed Partition Recovery & Zombie Data Prevention Tests.
 ======================================================================
 LAW: Distributed systems must handle partition recovery deterministically.
 Tombstones and Epochs ensure that deleted semantic regions stay deleted.
@@ -49,7 +48,6 @@ def test_zombie_data_prevention(nodes) -> None:
 
     assert ws_b.get_topology_view().region_count() == 0
     assert rid1 in ws_b._topology._tombstones
-    print("\nZombie Data Prevention: Region successfully pruned after partition recovery.")
 
 
 def test_epoch_divergence_resolution(nodes) -> None:
@@ -74,4 +72,3 @@ def test_epoch_divergence_resolution(nodes) -> None:
     ws_b.merge_state(ws_a.to_dict())
     assert ws_b._topology._topology_epoch >= ws_a._topology._topology_epoch
     assert ws_b.get_topology_view().region_count() == 6
-    print(f"\nEpoch Divergence Resolved: Final Epoch {ws_b._topology._topology_epoch}")

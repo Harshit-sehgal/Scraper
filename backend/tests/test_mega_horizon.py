@@ -1,5 +1,4 @@
-"""
-Mega-Horizon Evolution Stress Test — Phase 48
+"""Mega-Horizon Evolution Stress Test — Phase 48.
 =============================================
 LAW 48: Systems must be validated against long-horizon dynamical failure
 modes: attractor runaway, topology oscillation, and metastable lock states.
@@ -19,13 +18,13 @@ from app.semantic_world_state import SemanticWorldState
 class DynamicalAnalyzer:
     """Utility to detect emergent risks in long-horizon simulations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.energies: list[float] = []
         self.entropies: list[float] = []
         self.manifold_checksums: list[str] = []
         self.role_stabilities: dict[str, list[float]] = {}
 
-    def record(self, ws: SemanticWorldState):
+    def record(self, ws: SemanticWorldState) -> None:
         self.energies.append(ws.metrics.global_energy)
         self.entropies.append(ws.metrics.global_entropy)
         self.manifold_checksums.append(ws.get_manifold_checksum())
@@ -109,11 +108,9 @@ def test_mega_horizon_simulation(ws) -> None:
         if i % 10 == 0:
             analyzer.record(ws)
 
-    duration = time.time() - start_time
-    print(f"\nMega-horizon simulation (5000 events) completed in {duration:.2f}s")
+    time.time() - start_time
 
     analysis = analyzer.analyze()
-    print(f"Dynamical Analysis: {analysis}")
 
     # Assertions for basic sanity
     assert ws.metrics.global_energy < 50.0  # No energy explosion
@@ -144,7 +141,6 @@ def test_attractor_runaway_vulnerability(ws) -> None:
         if i % 10 == 0:
             analyzer.record(ws)
 
-    print(f"\nDominance test completed. Final Energy: {ws.metrics.global_energy:.2f}")
     # Dominance should not lead to energy explosion
     assert ws.metrics.global_energy < 20.0
 
@@ -167,13 +163,11 @@ def test_emergent_risk_detection(ws) -> None:
     snapshot = ws.capture_governance_snapshot()
     profile = ws._observability.get_memory_profile(snapshot)
     assert profile["total_estimated_bytes"] > 0
-    print(f"\nMemory Profile: {profile}")
 
     # 4. Resource Shedding
     # Trigger with a very low threshold
     did_shed = ws._observability.apply_resource_shedding(ws, ws.capture_governance_snapshot(), max_bytes=10)
     assert did_shed
-    print("\nResource shedding successfully triggered and executed.")
 
 
 def test_topology_scaling_benchmark(ws) -> None:
@@ -195,14 +189,12 @@ def test_topology_scaling_benchmark(ws) -> None:
             # Creating complex coupling by using overlapping roles
             ws.capture_pre_allocation_field([token], [roles[i % 5], roles[(i + 1) % 5]])
 
-    load_duration = time.time() - start_time
-    print(f"\nScaling Benchmark: Created 500 regions in {load_duration:.2f}s")
+    time.time() - start_time
 
     # 2. Run propagation
     start_time = time.time()
     ws.redistribute_instability()
     prop_duration = time.time() - start_time
-    print(f"Propagation (500 regions) completed in {prop_duration:.4f}s")
 
     # Target: propagation should be < 100ms for 500 regions
     assert prop_duration < 0.2  # Adjusted for CI environment

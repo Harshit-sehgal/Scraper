@@ -2,7 +2,7 @@ from app.config import settings
 from app.rate_limiter import RateLimiterMiddleware
 
 
-def test_job_create_limit_comes_from_settings(monkeypatch):
+def test_job_create_limit_comes_from_settings(monkeypatch) -> None:
     # Override settings directly
     monkeypatch.setattr(settings, "RATE_LIMIT_JOB_CREATE", "1/minute")
     rl = RateLimiterMiddleware(global_limit="600/minute")
@@ -10,7 +10,7 @@ def test_job_create_limit_comes_from_settings(monkeypatch):
     assert (max_req, window_sec) == (1, 60.0)
 
 
-def test_discover_limit_comes_from_settings(monkeypatch):
+def test_discover_limit_comes_from_settings(monkeypatch) -> None:
     monkeypatch.setattr(settings, "RATE_LIMIT_DISCOVER", "5/minute")
     rl = RateLimiterMiddleware(global_limit="600/minute")
     max_req, window_sec = rl._get_limits_for_path("/api/discover")

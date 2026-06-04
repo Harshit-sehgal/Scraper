@@ -1,6 +1,4 @@
-"""
-Crawl State Adapter — isolated state management for the crawl layer.
-"""
+"""Crawl State Adapter — isolated state management for the crawl layer."""
 
 from __future__ import annotations
 

@@ -1,5 +1,4 @@
-"""
-General Container Discovery — Finds and scores candidate result containers.
+"""General Container Discovery — Finds and scores candidate result containers.
 
 This module discovers candidate result containers from the DOM and scores
 them using only generic signals (text density, pattern matches, repeated
@@ -127,6 +126,7 @@ def discover_containers(
 
     Returns:
         ContainerRanking with all containers sorted by score.
+
     """
     if not html or len(html.strip()) < 100:
         return ContainerRanking(containers=[])
@@ -281,6 +281,7 @@ async def multi_pass_container_extraction(
 
     Returns:
         MultiPassResult with the best records found.
+
     """
     ranking = discover_containers(html, url=url)
     if not ranking.containers:
@@ -415,7 +416,7 @@ async def _extract_from_container(
             success=True,
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("[ContainerDiscovery] Extraction error for %s: %s", container.selector, e)
         return ContainerExtractionResult(
             selector=container.selector,
@@ -459,10 +460,7 @@ def _extract_record_from_element(
     used_snippet_indices: set[int] = set()
 
     def _is_span_used(start: int, end: int) -> bool:
-        for us, ue in used_spans:
-            if start < ue and end > us:
-                return True
-        return False
+        return any(start < ue and end > us for us, ue in used_spans)
 
     # Process fields in order: typed fields first, string / org last
     _TYPED_PRIORITY: dict = {
@@ -484,7 +482,7 @@ def _extract_record_from_element(
         ),
     )
 
-    for idx, field in sorted_fields:
+    for _idx, field in sorted_fields:
         field_type = field.field_type if hasattr(field, "field_type") else FieldType.STRING
         field_name = field.name.lower() if hasattr(field, "name") else ""
         field_desc = field.description.lower() if hasattr(field, "description") else ""
@@ -679,10 +677,7 @@ def _extract_field_value_stateful(
         return None
 
     def _is_span_used(start: int, end: int) -> bool:
-        for us, ue in used_spans:
-            if start < ue and end > us:
-                return True
-        return False
+        return any(start < ue and end > us for us, ue in used_spans)
 
     def _consume_snippet() -> str | None:
         """Pop the next unused snippet."""
@@ -736,7 +731,7 @@ def _extract_field_value_stateful(
 
     # ── Time ───────────────────────────────────────────────────────────
     time_field_names = {"time", "start_time", "end_time", "duration"}
-    if field_type in (FieldType.STRING,) and (field_name in time_field_names or field_name.endswith("_time")):
+    if field_type == FieldType.STRING and (field_name in time_field_names or field_name.endswith("_time")):
         return _consume_match(matches_by_type["time"])
 
     # ── Location / Code ────────────────────────────────────────────────

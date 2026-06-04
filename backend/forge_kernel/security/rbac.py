@@ -1,5 +1,4 @@
-"""
-RBAC — simple role-based access control for the product kernel.
+"""RBAC — simple role-based access control for the product kernel.
 
 Uses API keys as the authentication mechanism for operator/admin roles.
 """
@@ -17,7 +16,7 @@ from forge_kernel.config import settings
 _bearer = HTTPBearer(auto_error=False)
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     ADMIN = "admin"
     OPERATOR = "operator"
     VIEWER = "viewer"

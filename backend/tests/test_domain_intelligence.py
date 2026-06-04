@@ -1,6 +1,4 @@
-"""
-Tests for Domain Behavior Intelligence — Phase 79 Verification.
-"""
+"""Tests for Domain Behavior Intelligence — Phase 79 Verification."""
 
 import pytest
 from app.domain_intelligence import DomainIntelligenceRegistry

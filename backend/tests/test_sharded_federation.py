@@ -1,6 +1,4 @@
-"""
-Unit Tests for Phase 83 Multi-Shard Federation State Merging.
-"""
+"""Unit Tests for Phase 83 Multi-Shard Federation State Merging."""
 
 from __future__ import annotations
 

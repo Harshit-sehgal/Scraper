@@ -1,5 +1,4 @@
-"""
-Tests for Regression Capture — self-growing benchmark system.
+"""Tests for Regression Capture — self-growing benchmark system.
 
 Covers:
   - Capture criteria (empty results, low quality, forced capture)
@@ -15,13 +14,16 @@ from __future__ import annotations
 
 import json
 import time
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from app.regression_capture import (
     RegressionCapture,
     get_regression_capture,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ═══════════════════════════════════════════════════════════════════════
 # Fixtures

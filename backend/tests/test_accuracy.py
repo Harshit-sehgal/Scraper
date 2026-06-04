@@ -1,6 +1,4 @@
-"""
-Regression tests for Extraction Accuracy Framework.
-"""
+"""Regression tests for Extraction Accuracy Framework."""
 
 import pytest
 from app.benchmark_accuracy import calculate_extraction_accuracy

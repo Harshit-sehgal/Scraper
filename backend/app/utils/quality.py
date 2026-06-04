@@ -35,7 +35,7 @@ def compute_source_breakdown(results: list[dict]) -> dict:
 def safe_score(value: Any) -> float:
     try:
         return float(value)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return 0.0
 
 
@@ -314,8 +314,7 @@ def post_extract_validate_records(
                         if field.required:
                             discard = True
                             break
-                        else:
-                            validated[field.name] = None
+                        validated[field.name] = None
         if not discard:
             valid_records.append(validated)
 

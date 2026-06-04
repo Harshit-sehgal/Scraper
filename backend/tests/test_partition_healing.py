@@ -1,5 +1,4 @@
-"""
-Phase 67: Distributed Partition Healing & History Re-alignment Tests
+"""Phase 67: Distributed Partition Healing & History Re-alignment Tests.
 =====================================================================
 LAW: Substrate must reconcile divergent causal journals after partitions.
 """
@@ -25,9 +24,7 @@ def test_causal_stitching(partitioned_nodes) -> None:
     with ws_a.transaction("shared"):
         ws_a.set_manifold_vector("common", [0.5] * 16)
 
-    print(f"WS_A Journal after shared: {[tx.get('label') for tx in ws_a._history.transaction_journal]}")
     ws_b.merge_state(ws_a.to_dict())
-    print(f"WS_B Journal after merge 1: {[tx.get('label') for tx in ws_b._history.transaction_journal]}")
 
     # 2. Partition: A does work, B does different work
     with ws_a.transaction("a_only"):
@@ -36,12 +33,8 @@ def test_causal_stitching(partitioned_nodes) -> None:
     with ws_b.transaction("b_only"):
         ws_b.set_manifold_vector("b_role", [0.0] * 16)
 
-    print(f"WS_A Journal before merge 2: {[tx.get('label') for tx in ws_a._history.transaction_journal]}")
-    print(f"WS_B Journal before merge 2: {[tx.get('label') for tx in ws_b._history.transaction_journal]}")
-
     # 3. Merge: B merges A
     ws_b.merge_state(ws_a.to_dict())
-    print(f"WS_B Journal after merge 2: {[tx.get('label') for tx in ws_b._history.transaction_journal]}")
 
     # Verify B's journal has ALL transactions
     journal = ws_b._history.transaction_journal
@@ -54,8 +47,6 @@ def test_causal_stitching(partitioned_nodes) -> None:
     # Check temporal order (by timestamp)
     timestamps = [tx.get("timestamp", 0) for tx in journal]
     assert timestamps == sorted(timestamps)
-
-    print("\nCausal Stitching: Journals successfully re-aligned after partition.")
 
 
 def test_divergence_analyzer(partitioned_nodes) -> None:
@@ -72,5 +63,3 @@ def test_divergence_analyzer(partitioned_nodes) -> None:
     assert analysis["max_causal_skew"] == 90
     assert analysis["drift_risk"] == "high"
     assert analysis["action_recommendation"] == "merge"  # Still merge since 90 < 100
-
-    print("\nDivergence Analyzer: Causal distance correctly calculated.")

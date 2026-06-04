@@ -1,5 +1,4 @@
-"""
-Tests for the research-shell quarantine in app/routers/scraper.py
+"""Tests for the research-shell quarantine in app/routers/scraper.py
 and app/routers/operator.py.
 
 These two routers historically top-level imported 5 research modules

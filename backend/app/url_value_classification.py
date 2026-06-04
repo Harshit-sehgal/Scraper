@@ -57,10 +57,9 @@ def _classify_value(value: str) -> str:
                         if re.fullmatch(pattern, value, re.IGNORECASE):
                             matched_type = output_type
                             break
-                    else:
-                        if re.search(pattern, value, re.IGNORECASE):
-                            matched_type = output_type
-                            break
+                    elif re.search(pattern, value, re.IGNORECASE):
+                        matched_type = output_type
+                        break
                 except re.error:
                     continue
             if matched_type:

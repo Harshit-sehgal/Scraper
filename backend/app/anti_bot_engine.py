@@ -1,5 +1,4 @@
-"""
-Anti-Bot Resilience Engine — Surviving hostile web environments.
+"""Anti-Bot Resilience Engine — Surviving hostile web environments.
 
 Responsible for:
 - Detecting challenges (Cloudflare, Akamai, etc.)
@@ -111,7 +110,7 @@ class AntiBotEngine:
                 max_score = max(max_score, score)
 
         # 2. Pattern-based structural checks
-        for platform, patterns in CHALLENGE_PATTERNS.items():
+        for patterns in CHALLENGE_PATTERNS.values():
             for p in patterns:
                 if p in lower_html:
                     # Platform matches boost score
@@ -144,10 +143,7 @@ class AntiBotEngine:
         recent = history[-3:]
         if any(s > settings.ANTIBOT_HARD_BLOCK_THRESHOLD for s in recent):
             return True
-        if len(recent) >= 2 and sum(recent) / len(recent) > settings.ANTIBOT_STEALTH_ESCALATION_MEAN:
-            return True
-
-        return False
+        return bool(len(recent) >= 2 and sum(recent) / len(recent) > settings.ANTIBOT_STEALTH_ESCALATION_MEAN)
 
     def get_stealth_profile(self, domain: str) -> dict:
         """Return a comprehensive stealth profile for a domain.
@@ -217,7 +213,7 @@ class AntiBotEngine:
         viewport_width = random.choice([int(x) for x in settings.STEALTH_VIEWPORT_WIDTHS.split(",")])  # nosec B311
         viewport_height = random.choice([int(x) for x in settings.STEALTH_VIEWPORT_HEIGHTS.split(",")])  # nosec B311
 
-        profile = {
+        return {
             "user_agent": ua,
             "extra_headers": extra_headers,
             "viewport": {"width": viewport_width, "height": viewport_height},
@@ -227,7 +223,6 @@ class AntiBotEngine:
             "platform": "Win32" if "Windows" in ua else ("MacIntel" if "Mac" in ua else "Linux x86_64"),
             "device_scale_factor": random.choice([float(x) for x in settings.STEALTH_DEVICE_SCALE_FACTORS.split(",")]),  # nosec B311
         }
-        return profile
 
     def update_cookies(self, domain: str, cookie_string: str) -> None:
         """Persist cookies for a domain to reuse on subsequent requests."""
@@ -273,7 +268,7 @@ class AntiBotEngine:
 
         return policy
 
-    def record_block(self, domain: str, score: float):
+    def record_block(self, domain: str, score: float) -> None:
         """Track block patterns per domain for adaptive pacing."""
         if domain not in self._block_history:
             self._block_history[domain] = []
@@ -284,9 +279,9 @@ class AntiBotEngine:
         # If score indicates hard block, record proxy failure
         if score > settings.ANTIBOT_HARD_BLOCK_THRESHOLD and self.proxy_manager.enabled:
             self.proxy_manager.record_failure()
-            logger.info(f"Hard block detected on {domain}, recorded proxy failure")
+            logger.info("Hard block detected on %s, recorded proxy failure", domain)
 
-    def record_success(self, domain: str):
+    def record_success(self, domain: str) -> None:
         """Record successful fetch from domain."""
         if self.proxy_manager.enabled:
             self.proxy_manager.record_success()
@@ -295,7 +290,7 @@ class AntiBotEngine:
         """Explicitly rotate to next proxy and return it."""
         if self.proxy_manager.enabled:
             new_proxy = self.proxy_manager.rotate()
-            logger.info(f"Rotated proxy: {new_proxy}")
+            logger.info("Rotated proxy: %s", new_proxy)
             return new_proxy  # type: ignore[no-any-return]
         return None
 

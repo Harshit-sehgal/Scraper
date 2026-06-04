@@ -44,7 +44,7 @@ def requires_invariants(mutation_fn: Callable):
         if ws is not None:
             try:
                 snapshot = ws.to_dict()
-            except Exception as snapshot_err:
+            except Exception as snapshot_err:  # noqa: BLE001
                 snapshot = None
                 logger.warning("Could not take snapshot before %s — rollback unavailable", mutation_fn.__name__)
                 try:
@@ -53,7 +53,7 @@ def requires_invariants(mutation_fn: Callable):
                         severity="warning",
                         cause=f"Snapshot failed before {mutation_fn.__name__}: {snapshot_err}",
                     )
-                except Exception:  # nosec B110
+                except Exception:  # noqa: BLE001, nosec B110
                     pass
 
             # Check pre-conditions
@@ -77,7 +77,7 @@ def requires_invariants(mutation_fn: Callable):
                         original = getattr(ws.from_dict, "__wrapped__", ws.from_dict)
                         original(ws, snapshot)
                         logger.warning("Rolled back %s — %d issue(s) prevented", mutation_fn.__name__, len(post_issues))
-                    except Exception as rollback_err:
+                    except Exception as rollback_err:  # noqa: BLE001
                         logger.critical("ROLLBACK FAILED for %s: %s — state may be corrupt!", mutation_fn.__name__, rollback_err)
                         try:
                             ws.record_degradation(
@@ -85,7 +85,7 @@ def requires_invariants(mutation_fn: Callable):
                                 severity="critical",
                                 cause=f"Rollback failed for {mutation_fn.__name__}: {rollback_err}. State may be corrupt!",
                             )
-                        except Exception:  # nosec B110
+                        except Exception:  # noqa: BLE001, nosec B110
                             pass
                     finally:
                         setattr(ws, _ROLLBACK_GUARD_ATTR, False)
@@ -97,7 +97,7 @@ def requires_invariants(mutation_fn: Callable):
                             severity="critical",
                             cause=f"Cannot rollback {mutation_fn.__name__} — no snapshot available. State may be corrupt!",
                         )
-                    except Exception:  # nosec B110
+                    except Exception:  # noqa: BLE001, nosec B110
                         pass
                 msg = (
                     f"Invariant violation in {mutation_fn.__name__}: "

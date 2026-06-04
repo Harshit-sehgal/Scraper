@@ -1,11 +1,9 @@
-"""
-Job routes — job lifecycle endpoints for the kernel API.
-"""
+"""Job routes — job lifecycle endpoints for the kernel API."""
 
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -32,7 +30,7 @@ def _get_service(
 
 @router.get("")
 async def list_jobs(
-    status: str | None = Query(None, description="Filter by status"),
+    status: Annotated[str | None, Query(description="Filter by status")] = None,
     service: JobService = Depends(_get_service),
     _=Depends(require_viewer),
 ):
@@ -50,7 +48,7 @@ async def list_jobs(
 @router.post("")
 async def create_job(
     req: CreateJobRequest,
-    service: JobService = Depends(_get_service),
+    service: Annotated[JobService, Depends(_get_service)],
     _=Depends(require_operator),
 ):
     """Create a new scraping job."""
@@ -83,7 +81,7 @@ async def create_job(
 @router.get("/{job_id}")
 async def get_job(
     job_id: str,
-    service: JobService = Depends(_get_service),
+    service: Annotated[JobService, Depends(_get_service)],
     _=Depends(require_viewer),
 ):
     """Get a specific job by ID."""
@@ -96,7 +94,7 @@ async def get_job(
 @router.get("/{job_id}/results")
 async def get_job_results(
     job_id: str,
-    service: JobService = Depends(_get_service),
+    service: Annotated[JobService, Depends(_get_service)],
     _=Depends(require_viewer),
 ):
     """Get the results for a specific job."""
@@ -109,7 +107,7 @@ async def get_job_results(
 @router.post("/{job_id}/cancel")
 async def cancel_job(
     job_id: str,
-    service: JobService = Depends(_get_service),
+    service: Annotated[JobService, Depends(_get_service)],
     _=Depends(require_operator),
 ):
     """Cancel a running or pending job."""
@@ -122,7 +120,7 @@ async def cancel_job(
 @router.delete("/{job_id}")
 async def delete_job(
     job_id: str,
-    service: JobService = Depends(_get_service),
+    service: Annotated[JobService, Depends(_get_service)],
     _=Depends(require_operator),
 ):
     """Move a job to the recycle bin."""
@@ -137,7 +135,7 @@ async def delete_job(
 
 @router.get("/recycle/list")
 async def list_recycle(
-    service: JobService = Depends(_get_service),
+    service: Annotated[JobService, Depends(_get_service)],
     _=Depends(require_viewer),
 ):
     """List recycled jobs."""
@@ -151,7 +149,7 @@ async def list_recycle(
 @router.post("/recycle/{job_id}/restore")
 async def restore_job(
     job_id: str,
-    service: JobService = Depends(_get_service),
+    service: Annotated[JobService, Depends(_get_service)],
     _=Depends(require_operator),
 ):
     """Restore a job from the recycle bin."""
@@ -164,7 +162,7 @@ async def restore_job(
 @router.delete("/recycle/{job_id}")
 async def hard_delete_job(
     job_id: str,
-    service: JobService = Depends(_get_service),
+    service: Annotated[JobService, Depends(_get_service)],
     _=Depends(require_operator),
 ):
     """Permanently delete a job from the recycle bin."""

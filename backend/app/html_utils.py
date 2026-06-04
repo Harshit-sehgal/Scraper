@@ -83,16 +83,12 @@ def _is_placeholder_value(text: str) -> bool:
     if len(key) < settings.SELECTOR_MIN_TEXT_LEN:
         # If extremely short but contains alphanumeric characters (e.g. "LON", "PAR", "238", "1"), it is valid.
         # Only treat as placeholder if it is purely symbols (e.g. "--", "...")
-        if not re.search(r"[a-zA-Z0-9]", key):
-            return True
-        return False
+        return bool(not re.search(r"[a-zA-Z0-9]", key))
     if key.endswith(" page") and key.split()[0] in EMPTY_TOKENS:
         return True
     if key.startswith(("click ", "read ", "view ")):
         return True
-    if re.fullmatch(r"\d+\s+more", key):
-        return True
-    return False
+    return bool(re.fullmatch(r"\d+\s+more", key))
 
 
 def _is_entity_name_field(field_name: str) -> bool:
@@ -112,9 +108,7 @@ def _is_noise_name_value(text: str) -> bool:
         return True
     if re.search(r"\(\d+\)$", val):
         return True
-    if any(token in val for token in ["show all", "nearby locations", "use my current location"]):
-        return True
-    return False
+    return bool(any(token in val for token in ["show all", "nearby locations", "use my current location"]))
 
 
 def _is_likely_noise_entity(text: str) -> bool:
@@ -149,7 +143,7 @@ def _is_likely_noise_row(record: dict, schema_fields: list[SchemaField]) -> bool
     from app.semantic_segmentation import is_likely_noise_field, segment_single_text  # research-shell, lazy
 
     all_values = []
-    for _key, value in record.items():
+    for value in record.values():
         if value and not _is_empty_value(value):
             text = _compact_text(str(value)).lower()
             all_values.append(text)
@@ -355,6 +349,7 @@ async def fetch_page_content(
 
     Returns:
         tuple of (html_content, js_render_delay_ms, method_used, retry_count)
+
     """
     from app.strategy_evolution import FetchStrategy  # research-shell, lazy
 
@@ -397,7 +392,7 @@ async def fetch_page_content(
                 if detect_anti_bot(html) < 0.7:
                     return html, delay, method, retries
                 logger.info("[Scraper] HTTPX result looks like a block, falling through")
-        except Exception as e:
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError) as e:
             if strategy != FetchStrategy.HYBRID:
                 logger.warning("[Scraper] %s failed for %s: %s. Falling back to Playwright", strategy.value, url, e)
             # HYBRID continues to Playwright anyway if it fails
@@ -417,7 +412,7 @@ async def fetch_page_content(
             await page.set_extra_http_headers(extra_headers)
 
         # Phase 80: Lightweight mode filters more resources
-        async def _route_filter(route):
+        async def _route_filter(route) -> None:
             req_url = route.request.url
             from unittest.mock import Mock
 
@@ -455,10 +450,7 @@ async def fetch_page_content(
                 wait_until = "domcontentloaded"
             # Use recovery timeout if provided, otherwise use a short initial
             # timeout (15s) for networkidle
-            if timeout_ms is not None:
-                initial_timeout = timeout_ms
-            else:
-                initial_timeout = min(settings.PLAYWRIGHT_TIMEOUT, 15000)
+            initial_timeout = timeout_ms if timeout_ms is not None else min(settings.PLAYWRIGHT_TIMEOUT, 15000)
             await page.goto(url, wait_until=wait_until, timeout=initial_timeout)
 
             # SSRF: validate the final page URL is not private / internal after
@@ -484,7 +476,7 @@ async def fetch_page_content(
                 for sel in loading_selectors:
                     try:
                         await page.wait_for_selector(sel, state="hidden", timeout=2000)
-                    except Exception:  # nosec B110
+                    except Exception:  # noqa: BLE001, nosec B110
                         pass
 
             # Adaptive post-network buffer: check DOM stabilization
@@ -530,7 +522,7 @@ async def fetch_page_content(
                      }}""",
                     timeout=settle_timeout * 1000,
                 )
-            except Exception:  # nosec B110
+            except Exception:  # noqa: BLE001, nosec B110
                 pass
             js_render_delay_ms = (time.time() - stabilization_start) * 1000
             telemetry.record_stabilization(domain, js_render_delay_ms)
@@ -553,7 +545,7 @@ async def fetch_page_content(
                 await page.evaluate("window.scrollTo(0, 0)")
                 await asyncio.sleep(settings.POST_SCROLL_RESET_DELAY)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # Before falling back, check partial HTML for anti-bot signals
             try:
                 partial_html = await page.content()
@@ -569,7 +561,7 @@ async def fetch_page_content(
                     raise ValueError(msg)
             except ValueError:
                 raise  # Re-raise anti-bot detection so scraper records the proper failure reason
-            except Exception:  # nosec B110
+            except Exception:  # noqa: BLE001, nosec B110
                 pass
 
             logger.warning(
@@ -599,7 +591,7 @@ async def fetch_page_content(
                 from app.anti_bot_engine import get_anti_bot_engine
 
                 get_anti_bot_engine().update_cookies(domain, cookie_header)
-        except Exception as cookie_err:
+        except Exception as cookie_err:  # noqa: BLE001
             logger.debug("[BrowserState] Cookie persistence skipped for %s: %s", url, cookie_err)
 
         html = await page.content()
@@ -619,23 +611,21 @@ async def fetch_page_content(
         if page:
             try:
                 html_content = await page.content()
-            except Exception:  # nosec B110
+            except Exception:  # noqa: BLE001, nosec B110
                 pass
 
         err_msg = str(e).lower()
         is_antibot = False
         from app.scrape_telemetry import detect_anti_bot
 
-        if html_content and detect_anti_bot(html_content) > 0.5:
-            is_antibot = True
-        elif any(
+        if (html_content and detect_anti_bot(html_content) > 0.5) or any(
             marker in err_msg
             for marker in ["captcha", "cloudflare", "access denied", "denied", "forbidden", "challenge", "blocked"]
         ):
             is_antibot = True
 
         if is_antibot:
-            logger.error(
+            logger.exception(
                 "[Scraper] Anti-bot challenge detected during %s for %s. Refusing naive HTTP fallback to prevent IP ban.",
                 strategy.value,
                 url,
@@ -643,7 +633,7 @@ async def fetch_page_content(
             msg = f"Anti-bot challenge detected: {e}"
             raise ValueError(msg)
 
-        logger.error("[Scraper] %s failed for %s: %s. Final fallback to httpx_basic", strategy.value, url, e)
+        logger.exception("[Scraper] %s failed for %s. Final fallback to httpx_basic", strategy.value, url)
         return await _fetch_with_httpx(
             url,
             strategy=FetchStrategy.HTTPX_BASIC,
@@ -654,7 +644,7 @@ async def fetch_page_content(
         if page:
             try:
                 await page.close()
-            except Exception:  # nosec B110
+            except Exception:  # nosec B110  # noqa: BLE001
                 pass
 
 
@@ -771,12 +761,11 @@ async def _fetch_with_httpx(
                     )
                     await asyncio.sleep(wait)
                 else:
-                    logger.error(
-                        "[Scraper_diagnostics] %s failed after %d attempts for %s: %s",
+                    logger.exception(
+                        "[Scraper] %s failed after %d attempts for %s. Final fallback to httpx_basic",
                         strategy.value,
                         settings.MAX_RETRIES,
                         url,
-                        e,
                     )
                     raise
     return "", 0.0, method_used, 0
@@ -840,7 +829,7 @@ def _sanitize_field_value(field: SchemaField, value, base_url: str = ""):
         if not isinstance(value, list):
             value = [value]
         cleaned = [_compact_text(str(v)) for v in value if not _is_empty_value(v)]
-        return cleaned if cleaned else None
+        return cleaned or None
 
     text = _compact_text(str(value))
     if _is_empty_value(text):

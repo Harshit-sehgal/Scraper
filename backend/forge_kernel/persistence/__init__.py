@@ -1,5 +1,4 @@
-"""
-Persistence contracts — repository ABC and serialization helpers.
+"""Persistence contracts — repository ABC and serialization helpers.
 
 Defines the JobRepository interface and shared serializers for both backends.
 """
@@ -9,9 +8,10 @@ from __future__ import annotations
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from forge_kernel.contracts.job import Job
+if TYPE_CHECKING:
+    from forge_kernel.contracts.job import Job
 
 logger = logging.getLogger(__name__)
 
@@ -22,44 +22,37 @@ class JobRepository(ABC):
     @abstractmethod
     def load_all(self) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         """Load active jobs, recycled jobs, and world state."""
-        pass
 
     @abstractmethod
     def save_all(self, jobs: dict[str, Job], recycle_bin: dict[str, Job]) -> None:
         """Atomically persist all state."""
-        pass
 
     @abstractmethod
     def save_single(self, job: Job) -> None:
         """Upsert a single job's state."""
-        pass
 
     @abstractmethod
     def is_cancel_requested(self, job_id: str) -> bool:
         """Check if a cancellation has been requested for this job."""
-        pass
 
     @abstractmethod
     def move_to_recycle_bin(self, job_id: str) -> bool:
         """Move a job to the recycle bin."""
-        pass
 
     @abstractmethod
     def restore_from_recycle_bin(self, job_id: str) -> bool:
         """Restore a job from the recycle bin."""
-        pass
 
     @abstractmethod
     def hard_delete(self, job_id: str) -> bool:
         """Permanently delete a job."""
-        pass
 
 
 # Lazy import of repository resolver to avoid circular imports
 _repository_instance: JobRepository | None = None
 
 
-def get_job_repository() -> "JobRepository":
+def get_job_repository() -> JobRepository:
     """Resolve the appropriate JobRepository based on configuration."""
     global _repository_instance
     if _repository_instance is not None:
@@ -88,7 +81,7 @@ def get_job_repository() -> "JobRepository":
     return _repository_instance
 
 
-def reset_repository():
+def reset_repository() -> None:
     """Reset the cached repository instance (for testing)."""
     global _repository_instance
     _repository_instance = None

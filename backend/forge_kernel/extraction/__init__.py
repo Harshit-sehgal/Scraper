@@ -1,5 +1,4 @@
-"""
-Extraction — deterministic staged pipeline for web data extraction.
+"""Extraction — deterministic staged pipeline for web data extraction.
 
 Pipeline stages: fetch → extract → quality → clean
 Each stage produces typed output that feeds into the next.

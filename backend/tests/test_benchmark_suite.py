@@ -1,4 +1,4 @@
-"""Deterministic Local Benchmark Suite
+"""Deterministic Local Benchmark Suite.
 
 Validates extraction success rate, zero-result truthfulness, false-positive records,
 average scrape time, a simulated recovery metric, and cancellation response time
@@ -124,16 +124,6 @@ async def test_deterministic_benchmark_run() -> None:
     metrics["cancellation_response_time_ms"] = (cancel_end - cancel_start) * 1000
 
     # Output beautiful benchmark report
-    print("\n" + "=" * 50)
-    print(" DETERMINISTIC EXTRACTION BENCHMARK REPORT")
-    print("=" * 50)
-    print(f"Extraction Success Rate:         {metrics['success_rate'] * 100:.1f}% (Target: >85%)")
-    print(f"Zero-Result Truthfulness:         {metrics['zero_result_truthfulness'] * 100:.1f}% (Target: >90%)")
-    print(f"False-Positive Records:           {metrics['false_positive_records'] * 100:.1f}% (Target: <10%)")
-    print(f"Average Scrape Time:              {metrics['average_scrape_time_ms']:.2f} ms")
-    print(f"Recovery Metric (SIMULATED):          {metrics['recovery_success_rate'] * 100:.1f}% — NOT TESTED (see note above)")
-    print(f"Cancellation Response Time:       {metrics['cancellation_response_time_ms']:.4f} ms (Target: <1000ms)")
-    print("=" * 50 + "\n")
 
     # Assert target expectations are satisfied
     assert metrics["success_rate"] >= 0.85

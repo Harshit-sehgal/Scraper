@@ -117,16 +117,20 @@ class TestWorkerQueuePriority:
 
         # Should dequeue in priority order
         t1 = asyncio.run(queue.dequeue(timeout=1.0))
-        assert t1 is not None and t1.id == id_critical
+        assert t1 is not None
+        assert t1.id == id_critical
 
         t2 = asyncio.run(queue.dequeue(timeout=1.0))
-        assert t2 is not None and t2.id == id_high
+        assert t2 is not None
+        assert t2.id == id_high
 
         t3 = asyncio.run(queue.dequeue(timeout=1.0))
-        assert t3 is not None and t3.id == id_normal
+        assert t3 is not None
+        assert t3.id == id_normal
 
         t4 = asyncio.run(queue.dequeue(timeout=1.0))
-        assert t4 is not None and t4.id == id_low
+        assert t4 is not None
+        assert t4.id == id_low
 
 
 class TestWorkerQueueRetries:
@@ -164,7 +168,8 @@ class TestWorkerQueueRetries:
 
     def test_retry_task_becomes_dequeueable_after_backoff(self, tmp_path) -> None:
         """A retried task is set back to pending with future scheduled_at and
-        is dequeuable once scheduled_at <= now."""
+        is dequeuable once scheduled_at <= now.
+        """
         queue, _ = _make_queue(tmp_path)
 
         task_id = asyncio.run(queue.enqueue("test_task", {}, max_attempts=3))

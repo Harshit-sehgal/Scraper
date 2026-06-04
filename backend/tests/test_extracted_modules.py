@@ -19,7 +19,6 @@ def test_topology_state() -> None:
     r1.local_energy = 0.1
     assert ts.prune(min_instability=0.02) == 1
     assert ts.region_count() == 1
-    print("  topology_state.py: OK")
 
 
 def test_energy_state() -> None:
@@ -34,7 +33,6 @@ def test_energy_state() -> None:
     es.adjust_energy(-2.0)
     assert es.global_energy == 3.0
     assert 0.0 <= es.field_pressure <= 1.0
-    print("  energy_state.py: OK")
 
 
 def test_instability_state() -> None:
@@ -47,7 +45,6 @@ def test_instability_state() -> None:
     assert ist.exclusion_count() == 1
     ist.decay(rate=0.5)
     assert ist.get_exclusion("origin", "destination") < 0.5
-    print("  instability_state.py: OK")
 
 
 def test_topology_api() -> None:
@@ -72,7 +69,6 @@ def test_topology_api() -> None:
     assert api.prune_weak_regions(min_instability=0.02) == 1
 
     assert api.region_count() == 0
-    print("  topology_api.py: OK")
 
 
 def test_energy_api() -> None:
@@ -86,7 +82,6 @@ def test_energy_api() -> None:
     assert api.get_global_energy() == 5.0
     api.set_global_energy(float("nan"))
     assert api.get_global_energy() == 5.0  # unchanged
-    print("  energy_api.py: OK")
 
 
 def test_instability_api() -> None:
@@ -100,7 +95,6 @@ def test_instability_api() -> None:
     assert api.get_exclusion("a", "b") == 0.3
     api.decay_exclusion("a", "b", rate=0.5)
     assert api.get_exclusion("a", "b") < 0.3
-    print("  instability_api.py: OK")
 
 
 def test_event_journal() -> None:
@@ -117,7 +111,6 @@ def test_event_journal() -> None:
     assert len(chain) == 1
     j.clear()
     assert j.count == 0
-    print("  event_journal.py: OK")
 
 
 def test_field_validator() -> None:
@@ -131,7 +124,6 @@ def test_field_validator() -> None:
     ws._energy._global_energy = float("nan")  # Bypass setter
     issues = validate_world_state(ws)
     assert any("NaN" in i for i in issues)
-    print("  field_validator.py: OK")
 
 
 def test_observability() -> None:
@@ -144,7 +136,6 @@ def test_observability() -> None:
     assert "energy" in s
     t = topology_report(ws)
     assert "pressure" in t
-    print("  observability.py: OK")
 
 
 def test_field_laws() -> None:
@@ -153,7 +144,6 @@ def test_field_laws() -> None:
 
     assert PROPAGATION_DECAY_FLOOR == 0.3
     assert MAX_COUPLING_TRANSFER == 0.3
-    print("  field_laws.py: OK")
 
 
 def test_persistence() -> None:
@@ -167,7 +157,6 @@ def test_persistence() -> None:
     assert "version" in d
     assert "global_energy" in d
     clear_world_state(ws)
-    print("  persistence_state.py: OK")
 
 
 def test_core_types() -> None:
@@ -181,7 +170,6 @@ def test_core_types() -> None:
     es = EnergyState()
     assert 0.0 <= es.field_pressure <= 1.0
     assert 0.0 <= es.integrity_score <= 1.0
-    print("  core_types.py: OK")
 
 
 def test_topology_gc() -> None:
@@ -193,7 +181,6 @@ def test_topology_gc() -> None:
     ws._topology.append_region(FieldConflictRegion(competing_roles=["a", "b"], token="DEAD", instability=0.01, local_energy=0.1))
     collected = collect_garbage(ws)
     assert collected["regions"] >= 0
-    print("  topology_gc.py: OK")
 
 
 def test_invariant_firewall() -> None:
@@ -204,8 +191,7 @@ def test_invariant_firewall() -> None:
     ws.clear()
 
     @requires_invariants
-    def fn(w):
+    def fn(w) -> None:
         w.metrics.global_energy = 5.0
 
     fn(ws)
-    print("  invariant_firewall.py: OK")

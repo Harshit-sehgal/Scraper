@@ -294,7 +294,7 @@ class TestFieldMappingConfidence:
         provenance = pb.build()
         assert provenance is not None
         assert len(provenance.fields) > 0
-        for rec_idx, entry in provenance.fields.items():
+        for entry in provenance.fields.values():
             assert entry.field_name in ("price", "name")
             assert entry.method == "discovery"
             assert entry.confidence > 0
@@ -407,7 +407,7 @@ class TestFakeDynamicSessionBoundWebsite:
         payload = json.loads(FAKE_NETWORK_JSON)
         dumped = json.dumps(payload)
         for secret in ("token", "session_id", "cookie", "auth"):
-            assert secret not in dumped.lower() or secret in ("currency",), f"Leaked potential secret: {secret}"
+            assert secret not in dumped.lower() or secret == "currency", f"Leaked potential secret: {secret}"
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -440,7 +440,7 @@ class _SessionBoundHandler(http.server.BaseHTTPRequestHandler):
         },
     ).encode()
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/search/id/test12345abcde":
             self.send_response(200)
@@ -457,7 +457,7 @@ class _SessionBoundHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format, *args):
+    def log_message(self, format, *args) -> None:
         pass  # silence server logs during tests
 
 
@@ -471,7 +471,7 @@ class TestLocalSessionBoundServer:
     thread: threading.Thread
 
     @classmethod
-    def setup_class(cls):
+    def setup_class(cls) -> None:
         cls.server = http.server.HTTPServer(("127.0.0.1", 0), _SessionBoundHandler)
         cls.port = cls.server.server_address[1]
         cls.base_url = f"http://127.0.0.1:{cls.port}"
@@ -479,7 +479,7 @@ class TestLocalSessionBoundServer:
         cls.thread.start()
 
     @classmethod
-    def teardown_class(cls):
+    def teardown_class(cls) -> None:
         cls.server.shutdown()
 
     def test_local_server_serves_search_page(self) -> None:
@@ -487,7 +487,7 @@ class TestLocalSessionBoundServer:
         import urllib.request
 
         url = f"{self.base_url}/search/id/test12345abcde"
-        resp = urllib.request.urlopen(url)
+        resp = urllib.request.urlopen(url)  # nosec B310 - HTTP URL to local test server, not file:// scheme
         assert resp.status == 200
         html = resp.read().decode()
         assert "Alpha" in html
@@ -498,7 +498,7 @@ class TestLocalSessionBoundServer:
         import urllib.request
 
         url = f"{self.base_url}/search/id/test12345abcde"
-        resp = urllib.request.urlopen(url)
+        resp = urllib.request.urlopen(url)  # nosec B310 - HTTP URL to local test server, not file:// scheme
         cookies = resp.getheader("Set-Cookie") or ""
         assert "sid=deadbeef" in cookies
 
@@ -514,7 +514,7 @@ class TestLocalSessionBoundServer:
         import urllib.request
 
         url = f"{self.base_url}/api/results"
-        resp = urllib.request.urlopen(url)
+        resp = urllib.request.urlopen(url)  # nosec B310 - HTTP URL to local test server, not file:// scheme
         assert resp.status == 200
         data = json.loads(resp.read())
         assert len(data["results"]) == 2
@@ -525,7 +525,7 @@ class TestLocalSessionBoundServer:
         import urllib.request
 
         url = f"{self.base_url}/search/id/test12345abcde"
-        html = urllib.request.urlopen(url).read().decode()
+        html = urllib.request.urlopen(url).read().decode()  # nosec B310 - HTTP URL to local test server, not file:// scheme
         from app.selector_engine import apply_selectors
 
         schema = [
@@ -547,7 +547,7 @@ class TestLocalSessionBoundServer:
         import urllib.request
 
         url = f"{self.base_url}/api/results"
-        data = json.loads(urllib.request.urlopen(url).read())
+        data = json.loads(urllib.request.urlopen(url).read())  # nosec B310 - HTTP URL to local test server, not file:// scheme
         extracted = []
         for item in data["results"]:
             extracted.append(
@@ -566,7 +566,7 @@ class TestLocalSessionBoundServer:
         """Local HTML contains localStorage/cookie text but extraction strips it."""
         import urllib.request
 
-        html = urllib.request.urlopen(f"{self.base_url}/search/id/test12345abcde").read().decode()
+        html = urllib.request.urlopen(f"{self.base_url}/search/id/test12345abcde").read().decode()  # nosec B310 - HTTP URL to local test server, not file:// scheme
         from app.selector_engine import apply_selectors
 
         schema = [SchemaField(name="name", field_type=FieldType.STRING, description="", required=False)]

@@ -1,5 +1,4 @@
-"""
-Browser Network Capture — Intercepts fetch / XHR / GraphQL responses during Playwright page loads.
+"""Browser Network Capture — Intercepts fetch / XHR / GraphQL responses during Playwright page loads.
 
 This module captures actual browser network responses (not just inline scripts) for
 structured data extraction. Many modern SPAs load their data via API calls that never
@@ -141,7 +140,7 @@ def _is_session_state_name(name: str) -> bool:
 
 def _sanitize_storage_entry(name: Any, value: Any, source: str) -> dict[str, Any]:
     text = "" if value is None else str(value)
-    entry = {
+    return {
         "source": source,
         "name": _sanitize_name(name),
         "value_length": len(text),
@@ -149,7 +148,6 @@ def _sanitize_storage_entry(name: Any, value: Any, source: str) -> dict[str, Any
         "value_preview": _redacted_preview(text),
         "session_candidate": _is_session_state_name(str(name or "")),
     }
-    return entry
 
 
 def _sanitize_storage_mapping(mapping: Any, source: str) -> list[dict[str, Any]]:
@@ -220,7 +218,7 @@ async def collect_browser_state(page) -> dict[str, Any]:
     raw_cookies: list[dict[str, Any]] = []
     try:
         raw_cookies = await page.context.cookies()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.debug("[BrowserState] Could not read context cookies: %s", exc)
 
     storage_snapshot: dict[str, Any] = {}
@@ -254,7 +252,7 @@ async def collect_browser_state(page) -> dict[str, Any]:
                     cacheStorageKeys: cacheStorageKeys || []
                 };
             }""")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.debug("[BrowserState] Could not read browser storage: %s", exc)
     if not isinstance(storage_snapshot, dict):
         storage_snapshot = {}
@@ -313,6 +311,7 @@ def store_captures(url: str, payloads: list[dict]) -> None:
     Args:
         url: The page URL these payloads were captured from.
         payloads: List of captured payload dicts.
+
     """
     if not payloads:
         return
@@ -324,8 +323,8 @@ def store_captures(url: str, payloads: list[dict]) -> None:
     for p in payloads:
         try:
             total_new_bytes += len(json.dumps(p, ensure_ascii=False, default=str))
-        except Exception as e:
-            logger.debug("[BrowserNetwork] Failed to estimate payload size for %s: %s", url, e)
+        except (TypeError, ValueError):
+            logger.debug("[BrowserNetwork] Failed to estimate payload size for %s", url)
             total_new_bytes += 1024  # Conservative fallback estimate
 
     # Enforce memory caps
@@ -341,15 +340,15 @@ def store_captures(url: str, payloads: list[dict]) -> None:
     for p in reversed(existing):
         try:
             total_bytes += len(json.dumps(p, ensure_ascii=False, default=str))
-        except Exception as e:
-            logger.debug("[BrowserNetwork] Failed to size existing payload for %s: %s", url, e)
+        except (TypeError, ValueError):
+            logger.debug("[BrowserNetwork] Failed to size existing payload for %s", url)
             total_bytes += 1024
     while total_bytes > _MAX_BYTES_PER_URL and len(existing) > 1:
         removed = existing.pop(0)
         try:
             total_bytes -= len(json.dumps(removed, ensure_ascii=False, default=str))
-        except Exception as e:
-            logger.debug("[BrowserNetwork] Failed to size removed payload for %s: %s", url, e)
+        except (TypeError, ValueError):
+            logger.debug("[BrowserNetwork] Failed to size removed payload for %s", url)
             total_bytes -= 1024
 
     _captured_payloads[url] = existing
@@ -399,8 +398,8 @@ def _evict_lru_captures() -> None:
     for u, payloads in _captured_payloads.items():
         try:
             bytes_for_url = sum(len(_json.dumps(p, ensure_ascii=False, default=str)) for p in payloads)
-        except Exception as e:
-            logger.debug("[BrowserNetwork] Failed to compute bytes for URL %s: %s", u, e)
+        except (TypeError, ValueError):
+            logger.debug("[BrowserNetwork] Failed to compute bytes for URL %s", u)
             bytes_for_url = len(payloads) * 1024
         url_bytes.append((u, bytes_for_url))
         total_bytes += bytes_for_url
@@ -443,10 +442,11 @@ async def setup_network_capture(page) -> list[dict]:
         - resource_type: str
         - body: Any (parsed JSON)
         - status: int
+
     """
     captured: list[dict] = []
 
-    async def _on_response(response):
+    async def _on_response(response) -> None:
         """Handle a Playwright response event."""
         try:
             req = response.request
@@ -476,9 +476,9 @@ async def setup_network_capture(page) -> list[dict]:
             # Try to parse JSON body
             try:
                 body = await response.json()
-            except Exception as e:
+            except (TypeError, ValueError):
                 # Not JSON — skip with debug log
-                logger.debug("[BrowserNetwork] Response %s is not JSON: %s", _truncate_url(url), e)
+                logger.debug("[BrowserNetwork] Response %s is not JSON", _truncate_url(url))
                 return
 
             if body is None:
@@ -504,15 +504,15 @@ async def setup_network_capture(page) -> list[dict]:
             for p in captured:
                 try:
                     total_bytes += len(json.dumps(p, ensure_ascii=False, default=str))
-                except Exception as e:
-                    logger.debug("[BrowserNetwork] Failed to size captured payload for %s: %s", url, e)
+                except (TypeError, ValueError):
+                    logger.debug("[BrowserNetwork] Failed to size captured payload for %s", url)
                     total_bytes += 1024
 
             # Estimate new payload size
             try:
                 new_bytes = len(json.dumps(body, ensure_ascii=False, default=str))
-            except Exception as e:
-                logger.debug("[BrowserNetwork] Failed to estimate response payload size for %s: %s", url, e)
+            except (TypeError, ValueError):
+                logger.debug("[BrowserNetwork] Failed to estimate response payload size for %s", url)
                 new_bytes = 1024
 
             if total_bytes + new_bytes > _MAX_BYTES_PER_URL:
@@ -541,7 +541,7 @@ async def setup_network_capture(page) -> list[dict]:
                 resource_type,
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug("[BrowserNetwork] Error capturing response: %s", e)
 
     page.on("response", _on_response)
@@ -604,10 +604,7 @@ def _is_irrelevant_url(url: str) -> bool:
         ".mp3",
         ".wav",
     )
-    if path.endswith(skip_extensions):
-        return True
-
-    return False
+    return bool(path.endswith(skip_extensions))
 
 
 def _is_empty_payload(body: Any) -> bool:

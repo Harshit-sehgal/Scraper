@@ -1,5 +1,4 @@
-"""
-Tests for Extraction Provenance — Field-level explainability for extraction.
+"""Tests for Extraction Provenance — Field-level explainability for extraction.
 
 Tests cover:
   - FieldProvenance creation and serialization

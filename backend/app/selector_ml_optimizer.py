@@ -1,5 +1,4 @@
-"""
-Selector ML Optimizer — Machine learning-based selector quality prediction and optimization.
+"""Selector ML Optimizer — Machine learning-based selector quality prediction and optimization.
 
 Provides:
   - Selector feature extraction from CSS selectors and DOM context
@@ -76,6 +75,7 @@ class SelectorFeatureExtractor:
 
         Returns:
             SelectorFeatures object
+
         """
         # Basic feature counts
         class_count = selector.count(".")
@@ -146,7 +146,7 @@ class SelectorQualityPredictor:
     Uses a simple weighted feature model (no external ML libraries required).
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize predictor with learned weights."""
         # Feature weights learned from successful / failed selectors
         # These are baseline weights; they improve with more training data
@@ -176,6 +176,7 @@ class SelectorQualityPredictor:
 
         Returns:
             SelectorPrediction with quality score and recommendation
+
         """
         # Weighted sum of features
         score = 0.4  # Lower base score
@@ -252,6 +253,7 @@ class SelectorQualityPredictor:
 
         Returns:
             List of suggested alternative selectors
+
         """
         mutations = []
         selector = features.selector
@@ -289,12 +291,13 @@ class SelectorQualityPredictor:
         """Predict quality for multiple selectors."""
         return [self.predict(features) for features in features_list]
 
-    def update_weights(self, feedback: list[tuple], learning_rate: float = 0.01):
+    def update_weights(self, feedback: list[tuple], learning_rate: float = 0.01) -> None:
         """Update model weights based on feedback.
 
         Args:
             feedback: List of (features, actual_quality) tuples
             learning_rate: How much to adjust weights
+
         """
         if not feedback:
             return
@@ -305,7 +308,7 @@ class SelectorQualityPredictor:
 
             # Adjust weights based on error
             feature_dict: dict[str, Any] = asdict(features)
-            for feature_name in self.feature_weights.keys():
+            for feature_name in self.feature_weights:
                 if feature_name == "selector":
                     continue
 
@@ -326,7 +329,7 @@ class SelectorQualityPredictor:
 class SelectorOptimizationEngine:
     """Orchestrates selector optimization using ML predictions."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize optimizer with quality predictor."""
         self.predictor = SelectorQualityPredictor()
         self.feature_extractor = SelectorFeatureExtractor()
@@ -347,6 +350,7 @@ class SelectorOptimizationEngine:
 
         Returns:
             Optimization report with recommendations
+
         """
         report: dict[str, Any] = {
             "domain": domain,
@@ -399,13 +403,14 @@ class SelectorOptimizationEngine:
         domain: str,
         selector: str,
         actual_quality: float,
-    ):
+    ) -> None:
         """Learn from actual extraction results.
 
         Args:
             domain: Domain for context
             selector: CSS selector that was used
             actual_quality: Actual quality score achieved [0, 1]
+
         """
         features = self.feature_extractor.extract_features(selector)
 

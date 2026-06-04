@@ -40,7 +40,7 @@ def _custom_flight_schema() -> list[SchemaField]:
     ]
 
 
-def _skip_if_no_api_key():
+def _skip_if_no_api_key() -> None:
     """Skip test if no Groq API key is available (live API test)."""
     if not os.environ.get("GROQ_API_KEY"):
         pytest.skip("GROQ_API_KEY not set — live API test requires a valid key")

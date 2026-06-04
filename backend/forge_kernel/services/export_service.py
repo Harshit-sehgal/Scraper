@@ -1,5 +1,4 @@
-"""
-Export service — generates CSV, JSON, and Excel exports from job results.
+"""Export service — generates CSV, JSON, and Excel exports from job results.
 
 Ported from the existing export router logic into a clean service.
 """
@@ -82,15 +81,14 @@ class ExportService:
         if fmt == "csv":
             self.to_csv(records, field_names)
             return ExportArtifact(format="csv", row_count=len(records), generated_at="")
-        elif fmt == "json":
+        if fmt == "json":
             self.to_json(records)
             return ExportArtifact(format="json", row_count=len(records), generated_at="")
-        elif fmt == "xlsx":
+        if fmt == "xlsx":
             xlsx_content = self.to_xlsx(records, field_names)
             if xlsx_content is None:
                 msg = "XLSX export requires openpyxl: pip install openpyxl"
                 raise ValueError(msg)
             return ExportArtifact(format="xlsx", row_count=len(records), generated_at="", byte_size=len(xlsx_content))
-        else:
-            msg = f"Unsupported export format: {fmt}"
-            raise ValueError(msg)
+        msg = f"Unsupported export format: {fmt}"
+        raise ValueError(msg)

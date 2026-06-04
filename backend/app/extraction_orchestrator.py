@@ -1,5 +1,4 @@
-"""
-Extraction Orchestrator — Manages the multi-layered extraction fallback cascade.
+"""Extraction Orchestrator — Manages the multi-layered extraction fallback cascade.
 
 Layers:
   0. Network / JSON (Hydration, JSON-LD, Next.js state, Apollo cache)
@@ -37,7 +36,7 @@ class ExtractionResult:
         selector_success: bool = False,
         selectors: dict | None = None,
         network_diagnostics: list[str] | None = None,
-    ):
+    ) -> None:
         self.records = records
         self.method = method
         self.selector_success = selector_success
@@ -96,7 +95,7 @@ def _merge_composite_records(
                 # Generate a synthetic key if no id_field value
                 if not norm_key:
                     combined = "|".join(str(v) for v in new_record.values() if v not in (None, ""))
-                    norm_key = combined if combined else str(len(merged))
+                    norm_key = combined or str(len(merged))
                 if norm_key not in merged:
                     merged[norm_key] = new_record
 
@@ -174,7 +173,7 @@ def _multi_pass_extraction(
                 )
                 if isinstance(alt_result, list) and alt_result:
                     passes.append(alt_result)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug("[Orchestrator] Alt container pass failed for %s: %s", alt_sel, e)
 
     # Pass 3: Raw extraction without container (extract from full page)
@@ -193,7 +192,7 @@ def _multi_pass_extraction(
                 for rec in aligned:
                     rec["record_score"] = score_record_quality(rec, schema_fields)
                 passes.append([r for r in aligned if r.get("record_score", 0) > 0])
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug("[Orchestrator] Raw extraction pass failed: %s", e)
 
     # Merge all passes
@@ -230,7 +229,7 @@ async def orchestrate_extraction(
         records: list[dict],
         method: str,
         selectors: dict | None = None,
-    ):
+    ) -> None:
         """Record provenance for all fields in all extracted records."""
         if not provenance_builder:
             return
@@ -265,17 +264,14 @@ async def orchestrate_extraction(
     bodies = []
     if captured_payloads:
         for p in captured_payloads:
-            if isinstance(p, dict):
-                body = p.get("body")
-            else:
-                body = p
+            body = p.get("body") if isinstance(p, dict) else p
             if body is not None:
                 bodies.append(body)
                 try:
                     if isinstance(body, str):
                         json.loads(body)
                     parsed_json_count += 1
-                except Exception:
+                except (TypeError, ValueError):
                     if isinstance(body, dict):
                         parsed_json_count += 1
 
@@ -288,7 +284,7 @@ async def orchestrate_extraction(
 
             candidates = find_record_arrays(payload)
             record_arrays_found += len(candidates)
-        except Exception:  # nosec B110
+        except Exception:  # noqa: BLE001, nosec B110
             pass
 
     # Extract network results
@@ -340,12 +336,10 @@ async def orchestrate_extraction(
         net_cov = network_result.field_coverage
         net_score = network_result.score
 
-        if winning_source == "dom" or winning_source == dom_res.method:
-            reason = "DOM coverage / score (%.2f / %.1f) is equal / better than Network (%.2f / %.1f)" % (
-                dom_cov,
-                dom_score,
-                net_cov,
-                net_score,
+        if winning_source in ("dom", dom_res.method):
+            reason = (
+                f"DOM coverage / score ({dom_cov:.2f} / {dom_score:.1f}) is equal / better "
+                f"than Network ({net_cov:.2f} / {net_score:.1f})"
             )
             network_diagnostics.append(f"arbitration winner: dom (Reason: {reason})")
             dom_res.network_diagnostics = list(network_diagnostics)
@@ -354,12 +348,9 @@ async def orchestrate_extraction(
         # If network won:
         reason = ""
         if net_cov >= dom_cov + 0.2:
-            reason = "Network field coverage (%.2f) significantly exceeds DOM coverage (%.2f)" % (net_cov, dom_cov)
+            reason = f"Network field coverage ({net_cov:.2f}) significantly exceeds DOM coverage ({dom_cov:.2f})"
         elif net_score > dom_score and net_cov >= dom_cov:
-            reason = "Network score (%.1f) exceeds DOM score (%.1f) with equal / better coverage" % (
-                net_score,
-                dom_score,
-            )
+            reason = f"Network score ({net_score:.1f}) exceeds DOM score ({dom_score:.1f}) with equal / better coverage"
         else:
             reason = "Network payload won arbitration"
 
@@ -437,13 +428,12 @@ async def orchestrate_extraction(
             )
             _record_field_provenance(network_results, ExtractionMethod.DISCOVERY)
             return _arbitrate_and_return(ExtractionResult(network_results, "network_json", selector_success=True))
-        else:
-            logger.info(
-                "[Orchestrator] Network / JSON extraction LOW QUALITY (avg score: %.2f), falling through",
-                avg_score,
-            )
-            if provenance_builder:
-                provenance_builder.add_fallback_step("network_json_low_quality")
+        logger.info(
+            "[Orchestrator] Network / JSON extraction LOW QUALITY (avg score: %.2f), falling through",
+            avg_score,
+        )
+        if provenance_builder:
+            provenance_builder.add_fallback_step("network_json_low_quality")
     else:
         logger.info("[Orchestrator] Network / JSON extraction returned no results, falling through")
         if provenance_builder:
@@ -477,10 +467,9 @@ async def orchestrate_extraction(
                 return _arbitrate_and_return(
                     ExtractionResult(provided_results, "discovery", selector_success=True, selectors=provided_selectors),
                 )
-            else:
-                logger.info("[Orchestrator] Provided selectors LOW QUALITY (avg score: %.2f), falling through", avg_score)
-                if provenance_builder:
-                    provenance_builder.add_fallback_step("provided_selectors_low_quality")
+            logger.info("[Orchestrator] Provided selectors LOW QUALITY (avg score: %.2f), falling through", avg_score)
+            if provenance_builder:
+                provenance_builder.add_fallback_step("provided_selectors_low_quality")
         else:
             logger.info("[Orchestrator] Provided selectors returned no results, falling through")
             if provenance_builder:
@@ -577,7 +566,7 @@ async def orchestrate_extraction(
                             payload={"url": url, "avg_score": avg_score},
                         ),
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.warning("[Orchestrator] Failed to dispatch selector failure event: %s", e)
 
     # ── Layer 3: LLM Discovery ─────────────────────────────────────────
@@ -651,10 +640,9 @@ async def orchestrate_extraction(
                 return _arbitrate_and_return(
                     ExtractionResult(raw_results, "discovery", selector_success=True, selectors=discovered_selectors),
                 )
-            else:
-                logger.info("[Orchestrator] Discovery LOW QUALITY (avg score: %.2f)", avg_score)
-                if provenance_builder:
-                    provenance_builder.add_fallback_step("discovery_low_quality")
+            logger.info("[Orchestrator] Discovery LOW QUALITY (avg score: %.2f)", avg_score)
+            if provenance_builder:
+                provenance_builder.add_fallback_step("discovery_low_quality")
 
     # ── Layer 4: Container Discovery (general evidence-based) ────────
     logger.info("[Orchestrator] Trying general container discovery for %s", url)
@@ -679,7 +667,7 @@ async def orchestrate_extraction(
                 selectors={"item_container": container_result.best_selector},
             ),
         )
-    elif container_result.final_records:
+    if container_result.final_records:
         logger.info(
             "[Orchestrator] Container discovery PARTIAL (%d low-quality records)",
             container_result.total_records,
@@ -711,13 +699,12 @@ async def orchestrate_extraction(
             )
             _record_field_provenance(visible_results, ExtractionMethod.REGEX)
             return _arbitrate_and_return(ExtractionResult(visible_results, "visible_text", selector_success=False))
-        else:
-            logger.info(
-                "[Orchestrator] Visible-text extraction LOW QUALITY (avg score: %.2f)",
-                avg_score,
-            )
-            if provenance_builder:
-                provenance_builder.add_fallback_step("visible_text_low_quality")
+        logger.info(
+            "[Orchestrator] Visible-text extraction LOW QUALITY (avg score: %.2f)",
+            avg_score,
+        )
+        if provenance_builder:
+            provenance_builder.add_fallback_step("visible_text_low_quality")
     else:
         logger.info("[Orchestrator] Visible-text extraction returned no results")
         if provenance_builder:
@@ -828,7 +815,7 @@ def _check_type_compatibility(field_type: FieldType, values: list) -> float:
         numeric = sum(1 for v in str_vals if re.fullmatch(r"-?\d+", v))
         return numeric / len(str_vals)
 
-    if field_type == FieldType.FLOAT or field_type == FieldType.PERCENTAGE:
+    if field_type in (FieldType.FLOAT, FieldType.PERCENTAGE):
         numeric = sum(1 for v in str_vals if re.fullmatch(r"-?\d+(?:\.\d+)?%?", v.replace(",", "")))
         return numeric / len(str_vals)
 

@@ -13,12 +13,12 @@ Each mode determines:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from app.config import settings
 
 
-class AcquisitionMode(str, Enum):
+class AcquisitionMode(StrEnum):
     """Acquisition mode controlling fetch aggressiveness and recovery behavior."""
 
     # Standard mode: direct fetch, basic redirect handling
@@ -80,7 +80,7 @@ class AcquisitionConfig:
                 detect_session_params=True,
                 timeout_multiplier=1.0,
             )
-        elif mode == AcquisitionMode.AGGRESSIVE:
+        if mode == AcquisitionMode.AGGRESSIVE:
             return cls(
                 mode=mode,
                 attempt_recovery=True,
@@ -92,7 +92,7 @@ class AcquisitionConfig:
                 detect_session_params=True,
                 timeout_multiplier=settings.ACQUISITION_AGGRESSIVE_TIMEOUT_MULT,
             )
-        elif mode == AcquisitionMode.DEEP_SCAN:
+        if mode == AcquisitionMode.DEEP_SCAN:
             return cls(
                 mode=mode,
                 attempt_recovery=True,
@@ -149,7 +149,4 @@ def should_escalate(
     if acquisition_state in escalation_triggers:
         return True
 
-    if empty_response and current_mode == AcquisitionMode.STANDARD:
-        return True
-
-    return False
+    return bool(empty_response and current_mode == AcquisitionMode.STANDARD)

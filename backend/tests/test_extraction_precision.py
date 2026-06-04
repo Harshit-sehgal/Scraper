@@ -1,5 +1,4 @@
-"""
-Extraction Precision Tests — Verifying structural pattern matching against real-world DOM fixtures.
+"""Extraction Precision Tests — Verifying structural pattern matching against real-world DOM fixtures.
 
 These tests focus on the 'Regex Fallback' and 'Selector Engine' components
 without requiring live network or LLM calls.
@@ -15,7 +14,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures" / "pages"
 
 
 def load_fixture(name: str) -> str:
-    with open(FIXTURES_DIR / name, "r") as f:
+    with open(FIXTURES_DIR / name) as f:
         return f.read()
 
 

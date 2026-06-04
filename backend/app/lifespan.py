@@ -1,5 +1,4 @@
-"""
-Lifespan — FastAPI startup / shutdown lifecycle hooks.
+"""Lifespan — FastAPI startup / shutdown lifecycle hooks.
 
 Extracted from main.py as part of Phase 3 refactoring to keep the app factory
 thin and allow individual lifecycle components to be tested in isolation.
@@ -10,14 +9,16 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
+from typing import TYPE_CHECKING
 
 from app.config import settings
 from app.globals import CONFIG, jobs_store, recycle_bin_store
 from app.services.job_runner import run_job
 from app.state_store import get_state_file_path
 from app.storage_interface import get_job_repository
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +135,7 @@ async def lifespan(app: FastAPI):
         from app.state_store import flush_state_writes
 
         flush_state_writes()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("Failed to flush state writes during shutdown: %s", e)
 
     # Close Postgres connection pool
@@ -147,7 +148,7 @@ def schedule_background_task(coro):
     """Schedule a background task with error handling."""
     task = asyncio.create_task(coro)
 
-    def _handle_task_result(t: asyncio.Task):
+    def _handle_task_result(t: asyncio.Task) -> None:
         try:
             t.result()
         except asyncio.CancelledError:
@@ -165,13 +166,13 @@ def persist_single_wrapper(job_id: str, critical: bool = False) -> None:
     if job:
         try:
             get_job_repository().save_single(job)
-        except Exception as e:
-            logger.error("Failed to persist single job %s: %s", job_id, e)
+        except Exception:
+            logger.exception("Failed to persist single job %s", job_id)
             if critical:
                 raise
 
 
-async def run_job_wrapper(job_id: str):
+async def run_job_wrapper(job_id: str) -> None:
     """Run a job with all standard options wired from CONFIG."""
     import app.main as main_mod
 
@@ -192,7 +193,7 @@ async def run_job_wrapper(job_id: str):
     )
 
 
-def persist_state_wrapper():
+def persist_state_wrapper() -> None:
     """Persist all jobs and recycle bin to the configured backend."""
     repo = get_job_repository()
     repo.save_all(jobs=jobs_store, recycle_bin=recycle_bin_store)

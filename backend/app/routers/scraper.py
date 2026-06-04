@@ -1,5 +1,4 @@
-"""
-Scraper Router — endpoints for scraper observability, memory, configuration,
+"""Scraper Router — endpoints for scraper observability, memory, configuration,
 trend analysis, and economic tracking.
 
 Research-shell boundary
@@ -14,16 +13,19 @@ product kernel at startup.
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, Annotated
 
 from app.browser_pool import get_browser_pool
 from app.config import settings
-from app.models import SchemaField
 from app.regression_capture import get_regression_capture
 from app.scrape_telemetry import get_scrape_telemetry
 from app.scraper_diagnostics import run_diagnostics
 from app.selector_memory import get_selector_memory
 from app.utils.rbac import UserRole, require_role
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+if TYPE_CHECKING:
+    from app.models import SchemaField
 
 router = APIRouter(prefix="/api/scraper", tags=["scraper"])
 logger = logging.getLogger(__name__)
@@ -108,7 +110,7 @@ async def get_scraper_stats():
 
 
 @router.delete("/telemetry")
-async def clear_telemetry(_role: UserRole = Depends(require_role([UserRole.ADMIN]))):
+async def clear_telemetry(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))]):
     """Clear all scrape telemetry history."""
     get_scrape_telemetry().clear()
     return {"status": "ok"}
@@ -119,7 +121,7 @@ async def get_scraper_diagnostics(
     url: str,
     fields: list[SchemaField],
     min_score: float = 0.3,
-    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
+    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),  # noqa: B008
 ):
     """Run a deep diagnostic scrape for a URL.
 
@@ -135,7 +137,7 @@ async def get_scraper_diagnostics(
 
 
 @router.get("/trends")
-async def get_extraction_trends(window: int = Query(100, ge=10, le=500)):
+async def get_extraction_trends(window: Annotated[int, Query(ge=10, le=500)] = 100):
     """Analyze scrape telemetry for degradation patterns, domain health trends,
     and actionable alerts.
 
@@ -144,6 +146,7 @@ async def get_extraction_trends(window: int = Query(100, ge=10, le=500)):
 
     Returns:
         A TrendReport with domain-level trends, global metrics, and alerts.
+
     """
     from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
 
@@ -182,7 +185,7 @@ async def get_extraction_trends(window: int = Query(100, ge=10, le=500)):
 @router.get("/trends/{domain}")
 async def get_domain_trend(
     domain: str,
-    window: int = Query(100, ge=10, le=500),
+    window: Annotated[int, Query(ge=10, le=500)] = 100,
 ):
     """Get detailed trend analysis for a specific domain."""
     telemetry_history = get_scrape_telemetry().get_recent(window)
@@ -227,7 +230,7 @@ async def get_domain_trend(
 
 
 @router.get("/regressions")
-async def get_regression_archive(limit: int = Query(20, ge=1, le=100)):
+async def get_regression_archive(limit: Annotated[int, Query(ge=1, le=100)] = 20):
     """Return the regression capture archive — statistics and recent captures.
 
     The regression capture system automatically archives extraction failures
@@ -239,6 +242,7 @@ async def get_regression_archive(limit: int = Query(20, ge=1, le=100)):
 
     Returns:
         Archive statistics and the most recent capture entries.
+
     """
     capture = get_regression_capture()
     stats = capture.get_statistics()
@@ -274,7 +278,7 @@ async def get_regression_detail(entry_id: str):
 @router.post("/regressions/{entry_id}/generate-test")
 async def generate_regression_replay_test(
     entry_id: str,
-    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
     """Generate a pytest replay test for a captured regression."""
     capture = get_regression_capture()
@@ -288,7 +292,7 @@ async def generate_regression_replay_test(
 
 
 @router.post("/regressions/generate-all-tests")
-async def generate_all_replay_tests(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+async def generate_all_replay_tests(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))]):
     """Generate replay tests for all captured regressions that lack one."""
     capture = get_regression_capture()
     all_tests = capture.generate_all_replay_tests()
@@ -304,7 +308,7 @@ async def generate_all_replay_tests(_role: UserRole = Depends(require_role([User
 
 
 @router.get("/economics")
-async def get_extraction_economics(window: int = Query(200, ge=10, le=1000)):
+async def get_extraction_economics(window: Annotated[int, Query(ge=10, le=1000)] = 200):
     """Return extraction cost and efficiency analysis.
 
     Provides cost breakdowns by domain and category (LLM, browser, network),
@@ -496,7 +500,7 @@ async def get_domain_selector_confidence(domain: str):
 
 
 @router.post("/selectors/cleanup")
-async def trigger_selector_cleanup(_role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+async def trigger_selector_cleanup(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))]):
     """Manually trigger selector memory cleanup.
 
     Forces deletion of all selectors below the confidence threshold,
@@ -522,7 +526,7 @@ async def trigger_selector_cleanup(_role: UserRole = Depends(require_role([UserR
 
 
 @router.get("/selectors/low-confidence")
-async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)):
+async def get_low_confidence_selectors(threshold: Annotated[float, Query(ge=0, le=1)] = 0.5):
     """Get all selectors scoring below the specified threshold.
 
     Useful for identifying domains at risk of extraction failure.
@@ -563,19 +567,21 @@ async def get_low_confidence_selectors(threshold: float = Query(0.5, ge=0, le=1)
 async def optimize_domain_selectors(
     domain: str,
     selectors: dict | None = None,
-    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
+    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),  # noqa: B008
 ):
     """Optimize selectors for a domain using ML predictions.
 
     Analyzes CSS selector patterns and predicts quality.
     Returns recommendations for improving selectors.
 
-    Parameters:
+    Parameters
+    ----------
         - domain: Domain name
         - selectors: Optional dict of {field: css_selector} to analyze
 
     If no selectors provided, uses cached selectors from memory.
     Requires operator or admin role — triggers ML computation.
+
     """
     from app.selector_ml_optimizer import get_selector_optimizer
 
@@ -610,7 +616,7 @@ async def optimize_domain_selectors(
 
 
 @router.get("/ml/optimize/domain/{domain}/history")
-async def get_optimization_history(domain: str, limit: int = Query(10, ge=1, le=100)):
+async def get_optimization_history(domain: str, limit: Annotated[int, Query(ge=1, le=100)] = 10):
     """Get historical optimization reports for a domain.
 
     Shows how selector quality has evolved over time.
@@ -631,17 +637,19 @@ async def get_optimization_history(domain: str, limit: int = Query(10, ge=1, le=
 async def record_selector_learning(
     domain: str,
     selector: str,
-    quality: float = Query(0.0, ge=0, le=1),
-    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
+    quality: Annotated[float, Query(ge=0, le=1)] = 0.0,
+    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),  # noqa: B008
 ):
     """Record actual selector performance for ML model improvement.
 
     This feedback helps the ML model learn which selectors work best.
 
-    Parameters:
+    Parameters
+    ----------
         - domain: Domain name
         - selector: CSS selector that was used
         - quality: Actual quality score achieved [0, 1]
+
     """
     from app.selector_ml_optimizer import get_selector_optimizer
 
@@ -684,20 +692,22 @@ async def record_strategy_attempt(
     domain: str,
     strategy: str,
     success: bool,
-    time_ms: float = Query(0, ge=0),
-    quality: float = Query(0.5, ge=0, le=1),
+    time_ms: Annotated[float, Query(ge=0)] = 0,
+    quality: Annotated[float, Query(ge=0, le=1)] = 0.5,
     failure_reason: str | None = None,
-    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),
+    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),  # noqa: B008
 ):
     """Record a strategy attempt for learning.
 
-    Parameters:
+    Parameters
+    ----------
         - domain: Domain being fetched
         - strategy: Fetch strategy used (e.g., "playwright_full", "httpx_basic")
         - success: Whether attempt succeeded
         - time_ms: Time taken in milliseconds
         - quality: Quality of extracted data [0, 1]
         - failure_reason: Optional failure category
+
     """
     from app.strategy_evolution import FetchStrategy, get_strategy_evolution_engine
 
@@ -727,9 +737,7 @@ async def get_domain_strategy_analysis(domain: str):
     from app.strategy_evolution import get_strategy_evolution_engine
 
     engine = get_strategy_evolution_engine()
-    report = engine.get_domain_strategy_report(domain)
-
-    return report
+    return engine.get_domain_strategy_report(domain)
 
 
 @router.get("/strategy/report")
@@ -741,13 +749,14 @@ async def get_all_strategies_report():
     from app.strategy_evolution import get_strategy_evolution_engine
 
     engine = get_strategy_evolution_engine()
-    report = engine.get_all_domains_strategy_report()
-
-    return report
+    return engine.get_all_domains_strategy_report()
 
 
 @router.post("/strategy/evolve/{domain}")
-async def evolve_domain_strategy(domain: str, _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))):
+async def evolve_domain_strategy(
+    domain: str,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+):
     """Manually trigger strategy evolution for a domain.
 
     Useful when current strategy is degraded.

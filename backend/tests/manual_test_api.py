@@ -1,4 +1,3 @@
-import json
 import time
 
 import requests
@@ -6,21 +5,16 @@ import requests
 BASE_URL = "http://127.0.0.1:8000"
 
 
-def wait_for_job(job_id):
+def wait_for_job(job_id) -> None:
     for _ in range(60):
         res = requests.get(f"{BASE_URL}/api/jobs/{job_id}")
         data = res.json()
         if data["status"] in ["completed", "failed", "canceled"]:
-            print(f"Job {job_id} finished with status:", data["status"])
-            print("Results length:", len(data.get("results", [])))
-            print("First record:", json.dumps(data.get("results", [])[0] if data.get("results") else {}, indent=2))
             return
         time.sleep(2)
-    print("Job timed out!")
 
 
 def test_manual() -> None:
-    print("=== Testing MANUAL Mode ===")
     res = requests.post(
         f"{BASE_URL}/api/jobs",
         json={
@@ -36,13 +30,11 @@ def test_manual() -> None:
             "source_policy": "all_sources",
         },
     )
-    print("Manual create status:", res.status_code)
     job_id = res.json()["job_id"]
     wait_for_job(job_id)
 
 
 def test_auto() -> None:
-    print("\n=== Testing AUTO Mode ===")
     res = requests.post(
         f"{BASE_URL}/api/jobs",
         json={
@@ -59,7 +51,6 @@ def test_auto() -> None:
             "source_policy": "all_sources",
         },
     )
-    print("Auto create status:", res.status_code)
     job_id = res.json()["job_id"]
     wait_for_job(job_id)
 

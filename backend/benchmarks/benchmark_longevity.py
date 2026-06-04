@@ -1,5 +1,4 @@
-"""
-Million-Event Evolutionary Validation — Phase 54
+"""Million-Event Evolutionary Validation — Phase 54.
 ===============================================
 LAW: Systems must survive 1M+ evolution cycles without structural decay.
 
@@ -16,12 +15,14 @@ from app.semantic_world_state import SemanticWorldState
 
 def _check(condition: bool, message: str) -> None:
     """Runtime invariant check. Used instead of ``assert`` so the benchmark
-    keeps working when run with ``python -O`` (which strips asserts)."""
+    keeps working when run with ``python -O`` (which strips asserts).
+    """
     if not condition:
-        raise SystemExit(f"BENCHMARK INVARIANT FAILED: {message}")
+        msg = f"BENCHMARK INVARIANT FAILED: {message}"
+        raise SystemExit(msg)
 
 
-def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 0.5):
+def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 0.5) -> None:
     ws = SemanticWorldState()
     ws.clear()
 
@@ -32,8 +33,6 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
     checkpoint_interval = cycles // 20
 
     history_diversity = []
-
-    print(f"\n--- Initiating Longevity Validation ({cycles} cycles) ---")
 
     for i in range(cycles):
         # 1. Randomized but clustered Event (simulate recurring patterns)
@@ -81,22 +80,11 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
             history_diversity.append(diversity)
 
         if i % checkpoint_interval == 0 and i > 0:
-            elapsed = time.time() - start_time
-            report = ws._observability.get_governance_report(ws.capture_governance_snapshot())
-            print(
-                f"  [{i}] Energy: {ws.metrics.global_energy:.2f}, Entropy: {ws.metrics.global_entropy:.2f}, "
-                f"Diversity: {report['diversity']:.2f}, Elapsed: {elapsed:.1f}s",
-            )
+            time.time() - start_time
+            ws._observability.get_governance_report(ws.capture_governance_snapshot())
 
-    total_duration = time.time() - start_time
-    final_report = ws._observability.get_governance_report(ws.capture_governance_snapshot())
-
-    print("\n--- Longevity Validation Completed ---")
-    print(f"Total Duration: {total_duration:.2f}s")
-    print(f"Final Global Energy: {ws.metrics.global_energy:.2f}")
-    print(f"Final Global Entropy: {ws.metrics.global_entropy:.2f}")
-    print(f"Final Diversity: {final_report['diversity']:.3f}")
-    print(f"Active Regions: {ws.get_topology_view().region_count()}")
+    time.time() - start_time
+    ws._observability.get_governance_report(ws.capture_governance_snapshot())
 
     # 6. Evolutionary Stability Invariants
     # Energy must be bounded
@@ -105,14 +93,10 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
     _check(ws.metrics.global_entropy <= 1.0, f"global_entropy exceeded economy bound: {ws.metrics.global_entropy}")
     # Diversity should not collapse to zero (Semantic Freezing)
     avg_diversity = sum(history_diversity) / len(history_diversity)
-    print(f"Average Diversity over horizon: {avg_diversity:.3f}")
     _check(avg_diversity > diversity_threshold, f"diversity collapsed: {avg_diversity} <= {diversity_threshold}")
 
     # Check Journal Health (Phase 57)
-    journal_size = ws.trace_causality(limit=1000000)
-    print(f"Causal Journal Size: {len(journal_size)}")
-
-    print("\n[OK] Synthetic longevity invariants held for this run.")
+    ws.trace_causality(limit=1000000)
 
 
 if __name__ == "__main__":

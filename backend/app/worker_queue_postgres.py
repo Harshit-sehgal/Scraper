@@ -11,6 +11,7 @@ Usage:
 """
 
 import asyncio
+import contextlib
 import datetime
 import json
 import logging
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 _CURRENT_QUEUE_SCHEMA_VERSION = 3
 
 
-def _ensure_schema():
+def _ensure_schema() -> None:
     """Create queue tables and run schema migrations."""
     with _conn() as conn:
         # Check table existence via information_schema instead of try / except,
@@ -41,7 +42,7 @@ def _ensure_schema():
             # Verify the table has the expected structure
             try:
                 old_row = _fetch_one(conn, "SELECT id FROM queue_schema_version LIMIT 1")
-            except Exception:
+            except Exception:  # noqa: BLE001
                 old_row = None
             if old_row is None:
                 _execute(conn, "DROP TABLE IF EXISTS queue_schema_version CASCADE")
@@ -139,7 +140,7 @@ def _ensure_schema():
                 # Add result column (used for storing successful task results)
                 try:
                     _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN result TEXT")
-                except Exception:  # nosec B110
+                except Exception:  # noqa: BLE001, nosec B110
                     pass
                 current = 2
 
@@ -147,13 +148,14 @@ def _ensure_schema():
                 # Add execution_time_ms column for tracking task latencies
                 try:
                     _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN execution_time_ms INTEGER")
-                except Exception:  # nosec B110
+                except Exception:  # noqa: BLE001, nosec B110
                     pass
                 current = 3
 
             _execute(
                 conn,
-                "INSERT INTO queue_schema_version (id, version) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version",
+                "INSERT INTO queue_schema_version (id, version) VALUES (1, %s)"
+                " ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version",
                 (current,),
             )
             logger.info("Postgres queue schema migrated to version %d", current)
@@ -167,7 +169,7 @@ class PostgresWorkerQueue:
     Mirrors the WorkerQueue (SQLite) interface so callers are interchangeable.
     """
 
-    def __init__(self, max_concurrency: int = 5, poll_interval: float = 1.0):
+    def __init__(self, max_concurrency: int = 5, poll_interval: float = 1.0) -> None:
         self._max_concurrency = max_concurrency
         self._poll_interval = poll_interval
         self._running = False
@@ -179,7 +181,7 @@ class PostgresWorkerQueue:
 
     # ─── Task registration ─────────────────────────────────────────────
 
-    def register_handler(self, task_type: str, handler: Callable):
+    def register_handler(self, task_type: str, handler: Callable) -> None:
         """Register an async handler function for a task type.
 
         The handler receives (task: QueueTask) and should return True on success.
@@ -315,18 +317,17 @@ class PostgresWorkerQueue:
                     if isinstance(v, (datetime.datetime, datetime.date)):
                         row[_f] = v.strftime("%Y-%m-%d %H:%M:%S")
 
-                task = QueueTask.from_dict(
+                return QueueTask.from_dict(
                     {
                         **row,
                         "payload": json.loads(row["payload"]),
                     },
                 )
-                return task
         except Exception as e:
             logger.error("Postgres dequeue error: %s", e, exc_info=True)
             return None
 
-    async def complete(self, task_id: str, result: dict | None = None):
+    async def complete(self, task_id: str, result: dict | None = None) -> None:
         """Mark a task as completed successfully."""
         async with self._in_flight_lock:
             await asyncio.to_thread(
@@ -369,7 +370,7 @@ class PostgresWorkerQueue:
         task_id: str,
         error: str,
         retry: bool = True,
-    ):
+    ) -> None:
         """Mark a task as failed. Retries if attempts remain."""
         async with self._in_flight_lock:
             await asyncio.to_thread(
@@ -450,18 +451,16 @@ class PostgresWorkerQueue:
             if task_id in self._in_flight:
                 flight_task = self._in_flight[task_id]
                 flight_task.cancel()
-                result = await asyncio.to_thread(
+                return await asyncio.to_thread(
                     self._cancel_in_flight_sync,
                     task_id,
                 )
-                return result
 
             # Check pending tasks
-            result = await asyncio.to_thread(
+            return await asyncio.to_thread(
                 self._cancel_pending_sync,
                 task_id,
             )
-            return result
 
     def _cancel_in_flight_sync(self, task_id: str) -> bool:
         """Synchronous cancel for in-flight tasks — runs in a thread."""
@@ -534,7 +533,7 @@ class PostgresWorkerQueue:
 
     # ─── Worker loop ───────────────────────────────────────────────────
 
-    async def start(self):
+    async def start(self) -> None:
         """Start the background worker loop with recovery of stuck tasks."""
         if self._running:
             return
@@ -547,7 +546,7 @@ class PostgresWorkerQueue:
             self._poll_interval,
         )
 
-    def _recover_stuck_tasks(self):
+    def _recover_stuck_tasks(self) -> None:
         """Reset any tasks stuck in 'running' state back to 'pending' for retry.
 
         Synchronous — called via ``asyncio.to_thread`` to avoid blocking the event loop.
@@ -564,25 +563,23 @@ class PostgresWorkerQueue:
                         "WHERE status = 'running'",
                     )
                     logger.info("Recovered %d stuck task(s) from previous worker crash", count)
-        except Exception as e:
-            logger.error("Failed to recover stuck tasks: %s", e)
+        except Exception:
+            logger.exception("Failed to recover stuck tasks: %s")
 
-    async def stop(self, drain: bool = True):
+    async def stop(self, drain: bool = True) -> None:
         """Stop the worker loop. Optionally drain in-flight tasks."""
         self._running = False
         if self._worker_task:
             self._worker_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._worker_task
-            except asyncio.CancelledError:
-                pass
 
         if drain:
             await self._drain_in_flight()
 
         logger.info("Postgres worker queue stopped (drained=%s)", drain)
 
-    async def _worker_loop(self):
+    async def _worker_loop(self) -> None:
         """Main worker loop: dequeue and dispatch tasks."""
         while self._running:
             try:
@@ -614,7 +611,7 @@ class PostgresWorkerQueue:
                 logger.error("Worker loop error: %s", e, exc_info=True)
                 await asyncio.sleep(1)
 
-    async def _execute_task(self, task: QueueTask):
+    async def _execute_task(self, task: QueueTask) -> None:
         """Execute a single task with timeout."""
         handler = self._handlers.get(task.type)
         if handler is None:
@@ -631,17 +628,17 @@ class PostgresWorkerQueue:
                 await self.fail(task.id, "Handler returned False", retry=True)
             else:
                 await self.complete(task.id, result)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await self.fail(task.id, f"Timeout after {task.timeout_seconds}s", retry=True)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             await self.fail(task.id, f"{type(e).__name__}: {e}", retry=True)
 
-    async def _cleanup_in_flight(self, task_id: str):
+    async def _cleanup_in_flight(self, task_id: str) -> None:
         """Remove a task from the in-flight tracker."""
         async with self._in_flight_lock:
             self._in_flight.pop(task_id, None)
 
-    async def _drain_in_flight(self):
+    async def _drain_in_flight(self) -> None:
         """Wait for all in-flight tasks to complete."""
         async with self._in_flight_lock:
             tasks = list(self._in_flight.values())
@@ -677,8 +674,8 @@ class PostgresWorkerQueue:
                 if row:
                     return row
                 return None
-        except Exception as e:
-            logger.error("Failed to get task state for %s: %s", task_id, e)
+        except Exception:
+            logger.exception("Failed to get task state for %s", task_id)
             return None
 
     async def get_task_state_async(self, task_id: str) -> dict | None:
@@ -724,7 +721,7 @@ class PostgresWorkerQueue:
                     "next_tasks": top_pending,
                 }
         except Exception as e:
-            logger.error("Failed to get Postgres queue status: %s", e)
+            logger.exception("Failed to get Postgres queue status: %s")
             return {"ok": False, "backend": "postgres", "error": str(e), "pending": 0, "running": 0}
 
     async def get_status_async(self) -> dict:
@@ -735,16 +732,15 @@ class PostgresWorkerQueue:
         """Return dead letter queue entries."""
         try:
             with _conn() as conn:
-                rows = _fetch_all(
+                return _fetch_all(
                     conn,
                     """SELECT * FROM queue_task_history
                        WHERE status = 'dead_letter'
                        ORDER BY finished_at DESC LIMIT %s""",
                     (limit,),
                 )
-                return rows
-        except Exception as e:
-            logger.error("Failed to get dead letter queue: %s", e)
+        except Exception:
+            logger.exception("Failed to get dead letter queue: %s")
             return []
 
     async def get_dead_letter_queue_async(self, limit: int = 50) -> list[dict]:
@@ -787,15 +783,15 @@ class PostgresWorkerQueue:
                     (task_id,),
                 )
                 return True
-        except Exception as e:
-            logger.error("Failed to retry dead letter task %s: %s", task_id, e)
+        except Exception:
+            logger.exception("Failed to retry dead letter task %s", task_id)
             return False
 
     async def retry_dead_letter_async(self, task_id: str) -> bool:
         """Async version of ``retry_dead_letter`` — runs the blocking DB call in a thread."""
         return await asyncio.to_thread(self.retry_dead_letter, task_id)
 
-    def clear_completed_history(self, older_than_days: int = 7):
+    def clear_completed_history(self, older_than_days: int = 7) -> None:
         """Clean up old completed task history.
 
         This method is synchronous and performs blocking DB calls. When called
@@ -810,10 +806,10 @@ class PostgresWorkerQueue:
                        AND status IN ('completed', 'dead_letter')""",
                     (older_than_days,),
                 )
-        except Exception as e:
-            logger.error("Failed to clear completed history: %s", e)
+        except Exception:
+            logger.exception("Failed to clear completed history: %s")
 
-    async def clear_completed_history_async(self, older_than_days: int = 7):
+    async def clear_completed_history_async(self, older_than_days: int = 7) -> None:
         """Async version of ``clear_completed_history`` — runs the blocking DB call in a thread."""
         await asyncio.to_thread(self.clear_completed_history, older_than_days)
 
@@ -836,7 +832,7 @@ def get_postgres_worker_queue() -> PostgresWorkerQueue:
     return _queue_instance
 
 
-def reset_postgres_worker_queue():
+def reset_postgres_worker_queue() -> None:
     """Reset the global Postgres queue instance (for testing)."""
     global _queue_instance
     _queue_instance = None

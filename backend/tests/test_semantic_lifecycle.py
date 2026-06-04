@@ -11,9 +11,14 @@ Covers the hardening sprint:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Never
+
 import pytest
 from app.semantic_world_state.core import SemanticWorldState
 from app.transaction_context import get_active_transaction
+
+if TYPE_CHECKING:
+    from app.semantic_allocation_engine import _SemanticMetricsProtocol
 
 # ─── Test 1: reset_world_state does not leak subscribers ─────────────────
 
@@ -23,7 +28,8 @@ class TestResetWorldStateLifecycle:
 
     def test_reset_world_state_does_not_duplicate_field_wave_subscribers(self) -> None:
         """After reset_world_state(), a new world state should have exactly
-        one subscriber (its own), not accumulate from the old instance."""
+        one subscriber (its own), not accumulate from the old instance.
+        """
         from app.semantic_events import SemanticEventType
         from app.semantic_world_state import get_world_state, reset_world_state
 
@@ -88,11 +94,10 @@ class TestTransactionContextExceptionSafety:
     def test_transaction_resets_on_exception_in_body(self) -> None:
         """Exception inside the transaction body should still reset context."""
         ws = SemanticWorldState()
-        with pytest.raises(RuntimeError, match="test error"):
-            with ws.transaction("test_exception"):
-                assert get_active_transaction() is not None
-                msg = "test error"
-                raise RuntimeError(msg)
+        with pytest.raises(RuntimeError, match="test error"), ws.transaction("test_exception"):
+            assert get_active_transaction() is not None
+            msg = "test error"
+            raise RuntimeError(msg)
         assert get_active_transaction() is None
 
     def test_nested_transaction_does_not_set_new_context(self) -> None:
@@ -108,13 +113,14 @@ class TestTransactionContextExceptionSafety:
 
     def test_transaction_context_resets_if_begin_transaction_fails(self) -> None:
         """If a sub-state's begin_transaction() raises, the context variable
-        must still be reset to its previous value."""
+        must still be reset to its previous value.
+        """
         ws = SemanticWorldState()
 
         # Mock _manifold.begin_transaction to raise
         original_begin = ws._manifold.begin_transaction
 
-        def failing_begin():
+        def failing_begin() -> Never:
             msg = "begin_transaction simulated failure"
             raise RuntimeError(msg)
 
@@ -227,7 +233,8 @@ class TestCloseIdempotency:
 class TestBestEffortRollback:
     """Verify that transaction rollback is best-effort: if a subsystem
     rollback fails, the others still roll back and the original exception
-    is re-raised."""
+    is re-raised.
+    """
 
     def test_best_effort_rollback_logs_and_continues(self) -> None:
         """If one subsystem's rollback fails, others should still roll back."""
@@ -236,17 +243,16 @@ class TestBestEffortRollback:
         # Make _manifold.rollback raise
         original_rollback = ws._manifold.rollback
 
-        def failing_rollback():
+        def failing_rollback() -> Never:
             msg = "rollback simulated failure"
             raise RuntimeError(msg)
 
         ws._manifold.rollback = failing_rollback
 
         try:
-            with pytest.raises(RuntimeError, match="original error"):
-                with ws.transaction("test_best_effort"):
-                    msg = "original error"
-                    raise RuntimeError(msg)
+            with pytest.raises(RuntimeError, match="original error"), ws.transaction("test_best_effort"):
+                msg = "original error"
+                raise RuntimeError(msg)
         finally:
             ws._manifold.rollback = original_rollback
 
@@ -278,7 +284,7 @@ class TestBestEffortRollback:
                 originals[name] = obj.rollback
 
                 def make_failing(name_):
-                    def failing():
+                    def failing() -> Never:
                         msg = f"rollback failed for {name_}"
                         raise RuntimeError(msg)
 
@@ -287,10 +293,9 @@ class TestBestEffortRollback:
                 obj.rollback = make_failing(name)
 
         try:
-            with pytest.raises(RuntimeError, match="test all fail"):
-                with ws.transaction("test_all_fail"):
-                    msg = "test all fail"
-                    raise RuntimeError(msg)
+            with pytest.raises(RuntimeError, match="test all fail"), ws.transaction("test_all_fail"):
+                msg = "test all fail"
+                raise RuntimeError(msg)
         finally:
             for name, obj in state_attrs.items():
                 if name in originals:
@@ -300,7 +305,8 @@ class TestBestEffortRollback:
 
     def test_transaction_context_resets_if_commit_fails(self) -> None:
         """If a subsystem's commit() raises, the transaction context must reset.
-        Additionally, rollback must be attempted on all subsystems that have it."""
+        Additionally, rollback must be attempted on all subsystems that have it.
+        """
         ws = SemanticWorldState()
 
         # Make _manifold.commit raise
@@ -308,7 +314,7 @@ class TestBestEffortRollback:
         original_rollback = ws._manifold.rollback
         commit_called = False
 
-        def failing_commit():
+        def failing_commit() -> Never:
             nonlocal commit_called
             commit_called = True
             msg = "commit simulated failure"
@@ -317,9 +323,8 @@ class TestBestEffortRollback:
         ws._manifold.commit = failing_commit
 
         try:
-            with pytest.raises(RuntimeError, match="commit simulated failure"):
-                with ws.transaction("test_commit_fail"):
-                    pass  # Body succeeds, commit fails
+            with pytest.raises(RuntimeError, match="commit simulated failure"), ws.transaction("test_commit_fail"):
+                pass  # Body succeeds, commit fails
             # Context must be reset
             assert get_active_transaction() is None, "Transaction context was not reset after commit failure"
             assert commit_called, "commit() should have been called"
@@ -329,7 +334,8 @@ class TestBestEffortRollback:
 
     def test_rollback_failure_does_not_mask_original_exception(self) -> None:
         """When a subsystem rollback fails, the ORIGINAL exception
-        (not the rollback exception) must be raised to the caller."""
+        (not the rollback exception) must be raised to the caller.
+        """
         ws = SemanticWorldState()
 
         # Make _manifold.commit raise one error, and make rollback
@@ -337,11 +343,11 @@ class TestBestEffortRollback:
         original_commit = ws._manifold.commit
         original_rollback = ws._manifold.rollback
 
-        def failing_commit():
+        def failing_commit() -> Never:
             msg = "COMMIT_ERROR"
             raise RuntimeError(msg)
 
-        def failing_rollback():
+        def failing_rollback() -> Never:
             msg = "ROLLBACK_ERROR"
             raise RuntimeError(msg)
 
@@ -349,9 +355,8 @@ class TestBestEffortRollback:
         ws._manifold.rollback = failing_rollback
 
         try:
-            with pytest.raises(RuntimeError, match="COMMIT_ERROR"):
-                with ws.transaction("test_mask"):
-                    pass
+            with pytest.raises(RuntimeError, match="COMMIT_ERROR"), ws.transaction("test_mask"):
+                pass
             # The rollback error (ROLLBACK_ERROR) must NOT mask COMMIT_ERROR
         finally:
             ws._manifold.commit = original_commit
@@ -361,7 +366,8 @@ class TestBestEffortRollback:
 
     def test_all_subsystems_attempt_rollback_even_if_one_fails(self) -> None:
         """When one subsystem rollback fails, the remaining subsystems
-        must still have their rollback() called."""
+        must still have their rollback() called.
+        """
         ws = SemanticWorldState()
 
         # Track which subsystems had rollback called
@@ -393,10 +399,9 @@ class TestBestEffortRollback:
                 obj.rollback = make_tracker(name)
 
         try:
-            with pytest.raises(RuntimeError, match="original body error"):
-                with ws.transaction("test_all_attempted"):
-                    msg = "original body error"
-                    raise RuntimeError(msg)
+            with pytest.raises(RuntimeError, match="original body error"), ws.transaction("test_all_attempted"):
+                msg = "original body error"
+                raise RuntimeError(msg)
         finally:
             for name, obj in state_attrs.items():
                 if name in originals:
@@ -413,11 +418,13 @@ class TestBestEffortRollback:
 
 class TestMetricsProtocol:
     """Verify the _SemanticMetricsProtocol is structurally compatible
-    with EnergyState (the actual ws.metrics object)."""
+    with EnergyState (the actual ws.metrics object).
+    """
 
     def test_metrics_protocol_attributes_exist_on_energy_state(self) -> None:
         """All attributes required by the Protocol must exist on the
-        EnergyState object that ws.metrics points to."""
+        EnergyState object that ws.metrics points to.
+        """
         from app.semantic_world_state import get_world_state
 
         ws = get_world_state()
@@ -437,8 +444,8 @@ class TestMetricsProtocol:
 
     def test_metrics_protocol_can_be_used_instead_of_any(self) -> None:
         """The Protocol should be usable as a type annotation
-        without mypy errors (verified structurally)."""
-        from app.semantic_allocation_engine import _SemanticMetricsProtocol
+        without mypy errors (verified structurally).
+        """
         from app.semantic_world_state import get_world_state
 
         ws = get_world_state()

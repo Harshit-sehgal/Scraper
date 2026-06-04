@@ -19,7 +19,7 @@ class MockSettings:
         admin_api_key: str = "",
         storage_backend: str = "sqlite",
         database_url: str = "",
-    ):
+    ) -> None:
         self.ENV = env
         self.API_KEY = api_key
         self.OPERATOR_API_KEY = operator_api_key

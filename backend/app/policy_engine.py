@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from weakref import WeakKeyDictionary
 
 
-def get_world_state() -> "SemanticWorldState":
+def get_world_state() -> SemanticWorldState:
     import app.semantic_world_state
 
     return app.semantic_world_state.get_world_state()
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 class SubstratePolicy:
     """Governs when and how automated actions and structural changes occur."""
 
-    def __init__(self, ws: SemanticWorldState | None = None):
+    def __init__(self, ws: SemanticWorldState | None = None) -> None:
         self.ws: SemanticWorldState = ws or get_world_state()
         # Phase 68: Operational Guardrails
         self.max_community_density = 15  # Max roles per cluster
@@ -105,10 +105,7 @@ class SubstratePolicy:
         from app.semantic_inference_engine import RoleEmbeddingEngine
 
         certainty = RoleEmbeddingEngine().get_certainty()
-        if certainty < 0.1:
-            return False
-
-        return True
+        return not certainty < 0.1
 
 
 _policy_instances: WeakKeyDictionary | None = None

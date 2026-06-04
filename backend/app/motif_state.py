@@ -21,7 +21,7 @@ from app.transaction_context import active_transaction
 class MotifState:
     """Sole owner of the semantic field's motif structures."""
 
-    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None):
+    def __init__(self, delta_callback: Callable[[str, str, dict], None] | None = None) -> None:
         self._delta_callback = delta_callback
         self._motif_counts: Counter = Counter()
         self._motif_timestamps: dict[tuple[str, ...], int] = {}
@@ -35,18 +35,18 @@ class MotifState:
         return None
 
     @_staging.setter
-    def _staging(self, value: dict | None):
+    def _staging(self, value: dict | None) -> None:
         tx = active_transaction.get()
         if tx is not None:
             tx[f"motif_staging_{id(self)}"] = value
 
-    def _record(self, action: str, details: dict):
+    def _record(self, action: str, details: dict) -> None:
         if self._delta_callback:
             self._delta_callback("motif", action, details)
 
     # ─── Transaction Support ─────────────────────────────────────────────
 
-    def begin_transaction(self):
+    def begin_transaction(self) -> None:
         """Snapshot current state for staging."""
         self._staging = {
             "motif_counts": Counter(self._motif_counts),
@@ -54,7 +54,7 @@ class MotifState:
             "motif_stability": dict(self._motif_stability),
         }
 
-    def commit(self):
+    def commit(self) -> None:
         """Apply staged changes."""
         if self._staging is not None:
             self._motif_counts = self._staging["motif_counts"]
@@ -62,7 +62,7 @@ class MotifState:
             self._motif_stability = self._staging["motif_stability"]
             self._staging = None
 
-    def rollback(self):
+    def rollback(self) -> None:
         self._staging = None
 
     def _get_struct(self, key: str):
@@ -75,7 +75,7 @@ class MotifState:
         }
         return getattr(self, attr_map[key])
 
-    def _set_struct(self, key: str, val):
+    def _set_struct(self, key: str, val) -> None:
         if self._staging is not None:
             self._staging[key] = val
         else:
@@ -114,7 +114,7 @@ class MotifState:
 
     # ─── Controlled Mutations ───────────────────────────────────────────
 
-    def reinforce(self, motif: tuple[str, ...], current_record: int):
+    def reinforce(self, motif: tuple[str, ...], current_record: int) -> None:
         """Reinforce a structural motif with temporal awareness."""
         counts = self._get_struct("motif_counts")
         counts[motif] += 1
@@ -142,7 +142,7 @@ class MotifState:
         base_stability = count / max(total_records, 1)
         return min(base_stability * decay_factor, 1.0)  # type: ignore[no-any-return]
 
-    def prune_weak(self, threshold: float = 0.05):
+    def prune_weak(self, threshold: float = 0.05) -> None:
         """Remove motifs that have decayed below threshold."""
         stabs = self._get_struct("motif_stability")
         counts = self._get_struct("motif_counts")
@@ -156,7 +156,7 @@ class MotifState:
         self._set_struct("motif_counts", counts)
         self._set_struct("motif_timestamps", times)
 
-    def prune_aged(self, max_stability: float = 0.01):
+    def prune_aged(self, max_stability: float = 0.01) -> None:
         """Remove motifs whose stability has decayed below max_stability."""
         stabs = self._get_struct("motif_stability")
         counts = self._get_struct("motif_counts")
@@ -170,7 +170,7 @@ class MotifState:
         self._set_struct("motif_timestamps", times)
         self._set_struct("motif_stability", stabs)
 
-    def remove(self, motif: tuple[str, ...]):
+    def remove(self, motif: tuple[str, ...]) -> None:
         """Remove a specific motif from all stores."""
         counts = self._get_struct("motif_counts")
         times = self._get_struct("motif_timestamps")
@@ -208,7 +208,7 @@ class MotifState:
             "motif_stability": {str(k): v for k, v in self._motif_stability.items()},
         }
 
-    def from_dict(self, data: dict):
+    def from_dict(self, data: dict) -> None:
         self.clear()
         for k, v in data.get("motif_counts", {}).items():
             self._motif_counts[tuple(self._parse_motif_key(k))] = v
@@ -234,12 +234,12 @@ class MotifState:
             logging.getLogger(__name__).debug("Fallback parsing motif key: %s", key)
         return tuple(key.split(", "))
 
-    def clear(self):
+    def clear(self) -> None:
         self._set_struct("motif_counts", Counter())
         self._set_struct("motif_timestamps", {})
         self._set_struct("motif_stability", {})
 
-    def merge(self, other_data: dict):
+    def merge(self, other_data: dict) -> None:
         """Merge motif memory from another node or branch (Phase 32 / 39)."""
         counts = self._get_struct("motif_counts")
         times = self._get_struct("motif_timestamps")

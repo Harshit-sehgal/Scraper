@@ -13,8 +13,7 @@ async def run_sync_in_thread(
     *args,
     **kwargs,
 ) -> T:
-    """
-    Run a blocking function in a background thread and await its result.
+    """Run a blocking function in a background thread and await its result.
 
     Uses asyncio.to_thread when available (Python 3.9+) which is more
     efficient than manual thread polling. Falls back to run_in_executor

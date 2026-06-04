@@ -1,5 +1,4 @@
-"""
-Semantic Stress Testing — Adversarial Substrate Validation
+"""Semantic Stress Testing — Adversarial Substrate Validation.
 =========================================================
 LAW 46: Systemic survivability requires resilience against adversarial
 semantic streams (noise, contradictions, and recursive hallucinations).
@@ -20,8 +19,8 @@ def ws():
 
 def test_contradictory_bombardment(ws) -> None:
     """Feed two batches of data that directly contradict each other's schema
-    patterns and verify thermodynamic containment."""
-
+    patterns and verify thermodynamic containment.
+    """
     # Use roles that are in ROLE_EXCLUSIVITY to ensure regions are created
     schema = ["price", "cost"]
 
@@ -33,36 +32,30 @@ def test_contradictory_bombardment(ws) -> None:
         {"price": "Chennai", "cost": "Bangalore", "other": "Contradictory D"},
     ]
 
-    print("\n--- Phase 1: Stable Knowledge Acquisition ---")
     run_pipeline(batch1, schema)
     # Ensure some regions were created
     assert ws.get_topology_view().region_count() > 0
 
-    print("\n--- Phase 2: Contradictory Bombardment ---")
     run_pipeline(batch2, schema)
 
     # Entropy and Energy should reflect the tension (Adjusted for Phase 56 smoothing)
-    print(f"Entropy after bombardment: {ws.metrics.global_entropy:.2f}")
     assert ws.metrics.global_entropy > 0.05
 
-    print("\n--- Phase 3: Stabilization Pass ---")
     for _ in range(5):
         run_pipeline(batch1, schema)
         ws.apply_memory_decay()
         ws.aggregate_from_regions()
 
-    print(f"Entropy after stabilization: {ws.metrics.global_entropy:.2f}")
     assert ws.metrics.global_entropy < 0.7
 
 
 def test_recursive_hallucination_chain(ws) -> None:
     """Simulate a loop where the system's own outputs are fed back."""
-
     schema = ["entity_name", "price"]
     # Meaty data to pass filters
     data = [{"entity_name": "Product Alpha", "price": "$100"}]
 
-    for i in range(10):
+    for _i in range(10):
         results = run_pipeline(data, schema)
         if not results:
             break
@@ -85,7 +78,6 @@ def test_oscillation_detection(ws) -> None:
     oscillations = ws._observability.detect_oscillations(snapshots, window=20)
     assert len(oscillations) > 0
     assert oscillations[0]["type"] == "global_energy"
-    print(f"\nOscillation detected: {oscillations[0]}")
 
 
 def test_massive_topology_scaling(ws) -> None:
@@ -109,12 +101,10 @@ def test_massive_topology_scaling(ws) -> None:
             # Use 'price' and 'cost' to trigger ROLE_EXCLUSIVITY regions
             ws.capture_pre_allocation_field([token], ["price", "cost"])
 
-    capture_duration = time.time() - start_time
-    print(f"\nCaptured {ws.get_topology_view().region_count()} regions in {capture_duration:.2f}s")
+    time.time() - start_time
 
     start_time = time.time()
     ws.redistribute_instability()
     prop_duration = time.time() - start_time
-    print(f"Propagation completed in {prop_duration:.2f}s")
 
     assert prop_duration < 0.2

@@ -1,5 +1,4 @@
-"""
-Degradation Predictor — predicts what's about to fail in the extraction system.
+"""Degradation Predictor — predicts what's about to fail in the extraction system.
 
 Uses telemetry trend data from TrendAnalyzer to:
   - Identify domains heading toward failure based on slope analysis
@@ -20,8 +19,10 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from app.trend_analyzer import DomainTrend
+if TYPE_CHECKING:
+    from app.trend_analyzer import DomainTrend
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +150,7 @@ class DegradationPredictor:
     HIGH_HEALTH_THRESHOLD = 45
     MEDIUM_HEALTH_THRESHOLD = 65
 
-    def __init__(self, history_window: int = 200):
+    def __init__(self, history_window: int = 200) -> None:
         self._history_window = history_window
 
     def predict(self, telemetry_history: list[dict], domain_trends: dict | None = None) -> PredictionReport:
@@ -162,6 +163,7 @@ class DegradationPredictor:
 
         Returns:
             A PredictionReport with per-domain predictions and system risk.
+
         """
         from app.trend_analyzer import TrendAnalyzer
 
@@ -227,7 +229,7 @@ class DegradationPredictor:
 
     # ── Per-Domain Prediction ───────────────────────────────────────
 
-    def _predict_domain(self, domain: str, trend: "DomainTrend") -> list[Prediction]:
+    def _predict_domain(self, domain: str, trend: DomainTrend) -> list[Prediction]:
         """Generate all predictions for a single domain."""
         predictions: list[Prediction] = []
 
@@ -368,7 +370,7 @@ class DegradationPredictor:
 
         return predictions
 
-    def _predict_health_failure(self, domain: str, trend: "DomainTrend") -> Prediction | None:
+    def _predict_health_failure(self, domain: str, trend: DomainTrend) -> Prediction | None:
         """Generate a general health-based prediction if health is poor or declining."""
         if trend.health_score >= self.MEDIUM_HEALTH_THRESHOLD:
             return None  # Healthy enough
@@ -421,7 +423,7 @@ class DegradationPredictor:
         health_score_trend: str,
         evidence: list[str],
         recommended_actions: list[str],
-        trend: "DomainTrend",
+        trend: DomainTrend,
         cascade_risk: bool = False,
         cascade_risk_domains: list[str] | None = None,
     ) -> Prediction:
@@ -440,7 +442,7 @@ class DegradationPredictor:
             data_window_size=self._history_window,
         )
 
-    def _estimate_confidence(self, trend: "DomainTrend", base: float) -> float:
+    def _estimate_confidence(self, trend: DomainTrend, base: float) -> float:
         """Adjust base confidence based on data quality."""
         # More samples = more confident
         sample_factor = min(1.0, trend.sample_count / 30)
@@ -448,7 +450,7 @@ class DegradationPredictor:
         adjusted = base * (0.5 + 0.5 * sample_factor)
         return max(0.1, min(1.0, adjusted))
 
-    def _estimate_selector_decay_timer(self, trend: "DomainTrend") -> float | None:
+    def _estimate_selector_decay_timer(self, trend: DomainTrend) -> float | None:
         """Estimate hours until selector decay causes significant extraction loss."""
         if trend.sample_count < 5:
             return None
@@ -470,7 +472,7 @@ class DegradationPredictor:
 
         return None
 
-    def _determine_health_trend(self, trend: "DomainTrend") -> str:
+    def _determine_health_trend(self, trend: DomainTrend) -> str:
         """Determine if health is improving, stable, or declining."""
         declining_signals = 0
         if trend.quality_trend == "degrading":
@@ -490,7 +492,7 @@ class DegradationPredictor:
 
         if declining_signals >= 2:
             return "declining"
-        elif improving_signals >= 2:
+        if improving_signals >= 2:
             return "improving"
         return "stable"
 
@@ -498,9 +500,9 @@ class DegradationPredictor:
         """Compute overall systemic risk level."""
         if report.critical_risk_count >= 3 or report.high_risk_count >= 5:
             return "critical"
-        elif report.critical_risk_count >= 1 or report.high_risk_count >= 3:
+        if report.critical_risk_count >= 1 or report.high_risk_count >= 3:
             return "high"
-        elif report.high_risk_count >= 1 or report.medium_risk_count >= 5:
+        if report.high_risk_count >= 1 or report.medium_risk_count >= 5:
             return "medium"
         return "low"
 

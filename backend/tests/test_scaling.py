@@ -1,5 +1,4 @@
-"""
-Phase 66: Long-Horizon Scaling & Causal Pruning Tests
+"""Phase 66: Long-Horizon Scaling & Causal Pruning Tests.
 =====================================================
 LAW: Substrate must maintain causal integrity while skeletonizing history.
 """
@@ -35,8 +34,6 @@ def test_hierarchical_causal_pruning() -> None:
     assert "apply_force_to_manifold" not in types  # Trivial shift pruned
     assert "add" in types  # Structural change kept
 
-    print("\nHierarchical Causal Pruning: Trivial noise successfully filtered.")
-
 
 def test_attractor_skeletonization() -> None:
     """Verify that extremely stable attractors skip redundant learning."""
@@ -68,8 +65,6 @@ def test_attractor_skeletonization() -> None:
     engine.learn_from_allocation("role_a", SemanticType.TEXT, "breakthrough", success=True, delta=0.2)
     assert ws.learning_count == c0 + 1  # Learning allowed
 
-    print("\nAttractor Skeletonization: Semantic Saturation successfully applied.")
-
 
 def test_journal_skeletonization_fidelity() -> None:
     """Verify that historical structural events are preserved during trimming."""
@@ -92,5 +87,3 @@ def test_journal_skeletonization_fidelity() -> None:
     types = [e["type"] for e in journal._entries]
     assert "add" in types
     assert len(journal._entries) <= 15  # 10 (recent) + historical structural (1)
-
-    print("\nJournal Skeletonization: Critical historical events preserved.")

@@ -206,7 +206,7 @@ def align_extracted_keys_to_schema(
     if not raw_records or not schema_fields:
         return raw_records
 
-    profile_keys = [k for k in raw_records[0].keys() if not k.startswith("_")]
+    profile_keys = [k for k in raw_records[0] if not k.startswith("_")]
     if "_extraction_method" in raw_records[0]:
         profile_keys.append("_extraction_method")
     if not profile_keys:
@@ -218,7 +218,7 @@ def align_extracted_keys_to_schema(
         from app.intent_parser import keywords_to_tokens, parse_user_intent
 
         intent = parse_user_intent(user_intent)
-        for _need, kws in intent.semantic_needs.items():
+        for kws in intent.semantic_needs.values():
             intent_boost_fields |= keywords_to_tokens(kws)
 
     candidates: list[tuple[float, str, str]] = []
@@ -260,9 +260,7 @@ def align_extracted_keys_to_schema(
                 continue
             if pk in mapping:
                 aligned[mapping[pk]] = val
-            elif pk in schema_names:
-                aligned[pk] = val
-            elif pk == "_extraction_method":
+            elif pk in schema_names or pk == "_extraction_method":
                 aligned[pk] = val
         aligned_records.append(aligned)
 

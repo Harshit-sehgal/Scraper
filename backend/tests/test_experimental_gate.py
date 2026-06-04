@@ -1,5 +1,4 @@
-"""
-Tests for the experimental subsystems gate.
+"""Tests for the experimental subsystems gate.
 
 The deep-research-report requires that the research shell be quarantined
 behind a single flag (`ENABLE_EXPERIMENTAL_ROUTES`). These tests verify
@@ -68,21 +67,19 @@ def test_gate_falls_back_to_false_if_attribute_missing(monkeypatch) -> None:
 
 
 @pytest.fixture
-def gate_off(monkeypatch):
+def gate_off(monkeypatch) -> None:
     """Force the gate off for the duration of one test."""
     from app.config import settings
 
     monkeypatch.setattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", False, raising=False)
-    yield
 
 
 @pytest.fixture
-def gate_on(monkeypatch):
+def gate_on(monkeypatch) -> None:
     """Force the gate on for the duration of one test."""
     from app.config import settings
 
     monkeypatch.setattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", True, raising=False)
-    yield
 
 
 def test_init_graph_scheduler_noop_when_disabled(gate_off, caplog) -> None:
@@ -112,7 +109,7 @@ def test_init_gossip_and_heartbeat_returns_none_tuple_when_disabled(gate_off) ->
 
 def test_restore_semantic_world_state_noop_when_disabled(gate_off) -> None:
     # Should not raise even with arbitrary input.
-    restore_semantic_world_state({"some": "data"}, "/tmp/state.json")
+    restore_semantic_world_state({"some": "data"}, "/tmp/state.json")  # nosec B108 - hardcoded /tmp path is a test fixture, not production code
     restore_semantic_world_state(None, "")
 
 

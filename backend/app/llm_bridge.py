@@ -27,8 +27,7 @@ def _extract_json_payload(text: str | None):
         raw = raw[7:]
     elif raw.startswith("```"):
         raw = raw[3:]
-    if raw.endswith("```"):
-        raw = raw[:-3]
+    raw = raw.removesuffix("```")
     raw = raw.strip()
 
     for candidate in (raw,):
@@ -99,7 +98,7 @@ async def _call_openai_compatible_json(
                 content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
                 return _extract_json_payload(content)
         except Exception as error:
-            logging.exception(error)
+            logging.exception("API call failed")
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
@@ -146,7 +145,7 @@ async def _call_openai_compatible_text(
                 data = response.json()
                 return ((data.get("choices") or [{}])[0].get("message", {}).get("content", "") or "").strip()
         except Exception as error:
-            logging.exception(error)
+            logging.exception("API call failed")
             last_error = error
             if attempt >= max_attempts or not _should_retry_http_error(error):
                 raise
@@ -176,14 +175,14 @@ def _groq_model_candidates() -> list[str]:
     return models
 
 
-def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning"):
+def _record_llm_degradation(subsystem: str, cause: str, severity: str = "warning") -> None:
     """Helper to record LLM failures in the semantic world state if available."""
     try:
         from app.semantic_world_state import get_world_state
 
         ws = get_world_state()
         ws.record_degradation(subsystem=subsystem, severity=severity, cause=cause)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # Fallback to debug logging if world state is unavailable
         logging.getLogger(__name__).debug("Telemetry skipped (WS unavailable): %s", e)
 
@@ -198,7 +197,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:  # nosec B110
+    except Exception:  # noqa: BLE001, nosec B110
         pass
     if temperature is None:
         temperature = settings.LLM_TEMPERATURE
@@ -223,9 +222,9 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
                 if parsed is not None:
                     return parsed
             except Exception as e:
-                logging.exception(e)
+                logging.exception("LLM JSON call failed")
                 stage = "Groq JSON call" if idx == 0 else "Groq JSON fallback model call"
-                logging.error("%s failed (%s): %s", stage, model, e)
+                logging.exception("%s failed: %s", stage, model)
                 _record_llm_degradation(subsystem="groq", cause=f"{stage} ({model}) failed: {e}")
 
     if _public_llm_fallbacks_enabled():
@@ -240,7 +239,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
             if parsed is not None:
                 return parsed
         except Exception as e:
-            logging.error("Pollinations JSON call failed (prompt_len=%d): %s", len(messages), e)
+            logging.exception("Pollinations JSON call failed (prompt_len=%d)", len(messages))
             _record_llm_degradation(subsystem="pollinations", cause=f"JSON call failed: {e}")
 
         try:
@@ -269,7 +268,7 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
             if parsed is not None:
                 return parsed
         except Exception as e:
-            logging.error("g4f JSON fallback failed (prompt_len=%d): %s", len(messages), e)
+            logging.exception("g4f JSON fallback failed (prompt_len=%d): %s", len(messages))
             _record_llm_degradation(subsystem="g4f", cause=f"JSON fallback failed: {e}")
 
     return {}
@@ -281,7 +280,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:  # nosec B110
+    except Exception:  # noqa: BLE001, nosec B110
         pass
     if temperature is None:
         temperature = settings.LLM_FAST_TEMPERATURE
@@ -306,9 +305,9 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
                 if parsed is not None:
                     return parsed
             except Exception as e:
-                logging.exception(e)
+                logging.exception("Groq fast JSON call failed")
                 stage = "Groq fast JSON call" if idx == 0 else "Groq fast JSON fallback model call"
-                logging.error("%s failed (%s): %s", stage, model, e)
+                logging.exception("%s failed: %s", stage, model)
                 _record_llm_degradation(subsystem="groq_fast", cause=f"{stage} ({model}) failed: {e}")
 
     if _public_llm_fallbacks_enabled():
@@ -327,8 +326,7 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
             if parsed is not None:
                 return parsed
         except Exception as e:
-            logging.exception(e)
-            logging.error("Pollinations fast JSON call failed: %s", e)
+            logging.exception("Pollinations fast JSON call failed")
             _record_llm_degradation(subsystem="pollinations_fast", cause=f"Fast JSON call failed: {e}")
 
     return {}
@@ -339,7 +337,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:  # nosec B110
+    except Exception:  # noqa: BLE001, nosec B110
         pass
     if temperature is None:
         temperature = settings.LLM_TEXT_TEMPERATURE
@@ -363,10 +361,10 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
                 )
                 if text:
                     return text
-            except Exception as e:
-                logging.exception(e)
+            except Exception:
+                logging.exception("Groq text call failed")
                 stage = "Groq text call" if idx == 0 else "Groq text fallback model call"
-                logging.error("%s failed (%s): %s", stage, model, e)
+                logging.exception("%s failed: %s", stage, model)
 
     if _public_llm_fallbacks_enabled():
         try:
@@ -378,9 +376,8 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
             text = await _call_openai_compatible_text(settings.POLLINATIONS_API_ENDPOINT, payload, timeout=timeout)
             if text:
                 return text
-        except Exception as e:
-            logging.exception(e)
-            logging.error("Pollinations text call failed: %s", e)
+        except Exception:
+            logging.exception("Pollinations text call failed")
 
         try:
 
@@ -405,10 +402,9 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
             if result is None:
                 return ""
             return result  # type: ignore[no-any-return]
-        except Exception as e:
-            logging.exception(e)
-            logging.error("g4f text fallback failed: %s", e)
-            return ""
+        except Exception:
+            logging.exception("g4f text fallback failed")
+        return ""
 
     return ""
 
@@ -419,7 +415,7 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
 class SubstratePluginManager:
     """Manages the registration and execution of external action handlers."""
 
-    def __init__(self, ws: Any = None):
+    def __init__(self, ws: Any = None) -> None:
         self.ws = ws
         # Handlers: handler_name -> callable
         self._handlers: dict[str, Callable] = {}
@@ -429,12 +425,12 @@ class SubstratePluginManager:
         # ─── Self-Optimization Tools (Phase 44) ───
         self._register_native_tools()
 
-    def _register_native_tools(self):
+    def _register_native_tools(self) -> None:
         """Register built-in tools for substrate self-evolution."""
         self.register_handler("role_merger", self._native_role_merger)
         self.register_handler("manifold_compressor", self._native_manifold_compressor)
 
-    def _native_role_merger(self, **kwargs):
+    def _native_role_merger(self, **kwargs) -> str:
         """Native Tool: Merge redundant roles (Phase 44)."""
         if not self.ws:
             return "Fail: No WS"
@@ -448,7 +444,7 @@ class SubstratePluginManager:
             v1 = self.ws.role_manifold.get(role_a)
             v2 = self.ws.role_manifold.get(role_b)
             if v1 and v2:
-                merged_v = [(a + b) / 2 for a, b in zip(v1, v2)]
+                merged_v = [(a + b) / 2 for a, b in zip(v1, v2, strict=False)]
                 self.ws.set_manifold_vector(role_a, merged_v)
                 # Redirect role_b to role_a in topology (simplified)
                 # Future: update all regions referencing role_b
@@ -456,7 +452,7 @@ class SubstratePluginManager:
                 return f"Success: Merged {role_b} into {role_a}"
         return "Fail"
 
-    def _native_manifold_compressor(self, **kwargs):
+    def _native_manifold_compressor(self, **kwargs) -> str:
         """Native Tool: Prune low-impact manifold dimensions (Phase 44)."""
         if not self.ws:
             return "Fail: No WS"
@@ -487,16 +483,20 @@ class SubstratePluginManager:
             # In a real system, we'd rebuild the manifold.
             # Here we emit telemetry and log success.
             logging.getLogger(__name__).info(
-                f"REFACTOR: Compressed manifold from {dim} to {dim - 1} (Pruned Dim {min_idx} with var {min_var:.4f})",
+                "REFACTOR: Compressed manifold from %s to %s (Pruned Dim %s with var %.4f)",  # noqa: G004
+                dim,
+                dim - 1,
+                min_idx,
+                min_var,
             )
             return f"Success: Pruned low-variance dimension {min_idx}"
 
         return "Success: Manifold density optimal"
 
-    def register_handler(self, name: str, handler: Callable):
+    def register_handler(self, name: str, handler: Callable) -> None:
         """Register a python function as a substrate action handler (Phase 43)."""
         self._handlers[name] = handler
-        logging.getLogger(__name__).info(f"PLUGIN: Registered handler [{name}]")
+        logging.getLogger(__name__).info("PLUGIN: Registered handler [%s]", name)
 
     def call_tool(self, handler_name: str, **kwargs) -> Any:
         """Execute a registered handler with optional sandboxing."""
@@ -506,7 +506,7 @@ class SubstratePluginManager:
             raise ValueError(msg)
 
         # ─── Execution Boundary ───
-        logging.getLogger(__name__).info(f"TOOL CALL: Executing [{handler_name}] with {kwargs}")
+        logging.getLogger(__name__).info("TOOL CALL: Executing [%s] with %s", handler_name, kwargs)
 
         try:
             # Check for budget / policy if ws is available
@@ -526,7 +526,7 @@ class SubstratePluginManager:
 
         except Exception as e:
             self._execution_history.append({"handler": handler_name, "status": "error", "error": str(e)})
-            logging.getLogger(__name__).error(f"TOOL FAIL: [{handler_name}] - {e}")
+            logging.getLogger(__name__).exception("TOOL FAIL: [%s]", handler_name)
             raise
 
     def get_available_tools(self) -> list[str]:
@@ -541,12 +541,12 @@ def get_llm_call_count() -> int:
     return _call_count
 
 
-def reset_llm_call_count():
+def reset_llm_call_count() -> None:
     global _call_count
     _call_count = 0
 
 
-def _record_call():
+def _record_call() -> None:
     global _call_count
     _call_count = _call_count + 1
 
@@ -558,7 +558,7 @@ def get_plugin_manager(ws: Any = None) -> SubstratePluginManager:
     return _manager
 
 
-def reset_plugin_manager():
+def reset_plugin_manager() -> None:
     """Reset the global plugin manager (for testing)."""
     global _manager
     _manager = None

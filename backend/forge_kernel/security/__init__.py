@@ -1,6 +1,4 @@
-"""
-Security — SSRF checks, RBAC, and rate limiting for the product kernel.
-"""
+"""Security — SSRF checks, RBAC, and rate limiting for the product kernel."""
 
 from forge_kernel.security.rate_limiter import RateLimitResult, SlidingWindowCounter
 from forge_kernel.security.rbac import UserRole, require_role

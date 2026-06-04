@@ -1,5 +1,4 @@
-"""
-Shared Metrics Collector — holds runtime metric state that is read by the
+"""Shared Metrics Collector — holds runtime metric state that is read by the
 /metrics endpoint and written by middleware, workers, and other subsystems.
 
 This module is deliberately separate from main.py to avoid circular imports
@@ -35,7 +34,7 @@ _requests_total: int = 0
 _requests_total_lock = threading.Lock()
 
 
-def record_request_latency(duration_seconds: float):
+def record_request_latency(duration_seconds: float) -> None:
     """Record an API request duration for metrics export."""
     global _request_latencies, _requests_total
     with _request_latencies_lock:
@@ -46,7 +45,7 @@ def record_request_latency(duration_seconds: float):
         _requests_total += 1
 
 
-def record_worker_failure(task_type: str):
+def record_worker_failure(task_type: str) -> None:
     """Increment the worker failure counter for a task type.
 
     Called by worker_queue.py when a task enters dead_letter state.
@@ -55,7 +54,7 @@ def record_worker_failure(task_type: str):
         _worker_failures[task_type] = _worker_failures.get(task_type, 0) + 1
 
 
-def record_health_check_latency(duration_seconds: float):
+def record_health_check_latency(duration_seconds: float) -> None:
     """Record a backend health check duration."""
     global _health_check_latencies
     with _health_check_latencies_lock:
@@ -64,13 +63,13 @@ def record_health_check_latency(duration_seconds: float):
             _health_check_latencies = _health_check_latencies[-_MAX_METRIC_SAMPLES:]
 
 
-def record_error(error_type: str):
+def record_error(error_type: str) -> None:
     """Increment cumulative error counts by type."""
     with _errors_total_lock:
         _errors_total[error_type] = _errors_total.get(error_type, 0) + 1
 
 
-def record_llm_call():
+def record_llm_call() -> None:
     """Increment cumulative LLM call count."""
     global _llm_calls_total
     with _llm_calls_total_lock:
@@ -107,7 +106,7 @@ def get_requests_total() -> int:
         return _requests_total
 
 
-def reset_for_testing():
+def reset_for_testing() -> None:
     """Reset all counters and buffers (for test isolation)."""
     global _llm_calls_total, _requests_total
     with _request_latencies_lock:

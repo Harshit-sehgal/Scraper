@@ -77,7 +77,7 @@ PIPELINE_JSON = json.dumps(
 
 
 class _BrowserTestHandler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
+    def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/search/id/browser_test_token_abc":
             self.send_response(200)
@@ -104,7 +104,7 @@ class _BrowserTestHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format, *args):
+    def log_message(self, format, *args) -> None:
         pass
 
 
@@ -196,7 +196,7 @@ async def test_playwright_captures_network_response(browser_server) -> None:
         page = await browser.new_page()
         captured = []
 
-        async def handle_response(response):
+        async def handle_response(response) -> None:
             if "/api/results" in response.url:
                 try:
                     body = await response.text()
@@ -312,7 +312,7 @@ async def test_playwright_network_capture_feeds_extractor(browser_server) -> Non
         page = await browser.new_page()
         captured_payloads = []
 
-        async def handle_response(response):
+        async def handle_response(response) -> None:
             try:
                 ct = "".join(v for k, v in response.headers.items() if k.lower() == "content-type").lower()
                 if "application/json" in ct or "results" in response.url.lower():

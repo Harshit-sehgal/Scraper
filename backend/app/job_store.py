@@ -83,7 +83,7 @@ def _maybe_migrate_from_json(conn: sqlite3.Connection) -> None:
             len(data.get("jobs", [])),
             len(data.get("recycle_bin", [])),
         )
-    except Exception as e:
+    except (json.JSONDecodeError, OSError, ValueError) as e:
         logger.warning("JSON-to-SQLite migration skipped: %s", e)
 
 
@@ -168,7 +168,7 @@ def _row_to_job(row: dict) -> Job | None:
         source_policy_str = row.get("source_policy", "all_sources")
         try:
             sp = SourcePolicy(source_policy_str)
-        except Exception:
+        except (ValueError, KeyError):
             sp = SourcePolicy.ALL_SOURCES
 
         return Job.model_validate(
@@ -210,14 +210,14 @@ def _row_to_job(row: dict) -> Job | None:
                 "pagination": bool(row.get("pagination", 0)),
                 "deduplicate": bool(row.get("deduplicate", 1)),
                 "deduplicate_field": row.get("deduplicate_field", ""),
-                "started_at": row.get("started_at") if row.get("started_at") else None,
+                "started_at": row.get("started_at") or None,
                 "results_on_disk": bool(row.get("results_on_disk", 0)),
-                "results_file_path": row.get("results_file_path") if row.get("results_file_path") else None,
+                "results_file_path": row.get("results_file_path") or None,
                 "warnings": json.loads(row.get("warnings", "[]")),
                 "acquisition_mode": row.get("acquisition_mode", "standard"),
             },
         )
-    except Exception as e:
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
         logger.warning("Failed to deserialize job row: %s", e)
         return None
 
@@ -339,7 +339,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                 # 2. Fetch all existing records and convert each sqlite3.Row to
                 # a dict immediately
                 existing = [dict(row) for row in conn.execute("SELECT * FROM recycle_bin").fetchall()]
-            except Exception:
+            except (sqlite3.OperationalError, sqlite3.DatabaseError):
                 existing_cols = []
                 existing = []
 
@@ -444,6 +444,7 @@ def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[s
     Args:
         recover_in_progress: Mark pending/running jobs failed during startup
             recovery. Set False for normal worker/API reads.
+
     """
     with _DB_LOCK:
         conn = _get_connection()
@@ -489,7 +490,7 @@ def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[s
                 ws_path = _get_db_path().parent / "world_state.json"
                 if ws_path.exists():
                     world_state_data = json.loads(ws_path.read_text())
-            except Exception:  # nosec B110
+            except (json.JSONDecodeError, OSError):  # nosec B110
                 pass
 
             return jobs_store, recycle_bin_store, world_state_data
@@ -508,6 +509,7 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job], pr
             Default False — prevents accidental data loss when the in-memory
             snapshot differs from the persistent store (e.g. multi-process).
             Only set True when a complete state replacement is explicitly desired.
+
     """
     path = _get_db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -571,7 +573,6 @@ def persist_state_single(job: Job) -> None:
 
 def flush_state() -> None:
     """Ensure all pending writes are flushed (no-op for SQLite — writes are synchronous)."""
-    pass
 
 
 def shutdown() -> None:
@@ -632,7 +633,7 @@ def get_storage_health() -> dict:
             "expected_version": _CURRENT_SCHEMA_VERSION,
         }
     except Exception as e:
-        logger.error("Storage health check failed: %s", e)
+        logger.exception("Storage health check failed: %s")
         return {
             "ok": False,
             "error": str(e),
@@ -652,6 +653,7 @@ def get_storage_status() -> dict:
         job_count: Number of jobs in the jobs table
         recycle_bin_count: Number of jobs in recycle_bin
         wal_mode: Whether WAL journaling is active
+
     """
     try:
         conn = _get_connection()
@@ -672,7 +674,7 @@ def get_storage_status() -> dict:
             "recycle_bin_count": recycle_count,
             "wal_mode": wal_mode,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {
             "backend": "sqlite",
             "error": str(e),

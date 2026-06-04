@@ -1,5 +1,3 @@
-import json
-
 from app.main import app
 from fastapi.testclient import TestClient
 
@@ -10,7 +8,6 @@ def get_client():
 
 def test_manual_mode() -> None:
     client = get_client()
-    print("=== Testing MANUAL Mode ===")
     response = client.post(
         "/api/jobs",
         json={
@@ -26,7 +23,6 @@ def test_manual_mode() -> None:
             "source_policy": "all_sources",  # Don't block any domain
         },
     )
-    print("Create Job Response:", response.json())
     job_id = response.json()["job_id"]
 
     # Wait for completion
@@ -36,15 +32,12 @@ def test_manual_mode() -> None:
         res = client.get(f"/api/jobs/{job_id}")
         status = res.json()["status"]
         if status in ["completed", "failed", "canceled"]:
-            print("Job finished with status:", status)
-            print("Results:", json.dumps(res.json().get("results", []), indent=2))
             break
         time.sleep(2)
 
 
 def test_auto_mode() -> None:
     client = get_client()
-    print("\n=== Testing AUTO Mode ===")
     response = client.post(
         "/api/jobs",
         json={
@@ -61,7 +54,6 @@ def test_auto_mode() -> None:
             "source_policy": "all_sources",  # Don't block any domain
         },
     )
-    print("Create Job Response:", response.json())
     job_id = response.json()["job_id"]
 
     import time
@@ -70,8 +62,6 @@ def test_auto_mode() -> None:
         res = client.get(f"/api/jobs/{job_id}")
         status = res.json()["status"]
         if status in ["completed", "failed", "canceled"]:
-            print("Job finished with status:", status)
-            print("Results:", json.dumps(res.json().get("results", []), indent=2))
             break
         time.sleep(2)
 

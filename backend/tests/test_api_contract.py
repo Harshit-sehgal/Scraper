@@ -216,7 +216,7 @@ class TestExportShapeContract:
         transport = ASGITransport(app=app)
         import asyncio
 
-        async def _test():
+        async def _test() -> None:
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.get("/api/jobs/test/export/csv")
                 assert resp.status_code == 200
@@ -244,7 +244,7 @@ class TestExportShapeContract:
         transport = ASGITransport(app=app)
         import asyncio
 
-        async def _test():
+        async def _test() -> None:
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.get("/api/jobs/test/export/json")
                 assert resp.status_code == 200
@@ -274,7 +274,7 @@ class TestExportShapeContract:
         transport = ASGITransport(app=app)
         import asyncio
 
-        async def _test():
+        async def _test() -> None:
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.get("/api/jobs/test/export/json")
                 data = json.loads(resp.content)
@@ -302,7 +302,7 @@ class TestExportShapeContract:
         transport = ASGITransport(app=app)
         import asyncio
 
-        async def _test():
+        async def _test() -> None:
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.get("/api/jobs/test/export/excel")
                 assert resp.status_code == 200
@@ -322,7 +322,7 @@ class TestExportShapeContract:
         transport = ASGITransport(app=app)
         import asyncio
 
-        async def _test():
+        async def _test() -> None:
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.get("/api/jobs/nonexistent/export/csv")
                 assert resp.status_code == 404

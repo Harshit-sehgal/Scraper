@@ -1,6 +1,4 @@
-"""
-Shared System Globals — holds runtime job stores and limits to avoid circular imports.
-"""
+"""Shared System Globals — holds runtime job stores and limits to avoid circular imports."""
 
 from typing import Any
 

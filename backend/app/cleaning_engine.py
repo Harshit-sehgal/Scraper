@@ -1,5 +1,4 @@
-"""
-Cleaning Engine — AI-powered data cleaning, structuring, and schema alignment.
+"""Cleaning Engine — AI-powered data cleaning, structuring, and schema alignment.
 
 Extracted from scraper.py to reduce the god-object size of that module.
 Responsible for:
@@ -12,14 +11,16 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.config import settings
 from app.data_utils import _prepare_records_for_ai, normalize_scraped_record
 from app.llm_bridge import llm_json as _llm_json
 from app.llm_bridge import llm_json_fast as _llm_json_fast
-from app.models import SchemaField
 from app.utils.quality import score_record_quality
+
+if TYPE_CHECKING:
+    from app.models import SchemaField
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ Rules:
                     raw_response = await res_fast
                 else:
                     raw_response = res_fast
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Fast-path semantic inference failed for chunk %d/%d: %s", chunks_processed, len(chunks), e)
                 try:
                     from app.semantic_world_state import get_world_state
@@ -105,7 +106,7 @@ Rules:
                         severity="warning",
                         cause=f"Fast-path LLM inference failed for chunk {chunks_processed}: {e}",
                     )
-                except Exception as telemetry_err:
+                except Exception as telemetry_err:  # noqa: BLE001
                     logger.debug("Telemetry failed: %s", telemetry_err)
 
             cleaned_list = _extract_list_from_json(raw_response)
@@ -124,9 +125,8 @@ Rules:
                     consecutive_failures += 1
                     unprocessed_records.extend(chunk)
                     continue
-                else:
-                    consecutive_failures = 0
-                    cleaned_list = cleaned_std
+                consecutive_failures = 0
+                cleaned_list = cleaned_std
             else:
                 consecutive_failures = 0
 

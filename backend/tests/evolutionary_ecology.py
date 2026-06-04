@@ -1,5 +1,4 @@
-"""
-Million-Event Evolutionary Ecology Validation — Phase 58
+"""Million-Event Evolutionary Ecology Validation — Phase 58.
 ======================================================
 LAW: Stable adaptive systems must maintain structural diversity and
 causal coherence over multi-million event horizons.
@@ -8,7 +7,6 @@ This suite performs a massive longevity run, tracking emergent ecological
 metrics: diversity, fragmentation, drift, and oscillation frequency.
 """
 
-import json
 import random
 import time
 
@@ -19,7 +17,7 @@ from app.semantic_world_state import SemanticWorldState
 class EcologyAnalyzer:
     """Utility to track emergent ecological metrics over massive horizons."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.diversity_history: list[float] = []
         self.fragmentation_history: list[float] = []
         self.entropy_history: list[float] = []
@@ -27,7 +25,7 @@ class EcologyAnalyzer:
         self.dead_regions: set[str] = set()
         self.start_time = time.time()
 
-    def record_pulse(self, ws: SemanticWorldState):
+    def record_pulse(self, ws: SemanticWorldState) -> None:
         """Record a pulse of ecological metrics."""
         # Force community detection for accurate fragmentation stats
         ws._topology.detect_communities()
@@ -64,7 +62,7 @@ class EcologyAnalyzer:
         }
 
 
-def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.4):
+def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.4) -> None:
     ws = SemanticWorldState()
     ws.clear()
     # Ensure journal capacity for long-horizon causal audits
@@ -73,8 +71,6 @@ def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.
     analyzer = EcologyAnalyzer()
     roles = [f"role_{i}" for i in range(30)]
     types = list(SemanticType)
-
-    print(f"\n--- Initiating Evolutionary Ecology Validation ({cycles} cycles) ---")
 
     for i in range(cycles):
         # 1. Transactional Event
@@ -122,13 +118,8 @@ def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.
             analyzer.record_pulse(ws)
 
         if i % (cycles // 10) == 0 and i > 0:
-            stats = analyzer.summarize()
-            print(
-                f"  [{i}] Diversity: {stats['avg_diversity']:.2f}, Frag: {stats['avg_fragmentation']:.2f}, "
-                f"Oscillations: {stats['oscillation_events']}",
-            )
+            analyzer.summarize()
 
-    print("\n--- Initiating Stabilization Phase (2000 cycles, no new signals) ---")
     for i in range(2000):
         ws.decay_field_regions()
         ws.redistribute_instability()
@@ -139,19 +130,14 @@ def run_ecology_simulation(cycles: int = 100000, diversity_threshold: float = 0.
             analyzer.record_pulse(ws)
 
     final_stats = analyzer.summarize()
-    print("\n--- Ecology Simulation Completed ---")
-    print(json.dumps(final_stats, indent=2))
 
     # 6. Success Invariants
     assert final_stats["avg_diversity"] > diversity_threshold, "CRITICAL: Semantic field froze (diversity collapse)"
 
     final_entropy = ws.metrics.global_entropy
-    print(f"Final Entropy after stabilization: {final_entropy:.4f}")
     assert final_entropy < 0.4, "CRITICAL: Field failed to reach convergent equilibrium"
 
     assert ws.get_topology_view().region_count() < 200, "CRITICAL: Topology fragmented uncontrollably"
-
-    print("\n[SUCCESS] Semantic ecology proven stable, diverse, and adaptive.")
 
 
 if __name__ == "__main__":

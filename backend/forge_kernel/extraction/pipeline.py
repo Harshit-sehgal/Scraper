@@ -1,5 +1,4 @@
-"""
-Extraction pipeline — deterministic staged extraction with explicit telemetry.
+"""Extraction pipeline — deterministic staged extraction with explicit telemetry.
 
 Stages:
   1. Fetch: HTTP or browser-assisted page retrieval
@@ -12,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import UTC
 from typing import Any
 
 from forge_kernel.contracts.analysis import ExtractionAttempt
@@ -34,7 +34,7 @@ class PipelineResult:
 class ExtractionPipeline:
     """Deterministic staged extraction pipeline."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._attempts: list[ExtractionAttempt] = []
 
     async def run(
@@ -48,7 +48,7 @@ class ExtractionPipeline:
 
         Tries strategies in order: profile → selector → container → visible text → network
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from forge_kernel.extraction.fetch import fetch_page_content
 
@@ -122,7 +122,7 @@ class ExtractionPipeline:
 
             # Convert to ResultRecords
             records: list[ResultRecord] = []
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             for rec in enriched_records:
                 rec["source_url"] = url
                 rec["scraped_at"] = now

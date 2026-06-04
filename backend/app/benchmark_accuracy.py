@@ -1,5 +1,4 @@
-"""
-Extraction Accuracy Framework — Measuring interpretative quality.
+"""Extraction Accuracy Framework — Measuring interpretative quality.
 
 Evaluates scraper output against ground-truth "golden" datasets using
 statistical precision, recall, and conformity metrics.
@@ -49,8 +48,8 @@ def calculate_extraction_accuracy(
     true_positives = 0
     total_expected_fields = sum(len(r) for r in expected)
 
-    field_hits = {k: 0 for r in expected for k in r.keys()}
-    field_totals = {k: 0 for r in expected for k in r.keys()}
+    field_hits = {k: 0 for r in expected for k in r}
+    field_totals = {k: 0 for r in expected for k in r}
 
     # Count extracted comparable fields. Metadata such as record_score should not
     # dilute precision, but extra extracted data fields and extra records
@@ -61,7 +60,7 @@ def calculate_extraction_accuracy(
     available_extracted = list(extracted)
 
     for exp_rec in expected:
-        for k in exp_rec.keys():
+        for k in exp_rec:
             field_totals[k] = field_totals.get(k, 0) + 1
 
         best_match_idx = -1
@@ -96,9 +95,9 @@ def calculate_extraction_accuracy(
 
     # 3. Completeness & Schema Conformity
     metrics.completeness = min(1.0, len(extracted) / max(1, len(expected)))
-    expected_schema = {k for r in expected for k in r.keys()}
+    expected_schema = {k for r in expected for k in r}
     extracted_schema_fields = sum(len(_data_fields(r)) for r in extracted)
-    conforming_schema_fields = sum(1 for r in extracted for k in _data_fields(r).keys() if k in expected_schema)
+    conforming_schema_fields = sum(1 for r in extracted for k in _data_fields(r) if k in expected_schema)
     metrics.schema_conformity = conforming_schema_fields / extracted_schema_fields if extracted_schema_fields > 0 else 0.0
 
     # Per-field accuracy
@@ -152,10 +151,7 @@ def _values_match(v1: Any, v2: Any) -> bool:
         return True
 
     # Partial match for longer strings
-    if len(s1) > 10 and len(s2) > 10 and (s1 in s2 or s2 in s1):
-        return True
-
-    return False
+    return bool(len(s1) > 10 and len(s2) > 10 and (s1 in s2 or s2 in s1))
 
 
 def _record_hash(record: dict[str, Any]) -> str:

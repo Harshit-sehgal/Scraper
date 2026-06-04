@@ -1,5 +1,4 @@
-"""
-Active Stabilization & Substrate Sharding Verification — Phase 52/53
+"""Active Stabilization & Substrate Sharding Verification — Phase 52/53.
 ==================================================================
 LAW: Adaptive systems must actively dampen pathological loops and scale
 via topological partitioning.
@@ -30,7 +29,6 @@ def test_attractor_rebalancing(ws) -> None:
     # 3. Verify energy drop and entropy spike
     assert ws.metrics.global_energy < 10.0
     assert ws.metrics.global_entropy > 0.1
-    print(f"\nAttractor Rebalanced: Energy={ws.metrics.global_energy:.2f}, Entropy={ws.metrics.global_entropy:.2f}")
 
 
 def test_topology_restructuring_lock_escape(ws) -> None:
@@ -52,7 +50,6 @@ def test_topology_restructuring_lock_escape(ws) -> None:
     # 3. Verify restructuring (neighbor cleared, temperature spike)
     r_live = ws.get_topology_view().find_by_token_and_roles("lock", ("r1",))
     assert r_live.local_temperature > 0.5
-    print("\nMetastable Lock Escaped via structural rewiring.")
 
 
 def test_substrate_sharding_assignment(ws) -> None:
@@ -74,5 +71,3 @@ def test_substrate_sharding_assignment(ws) -> None:
     assert role_shards["price"] == role_shards["cost"]
     assert role_shards["loc"] == role_shards["org"]
     assert role_shards["price"] != role_shards["loc"]
-
-    print(f"\nSubstrate Sharded into {len(shards)} independent logical partitions.")

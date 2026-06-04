@@ -1,10 +1,9 @@
-"""
-System routes — status, metrics, and diagnostics for the kernel API.
-"""
+"""System routes — status, metrics, and diagnostics for the kernel API."""
 
 from __future__ import annotations
 
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
@@ -25,7 +24,7 @@ def _get_service(
 
 @router.get("/status")
 async def system_status(
-    service: JobService = Depends(_get_service),
+    service: Annotated[JobService, Depends(_get_service)],
     _=Depends(require_viewer),
 ):
     """Detailed system status with job counts and runtime limits."""

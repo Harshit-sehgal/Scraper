@@ -1,5 +1,4 @@
-"""
-Recovery Handlers Implementation — Concrete implementations of all recovery actions.
+"""Recovery Handlers Implementation — Concrete implementations of all recovery actions.
 
 Wires recovery actions to system components:
   - ROTATE_PROXY → proxy_manager.rotate()
@@ -99,8 +98,10 @@ async def handle_reduce_concurrency(params: dict[str, Any], context: dict[str, A
 async def handle_retry_with_dns_flush(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
     """Retry with DNS cache flush.
 
-    Parameters:
+    Parameters
+    ----------
         - delay_ms: Delay before retry (default 2000)
+
     """
     delay_ms = params.get("delay_ms", 2000)
     delay_seconds = delay_ms / 1000.0
@@ -135,12 +136,14 @@ async def handle_force_rediscovery_with_swap_detection(
 ) -> bool:
     """Force rediscovery with field swap detection.
 
-    Parameters:
+    Parameters
+    ----------
         - enable_swap_detection: Enable detection (default True)
         - bypass_memory: Skip selector memory (default True)
 
     Side Effect:
         Same as force_rediscovery, but caller should enable swap detection
+
     """
     # Same as basic force_rediscovery for now
     # The swap detection would be in the extraction layer
@@ -233,8 +236,10 @@ async def handle_skip_domain(params: dict[str, Any], context: dict[str, Any], at
 async def handle_skip_url(params: dict[str, Any], context: dict[str, Any], attempt_ctx=None) -> bool:
     """Skip this specific URL.
 
-    Parameters:
+    Parameters
+    ----------
         None
+
     """
     url = context.get("url")
     logger.warning("Recovery action: skipping URL %s", url)
@@ -249,7 +254,7 @@ async def handle_skip_url(params: dict[str, Any], context: dict[str, Any], attem
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def register_all_recovery_handlers():
+def register_all_recovery_handlers() -> None:
     """Register all recovery action handlers with the executor.
 
     Should be called once at application startup.

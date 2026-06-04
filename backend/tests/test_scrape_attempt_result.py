@@ -9,7 +9,7 @@ from app.zero_result_classifier import ZeroResultClassification
 
 
 class LazyClassMeta(type):
-    def __instancecheck__(cls, instance):
+    def __instancecheck__(cls, instance) -> bool:
         import app.scraper
 
         return isinstance(instance, app.scraper.ScrapeAttemptResult)
@@ -51,10 +51,10 @@ async def scrape_url_attempt(*args: Any, **kwargs: Any) -> Any:
 
 
 class _AllowAllCrawlPolicy:
-    async def check_domain(self, url):
+    async def check_domain(self, url) -> None:
         return None
 
-    def record_result(self, url, success=True):
+    def record_result(self, url, success=True) -> None:
         return None
 
 
@@ -296,25 +296,25 @@ async def test_scrape_url_attempt_returns_rich_result(monkeypatch) -> None:
     async def fake_orchestrate(*args, **kwargs):
         return FakeExtractionResult()
 
-    async def fake_profile(*args, **kwargs):
+    async def fake_profile(*args, **kwargs) -> None:
         return None
 
-    monkeypatch.setattr(scraper, "get_crawl_policy", lambda: _AllowAllCrawlPolicy())
+    monkeypatch.setattr(scraper, "get_crawl_policy", _AllowAllCrawlPolicy)
     monkeypatch.setattr(scraper, "match_profile_for_url", lambda url: None)
     monkeypatch.setattr(scraper, "try_profile_extraction", fake_profile)
     monkeypatch.setattr(scraper, "fetch_page_content", fake_fetch)
     monkeypatch.setattr(scraper, "orchestrate_extraction", fake_orchestrate)
 
     class FakeTelemetry:
-        def record(self, **kw):
+        def record(self, **kw) -> None:
             pass
 
     class FakeFrontier:
-        async def add_discovered_links(self, links, source_url, source_depth=0):
+        async def add_discovered_links(self, links, source_url, source_depth=0) -> int:
             return 0
 
-    monkeypatch.setattr(scraper, "get_scrape_telemetry", lambda: FakeTelemetry())
-    monkeypatch.setattr(scraper, "get_crawl_frontier", lambda: FakeFrontier())
+    monkeypatch.setattr(scraper, "get_scrape_telemetry", FakeTelemetry)
+    monkeypatch.setattr(scraper, "get_crawl_frontier", FakeFrontier)
     monkeypatch.setattr(scraper, "detect_anti_bot", lambda html: 0.0)
     monkeypatch.setattr(scraper, "estimate_dom_nodes", lambda html: 1)
     monkeypatch.setattr(scraper, "collect_page_evidence", lambda *a, **kw: None)
@@ -393,29 +393,29 @@ async def test_scrape_url_attempt_zero_result_with_html(monkeypatch) -> None:
     async def fake_orchestrate(*args, **kwargs):
         return FakeExtractionResult()
 
-    async def fake_profile(*args, **kwargs):
+    async def fake_profile(*args, **kwargs) -> None:
         return None
 
-    monkeypatch.setattr(scraper, "get_crawl_policy", lambda: _AllowAllCrawlPolicy())
+    monkeypatch.setattr(scraper, "get_crawl_policy", _AllowAllCrawlPolicy)
     monkeypatch.setattr(scraper, "match_profile_for_url", lambda url: None)
     monkeypatch.setattr(scraper, "try_profile_extraction", fake_profile)
     monkeypatch.setattr(scraper, "fetch_page_content", fake_fetch)
     monkeypatch.setattr(scraper, "orchestrate_extraction", fake_orchestrate)
 
     class FakeTelemetry:
-        def record(self, **kw):
+        def record(self, **kw) -> None:
             pass
 
     class FakeFrontier:
-        async def add_discovered_links(self, links, source_url, source_depth=0):
+        async def add_discovered_links(self, links, source_url, source_depth=0) -> int:
             return 0
 
     class FakeEvidence:
         forms: str | None = None
         candidate_containers: list = []
 
-    monkeypatch.setattr(scraper, "get_scrape_telemetry", lambda: FakeTelemetry())
-    monkeypatch.setattr(scraper, "get_crawl_frontier", lambda: FakeFrontier())
+    monkeypatch.setattr(scraper, "get_scrape_telemetry", FakeTelemetry)
+    monkeypatch.setattr(scraper, "get_crawl_frontier", FakeFrontier)
     monkeypatch.setattr(scraper, "collect_page_evidence", lambda *a, **kw: FakeEvidence())
     monkeypatch.setattr(scraper, "detect_anti_bot", lambda html: 0.05)
     monkeypatch.setattr(scraper, "estimate_dom_nodes", lambda html: 10)

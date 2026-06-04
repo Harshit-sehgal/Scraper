@@ -101,7 +101,7 @@ def test_field_validator_detects_nan() -> None:
 
 
 def test_observability_is_read_only() -> None:
-    """observability functions must not mutate state."""
+    """Observability functions must not mutate state."""
     from app.observability import field_summary
 
     # observability functions take world state, not metrics directly

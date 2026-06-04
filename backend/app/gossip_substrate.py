@@ -1,5 +1,4 @@
-"""
-Enhanced Gossip Substrate — Multi-node state synchronization.
+"""Enhanced Gossip Substrate — Multi-node state synchronization.
 
 Implements Push-Pull gossip with:
 - Vector clock tracking for causality
@@ -26,7 +25,7 @@ logger = logging.getLogger(__name__)
 class VectorClock:
     """Track causality of events across distributed nodes."""
 
-    def __init__(self, node_id: str):
+    def __init__(self, node_id: str) -> None:
         self.node_id = node_id
         self.clock: dict[str, int] = defaultdict(int)
         self.clock[node_id] = 0
@@ -45,7 +44,7 @@ class VectorClock:
         """Export clock as dict."""
         return dict(self.clock)
 
-    def compare(self, other: "VectorClock") -> str:
+    def compare(self, other: VectorClock) -> str:
         """Compare with another clock.
 
         Returns: 'before', 'after', 'concurrent', or 'equal'
@@ -64,18 +63,17 @@ class VectorClock:
 
         if self_lt_other and self_gt_other:
             return "concurrent"
-        elif self_lt_other:
+        if self_lt_other:
             return "before"
-        elif self_gt_other:
+        if self_gt_other:
             return "after"
-        else:
-            return "equal"
+        return "equal"
 
 
 class NodeHealth:
     """Track health and reliability of a peer node."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.success_count = 0
         self.failure_count = 0
         self.last_seen = time.time()
@@ -106,7 +104,7 @@ class GossipSubstrate:
     - Topology awareness (prefer nearby nodes)
     """
 
-    def __init__(self, node_id: str = "default"):
+    def __init__(self, node_id: str = "default") -> None:
         self.node_id = node_id
         self.vector_clock = VectorClock(node_id)
         self.peers: dict[str, Any] = {}  # node_id -> state_provider
@@ -120,7 +118,7 @@ class GossipSubstrate:
         """Register a virtual peer in the substrate."""
         self.peers[node_id] = provider
         self.known_nodes.add(node_id)
-        logger.debug(f"[Gossip] Registered node: {node_id}")
+        logger.debug("[Gossip] Registered node: %s", node_id)
 
     def select_peers_for_gossip(self, count: int = 1) -> list[str]:
         """Select healthy peers for gossip, preferring reliable nodes.
@@ -171,6 +169,7 @@ class GossipSubstrate:
 
         Returns:
             True if successful, False otherwise
+
         """
         if not peer_id:
             candidates = self.select_peers_for_gossip(1)
@@ -206,12 +205,12 @@ class GossipSubstrate:
             self.peer_health[peer_id].last_seen = time.time()
             self.peer_health[peer_id].last_sync = time.time()
 
-            logger.debug(f"[Gossip] {local_node_id} <-> {peer_id}: sync successful")
+            logger.debug("[Gossip] %s <-> %s: sync successful", local_node_id, peer_id)
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.peer_health[peer_id].failure_count += 1
-            logger.warning(f"[Gossip] Sync with {peer_id} failed: {e}")
+            logger.warning("[Gossip] Sync with %s failed: %s", peer_id, e)
             return False
 
     def _detect_conflicts(self, local_id: str, peer_id: str, remote_state: dict, remote_clock: dict) -> bool:
@@ -298,6 +297,7 @@ class GossipSubstrate:
             heartbeat_manager: Optional heartbeat manager for observability.
 
         Returns: Number of peers successfully updated
+
         """
         self.vector_clock.increment()
 
@@ -324,7 +324,7 @@ class GossipSubstrate:
                     success_count += 1
                     self.peer_health[peer_id].success_count += 1
                     self.peer_health[peer_id].last_seen = time.time()
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.warning("[Gossip] State propagation to %s failed: %s", peer_id, e)
                     self.peer_health[peer_id].failure_count += 1
 

@@ -1,6 +1,5 @@
-"""
-DataForge Chaos Engineering Framework
-Phase 5 Week 5 - 8: Test system resilience and validate recovery
+"""DataForge Chaos Engineering Framework
+Phase 5 Week 5 - 8: Test system resilience and validate recovery.
 
 This module provides failure injection and chaos testing capabilities to ensure
 the system remains operational under adverse conditions.
@@ -54,15 +53,15 @@ def __getattr__(name):
 
 
 class ChaosSimulator:
-    """Main chaos engineering simulator"""
+    """Main chaos engineering simulator."""
 
-    def __init__(self, system_interface=None):
-        """
-        Initialize chaos simulator
+    def __init__(self, system_interface=None) -> None:
+        """Initialize chaos simulator.
 
         Args:
             system_interface: Interface to the system being tested
                              Allows injection of failures and observation
+
         """
         self.system = system_interface
         self.active_failures: dict[str, bool] = {}
@@ -71,8 +70,7 @@ class ChaosSimulator:
         self.logger = logging.getLogger("chaos_simulator")
 
     async def inject_failure(self, failure_mode: FailureMode, duration: float = 10.0, intensity: float = 1.0) -> dict[str, Any]:
-        """
-        Inject a failure into the system
+        """Inject a failure into the system.
 
         Args:
             failure_mode: Type of failure to inject
@@ -81,8 +79,9 @@ class ChaosSimulator:
 
         Returns:
             Metrics about the failure and recovery
+
         """
-        self.logger.info(f"Injecting failure: {failure_mode.value}")
+        self.logger.info("Injecting failure: %s", failure_mode.value)
 
         failure_start = time.time()
         impact_metrics = {
@@ -107,25 +106,25 @@ class ChaosSimulator:
             impact_metrics["recovered"] = recovered
             impact_metrics["recovery_time"] = recovery_time
         except Exception as e:
-            self.logger.error(f"Error during chaos injection: {e}")
+            self.logger.exception("Error during chaos injection")
             impact_metrics["error"] = str(e)
 
         self.failure_history.append(impact_metrics)
         return impact_metrics
 
     async def _wait_for_recovery(self, failure_mode: FailureMode, timeout: float = 60.0) -> bool:
-        """Wait for system to recover from failure"""
+        """Wait for system to recover from failure."""
         start = time.time()
         while time.time() - start < timeout:
             if self._is_system_healthy(failure_mode):
-                self.logger.info(f"System recovered from {failure_mode.value}")
+                self.logger.info("System recovered from %s", failure_mode.value)
                 return True
             await asyncio.sleep(0.5)
-        self.logger.error(f"System did not recover from {failure_mode.value} within {timeout}s")
+        self.logger.error("System did not recover from %s within %ss", failure_mode.value, timeout)
         return False
 
     def _is_system_healthy(self, _previous_failure: FailureMode) -> bool:
-        """Check if system is healthy after failure"""
+        """Check if system is healthy after failure."""
         try:
             from app.domain_health_alerts import get_domain_health_monitor
 
@@ -139,16 +138,13 @@ class ChaosSimulator:
             healths = monitor.get_all_domains_health()
             if not healths:
                 return True
-            for h in healths:
-                if h.get("health_level") in ["unhealthy", "critical", "blacklisted"]:
-                    return False
-            return True
-        except Exception as e:
-            self.logger.error(f"Error checking system health: {e}")
+            return all(h.get("health_level") not in ["unhealthy", "critical", "blacklisted"] for h in healths)
+        except Exception:
+            self.logger.exception("Error checking system health")
             return True
 
     def is_failure_active(self, failure_mode: FailureMode) -> bool:
-        """Check if a specific failure mode is currently active"""
+        """Check if a specific failure mode is currently active."""
         return self.active_failures.get(failure_mode.value, False)
 
 
@@ -165,8 +161,6 @@ def get_chaos_simulator() -> ChaosSimulator:
 
 if __name__ == "__main__":
     # Print all scenarios
-    print("DataForge Chaos Engineering Scenarios:")
-    print("=" * 80)
 
     scenarios = FailureScenarios.get_all_scenarios()
 
@@ -178,8 +172,5 @@ if __name__ == "__main__":
         categories[cat].append(scenario)
 
     for cat, scenarios_in_cat in sorted(categories.items()):
-        print(f"\n{cat.upper()} FAILURES ({len(scenarios_in_cat)} scenarios):")
         for scenario in scenarios_in_cat:
-            print(f"  - {scenario.name}")
-            print(f"    Severity: {scenario.severity.value}")
-            print(f"    Expected Recovery: {scenario.expected_recovery_time_seconds}s")
+            pass

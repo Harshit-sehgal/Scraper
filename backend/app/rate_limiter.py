@@ -1,5 +1,4 @@
-"""
-Rate Limiter — in-memory sliding window rate limiting middleware.
+"""Rate Limiter — in-memory sliding window rate limiting middleware.
 
 Provides per-IP rate limiting for API endpoints without
 external dependencies. Uses a sliding window counter approach.
@@ -22,10 +21,14 @@ from __future__ import annotations
 import ipaddress
 import logging
 import time
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import Request, Response
 from fastapi.responses import JSONResponse
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from fastapi import Request, Response
 
 logger = logging.getLogger(__name__)
 
@@ -92,12 +95,11 @@ def _parse_rate_limit(limit_str: str) -> tuple[int, float]:
     unit = parts[1]
     if unit in ("second", "seconds", "s"):
         return max_requests, 1.0
-    elif unit in ("minute", "minutes", "m"):
+    if unit in ("minute", "minutes", "m"):
         return max_requests, 60.0
-    elif unit in ("hour", "hours", "h"):
+    if unit in ("hour", "hours", "h"):
         return max_requests, 3600.0
-    else:
-        return 0, 0
+    return 0, 0
 
 
 def _get_route_key(path: str, method: str | None = None) -> str:
@@ -145,7 +147,7 @@ class DatabaseSlidingWindowCounter:
                     )
                     _execute(conn, "CREATE INDEX IF NOT EXISTS idx_rate_limits_key_ts ON rate_limits(key, timestamp)")
                 self._initialized = True
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Failed to initialize Postgres rate limit table: %s", e)
         else:
             try:
@@ -165,7 +167,7 @@ class DatabaseSlidingWindowCounter:
                     finally:
                         conn.close()
                 self._initialized = True
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Failed to initialize SQLite rate limit table: %s", e)
 
     def allow(self) -> bool:
@@ -191,7 +193,7 @@ class DatabaseSlidingWindowCounter:
                     # Insert new request timestamp
                     _execute(conn, "INSERT INTO rate_limits (key, timestamp) VALUES (%s, %s)", (self.key, now))
                 return True
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Postgres rate limiter database error: %s. Falling back to in-memory behavior.", e)
                 return self._fallback_counter.allow()
         else:
@@ -214,7 +216,7 @@ class DatabaseSlidingWindowCounter:
                     finally:
                         conn.close()
                 return True
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("SQLite rate limiter database error: %s. Falling back to in-memory behavior.", e)
                 return self._fallback_counter.allow()
 
@@ -235,7 +237,7 @@ class DatabaseSlidingWindowCounter:
                     row = _fetch_one(conn, "SELECT COUNT(*) AS count FROM rate_limits WHERE key = %s", (self.key,))
                     count = row["count"] if row else 0
                     return max(0, self.max_requests - count)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return self._fallback_counter.remaining()
         else:
             try:
@@ -250,7 +252,7 @@ class DatabaseSlidingWindowCounter:
                         return max(0, self.max_requests - count)
                     finally:
                         conn.close()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return self._fallback_counter.remaining()
 
     def reset_in(self) -> float:
@@ -270,7 +272,7 @@ class DatabaseSlidingWindowCounter:
                     if min_ts is None:
                         return 0.0
                     return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return self._fallback_counter.reset_in()
         else:
             try:
@@ -289,7 +291,7 @@ class DatabaseSlidingWindowCounter:
                         return max(0.0, self.window_seconds - (now - min_ts))  # type: ignore[no-any-return]
                     finally:
                         conn.close()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return self._fallback_counter.reset_in()
 
     def is_expired(self) -> bool:
@@ -397,7 +399,7 @@ class RateLimiterMiddleware:
             peer_ip = ipaddress.ip_address(client_host)
             is_trusted_proxy = peer_ip.is_private or peer_ip.is_loopback
         except ValueError:
-            is_trusted_proxy = client_host in {"localhost"}
+            is_trusted_proxy = client_host == "localhost"
 
         if is_trusted_proxy:
             forwarded = request.headers.get("X-Forwarded-For", "")
@@ -434,7 +436,7 @@ class RateLimiterMiddleware:
                 return min(route_max, self._global_max), route_window
         return self._global_max, self._global_window
 
-    def _prune_expired_counters(self):
+    def _prune_expired_counters(self) -> None:
         """Remove expired counters to prevent unbounded memory growth.
 
         Runs periodically based on cleanup_interval.
@@ -469,10 +471,7 @@ class RateLimiterMiddleware:
         method = request.method
 
         # Build per-route, per-IP limit key
-        if self._per_ip:
-            key = self._get_client_key(path, method, client_ip)
-        else:
-            key = f"{_get_route_key(path, method)}:{method}"
+        key = self._get_client_key(path, method, client_ip) if self._per_ip else f"{_get_route_key(path, method)}:{method}"
 
         # Get limits for this route (stricter of global and route-specific)
         max_req, window_sec = self._get_limits_for_path(path, method)
@@ -532,6 +531,6 @@ class RateLimiterMiddleware:
             "route_limits": {k: {"max_requests": v[0], "window_seconds": v[1]} for k, v in _get_effective_route_limits().items()},
         }
 
-    def reset(self):
+    def reset(self) -> None:
         """Clear all counters (for testing)."""
         self._counters.clear()

@@ -1,5 +1,4 @@
-"""
-Job service — orchestrates job lifecycle and extraction orchestration.
+"""Job service — orchestrates job lifecycle and extraction orchestration.
 
 Responsible for:
 - Creating and validating jobs
@@ -13,12 +12,15 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+from typing import TYPE_CHECKING
 
 from forge_kernel.config import settings
 from forge_kernel.contracts.job import Job, JobStatus
-from forge_kernel.contracts.result import ResultRecord
 from forge_kernel.persistence import get_job_repository
 from forge_kernel.services.extraction_service import ExtractionService
+
+if TYPE_CHECKING:
+    from forge_kernel.contracts.result import ResultRecord
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ logger = logging.getLogger(__name__)
 class JobService:
     """Service for managing the job lifecycle."""
 
-    def __init__(self, jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]):
+    def __init__(self, jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) -> None:
         self._jobs = jobs_store
         self._recycle_bin = recycle_bin_store
         self._extraction = ExtractionService()
@@ -124,12 +126,12 @@ class JobService:
                         url=url,
                         schema_fields=schema_dicts,
                         min_record_score=job.min_record_score,
-                        selectors_map=job.selectors_map if job.selectors_map else None,
+                        selectors_map=job.selectors_map or None,
                     ),
                     timeout=settings.extraction.PER_URL_TIMEOUT_SECONDS,
                 )
                 all_records.extend(records)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Timeout extracting %s, continuing", url)
                 job.warnings.append(f"Timeout extracting {url}")
             except Exception as e:
@@ -165,12 +167,12 @@ class JobService:
 
     # ─── Persistence ────────────────────────────────────────────────────
 
-    def _persist(self):
+    def _persist(self) -> None:
         try:
             repo = get_job_repository()
             repo.save_all(jobs=self._jobs, recycle_bin=self._recycle_bin)
         except Exception as e:
-            logger.error("Failed to persist state: %s", e)
+            logger.exception("Failed to persist state: %s", e)
 
     def load_all(self):
         """Load all state from the persistent store."""
@@ -183,5 +185,5 @@ class JobService:
             self._recycle_bin.update(recycle)
             return ws
         except Exception as e:
-            logger.error("Failed to load state: %s", e)
+            logger.exception("Failed to load state: %s", e)
             return None

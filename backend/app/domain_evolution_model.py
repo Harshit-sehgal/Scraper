@@ -1,5 +1,4 @@
-"""
-Domain Evolution Model — Tracks and models behavioral evolution of scraped domains.
+"""Domain Evolution Model — Tracks and models behavioral evolution of scraped domains.
 
 Provides:
   - Mutation frequency tracking (how often does a domain's structure change?)
@@ -20,13 +19,16 @@ The architecture must model and anticipate these changes.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
+from typing import TYPE_CHECKING
 
 from app.selector_memory import get_selector_memory
+
+if TYPE_CHECKING:
+    import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +36,7 @@ logger = logging.getLogger(__name__)
 _background_tasks: set[asyncio.Task] = set()
 
 
-async def _trigger_webhook(url: str, payload: dict):
+async def _trigger_webhook(url: str, payload: dict) -> None:
     try:
         from app.url_safety import get_safe_async_client
 
@@ -42,7 +44,7 @@ async def _trigger_webhook(url: str, payload: dict):
             response = await client.post(url, json=payload)
             if response.status_code >= 400:
                 logger.warning("Alert webhook returned status code %d", response.status_code)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("Failed to deliver alert webhook: %s", e)
 
 
@@ -127,6 +129,7 @@ class DomainEvolutionModel:
         Args:
             domain: The domain whose selector was replaced
             previous_lifespan_hours: How long the previous selector lasted
+
         """
         metrics = self._get_or_create(domain)
         metrics.mutation_count += 1
@@ -150,6 +153,7 @@ class DomainEvolutionModel:
         Args:
             domain: The domain experiencing escalation
             new_anti_bot_score: Current anti-bot detection score [0, 1]
+
         """
         metrics = self._get_or_create(domain)
 
@@ -206,13 +210,13 @@ class DomainEvolutionModel:
                     # No running event loop, send in background thread
                     import threading
 
-                    def fire_sync():
+                    def fire_sync() -> None:
                         from app.url_safety import get_safe_client
 
                         try:
                             with get_safe_client(timeout=5.0) as client:
                                 client.post(webhook_url, json=payload)
-                        except Exception as ex:
+                        except Exception as ex:  # noqa: BLE001
                             logger.debug("Failed to deliver webhook synchronously: %s", ex)
 
                     threading.Thread(target=fire_sync, daemon=True).start()
@@ -297,6 +301,7 @@ class DomainEvolutionModel:
 
         Returns:
             List of volatile domains sorted by volatility (highest first)
+
         """
         volatile = [m for m in self._domains.values() if m.volatility_index >= threshold]
         return sorted(volatile, key=lambda x: x.volatility_index, reverse=True)

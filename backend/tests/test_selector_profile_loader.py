@@ -1,5 +1,4 @@
-"""
-Unit Tests for Selector Profile Loader.
+"""Unit Tests for Selector Profile Loader.
 Tests the non-Playwright parts of the profile loader: domain matching,
 currency parsing, field post-processing, and profile cache management.
 """
@@ -76,10 +75,10 @@ class TestPostprocessField:
 
 
 class TestProfileLoading:
-    def setup_method(self):
+    def setup_method(self) -> None:
         reload_profiles()  # Reset cache before each test
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         reload_profiles()
 
     def test_load_empty_dir_returns_empty(self) -> None:
@@ -106,10 +105,10 @@ class TestProfileLoading:
 
 
 class TestMatchDomain:
-    def setup_method(self):
+    def setup_method(self) -> None:
         reload_profiles()
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         reload_profiles()
 
     def test_match_returns_profile_for_known_profile(self) -> None:

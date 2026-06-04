@@ -36,7 +36,7 @@ class MetricsMixin:
         # 2. Compatibility pressure (topology-native): divergent type
         # preferences → exclusion
         observed_types = set()
-        for r, t in self.role_compatibility:
+        for _r, t in self.role_compatibility:
             observed_types.add(t)
         for ttype in observed_types:
             ca = self.role_compatibility.get((role_a, ttype), 0.5)

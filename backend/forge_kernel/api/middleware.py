@@ -1,5 +1,4 @@
-"""
-Middleware — CORS, body size, API key authentication, and latency tracking.
+"""Middleware — CORS, body size, API key authentication, and latency tracking.
 
 Ported from existing app.middlewares into the kernel.
 """
@@ -8,14 +7,18 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from forge_kernel.config import settings
 from forge_kernel.security.rbac import _resolve_role
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from fastapi import FastAPI, Request, Response
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +96,7 @@ class LatencyTrackingMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def configure_middleware(app: FastAPI):
+def configure_middleware(app: FastAPI) -> None:
     """Configure all middleware for the kernel FastAPI app."""
     app.add_middleware(
         CORSMiddleware,
