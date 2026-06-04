@@ -14,6 +14,7 @@ from app.selector_engine import (
     extract_raw_from_selectors,
     extract_with_regex,
 )
+from conftest import make_schema_field_list
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Table Header Detection
@@ -251,9 +252,8 @@ class TestExtractContextWindow:
 
     def test_returns_none_for_short_segment(self) -> None:
         result = _extract_context_window("a", ["a"])
-        # The segment might be too short based on SELECTOR_MIN_SEGMENT_LEN
-        # Just verify it returns None or a string
-        assert result is None or isinstance(result, str)
+        # The segment is too short (< SELECTOR_MIN_SEGMENT_LEN), expect None
+        assert result is None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -318,12 +318,12 @@ class TestExtractRawFromSelectors:
 
 class TestExtractWithRegex:
     def test_returns_empty_for_empty_html(self) -> None:
-        schema = [SchemaField(name="name", field_type=FieldType.STRING, required=False, description="")]
+        schema = make_schema_field_list(["name"])
         result = extract_with_regex("", schema)
         assert result == []
 
     def test_extracts_from_simple_html(self) -> None:
-        schema = [SchemaField(name="name", field_type=FieldType.STRING, required=False, description="")]
+        schema = make_schema_field_list(["name"])
         html = '<html><body><article class="item"><h2>Product A</h2></article></body></html>'
         result = extract_with_regex(html, schema)
         assert isinstance(result, list)
@@ -332,10 +332,10 @@ class TestExtractWithRegex:
             assert result[0].get("name") is not None
 
     def test_skips_noise_containers(self) -> None:
-        schema = [SchemaField(name="name", field_type=FieldType.STRING, required=False, description="")]
+        schema = make_schema_field_list(["name"])
         html = '<html><body><div class="ad-banner">Subscribe to newsletter</div></body></html>'
         result = extract_with_regex(html, schema)
-        assert isinstance(result, list)
+        assert result == []
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -356,6 +356,6 @@ class TestApplySelectors:
         result = apply_selectors(
             "<html></html>",
             {"item_container": "", "fields": {}},
-            [SchemaField(name="name", field_type=FieldType.STRING, required=False, description="")],
+            make_schema_field_list(["name"]),
         )
         assert result == []
