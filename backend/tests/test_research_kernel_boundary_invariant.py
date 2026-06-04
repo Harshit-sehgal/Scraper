@@ -106,9 +106,9 @@ def test_well_known_kernel_modules_are_NOT_classified() -> None:
         "experimental_startup",
     ]
     wrong = [m for m in expected_kernel if is_research_module(m)]
-    assert (
-        not wrong
-    ), f"Product-kernel modules are incorrectly classified as research: {wrong}. Remove them from app/research/__init__.py."
+    assert not wrong, (
+        f"Product-kernel modules are incorrectly classified as research: {wrong}. Remove them from app/research/__init__.py."
+    )
 
 
 def test_research_path_strips_leading_app_prefix() -> None:
@@ -219,13 +219,13 @@ def test_scanner_detects_synthetic_violation() -> None:
                 for lineno, mod, names in scanner._top_level_research_imports(fp):
                     violations.append((os.path.relpath(fp), lineno, mod, names))
         # Expect at least one violation for the research import.
-        assert any(
-            mod == "app.semantic_world_state" for _, _, mod, _ in violations
-        ), f"Synthetic violation was not detected: {violations}"
+        assert any(mod == "app.semantic_world_state" for _, _, mod, _ in violations), (
+            f"Synthetic violation was not detected: {violations}"
+        )
         # And no violation for the kernel import.
-        assert not any(
-            mod == "app.scraper" for _, _, mod, _ in violations
-        ), f"Kernel import incorrectly flagged as a violation: {violations}"
+        assert not any(mod == "app.scraper" for _, _, mod, _ in violations), (
+            f"Kernel import incorrectly flagged as a violation: {violations}"
+        )
 
 
 def test_scanner_handles_unparseable_file_gracefully() -> None:
