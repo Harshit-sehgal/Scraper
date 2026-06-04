@@ -181,6 +181,14 @@ def reset_failure_injection():
     set_injection_probability(0.0)
 
 
+from app.models import FieldType, SchemaField
+
+
+def make_schema_field_list(names: list[str], field_type: FieldType = FieldType.STRING) -> list[SchemaField]:
+    """Helper to create SchemaField lists from field names. Shared across test files."""
+    return [SchemaField(name=n, field_type=field_type, required=False, description="") for n in names]
+
+
 class LocalASGIClient:
     """Small sync wrapper around httpx ASGITransport that avoids TestClient threads.
 
