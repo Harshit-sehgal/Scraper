@@ -140,16 +140,16 @@ def _ensure_schema() -> None:
                 # Add result column (used for storing successful task results)
                 try:
                     _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN result TEXT")
-                except Exception:  # noqa: BLE001, nosec B110
-                    pass
+                except Exception:  # noqa: BLE001
+                    pass  # nosec B110
                 current = 2
 
             if current < 3:
                 # Add execution_time_ms column for tracking task latencies
                 try:
                     _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN execution_time_ms INTEGER")
-                except Exception:  # noqa: BLE001, nosec B110
-                    pass
+                except Exception:  # noqa: BLE001
+                    pass  # nosec B110
                 current = 3
 
             _execute(
@@ -564,7 +564,7 @@ class PostgresWorkerQueue:
                     )
                     logger.info("Recovered %d stuck task(s) from previous worker crash", count)
         except Exception:
-            logger.exception("Failed to recover stuck tasks: %s")
+            logger.exception("Failed to recover stuck tasks")
 
     async def stop(self, drain: bool = True) -> None:
         """Stop the worker loop. Optionally drain in-flight tasks."""
@@ -721,7 +721,7 @@ class PostgresWorkerQueue:
                     "next_tasks": top_pending,
                 }
         except Exception as e:
-            logger.exception("Failed to get Postgres queue status: %s")
+            logger.exception("Failed to get Postgres queue status: %s", str(e))
             return {"ok": False, "backend": "postgres", "error": str(e), "pending": 0, "running": 0}
 
     async def get_status_async(self) -> dict:

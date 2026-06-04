@@ -107,8 +107,8 @@ def _conn() -> Iterator[psycopg2.extensions.connection]:
             from app.metrics_collector import record_error
 
             record_error("database")
-        except Exception:  # noqa: BLE001, nosec B110 - metrics must never break the caller
-            pass
+        except Exception:  # noqa: BLE001  # metrics must never break the caller
+            pass  # nosec B110
         raise
     finally:
         pool.putconn(conn)

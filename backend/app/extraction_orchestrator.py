@@ -284,8 +284,8 @@ async def orchestrate_extraction(
 
             candidates = find_record_arrays(payload)
             record_arrays_found += len(candidates)
-        except Exception:  # noqa: BLE001, nosec B110
-            pass
+        except Exception:  # noqa: BLE001
+            pass  # nosec B110
 
     # Extract network results
     from app.network_payload_extractor import arbitrate_sources, extract_from_network_payloads

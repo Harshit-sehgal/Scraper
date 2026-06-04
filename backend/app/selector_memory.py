@@ -64,16 +64,16 @@ class SelectorMemory:
             try:
                 with open(self.path) as f:  # noqa: PTH123
                     self._memory = json.load(f)
-            except Exception:
-                logger.exception("Failed to load selector memory: %s")
+            except (OSError, json.JSONDecodeError):
+                logger.exception("Failed to load selector memory")
                 self._memory = {}
 
     def _save(self) -> None:
         try:
             with open(self.path, "w") as f:  # noqa: PTH123
                 json.dump(self._memory, f, indent=2)
-        except Exception:
-            logger.exception("Failed to save selector memory: %s")
+        except (OSError, TypeError):
+            logger.exception("Failed to save selector memory")
 
     def _compute_confidence(self, entry: dict) -> SelectorConfidenceScore:
         """Compute confidence score for a selector entry.
@@ -344,7 +344,7 @@ class SelectorMemory:
         try:
             parsed = urlparse(url)
             return parsed.netloc.lower() or None
-        except Exception:  # noqa: BLE001
+        except (ValueError, AttributeError):
             return None
 
 

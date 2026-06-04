@@ -197,8 +197,8 @@ async def llm_json(messages: list[dict], temperature: float | None = None, timeo
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:  # noqa: BLE001, nosec B110
-        pass
+    except Exception:  # noqa: BLE001
+        pass  # nosec B110
     if temperature is None:
         temperature = settings.LLM_TEMPERATURE
     if timeout is None:
@@ -280,8 +280,8 @@ async def llm_json_fast(messages: list[dict], temperature: float | None = None, 
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:  # noqa: BLE001, nosec B110
-        pass
+    except Exception:  # noqa: BLE001
+        pass  # nosec B110
     if temperature is None:
         temperature = settings.LLM_FAST_TEMPERATURE
     if timeout is None:
@@ -337,8 +337,8 @@ async def llm_text(messages: list[dict], temperature: float | None = None, timeo
         from app.metrics_collector import record_llm_call
 
         record_llm_call()
-    except Exception:  # noqa: BLE001, nosec B110
-        pass
+    except Exception:  # noqa: BLE001
+        pass  # nosec B110
     if temperature is None:
         temperature = settings.LLM_TEXT_TEMPERATURE
     if timeout is None:

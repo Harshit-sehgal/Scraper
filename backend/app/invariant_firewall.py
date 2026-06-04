@@ -53,8 +53,8 @@ def requires_invariants(mutation_fn: Callable):
                         severity="warning",
                         cause=f"Snapshot failed before {mutation_fn.__name__}: {snapshot_err}",
                     )
-                except Exception:  # noqa: BLE001, nosec B110
-                    pass
+                except Exception:  # noqa: BLE001
+                    pass  # nosec B110
 
             # Check pre-conditions
             pre_issues = validate_world_state(ws)
@@ -85,8 +85,8 @@ def requires_invariants(mutation_fn: Callable):
                                 severity="critical",
                                 cause=f"Rollback failed for {mutation_fn.__name__}: {rollback_err}. State may be corrupt!",
                             )
-                        except Exception:  # noqa: BLE001, nosec B110
-                            pass
+                        except Exception:  # noqa: BLE001
+                            pass  # nosec B110
                     finally:
                         setattr(ws, _ROLLBACK_GUARD_ATTR, False)
                 else:
@@ -97,8 +97,8 @@ def requires_invariants(mutation_fn: Callable):
                             severity="critical",
                             cause=f"Cannot rollback {mutation_fn.__name__} — no snapshot available. State may be corrupt!",
                         )
-                    except Exception:  # noqa: BLE001, nosec B110
-                        pass
+                    except Exception:  # noqa: BLE001
+                        pass  # nosec B110
                 msg = (
                     f"Invariant violation in {mutation_fn.__name__}: "
                     f"{post_issues[0]}{' (+' + str(len(post_issues) - 1) + ' more)' if len(post_issues) > 1 else ''}"

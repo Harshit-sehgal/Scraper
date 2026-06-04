@@ -24,19 +24,19 @@ def check_all_fixes() -> dict:
 
     # 1. ROLE_EXCLUSIVITY has price / cost (moved to field_laws.py)
     path_laws = Path(base_dir) / "field_laws.py"
-    with open(path_laws) as f:  # noqa: PTH123
+    with path_laws.open() as f:
         content_laws = f.read()
     results["ROLE_EXCLUSIVITY price / cost (field_laws.py)"] = 'price", "cost"' in content_laws
 
     # 2. create_token has source_field
     path_ir = Path(base_dir) / "semantic_ir.py"
-    with open(path_ir) as f:  # noqa: PTH123
+    with path_ir.open() as f:
         content_ir = f.read()
     results["create_token source_field"] = "source_field=source," in content_ir or "source_field=primary_type" in content_ir
 
     # 3. schema_instability is in EnergyState (via energy_state.py)
     path_energy = Path(base_dir) / "energy_state.py"
-    with open(path_energy) as f:  # noqa: PTH123
+    with path_energy.open() as f:
         content_energy = f.read()
     results["schema_instability property (energy_state.py)"] = (
         "def schema_instability" in content_energy and "dict(self._schema_instability)" in content_energy
@@ -52,12 +52,12 @@ def check_all_fixes() -> dict:
         for root, _, files in os.walk(ws_dir):
             for fname in files:
                 if fname.endswith(".py"):
-                    with open(Path(root) / fname) as f:  # noqa: PTH123
+                    with (Path(root) / fname).open() as f:
                         content_ws += f.read() + "\n"
     else:
         path_ws = Path(base_dir) / "semantic_world_state.py"
         if Path(path_ws).exists():
-            with open(path_ws) as f:  # noqa: PTH123
+            with path_ws.open() as f:
                 content_ws = f.read()
     results["capture schema expansion"] = "ROLE_EXCLUSIVITY" in content_ws and "for ra, rb in ROLE_EXCLUSIVITY" in content_ws
 
@@ -80,7 +80,7 @@ def check_all_fixes() -> dict:
 
     # 8. Pipeline is clean of dead imports
     path_pipe = Path(base_dir) / "semantic_pipeline.py"
-    with open(path_pipe) as f:  # noqa: PTH123
+    with path_pipe.open() as f:
         content_pipe = f.read()
     results["pipeline clean"] = "semantic_contradiction_engine" not in content_pipe
 
