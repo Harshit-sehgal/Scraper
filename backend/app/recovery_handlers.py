@@ -18,12 +18,7 @@ import asyncio
 import logging
 from typing import Any
 
-from app.domain_runtime_policy import get_domain_runtime_policy
 from app.proxy_manager import get_proxy_manager
-from app.recovery_strategies import (
-    RecoveryAction,
-    get_recovery_executor,
-)
 from app.selector_memory import get_selector_memory
 
 logger = logging.getLogger(__name__)
@@ -57,6 +52,8 @@ async def handle_backoff_and_slow(params: dict[str, Any], context: dict[str, Any
     await asyncio.sleep(delay_seconds)
     url = context.get("url", "")
     if url:
+        from app.domain_runtime_policy import get_domain_runtime_policy
+
         get_domain_runtime_policy().set_reduce_concurrency(url)
     if attempt_ctx:
         attempt_ctx.reduce_concurrency = True
@@ -89,6 +86,8 @@ async def handle_reduce_concurrency(params: dict[str, Any], context: dict[str, A
     url = context.get("url", "")
     logger.info("Reducing concurrency for %s", url)
     if url:
+        from app.domain_runtime_policy import get_domain_runtime_policy
+
         get_domain_runtime_policy().set_reduce_concurrency(url)
     if attempt_ctx:
         attempt_ctx.reduce_concurrency = True
@@ -191,6 +190,8 @@ async def handle_abort_domain(params: dict[str, Any], context: dict[str, Any], a
     url = context.get("url")
     logger.warning("Recovery action: aborting domain %s for %d minutes", url, skip_minutes)
     if url:
+        from app.domain_runtime_policy import get_domain_runtime_policy
+
         get_domain_runtime_policy().set_abort_domain(url)
     if attempt_ctx:
         attempt_ctx.abort_domain = True
@@ -222,6 +223,8 @@ async def handle_skip_domain(params: dict[str, Any], context: dict[str, Any], at
     url = context.get("url")
     logger.warning("Recovery action: skipping domain %s", url)
     if url:
+        from app.domain_runtime_policy import get_domain_runtime_policy
+
         get_domain_runtime_policy().set_abort_domain(url)
 
     if attempt_ctx:
@@ -258,7 +261,13 @@ def register_all_recovery_handlers() -> None:
     """Register all recovery action handlers with the executor.
 
     Should be called once at application startup.
+
+    RecoveryAction and get_recovery_executor come from app.recovery_strategies
+    (research module) and are imported lazily here so that the kernel
+    import graph does not depend on the research shell.
     """
+    from app.recovery_strategies import RecoveryAction, get_recovery_executor
+
     executor = get_recovery_executor()
 
     # Register all handlers

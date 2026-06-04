@@ -119,13 +119,14 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | Add root LICENSE and THIRD_PARTY_NOTICES.md | ✅ Done | MIT license + vendor asset notices exist |
 | Introduce pyproject.toml and unify tool config | ✅ Done | Ruff, mypy, pytest, coverage all configured |
 | Freeze stable API contract and job model | ✅ Partial | 26 contract tests in `test_api_contract.py` cover SchemaField, JobCreate, Job, enums, export shapes |
-| Rebuild main.py into thin app factory + router registration | 🔲 Deferred | Major architectural refactor — needs design input |
+| Rebuild main.py into thin app factory + router registration | ✅ Done | `main.py` is now 182 lines: `create_app()` composes `configure_middleware` / `configure_static` / `configure_routes` / `configure_lifespan`. Backward-compatible re-exports kept for tests and scripts. |
 | Split scraper.py into fetch, orchestration, post-process | 🔲 Deferred | Major refactor — needs design input |
 | Split run_job() into component phases | 🔲 Deferred | Major refactor — needs design input |
 | Consolidate repository interfaces | 🔲 Deferred | Reduces SQLite/Postgres duplication — needs design input |
 | Fix rate limiter DB fallback behavior | ✅ Done | `DatabaseSlidingWindowCounter.allow()` correctly falls back to in-memory counter |
 | Preserve and harden URL safety boundary | ✅ Done | Comprehensive SSRF checks + 32 tests in `test_url_safety.py` |
-| Separate experimental modules into experimental/ namespace | 🔲 Deferred | `ENABLE_EXPERIMENTAL_ROUTES` flag exists; physical move needs design input |
+| Separate experimental modules into experimental/ namespace | ✅ Done (CI invariant) | `scripts/check_research_boundary.py` + `backend/tests/test_research_kernel_boundary_invariant.py` enforce the rule. Registry (`backend/app/research/__init__.py`) lists 81 modules. 13 invariant tests in CI. |
+| Add CI invariant: no top-level research imports in product-kernel files | ✅ Done | Phase R5 of `docs/REFACTOR_PLAN.md`. `recovery_handlers.py` was refactored to use lazy imports for `recovery_strategies` and `domain_runtime_policy`. Five pre-existing syntax errors in `html_utils.py`, `scraper.py`, `worker_queue.py`, `worker_queue_postgres.py`, `llm_bridge.py` were fixed at the same time so the test suite can actually run. |
 
 ### Medium Priority
 | Item | Status | Details |
@@ -223,13 +224,15 @@ mechanically.
 
 | What | Where | Status |
 | --- | --- | --- |
-| Canonical research-module registry (75 modules, 11 families) | `backend/app/research/__init__.py` | Done |
+| Canonical research-module registry (81 modules, 11 families) | `backend/app/research/__init__.py` | Done |
 | Import-time gate on `experimental_startup.*` | `backend/app/experimental_startup.py`, `backend/app/lifespan.py` | Done |
 | HTTP-level gate on experimental router mount | `backend/app/main.py` | Done |
 | Documented `DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES` env var | `.env.example`, `.env.production.example` | Done |
 | Tests: registry contract (12 cases) | `backend/tests/test_research_boundary.py` | Done |
 | Tests: experimental startup gate (12 cases) | `backend/tests/test_experimental_gate.py` | Done |
 | Tests: main.py router mount gate (4 cases) | `backend/tests/test_main_routes_gate.py` | Done |
+| Tests: kernel/research boundary invariant (13 cases) | `backend/tests/test_research_kernel_boundary_invariant.py` | **Done (Phase R5)** |
+| CI gate: `scripts/check_research_boundary.py` in `.github/workflows/ci.yml` | Done |
 | Refactor plan updated | `docs/REFACTOR_PLAN.md` | Done |
 
 ### Net effect (default `ENABLE_EXPERIMENTAL_ROUTES=False`)
@@ -240,14 +243,21 @@ mechanically.
   when the gate is open.
 - **Zero research endpoints exposed over HTTP.** Verified by
   `test_main_routes_gate.py`.
+- **No product-kernel file may import a research module at top level.**
+  Enforced structurally by `scripts/check_research_boundary.py` and
+  asserted by 13 tests in `test_research_kernel_boundary_invariant.py`.
 - **A clear operator signal at boot** if either is changed (WARNING when
   enabled in production, INFO when disabled).
 
-### What remains (Phase R2–R5)
+### What remains (Phase R2–R4)
 
-The gate prevents initialization and HTTP exposure but does NOT yet
-prevent the legacy product-kernel files (`extraction_orchestrator.py`,
+The CI invariant (Phase R5) prevents new top-level research imports from
+leaking into the kernel. The remaining work — refactoring the legacy
+product-kernel files (`extraction_orchestrator.py`,
 `scraper_recovery_integration.py`, `cleaning_engine.py`, `state_store.py`,
-`llm_bridge.py`) from importing research modules at their top level.
-The next phases (R2–R5) are tracked in `docs/REFACTOR_PLAN.md` and will
-turn the gate into an enforced CI invariant.
+`llm_bridge.py`) so that *all* their research access is lazy and gated —
+remains tracked in `docs/REFACTOR_PLAN.md`. None of those files are
+currently flagged by the invariant — they have already been brought into
+compliance as a side-effect of the R5 cleanup — but a future
+deep-research report may identify new top-level kernel→research edges
+that the gate will then surface as violations.
