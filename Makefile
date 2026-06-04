@@ -8,12 +8,17 @@
 #   make build         Build Docker image
 #   make up            Start development stack
 #   make down          Stop development stack
-#   make logs          Tail logs
-#   make shell         Open shell in running container
+#   make logs          Tail all logs
+#   make shell         Open bash in running container
 #   make test          Run tests inside container
-#   make lint          Run linters inside container
+#   make lint          Run ruff lint + format inside container
+#   make mypy          Run mypy type checker
+#   make boundary      Run the research-shell boundary check (CI invariant)
+#   make deps-check    Validate pyproject.toml dependency bounds
+#   make lint-all      Run lint + mypy + boundary + deps-check
+#   make validate      Run all CI checks locally (does not require Docker)
 #   make prod          Start production stack
-#   make clean         Remove containers, volumes, and images
+#   make clean         Remove containers, volumes, and dangling images
 # =============================================================================
 
 .DEFAULT_GOAL := help
