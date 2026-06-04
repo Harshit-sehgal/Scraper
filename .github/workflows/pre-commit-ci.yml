@@ -79,20 +79,20 @@ jobs:
         run: python scripts/validate_dependency_bounds.py
 
   notify:
-    name: Slack Notification
+    name: Telegram Notification
     needs: [ruff, mypy, boundary, deps-bounds]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Slack Notification
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_TITLE: "Pre-commit Checks Status"
-          SLACK_MESSAGE: |
-            *Repo*: ${{ github.repository }}
-            *Commit*: <https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>
-            *Branch*: ${{ github.ref_name }}
-            *Author*: ${{ github.actor }}
-            *Status*: ${{ (needs.ruff.result == 'success' && needs.mypy.result == 'success' && needs.boundary.result == 'success' && needs.deps-bounds.result == 'success') && '✅ Passed' || '❌ Failed' }}
-          SLACK_COLOR: ${{ (needs.ruff.result == 'success' && needs.mypy.result == 'success' && needs.boundary.result == 'success' && needs.deps-bounds.result == 'success') && 'good' || 'danger' }}
+      - name: Send Telegram Message
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🔔 Pre-commit Checks Status: ${{ (needs.ruff.result == 'success' && needs.mypy.result == 'success' && needs.boundary.result == 'success' && needs.deps-bounds.result == 'success') && '✅ Passed' || '❌ Failed' }}
+
+            Repo: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+            Author: ${{ github.actor }}

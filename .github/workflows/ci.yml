@@ -109,20 +109,20 @@ jobs:
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite           python -m pytest -q backend/tests -o addopts= --tb=short
 
   notify:
-    name: Slack Notification
+    name: Telegram Notification
     needs: [ci-gates, lint-type-checks]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Slack Notification
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_TITLE: "CI Workflow Status"
-          SLACK_MESSAGE: |
-            *Repo*: ${{ github.repository }}
-            *Commit*: <https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>
-            *Branch*: ${{ github.ref_name }}
-            *Author*: ${{ github.actor }}
-            *Status*: ${{ (needs.ci-gates.result == 'success' && needs.lint-type-checks.result == 'success') && '✅ Passed' || '❌ Failed' }}
-          SLACK_COLOR: ${{ (needs.ci-gates.result == 'success' && needs.lint-type-checks.result == 'success') && 'good' || 'danger' }}
+      - name: Send Telegram Message
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🔔 CI Workflow Status: ${{ (needs.ci-gates.result == 'success' && needs.lint-type-checks.result == 'success') && '✅ Passed' || '❌ Failed' }}
+
+            Repo: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+            Author: ${{ github.actor }}
