@@ -30,8 +30,10 @@ PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sql
 Optional, if installed:
 
 ```bash
-python3 -m pyflakes backend/app scripts architecture_validator.py
-python3 -m mypy backend/app --ignore-missing-imports
+python3 -m ruff check backend/app backend/tests
+python3 -m ruff format --check backend/app backend/tests
+python3 -m mypy backend/app backend/tests
+python3 -m bandit -r backend/app -q
 ```
 
 ## Standards

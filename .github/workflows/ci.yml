@@ -64,10 +64,9 @@ jobs:
             echo "✅ check_prod_env.py correctly failed on placeholder secrets (expected behaviour)."
           fi
 
-  advisory-linting:
-    name: Advisory Lint & Type Checks
+  lint-type-checks:
+    name: Lint, Type & Security Checks
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -88,12 +87,20 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.txt
-          pip install ruff mypy types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
+          pip install ruff mypy bandit types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
 
-      - name: Run Ruff Lint (Advisory)
+      - name: Run Ruff Lint
         run: ruff check backend/app backend/tests
-        continue-on-error: true
 
-      - name: Run Mypy Typecheck (Advisory)
+      - name: Run Ruff Format Check
+        run: ruff format --check backend/app backend/tests
+
+      - name: Run Mypy Typecheck
         run: python -m mypy backend/app backend/tests --check-untyped-defs
-        continue-on-error: true
+
+      - name: Run Bandit Security Scan
+        run: python -m bandit -r backend/app -q
+
+      - name: Run Full Test Suite (SQLite)
+        run: |
+          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite           python -m pytest -q backend/tests -o addopts= --tb=short
