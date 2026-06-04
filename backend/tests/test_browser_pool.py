@@ -533,6 +533,106 @@ class TestBrowserReconnection:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# RSS Memory
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestGetRssMemory:
+    def test_returns_int(self) -> None:
+        pool = BrowserPool()
+        rss = pool._get_rss_memory()
+        assert isinstance(rss, int)
+        assert rss >= 0
+
+    def test_returns_zero_on_failure(self) -> None:
+        with patch("resource.getrusage", side_effect=OSError("Not available")):
+            pool = BrowserPool()
+            rss = pool._get_rss_memory()
+            assert rss == 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Close with Cleanup Task
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestCloseWithCleanup:
+    @pytest.mark.asyncio
+    async def test_cancels_cleanup_task(self) -> None:
+        pool = BrowserPool()
+        mock_task = MagicMock()
+        mock_task.done.return_value = False
+        pool._cleanup_task = mock_task
+        pool._browser = AsyncMock()
+        pool._playwright = MagicMock()
+
+        await pool.close()
+
+        mock_task.cancel.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_stops_playwright(self) -> None:
+        pool = BrowserPool()
+        mock_pw = AsyncMock()
+        pool._playwright = mock_pw
+
+        await pool.close()
+
+        mock_pw.stop.assert_awaited_once()
+        assert pool._playwright is None
+
+    @pytest.mark.asyncio
+    async def test_handles_playwright_stop_exception(self) -> None:
+        pool = BrowserPool()
+        mock_pw = AsyncMock()
+        mock_pw.stop.side_effect = Exception("Stop failed")
+        pool._playwright = mock_pw
+
+        await pool.close()  # Should not raise
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Check and Trigger Recycle
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestCheckAndTriggerRecycle:
+    @pytest.mark.asyncio
+    async def test_returns_early_when_not_needed(self) -> None:
+        pool = BrowserPool()
+        pool._cumulative_fetches = 0  # Below threshold
+        await pool._check_and_trigger_recycle()
+        assert pool._recycling is False
+        assert pool._recycle_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_returns_early_when_already_recycling(self) -> None:
+        pool = BrowserPool()
+        pool._recycling = True
+        pool._cumulative_fetches = 999  # Would trigger if not already recycling
+        with patch("app.browser_pool.settings.BROWSER_MAX_CUMULATIVE_FETCHES", 100):
+            await pool._check_and_trigger_recycle()
+        assert pool._recycling is True  # Still True (didn't change)
+
+    @pytest.mark.asyncio
+    async def test_triggers_recycle_and_resets(self) -> None:
+        pool = BrowserPool()
+        pool._cumulative_fetches = 200
+        pool._active_fetches = 0
+        pool._recycle_event.set()
+
+        with (
+            patch("app.browser_pool.settings.BROWSER_MAX_CUMULATIVE_FETCHES", 100),
+            patch("app.browser_pool.settings.BROWSER_DRAIN_POLL_INTERVAL", 0.01),
+            patch.object(pool, "_hard_recycle", AsyncMock()),
+        ):
+            await pool._check_and_trigger_recycle()
+
+        assert pool._recycling is False
+        assert pool._recycle_event.is_set()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Get Browser Pool (Singleton Factory)
 # ═══════════════════════════════════════════════════════════════════════════════
 
