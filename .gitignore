@@ -19,6 +19,7 @@ backend/.pylint_venv/
 .coverage
 backend/.coverage
 *.cover
+*.py,cover
 
 # Local environment files. Keep committed examples.
 .env
