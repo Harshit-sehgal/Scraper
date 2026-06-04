@@ -1,4 +1,5 @@
 name: CI
+# Trigger run to test Telegram notification
 
 on:
   push:
