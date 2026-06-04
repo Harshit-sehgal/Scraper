@@ -156,7 +156,7 @@ def test_clear_terminal_jobs_preserves_result_files(client, tmp_path, monkeypatc
 
 def test_backfill_metadata_only_saves_single_job(client, monkeypatch) -> None:
     """Verify that backfill-metadata endpoint only saves the single job updated and doesn't call a global save."""
-    saved_jobs = []
+    saved_jobs: list[Job] = []
 
     # Mock _save_job to track what gets saved
     monkeypatch.setattr("app.routers.jobs._save_job", saved_jobs.append)
