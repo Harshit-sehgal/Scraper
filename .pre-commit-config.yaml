@@ -6,6 +6,16 @@ repos:
         args: [--fix]
       - id: ruff-format
 
+  - repo: local
+    hooks:
+      - id: check-research-boundary
+        name: Check kernel/research boundary
+        entry: python scripts/check_research_boundary.py
+        language: system
+        pass_filenames: false
+        types: [python]
+        stages: [pre-commit]
+
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.11.2
     hooks:
