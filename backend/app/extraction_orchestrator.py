@@ -254,7 +254,7 @@ async def orchestrate_extraction(
     from app.session_url_detector import detect_session_params
 
     session_detect = detect_session_params(url)
-    is_session = bool(session_detect.get("is_session_bound") or "/search / id/" in url)
+    is_session = bool(session_detect.get("is_session_bound"))
 
     from app.browser_network_capture import get_captures
 
@@ -533,7 +533,7 @@ async def orchestrate_extraction(
             from app.session_url_detector import detect_session_params
 
             session_detect = detect_session_params(url)
-            is_session = bool(session_detect.get("is_session_bound") or "/search / id/" in url)
+            is_session = bool(session_detect.get("is_session_bound"))
             fields_sel = remembered_selectors.get("fields", {})
             selectors_empty = not fields_sel or all(not sel for sel in fields_sel.values())
 

@@ -985,6 +985,18 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def solidified_motifs(self):
         return list(self._history.solidified_motifs)
 
+    def add_solidified_motifs(self, new_motifs: list) -> int:
+        """Atomically merge ``new_motifs`` into the solidified set.
+
+        Holds the substrate lock for the read-modify-write so concurrent
+        callers can't lose updates. Returns the number of newly added
+        motifs (existing duplicates are skipped).
+        """
+        if not new_motifs:
+            return 0
+        with self._lock:
+            return self._history.add_solidified_motifs(new_motifs)
+
     # ─── Delegation Properties: Topology-Derived Structures ───────────────
 
     @property

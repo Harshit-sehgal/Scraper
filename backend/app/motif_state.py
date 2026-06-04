@@ -217,8 +217,14 @@ class MotifState:
         for k, v in data.get("motif_stability", {}).items():
             self._motif_stability[tuple(self._parse_motif_key(k))] = v
 
+    MAX_MOTIF_KEY_LENGTH = 1_000_000
+
     def _parse_motif_key(self, key: str) -> tuple:
         import ast
+
+        if len(key) > self.MAX_MOTIF_KEY_LENGTH:
+            logging.getLogger(__name__).warning("Motif key too long (%d chars), falling back to split", len(key))
+            return tuple(key.split(", "))
 
         try:
             parsed = ast.literal_eval(key)

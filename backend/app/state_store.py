@@ -65,8 +65,14 @@ def _try_load_from(path: Path) -> dict | None:
         if _validate_payload(payload):
             return payload  # type: ignore[no-any-return]
         logging.error("State file %s failed structural validation", path)
-    except Exception as e:
-        logging.error("Failed to read / parse state file %s: %s", path, e)
+    except FileNotFoundError:
+        logging.warning("State file not found: %s", path)
+    except json.JSONDecodeError as e:
+        logging.error("State file %s contains invalid JSON: %s", path, e)
+    except PermissionError:
+        logging.error("Permission denied reading state file: %s", path)
+    except OSError as e:
+        logging.error("OS error reading state file %s: %s", path, e)
     return None
 
 
@@ -97,15 +103,15 @@ def load_state() -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         try:
             job = Job.model_validate(raw)
             jobs_store[job.id] = job
-        except Exception as e:
-            logging.exception("Skipping invalid job entry: %s", e)
+        except (ValueError, TypeError):
+            logging.exception("Skipping invalid job entry during state load")
 
     for raw in payload.get("recycle_bin", []):
         try:
             job = Job.model_validate(raw)
             recycle_bin_store[job.id] = job
-        except Exception as e:
-            logging.exception("Skipping invalid recycle-bin entry: %s", e)
+        except (ValueError, TypeError):
+            logging.exception("Skipping invalid recycle-bin entry during state load")
 
     # Jobs that were in-progress during shutdown are marked failed on recovery.
     for job in jobs_store.values():
