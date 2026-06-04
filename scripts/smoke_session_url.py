@@ -55,9 +55,13 @@ async def fetch_and_capture(url: str) -> tuple[str, list[str | dict], dict]:
                     try:
                         obj = json.loads(text)
                         captured_payloads.append(obj)
-                    except Exception:
+                    except (json.JSONDecodeError, ValueError):  # nosec B110 — non-JSON response bodies are dropped by design
+                        # Best-effort capture: non-JSON bodies are not JSON
+                        # payloads. Dropping them is the intended behavior.
                         pass
-            except Exception:
+            except Exception:  # nosec B110 — network/transport errors on a single response must not abort the whole scrape
+                # Best-effort capture: network/transport errors on a single
+                # response should not abort the whole scrape.
                 pass
 
         page.on("response", on_response)

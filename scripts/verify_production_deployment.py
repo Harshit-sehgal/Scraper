@@ -12,10 +12,10 @@ Run on the target host:
 
 import json
 import os
-import subprocess
+import subprocess  # nosec B404 — operational script, hardcoded command vectors
 import sys
-import urllib.error
-import urllib.request
+import urllib.error  # nosec B310 — fixed local probe URLs
+import urllib.request  # nosec B310 — fixed local probe URLs
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BACKEND_DIR = os.path.join(ROOT_DIR, "backend")
@@ -25,7 +25,7 @@ if BACKEND_DIR not in sys.path:
 
 def run_command(cmd: list[str]) -> tuple[int, str]:
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)  # nosec B603 — hardcoded command vectors (docker, curl, ls)
         return res.returncode, res.stdout.strip() or res.stderr.strip()
     except Exception as e:
         return -1, str(e)
@@ -124,7 +124,7 @@ def main():
     for url, expected_code, desc in test_urls:
         try:
             req = urllib.request.Request(url, method="GET")
-            with urllib.request.urlopen(req, timeout=3) as resp:
+            with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310 — hardcoded local probe URLs
                 status = resp.status
         except urllib.error.HTTPError as e:
             status = e.code

@@ -13,6 +13,13 @@ import time
 from app.semantic_world_state import SemanticWorldState
 
 
+def _check(condition: bool, message: str) -> None:
+    """Runtime invariant check. Used instead of ``assert`` so the benchmark
+    keeps working when run with ``python -O`` (which strips asserts)."""
+    if not condition:
+        raise SystemExit(f"BENCHMARK INVARIANT FAILED: {message}")
+
+
 def benchmark_replay(transaction_count: int = 10000):
     ws = SemanticWorldState()
     ws.clear()
@@ -29,7 +36,7 @@ def benchmark_replay(transaction_count: int = 10000):
         with ws.transaction(f"tx_{i}"):
             # 3 mutations per tx
             for _ in range(3):
-                ws.set_manifold_vector(random.choice(roles), [random.random() for _ in range(16)])
+                ws.set_manifold_vector(random.choice(roles), [random.random() for _ in range(16)])  # nosec B311 — synthetic load generator, no security need
 
     duration_gen = time.time() - start_gen
     print(f"  Generation phase: {duration_gen:.2f}s ({transaction_count / duration_gen:.1f} tx/s)")
@@ -37,7 +44,7 @@ def benchmark_replay(transaction_count: int = 10000):
     # 2. Replay Phase
     journal = ws.trace_causality(limit=transaction_count + 100)
     # Ensure full journal captured
-    assert len(journal) >= transaction_count
+    _check(len(journal) >= transaction_count, f"journal truncated: got {len(journal)} of {transaction_count}")
 
     original_checksum = ws.get_manifold_checksum()
     ws.clear()

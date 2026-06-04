@@ -53,7 +53,7 @@ def validate_public_http_url(url: str) -> None:
             return
 
     # Reject explicit loopback / internal names
-    if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):
+    if hostname_lower in ("localhost", "host.docker.internal", "[::1]", "::1", "0.0.0.0", "127.0.0.1"):  # nosec B104 — string literal in a hostname-deny list, not a bind address
         msg = f"URL hostname '{hostname}' is a restricted local loopback target."
         raise ValueError(msg)
 

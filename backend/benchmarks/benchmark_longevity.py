@@ -14,6 +14,13 @@ from app.semantic_ir import SemanticToken, SemanticType, Span
 from app.semantic_world_state import SemanticWorldState
 
 
+def _check(condition: bool, message: str) -> None:
+    """Runtime invariant check. Used instead of ``assert`` so the benchmark
+    keeps working when run with ``python -O`` (which strips asserts)."""
+    if not condition:
+        raise SystemExit(f"BENCHMARK INVARIANT FAILED: {message}")
+
+
 def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 0.5):
     ws = SemanticWorldState()
     ws.clear()
@@ -32,8 +39,8 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
         # 1. Randomized but clustered Event (simulate recurring patterns)
         with ws.transaction(f"longevity_{i}"):
             # Picking a role to evolve
-            role = random.choice(roles)
-            ttype = random.choice(types)
+            role = random.choice(roles)  # nosec B311 — synthetic load generator, no security need
+            ttype = random.choice(types)  # nosec B311 — synthetic load generator, no security need
 
             # Create token with some recurring consistency
             token_val = f"val_{role}_{i % 50}"
@@ -47,7 +54,7 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
             )
             ws.capture_pre_allocation_field([token], roles)
             # Manifold drift - very small for longevity
-            ws.apply_force_to_manifold(role, [random.uniform(-0.005, 0.005) for _ in range(16)])
+            ws.apply_force_to_manifold(role, [random.uniform(-0.005, 0.005) for _ in range(16)])  # nosec B311 — synthetic load generator, no security need
 
         # 2. Adaptive Governance (Phase 56)
         # Includes: Instability redistribution, Attractor rebalancing, Entropy economy
@@ -93,13 +100,13 @@ def run_longevity_validation(cycles: int = 100000, diversity_threshold: float = 
 
     # 6. Evolutionary Stability Invariants
     # Energy must be bounded
-    assert ws.metrics.global_energy < 50.0
+    _check(ws.metrics.global_energy < 50.0, f"global_energy drifted: {ws.metrics.global_energy}")
     # Entropy should be contained (Phase 56 economy)
-    assert ws.metrics.global_entropy <= 1.0
+    _check(ws.metrics.global_entropy <= 1.0, f"global_entropy exceeded economy bound: {ws.metrics.global_entropy}")
     # Diversity should not collapse to zero (Semantic Freezing)
     avg_diversity = sum(history_diversity) / len(history_diversity)
     print(f"Average Diversity over horizon: {avg_diversity:.3f}")
-    assert avg_diversity > diversity_threshold
+    _check(avg_diversity > diversity_threshold, f"diversity collapsed: {avg_diversity} <= {diversity_threshold}")
 
     # Check Journal Health (Phase 57)
     journal_size = ws.trace_causality(limit=1000000)

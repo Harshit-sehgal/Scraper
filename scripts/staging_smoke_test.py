@@ -28,6 +28,13 @@ from fastapi.testclient import TestClient
 client = TestClient(app)
 
 
+def _check(condition: bool, message: str) -> None:
+    """Runtime check for the drill script. Used instead of ``assert`` so the
+    script keeps working when run with ``python -O`` (which strips asserts)."""
+    if not condition:
+        raise SystemExit(f"DRILL CHECK FAILED: {message}")
+
+
 def run_drill():
     print("======================================================================")
     print("🚀 STARTING AUTOMATED DATA FORGE PRODUCTION-STAGING SMOKE TEST DRILL")
@@ -55,7 +62,7 @@ def run_drill():
                 "min_record_score": 0.4,
             },
         )
-        assert response.status_code == 200, f"Failed to create manual job {i}: {response.text}"
+        _check(response.status_code == 200, f"Failed to create manual job {i}: {response.text}")
         job_data = response.json()
         manual_job_ids.append(job_data["job_id"])
         print(f"  - Created Manual Job ID: {job_data['job_id']}")
@@ -78,7 +85,7 @@ def run_drill():
                 "min_record_score": 0.35,
             },
         )
-        assert response.status_code == 200, f"Failed to create auto job {i}: {response.text}"
+        _check(response.status_code == 200, f"Failed to create auto job {i}: {response.text}")
         job_data = response.json()
         auto_job_ids.append(job_data["job_id"])
         print(f"  - Created Auto Job ID: {job_data['job_id']}")
@@ -87,9 +94,9 @@ def run_drill():
     print("\n[Step 3] Cancelling 1 job...")
     cancel_job_id = manual_job_ids[0]
     response = client.post(f"/api/jobs/{cancel_job_id}/cancel")
-    assert response.status_code == 200, f"Failed to cancel job: {response.text}"
+    _check(response.status_code == 200, f"Failed to cancel job: {response.text}")
     cancel_data = response.json()
-    assert cancel_data["cancel_requested"] is True, "Cancel request flag was not set!"
+    _check(cancel_data["cancel_requested"] is True, "Cancel request flag was not set!")
     print(f"  - Successfully set cancel_requested=True for Job ID: {cancel_job_id}")
 
     # 5. Simulate a hard server crash / ungraceful termination
@@ -116,38 +123,39 @@ def run_drill():
     # 7. Confirm the interrupted job becomes FAILED with restart recovery log
     print("\n[Step 7] Confirming the interrupted job transitioned to FAILED...")
     interrupted_job = loaded_jobs.get(crash_job_id)
-    assert interrupted_job is not None, "Interrupted job not found after reload!"
-    assert interrupted_job.status == JobStatus.FAILED, f"Interrupted job status is {interrupted_job.status}, expected FAILED!"
+    _check(interrupted_job is not None, "Interrupted job not found after reload!")
+    _check(interrupted_job.status == JobStatus.FAILED, f"Interrupted job status is {interrupted_job.status}, expected FAILED!")
 
     # Verify the restart recovery message exists on the job error attribute
-    assert interrupted_job.error is not None, "Interrupted job did not contain an error message!"
-    assert (
+    _check(interrupted_job.error is not None, "Interrupted job did not contain an error message!")
+    _check(
         "restart" in interrupted_job.error.lower()
         or "recovery" in interrupted_job.error.lower()
-        or "recovered" in interrupted_job.error.lower()
-    ), f"Unexpected error message: {interrupted_job.error}"
+        or "recovered" in interrupted_job.error.lower(),
+        f"Unexpected error message: {interrupted_job.error}",
+    )
     print(f"  - Verified recovery error: {interrupted_job.error}")
     print("  - Interrupted job successfully recovered to FAILED status.")
 
     # 8. Confirm completed or other jobs still load from SQLite
     print("\n[Step 8] Confirming other jobs load normally from SQLite...")
-    assert len(loaded_jobs) == 7, f"Expected 7 jobs in store, found {len(loaded_jobs)}!"
+    _check(len(loaded_jobs) == 7, f"Expected 7 jobs in store, found {len(loaded_jobs)}!")
     print("  - Loaded all 7 jobs successfully.")
 
     # 9. Confirm /api/system/status is healthy
     print("\n[Step 9] Confirming /api/system/status and /api/storage/status endpoint status...")
     response = client.get("/api/system/status")
-    assert response.status_code == 200, f"Health check failed: {response.text}"
+    _check(response.status_code == 200, f"Health check failed: {response.text}")
     health_data = response.json()
-    assert health_data["status"] == "online", f"Health status is {health_data['status']}, expected online!"
+    _check(health_data["status"] == "online", f"Health status is {health_data['status']}, expected online!")
     print(f"  - System Status: {health_data}")
 
     # Also verify SQLite Storage backend
     response = client.get("/api/system/storage/status")
-    assert response.status_code == 200, f"Storage status failed: {response.text}"
+    _check(response.status_code == 200, f"Storage status failed: {response.text}")
     storage_data = response.json()
-    assert storage_data["backend"] == "sqlite", f"Expected sqlite, found {storage_data['backend']}"
-    assert storage_data["wal_mode"] == "wal", f"Expected wal mode, found {storage_data['wal_mode']}"
+    _check(storage_data["backend"] == "sqlite", f"Expected sqlite, found {storage_data['backend']}")
+    _check(storage_data["wal_mode"] == "wal", f"Expected wal mode, found {storage_data['wal_mode']}")
     print(f"  - Storage Status: {storage_data}")
 
     # 10. Confirm results export works
@@ -162,10 +170,10 @@ def run_drill():
     persist_state_single(job)
     # Get the job results
     response = client.get(f"/api/jobs/{export_job_id}")
-    assert response.status_code == 200, f"Failed to get job: {response.text}"
+    _check(response.status_code == 200, f"Failed to get job: {response.text}")
     job_details = response.json()
-    assert len(job_details["results"]) == 1, "Results failed to serialize/deserialize!"
-    assert job_details["results"][0]["flight_no"] == "AA123", "Result data mismatch!"
+    _check(len(job_details["results"]) == 1, "Results failed to serialize/deserialize!")
+    _check(job_details["results"][0]["flight_no"] == "AA123", "Result data mismatch!")
     print(f"  - Verified results offload & export for Job ID: {export_job_id}: {job_details['results']}")
 
     # 11. Confirm recycle-bin actions work
@@ -177,28 +185,28 @@ def run_drill():
 
     # Delete the job (moves it to recycle bin)
     response = client.delete(f"/api/jobs/{delete_job_id}")
-    assert response.status_code == 200, f"Failed to move job to recycle bin: {response.text}"
+    _check(response.status_code == 200, f"Failed to move job to recycle bin: {response.text}")
 
     # Verify it is not listed in active jobs list
     response = client.get("/api/jobs")
     active_jobs = response.json()["jobs"]
-    assert delete_job_id not in [j["id"] for j in active_jobs], "Deleted job still listed as active!"
+    _check(delete_job_id not in [j["id"] for j in active_jobs], "Deleted job still listed as active!")
 
     # Check recycle bin list
     response = client.get("/api/recycle_bin")
-    assert response.status_code == 200, f"Failed to fetch recycle bin: {response.text}"
+    _check(response.status_code == 200, f"Failed to fetch recycle bin: {response.text}")
     bin_jobs = response.json()["jobs"]
-    assert delete_job_id in [j["id"] for j in bin_jobs], "Deleted job not found in recycle bin!"
+    _check(delete_job_id in [j["id"] for j in bin_jobs], "Deleted job not found in recycle bin!")
     print(f"  - Verified job {delete_job_id} is in recycle bin.")
 
     # Restore the job
     response = client.post(f"/api/recycle_bin/{delete_job_id}/restore")
-    assert response.status_code == 200, f"Failed to restore job: {response.text}"
+    _check(response.status_code == 200, f"Failed to restore job: {response.text}")
 
     # Verify it is back in active list
     response = client.get("/api/jobs")
     active_jobs = response.json()["jobs"]
-    assert delete_job_id in [j["id"] for j in active_jobs], "Restored job not listed as active!"
+    _check(delete_job_id in [j["id"] for j in active_jobs], "Restored job not listed as active!")
     print(f"  - Verified job {delete_job_id} successfully restored from recycle bin.")
 
     print("\n======================================================================")

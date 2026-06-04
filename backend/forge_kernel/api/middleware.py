@@ -53,13 +53,13 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         sec = settings.security
 
         # If no API keys are configured, allow all
-        if not sec.API_KEY and not sec.OPERATOR_API_KEY and not sec.ADMIN_API_KEY:
+        if not sec.API_KEY and not sec.OPERATOR_API_KEY and not sec.ADMIN_API_KEY:  # nosec B105 — string-equality against empty string, no credential present
             return await call_next(request)
 
         # Check auth
         api_key = request.headers.get("X-API-Key", "")
         auth_header = request.headers.get("Authorization", "")
-        bearer_token = ""
+        bearer_token = ""  # nosec B105 — initialized empty; populated below only on valid Bearer prefix
         if auth_header.startswith("Bearer "):
             bearer_token = auth_header[7:]
 
@@ -88,7 +88,7 @@ class LatencyTrackingMiddleware(BaseHTTPMiddleware):
             from forge_kernel.observability import get_kernel_metrics
 
             get_kernel_metrics().record("request_duration_ms", duration)
-        except Exception:
+        except Exception:  # nosec B110 — observability failure must not affect response delivery
             pass
         return response
 
