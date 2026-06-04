@@ -243,9 +243,9 @@ class TestDegradationPredictor:
         assert report.domains_analyzed == 1
         # Healthy domains shouldn't generate high-risk predictions
         high_risk = sum(1 for p in report.predictions if p.risk_level in ("high", "critical"))
-        assert (
-            high_risk == 0
-        ), f"Expected no high-risk predictions for healthy domain, got {high_risk}: {[p.to_dict() for p in report.predictions]}"
+        assert high_risk == 0, (
+            f"Expected no high-risk predictions for healthy domain, got {high_risk}: {[p.to_dict() for p in report.predictions]}"
+        )
 
     def test_predict_degrading_domain_has_predictions(self) -> None:
         predictor = DegradationPredictor()
@@ -411,9 +411,9 @@ class TestDegradationPredictor:
         for i in range(len(report.top_risks) - 1):
             current = severity_order.get(report.top_risks[i]["risk_level"], 99)
             next_ = severity_order.get(report.top_risks[i + 1]["risk_level"], 99)
-            assert (
-                current <= next_
-            ), f"Top risks not sorted: {report.top_risks[i]['risk_level']} before {report.top_risks[i + 1]['risk_level']}"
+            assert current <= next_, (
+                f"Top risks not sorted: {report.top_risks[i]['risk_level']} before {report.top_risks[i + 1]['risk_level']}"
+            )
 
     def test_multi_domain_prediction(self) -> None:
         predictor = DegradationPredictor()
@@ -487,9 +487,9 @@ class TestDegradationPredictor:
         report = predictor.predict([], trends)
 
         for p in report.predictions:
-            assert (
-                len(p.recommended_actions) >= 1
-            ), f"Prediction for {p.domain} ({p.predicted_failure_type}) should have at least 1 recommended action"
+            assert len(p.recommended_actions) >= 1, (
+                f"Prediction for {p.domain} ({p.predicted_failure_type}) should have at least 1 recommended action"
+            )
             assert len(p.evidence) >= 1, f"Prediction for {p.domain} should have at least 1 evidence item"
 
 

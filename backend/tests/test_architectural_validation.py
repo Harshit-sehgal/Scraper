@@ -296,9 +296,9 @@ class TestCircularDependencies:
                 if "Intelligence" not in layers:  # Intelligence allowed to have cross-layer
                     cross_layer_cycles.append(cycle)
 
-        assert (
-            len(cross_layer_cycles) == 0
-        ), f"Found {len(cross_layer_cycles)} cross-layer cycles (cycles should stay within layer)"
+        assert len(cross_layer_cycles) == 0, (
+            f"Found {len(cross_layer_cycles)} cross-layer cycles (cycles should stay within layer)"
+        )
 
     def test_cycle_intentionality(self) -> None:
         """Cycles should be intentional (learning loops, etc.)."""

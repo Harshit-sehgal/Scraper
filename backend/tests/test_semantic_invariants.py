@@ -210,9 +210,9 @@ def test_topology_evolution_invariant() -> None:
     # Record 2: no contradiction → decay (pipeline dynamics may cause minor fluctuations)
     run_pipeline([{"source": "TOK2", "target": "TOK3"}], schema)
     after_decay = ws.learned_exclusions.get(key, 0.0)
-    assert (
-        after_decay < after_first + 0.005
-    ), f"Exclusion should not significantly increase without reinforcement ({after_decay} > {after_first + 0.005})"
+    assert after_decay < after_first + 0.005, (
+        f"Exclusion should not significantly increase without reinforcement ({after_decay} > {after_first + 0.005})"
+    )
 
     # Record 3: contradiction again → reinforce
     run_pipeline([{"source": "TOK4", "target": "TOK4"}], schema)
@@ -375,9 +375,9 @@ def test_field_pressure_includes_contradictions() -> None:
     # Maintain entropy baseline to isolate contradiction effect
     ws._energy.set_entropy(0.5)
     p_after = ws.metrics.field_pressure
-    assert (
-        p_after > p_before or abs(p_after - p_before) < 0.001
-    ), "Field pressure must increase or stay same with more contradictions"
+    assert p_after > p_before or abs(p_after - p_before) < 0.001, (
+        "Field pressure must increase or stay same with more contradictions"
+    )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -440,9 +440,9 @@ def test_topology_causality_invariant() -> None:
     ws._energy.set_entropy(0.9)
     t_high = _adaptive_exclusion_threshold()
 
-    assert (
-        t_high >= t_low or abs(t_high - t_low) < 0.01
-    ), f"Higher field pressure must raise exclusion threshold ({t_high} >= {t_low})"
+    assert t_high >= t_low or abs(t_high - t_low) < 0.01, (
+        f"Higher field pressure must raise exclusion threshold ({t_high} >= {t_low})"
+    )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -462,9 +462,9 @@ def test_semantic_gravity_invariant() -> None:
     ws._motif._motif_counts[("organization", "price")] = 500  # high count = stable
     ws._motif._motif_timestamps[("organization", "price")] = 95
     e_after = ws.get_derived_exclusion("name", "price")
-    assert (
-        e_after <= e_before or abs(e_after - e_before) < 0.001
-    ), f"Stable motifs should reduce or maintain exclusion ({e_after} <= {e_before})"
+    assert e_after <= e_before or abs(e_after - e_before) < 0.001, (
+        f"Stable motifs should reduce or maintain exclusion ({e_after} <= {e_before})"
+    )
 
 
 # ─────────────────────────────────────────────────────────────

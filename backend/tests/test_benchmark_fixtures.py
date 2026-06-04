@@ -92,15 +92,15 @@ async def test_fixture_extraction_yields_records(
             f"or has unusual HTML structure.",
         )
 
-    assert (
-        len(records) >= min_expected_records
-    ), f"Expected at least {min_expected_records} records from {fixture_name}, got {len(records)}"
+    assert len(records) >= min_expected_records, (
+        f"Expected at least {min_expected_records} records from {fixture_name}, got {len(records)}"
+    )
 
     # Check required fields are populated in at least one record
     for field_name in required_fields:
-        assert any(
-            r.get(field_name) and str(r.get(field_name, "")).strip() for r in records
-        ), f"Required field '{field_name}' not found in any record from {fixture_name}"
+        assert any(r.get(field_name) and str(r.get(field_name, "")).strip() for r in records), (
+            f"Required field '{field_name}' not found in any record from {fixture_name}"
+        )
 
 
 # ── False-success prevention tests ──────────────────────────────────────
@@ -150,15 +150,15 @@ async def test_blocked_fixture_does_not_produce_false_records(
     if expected_block_type == "anti_bot_or_challenge":
         # The page should be classified as anti-bot or challenge
         failure_class = classification.failure_class or ""
-        assert any(
-            kw in failure_class.lower() for kw in ("anti_bot", "blocked", "challenge", "captcha", "empty")
-        ), f"Expected anti-bot/block classification, got: {failure_class}"
+        assert any(kw in failure_class.lower() for kw in ("anti_bot", "blocked", "challenge", "captcha", "empty")), (
+            f"Expected anti-bot/block classification, got: {failure_class}"
+        )
     elif expected_block_type == "empty_or_shell":
         # The page should be classified as empty or shell
         failure_class = classification.failure_class or ""
-        assert any(
-            kw in failure_class.lower() for kw in ("empty_response", "genuinely_empty", "js_render")
-        ), f"Expected empty/shell classification, got: {failure_class}"
+        assert any(kw in failure_class.lower() for kw in ("empty_response", "genuinely_empty", "js_render")), (
+            f"Expected empty/shell classification, got: {failure_class}"
+        )
 
 
 # ── Acquisition lineage tests ───────────────────────────────────────────
