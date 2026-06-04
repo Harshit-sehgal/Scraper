@@ -41,6 +41,9 @@ jobs:
       - name: Run Research-Shell Boundary Check
         run: PYTHONPATH=backend python scripts/check_research_boundary.py
 
+      - name: Validate Dependency Bounds
+        run: python scripts/validate_dependency_bounds.py
+
       - name: Install Playwright Chromium
         run: python -m playwright install --with-deps chromium
 
