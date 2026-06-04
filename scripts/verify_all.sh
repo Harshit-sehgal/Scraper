@@ -2,8 +2,9 @@
 # =============================================================================
 # verify_all.sh — Local selected verification
 # =============================================================================
-# Run selected checks used by GitHub Actions: pyflakes, mypy, pytest,
-# frontend JS validation, and git diff check.
+# Run selected checks used by GitHub Actions: pyflakes, ruff (lint + format),
+# research-boundary CI check, mypy, pytest, frontend JS validation,
+# shell script syntax, and git diff check.
 # =============================================================================
 set -euo pipefail
 
@@ -27,15 +28,40 @@ echo "============================================"
 echo ""
 
 # ─── pyflakes ──────────────────────────────────────────────────
-echo "[1/6] pyflakes"
+echo "[1/9] pyflakes"
 if python3 -m pyflakes "$BACKEND_DIR/app" "$BACKEND_DIR/tests" 2>&1; then
     pass_check "pyflakes — 0 issues"
 else
     fail_check "pyflakes — issues found"
 fi
 
+# ─── ruff lint ─────────────────────────────────────────────────
+echo "[2/9] ruff lint"
+if python3 -m ruff check "$BACKEND_DIR/app" "$BACKEND_DIR/tests" "$PROJECT_DIR/scripts" 2>&1; then
+    pass_check "ruff lint — clean"
+else
+    fail_check "ruff lint — issues found"
+fi
+
+# ─── ruff format ───────────────────────────────────────────────
+echo "[3/9] ruff format"
+if python3 -m ruff format --check "$BACKEND_DIR/app" "$BACKEND_DIR/tests" "$PROJECT_DIR/scripts" 2>&1; then
+    pass_check "ruff format — clean"
+else
+    fail_check "ruff format — would reformat"
+fi
+
+# ─── research-shell boundary ───────────────────────────────────
+echo "[4/9] research-shell boundary"
+if PYTHONPATH="$BACKEND_DIR" python3 "$PROJECT_DIR/scripts/check_research_boundary.py" >/dev/null 2>&1; then
+    pass_check "research-shell boundary — clean"
+else
+    fail_check "research-shell boundary — violations"
+    PYTHONPATH="$BACKEND_DIR" python3 "$PROJECT_DIR/scripts/check_research_boundary.py" 2>&1 | head -10
+fi
+
 # ─── mypy ──────────────────────────────────────────────────────
-echo "[2/6] mypy"
+echo "[5/9] mypy"
 if python3 -m mypy "$BACKEND_DIR/app" --ignore-missing-imports 2>&1 | tail -1 | grep -q "Success"; then
     pass_check "mypy — 0 errors"
 else
@@ -44,10 +70,11 @@ else
 fi
 
 # ─── pytest ────────────────────────────────────────────────────
-echo "[3/6] pytest"
+echo "[6/9] pytest"
 PYTEST_TMP=$(mktemp)
 set +e
-PYTHONPATH="$BACKEND_DIR" python3 -m pytest "$BACKEND_DIR/tests" \
+PYTHONPATH="$BACKEND_DIR" DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+    python3 -m pytest "$BACKEND_DIR/tests" \
     -q -o "addopts=" \
     --ignore="$BACKEND_DIR/tests/test_profile_alignment_e2e.py" \
     > "$PYTEST_TMP" 2>&1
@@ -63,7 +90,7 @@ fi
 rm -f "$PYTEST_TMP"
 
 # ─── frontend JS ───────────────────────────────────────────────
-echo "[4/6] frontend JS validation"
+echo "[7/9] frontend JS validation"
 JS_OK=true
 for jsfile in "$PROJECT_DIR/frontend/app.js" "$PROJECT_DIR/frontend/dashboard/dashboard.js"; do
     if ! node -c "$jsfile" 2>/dev/null; then
@@ -77,7 +104,7 @@ else
 fi
 
 # ─── shell scripts ─────────────────────────────────────────────
-echo "[5/6] shell scripts"
+echo "[8/9] shell scripts"
 SH_OK=true
 for shfile in "$PROJECT_DIR/scripts"/*.sh; do
     if ! bash -n "$shfile" 2>/dev/null; then
@@ -91,7 +118,7 @@ else
 fi
 
 # ─── git diff ──────────────────────────────────────────────────
-echo "[6/6] git diff --check"
+echo "[9/9] git diff --check"
 if git -C "$PROJECT_DIR" diff --check 2>/dev/null; then
     pass_check "git diff — clean"
 else
