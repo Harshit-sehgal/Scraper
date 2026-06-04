@@ -20,7 +20,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: dev
-    image: dataforge:latest
+    image: dataforge:${DATAFORGE_IMAGE_TAG:-latest}
     container_name: dataforge-scraper
     ports:
       - "${HOST:-127.0.0.1}:${PORT:-8000}:8000"
