@@ -326,7 +326,7 @@ class TestBenchmarkCorpusSuite:
         async def dummy_check_domain(*args, **kwargs) -> None:
             return None
 
-        app.crawl_policy.CrawlPolicyEngine.check_domain = dummy_check_domain
+        app.crawl_policy.CrawlPolicyEngine.check_domain = dummy_check_domain  # type: ignore[method-assign]
 
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _BenchmarkCorpusHandler)
         self.port = self.server.server_address[1]
@@ -342,7 +342,7 @@ class TestBenchmarkCorpusSuite:
 
         app.url_safety.validate_public_http_url = self._orig_validate
         app.html_utils._validate_url_safe = self._orig_html_validate
-        app.crawl_policy.CrawlPolicyEngine.check_domain = self._orig_check_domain
+        app.crawl_policy.CrawlPolicyEngine.check_domain = self._orig_check_domain  # type: ignore[method-assign]
 
         # Stop the server
         self.server.shutdown()
