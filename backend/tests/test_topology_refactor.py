@@ -189,7 +189,7 @@ def test_redirect_repulsive_pressure_routes_through_affinity() -> None:
     target = ts.add(["b"], "T2", instability=0.1)
 
     # Build a forces dict with a high-affinity edge a↔b
-    forces: dict[tuple[str, str], dict[str, float]] = {
+    forces: dict[tuple[str, str], dict[str, object]] = {
         ("a", "b"): {
             "affinity": 0.8,
             "repulsion": 0.1,
@@ -215,7 +215,7 @@ def test_redirect_repulsive_pressure_remainder_heats_source() -> None:
     ts.add(["b"], "T2", instability=0.1)
 
     # Low route_strength means most pressure won't be redirected
-    forces: dict[tuple[str, str], dict[str, float]] = {
+    forces: dict[tuple[str, str], dict[str, object]] = {
         ("a", "b"): {
             "affinity": 0.4,
             "repulsion": 0.1,
