@@ -14,7 +14,7 @@ from enum import StrEnum
 from typing import Annotated
 
 from app.config import settings
-from app.globals import CONFIG, jobs_store, recycle_bin_store
+from app.globals import config_view, jobs_store, recycle_bin_store
 from app.selector_discovery import analyze_url_for_fields
 from app.url_safety import validate_public_http_url
 from app.utils.rbac import UserRole, require_role
@@ -107,7 +107,7 @@ async def system_status():
             "failed": counts.get(JobStatus.FAILED.value, 0),
             "canceled": counts.get(JobStatus.CANCELED.value, 0),
         },
-        "runtime_limits": CONFIG,
+        "runtime_limits": config_view(),
     }
     if settings.ENV.lower() != "production":
         response["state_file"] = str(get_state_file_path())
@@ -553,7 +553,7 @@ async def metrics(request: Request):
     recycle_gauge.set(len(recycle_bin_store))
 
     # Runtime limits
-    for key, val in CONFIG.items():
+    for key, val in config_view().items():
         g = Gauge(f"dataforge_config_{key}", f"Config value for {key}", registry=registry)
         with contextlib.suppress(TypeError, ValueError):
             g.set(float(val))

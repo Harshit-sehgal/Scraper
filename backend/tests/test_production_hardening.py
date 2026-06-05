@@ -86,15 +86,31 @@ def test_prometheus_does_not_reference_undeployed_alertmanager() -> None:
         assert "\nalerting:" not in prometheus
 
 
-@pytest.mark.skip(reason="Promtool config validation removed from simplified CI to keep it lightweight.")
-def test_ci_prometheus_check_matches_production_mount_layout() -> None:
-    """CI promtool validation should use the same selected-file mounts as prod."""
-    workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "ci.yml"
-    content = workflow.read_text()
+def test_production_prometheus_uses_selected_file_mounts() -> None:
+    """Production compose must mount selected files, not the whole repo.
 
-    assert "$PWD/prometheus.yml:/etc/prometheus/prometheus.yml:ro" in content
-    assert "$PWD/prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro" in content
-    assert "$PWD:/etc/prometheus:ro" not in content
+    A whole-directory mount (``./:/etc/prometheus:ro``) would leak
+    every file in the project tree into the Prometheus container
+    config dir, including secrets and source code. The compose
+    currently mounts only the two files Prometheus needs:
+    ``prometheus.yml`` and ``prometheus_alerts.yml``. This is a
+    regression-guard for that security property.
+
+    Pinned because it is a load-bearing security invariant. The
+    previous CI-side test (which referenced a removed promtool lane)
+    was deleted in this pass; the property now lives here.
+    """
+    root = Path(__file__).resolve().parents[2]
+    compose = (root / "docker-compose.prod.yml").read_text()
+
+    # Positive: the two files Prometheus needs are mounted.
+    assert "./prometheus.yml:/etc/prometheus/prometheus.yml" in compose
+    assert "./prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml" in compose
+
+    # Negative: a whole-directory mount would be a regression.
+    assert ":/etc/prometheus:ro" not in compose, (
+        "Whole-directory mount detected; this leaks the repo into the Prometheus container. Use selected-file mounts instead."
+    )
 
 
 def test_ci_does_not_install_optional_g4f_by_default() -> None:

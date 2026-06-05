@@ -146,6 +146,21 @@ def test_app_main_does_not_load_experimental_router_when_gate_off() -> None:
 LEAKY_MODULES: tuple[str, ...] = ()
 
 
+# ─── Tripwire: pending leaks ──────────────────────────────────────────────
+# The test below is a TRIPWIRE. It is intentionally skipped while
+# ``LEAKY_MODULES`` is empty (i.e. all known research leaks have been
+# fixed). If a future phase re-introduces a top-level research import
+# in a product-kernel file:
+#
+#   1. Add the offending module name to ``LEAKY_MODULES``.
+#   2. Remove the ``@pytest.mark.skip`` decorator below.
+#
+# The test will then activate and pin the regression until the leak
+# is fixed in a subsequent phase. ``FIXED_MODULES`` (below) is the
+# positive guard that stays enabled and asserts the already-fixed
+# leaks do NOT come back.
+
+
 # ─── Phase R2 achievements: leaks that have been fixed ─────────────────────
 # These research modules are NO LONGER loaded at startup. The modules
 # are imported lazily inside the functions that use them. If a regression
@@ -179,6 +194,14 @@ def test_fixed_research_leak_stays_absent(fixed_module) -> None:
 
 
 @pytest.mark.parametrize("leaky_module", LEAKY_MODULES)
+@pytest.mark.skip(
+    reason=(
+        "TRIPWIRE: no pending research leaks. LEAKY_MODULES is empty. "
+        "If a regression reintroduces a top-level research import, add "
+        "the module name to LEAKY_MODULES and remove this @pytest.mark.skip "
+        "to activate the test."
+    ),
+)
 def test_known_pending_research_leak_is_still_present(leaky_module) -> None:
     """Document that this research module is still pulled in at startup.
 

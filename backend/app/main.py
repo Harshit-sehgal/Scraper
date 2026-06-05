@@ -120,7 +120,6 @@ def configure_routes(app: FastAPI) -> None:
             persist_state_fn=_persist_state_wrapper,
             schedule_task_fn=_schedule_background_task,
             run_job_coro_fn=_run_job_wrapper,
-            config=CONFIG,
         ),
     )
     app.include_router(create_exports_router(jobs_store=jobs_store))
