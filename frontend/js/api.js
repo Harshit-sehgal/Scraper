@@ -20,14 +20,29 @@ export const API = (() => {
     return 'http://127.0.0.1:8000';
 })();
 
-// ─── API Key Management ───
+// ─── API Key Management ────────────────────────────────────────────────────
+// SECURITY: The API key is held ONLY in JavaScript memory for the lifetime
+// of the current page. It is NEVER persisted to sessionStorage, localStorage,
+// or any other durable browser storage. A page reload will require the user
+// to re-enter the key. This protects the key from any same-origin XSS that
+// succeeds in exfiltrating storage but is not running in this page's context.
+//
+// Future hardening: replace this with a backend-issued, HTTP-only,
+// Secure, SameSite=strict session cookie minted by /api/session after
+// validating X-API-Key. That removes the need for browser-side key
+// storage entirely.
+let _apiKey = '';
 
 function getApiKey() {
-    try { return sessionStorage.getItem('dataforge_api_key') || ''; } catch { return ''; }
+    return _apiKey;
 }
 
 function setApiKey(key) {
-    try { sessionStorage.setItem('dataforge_api_key', key); } catch { /* ignore storage errors */ }
+    _apiKey = (key || '').trim();
+}
+
+function clearApiKey() {
+    _apiKey = '';
 }
 
 // ─── Admin Key Management (session-scoped) ─
@@ -60,11 +75,12 @@ function setupKeyModal(type) {
 
     if (type === 'admin') {
         title.textContent = '\u{1F6E1}\uFE0F Admin Key';
-        desc.textContent = 'Enter your DataForge Admin key for protected actions (session only).';
+        desc.textContent = 'Enter your DataForge Admin key for protected actions (session only — held in memory, not stored).';
     } else {
         title.textContent = '\u{1F511} API Key';
-        desc.textContent = 'Enter your DataForge API key for production access.';
-        try { input.value = sessionStorage.getItem('dataforge_api_key') || ''; } catch { /* ignore */ }
+        desc.textContent = 'Enter your DataForge API key. The key is held in memory only and is cleared on page reload.';
+        // Pre-fill only with the in-memory copy; never read from storage.
+        input.value = getApiKey() || '';
     }
 
     _pendingKeyType = type;
@@ -152,4 +168,4 @@ export async function apiFetch(url, options = {}) {
     }
 }
 
-export { getApiKey, isKeyModalVisible, closeKeyModal, saveKeyFromModal };
+export { getApiKey, isKeyModalVisible, closeKeyModal, saveKeyFromModal, clearApiKey };

@@ -23,12 +23,27 @@ from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
 from app.utils.rbac import UserRole, require_role
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from starlette.concurrency import run_in_threadpool
 
 
 def _save_job(job) -> None:
     """Persist a single job through the configured repository."""
     get_job_repository().save_single(job)
+
+
+def _lookup_idempotency_key(idem_key: str) -> str | None:
+    """Threadpool-safe wrapper around ``app.job_store.lookup_idempotency_key``."""
+    from app.job_store import lookup_idempotency_key
+
+    return lookup_idempotency_key(idem_key)
+
+
+def _record_idempotency_key(idem_key: str, job_id: str, fingerprint: str) -> None:
+    """Threadpool-safe wrapper around ``app.job_store.record_idempotency_key``."""
+    from app.job_store import record_idempotency_key
+
+    record_idempotency_key(idem_key, job_id, fingerprint)
 
 
 def _is_worker_mode() -> bool:
@@ -50,14 +65,16 @@ def _refresh_job_from_repo(job: Job, jobs_store: dict) -> Job:
     state, then returns the refreshed job.
 
     Falls back to the in-memory copy if the DB read fails.
+
+    Note: this is a synchronous helper. Async route handlers must call
+    it via ``run_in_threadpool`` to avoid blocking the event loop.
     """
     if not _is_worker_mode():
         return job
     try:
         repo = get_job_repository()
-        fresh_jobs = repo.load_jobs()
-        if job.id in fresh_jobs:
-            fresh = fresh_jobs[job.id]
+        fresh = repo.get_job(job.id)
+        if fresh is not None:
             jobs_store[job.id] = fresh
             return fresh
     except (AttributeError, ImportError, RuntimeError):
@@ -87,6 +104,10 @@ def create_jobs_router(
         In worker mode, refreshes from the persistent store so the API
         returns the latest state even when a separate worker process
         has updated the job.
+
+        This helper is synchronous; async route handlers must call it
+        via ``run_in_threadpool`` to avoid blocking the event loop on
+        the targeted DB read.
         """
         with _store_lock:
             if job_id not in jobs_store:
@@ -97,9 +118,8 @@ def create_jobs_router(
             if _is_worker_mode():
                 try:
                     repo = get_job_repository()
-                    fresh_jobs = repo.load_jobs()
-                    if job_id in fresh_jobs:
-                        fresh = fresh_jobs[job_id]
+                    fresh = repo.get_job(job_id)
+                    if fresh is not None:
                         jobs_store[job_id] = fresh
                         return fresh
                 except (AttributeError, ImportError, RuntimeError):
@@ -170,27 +190,59 @@ def create_jobs_router(
         return await suggest_schema_from_intent(req.intent, max_fields=req.max_fields)
 
     @router.get("/api/jobs")
-    async def list_jobs():
-        # In worker mode, refresh from repo to pick up cross-process updates
+    async def list_jobs(
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        cursor: Annotated[str | None, Query()] = None,
+    ):
+        """List job summaries.
+
+        Supports keyset pagination via ``limit`` and ``cursor`` (an
+        ISO-8601 ``created_at`` timestamp). The response shape is
+        additive: callers that ignore ``next_cursor`` see the same
+        data they always have. When more results are available the
+        field contains the ``created_at`` of the last returned item;
+        when the result set is exhausted it is ``None``.
+        """
+        # In worker mode, refresh from repo using a summary projection.
+        # Previously this called ``load_jobs()`` and deserialized every
+        # row (results, logs, selectors_map, …) just to render a list.
         if _is_worker_mode():
             try:
                 repo = get_job_repository()
-                fresh_jobs = repo.load_jobs()
+                summaries = await run_in_threadpool(
+                    repo.list_job_summaries,
+                    limit,
+                    cursor,
+                )
+                next_cursor = summaries[-1]["created_at"] if len(summaries) == limit else None
                 with _store_lock:
-                    # Merge fresh data into in-memory store, preserving any jobs
-                    # that the worker doesn't track (e.g., newly created via
-                    # API)
-                    for jid, fresh in fresh_jobs.items():
-                        jobs_store[jid] = fresh
+                    summary_ids = {s["id"] for s in summaries}
+                    # Touch in-memory cache for any ids that already exist
+                    # so callers hitting detail endpoints immediately after
+                    # benefit from the warmer in-memory copy.
+                    for s in summaries:
+                        if s["id"] in jobs_store:
+                            cached = jobs_store[s["id"]]
+                            # Update only the summary fields to avoid
+                            # clobbering full result data with summary
+                            # placeholders.
+                            cached.status = s["status"]  # type: ignore[assignment]
+                            cached.completed_at = s["completed_at"]  # type: ignore[assignment]
                     # Remove jobs that were hard-deleted by the worker
-                    stale_ids = [jid for jid in jobs_store if jid not in fresh_jobs]
+                    stale_ids = [jid for jid in jobs_store if jid not in summary_ids]
                     for jid in stale_ids:
                         jobs_store.pop(jid, None)
+                    return {"jobs": summaries, "next_cursor": next_cursor}
             except (AttributeError, ImportError, RuntimeError):
                 logging.getLogger(__name__).debug("Failed to refresh jobs list from repo")
 
         with _store_lock:
             ordered = sorted(jobs_store.values(), key=lambda j: j.created_at, reverse=True)
+            # Apply keyset cursor in the in-memory path too so behavior
+            # is consistent with worker mode.
+            if cursor:
+                ordered = [j for j in ordered if (j.created_at or "") < cursor]
+            ordered = ordered[:limit]
             summaries = []
             for job in ordered:
                 dumped = job.model_dump()
@@ -212,11 +264,12 @@ def create_jobs_router(
                         "error": dumped.get("error"),
                     },
                 )
-            return {"jobs": summaries}
+            next_cursor = summaries[-1]["created_at"] if len(summaries) == limit else None
+            return {"jobs": summaries, "next_cursor": next_cursor}
 
     @router.get("/api/jobs/{job_id}")
     async def get_job(job_id: str, include_results: Annotated[bool, Query()] = False):
-        job = _get_job(job_id)
+        job = await run_in_threadpool(_get_job, job_id)
 
         results_list = []
         if include_results:
@@ -237,8 +290,15 @@ def create_jobs_router(
         limit: Annotated[int, Query(ge=1, le=1000)] = 100,
         offset: Annotated[int, Query(ge=0)] = 0,
     ):
-        """Return a paginated slice of job results."""
-        job = _get_job(job_id)
+        """Return a paginated slice of job results.
+
+        When results live on disk (large jobs), we read the JSONL
+        file directly via ``load_paginated_job_results_from_disk``.
+        Otherwise we prefer the ``job_results`` companion table
+        (storage-split v4) and only fall back to ``job.results``
+        for back-compat with v3 deployments.
+        """
+        job = await run_in_threadpool(_get_job, job_id)
 
         if job.results_on_disk:
             from app.utils.job_results_store import load_paginated_job_results_from_disk
@@ -250,9 +310,16 @@ def create_jobs_router(
                 file_path=job.results_file_path,
             )
         else:
-            results_list = list(job.results)
-            total = len(results_list)
-            page = results_list[offset : offset + limit]
+            from app.job_store import read_job_results
+
+            disk_results = await run_in_threadpool(read_job_results, job.id)
+            if disk_results:
+                total = len(disk_results)
+                page = disk_results[offset : offset + limit]
+            else:
+                results_list = list(job.results)
+                total = len(results_list)
+                page = results_list[offset : offset + limit]
 
         next_offset = offset + limit if (offset + limit) < total else None
 
@@ -266,13 +333,103 @@ def create_jobs_router(
             "returned": len(page),
         }
 
+    @router.get("/api/jobs/{job_id}/events")
+    async def get_job_events(
+        job_id: str,
+        limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        level: Annotated[str | None, Query()] = None,
+    ):
+        """Return a paginated, filterable view of a job's lifecycle events.
+
+        Events are read from the dedicated ``job_events`` companion
+        table when the repository supports it (storage split, v4+);
+        otherwise we fall back to ``Job.logs`` for back-compat. The
+        response shape is stable for clients that poll a long-running
+        job for progress:
+
+        ::
+
+            {
+                "job_id": "...",
+                "events": [
+                    {"timestamp": "...", "level": "info", "message": "..."},
+                    ...
+                ],
+                "total": int,
+                "limit": int,
+                "offset": int,
+                "next_offset": int | null,
+                "status": "running" | "completed" | "failed" | ...,
+            }
+        """
+        job = await run_in_threadpool(_get_job, job_id)
+
+        # Prefer the companion-table reader; fall back to ``Job.logs``
+        # if the repository has not dual-written to ``job_events`` yet.
+        events: list[dict] = []
+        try:
+            repo = get_job_repository()
+            events = await run_in_threadpool(
+                repo.read_events,
+                job_id,
+                limit + offset,  # pull enough to honour offset+limit
+                0,
+                level,
+            )
+        except (AttributeError, RuntimeError):
+            events = []
+
+        if not events:
+            for entry in job.logs or []:
+                try:
+                    payload = entry.model_dump() if hasattr(entry, "model_dump") else dict(entry)
+                except (AttributeError, TypeError, ValueError):
+                    payload = {"timestamp": "", "level": "info", "message": str(entry)}
+                events.append(
+                    {
+                        "timestamp": payload.get("timestamp") or "",
+                        "level": payload.get("level") or "info",
+                        "message": payload.get("message") or "",
+                    },
+                )
+            # Add a synthetic status event so polling clients can see
+            # the last known lifecycle state without a separate GET.
+            status_ts = job.completed_at or job.started_at or job.created_at or ""
+            if status_ts:
+                events.append(
+                    {
+                        "timestamp": status_ts,
+                        "level": "info",
+                        "message": f"status: {job.status}",
+                    },
+                )
+            events.sort(key=lambda e: e.get("timestamp") or "")
+            if level:
+                lvl = level.lower()
+                events = [e for e in events if (e.get("level") or "").lower().startswith(lvl)]
+
+        total = len(events)
+        page = events[offset : offset + limit]
+        next_offset = offset + limit if (offset + limit) < total else None
+
+        return {
+            "job_id": job_id,
+            "status": job.status,
+            "events": page,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "next_offset": next_offset,
+        }
+
     @router.post("/api/jobs/{job_id}/backfill-metadata")
     async def backfill_job_metadata(
         job_id: str,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
         """Explicitly backfill source metadata for manual-mode job results."""
-        job = _get_job(job_id)
+        job = await run_in_threadpool(_get_job, job_id)
 
         results_list = list(job.results)
         if job.results_on_disk:
@@ -306,8 +463,42 @@ def create_jobs_router(
     @router.post("/api/jobs")
     async def create_job(
         job_data: JobCreate,
+        request: Request,
         _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
     ):
+        # Optional idempotency-key support. A client that retries the
+        # same ``POST /api/jobs`` with the same ``Idempotency-Key``
+        # header receives the originally-created job_id instead of a
+        # duplicate. The header is permissive (any non-empty string up
+        # to 128 chars) and the storage layer is keyed on the header
+        # value. See ``app.job_store.lookup_idempotency_key`` and
+        # ``app.job_store.record_idempotency_key``.
+        idem_key = (request.headers.get("Idempotency-Key") or "").strip()
+        if idem_key and len(idem_key) > 128:
+            raise HTTPException(
+                status_code=400,
+                detail="Idempotency-Key header is too long (max 128 chars).",
+            )
+        if idem_key:
+            existing_job_id = await run_in_threadpool(
+                _lookup_idempotency_key,
+                idem_key,
+            )
+            if existing_job_id is not None:
+                cached = jobs_store.get(existing_job_id)
+                if cached is not None:
+                    return {
+                        "job_id": cached.id,
+                        "status": cached.status.value,
+                        "idempotent_replay": True,
+                    }
+                # Job not in memory (worker mode). Return a stub.
+                return {
+                    "job_id": existing_job_id,
+                    "status": "unknown",
+                    "idempotent_replay": True,
+                }
+
         manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
         urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
 
@@ -335,6 +526,15 @@ def create_jobs_router(
         )
         jobs_store[job.id] = job
         _save_job(job)
+
+        if idem_key:
+            fingerprint = f"{job_data.mode.value}:{job_data.name}:{','.join(manual_urls)}"
+            await run_in_threadpool(
+                _record_idempotency_key,
+                idem_key,
+                job.id,
+                fingerprint,
+            )
 
         # If DATAFORGE_WORKER_QUEUE is set, enqueue the job for async
         # processing
@@ -380,7 +580,11 @@ def create_jobs_router(
         else:
             schedule_task_fn(run_job_coro_fn(job.id))
 
-        return {"job_id": job.id, "status": job.status.value}
+        return {
+            "job_id": job.id,
+            "status": job.status.value,
+            "idempotent_replay": False,
+        }
 
     @router.post("/api/jobs/{job_id}/cancel")
     async def cancel_job(job_id: str, _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))]):
@@ -687,7 +891,19 @@ def create_jobs_router(
         }
 
     @router.get("/api/recycle_bin")
-    async def list_recycle_bin():
+    async def list_recycle_bin(
+        limit: int = 100,
+        cursor: str | None = None,
+    ):
+        if _is_worker_mode():
+            repo = get_job_repository()
+            summaries = await run_in_threadpool(
+                repo.list_recycle_summaries,
+                limit=limit,
+                cursor=cursor,
+            )
+            return {"jobs": summaries}
+
         with _store_lock:
             ordered = sorted(recycle_bin_store.values(), key=lambda j: j.created_at, reverse=True)
             summaries = []

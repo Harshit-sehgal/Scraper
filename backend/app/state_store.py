@@ -40,8 +40,8 @@ def get_state_file_path() -> Path:
     if settings.STATE_FILE:
         return Path(settings.STATE_FILE).expanduser()
 
-    if settings.STATE_FILE_PATH:
-        return Path(settings.STATE_FILE_PATH).expanduser()
+    if settings.STATE_FILE_PATH_DYNAMIC:
+        return Path(settings.STATE_FILE_PATH_DYNAMIC).expanduser()
 
     return _DEFAULT_STATE_FILE
 

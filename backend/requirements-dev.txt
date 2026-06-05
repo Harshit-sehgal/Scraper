@@ -1,25 +1,17 @@
 # =============================================================================
-# DataForge Scraper — Development Dependencies
+# DataForge Scraper — Python Development Dependencies (lower-bound convenience)
 # =============================================================================
-# Install:  pip install -r backend/requirements-dev.txt
-# Run:      pytest -q -m "not postgres"
-# Postgres: pytest --run-postgres -m postgres -v
+# This file is a thin wrapper that defers ALL pinned versions to
+# `requirements-dev.lock.txt`. It is kept only for callers that expect
+# a top-level `requirements-dev.txt` (e.g. legacy README snippets,
+# optional CI suites).
+#
+# Canonical sources are:
+#   - backend/requirements-dev.in          (dev tooling intent, bounded)
+#   - backend/requirements-dev.lock.txt     (dev, pinned)
+#
+# Update:
+#   pip install -r requirements-dev.lock.txt
 # =============================================================================
 
--r requirements.txt
-
-# ─── Testing (production reqs should not include these) ────────────────────
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
-
-# ─── Optional Test Dependencies ──────────────────────────────────────────
-testcontainers[postgres]>=4.0.0
-pytest-cov>=5.0.0
-pytest-timeout>=2.3.0
-
-# ─── Linting & Code Quality ──────────────────────────────────────────────
-pyflakes>=3.2.0
-PyYAML>=6.0.0
-ruff>=0.1.0
-mypy>=1.0.0
-bandit>=1.7.0
+-r requirements-dev.lock.txt

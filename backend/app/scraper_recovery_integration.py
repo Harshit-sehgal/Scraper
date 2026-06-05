@@ -227,6 +227,12 @@ async def scrape_url_with_recovery(
             elif anti_bot_score > 0.5:
                 state = AcquisitionState.ANTI_BOT_BLOCKED
                 user_message = "Page may have anti-bot protections."
+                try:
+                    from app.metrics_collector import record_anti_bot_classification
+
+                    record_anti_bot_classification("anti_bot_block")
+                except (ImportError, AttributeError, TypeError, ValueError):
+                    pass
             else:
                 state = AcquisitionState.DIRECT
                 user_message = "Page loaded successfully."

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _SETTINGS_ENV_FILE = os.getenv("DATAFORGE_DOTENV_PATH", ".env").strip() or ".env"
@@ -251,6 +252,16 @@ class Settings(BaseSettings):
 
     STATE_FILE_PATH: str = ""
     """Override for jobs_state.json path. Empty = use default ./backend/data/jobs_state.json"""
+
+    @property
+    def STATE_FILE_PATH_DYNAMIC(self) -> str:
+        """State file path (dynamic). Reads from DATAFORGE_STATE_FILE env var
+        dynamically, falls back to static STATE_FILE_PATH field. This lets the
+        test conftest isolate test runs from the developer runtime database
+        without rewriting settings.STATE_FILE_PATH after import.
+        """
+        return os.environ.get("DATAFORGE_STATE_FILE") or self.STATE_FILE_PATH
+
     AUDIT_LOG_DIR: str = ""
     """Override for audit log directory. Empty = use audit logger default."""
 
@@ -271,6 +282,13 @@ class Settings(BaseSettings):
     """URL to send webhook alerts for domain anti-bot level shifts."""
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:8000", "http://127.0.0.1:5173", "http://127.0.0.1:8000"]
     """Allowed origins for CORS. Defaults to localhost for dev; must be locked to real domains in production."""
+    CSP_REPORT_ONLY: bool = True
+    """Attach a report-only Content-Security-Policy header to every response.
+    Never blocks anything; the browser POSTs violation reports to
+    ``/api/system/csp-violations`` so the operator can iteratively tighten
+    the policy. Defaults to True in development; set to False in production
+    until the operator confirms the policy is clean (i.e. zero violations
+    in the dashboard for at least one release cycle)."""
     METRICS_ENABLE_HISTOGRAMS: bool = True
     """Enable request duration and operation latency histograms in /metrics output."""
     METRICS_HISTOGRAM_BUCKETS: str = "0.01,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0,30.0,60.0,120.0"
@@ -458,6 +476,38 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         """Database URL. Reads from DATAFORGE_DATABASE_URL env var dynamically."""
         return (os.environ.get("DATAFORGE_DATABASE_URL") or "").strip()
+
+    @property
+    def PG_MIN_CONN(self) -> int:
+        """Postgres pool minimum size. Reads from DATAFORGE_PG_MIN_CONN.
+
+        Default: 1 (matches the prior hard-coded psycopg2/psycopg3
+        ``minconn=1`` / ``min_size=1`` behaviour so existing
+        deployments see no change).
+        """
+        raw = (os.environ.get("DATAFORGE_PG_MIN_CONN") or "1").strip()
+        try:
+            value = int(raw)
+        except ValueError:
+            return 1
+        return max(1, min(value, 1000))
+
+    @property
+    def PG_MAX_CONN(self) -> int:
+        """Postgres pool maximum size. Reads from DATAFORGE_PG_MAX_CONN.
+
+        Default: 10 (matches the prior hard-coded psycopg2
+        ``maxconn=10`` / psycopg3 ``max_size=10`` behaviour so existing
+        deployments see no change). The setting is clamped to a safe
+        upper bound of 1000 to prevent accidental denial-of-service via
+        a malformed env var.
+        """
+        raw = (os.environ.get("DATAFORGE_PG_MAX_CONN") or "10").strip()
+        try:
+            value = int(raw)
+        except ValueError:
+            return 10
+        return max(1, min(value, 1000))
 
     @property
     def QUEUE_BACKEND_DYNAMIC(self) -> str:
@@ -701,6 +751,25 @@ class Settings(BaseSettings):
 
         msg = f"'{type(self).__name__}' object has no attribute '{name}'"
         raise AttributeError(msg)
+
+    @model_validator(mode="after")
+    def _auto_promote_db_backed_rate_limit(self) -> Settings:
+        """Promote ``RATE_LIMIT_DB_BACKED`` to True in production-like envs.
+
+        A multi-process / multi-worker deployment cannot share an
+        in-process rate-limit counter across workers. When ``ENV`` is
+        ``production`` or ``staging`` we therefore default the flag to
+        True unless the operator has explicitly opted out.
+
+        The check uses ``model_fields_set`` to detect an explicit
+        assignment (env var, init kwarg, or ``.model_construct``). An
+        unset field keeps its declared default ``False`` and is
+        promoted here; an explicitly-set value is always respected.
+        """
+        if self.ENV.lower() in {"production", "staging"}:
+            if "RATE_LIMIT_DB_BACKED" not in self.model_fields_set:
+                self.RATE_LIMIT_DB_BACKED = True
+        return self
 
 
 settings = Settings()

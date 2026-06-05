@@ -133,6 +133,50 @@ async def latency_tracking_middleware(request: Request, call_next):
         return await call_next(request)
 
 
+# ─── CSP (Content-Security-Policy) Report-Only ────────────────────────────
+# A conservative report-only CSP is sent with every response. The policy is
+# deliberately loose (it must not break the dashboard or scraper UI) but it
+# surfaces a violation report endpoint so the operator can tighten the policy
+# iteratively. Enable via DATAFORGE_CSP_REPORT_ONLY=true (default true in
+# development, false in production until the operator confirms the policy).
+DEFAULT_CSP_REPORT_ONLY_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: https:; "
+    "font-src 'self' data:; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "report-uri /api/system/csp-violations"
+)
+
+
+async def csp_report_only_middleware(request: Request, call_next):
+    """Attach a report-only Content-Security-Policy header to every response.
+
+    The header is *report-only* — it never blocks anything — but the browser
+    will POST a violation report to ``/api/system/csp-violations`` when a
+    directive is violated. The endpoint logs the violation and increments
+    ``dataforge_csp_violations_total{directive=...}``.
+    """
+    if not getattr(settings, "CSP_REPORT_ONLY", True):
+        return await call_next(request)
+
+    response = await call_next(request)
+    try:
+        response.headers.setdefault(
+            "Content-Security-Policy-Report-Only",
+            DEFAULT_CSP_REPORT_ONLY_POLICY,
+        )
+    except (AttributeError, TypeError, ValueError):
+        # Some response types (StreamingResponse, Response without headers
+        # mutation) may reject setdefault; never let CSP break the response.
+        pass
+    return response
+
+
 rate_limiter = RateLimiterMiddleware(
     global_limit=settings.RATE_LIMIT_GLOBAL,
 )

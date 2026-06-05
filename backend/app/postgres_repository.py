@@ -66,18 +66,34 @@ def _get_database_url() -> str:
 
 
 def _get_pool() -> pg_pool.ThreadedConnectionPool:
-    """Get or create the psycopg2 connection pool."""
+    """Get or create the psycopg2 connection pool.
+
+    Pool sizing is configurable via ``DATAFORGE_PG_MIN_CONN`` and
+    ``DATAFORGE_PG_MAX_CONN`` (defaults: 1 and 10 — matches the prior
+    hard-coded values plus the new ``Settings.PG_MIN_CONN`` /
+    ``Settings.PG_MAX_CONN`` properties so single-source-of-truth
+    configuration is honoured).
+    """
     global _pool
     if _pool is None:
         with _pool_lock:
             if _pool is None:
+                from app.config import settings as _settings
+
                 dsn = _get_database_url()
+                minconn = _settings.PG_MIN_CONN
+                maxconn = max(_settings.PG_MAX_CONN, minconn)
                 _pool = pg_pool.ThreadedConnectionPool(
-                    minconn=2,
-                    maxconn=10,
+                    minconn=minconn,
+                    maxconn=maxconn,
                     dsn=dsn,
                 )
-                logger.info("Created psycopg2 pool for %s", dsn.split("@")[-1] if "@" in dsn else dsn)
+                logger.info(
+                    "Created psycopg2 pool for %s (minconn=%d, maxconn=%d)",
+                    dsn.split("@")[-1] if "@" in dsn else dsn,
+                    minconn,
+                    maxconn,
+                )
     return _pool
 
 
@@ -479,6 +495,79 @@ class PostgresJobRepository(JobRepository):
                     jobs[job.id] = job
             return jobs
 
+    def get_job(self, job_id: str) -> Job | None:
+        """Targeted read: single active job by primary key.
+
+        Avoids the full ``SELECT *`` performed by ``load_jobs()`` on
+        single-item read paths. Soft-deleted rows are excluded.
+        """
+        self._ensure()
+        with _conn() as conn:
+            row = _fetch_one(
+                conn,
+                "SELECT * FROM jobs WHERE id = %s AND deleted_at IS NULL",
+                (job_id,),
+            )
+            if not row:
+                return None
+            return _row_to_job(row)
+
+    def list_job_summaries(
+        self,
+        limit: int = 100,
+        cursor: str | None = None,
+    ) -> list[dict]:
+        """Lightweight summary projection for ``GET /api/jobs``.
+
+        Avoids deserializing JSON blobs (``results``, ``logs``,
+        ``selectors_map``) so list endpoints stay cheap. The ``urls``
+        column is JSONB in spirit (stored as TEXT) — the decoded list
+        matches the SQLite implementation.
+        """
+        self._ensure()
+        safe_limit = max(1, min(int(limit), 500))
+        params: list[object] = []
+        sql = (
+            "SELECT id, name, status, mode, topic, urls, created_at, started_at, "
+            "completed_at, total_records, filtered_records, progress_current, "
+            "progress_total, error "
+            "FROM jobs "
+            "WHERE deleted_at IS NULL"
+        )
+        if cursor:
+            sql += " AND created_at < %s"
+            params.append(cursor)
+        sql += " ORDER BY created_at DESC LIMIT %s"
+        params.append(safe_limit)
+        with _conn() as conn:
+            rows = _fetch_all(conn, sql, tuple(params))
+        summaries: list[dict] = []
+        for row in rows:
+            urls_raw = row.get("urls") or "[]"
+            try:
+                urls_val = json.loads(urls_raw) if isinstance(urls_raw, str) else (urls_raw or [])
+            except (TypeError, ValueError):
+                urls_val = []
+            summaries.append(
+                {
+                    "id": row.get("id"),
+                    "name": row.get("name"),
+                    "mode": row.get("mode"),
+                    "urls": urls_val,
+                    "topic": row.get("topic", "") or "",
+                    "status": row.get("status"),
+                    "created_at": row.get("created_at"),
+                    "started_at": row.get("started_at") or None,
+                    "completed_at": row.get("completed_at") or None,
+                    "total_records": row.get("total_records", 0) or 0,
+                    "filtered_records": row.get("filtered_records", 0) or 0,
+                    "progress_current": row.get("progress_current", 0) or 0,
+                    "progress_total": row.get("progress_total", 0) or 0,
+                    "error": row.get("error") or None,
+                },
+            )
+        return summaries
+
     def load_recycle_bin(self) -> dict[str, Job]:
         self._ensure()
         with _conn() as conn:
@@ -489,6 +578,65 @@ class PostgresJobRepository(JobRepository):
                 if job:
                     jobs[job.id] = job
             return jobs
+
+    def list_recycle_summaries(
+        self,
+        limit: int = 100,
+        cursor: str | None = None,
+    ) -> list[dict]:
+        """Lightweight summary projection for ``GET /api/recycle_bin``.
+
+        Performs a single SELECT against the small summary columns of
+        the ``recycle_bin`` table. The ``deleted_at`` column is
+        included so the UI can show how long ago the row was
+        soft-deleted. The projection shape matches
+        :meth:`SQLiteJobRepository.list_recycle_summaries` so the
+        ``GET /api/recycle_bin`` endpoint is identical across backends.
+        """
+        self._ensure()
+        safe_limit = max(1, min(int(limit), 500))
+        params: list[object] = []
+        sql = (
+            "SELECT id, name, status, mode, topic, urls, created_at, started_at, "
+            "completed_at, total_records, filtered_records, progress_current, "
+            "progress_total, error, deleted_at "
+            "FROM recycle_bin "
+            "WHERE 1=1"
+        )
+        if cursor:
+            sql += " AND created_at < %s"
+            params.append(cursor)
+        sql += " ORDER BY created_at DESC LIMIT %s"
+        params.append(safe_limit)
+        with _conn() as conn:
+            rows = _fetch_all(conn, sql, tuple(params))
+        summaries: list[dict] = []
+        for row in rows:
+            urls_raw = row.get("urls") or "[]"
+            try:
+                urls_val = json.loads(urls_raw) if isinstance(urls_raw, str) else (urls_raw or [])
+            except (TypeError, ValueError):
+                urls_val = []
+            summaries.append(
+                {
+                    "id": row.get("id"),
+                    "name": row.get("name"),
+                    "mode": row.get("mode"),
+                    "urls": urls_val,
+                    "topic": row.get("topic", "") or "",
+                    "status": row.get("status"),
+                    "created_at": row.get("created_at"),
+                    "started_at": row.get("started_at") or None,
+                    "completed_at": row.get("completed_at") or None,
+                    "total_records": row.get("total_records", 0) or 0,
+                    "filtered_records": row.get("filtered_records", 0) or 0,
+                    "progress_current": row.get("progress_current", 0) or 0,
+                    "progress_total": row.get("progress_total", 0) or 0,
+                    "error": row.get("error") or None,
+                    "deleted_at": row.get("deleted_at") or None,
+                },
+            )
+        return summaries
 
     def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         self._ensure()
@@ -635,6 +783,45 @@ class PostgresJobRepository(JobRepository):
                 f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608 — cols/update_cols are model field names, not user input
                 list(row.values()),
             )
+
+    def read_events(
+        self,
+        job_id: str,
+        limit: int = 200,
+        offset: int = 0,
+        level_prefix: str | None = None,
+    ) -> list[dict]:
+        """Read lifecycle events from the ``job_events`` companion table.
+
+        Returns ``[]`` when the table has not been populated (the
+        dual-write is opt-in for non-SQLite deployments) so the
+        caller can fall back to the in-memory ``Job.logs`` list.
+        """
+        self._ensure()
+        safe_limit = max(1, min(int(limit), 1000))
+        safe_offset = max(0, int(offset))
+        sql = "SELECT timestamp, level, message FROM job_events WHERE job_id = %s"
+        params: list[object] = [job_id]
+        if level_prefix:
+            sql += " AND LOWER(level) LIKE %s"
+            params.append(f"{level_prefix.lower()}%")
+        sql += " ORDER BY event_id ASC LIMIT %s OFFSET %s"
+        params.extend([safe_limit, safe_offset])
+        try:
+            with _conn() as conn:
+                rows = _fetch_all(conn, sql, tuple(params))
+        except Exception:
+            # Companion table may not exist yet on this deployment; the
+            # caller falls back to in-memory logs.
+            return []
+        return [
+            {
+                "timestamp": (row.get("timestamp") or ""),
+                "level": (row.get("level") or "info"),
+                "message": (row.get("message") or ""),
+            }
+            for row in rows
+        ]
 
     # ─── Individual repository operations (avoid full-state rewrites) ────
 

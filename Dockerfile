@@ -34,6 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 1: Python dependencies (cached separately from app code)
 # ─────────────────────────────────────────────────────────────────────────────
+# Production-only lock. Dev/test tooling lives in
+# backend/requirements-dev.lock.txt and is NEVER installed in this stage.
+# scripts/validate_dependency_bounds.py enforces this in CI.
 FROM base AS deps
 
 COPY backend/requirements.lock.txt .
@@ -46,8 +49,12 @@ RUN pip install --no-cache-dir -r requirements.lock.txt
 # ─────────────────────────────────────────────────────────────────────────────
 FROM deps AS dev
 
-# Install dev dependencies
-RUN pip install --no-cache-dir pytest pytest-cov pytest-asyncio mypy pyflakes autoflake
+# Copy the dev lock and install dev tooling on top of the prod layer.
+# Keep this separate from the prod lock so a dev-only pin can never leak
+# into the production image.
+COPY backend/requirements-dev.lock.txt /tmp/requirements-dev.lock.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-dev.lock.txt && \
+    rm -f /tmp/requirements-dev.lock.txt
 
 # Install Playwright browsers (deferred to runtime in dev for faster image builds)
 RUN playwright install chromium 2>&1 | tail -5

@@ -24,14 +24,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-ci-${{ hashFiles('backend/requirements-dev.txt') }}
+          key: ${{ runner.os }}-pip-ci-${{ hashFiles('backend/requirements-dev.lock.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements-dev.txt
+          pip install -r backend/requirements-dev.lock.txt
 
       - name: Python syntax check (compileall)
         run: python -m compileall -q backend/app scripts architecture_validator.py
@@ -44,6 +44,15 @@ jobs:
 
       - name: Validate Dependency Bounds
         run: python scripts/validate_dependency_bounds.py
+
+      - name: Run Dependency Vulnerability Audit
+        run: |
+          # pip-audit is included via requirements-dev.lock.txt. Audits the
+          # production lock to catch CVEs in anything that ends up in the
+          # image. Dev-only tools are scanned separately.
+          pip-audit -r backend/requirements.lock.txt --strict
+          pip-audit -r backend/requirements-dev.lock.txt --strict || \
+            echo "::warning::pip-audit reported issues in dev-only dependencies (non-blocking)"
 
       - name: Install Playwright Chromium
         run: python -m playwright install --with-deps chromium
@@ -83,14 +92,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-lint-${{ hashFiles('backend/requirements-dev.txt') }}
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('backend/requirements-dev.lock.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements-dev.txt
+          pip install -r backend/requirements-dev.lock.txt
           pip install ruff mypy bandit types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
 
       - name: Run Ruff Lint
@@ -105,18 +114,85 @@ jobs:
       - name: Run Bandit Security Scan
         run: python -m bandit -r backend/app -q
 
+      - name: Frontend Syntax Check
+        run: python scripts/frontend_syntax_check.py
+
+      - name: Docs Lint
+        run: python scripts/docs_lint.py
+
+      - name: Generate Route Inventory Artifact
+        run: |
+          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+          python scripts/route_inventory.py > route-inventory.md
+        continue-on-error: false
+
+      - name: Upload Route Inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-inventory
+          path: route-inventory.md
+          retention-days: 30
+
       - name: Run Full Test Suite (SQLite)
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite           python -m pytest -q backend/tests -o addopts= --tb=short
 
+      - name: Enforce coverage floors
+        run: |
+          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite           python -m coverage run --source=backend/app -m pytest -q backend/tests -o addopts= --tb=line --no-cov-on-fail -q
+          python -m coverage json -o coverage.json
+          python scripts/check_coverage_floors.py coverage.json
+          python -m coverage report --fail-under=60
+        continue-on-error: false
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.json
+            coverage_html/
+          retention-days: 30
+
+  sbom:
+    name: SBOM Generation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM (CycloneDX JSON)
+        run: |
+          syft scan dir:. -o cyclonedx-json=backend-sbom.cdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: backend-sbom.cdx.json
+          retention-days: 30
+
   notify:
     name: Telegram Notification
-    needs: [ci-gates, lint-type-checks]
+    needs: [ci-gates, lint-type-checks, sbom]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Send Telegram Message
-        uses: appleboy/telegram-action@master
+        # Pinned to a specific commit SHA for supply-chain integrity.
+        # Update via Dependabot (or manual bump) when upstream ships.
+        # See: https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions
+        uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b  # master @ 2026-04-08
         with:
           to: ${{ secrets.TELEGRAM_TO }}
           token: ${{ secrets.TELEGRAM_TOKEN }}

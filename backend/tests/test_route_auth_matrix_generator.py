@@ -84,8 +84,24 @@ def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) ->
     monkeypatch.setenv("DATAFORGE_SEMANTIC_STATE_PATH", str(tmp_path / "semantic_state.json"))
 
     matrix = _load_module().build_matrix()
+
+    # Endpoints that are intentionally unauthenticated mutation routes. Each
+    # entry is a (method, path) pair that has a documented reason for being
+    # open (e.g. browser-generated reports). The reason is enforced by the
+    # body-size middleware (5 MB cap) and the global /api/* rate limiter.
+    UNAUTHENTICATED_MUTATIONS = {
+        ("POST", "/api/system/csp-violations"),  # browser CSP report, no key
+    }
+
     unsafe = [
-        row for row in matrix if row.path.startswith("/api/") and row.method != "GET" and row.access == "authenticated-user"
+        row
+        for row in matrix
+        if (
+            row.path.startswith("/api/")
+            and row.method != "GET"
+            and row.access == "authenticated-user"
+            and (row.method, row.path) not in UNAUTHENTICATED_MUTATIONS
+        )
     ]
 
     assert unsafe == []

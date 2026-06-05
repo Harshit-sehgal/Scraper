@@ -28,7 +28,7 @@ if [ -z "$VENV_DIR" ]; then
     echo "❌ No virtual environment found. Create one first:"
     echo "   python3 -m venv .venv"
     echo "   source .venv/bin/activate"
-    echo "   pip install -r backend/requirements.txt"
+    echo "   pip install -r backend/requirements-dev.lock.txt"
     exit 1
 fi
 
@@ -87,7 +87,7 @@ print("Dependency check passed")
 PY
 then
     echo "❌ Runtime dependencies not installed or incomplete. Run:"
-    echo "   pip install -r backend/requirements.txt"
+    echo "   pip install -r backend/requirements-dev.lock.txt"
     echo "   python -m playwright install chromium"
     exit 1
 fi

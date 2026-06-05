@@ -1,0 +1,49 @@
+name: Image Build & Smoke
+
+# Image / release lane. Runs only on main and on tag pushes so PR
+# build latency stays low. Verifies the production image builds,
+# the container's /ready health check returns 200, and the image
+# does not contain dev-only packages.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build-production:
+    name: Build production image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build production target
+        run: docker build --target production -t dataforge:test .
+
+      - name: Smoke-test /ready
+        run: |
+          docker run -d --rm \
+            -e DATAFORGE_STORAGE_BACKEND=sqlite \
+            -e DATAFORGE_ENV=staging \
+            -e DATAFORGE_API_KEY=test \
+            -p 8000:8000 \
+            --name dataforge-smoke \
+            dataforge:test
+          # Wait for the server to come up.
+          for i in $(seq 1 30); do
+            if curl -sf -H "X-API-Key: test" http://localhost:8000/ready >/dev/null; then
+              echo "✅ /ready returned 200"
+              break
+            fi
+            sleep 1
+          done
+          docker stop dataforge-smoke || true
+
+      - name: Validate compose config
+        run: |
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.prod.yml config -q

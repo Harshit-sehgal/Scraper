@@ -1,4 +1,5 @@
 import logging
+import os
 from abc import ABC, abstractmethod
 
 from app.models import Job
@@ -21,6 +22,62 @@ class JobRepository(ABC):
         """Load all deleted / recycled jobs from the persistent store."""
 
     @abstractmethod
+    def get_job(self, job_id: str) -> Job | None:
+        """Load a single active job by id.
+
+        Targeted read for hot paths that previously called ``load_jobs()`` and
+        filtered client-side. Implementations should issue a primary-key
+        lookup that avoids deserializing unrelated rows.
+        """
+
+    @abstractmethod
+    def list_job_summaries(
+        self,
+        limit: int = 100,
+        cursor: str | None = None,
+    ) -> list[dict]:
+        """Return lightweight job summaries for API list views.
+
+        Each dict contains the same projection used by
+        ``GET /api/jobs`` / ``GET /api/recycle_bin``: id, name, mode, urls,
+        topic, status, created_at, started_at, completed_at, total_records,
+        filtered_records, progress_current, progress_total, error. Heavy
+        fields like ``results``, ``logs``, ``selectors_map`` are deliberately
+        excluded.
+
+        Args:
+            limit: Maximum number of summaries to return. Implementations
+                should clamp to a safe upper bound.
+            cursor: Opaque cursor for keyset pagination. For the initial
+                cut this is treated as an ISO timestamp string; the API
+                returns ``created_at`` values that callers can pass back.
+        """
+
+    @abstractmethod
+    def list_recycle_summaries(
+        self,
+        limit: int = 100,
+        cursor: str | None = None,
+    ) -> list[dict]:
+        """Return lightweight summaries for soft-deleted jobs.
+
+        Targeted read for ``GET /api/recycle_bin`` that avoids
+        deserializing every row in the recycle bin just to project a
+        handful of summary columns. Returns the same projection shape as
+        :meth:`list_job_summaries` (id, name, mode, urls, topic, status,
+        created_at, started_at, completed_at, total_records,
+        filtered_records, progress_current, progress_total, error) with
+        an additional ``deleted_at`` field.
+
+        Args:
+            limit: Maximum number of summaries to return. Implementations
+                should clamp to a safe upper bound.
+            cursor: Opaque cursor for keyset pagination. Treated as an
+                ISO timestamp string; callers should pass back a
+                ``created_at`` value from a previous page.
+        """
+
+    @abstractmethod
     def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         """Load active jobs, recycled jobs, and world state in a single DB read pass.
 
@@ -41,6 +98,28 @@ class JobRepository(ABC):
                 present in the provided dicts before upserting. Default False — prevents
                 accidental data loss in multi-process scenarios.
 
+        """
+
+    @abstractmethod
+    def read_events(
+        self,
+        job_id: str,
+        limit: int = 200,
+        offset: int = 0,
+        level_prefix: str | None = None,
+    ) -> list[dict]:
+        """Return lifecycle events for a job from the dedicated events table.
+
+        Companion to :meth:`list_job_summaries` for endpoints that only
+        need the event stream (e.g. ``GET /api/jobs/{id}/events``).
+        Implementations should return ``[{timestamp, level, message}, ...]``
+        ordered by insertion / ``event_id`` ascending. The
+        ``level_prefix`` argument is an optional case-insensitive
+        prefix filter (e.g. ``"err"`` matches ``error`` / ``error:``).
+
+        Implementations are expected to return ``[]`` for missing jobs
+        or when the companion table is unavailable; the caller can
+        fall back to the ``Job.logs`` field of the in-memory job.
         """
 
     @abstractmethod
@@ -108,6 +187,154 @@ class SQLiteJobRepository(JobRepository):
         _, recycle, _ = load_state(recover_in_progress=False)
         return recycle
 
+    def list_recycle_summaries(
+        self,
+        limit: int = 100,
+        cursor: str | None = None,
+    ) -> list[dict]:
+        """Lightweight summary projection for ``GET /api/recycle_bin``.
+
+        Performs a single SELECT against the small summary columns of
+        the ``recycle_bin`` table and does not deserialize JSON blobs.
+        The ``deleted_at`` column is included so the UI can show how
+        long ago the row was soft-deleted.
+        """
+        from app.job_store import _DB_LOCK, _get_connection
+
+        safe_limit = max(1, min(int(limit), 500))
+        params: list[object] = []
+        where = "1=1"
+        if cursor:
+            where += " AND created_at < ?"
+            params.append(cursor)
+        params.append(safe_limit)
+        sql = (
+            "SELECT id, name, status, mode, topic, urls, created_at, started_at, "  # nosec B608
+            "completed_at, total_records, filtered_records, progress_current, "
+            "progress_total, error, deleted_at "
+            "FROM recycle_bin "
+            f"WHERE {where} "  # nosec B608
+            "ORDER BY created_at DESC LIMIT ?"
+        )
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                rows = conn.execute(sql, params).fetchall()
+            finally:
+                conn.close()
+        summaries: list[dict] = []
+        for row in rows:
+            d = dict(row)
+            urls_raw = d.get("urls") or "[]"
+            try:
+                import json as _json
+
+                urls_val = _json.loads(urls_raw) if isinstance(urls_raw, str) else (urls_raw or [])
+            except (TypeError, ValueError):
+                urls_val = []
+            summaries.append(
+                {
+                    "id": d.get("id"),
+                    "name": d.get("name"),
+                    "mode": d.get("mode"),
+                    "urls": urls_val,
+                    "topic": d.get("topic", "") or "",
+                    "status": d.get("status"),
+                    "created_at": d.get("created_at"),
+                    "started_at": d.get("started_at") or None,
+                    "completed_at": d.get("completed_at") or None,
+                    "total_records": d.get("total_records", 0) or 0,
+                    "filtered_records": d.get("filtered_records", 0) or 0,
+                    "progress_current": d.get("progress_current", 0) or 0,
+                    "progress_total": d.get("progress_total", 0) or 0,
+                    "error": d.get("error") or None,
+                    "deleted_at": d.get("deleted_at") or None,
+                },
+            )
+        return summaries
+
+    def get_job(self, job_id: str) -> Job | None:
+        """Targeted read: load a single job by primary key from SQLite.
+
+        Avoids deserializing every row in the ``jobs`` table on hot read
+        paths (single-job detail, worker-mode refresh, etc.).
+        """
+        from app.job_store import _DB_LOCK, _get_connection, _row_to_job
+
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+                if not row:
+                    return None
+                return _row_to_job(dict(row))
+            finally:
+                conn.close()
+
+    def list_job_summaries(
+        self,
+        limit: int = 100,
+        cursor: str | None = None,
+    ) -> list[dict]:
+        """Lightweight summary projection for ``GET /api/jobs`` in worker mode.
+
+        Performs a single SELECT against the small summary columns and
+        does not deserialize JSON blobs (results, logs, selectors_map, …).
+        """
+        from app.job_store import _DB_LOCK, _get_connection
+
+        safe_limit = max(1, min(int(limit), 500))
+        params: list[object] = []
+        where = "1=1"
+        if cursor:
+            where += " AND created_at < ?"
+            params.append(cursor)
+        params.append(safe_limit)
+        sql = (
+            "SELECT id, name, status, mode, topic, urls, created_at, started_at, "  # nosec B608
+            "completed_at, total_records, filtered_records, progress_current, "
+            "progress_total, error "
+            "FROM jobs "
+            f"WHERE {where} "  # nosec B608
+            "ORDER BY created_at DESC LIMIT ?"
+        )
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                rows = conn.execute(sql, params).fetchall()
+            finally:
+                conn.close()
+        summaries: list[dict] = []
+        for row in rows:
+            d = dict(row)
+            # ``urls`` is stored as JSON; decode once for the API surface.
+            urls_raw = d.get("urls") or "[]"
+            try:
+                import json as _json
+
+                urls_val = _json.loads(urls_raw) if isinstance(urls_raw, str) else (urls_raw or [])
+            except (TypeError, ValueError):
+                urls_val = []
+            summaries.append(
+                {
+                    "id": d.get("id"),
+                    "name": d.get("name"),
+                    "mode": d.get("mode"),
+                    "urls": urls_val,
+                    "topic": d.get("topic", "") or "",
+                    "status": d.get("status"),
+                    "created_at": d.get("created_at"),
+                    "started_at": d.get("started_at") or None,
+                    "completed_at": d.get("completed_at") or None,
+                    "total_records": d.get("total_records", 0) or 0,
+                    "filtered_records": d.get("filtered_records", 0) or 0,
+                    "progress_current": d.get("progress_current", 0) or 0,
+                    "progress_total": d.get("progress_total", 0) or 0,
+                    "error": d.get("error") or None,
+                },
+            )
+        return summaries
+
     def load_all(self, recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:
         from app.job_store import load_state
 
@@ -117,6 +344,28 @@ class SQLiteJobRepository(JobRepository):
         from app.job_store import save_state
 
         save_state(jobs, recycle_bin, prune_missing=prune_missing)
+
+    def read_events(
+        self,
+        job_id: str,
+        limit: int = 200,
+        offset: int = 0,
+        level_prefix: str | None = None,
+    ) -> list[dict]:
+        """Read events from the ``job_events`` companion table.
+
+        Returns an empty list when the table is empty (e.g. before
+        v4 dual-write has populated it) so the caller can fall back
+        to the in-memory ``Job.logs`` list.
+        """
+        from app.job_store import read_job_events
+
+        return read_job_events(
+            job_id,
+            limit=limit,
+            offset=offset,
+            level_prefix=level_prefix,
+        )
 
     def is_cancel_requested(self, job_id: str) -> bool:
         """Check from SQLite whether a job has a pending cancellation request.
@@ -358,6 +607,40 @@ def get_job_repository() -> JobRepository:
             raise RuntimeError(
                 msg,
             )
+        # Phase A: driver selection via DATAFORGE_PG_DRIVER. Defaults to
+        # psycopg2 (preserves existing behaviour). Set
+        # DATAFORGE_PG_DRIVER=psycopg3 to opt in to the new driver.
+        pg_driver = (os.environ.get("DATAFORGE_PG_DRIVER") or "psycopg2").strip().lower()
+
+        if pg_driver == "psycopg3":
+            try:
+                from app.psycopg3_repository import (
+                    Psycopg3JobRepository,
+                    verify_psycopg3_connectivity,
+                )
+
+                connectivity = verify_psycopg3_connectivity()
+                if not connectivity.get("ok"):
+                    msg = (
+                        f"Postgres (psycopg3) connectivity check failed: "
+                        f"{connectivity.get('error', 'unknown error')}. "
+                        "Cannot use Postgres backend. Check DATAFORGE_DATABASE_URL "
+                        "and ensure the database is running."
+                    )
+                    raise RuntimeError(msg)
+                repo: JobRepository = Psycopg3JobRepository()
+                _repository_instance = repo
+                logger.info("Using Psycopg3JobRepository (STORAGE_BACKEND=postgres, PG_DRIVER=psycopg3)")
+                return repo
+            except RuntimeError:
+                raise
+            except Exception as e:
+                msg = (
+                    f"Failed to create Psycopg3JobRepository: {e}. "
+                    "Install psycopg 3 with: pip install 'psycopg[binary,pool]>=3.2'"
+                )
+                raise RuntimeError(msg) from e
+
         try:
             from app.postgres_repository import PostgresJobRepository, verify_postgres_connectivity
 
@@ -371,7 +654,7 @@ def get_job_repository() -> JobRepository:
                 raise RuntimeError(
                     msg,
                 )
-            repo: JobRepository = PostgresJobRepository()
+            repo = PostgresJobRepository()
             _repository_instance = repo
             logger.info("Using PostgresJobRepository (explicit STORAGE_BACKEND=postgres)")
             return repo

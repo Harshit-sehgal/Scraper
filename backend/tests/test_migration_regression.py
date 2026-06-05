@@ -2,7 +2,7 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
-from app.job_store import _run_migrations, persist_state_single
+from app.job_store import _CURRENT_SCHEMA_VERSION, _run_migrations, persist_state_single
 from app.models import Job, JobStatus
 
 
@@ -149,6 +149,10 @@ def test_migrations_cached_per_db_path(monkeypatch) -> None:
         db_path1 = Path(tmp1.name)
         db_path2 = Path(tmp2.name)
 
+    # Clear any test-suite-level DATAFORGE_STATE_FILE so the dynamic
+    # property falls back to the static field, which we can monkeypatch.
+    monkeypatch.delenv("DATAFORGE_STATE_FILE", raising=False)
+
     try:
         # DB 1 setup: change settings.STATE_FILE_PATH dynamically
         monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_path1))
@@ -174,7 +178,7 @@ def test_migrations_cached_per_db_path(monkeypatch) -> None:
             conn = sqlite3.connect(str(path))
             row = conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
             assert row is not None
-            assert row[0] == 3
+            assert row[0] == _CURRENT_SCHEMA_VERSION
             conn.close()
 
     finally:
@@ -281,7 +285,7 @@ def test_schema_invalidation_and_recreation(monkeypatch) -> None:
         # Verify schema is recreated successfully
         row = conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
         assert row is not None
-        assert row[0] == 3
+        assert row[0] == _CURRENT_SCHEMA_VERSION
         conn.close()
 
     finally:
@@ -443,6 +447,10 @@ def test_json_to_sqlite_migration_imports_existing_jobs(monkeypatch) -> None:
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp_db:
         db_path = Path(tmp_db.name)
     json_path = db_path.with_suffix(".json")
+
+    # Clear any test-suite-level DATAFORGE_STATE_FILE so the dynamic
+    # property falls back to the static field, which we can monkeypatch.
+    monkeypatch.delenv("DATAFORGE_STATE_FILE", raising=False)
 
     try:
         monkeypatch.setattr(settings, "STATE_FILE_PATH", str(db_path))

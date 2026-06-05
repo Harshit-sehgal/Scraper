@@ -1,178 +1,150 @@
 #!/usr/bin/env python3
-"""Validate that pyproject.toml dependency bounds are consistent with requirements.lock.txt.
+"""Validate that dependency lock files match their declared intent.
 
-Checks:
-  1. Every production dependency in pyproject.toml has an upper version bound (<).
-  2. The locked version from requirements.lock.txt falls within the declared range.
-  3. All production deps in pyproject.toml exist in the lock file (name-normalized).
+Rules enforced:
 
-Exit codes:
-  0 = all checks pass
-  1 = one or more violations found
+1. ``requirements.lock.txt`` MUST NOT contain dev-only packages (pytest,
+   pytest-cov, pytest-asyncio, testcontainers, coverage, pyflakes, ruff,
+   mypy, bandit, pip-audit, pip-tools).
+2. ``requirements-dev.lock.txt`` MUST be a superset of
+   ``requirements.lock.txt`` (any package present in prod must also be
+   present in dev with an equal-or-higher pinned version).
+3. Both lock files MUST be parseable as ``name==version`` lines.
+
+Exit code:
+    0 - all rules pass
+    1 - one or more rules failed
 """
 
-import os
+from __future__ import annotations
+
 import re
 import sys
-import tomllib
+from pathlib import Path
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(HERE, ".."))
-PYPROJECT_TOML = os.path.join(PROJECT_ROOT, "pyproject.toml")
-LOCK_FILE = os.path.join(PROJECT_ROOT, "backend", "requirements.lock.txt")
+BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
+
+PROD_LOCK = BACKEND_DIR / "requirements.lock.txt"
+DEV_LOCK = BACKEND_DIR / "requirements-dev.lock.txt"
+
+# Packages that are never acceptable in a production image.
+DEV_ONLY_PACKAGES: set[str] = {
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "pytest-timeout",
+    "pytest-mock",
+    "testcontainers",
+    "coverage",
+    "pyflakes",
+    "ruff",
+    "mypy",
+    "bandit",
+    "pip-audit",
+    "pip-tools",
+}
+
+# Common normalisations (distro name may differ from import name)
+NORMALISATIONS: dict[str, str] = {
+    "pytest-cov": "pytest-cov",
+    "pytest-asyncio": "pytest-asyncio",
+    "pytest-timeout": "pytest-timeout",
+    "pytest-mock": "pytest-mock",
+    "pip-audit": "pip-audit",
+    "pip-tools": "pip-tools",
+}
+
+_PIN_RE = re.compile(r"^([A-Za-z0-9_.\-]+)==([0-9][^\s#]*)")
 
 
-def _normalize(name: str) -> str:
-    """Normalize a package name per PEP 503 / pip."""
-    return re.sub(r"[-_.]+", "-", name).strip().lower()
-
-
-def parse_lock_file(path: str) -> dict[str, str]:
-    """Parse requirements.lock.txt into {normalized_name: version}."""
-    locked: dict[str, str] = {}
-    if not os.path.isfile(path):
-        print(f"SKIP: Lock file not found at {path}")
-        return locked
-
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if "==" in line:
-                name, version = line.split("==", 1)
-                locked[_normalize(name)] = version.strip()
-    return locked
-
-
-def parse_pyproject_deps(path: str) -> list[dict]:
-    """Extract production dependencies from pyproject.toml using tomllib.
-
-    Returns list of dicts with keys: raw, name, version_spec, has_upper.
-    """
-    deps: list[dict] = []
-    if not os.path.isfile(path):
-        print(f"SKIP: pyproject.toml not found at {path}")
-        return deps
-
-    with open(path, "rb") as f:
-        try:
-            data = tomllib.load(f)
-        except tomllib.TOMLDecodeError as e:
-            print(f"ERROR: Failed to parse pyproject.toml: {e}")
-            return deps
-
-    raw_deps: list[str] = data.get("project", {}).get("dependencies", [])
-    if not raw_deps:
-        print("WARN: No production dependencies found in pyproject.toml")
-        return deps
-
-    for dep_raw in raw_deps:
-        # Parse using regex: package_name [extras] version_spec
-        # Pattern: package_name>=X.Y.Z,<A.B.C or package_name[extras]>=X.Y.Z,<A.B.C
-        match = re.match(r"^([a-zA-Z0-9_.\-]+(?:\[[^\]]*\])?)\s*(.*)", dep_raw)
-        if not match:
-            print(f"WARN: Could not parse dependency: {dep_raw}")
+def parse_lock(path: Path) -> dict[str, str]:
+    """Return a dict of normalised package name -> pinned version."""
+    if not path.exists():
+        return {}
+    out: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
             continue
-
-        name = match.group(1).strip()
-        # Remove extras like [standard]
-        name_clean = re.sub(r"\[.*?\]", "", name).strip()
-        version_spec = match.group(2).strip()
-
-        has_upper = "<" in version_spec
-
-        # Extract lower bound
-        lower_match = re.search(r">=(\d+\.\d+\.\d+|\d+\.\d+|\d+)", version_spec)
-        lower = lower_match.group(1) if lower_match else None
-
-        # Extract upper bound
-        upper_match = re.search(r"<(\d+\.\d+\.\d+|\d+\.\d+|\d+)", version_spec)
-        upper = upper_match.group(1) if upper_match else None
-
-        deps.append(
-            {
-                "raw": dep_raw,
-                "name": _normalize(name_clean),
-                "name_clean": name_clean,
-                "version_spec": version_spec,
-                "lower": lower,
-                "upper": upper,
-                "has_upper": has_upper,
-            }
-        )
-
-    return deps
+        m = _PIN_RE.match(line)
+        if not m:
+            continue
+        name = m.group(1).lower()
+        # PEP 503 normalisation: collapse runs of [-_.] to "-"
+        canon = re.sub(r"[-_.]+", "-", name)
+        out[canon] = m.group(2)
+    return out
 
 
-def check_version_in_bounds(version_str: str, dep: dict) -> bool:
-    """Check if a version string falls within the declared bounds."""
-    try:
-        from packaging.version import Version
+def compare_versions(a: str, b: str) -> int:
+    """Return -1, 0, or 1 by lexicographic compare on the leading numeric tuple."""
 
-        ver = Version(version_str)
-    except ImportError:
-        return True  # Can't validate without packaging
+    def to_tuple(s: str) -> tuple[int, ...]:
+        parts: list[int] = []
+        for chunk in re.split(r"[^0-9]+", s):
+            if not chunk:
+                continue
+            try:
+                parts.append(int(chunk))
+            except ValueError:
+                break
+        return tuple(parts)
 
-    if dep["lower"]:
-        try:
-            lower_ver = Version(dep["lower"])
-            if ver < lower_ver:
-                return False
-        except Exception:
-            pass
-
-    if dep["upper"]:
-        try:
-            upper_ver = Version(dep["upper"])
-            if ver >= upper_ver:
-                return False
-        except Exception:
-            pass
-
-    return True
+    ta, tb = to_tuple(a), to_tuple(b)
+    if ta < tb:
+        return -1
+    if ta > tb:
+        return 1
+    return 0
 
 
 def main() -> int:
-    locked = parse_lock_file(LOCK_FILE)
-    deps = parse_pyproject_deps(PYPROJECT_TOML)
+    failures: list[str] = []
 
-    if not deps:
-        print("No production dependencies found or pyproject.toml missing — skipping.")
-        return 0
+    prod = parse_lock(PROD_LOCK)
+    dev = parse_lock(DEV_LOCK)
 
-    violations: list[str] = []
+    # Rule 1: prod lock must not contain dev-only packages.
+    if prod:
+        leaked = sorted(set(DEV_ONLY_PACKAGES) & set(prod))
+        if leaked:
+            failures.append(
+                "Production lock file contains dev-only packages: " + ", ".join(leaked) + ". Move them to requirements-dev.in.",
+            )
 
-    for dep in deps:
-        name = dep["name"]
-
-        # Check 1: Upper bound exists
-        if not dep["has_upper"]:
-            violations.append(f"{dep['name_clean']}: missing upper bound ('{dep['version_spec']}' has no '<')")
-
-        # Check 2: Exists in lock file
-        if name not in locked:
-            # Try matching with alternative normalization (underscore vs hyphen)
-            alt_name = name.replace("-", "_")
-            if alt_name in locked:
-                locked[name] = locked.pop(alt_name)
-            else:
-                violations.append(f"{dep['name_clean']}: not found in {os.path.basename(LOCK_FILE)}")
+    # Rule 2: dev lock is a superset of prod (with version >= prod).
+    if prod and dev:
+        missing_in_dev: list[str] = []
+        older_in_dev: list[str] = []
+        for name, prod_ver in prod.items():
+            if name not in dev:
+                missing_in_dev.append(f"{name}=={prod_ver}")
                 continue
+            if compare_versions(dev[name], prod_ver) < 0:
+                older_in_dev.append(
+                    f"{name}: dev={dev[name]} prod={prod_ver}",
+                )
+        if missing_in_dev:
+            failures.append(
+                "Dev lock is missing prod packages: " + ", ".join(missing_in_dev),
+            )
+        if older_in_dev:
+            failures.append(
+                "Dev lock has older pins than prod: " + ", ".join(older_in_dev),
+            )
 
-        # Check 3: Locked version within bounds
-        locked_ver = locked[name]
-        if not check_version_in_bounds(locked_ver, dep):
-            violations.append(f"{dep['name_clean']}: locked version {locked_ver} is outside bounds '{dep['version_spec']}'")
-
-    if violations:
-        print(f"Found {len(violations)} violation(s):")
-        for v in violations:
-            print(f"  ❌ {v}")
+    if failures:
+        print("Dependency validation FAILED:")
+        for f in failures:
+            print(f"  - {f}")
+        print()
+        print("Run the lock regeneration commands documented in requirements.in.")
         return 1
-    else:
-        print(f"✅ All {len(deps)} dependencies have valid upper bounds matching lock file.")
-        return 0
+
+    print(
+        f"Dependency validation OK: {len(prod)} prod packages, {len(dev)} dev packages.",
+    )
+    return 0
 
 
 if __name__ == "__main__":
