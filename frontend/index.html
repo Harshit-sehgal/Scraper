@@ -88,9 +88,22 @@
 
                 <!-- Jobs List -->
                 <div class="list" id="jobs-list">
-                    <div class="empty" id="empty-state">
-                        <p>No jobs yet</p>
-                        <span class="subtle">Click "New Job" to start scraping</span>
+                    <div class="empty-state-illustration" id="empty-state">
+                        <svg class="empty-state-svg" viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="20" y="30" width="120" height="75" rx="8" stroke="var(--ink-faint)" stroke-width="1.5" fill="none" class="empty-svg-line"/>
+                            <rect x="35" y="42" width="36" height="36" rx="4" stroke="var(--ink-faint)" stroke-width="1" fill="none" class="anim-float"/>
+                            <rect x="78" y="42" width="50" height="8" rx="2" stroke="var(--ink-faint)" stroke-width="1" fill="none" stroke-opacity="0.5"/>
+                            <rect x="78" y="54" width="40" height="6" rx="2" stroke="var(--ink-faint)" stroke-width="1" fill="none" stroke-opacity="0.35"/>
+                            <rect x="78" y="64" width="45" height="6" rx="2" stroke="var(--ink-faint)" stroke-width="1" fill="none" stroke-opacity="0.25"/>
+                            <circle cx="53" cy="95" r="3" fill="var(--accent)" class="anim-dot" opacity="0.3"/>
+                            <circle cx="70" cy="95" r="3" fill="var(--accent)" class="anim-dot" opacity="0.3"/>
+                            <circle cx="87" cy="95" r="3" fill="var(--accent)" class="anim-dot" opacity="0.3"/>
+                            <circle cx="104" cy="95" r="3" fill="var(--accent)" class="anim-dot" opacity="0.3"/>
+                            <path d="M35 100 Q 50 90, 65 100 T 95 100 T 125 100" stroke="var(--ink-faint)" stroke-width="1" fill="none" stroke-opacity="0.2" class="anim-pulse-slow"/>
+                        </svg>
+                        <div class="empty-state-title">No jobs yet</div>
+                        <div class="empty-state-desc">Create your first scraping job to start extracting data from the web.</div>
+                        <button type="button" class="empty-state-btn" data-action="switch-view" data-view="new">Create your first job</button>
                     </div>
                 </div>
             </div>
@@ -117,8 +130,18 @@
                 </div>
 
                 <div class="list" id="recycle-list">
-                    <div class="empty" id="empty-recycle-state">
-                        <p>Recycle bin is empty</p>
+                    <div class="empty-state-illustration" id="empty-recycle-state">
+                        <svg class="empty-state-svg" viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M42 28 L72 28 L82 18 L92 28 L122 28" stroke="var(--ink-faint)" stroke-width="1.5" fill="none" class="empty-svg-line"/>
+                            <rect x="52" y="40" width="60" height="55" rx="6" stroke="var(--ink-faint)" stroke-width="1" fill="none" class="anim-float-reverse"/>
+                            <line x1="62" y1="52" x2="102" y2="52" stroke="var(--ink-faint)" stroke-width="1" stroke-opacity="0.4"/>
+                            <line x1="62" y1="60" x2="95" y2="60" stroke="var(--ink-faint)" stroke-width="1" stroke-opacity="0.3"/>
+                            <line x1="62" y1="68" x2="88" y2="68" stroke="var(--ink-faint)" stroke-width="1" stroke-opacity="0.2"/>
+                            <circle cx="82" cy="82" r="4" fill="var(--accent)" class="anim-pulse-slow"/>
+                            <path d="M60 96 L104 96" stroke="var(--ink-faint)" stroke-width="1" stroke-opacity="0.25" stroke-dasharray="4 3" class="anim-pulse-slow"/>
+                        </svg>
+                        <div class="empty-state-title">Recycle bin is empty</div>
+                        <div class="empty-state-desc">Deleted jobs will appear here. You can restore them or permanently remove them.</div>
                     </div>
                 </div>
             </div>

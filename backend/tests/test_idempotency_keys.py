@@ -115,3 +115,81 @@ class TestIdempotencyStorage:
             assert lookup_idempotency_key("ancient") is None
         finally:
             reset_job_store_for_tests()
+
+    def test_prune_does_not_remove_recent_keys(self, tmp_path, monkeypatch) -> None:
+        """Keys created within the prune window must survive."""
+        from app.config import settings
+        from app.job_store import (
+            lookup_idempotency_key,
+            prune_idempotency_keys,
+            record_idempotency_key,
+            reset_job_store_for_tests,
+        )
+
+        monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "idem_state.json"))
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(tmp_path / "idem_state.json"))
+        reset_job_store_for_tests()
+        try:
+            record_idempotency_key("recent", "job-r", "fp")
+            deleted = prune_idempotency_keys(older_than_days=7)
+            assert deleted == 0
+            assert lookup_idempotency_key("recent") == "job-r"
+        finally:
+            reset_job_store_for_tests()
+
+    def test_prune_zero_days_removes_nothing(self, tmp_path, monkeypatch) -> None:
+        """prune with older_than_days=0 should remove nothing."""
+        from app.config import settings
+        from app.job_store import (
+            lookup_idempotency_key,
+            prune_idempotency_keys,
+            record_idempotency_key,
+            reset_job_store_for_tests,
+        )
+
+        monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "idem_state.json"))
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(tmp_path / "idem_state.json"))
+        reset_job_store_for_tests()
+        try:
+            record_idempotency_key("zero", "job-z", "fp")
+            deleted = prune_idempotency_keys(older_than_days=0)
+            assert deleted == 0
+            assert lookup_idempotency_key("zero") == "job-z"
+        finally:
+            reset_job_store_for_tests()
+
+    def test_record_empty_key_noop(self, tmp_path, monkeypatch) -> None:
+        """record_idempotency_key with an empty key must not write anything."""
+        from app.config import settings
+        from app.job_store import (
+            lookup_idempotency_key,
+            record_idempotency_key,
+            reset_job_store_for_tests,
+        )
+
+        monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "idem_state.json"))
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(tmp_path / "idem_state.json"))
+        reset_job_store_for_tests()
+        try:
+            record_idempotency_key("", "job-empty", "fp")
+            assert lookup_idempotency_key("") is None
+        finally:
+            reset_job_store_for_tests()
+
+    def test_record_none_key_noop(self, tmp_path, monkeypatch) -> None:
+        """record_idempotency_key with None key must not write anything."""
+        from app.config import settings
+        from app.job_store import (
+            lookup_idempotency_key,
+            record_idempotency_key,
+            reset_job_store_for_tests,
+        )
+
+        monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "idem_state.json"))
+        monkeypatch.setattr(settings, "STATE_FILE_PATH", str(tmp_path / "idem_state.json"))
+        reset_job_store_for_tests()
+        try:
+            record_idempotency_key(None, "job-none", "fp")  # type: ignore[arg-type]
+            assert lookup_idempotency_key(None) is None  # type: ignore[arg-type]
+        finally:
+            reset_job_store_for_tests()

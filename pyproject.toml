@@ -86,6 +86,7 @@ markers = [
     "postgres: tests that require a running Postgres instance (via testcontainers). Skipped by default.",
     "browser: tests that require Playwright/browser runtime and local HTTP server binding. Skipped by default.",
     "golden_dataset: tests that hit real websites for extraction validation. Skipped by default (use --run-golden-dataset).",
+    "live_benchmark: marks tests that require live-internet access for benchmarking. Skipped by default (use --run-live-benchmark).",
     "timeout: marks tests to run with a timeout"
 ]
 

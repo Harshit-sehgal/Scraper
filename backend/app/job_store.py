@@ -454,8 +454,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                     job_id TEXT NOT NULL,
                     result_index INTEGER NOT NULL,
                     payload TEXT NOT NULL,
-                    PRIMARY KEY (job_id, result_index),
-                    FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+                    PRIMARY KEY (job_id, result_index)
                 )
             """)
             conn.execute("""
@@ -464,8 +463,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                     job_id TEXT NOT NULL,
                     timestamp TEXT NOT NULL DEFAULT '',
                     level TEXT NOT NULL DEFAULT 'info',
-                    message TEXT NOT NULL,
-                    FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+                    message TEXT NOT NULL
                 )
             """)
             conn.execute(
@@ -502,6 +500,17 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
         conn.commit()
         logger.info("SQLite schema migrated to version %d", current)
+
+    # ── Hot-path indexes (run unconditionally for existing v4+ databases) ──
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)",
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_recycle_bin_created_at ON recycle_bin(created_at)",
+    )
 
 
 def load_state(recover_in_progress: bool = True) -> tuple[dict[str, Job], dict[str, Job], dict | None]:

@@ -18,6 +18,7 @@ backend/.venv/
 backend/.pylint_venv/
 .coverage
 backend/.coverage
+coverage.json
 *.cover
 *.py,cover
 

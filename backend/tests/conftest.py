@@ -301,9 +301,35 @@ def client(monkeypatch):
     if hasattr(main_mod, "rate_limiter"):
         main_mod.rate_limiter.reset()
 
+    # Clear idempotency keys so tests don't see stale records from previous runs
+    try:
+        from app.job_store import _DB_LOCK, _get_connection
+
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                conn.execute("DELETE FROM idempotency_keys")
+                conn.commit()
+            finally:
+                conn.close()
+    except Exception:
+        pass
+
     client = LocalASGIClient(main_mod.app)
     yield client
 
     client.close()
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
+    try:
+        from app.job_store import _DB_LOCK, _get_connection
+
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                conn.execute("DELETE FROM idempotency_keys")
+                conn.commit()
+            finally:
+                conn.close()
+    except Exception:
+        pass

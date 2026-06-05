@@ -228,6 +228,73 @@ class TestReadEventsContract:
         assert sqlite_repo.read_events("never-persisted") == []
 
 
+# ─── Contract: read_results (empty/offset/order contracts) ────────────
+
+
+class TestReadResultsContract:
+    def test_read_results_empty_for_no_results_sqlite(self, sqlite_repo) -> None:
+        job = _make_job(30)
+        sqlite_repo.save_all({job.id: job}, {}, prune_missing=False)
+        assert sqlite_repo.read_results(job.id) == []
+
+    def test_read_results_returns_in_order_sqlite(self, sqlite_repo) -> None:
+        job = _make_job(31)
+        job.results = [{"idx": i} for i in range(5)]
+        sqlite_repo.save_all({job.id: job}, {}, prune_missing=False)
+        out = sqlite_repo.read_results(job.id)
+        assert [r["idx"] for r in out] == [0, 1, 2, 3, 4]
+
+    def test_read_results_respects_limit_sqlite(self, sqlite_repo) -> None:
+        job = _make_job(32)
+        job.results = [{"idx": i} for i in range(20)]
+        sqlite_repo.save_all({job.id: job}, {}, prune_missing=False)
+        out = sqlite_repo.read_results(job.id, limit=3)
+        assert len(out) == 3
+        assert [r["idx"] for r in out] == [0, 1, 2]
+
+    def test_read_results_offset_sqlite(self, sqlite_repo) -> None:
+        job = _make_job(33)
+        job.results = [{"idx": i} for i in range(10)]
+        sqlite_repo.save_all({job.id: job}, {}, prune_missing=False)
+        out = sqlite_repo.read_results(job.id, limit=5, offset=5)
+        assert [r["idx"] for r in out] == [5, 6, 7, 8, 9]
+
+    def test_read_results_unknown_job_returns_empty_sqlite(self, sqlite_repo) -> None:
+        assert sqlite_repo.read_results("never-existed") == []
+
+    def test_read_results_updated_after_resave_sqlite(self, sqlite_repo) -> None:
+        """Re-saving a job with different results must replace companion data."""
+        job = _make_job(34)
+        job.results = [{"v": "first"}]
+        sqlite_repo.save_all({job.id: job}, {}, prune_missing=False)
+        job.results = [{"v": "second"}, {"v": "third"}]
+        sqlite_repo.save_all({job.id: job}, {}, prune_missing=False)
+        out = sqlite_repo.read_results(job.id)
+        assert [r["v"] for r in out] == ["second", "third"]
+
+
+# ─── Contract: idempotency-key lifecycle ─────────────────────────────
+
+
+class TestIdempotencyContract:
+    def test_record_and_lookup_sqlite(self, sqlite_repo) -> None:
+        sqlite_repo.record_idempotency_key("contract-key", "parity-40", "fp")
+        assert sqlite_repo.lookup_idempotency_key("contract-key") == "parity-40"
+
+    def test_lookup_missing_returns_none_sqlite(self, sqlite_repo) -> None:
+        assert sqlite_repo.lookup_idempotency_key("never-recorded") is None
+
+    def test_empty_key_lookup_returns_none_sqlite(self, sqlite_repo) -> None:
+        assert sqlite_repo.lookup_idempotency_key("") is None
+        assert sqlite_repo.lookup_idempotency_key(None) is None  # type: ignore[arg-type]
+
+    def test_prune_idempotency_keys_sqlite(self, sqlite_repo) -> None:
+        sqlite_repo.record_idempotency_key("will-prune", "parity-41", "fp")
+        # Prune with 0 days — recent keys survive
+        assert sqlite_repo.prune_idempotency_keys(older_than_days=0) == 0
+        assert sqlite_repo.lookup_idempotency_key("will-prune") == "parity-41"
+
+
 # ─── Optional Postgres parity (only run with --run-postgres) ──────────
 
 
@@ -267,7 +334,7 @@ class TestPostgresParity:
                     ("2026-06-01T10:00:02Z", "info", "recovered"),
                 ]:
                     cur.execute(
-                        "INSERT INTO job_events (job_id, timestamp, level, message) VALUES (%s, %s, %s)",
+                        "INSERT INTO job_events (job_id, timestamp, level, message) VALUES (%s, %s, %s, %s)",
                         ("parity-200", ts, level, message),
                     )
             conn.commit()
@@ -281,6 +348,65 @@ class TestPostgresParity:
         ours = [s for s in summaries if s["id"] == "parity-300"]
         assert len(ours) == 1
         assert "deleted_at" in ours[0]
+
+    def test_read_results_round_trip_postgres(self, postgres_repo) -> None:
+        """Postgres read_results must return results in insertion order."""
+        job = _make_job(400)
+        job.results = [{"k": "v1", "n": 1}, {"k": "v2", "n": 2}]
+        postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+        out = postgres_repo.read_results(job.id)
+        assert out == [{"k": "v1", "n": 1}, {"k": "v2", "n": 2}]
+
+    def test_read_results_empty_postgres(self, postgres_repo) -> None:
+        """Postgres read_results must return [] when no results exist."""
+        job = _make_job(401)
+        postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+        assert postgres_repo.read_results(job.id) == []
+
+    def test_read_results_respects_limit_postgres(self, postgres_repo) -> None:
+        """Postgres read_results must respect the limit parameter."""
+        job = _make_job(402)
+        job.results = [{"idx": i} for i in range(20)]
+        postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+        out = postgres_repo.read_results(job.id, limit=3)
+        assert len(out) == 3
+        assert [r["idx"] for r in out] == [0, 1, 2]
+
+    def test_read_results_offset_postgres(self, postgres_repo) -> None:
+        """Postgres read_results must skip offset rows."""
+        job = _make_job(403)
+        job.results = [{"idx": i} for i in range(10)]
+        postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+        out = postgres_repo.read_results(job.id, limit=5, offset=5)
+        assert [r["idx"] for r in out] == [5, 6, 7, 8, 9]
+
+    def test_read_results_updated_after_resave_postgres(self, postgres_repo) -> None:
+        """Re-saving must replace companion data, not append."""
+        job = _make_job(404)
+        job.results = [{"v": "first"}]
+        postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+        job.results = [{"v": "second"}, {"v": "third"}]
+        postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+        out = postgres_repo.read_results(job.id)
+        assert [r["v"] for r in out] == ["second", "third"]
+
+    def test_idempotency_key_round_trip_postgres(self, postgres_repo) -> None:
+        """Postgres record_idempotency_key + lookup_idempotency_key round-trip."""
+        postgres_repo.record_idempotency_key("pg-key", "parity-410", "fp")
+        assert postgres_repo.lookup_idempotency_key("pg-key") == "parity-410"
+
+    def test_idempotency_key_empty_lookup_postgres(self, postgres_repo) -> None:
+        """Postgres lookup_idempotency_key must return None for empty keys."""
+        assert postgres_repo.lookup_idempotency_key("") is None
+
+    def test_cleanup_companion_data_postgres(self, postgres_repo) -> None:
+        """Postgres cleanup_companion_data must remove companion rows."""
+        job = _make_job(420)
+        job.results = [{"data": True}]
+        postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+        assert postgres_repo.read_results(job.id) == [{"data": True}]
+        postgres_repo.cleanup_companion_data(job.id)
+        assert postgres_repo.read_results(job.id) == []
 
 
 # ─── Cross-backend smoke test: psycopg3 factory selection ────────────

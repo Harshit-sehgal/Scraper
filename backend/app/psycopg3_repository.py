@@ -34,7 +34,7 @@ from app.storage_interface import JobRepository
 
 logger = logging.getLogger(__name__)
 
-_CURRENT_SCHEMA_VERSION = 3
+_CURRENT_SCHEMA_VERSION = 4
 
 # ───────────────────────────────────────────────────────────────────────
 # Connection pool (thread-safe, synchronous)
@@ -226,6 +226,7 @@ def _ensure_required_tables(conn) -> None:
     for idx_sql in [
         "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
         "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_recycle_bin_created_at ON recycle_bin(created_at DESC)",
     ]:
         try:
             _execute(conn, idx_sql)
@@ -254,6 +255,58 @@ def _ensure_schema() -> None:
                         updated_at TEXT NOT NULL
                     )""",
                 )
+
+            if current < 4:
+                # Version 3 -> 4: companion tables for the storage split.
+                _execute(
+                    conn,
+                    """
+                    CREATE TABLE IF NOT EXISTS job_results (
+                        job_id TEXT NOT NULL,
+                        result_index INTEGER NOT NULL,
+                        payload TEXT NOT NULL,
+                        PRIMARY KEY (job_id, result_index),
+                        FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+                    )
+                """,
+                )
+                _execute(
+                    conn,
+                    """
+                    CREATE TABLE IF NOT EXISTS job_events (
+                        event_id BIGSERIAL PRIMARY KEY,
+                        job_id TEXT NOT NULL,
+                        timestamp TEXT NOT NULL DEFAULT '',
+                        level TEXT NOT NULL DEFAULT 'info',
+                        message TEXT NOT NULL,
+                        FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+                    )
+                """,
+                )
+                _execute(
+                    conn,
+                    "CREATE INDEX IF NOT EXISTS idx_job_events_job_id ON job_events(job_id, event_id)",
+                )
+                _execute(
+                    conn,
+                    "CREATE INDEX IF NOT EXISTS idx_job_results_job_id ON job_results(job_id)",
+                )
+                _execute(
+                    conn,
+                    """
+                    CREATE TABLE IF NOT EXISTS idempotency_keys (
+                        idem_key TEXT PRIMARY KEY,
+                        job_id TEXT NOT NULL,
+                        request_fingerprint TEXT NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                    )
+                """,
+                )
+                _execute(
+                    conn,
+                    "CREATE INDEX IF NOT EXISTS idx_idempotency_keys_created_at ON idempotency_keys(created_at)",
+                )
+
             _execute(conn, "DELETE FROM schema_version")
             _execute(
                 conn,
@@ -532,6 +585,11 @@ class Psycopg3JobRepository(JobRepository):
                     f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608
                     [row[k] for k in safe_keys],
                 )
+                # Dual-write to companion tables (Schema v4)
+                from app.postgres_repository import _sync_job_events, _sync_job_results
+
+                _sync_job_results(conn, job.id, job.results)
+                _sync_job_events(conn, job.id, job.logs)
             if prune_missing:
                 active_ids = list(jobs.keys())
                 _execute(
@@ -563,6 +621,94 @@ class Psycopg3JobRepository(JobRepository):
                     (recycle_ids,) if recycle_ids else (["__no_recycle_ids__"],),
                 )
 
+    def read_results(
+        self,
+        job_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict]:
+        """Read a job's results from the ``job_results`` companion table."""
+        self._ensure()
+        safe_limit = max(1, min(int(limit), 1000))
+        safe_offset = max(0, int(offset))
+        sql = "SELECT payload FROM job_results WHERE job_id = %s ORDER BY result_index ASC LIMIT %s OFFSET %s"
+        try:
+            with _conn() as conn:
+                rows = _fetch_all(conn, sql, (job_id, safe_limit, safe_offset))
+        except Exception:
+            return []
+        out: list[dict] = []
+        for row in rows:
+            try:
+                out.append(json.loads(row["payload"]))
+            except (TypeError, ValueError):
+                out.append({"_unparseable": row["payload"]})
+        return out
+
+    def lookup_idempotency_key(self, idem_key: str) -> str | None:
+        if not idem_key:
+            return None
+        self._ensure()
+        try:
+            with _conn() as conn:
+                row = _fetch_one(
+                    conn,
+                    "SELECT job_id FROM idempotency_keys WHERE idem_key = %s",
+                    (idem_key,),
+                )
+                return str(row["job_id"]) if row else None
+        except Exception:
+            return None
+
+    def record_idempotency_key(
+        self,
+        idem_key: str,
+        job_id: str,
+        request_fingerprint: str,
+    ) -> None:
+        if not idem_key or not job_id:
+            return
+        self._ensure()
+        try:
+            with _conn() as conn:
+                _execute(
+                    conn,
+                    """
+                    INSERT INTO idempotency_keys
+                        (idem_key, job_id, request_fingerprint)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (idem_key) DO UPDATE
+                        SET job_id = EXCLUDED.job_id,
+                            request_fingerprint = EXCLUDED.request_fingerprint,
+                            created_at = NOW()
+                    """,
+                    (idem_key, job_id, request_fingerprint),
+                )
+        except Exception:
+            logger.exception("Failed to record idempotency key %s", idem_key)
+
+    def prune_idempotency_keys(self, older_than_days: int = 7) -> int:
+        self._ensure()
+        try:
+            with _conn() as conn:
+                cur = _execute(
+                    conn,
+                    "DELETE FROM idempotency_keys WHERE created_at < NOW() - INTERVAL %s",
+                    (f"{int(older_than_days)} days",),
+                )
+                return int(cur.rowcount) if cur.rowcount else 0
+        except Exception:
+            return 0
+
+    def cleanup_companion_data(self, job_id: str) -> None:
+        self._ensure()
+        try:
+            with _conn() as conn:
+                _execute(conn, "DELETE FROM job_results WHERE job_id = %s", (job_id,))
+                _execute(conn, "DELETE FROM job_events WHERE job_id = %s", (job_id,))
+        except Exception:
+            logger.exception("Failed to clean up companion data for job %s", job_id)
+
     def save_single(self, job: Job) -> None:
         self._ensure()
         with _conn() as conn:
@@ -575,6 +721,11 @@ class Psycopg3JobRepository(JobRepository):
                 f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608
                 list(row.values()),
             )
+            # Dual-write to companion tables (Schema v4)
+            from app.postgres_repository import _sync_job_events, _sync_job_results
+
+            _sync_job_results(conn, job.id, job.results)
+            _sync_job_events(conn, job.id, job.logs)
 
     def read_events(
         self,
@@ -667,6 +818,9 @@ class Psycopg3JobRepository(JobRepository):
             cur = _execute(conn, "DELETE FROM jobs WHERE id = %s", (job_id,))
             deleted = cur.rowcount
             _execute(conn, "DELETE FROM recycle_bin WHERE id = %s", (job_id,))
+            # Clean up companion tables (Schema v4)
+            _execute(conn, "DELETE FROM job_results WHERE job_id = %s", (job_id,))
+            _execute(conn, "DELETE FROM job_events WHERE job_id = %s", (job_id,))
             return deleted > 0
 
     def clear_terminal_jobs(self, older_than: str | None = None) -> int:
@@ -696,6 +850,9 @@ class Psycopg3JobRepository(JobRepository):
                     f"INSERT INTO recycle_bin ({col_list}, deleted_at) VALUES ({{}}, %s) ON CONFLICT (id) DO NOTHING".format(ph),  # nosec B608
                     [row[k] for k in cols] + [now],
                 )
+                # Clean up companion tables (Schema v4)
+                _execute(conn, "DELETE FROM job_results WHERE job_id = %s", (row["id"],))
+                _execute(conn, "DELETE FROM job_events WHERE job_id = %s", (row["id"],))
             return len(rows)
 
     def load_world_state(self) -> dict | None:

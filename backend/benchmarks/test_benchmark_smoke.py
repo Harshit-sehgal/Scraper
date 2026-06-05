@@ -2,9 +2,16 @@
 """Manual live benchmark smoke test for the evidence-based extraction pipeline
 across a sample of public websites.
 
-This file is not collected by pytest under the current pytest.ini. Results are
-network-dependent and should be treated as live smoke observations, not proof of
-universal extraction behavior.
+This file is collected by pytest (``backend/benchmarks`` is in ``testpaths``)
+but the ``test_live_benchmark_extraction()`` function is gated behind
+**both** the ``@pytest.mark.live_benchmark`` marker AND the
+``DATAFORGE_RUN_LIVE_BENCHMARKS=true`` environment variable.  A simple
+configuration-import check (``test_benchmark_smoke_configuration_is_importable``)
+IS run by default to keep the SITES definitions honest, so the file is never
+entirely dead code.
+
+Live-internet benchmarks should be treated as observational smoke tests, not
+proof of universal extraction behaviour.  Results are network-dependent.
 """
 
 import asyncio
@@ -662,9 +669,15 @@ def test_benchmark_smoke_configuration_is_importable() -> None:
     assert all(site.url.startswith(("http://", "https://")) for site in SITES)
 
 
+@pytest.mark.live_benchmark
 @pytest.mark.asyncio
 async def test_live_benchmark_extraction() -> None:
-    """Run live benchmark extraction across all defined sites if enabled by env var."""
+    """Run live benchmark extraction across all defined sites if enabled by env var.
+
+    Requires both the ``live_benchmark`` pytest marker (``--run-live-benchmark``)
+    AND ``DATAFORGE_RUN_LIVE_BENCHMARKS=true`` to actually execute, so it is
+    doubly gated against accidental network use in CI.
+    """
     import os
 
     if os.environ.get("DATAFORGE_RUN_LIVE_BENCHMARKS") != "true":

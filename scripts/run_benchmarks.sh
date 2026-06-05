@@ -38,7 +38,15 @@ else
 fi
 
 # 4. Run standard in-corpus unit benchmarks (always safe for CI)
-echo "Running in-corpus unit benchmarks..."
+echo "Running in-corpus unit benchmarks (excluded: browser, live_benchmark, golden_dataset)..."
+
+# Use pytest marker filtering to exclude live-internet and browser-dependent tests.
+# The --co option shows a brief summary of selected/ deselected tests.
+$PYTHON_EXEC -m pytest backend/benchmarks \
+  -m "not live_benchmark and not browser and not golden_dataset" \
+  -q "$@"
+
+# Core-unit benchmark tests from the test tree (deterministic, fixture-based)
 $PYTHON_EXEC -m pytest backend/tests/test_field_waves.py "$@"
 $PYTHON_EXEC -m pytest backend/tests/test_field_validator.py "$@"
 $PYTHON_EXEC -m pytest backend/tests/test_extraction_precision.py "$@"
