@@ -106,7 +106,7 @@ class TestSelfCheckDetectsBrokenInjection:
         # Build a pool-shaped object that has _network_backend pointing
         # at a SafeAsyncNetworkBackend but is missing the marker.
         class _FakePool:
-            _network_backend = _PartialBackend(_PartialBackend.__mro__[1].__new__(_PartialBackend))
+            _network_backend = _PartialBackend(_PartialBackend.__mro__[1].__new__(_PartialBackend))  # type: ignore[call-overload]
 
         class _FakeTransport:
             _pool = _FakePool()

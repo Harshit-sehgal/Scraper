@@ -85,32 +85,29 @@ after the deep-research remediation pass (2026-06).
 - **Done in this pass:** image-build lane, coverage + route-inventory
   artifacts, docs lint scope extended, lanes split.
 
-### W6 — Observability (Prometheus) — done in this pass
+### W6 — Observability (Prometheus + Grafana + Alerts) — done in this pass
 
-- **Status:** new gauges exported from `/metrics`:
-  - `dataforge_extraction_method_total{method}`
-  - `dataforge_anti_bot_classifications_total{classification}`
-  - `dataforge_export_outcomes_total{format,outcome}`
-  - `dataforge_browser_launch_total{outcome}`
-  - `dataforge_ssrf_rejects_total{reason}`
-  - `dataforge_repo_query_latency_seconds{quantile=0.5|0.95}`
-  - `dataforge_csp_violations_total{directive}`
-- **Call-site coverage:** SSRF reject wired in `url_safety.validate_public_http_url`,
-  browser launch outcomes wired in `browser_pool.py`, export outcomes wired
-  around the csv/json/excel routes, CSP violations wired to
-  `POST /api/system/csp-violations`. Extraction method + anti-bot
-  classification call sites wired at the scraper-engine convergence
-  points (`scraper.py`), `failure_classification._build_classification`,
-  `zero_result_classifier._build`, and the recovery integration's
-  `ANTI_BOT_BLOCKED` branch. Platform label resolved by
-  `detect_anti_bot_platform()`.
-- **Next:** build Grafana dashboard; add Prometheus alert rules (queue
-  depth, browser failure rate, SSRF reject rate, CSP violation rate).
-- **Done in this pass:** metric helpers, basic + prometheus-client paths,
-  call-site wiring for SSRF / browser / exports / CSP, scraper-engine
-  convergence points wired for extraction method + anti-bot, platform
-  label resolution, tests (`test_metrics_observability.py` 21 tests,
-  `test_csp_report_only.py` 10 tests).
+- **Status:** Grafana dashboard (`grafana/dashboards/dataforge_overview.json`)
+  covers 22 panels across 8 KPI stats, 10 timeseries graphs, and 4 pie charts.
+  All 14 supported Prometheus metrics are surfaced: system health,
+  request latency, memory, LLM usage, anti-bot classifications (9 platforms),
+  extraction methods, browser launches, export outcomes, SSRF rejects by
+  reason, CSP violations by directive, repo query latency quantiles, and
+  queue depth. Prometheus alert rules (`prometheus_alerts.yml`) define
+  12 alert rules: 3 critical (API down, DB errors, browser failures),
+  8 warning (queue backlog, job failures, latency, anti-bot blocks, export
+  failures, SSRF blocks, repo latency degradation, extraction method
+  anomaly), and 1 info (CSP violation rate). Alertmanager
+  (`alertmanager.yml`) routes alerts by severity to email and Slack with
+  3 inhibition rules and rate-limiting varying by severity (1h critical,
+  4h warning, 24h info). See W14 for Alertmanager details.
+- **Next:** raise Postgres backend coverage floors from 24% to 40% in
+  the next minor release. Tighten CSP to enforce mode once the dashboard
+  shows zero violations for at least one release cycle.
+- **Done in this pass:** 22-panel Grafana dashboard, 12 Prometheus alert
+  rules, Alertmanager config + docker-compose integration, Severity-based
+  routing + inhibition, metrics collectors + call-site wiring, metric
+  tests (21 + 10 tests), CSP report-only middleware.
 
 ### W7 — Security & TLS — done in this pass
 
@@ -166,7 +163,7 @@ after the deep-research remediation pass (2026-06).
 
 ### W10 — Test strategy — done in this pass
 
-- **Status:** 2623 tests pass, 83 skipped (fast lane). The optional
+- **Status:** 2774 tests pass, 87 skipped (fast lane). The optional
   postgres / browser / golden-dataset lanes are opt-in.
 - **Status details:**
   1. **Repository parity tests** — `test_repository_parity.py` provides
@@ -224,17 +221,55 @@ after the deep-research remediation pass (2026-06).
 ### W13 — Release engineering — next quarter
 
 - **Status:** `image-build.yml` builds the image on `main` + tags; no cosign
-  signing yet, no SBOM attestation.
-- **Next:** cosign signing, SBOM via `syft`, SLSA provenance, GHCR publish.
-- **Done in this pass:** image-build lane.
+  signing yet, no SBOM attestation. SBOM generation runs in CI via `syft`.
+- **Next:** cosign signing, SLSA provenance, GHCR publish.
+- **Done in this pass:** image-build lane, SBOM generation in CI.
 
-## Phased plan (from the deep-research report)
+### W14 — Alertmanager — done in this pass
+
+- **Status:** Full Alertmanager configuration (`alertmanager.yml`) deployed
+  as a Docker Compose service (`prom/alertmanager:v0.27.0`) in the production
+  stack. Routes alerts from the 12 Prometheus rules by severity:
+  - **Critical** (3 rules): email + Slack (`#alerts-critical`), repeats
+    every 1h, `continue: true` for redundant email delivery
+  - **Warning** (8 rules): Slack only (`#alerts-warning`), repeats every 4h
+  - **Info** (1 rule): Slack only (`#alerts-info`), repeats every 24h,
+    `send_resolved: false`
+  3 inhibition rules suppress symptomatic alerts when root causes fire
+  (API down → all warnings, DB errors → repo latency, critical →
+  extraction anomaly). Prometheus configured with `alerting:` block
+  pointing at `alertmanager:9093` with `api_version: v2` and labeldrop
+  relabel. Credentials injected via Go template env vars (`{{ .Env.VAR }}`).
+  Graceful handling of missing SMTP/Slack env vars (logs warning, skips
+  notifications).
+- **Next:** add pushover / pagerduty receiver for critical alerts.
+  Wire up alertmanager_data volume to backup schedule.
+- **Done in this pass:** alertmanager.yml, Prometheus alerting block,
+  docker-compose.prod.yml service, severity-based routing, inhibition
+  rules, env var templating.
+
+### W15 — Frontend tooling (CSS lint) — done in this pass
+
+- **Status:** stylelint@^16 with stylelint-config-standard@^36 enforces CSS
+  quality in CI. Config (`package.json`, `.stylelintrc.json`) tuned for the
+  project: modern color notation (`rgb(0 0 0 / 0.35)`), relaxed selector
+  patterns (dotted class names like `.gap-0.5`), no blocking specificity
+  or single-line declaration checks. Runs in `lint-type-checks` CI job
+  with npm caching. The 2,312-line `frontend/styles.css` passes with
+  0 errors after auto-fixing color notation to modern and removing a
+  duplicate `.shortcut-hint` selector.
+- **Next:** add Prettier or dprint for JS formatting parity.
+- **Done in this pass:** package.json, .stylelintrc.json, CI job with
+  npm cache, CSS fixes (modern notation, duplicate selector removal).
+
+## Phased plan
 
 | Phase | Window | Theme | Items |
 |-------|--------|-------|-------|
-| Late Q2 | 2026-06 | Hygiene + hard gates | W1, W2, W3, W4, W5, W6, W6.5, W7, W7.5, W8, W9, W10, W11 (this pass) |
-| Q3 | 2026-07 → 2026-09 | Observability dashboards + storage split v5 | Grafana, Prometheus alerts, raise Postgres coverage floors, v5 column drop |
-| Q4 | 2026-10 → 2026-12 | DR + release engineering | W12, W13 |
+| Late Q2 | 2026-06 | Hygiene + hard gates | W1–W11 (deep-research pass) |
+| Late Q2 | 2026-06 | Observability + tooling | W6 (Grafana + alerts), W14 (Alertmanager), W15 (CSS lint) |
+| Q3 | 2026-07 → 2026-09 | Storage + coverage | v5 column drop, raise Postgres coverage floors to 40% |
+| Q4 | 2026-10 → 2026-12 | DR + release engineering | W12 (DR drills), W13 (cosign, GHCR) |
 | Q1 2027 | 2027-01 → 2027-03 | Storage split v6 + v2 dashboard auth | v6 JSONB, HTTP-only cookie auth |
 
 ## Out-of-scope
