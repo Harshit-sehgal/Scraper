@@ -156,6 +156,33 @@ services:
     networks:
       - dataforge-net
 
+  # ─── Postgres Exporter ────────────────────────────────────────────────────
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: dataforge-postgres-exporter
+    expose:
+      - "9187"
+    environment:
+      DATA_SOURCE_NAME: "postgresql://dataforge:${DATAFORGE_DB_PASSWORD:?DATAFORGE_DB_PASSWORD is required}@postgres:5432/dataforge?sslmode=disable"
+      PG_EXPORTER_DISABLE_DEFAULT_METRICS: "true"
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres-exporter/queries.yaml
+    volumes:
+      - ./postgres-queries.yaml:/etc/postgres-exporter/queries.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+          cpus: "0.1"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - dataforge-net
+
   # ─── Reverse Proxy ───────────────────────────────────────────────────────
   nginx:
     image: nginx:1.27-alpine

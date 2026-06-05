@@ -155,6 +155,14 @@ class JobRepository(ABC):
         """
 
     @abstractmethod
+    def lookup_idempotency_fingerprint(self, idem_key: str) -> str | None:
+        """Return the ``request_fingerprint`` previously associated with ``idem_key``.
+
+        Returns ``None`` if the key has never been seen (or the
+        backend does not support idempotency keys).
+        """
+
+    @abstractmethod
     def record_idempotency_key(
         self,
         idem_key: str,
@@ -467,6 +475,12 @@ class SQLiteJobRepository(JobRepository):
         from app.job_store import lookup_idempotency_key as _lookup
 
         return _lookup(idem_key)
+
+    def lookup_idempotency_fingerprint(self, idem_key: str) -> str | None:
+        """Lookup an idempotency key's request fingerprint in SQLite."""
+        from app.job_store import lookup_idempotency_fingerprint as _lookup_fingerprint
+
+        return _lookup_fingerprint(idem_key)
 
     def record_idempotency_key(
         self,

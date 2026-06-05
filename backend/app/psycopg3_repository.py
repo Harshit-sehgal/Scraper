@@ -660,6 +660,22 @@ class Psycopg3JobRepository(JobRepository):
         except Exception:
             return None
 
+    def lookup_idempotency_fingerprint(self, idem_key: str) -> str | None:
+        """Lookup an idempotency key's request fingerprint in Postgres (psycopg 3)."""
+        if not idem_key:
+            return None
+        self._ensure()
+        try:
+            with _conn() as conn:
+                row = _fetch_one(
+                    conn,
+                    "SELECT request_fingerprint FROM idempotency_keys WHERE idem_key = %s",
+                    (idem_key,),
+                )
+                return str(row["request_fingerprint"]) if row else None
+        except Exception:
+            return None
+
     def record_idempotency_key(
         self,
         idem_key: str,
