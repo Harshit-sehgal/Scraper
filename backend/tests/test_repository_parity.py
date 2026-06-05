@@ -77,31 +77,59 @@ def sqlite_repo(tmp_path, monkeypatch):
 
 @pytest.fixture
 def postgres_repo(monkeypatch, tmp_path):
-    """Build a PostgresJobRepository (psycopg2) backed by testcontainers.
+    """Build a PostgresJobRepository (psycopg2) backed by testcontainers or a running instance.
 
-    Requires the ``--run-postgres`` flag and a working Docker daemon. The
-    fixture is intentionally light — it skips with a clear message when
-    the testcontainers library is unavailable.
+    Requires the ``--run-postgres`` flag and a working Docker daemon.
     """
     pytest.importorskip("testcontainers")
     pytest.importorskip("psycopg2")
 
-    from testcontainers.postgres import PostgresContainer
+    import socket
 
-    container = PostgresContainer("postgres:16-alpine")
-    container.start()
-    try:
-        # testcontainers returns a SQLAlchemy-style URL; convert to libpq.
-        url = container.get_connection_url()
-        if url.startswith("postgresql+psycopg2://"):
-            url = "postgresql://" + url[len("postgresql+psycopg2://") :]
-        monkeypatch.setenv("DATAFORGE_DATABASE_URL", url)
-        from app.postgres_repository import PostgresJobRepository
+    use_running = False
+    dsn = os.environ.get("DATAFORGE_DATABASE_URL")
+    if dsn:
+        use_running = True
+    else:
+        try:
+            with socket.create_connection(("127.0.0.1", 5432), timeout=1):
+                use_running = True
+                url = "postgresql://testuser:testpassword@127.0.0.1:5432/testdb"
+                monkeypatch.setenv("DATAFORGE_DATABASE_URL", url)
+        except (TimeoutError, ConnectionRefusedError):
+            pass
 
+    if use_running:
+        # Clean schema first to ensure clean state
+        from app.postgres_repository import PostgresJobRepository, _conn, _execute
+
+        try:
+            with _conn() as conn:
+                _execute(
+                    conn,
+                    "DROP TABLE IF EXISTS jobs, recycle_bin, job_results, job_events, idempotency_keys, schema_version CASCADE",
+                )
+        except Exception:
+            pass
         repo = PostgresJobRepository()
         yield repo
-    finally:
-        container.stop()
+    else:
+        from testcontainers.postgres import PostgresContainer
+
+        container = PostgresContainer("postgres:16-alpine")
+        container.start()
+        try:
+            # testcontainers returns a SQLAlchemy-style URL; convert to libpq.
+            url = container.get_connection_url()
+            if url.startswith("postgresql+psycopg2://"):
+                url = "postgresql://" + url[len("postgresql+psycopg2://") :]
+            monkeypatch.setenv("DATAFORGE_DATABASE_URL", url)
+            from app.postgres_repository import PostgresJobRepository
+
+            repo = PostgresJobRepository()
+            yield repo
+        finally:
+            container.stop()
 
 
 # ─── Contract: get_job returns the same row that was persisted ────────
@@ -280,13 +308,17 @@ class TestIdempotencyContract:
     def test_record_and_lookup_sqlite(self, sqlite_repo) -> None:
         sqlite_repo.record_idempotency_key("contract-key", "parity-40", "fp")
         assert sqlite_repo.lookup_idempotency_key("contract-key") == "parity-40"
+        assert sqlite_repo.lookup_idempotency_fingerprint("contract-key") == "fp"
 
     def test_lookup_missing_returns_none_sqlite(self, sqlite_repo) -> None:
         assert sqlite_repo.lookup_idempotency_key("never-recorded") is None
+        assert sqlite_repo.lookup_idempotency_fingerprint("never-recorded") is None
 
     def test_empty_key_lookup_returns_none_sqlite(self, sqlite_repo) -> None:
         assert sqlite_repo.lookup_idempotency_key("") is None
         assert sqlite_repo.lookup_idempotency_key(None) is None  # type: ignore[arg-type]
+        assert sqlite_repo.lookup_idempotency_fingerprint("") is None
+        assert sqlite_repo.lookup_idempotency_fingerprint(None) is None  # type: ignore[arg-type]
 
     def test_prune_idempotency_keys_sqlite(self, sqlite_repo) -> None:
         sqlite_repo.record_idempotency_key("will-prune", "parity-41", "fp")
@@ -309,9 +341,8 @@ class TestPostgresParity:
         assert loaded.name == job.name
 
     def test_list_summaries_returns_all_persisted_jobs_postgres(self, postgres_repo) -> None:
-        for idx in range(101, 104):
-            job = _make_job(idx)
-            postgres_repo.save_all({job.id: job}, {}, prune_missing=True)
+        jobs = {f"parity-{idx}": _make_job(idx) for idx in range(101, 104)}
+        postgres_repo.save_all(jobs, {}, prune_missing=False)
         summaries = postgres_repo.list_job_summaries()
         ids = {s["id"] for s in summaries}
         assert {"parity-101", "parity-102", "parity-103"} <= ids
@@ -394,10 +425,12 @@ class TestPostgresParity:
         """Postgres record_idempotency_key + lookup_idempotency_key round-trip."""
         postgres_repo.record_idempotency_key("pg-key", "parity-410", "fp")
         assert postgres_repo.lookup_idempotency_key("pg-key") == "parity-410"
+        assert postgres_repo.lookup_idempotency_fingerprint("pg-key") == "fp"
 
     def test_idempotency_key_empty_lookup_postgres(self, postgres_repo) -> None:
         """Postgres lookup_idempotency_key must return None for empty keys."""
         assert postgres_repo.lookup_idempotency_key("") is None
+        assert postgres_repo.lookup_idempotency_fingerprint("") is None
 
     def test_cleanup_companion_data_postgres(self, postgres_repo) -> None:
         """Postgres cleanup_companion_data must remove companion rows."""

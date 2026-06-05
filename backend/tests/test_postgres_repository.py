@@ -518,7 +518,7 @@ class TestPostgresIntegration:
         # Trigger schema ensure + health check
         health = repo.health_check()
         assert health["ok"] is True, f"Health check failed: {health}"
-        assert health["schema_version"] == 3, f"Expected schema_version=3, got {health['schema_version']}"
+        assert health["schema_version"] == 4, f"Expected schema_version=4, got {health['schema_version']}"
 
         # Verify recycle_bin table exists
         health2 = repo.health_check()

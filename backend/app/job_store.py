@@ -830,6 +830,24 @@ def lookup_idempotency_key(idem_key: str) -> str | None:
     return str(row["job_id"]) if row else None
 
 
+def lookup_idempotency_fingerprint(idem_key: str) -> str | None:
+    """Return the ``request_fingerprint`` previously associated with ``idem_key``,
+    or ``None`` if the key has never been seen.
+    """
+    if not idem_key:
+        return None
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            row = conn.execute(
+                "SELECT request_fingerprint FROM idempotency_keys WHERE idem_key = ?",
+                (idem_key,),
+            ).fetchone()
+        finally:
+            conn.close()
+    return str(row["request_fingerprint"]) if row else None
+
+
 def record_idempotency_key(
     idem_key: str,
     job_id: str,

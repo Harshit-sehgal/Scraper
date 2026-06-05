@@ -54,16 +54,14 @@ scrape_configs:
           service: 'scraper'
           component: 'api'
 
-  # ─── PostgreSQL Exporter (if enabled) ───────────────────────────────
-  # Disabled until a postgres-exporter service is added to
-  # docker-compose.prod.yml.
-  # - job_name: 'postgres'
-  #   metrics_path: '/metrics'
-  #   static_configs:
-  #     - targets: ['postgres-exporter:9187']
-  #       labels:
-  #         service: 'postgres'
-  #         component: 'database'
+  # ─── PostgreSQL Exporter ────────────────────────────────────────────
+  - job_name: 'postgres'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgres'
+          component: 'database'
 
   # ─── Nginx Metrics (via stub_status or exporter) ────────────────────
   # Disabled until stub_status location is added to nginx.conf.

@@ -391,7 +391,7 @@ class TestPostgresSchemaRepairIntegration:
         health = repo.health_check()
 
         assert health["ok"] is True, f"Health check failed: {health}"
-        assert health["schema_version"] == 3, f"Expected schema_version=3 after repair, got {health['schema_version']}"
+        assert health["schema_version"] == 4, f"Expected schema_version=4 after repair, got {health['schema_version']}"
 
         # Verify recycle_bin table now exists
         _close_pool()

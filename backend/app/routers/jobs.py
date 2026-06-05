@@ -45,6 +45,15 @@ def _lookup_idempotency_key(idem_key: str) -> str | None:
         return None
 
 
+def _lookup_idempotency_fingerprint(idem_key: str) -> str | None:
+    """Threadpool-safe wrapper around the repository's request fingerprint lookup."""
+    try:
+        repo = get_job_repository()
+        return repo.lookup_idempotency_fingerprint(idem_key)
+    except Exception:
+        return None
+
+
 def _record_idempotency_key(idem_key: str, job_id: str, fingerprint: str) -> None:
     """Threadpool-safe wrapper around the repository's idempotency-key recording."""
     try:
@@ -480,6 +489,10 @@ def create_jobs_router(
         # to 128 chars) and the storage layer is keyed on the header
         # value. See ``app.job_store.lookup_idempotency_key`` and
         # ``app.job_store.record_idempotency_key``.
+        manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
+        urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
+        incoming_fingerprint = f"{job_data.mode.value}:{job_data.name}:{','.join(manual_urls)}"
+
         idem_key = (request.headers.get("Idempotency-Key") or "").strip()
         if idem_key and len(idem_key) > 128:
             raise HTTPException(
@@ -492,6 +505,16 @@ def create_jobs_router(
                 idem_key,
             )
             if existing_job_id is not None:
+                existing_fingerprint = await run_in_threadpool(
+                    _lookup_idempotency_fingerprint,
+                    idem_key,
+                )
+                if existing_fingerprint is not None and existing_fingerprint != incoming_fingerprint:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Conflict: Another request with a different payload was already sent for this Idempotency-Key.",
+                    )
+
                 cached = jobs_store.get(existing_job_id)
                 if cached is not None:
                     return {
@@ -505,9 +528,6 @@ def create_jobs_router(
                     "status": "unknown",
                     "idempotent_replay": True,
                 }
-
-        manual_urls = [u.strip() for u in job_data.urls if str(u or "").strip()]
-        urls = manual_urls if job_data.mode == ScrapeMode.MANUAL else []
 
         job = Job(
             name=job_data.name,
