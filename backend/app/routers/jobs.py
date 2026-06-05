@@ -105,7 +105,7 @@ def create_jobs_router(
     persist_state_fn: Callable,
     schedule_task_fn: Callable,
     run_job_coro_fn: Callable,
-    config: dict,
+    config: dict | None = None,
 ):
     router = APIRouter()
 
@@ -716,11 +716,11 @@ def create_jobs_router(
                         job.schema_fields,
                         min_record_score=job.min_record_score,
                     ),
-                    timeout=config["ai_structuring_timeout_seconds"],
+                    timeout=settings.AI_STRUCTURING_TIMEOUT_SECONDS,
                 )
             except TimeoutError:
                 cleaned_rows = working_rows
-                timeout_s = config["ai_structuring_timeout_seconds"]
+                timeout_s = settings.AI_STRUCTURING_TIMEOUT_SECONDS
                 reclean_warnings.append(
                     f"AI re-clean timed out after {timeout_s}s; used deterministic post-processing.",
                 )
