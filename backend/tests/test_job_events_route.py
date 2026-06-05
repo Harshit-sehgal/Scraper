@@ -5,9 +5,7 @@ status event. We seed an in-memory job directly to avoid the API-key
 + scheduler paths in the shared ``client`` fixture.
 """
 
-from __future__ import annotations
-
-from app.models import Job, JobStatus, ScrapeMode
+from app.models import Job, JobStatus, LogEntry, ScrapeMode
 
 
 def _seed_job(jobs_store, job_id: str = "evt-test-1") -> Job:
@@ -20,14 +18,12 @@ def _seed_job(jobs_store, job_id: str = "evt-test-1") -> Job:
         status=JobStatus.RUNNING,
     )
     # Add some lifecycle entries.
-    job.logs.append(  # type: ignore[union-attr]
-        type(job.logs[0])
-        if job.logs
-        else __import__("app.models", fromlist=["LogEntry"]).LogEntry(
+    job.logs.append(
+        LogEntry(
             timestamp="2026-01-01T00:00:00+00:00",
             message="started",
             level="info",
-        ),
+        )
     )
     jobs_store[job_id] = job
     return job

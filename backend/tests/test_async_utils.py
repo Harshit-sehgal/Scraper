@@ -47,5 +47,5 @@ class TestRunSyncInThread:
 
     @pytest.mark.asyncio
     async def test_none_return(self) -> None:
-        result = await run_sync_in_thread(lambda: None)
+        result = await run_sync_in_thread(lambda: None)  # type: ignore[func-returns-value]
         assert result is None

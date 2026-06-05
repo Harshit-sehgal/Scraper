@@ -32,7 +32,7 @@ class TestLooksLikeEmail:
         assert _looks_like_email("not-an-email") is False
         assert _looks_like_email("@example.com") is False
         assert _looks_like_email("user@") is False
-        assert _looks_like_email(None) is False
+        assert _looks_like_email(None) is False  # type: ignore[arg-type]
 
 
 # ─── _looks_like_phone ──────────────────────────────────────────────────
@@ -49,7 +49,7 @@ class TestLooksLikePhone:
         assert _looks_like_phone("") is False
         assert _looks_like_phone("12345") is False  # too short
         assert _looks_like_phone("+" + "1" * 16) is False  # too long
-        assert _looks_like_phone(None) is False
+        assert _looks_like_phone(None) is False  # type: ignore[arg-type]
 
 
 # ─── _looks_like_url ────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ class TestLooksLikeUrl:
         assert _looks_like_url("") is False
         assert _looks_like_url("just text") is False
         assert _looks_like_url("user@example.com") is False  # email, not URL
-        assert _looks_like_url(None) is False
+        assert _looks_like_url(None) is False  # type: ignore[arg-type]
 
 
 # ─── _is_entity_name_field ──────────────────────────────────────────────
