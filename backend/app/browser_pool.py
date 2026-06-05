@@ -81,15 +81,15 @@ class BrowserPool:
                         from app.metrics_collector import record_browser_launch
 
                         record_browser_launch(success=False)
-                    except Exception:  # noqa: BLE001
-                        pass
+                    except Exception:
+                        logger.debug("[BrowserPool] Failed to record browser launch failure metric")
                     raise
                 try:
                     from app.metrics_collector import record_browser_launch
 
                     record_browser_launch(success=True)
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception:
+                    logger.debug("[BrowserPool] Failed to record browser launch success metric")
 
                 # Ensure background cleanup is running
                 if not self._cleanup_task or self._cleanup_task.done():

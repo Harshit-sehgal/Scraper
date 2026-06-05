@@ -1,0 +1,14 @@
+{
+  "name": "dataforge-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DataForge Studio — frontend tooling (CSS lint)",
+  "devDependencies": {
+    "stylelint": "^16.26.1",
+    "stylelint-config-standard": "^36.0.1"
+  },
+  "scripts": {
+    "lint:css": "stylelint 'frontend/**/*.css'",
+    "lint:css:fix": "stylelint 'frontend/**/*.css' --fix"
+  }
+}

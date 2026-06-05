@@ -77,9 +77,13 @@ def test_prometheus_does_not_reference_undeployed_alertmanager() -> None:
     compose = (root / "docker-compose.prod.yml").read_text()
     prometheus = (root / "prometheus.yml").read_text()
 
-    assert "alertmanager:" not in compose
-    assert "alertmanager:9093" not in prometheus
-    assert "\nalerting:" not in prometheus
+    has_alertmanager = "alertmanager:" in compose
+    if has_alertmanager:
+        assert "alertmanager:9093" in prometheus
+        assert "\nalerting:" in prometheus
+    else:
+        assert "alertmanager:9093" not in prometheus
+        assert "\nalerting:" not in prometheus
 
 
 @pytest.mark.skip(reason="Promtool config validation removed from simplified CI to keep it lightweight.")

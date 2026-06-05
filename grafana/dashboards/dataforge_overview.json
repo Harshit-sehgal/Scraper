@@ -1,129 +1,459 @@
 {
   "title": "DataForge — Production Overview",
   "uid": "dataforge-overview",
-  "version": 2,
+  "version": 3,
   "schemaVersion": 39,
-  "tags": ["dataforge", "production"],
+  "tags": ["dataforge", "production", "monitoring"],
   "timezone": "browser",
   "editable": true,
+  "description": "Comprehensive operational dashboard for DataForge scraper. Covers system health, scraper metrics, security, and performance.",
+  "refresh": "30s",
   "panels": [
     {
+      "id": 1,
       "title": "System Status",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
-      "targets": [{"expr": "up{job='dataforge'}", "legendFormat": "API Server"}]
+      "description": "API server liveness — up (1) means healthy, down (0) means unreachable",
+      "gridPos": {"h": 4, "w": 3, "x": 0, "y": 0},
+      "targets": [{"expr": "up{job='dataforge'}", "legendFormat": "API Server"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      }
     },
     {
+      "id": 2,
       "title": "Active Jobs",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
-      "targets": [{"expr": "sum(dataforge_jobs_total{status='running'}) or vector(0)", "legendFormat": "Active"}]
+      "description": "Number of jobs currently in running state",
+      "gridPos": {"h": 4, "w": 3, "x": 3, "y": 0},
+      "targets": [{"expr": "sum(dataforge_jobs_total{status='running'}) or vector(0)", "legendFormat": "Active"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 10}, {"color": "red", "value": 25}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      }
     },
     {
+      "id": 3,
       "title": "Queue Depth",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
-      "targets": [{"expr": "dataforge_queue_pending", "legendFormat": "Pending"}]
+      "description": "Pending jobs awaiting dispatch by the worker queue",
+      "gridPos": {"h": 4, "w": 3, "x": 6, "y": 0},
+      "targets": [{"expr": "dataforge_queue_pending", "legendFormat": "Pending"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 50}, {"color": "red", "value": 100}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      }
     },
     {
-      "title": "Failed Jobs Stat",
+      "id": 4,
+      "title": "Browser Health",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
-      "targets": [{"expr": "sum(dataforge_jobs_total{status='failed'}) or vector(0)", "legendFormat": "Failed"}]
+      "description": "Browser launch success rate over the last hour. Close to 1.0 means healthy.",
+      "gridPos": {"h": 4, "w": 3, "x": 9, "y": 0},
+      "targets": [{
+        "expr": "sum(rate(dataforge_browser_launch_total{outcome='success'}[1h])) / (sum(rate(dataforge_browser_launch_total[1h])) + 1)",
+        "legendFormat": "Success Rate"
+      }],
+      "unit": "percentunit",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 0.9}, {"color": "green", "value": 0.98}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      }
     },
     {
-      "title": "DB Errors Stat",
+      "id": 5,
+      "title": "Failed Jobs (24h)",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
-      "targets": [{"expr": "sum(dataforge_errors_total{type='database'}) or vector(0)", "legendFormat": "DB Errors"}]
+      "description": "Total failed jobs in the last 24 hours",
+      "gridPos": {"h": 4, "w": 3, "x": 12, "y": 0},
+      "targets": [{"expr": "sum(increase(dataforge_jobs_total{status='failed'}[24h])) or vector(0)", "legendFormat": "Failed"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 5}, {"color": "red", "value": 20}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      }
     },
     {
-      "title": "Request Rate (1m)",
-      "type": "graph",
+      "id": 6,
+      "title": "DB Errors (1h)",
+      "type": "stat",
+      "description": "Database errors in the last hour — any above zero warrants investigation",
+      "gridPos": {"h": 4, "w": 3, "x": 15, "y": 0},
+      "targets": [{"expr": "sum(increase(dataforge_errors_total{type='database'}[1h])) or vector(0)", "legendFormat": "DB Errors"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "SSRF Rejects (1h)",
+      "type": "stat",
+      "description": "URLs blocked by the SSRF guard in the last hour — spikes may indicate scanning",
+      "gridPos": {"h": 4, "w": 3, "x": 18, "y": 0},
+      "targets": [{"expr": "sum(increase(dataforge_ssrf_rejects_total[1h])) or vector(0)", "legendFormat": "Rejects"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 10}, {"color": "red", "value": 50}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Repo Query P95 Latency",
+      "type": "stat",
+      "description": "95th percentile repository query latency — should stay under 200ms",
+      "gridPos": {"h": 4, "w": 3, "x": 21, "y": 0},
+      "targets": [{"expr": "dataforge_repo_query_latency_seconds{quantile='0.95'} or vector(0)", "legendFormat": "p95"}],
+      "unit": "s",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.2}, {"color": "red", "value": 0.5}]
+          },
+          "color": {"mode": "thresholds"},
+          "decimals": 3
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Request Rate & P95 Latency",
+      "type": "timeseries",
+      "description": "API request rate (req/s) and 95th percentile latency. Latency >2s indicates backend saturation.",
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
-      "targets": [{"expr": "rate(dataforge_requests_total[1m])", "legendFormat": "req/s"}]
+      "targets": [
+        {"expr": "rate(dataforge_requests_total[1m])", "legendFormat": "Request Rate (req/s)"},
+        {"expr": "histogram_quantile(0.95, sum(rate(dataforge_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P95 Latency"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "P95 Latency"},
+            "properties": [
+              {"id": "unit", "value": "s"},
+              {"id": "custom.axisPlacement", "value": "right"},
+              {"id": "custom.fillOpacity", "value": 0},
+              {"id": "custom.lineWidth", "value": 2},
+              {"id": "custom.lineStyle", "value": {"fill": "dash"}},
+              {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1.0}, {"color": "red", "value": 2.0}]}}
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "right"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
     },
     {
+      "id": 10,
       "title": "Job Status Breakdown",
       "type": "piechart",
+      "description": "Distribution of jobs by final status — completed, failed, canceled",
       "gridPos": {"h": 8, "w": 6, "x": 12, "y": 4},
       "targets": [
-        {"expr": "dataforge_jobs_total{status='completed'}", "legendFormat": "Completed"},
-        {"expr": "dataforge_jobs_total{status='failed'}", "legendFormat": "Failed"},
-        {"expr": "dataforge_jobs_total{status='running'}", "legendFormat": "Running"},
-        {"expr": "dataforge_jobs_total{status='canceled'}", "legendFormat": "Canceled"}
-      ]
+        {"expr": "sum(dataforge_jobs_total{status='completed'}) or vector(0)", "legendFormat": "Completed"},
+        {"expr": "sum(dataforge_jobs_total{status='failed'}) or vector(0)", "legendFormat": "Failed"},
+        {"expr": "sum(dataforge_jobs_total{status='running'}) or vector(0)", "legendFormat": "Running"},
+        {"expr": "sum(dataforge_jobs_total{status='canceled'}) or vector(0)", "legendFormat": "Canceled"}
+      ],
+      "options": {
+        "pieType": "pie",
+        "displayLabels": ["name", "percent"],
+        "legend": {"displayMode": "table", "placement": "right"},
+        "reduceOptions": {"values": true, "calcs": ["sum"]}
+      }
     },
     {
-      "title": "95th Percentile Latency",
-      "type": "graph",
+      "id": 11,
+      "title": "Error Rate by Type",
+      "type": "timeseries",
+      "description": "Error rate broken down by error type (database, anti_bot, timeout, etc.)",
       "gridPos": {"h": 8, "w": 6, "x": 18, "y": 4},
-      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(dataforge_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95 Latency"}]
+      "targets": [
+        {"expr": "rate(dataforge_errors_total{type='database'}[5m])", "legendFormat": "Database"},
+        {"expr": "rate(dataforge_errors_total{type!='database'}[5m])", "legendFormat": "Other"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"fillOpacity": 20, "lineWidth": 2}
+        }
+      },
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "right"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
     },
     {
+      "id": 12,
       "title": "Memory Usage",
-      "type": "graph",
+      "type": "timeseries",
+      "description": "Process resident memory — sustained high values may indicate memory leak",
       "gridPos": {"h": 8, "w": 6, "x": 0, "y": 12},
-      "targets": [{"expr": "process_resident_memory_bytes{job='dataforge'}", "legendFormat": "Memory"}]
+      "targets": [{"expr": "process_resident_memory_bytes{job='dataforge'}", "legendFormat": "Resident Memory"}],
+      "unit": "bytes",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"fillOpacity": 20, "lineWidth": 2}
+        }
+      },
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "right"}
+      }
     },
     {
+      "id": 13,
       "title": "LLM Call Rate",
-      "type": "graph",
+      "type": "timeseries",
+      "description": "Rate of LLM-based extraction calls — useful for cost tracking and capacity planning",
       "gridPos": {"h": 8, "w": 6, "x": 6, "y": 12},
-      "targets": [{"expr": "rate(dataforge_llm_calls_total[5m])", "legendFormat": "calls/s"}]
+      "targets": [{"expr": "rate(dataforge_llm_calls_total[5m])", "legendFormat": "LLM calls/s"}],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"fillOpacity": 20, "lineWidth": 2}
+        }
+      },
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "right"}
+      }
     },
     {
-      "title": "Error Rate",
-      "type": "graph",
+      "id": 14,
+      "title": "Browser Launch Outcomes",
+      "type": "timeseries",
+      "description": "Browser launch outcomes over time — a sustained failure rate above 0 indicates deployment issues",
       "gridPos": {"h": 8, "w": 6, "x": 12, "y": 12},
-      "targets": [{"expr": "rate(dataforge_errors_total[5m])", "legendFormat": "errors/s"}]
+      "targets": [
+        {"expr": "rate(dataforge_browser_launch_total{outcome='success'}[10m])", "legendFormat": "Success"},
+        {"expr": "rate(dataforge_browser_launch_total{outcome='failure'}[10m])", "legendFormat": "Failure"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"fillOpacity": 20, "lineWidth": 2}
+        }
+      },
+      "options": {
+        "legend": {"calcs": ["mean"], "displayMode": "table", "placement": "right"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
     },
     {
-      "title": "Anti-Bot Classification",
+      "id": 15,
+      "title": "Anti-Bot Classification Breakdown",
       "type": "piechart",
-      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 20},
+      "description": "Classification of pages by anti-bot platform encountered. High non-OK proportion indicates aggressive bot detection on target sites.",
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 12},
       "targets": [
         {"expr": "sum(dataforge_anti_bot_classifications_total{classification='ok'}) or vector(0)", "legendFormat": "OK"},
         {"expr": "sum(dataforge_anti_bot_classifications_total{classification='captcha'}) or vector(0)", "legendFormat": "Captcha"},
         {"expr": "sum(dataforge_anti_bot_classifications_total{classification='cloudflare'}) or vector(0)", "legendFormat": "Cloudflare"},
         {"expr": "sum(dataforge_anti_bot_classifications_total{classification='rate_limit'}) or vector(0)", "legendFormat": "Rate Limit"},
-        {"expr": "sum(dataforge_anti_bot_classifications_total{classification='generic_block'}) or vector(0)", "legendFormat": "Generic Block"}
-      ]
+        {"expr": "sum(dataforge_anti_bot_classifications_total{classification='generic_block'}) or vector(0)", "legendFormat": "Generic Block"},
+        {"expr": "sum(dataforge_anti_bot_classifications_total{classification='js_required'}) or vector(0)", "legendFormat": "JS Required"},
+        {"expr": "sum(dataforge_anti_bot_classifications_total{classification='akamai'}) or vector(0)", "legendFormat": "Akamai"},
+        {"expr": "sum(dataforge_anti_bot_classifications_total{classification='perimeterx'}) or vector(0)", "legendFormat": "PerimeterX"},
+        {"expr": "sum(dataforge_anti_bot_classifications_total{classification='incapsula'}) or vector(0)", "legendFormat": "Incapsula"}
+      ],
+      "options": {
+        "pieType": "pie",
+        "displayLabels": ["name", "percent"],
+        "legend": {"displayMode": "table", "placement": "right"},
+        "reduceOptions": {"values": true, "calcs": ["sum"]}
+      }
     },
     {
+      "id": 16,
       "title": "Extraction Method Distribution",
       "type": "piechart",
+      "description": "How data fields are being extracted — LLM, CSS selectors, regex, or XPath. A sudden drop in LLM may indicate API issues.",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 20},
+      "targets": [
+        {"expr": "sum(dataforge_extraction_method_total{method='llm'}) or vector(0)", "legendFormat": "LLM"},
+        {"expr": "sum(dataforge_extraction_method_total{method='regex'}) or vector(0)", "legendFormat": "Regex"},
+        {"expr": "sum(dataforge_extraction_method_total{method='css'}) or vector(0)", "legendFormat": "CSS"},
+        {"expr": "sum(dataforge_extraction_method_total{method='xpath'}) or vector(0)", "legendFormat": "XPath"}
+      ],
+      "options": {
+        "pieType": "pie",
+        "displayLabels": ["name", "percent"],
+        "legend": {"displayMode": "table", "placement": "right"},
+        "reduceOptions": {"values": true, "calcs": ["sum"]}
+      }
+    },
+    {
+      "id": 17,
+      "title": "Export Outcomes by Format",
+      "type": "timeseries",
+      "description": "Export generation success and failure rates, broken down by export format (CSV, JSON, Excel)",
       "gridPos": {"h": 8, "w": 6, "x": 6, "y": 20},
       "targets": [
-        {"expr": "sum(dataforge_extraction_methods_total{method='llm'}) or vector(0)", "legendFormat": "LLM"},
-        {"expr": "sum(dataforge_extraction_methods_total{method='regex'}) or vector(0)", "legendFormat": "Regex"},
-        {"expr": "sum(dataforge_extraction_methods_total{method='css'}) or vector(0)", "legendFormat": "CSS"},
-        {"expr": "sum(dataforge_extraction_methods_total{method='xpath'}) or vector(0)", "legendFormat": "XPath"}
-      ]
-    },
-    {
-      "title": "Browser Launch Status",
-      "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 20},
-      "targets": [
-        {
-          "expr": "sum(dataforge_browser_launch_total{outcome='success'}) or vector(0)",
-          "legendFormat": "OK"
-        },
-        {
-          "expr": "sum(dataforge_browser_launch_total{outcome='failure'}) or vector(0)",
-          "legendFormat": "Failed"
+        {"expr": "rate(dataforge_export_outcomes_total{outcome='success'}[10m])", "legendFormat": "Success"},
+        {"expr": "rate(dataforge_export_outcomes_total{outcome='failure'}[10m])", "legendFormat": "Failure"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"fillOpacity": 20, "lineWidth": 2}
         }
-      ]
+      },
+      "options": {
+        "legend": {"calcs": ["mean"], "displayMode": "table", "placement": "right"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
     },
     {
-      "title": "Export Outcomes",
-      "type": "graph",
-      "gridPos": {"h": 8, "w": 6, "x": 16, "y": 20},
+      "id": 18,
+      "title": "SSRF Rejects Rate by Reason",
+      "type": "timeseries",
+      "description": "Rate of SSRF guard rejections by reason. Blocks targeting internal/private IP addresses.",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 20},
       "targets": [
-        {"expr": "rate(dataforge_exports_total{outcome='success'}[10m])", "legendFormat": "Success"},
-        {"expr": "rate(dataforge_exports_total{outcome='failure'}[10m])", "legendFormat": "Failure"}
-      ]
+        {"expr": "rate(dataforge_ssrf_rejects_total{reason='private_ip'}[10m])", "legendFormat": "Private IP"},
+        {"expr": "rate(dataforge_ssrf_rejects_total{reason='invalid_scheme'}[10m])", "legendFormat": "Invalid Scheme"},
+        {"expr": "rate(dataforge_ssrf_rejects_total{reason='loopback'}[10m])", "legendFormat": "Loopback"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"fillOpacity": 20, "lineWidth": 2}
+        }
+      },
+      "options": {
+        "legend": {"calcs": ["mean"], "displayMode": "table", "placement": "right"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
+    },
+    {
+      "id": 19,
+      "title": "CSP Violations Rate by Directive",
+      "type": "timeseries",
+      "description": "Content-Security-Policy report-only violations by directive. Zero violations means the CSP can be tightened to enforce mode.",
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 20},
+      "targets": [
+        {"expr": "rate(dataforge_csp_violations_total[10m])", "legendFormat": "Total"},
+        {"expr": "rate(dataforge_csp_violations_total{directive='script-src'}[10m])", "legendFormat": "script-src"},
+        {"expr": "rate(dataforge_csp_violations_total{directive='style-src'}[10m])", "legendFormat": "style-src"},
+        {"expr": "rate(dataforge_csp_violations_total{directive='img-src'}[10m])", "legendFormat": "img-src"},
+        {"expr": "rate(dataforge_csp_violations_total{directive='font-src'}[10m])", "legendFormat": "font-src"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"fillOpacity": 20, "lineWidth": 2}
+        }
+      },
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "right"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
+    },
+    {
+      "id": 20,
+      "title": "Repo Query Latency (Quantiles)",
+      "type": "timeseries",
+      "description": "Repository query latency at the 50th and 95th percentiles. P95 > 500ms may indicate connection pool exhaustion.",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 28},
+      "targets": [
+        {"expr": "dataforge_repo_query_latency_seconds{quantile='0.5'} or vector(0)", "legendFormat": "p50"},
+        {"expr": "dataforge_repo_query_latency_seconds{quantile='0.95'} or vector(0)", "legendFormat": "p95"}
+      ],
+      "unit": "s",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"fillOpacity": 20, "lineWidth": 2},
+          "decimals": 3
+        }
+      },
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "right"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
+    },
+    {
+      "id": 21,
+      "title": "Queue Pending Over Time",
+      "type": "timeseries",
+      "description": "Pending queue depth over time — shows backlog trends and worker throughput",
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 28},
+      "targets": [{"expr": "dataforge_queue_pending", "legendFormat": "Pending"}],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"fillOpacity": 30, "lineWidth": 2}
+        }
+      },
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "right"}
+      }
+    },
+    {
+      "id": 22,
+      "title": "LLM Cost Estimate",
+      "type": "stat",
+      "description": "Estimated LLM API cost over the last 24 hours based on call volume. ~$0.002/call estimate.",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 28},
+      "targets": [{
+        "expr": "sum(increase(dataforge_llm_calls_total[24h])) * 0.002 or vector(0)",
+        "legendFormat": "Est. Cost (USD)"
+      }],
+      "unit": "currencyusd",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 10}, {"color": "red", "value": 50}]
+          },
+          "color": {"mode": "thresholds"}
+        }
+      }
     }
+  ],
+  "links": [
+    {"title": "API Docs", "url": "/docs", "targetBlank": true},
+    {"title": "Health API", "url": "/api/operator/health", "targetBlank": true},
+    {"title": "Dashboard API", "url": "/api/operator/dashboard", "targetBlank": true},
+    {"title": "Prometheus Targets", "url": "http://localhost:9090/targets", "targetBlank": true}
   ]
 }

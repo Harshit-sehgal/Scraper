@@ -167,6 +167,20 @@ jobs:
       - name: Frontend Syntax Check
         run: python scripts/frontend_syntax_check.py
 
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install npm dependencies (stylelint)
+        run: npm ci
+
+      - name: CSS Lint (stylelint)
+        run: npx stylelint 'frontend/**/*.css'
+
       - name: Docs Lint
         run: python scripts/docs_lint.py
 

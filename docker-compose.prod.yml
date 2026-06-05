@@ -242,7 +242,42 @@ services:
     networks:
       - dataforge-net
 
+  # ─── Alertmanager ────────────────────────────────────────────────────────
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: dataforge-alertmanager
+    expose:
+      - "9093"
+    env_file:
+      - .env
+    environment:
+      - ALERTMANAGER_SMTP_HOST=${ALERTMANAGER_SMTP_HOST:-}
+      - ALERTMANAGER_SMTP_USER=${ALERTMANAGER_SMTP_USER:-}
+      - ALERTMANAGER_SMTP_PASS=${ALERTMANAGER_SMTP_PASS:-}
+      - ALERTMANAGER_EMAIL_FROM=${ALERTMANAGER_EMAIL_FROM:-}
+      - ALERTMANAGER_EMAIL_TO=${ALERTMANAGER_EMAIL_TO:-}
+      - ALERTMANAGER_SLACK_WEBHOOK_URL=${ALERTMANAGER_SLACK_WEBHOOK_URL:-}
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+      - '--cluster.listen-address=' # Single-node, no clustering
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+          cpus: "0.1"
+    networks:
+      - dataforge-net
+
 volumes:
+  alertmanager_data:
+    name: dataforge_alertmanager_data
   dataforge_data:
     name: dataforge_scraper_data
   postgres_data:

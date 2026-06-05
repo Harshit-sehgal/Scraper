@@ -1,0 +1,163 @@
+# =============================================================================
+# DataForge Scraper — Alertmanager Configuration
+# =============================================================================
+# Routes alerts from Prometheus rule evaluations to notification channels.
+#
+# ── Setup ──
+# 1. Set required env vars in .env.production:
+#      ALERTMANAGER_SMTP_HOST=smtp.example.com:587
+#      ALERTMANAGER_SMTP_USER=alerts@example.com
+#      ALERTMANAGER_SMTP_PASS=...
+#      ALERTMANAGER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+#      ALERTMANAGER_EMAIL_TO=ops@example.com
+#      ALERTMANAGER_EMAIL_FROM=alertmanager@example.com
+# 2. The Alertmanager service reads these via docker-compose environment.
+# 3. Reload: curl -X POST http://alertmanager:9093/-/reload
+#
+# If neither SMTP nor Slack webhook is configured, alerts are still
+# visible in the Prometheus UI and Grafana but will not produce
+# out-of-band notifications.
+#
+# ⚠️  If ALERTMANAGER_SMTP_HOST is empty, Alertmanager will log a
+#    warning at startup but will continue running without email
+#    notifications. Slack notifications similarly skip when the
+#    webhook URL is empty. Set both to enable full alert delivery.
+#
+#    Required env vars for full functionality:
+#      ALERTMANAGER_SMTP_HOST=smtp.example.com:587
+#      ALERTMANAGER_SMTP_USER=alerts@example.com
+#      ALERTMANAGER_SMTP_PASS=...
+#      ALERTMANAGER_EMAIL_FROM=alertmanager@example.com
+#      ALERTMANAGER_EMAIL_TO=ops@example.com
+#      ALERTMANAGER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+# =============================================================================
+
+global:
+  # Default SMTP configuration (overridable per receiver)
+  smtp_smarthost: '{{ .Env.ALERTMANAGER_SMTP_HOST }}'
+  smtp_from: '{{ .Env.ALERTMANAGER_EMAIL_FROM }}'
+  smtp_auth_username: '{{ .Env.ALERTMANAGER_SMTP_USER }}'
+  smtp_auth_password: '{{ .Env.ALERTMANAGER_SMTP_PASS }}'
+  smtp_require_tls: true
+
+  # Default Slack configuration (overridable per receiver)
+  slack_api_url: '{{ .Env.ALERTMANAGER_SLACK_WEBHOOK_URL }}'
+
+  # How long to wait before re-notifying on a still-firing alert
+  repeat_interval: 4h
+
+# ─── Route Tree ───────────────────────────────────────────────────────────
+# Alerts without explicit severity or alertname fall through to ``default_receiver``.
+# Critical alerts also go to ``critical_receiver`` in addition to default.
+route:
+  receiver: 'default'
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  # Severity-based sub-routes
+  routes:
+    # Critical: page ops immediately via email + Slack
+    # `continue: true` means critical alerts also go through the default
+    # receiver, producing two emails (one with standard subject, one with
+    # [CRITICAL] prefix). This is intentional for redundancy.
+    - receiver: 'critical'
+      match:
+        severity: 'critical'
+      repeat_interval: 1h
+      continue: true
+
+    # Warning: notify via Slack only, once per 4h
+    - receiver: 'warning'
+      match:
+        severity: 'warning'
+      repeat_interval: 4h
+
+    # Info: notify via Slack only, once per 24h
+    - receiver: 'info'
+      match:
+        severity: 'info'
+      repeat_interval: 24h
+
+# ─── Receivers ─────────────────────────────────────────────────────────────
+receivers:
+  # ── Default: Email (fallback when no severity match) ──
+  - name: 'default'
+    email_configs:
+      - to: '{{ .Env.ALERTMANAGER_EMAIL_TO }}'
+        send_resolved: true
+        headers:
+          subject: '[DataForge] {{ .GroupLabels.alertname }} — {{ .Status }}'
+
+  # ── Critical: Email + Slack — immediate attention ──
+  - name: 'critical'
+    email_configs:
+      - to: '{{ .Env.ALERTMANAGER_EMAIL_TO }}'
+        send_resolved: true
+        headers:
+          subject: '[DataForge CRITICAL] {{ .GroupLabels.alertname }} — {{ .Status }}'
+        html: |
+          <h2>🔥 DataForge Critical Alert</h2>
+          <p><strong>Alert:</strong> {{ .GroupLabels.alertname }}</p>
+          <p><strong>Severity:</strong> CRITICAL</p>
+          <p><strong>Description:</strong> {{ .CommonAnnotations.description }}</p>
+          <p><strong>Summary:</strong> {{ .CommonAnnotations.summary }}</p>
+          <hr>
+          <p><small>Firing since: {{ .StartsAt }}</small></p>
+    slack_configs:
+      - channel: '#alerts-critical'
+        send_resolved: true
+        title: '🔥 [CRITICAL] {{ .GroupLabels.alertname }}'
+        text: |-
+          *Description:* {{ .CommonAnnotations.description }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Severity:* CRITICAL
+          *Instance:* {{ .CommonLabels.instance }}
+          *See:* <http://localhost:9090|Prometheus> | <http://localhost:3000|Grafana>
+
+  # ── Warning: Slack only ──
+  - name: 'warning'
+    slack_configs:
+      - channel: '#alerts-warning'
+        send_resolved: true
+        title: '⚠️ [WARNING] {{ .GroupLabels.alertname }}'
+        text: |-
+          *Description:* {{ .CommonAnnotations.description }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Severity:* WARNING
+          *Instance:* {{ .CommonLabels.instance }}
+
+  # ── Info: Slack only, throttled ──
+  - name: 'info'
+    slack_configs:
+      - channel: '#alerts-info'
+        send_resolved: false  # Don't clutter with resolved info alerts
+        title: 'ℹ️ [INFO] {{ .GroupLabels.alertname }}'
+        text: |-
+          *Description:* {{ .CommonAnnotations.description }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Severity:* INFO
+
+# ─── Inhibition Rules ─────────────────────────────────────────────────────
+# Suppress lower-severity alerts when a higher-severity root cause is firing.
+inhibit_rules:
+  # If the API is down, suppress all other alerts that depend on it
+  - source_match:
+      alertname: 'DataForgeAPIInstanceDown'
+    target_match:
+      severity: 'warning'
+    equal: ['instance']
+
+  # If the database is erroring, suppress repo latency alerts (they're symptomatic)
+  - source_match:
+      alertname: 'DatabaseErrorsDetected'
+    target_match:
+      alertname: 'RepoQueryLatencyDegraded'
+    equal: ['instance']
+
+  # If the queue has critical backlog, suppress downstream extraction warnings
+  - source_match:
+      severity: 'critical'
+    target_match:
+      alertname: 'ExtractionMethodAnomaly'
