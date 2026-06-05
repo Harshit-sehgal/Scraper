@@ -75,8 +75,8 @@ def _record_export_outcome(fmt: str, success: bool) -> None:
         from app.metrics_collector import record_export_outcome
 
         record_export_outcome(fmt, success)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception:
+        logger.debug("Failed to record export outcome metric for %s", fmt)
 
 
 def create_exports_router(jobs_store: dict):

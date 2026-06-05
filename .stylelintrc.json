@@ -1,0 +1,28 @@
+{
+  "extends": "stylelint-config-standard",
+  "rules": {
+    "no-descending-specificity": null,
+    "selector-class-pattern": null,
+    "custom-property-pattern": [
+      "^[a-z][a-zA-Z0-9_-]*$",
+      {
+        "message": "Expected custom property to be kebab-case or camelCase"
+      }
+    ],
+    "keyframes-name-pattern": [
+      "^[a-z][a-zA-Z0-9_-]*$",
+      {
+        "message": "Expected keyframe name to be kebab-case or camelCase"
+      }
+    ],
+    "at-rule-no-unknown": null,
+    "import-notation": "string",
+    "media-feature-range-notation": "prefix",
+    "declaration-block-no-redundant-longhand-properties": null,
+    "color-function-notation": "modern",
+    "hue-degree-notation": "number",
+    "declaration-empty-line-before": null,
+    "declaration-block-single-line-max-declarations": null,
+    "alpha-value-notation": "number"
+  }
+}

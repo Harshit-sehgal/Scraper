@@ -115,8 +115,8 @@ def _close_pool() -> None:
             if pool is not None:
                 try:
                     pool.close()
-                except Exception:  # nosec B110
-                    pass
+                except Exception:
+                    logger.debug("Failed to close psycopg3 pool during shutdown")
                 logger.info("Closed psycopg3 pool")
 
 
@@ -134,7 +134,7 @@ def _conn() -> Iterator:
                 from app.metrics_collector import record_error
 
                 record_error("database")
-            except Exception:  # metrics must never break the caller
+            except Exception:  # nosec B110 - metrics must never break the caller
                 pass
             raise
 

@@ -6,6 +6,7 @@
 
 groups:
   - name: dataforge_scraper_alerts
+    interval: 1m
     rules:
       # 1. API Server Liveness Alert
       - alert: DataForgeAPIInstanceDown
@@ -80,15 +81,15 @@ groups:
           severity: critical
         annotations:
           summary: "Browser launch failures detected"
-          description: "Playwright browser launches are failing at {{ $value }} failures/sec over 5 minutes. Check browser binary integrity and system dependencies."
+          description: "Playwright browser launches are failing at {{ $value | humanize }} failures/sec over 5 minutes. Check browser binary integrity and system dependencies."
 
       # 8. Export Generation Failure Rate Alert
       - alert: HighExportFailureRate
         expr: |
           (
-            sum(rate(dataforge_exports_total{outcome="failure"}[10m]))
+            sum(rate(dataforge_export_outcomes_total{outcome="failure"}[10m]))
             /
-            (sum(rate(dataforge_exports_total[10m])) + 1)
+            (sum(rate(dataforge_export_outcomes_total[10m])) + 1)
           ) > 0.2
         for: 10m
         labels:
@@ -106,3 +107,38 @@ groups:
         annotations:
           summary: "High SSRF reject rate"
           description: "SSRF guard is rejecting {{ $value | humanize }} requests/sec. Possible malicious scanning or misconfigured URLs."
+
+      # 10. CSP Violation Rate Alert — NEW
+      - alert: HighCSPViolationRate
+        expr: rate(dataforge_csp_violations_total[5m]) > 0
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "CSP violations detected"
+          description: "Content-Security-Policy report-only violations are occurring at {{ $value | humanize }} violations/sec. Once the report-only period shows zero violations for a full release cycle, the CSP can be tightened to enforce mode."
+
+      # 11. Repo Query Latency Degradation Alert — NEW
+      - alert: RepoQueryLatencyDegraded
+        expr: dataforge_repo_query_latency_seconds{quantile="0.95"} > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Repository query latency degraded"
+          description: "95th percentile repository query latency is {{ $value }}s (threshold > 0.5s) for more than 10 minutes. Check Postgres connection pool health and query performance."
+
+      # 12. Extraction Method Anomaly Alert — NEW
+      - alert: ExtractionMethodAnomaly
+        expr: |
+          (
+            sum(rate(dataforge_extraction_method_total{method="llm"}[30m]))
+            /
+            (sum(rate(dataforge_extraction_method_total[30m])) + 1)
+          ) < 0.05
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM-based extraction rate anomaly"
+          description: "LLM-based extraction accounts for less than 5% of extractions over 30 minutes (currently {{ $value | humanizePercentage }}). This may indicate an LLM API outage or configuration issue if LLM extraction was expected to be dominant."

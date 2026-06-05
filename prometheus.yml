@@ -18,10 +18,23 @@ global:
     monitor: 'dataforge'
     env:     'production'
 
-# Rule files are evaluated locally. Alertmanager routing is intentionally
-# omitted until an alertmanager service and routing config are deployed.
+# Rule files are evaluated locally.
 rule_files:
   - "/etc/prometheus/prometheus_alerts.yml"
+
+# ─── Alertmanager ─────────────────────────────────────────────────────
+alerting:
+  alert_relabel_configs:
+    # Drop labels that are not needed in alerts to reduce cardinality
+    - action: labeldrop
+      regex: "(prometheus|__name__)"
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
+      scheme: http
+      timeout: 10s
+      api_version: v2
 
 scrape_configs:
   # ─── Prometheus Self-monitoring ──────────────────────────────────────

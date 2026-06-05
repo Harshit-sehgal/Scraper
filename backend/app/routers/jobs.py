@@ -51,7 +51,7 @@ def _record_idempotency_key(idem_key: str, job_id: str, fingerprint: str) -> Non
         repo = get_job_repository()
         repo.record_idempotency_key(idem_key, job_id, fingerprint)
     except Exception:
-        pass
+        logging.getLogger(__name__).debug("Failed to record idempotency key %s", idem_key)
 
 
 def _is_worker_mode() -> bool:

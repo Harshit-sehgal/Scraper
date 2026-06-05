@@ -123,11 +123,8 @@ def _record_ssrf_reject(reason: str) -> None:
         from app.metrics_collector import record_ssrf_reject
 
         record_ssrf_reject(reason)
-    except Exception:  # noqa: BLE001
-        # Metrics MUST never block URL validation. The catch-all is
-        # intentional: a broken metrics subsystem must not turn into
-        # a security regression.
-        pass
+    except Exception:
+        logger.debug("Failed to record SSRF reject reason: %s", reason)
 
 
 # ───────────────────────────────────────────────────────────────────────
