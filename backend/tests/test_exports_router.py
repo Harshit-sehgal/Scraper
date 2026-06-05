@@ -1,6 +1,6 @@
 """Unit Tests for the Export Router.
 
-Tests CSV, JSON, and Excel export endpoints using a mock jobs_store
+Tests CSV, JSON, Excel, and batch export endpoints using a mock jobs_store
 with minimal Job objects.
 """
 
@@ -613,3 +613,409 @@ class TestExportFilename:
         disp = resp.headers.get("content-disposition", "")
         # Special chars should be sanitized
         assert ".json" in disp
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Batch Export Tests
+# ═══════════════════════════════════════════════════════════════════
+
+
+class TestBatchExportErrors:
+    """Error handling for the batch export endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_batch_missing_job_returns_404(self) -> None:
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["exists"] = _make_job("exists", results=[{"x": "1"}])
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = ASGITransport(app=test_app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+            resp = await c.post(
+                "/api/exports/batch",
+                json={"job_ids": ["exists", "missing"], "format": "csv"},
+            )
+        assert resp.status_code == 404
+        assert "missing" in resp.text
+
+    @pytest.mark.asyncio
+    async def test_batch_all_missing_returns_404(self) -> None:
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = ASGITransport(app=test_app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+            resp = await c.post(
+                "/api/exports/batch",
+                json={"job_ids": ["nope"], "format": "csv"},
+            )
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_batch_no_results_returns_400(self) -> None:
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["empty"] = _make_job("empty", results=[])
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = ASGITransport(app=test_app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+            resp = await c.post(
+                "/api/exports/batch",
+                json={"job_ids": ["empty"], "format": "csv"},
+            )
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_batch_unsupported_format_returns_400(self) -> None:
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["j1"] = _make_job("j1", results=[{"x": "1"}])
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = ASGITransport(app=test_app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+            resp = await c.post(
+                "/api/exports/batch",
+                json={"job_ids": ["j1"], "format": "xml"},
+            )
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_batch_empty_job_ids_returns_422(self) -> None:
+        """Empty job_ids list should fail Pydantic validation."""
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = ASGITransport(app=test_app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+            resp = await c.post(
+                "/api/exports/batch",
+                json={"job_ids": [], "format": "csv"},
+            )
+        assert resp.status_code == 422
+
+
+class TestBatchCsvExport:
+    """CSV batch export tests."""
+
+    @pytest_asyncio.fixture
+    async def batch_csv_client(self):
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["a"] = _make_job(
+            "a",
+            name="Job A",
+            results=[{"city": "London", "temp": "15"}],
+        )
+        jobs_store["b"] = _make_job(
+            "b",
+            name="Job B",
+            results=[{"city": "Paris", "temp": "18"}, {"city": "Rome", "temp": "22"}],
+        )
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = ASGITransport(app=test_app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+            yield c
+
+    @pytest.mark.asyncio
+    async def test_batch_csv_flatten_returns_200(self, batch_csv_client) -> None:
+        resp = await batch_csv_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a", "b"], "format": "csv", "flatten": True},
+        )
+        assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_batch_csv_flatten_content_type(self, batch_csv_client) -> None:
+        resp = await batch_csv_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a", "b"], "format": "csv", "flatten": True},
+        )
+        assert resp.headers.get("content-type", "").startswith("text/csv")
+
+    @pytest.mark.asyncio
+    async def test_batch_csv_flatten_has_source_column(self, batch_csv_client) -> None:
+        resp = await batch_csv_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a", "b"], "format": "csv", "flatten": True},
+        )
+        text = resp.text
+        lines = text.strip().split("\n")
+        # Header row should include _source_job
+        assert "_source_job" in lines[0]
+        # Data rows should have job names
+        assert "Job A" in text
+        assert "Job B" in text
+        # All 3 data rows should be present
+        assert len(lines) == 4  # header + 3 data rows
+
+    @pytest.mark.asyncio
+    async def test_batch_csv_non_flatten_has_separators(self, batch_csv_client) -> None:
+        resp = await batch_csv_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a", "b"], "format": "csv", "flatten": False},
+        )
+        text = resp.text
+        lines = text.strip().split("\n")
+        # Should have separator row after header for Job B
+        assert "--- Job B ---" in text
+        # _source_job should NOT be in header when flatten=False
+        assert "_source_job" not in lines[0]
+        # Header + 1 data row (Job A) + separator + 2 data rows (Job B) = 4
+        # Actually: header + data + separator + data + data = 5 lines
+        assert len(lines) == 5
+
+    @pytest.mark.asyncio
+    async def test_batch_csv_disposition_header(self, batch_csv_client) -> None:
+        resp = await batch_csv_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a"], "format": "csv"},
+        )
+        disp = resp.headers.get("content-disposition", "")
+        assert "attachment" in disp
+        assert ".csv" in disp
+        assert "batch_export_" in disp
+
+
+class TestBatchJsonExport:
+    """JSON batch export tests."""
+
+    @pytest_asyncio.fixture
+    async def batch_json_client(self):
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["a"] = _make_job(
+            "a",
+            name="Job A",
+            results=[{"city": "London", "temp": "15"}],
+        )
+        jobs_store["b"] = _make_job(
+            "b",
+            name="Job B",
+            results=[{"city": "Paris", "temp": "18"}],
+        )
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = ASGITransport(app=test_app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+            yield c
+
+    @pytest.mark.asyncio
+    async def test_batch_json_flatten_returns_array(self, batch_json_client) -> None:
+        resp = await batch_json_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a", "b"], "format": "json", "flatten": True},
+        )
+        assert resp.status_code == 200
+        data = json.loads(resp.content)
+        assert isinstance(data, list)
+        assert len(data) == 2
+        assert data[0]["_source_job"] == "Job A"
+        assert data[1]["_source_job"] == "Job B"
+
+    @pytest.mark.asyncio
+    async def test_batch_json_non_flatten_returns_exports_object(self, batch_json_client) -> None:
+        resp = await batch_json_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a", "b"], "format": "json", "flatten": False},
+        )
+        assert resp.status_code == 200
+        data = json.loads(resp.content)
+        assert isinstance(data, dict)
+        assert "exports" in data
+        assert len(data["exports"]) == 2
+        assert data["exports"][0]["job_id"] == "a"
+        assert data["exports"][0]["job_name"] == "Job A"
+        assert len(data["exports"][0]["results"]) == 1
+        assert data["exports"][1]["job_id"] == "b"
+
+    @pytest.mark.asyncio
+    async def test_batch_json_content_type(self, batch_json_client) -> None:
+        resp = await batch_json_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a"], "format": "json"},
+        )
+        assert "application/json" in resp.headers.get("content-type", "")
+
+    @pytest.mark.asyncio
+    async def test_batch_json_disposition(self, batch_json_client) -> None:
+        resp = await batch_json_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a"], "format": "json"},
+        )
+        disp = resp.headers.get("content-disposition", "")
+        assert "batch_export_" in disp
+        assert ".json" in disp
+
+
+class TestBatchExcelExport:
+    """Excel batch export tests."""
+
+    @pytest_asyncio.fixture
+    async def batch_xlsx_client(self):
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["a"] = _make_job(
+            "a",
+            name="Job A",
+            results=[{"city": "London", "temp": "15"}],
+        )
+        jobs_store["b"] = _make_job(
+            "b",
+            name="Job B",
+            results=[{"city": "Paris", "temp": "18"}],
+        )
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = ASGITransport(app=test_app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+            yield c
+
+    @pytest.mark.asyncio
+    async def test_batch_xlsx_flatten_returns_200(self, batch_xlsx_client) -> None:
+        resp = await batch_xlsx_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a", "b"], "format": "xlsx", "flatten": True},
+        )
+        assert resp.status_code == 200
+        assert resp.content[:2] == b"PK"
+
+    @pytest.mark.asyncio
+    async def test_batch_xlsx_non_flatten_returns_200(self, batch_xlsx_client) -> None:
+        resp = await batch_xlsx_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a", "b"], "format": "xlsx", "flatten": False},
+        )
+        assert resp.status_code == 200
+        assert resp.content[:2] == b"PK"
+
+    @pytest.mark.asyncio
+    async def test_batch_xlsx_content_type(self, batch_xlsx_client) -> None:
+        resp = await batch_xlsx_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a"], "format": "xlsx"},
+        )
+        assert "spreadsheetml" in resp.headers.get("content-type", "")
+
+    @pytest.mark.asyncio
+    async def test_batch_xlsx_disposition(self, batch_xlsx_client) -> None:
+        resp = await batch_xlsx_client.post(
+            "/api/exports/batch",
+            json={"job_ids": ["a"], "format": "xlsx"},
+        )
+        disp = resp.headers.get("content-disposition", "")
+        assert "batch_export_" in disp
+        assert ".xlsx" in disp
+
+
+class TestBatchExportEmptyResultsHandling:
+    """When some jobs have results and others don't, only jobs with data should be included."""
+
+    @pytest.mark.asyncio
+    async def test_batch_skip_jobs_without_results(self) -> None:
+        """Jobs with no results should not cause failure; they're silently skipped."""
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["full"] = _make_job("full", name="Has Data", results=[{"x": "1"}])
+        jobs_store["empty"] = _make_job("empty", name="Empty", results=[])
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = ASGITransport(app=test_app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+            resp = await c.post(
+                "/api/exports/batch",
+                json={"job_ids": ["full", "empty"], "format": "csv", "flatten": True},
+            )
+        assert resp.status_code == 200
+        text = resp.text
+        lines = text.strip().split("\n")
+        # Only 1 data row (from "full"), header included
+        assert len(lines) == 2
+        assert "Has Data" in text
+        assert "Empty" not in text
+
+
+class TestBatchExportUnionFieldnames:
+    """When jobs have different field schemas, the union of all fields should be used."""
+
+    @pytest.mark.asyncio
+    async def test_batch_union_of_fieldnames(self) -> None:
+        from httpx import ASGITransport, AsyncClient
+
+        jobs_store: dict[str, Job] = {}
+        router = create_exports_router(jobs_store)
+        jobs_store["a"] = _make_job("a", name="A", results=[{"name": "X", "age": "30"}])
+        jobs_store["b"] = _make_job("b", name="B", results=[{"name": "Y", "email": "y@test.com"}])
+        test_app = FastAPI()
+        test_app.include_router(router)
+        transport = ASGITransport(app=test_app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+            resp = await c.post(
+                "/api/exports/batch",
+                json={"job_ids": ["a", "b"], "format": "csv", "flatten": True},
+            )
+        assert resp.status_code == 200
+        text = resp.text
+        lines = text.strip().split("\n")
+        header = lines[0]
+        assert "name" in header
+        assert "age" in header
+        assert "email" in header
+        assert "_source_job" in header
+        # 3 data rows: header + 2 = 3 lines
+        assert len(lines) == 3
+
+
+class TestBatchExportWithDiskResults:
+    """Batch export should also handle jobs with results_on_disk."""
+
+    @pytest.mark.asyncio
+    async def test_batch_csv_with_disk_results(self) -> None:
+        from httpx import ASGITransport, AsyncClient
+
+        mock_data = [{"city": "Tokyo", "temp": "28"}]
+        with patch(
+            "app.utils.job_results_store.load_paginated_job_results_from_disk",
+            return_value=(mock_data, 1),
+        ):
+            jobs_store: dict[str, Job] = {}
+            router = create_exports_router(jobs_store)
+            jobs_store["disk-job"] = _make_job(
+                "disk-job",
+                name="Disk Job",
+                results=[],
+                results_on_disk=True,
+            )
+            test_app = FastAPI()
+            test_app.include_router(router)
+            transport = ASGITransport(app=test_app)
+            async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+                resp = await c.post(
+                    "/api/exports/batch",
+                    json={"job_ids": ["disk-job"], "format": "csv"},
+                )
+        assert resp.status_code == 200
+        assert "Tokyo" in resp.text

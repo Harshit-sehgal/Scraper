@@ -85,10 +85,43 @@ class TestRateLimiterMiddlewareUnit:
         rl = RateLimiterMiddleware(global_limit="100/minute")
         stats = rl.get_stats()
         assert stats["enabled"] is True
-        assert stats["limit_per_window"] == 100
-        assert stats["window_seconds"] == 60.0
+        assert stats["global_limit_per_window"] == 100
+        assert stats["global_window_seconds"] == 60.0
         assert "/api/jobs" in stats["route_limits"]
         assert stats["active_keys"] == 0
+
+    def test_get_stats_per_ip_enabled(self) -> None:
+        rl = RateLimiterMiddleware(
+            global_limit="10000/minute",
+            per_ip=True,
+            per_ip_limit="100/minute",
+        )
+        stats = rl.get_stats()
+        assert stats["per_ip_enabled"] is True
+        assert stats["per_ip_limit_per_window"] == 100
+        assert stats["per_ip_window_seconds"] == 60.0
+
+    def test_get_stats_per_ip_disabled(self) -> None:
+        rl = RateLimiterMiddleware(
+            global_limit="10000/minute",
+            per_ip=False,
+        )
+        stats = rl.get_stats()
+        assert stats["per_ip_enabled"] is False
+        assert stats["per_ip_limit_per_window"] == 0
+
+    def test_get_stats_only_per_ip(self) -> None:
+        """Rate limiter can be enabled with only a per-IP limit and no global."""
+        rl = RateLimiterMiddleware(
+            global_limit="",
+            per_ip=True,
+            per_ip_limit="50/minute",
+        )
+        stats = rl.get_stats()
+        assert stats["enabled"] is True
+        assert stats["global_limit_per_window"] == 0
+        assert stats["per_ip_enabled"] is True
+        assert stats["per_ip_limit_per_window"] == 50
 
     def test_reset_clears_counters(self) -> None:
         rl = RateLimiterMiddleware(global_limit="10/minute")

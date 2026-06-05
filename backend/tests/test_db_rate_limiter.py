@@ -1,5 +1,4 @@
 import time
-from unittest.mock import MagicMock
 
 from app.rate_limiter import DatabaseSlidingWindowCounter, RateLimiterMiddleware
 
@@ -83,22 +82,36 @@ def test_rate_limiter_middleware_db_backed_selection() -> None:
 
     middleware = RateLimiterMiddleware(global_limit="5 / minute", per_ip=True)
 
-    mock_request = MagicMock()
-    mock_request.url.path = "/api/jobs"
-    mock_request.client.host = "127.0.0.1"
-    mock_request.headers = {}
-
     # We patch settings.RATE_LIMIT_DB_BACKED to True
     with patch("app.config.settings.RATE_LIMIT_DB_BACKED", True):
-        # Trigger the middleware key logic
-        key = middleware._get_client_key("/api/jobs", "127.0.0.1")
-        max_req, window_sec = middleware._get_limits_for_path("/api/jobs")
+        # Create a counter via _get_or_create_counter (which checks DB_BACKED)
+        counter = middleware._get_or_create_counter("_test_key", 5, 60.0)
+        assert isinstance(counter, DatabaseSlidingWindowCounter)
 
-        # Test lazy counter creation in dict
-        if key not in middleware._counters:
-            middleware._counters[key] = DatabaseSlidingWindowCounter(max_req, window_sec, key)
 
-        assert isinstance(middleware._counters[key], DatabaseSlidingWindowCounter)
+def test_rate_limiter_middleware_in_memory_selection() -> None:
+    """Verify that RateLimiterMiddleware uses in-memory counter when DB_BACKED is False."""
+    from unittest.mock import patch
+
+    middleware = RateLimiterMiddleware(global_limit="5 / minute", per_ip=True)
+
+    with patch("app.config.settings.RATE_LIMIT_DB_BACKED", False):
+        counter = middleware._get_or_create_counter("_test_key_inmem", 5, 60.0)
+        assert isinstance(counter, SlidingWindowCounter)
+
+
+from app.rate_limiter import SlidingWindowCounter
+
+
+def test_dual_layer_keys_are_different() -> None:
+    """Verify that aggregate and per-IP keys are distinct for the same route+method+ip."""
+    middleware = RateLimiterMiddleware(global_limit="100/minute", per_ip=True, per_ip_limit="10/minute")
+    agg_key = middleware._get_aggregate_key("/api/jobs", "POST")
+    ip_key = middleware._get_per_ip_key("/api/jobs", "POST", "1.2.3.4")
+    assert agg_key != ip_key
+    # _get_route_key("/api/jobs") returns "jobs"
+    assert agg_key == "_global:jobs:POST"
+    assert ip_key == "jobs:POST:1.2.3.4"
 
 
 def test_db_sliding_window_counter_fallback() -> None:
