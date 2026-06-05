@@ -60,3 +60,22 @@ jobs:
           DATAFORGE_STORAGE_BACKEND=postgres \
           DATAFORGE_DATABASE_URL=postgresql://testuser:testpassword@localhost:5432/testdb \
           python -m pytest -v backend/tests --run-postgres -o addopts= --tb=short
+
+  notify:
+    name: Telegram Notification
+    needs: [postgres-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Send Telegram Message
+        uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🔔 Postgres Integration Tests Status: ${{ needs.postgres-tests.result == 'success' && '✅ Passed' || '❌ Failed' }}
+
+            Repo: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+            Author: ${{ github.actor }}

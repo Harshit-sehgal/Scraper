@@ -39,7 +39,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r backend/requirements-dev.lock.txt
-          pip install psycopg2-binary
+          pip install psycopg2-binary testcontainers
           python -m playwright install --with-deps chromium
       - name: Run Postgres tests
         run: |
@@ -99,3 +99,22 @@ jobs:
           FAILED=$(grep "failed" /tmp/golden_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
           echo "Golden dataset: $PASSED passed, $FAILED failed"
           if [ "$FAILED" -gt 0 ]; then exit 1; fi
+
+  notify:
+    name: Telegram Notification
+    needs: [postgres, browser-e2e, golden-dataset]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Send Telegram Message
+        uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🔔 Optional Test Suites Status: ${{ (needs.postgres.result == 'success' && needs.browser-e2e.result == 'success' && needs.golden-dataset.result == 'success') && '✅ Passed' || '❌ Failed' }}
+
+            Repo: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+            Author: ${{ github.actor }}

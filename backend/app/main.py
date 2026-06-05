@@ -165,8 +165,23 @@ def create_app() -> FastAPI:
 
     app_instance = FastAPI(
         title="DataForge — General-Purpose Web Scraper",
-        description="Web extraction backend for supported accessible pages",
+        description=(
+            "Web extraction backend for supported accessible pages. "
+            "Supports manual, discovery, and AI-assisted extraction modes "
+            "with optional browser rendering, anti-bot detection, and "
+            "content-quality scoring. See `docs/API.md` for the full "
+            "endpoint reference."
+        ),
         version="2.0.0",
+        contact={
+            "name": "DataForge Engineering",
+            "url": "https://github.com/Harshit-sehgal/Scraper/issues",
+        },
+        license_info={
+            "name": "Proprietary",
+            "url": "https://github.com/Harshit-sehgal/Scraper/blob/main/LICENSE",
+        },
+        terms_of_service="https://github.com/Harshit-sehgal/Scraper/blob/main/docs/TERMS.md",
         lifespan=lifespan,
         docs_url=_docs_url,
         redoc_url=_redoc_url,
