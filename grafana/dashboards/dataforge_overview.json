@@ -77,6 +77,53 @@
       "type": "graph",
       "gridPos": {"h": 8, "w": 6, "x": 12, "y": 12},
       "targets": [{"expr": "rate(dataforge_errors_total[5m])", "legendFormat": "errors/s"}]
+    },
+    {
+      "title": "Anti-Bot Classification",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 20},
+      "targets": [
+        {"expr": "sum(dataforge_anti_bot_classifications_total{classification='ok'}) or vector(0)", "legendFormat": "OK"},
+        {"expr": "sum(dataforge_anti_bot_classifications_total{classification='captcha'}) or vector(0)", "legendFormat": "Captcha"},
+        {"expr": "sum(dataforge_anti_bot_classifications_total{classification='cloudflare'}) or vector(0)", "legendFormat": "Cloudflare"},
+        {"expr": "sum(dataforge_anti_bot_classifications_total{classification='rate_limit'}) or vector(0)", "legendFormat": "Rate Limit"},
+        {"expr": "sum(dataforge_anti_bot_classifications_total{classification='generic_block'}) or vector(0)", "legendFormat": "Generic Block"}
+      ]
+    },
+    {
+      "title": "Extraction Method Distribution",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 20},
+      "targets": [
+        {"expr": "sum(dataforge_extraction_methods_total{method='llm'}) or vector(0)", "legendFormat": "LLM"},
+        {"expr": "sum(dataforge_extraction_methods_total{method='regex'}) or vector(0)", "legendFormat": "Regex"},
+        {"expr": "sum(dataforge_extraction_methods_total{method='css'}) or vector(0)", "legendFormat": "CSS"},
+        {"expr": "sum(dataforge_extraction_methods_total{method='xpath'}) or vector(0)", "legendFormat": "XPath"}
+      ]
+    },
+    {
+      "title": "Browser Launch Status",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 20},
+      "targets": [
+        {
+          "expr": "sum(dataforge_browser_launch_total{outcome='success'}) or vector(0)",
+          "legendFormat": "OK"
+        },
+        {
+          "expr": "sum(dataforge_browser_launch_total{outcome='failure'}) or vector(0)",
+          "legendFormat": "Failed"
+        }
+      ]
+    },
+    {
+      "title": "Export Outcomes",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 6, "x": 16, "y": 20},
+      "targets": [
+        {"expr": "rate(dataforge_exports_total{outcome='success'}[10m])", "legendFormat": "Success"},
+        {"expr": "rate(dataforge_exports_total{outcome='failure'}[10m])", "legendFormat": "Failure"}
+      ]
     }
   ]
 }

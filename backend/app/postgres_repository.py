@@ -28,7 +28,7 @@ from app.storage_interface import JobRepository
 
 logger = logging.getLogger(__name__)
 
-_CURRENT_SCHEMA_VERSION = 3
+_CURRENT_SCHEMA_VERSION = 4
 
 # ───────────────────────────────────────────────────────────────────────
 # Connection pool (thread-safe, synchronous)
@@ -268,6 +268,7 @@ def _ensure_required_tables(conn) -> None:
     for idx_sql in [
         "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
         "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_recycle_bin_created_at ON recycle_bin(created_at DESC)",
     ]:
         try:
             _execute(conn, "SAVEPOINT create_index")
@@ -326,6 +327,62 @@ def _ensure_schema() -> None:
                 """,
                 )
 
+            if current < 4:
+                # Version 3 -> 4: companion tables for the storage split.
+                # ``job_results`` holds each extracted result as a dedicated
+                # row so summary queries don't deserialize the entire JSON
+                # blob. ``job_events`` holds lifecycle events similarly.
+                # ``idempotency_keys`` supports Idempotency-Key headers on
+                # ``POST /api/jobs``.
+                _execute(
+                    conn,
+                    """
+                    CREATE TABLE IF NOT EXISTS job_results (
+                        job_id TEXT NOT NULL,
+                        result_index INTEGER NOT NULL,
+                        payload TEXT NOT NULL,
+                        PRIMARY KEY (job_id, result_index),
+                        FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+                    )
+                """,
+                )
+                _execute(
+                    conn,
+                    """
+                    CREATE TABLE IF NOT EXISTS job_events (
+                        event_id BIGSERIAL PRIMARY KEY,
+                        job_id TEXT NOT NULL,
+                        timestamp TEXT NOT NULL DEFAULT '',
+                        level TEXT NOT NULL DEFAULT 'info',
+                        message TEXT NOT NULL,
+                        FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+                    )
+                """,
+                )
+                _execute(
+                    conn,
+                    "CREATE INDEX IF NOT EXISTS idx_job_events_job_id ON job_events(job_id, event_id)",
+                )
+                _execute(
+                    conn,
+                    "CREATE INDEX IF NOT EXISTS idx_job_results_job_id ON job_results(job_id)",
+                )
+                _execute(
+                    conn,
+                    """
+                    CREATE TABLE IF NOT EXISTS idempotency_keys (
+                        idem_key TEXT PRIMARY KEY,
+                        job_id TEXT NOT NULL,
+                        request_fingerprint TEXT NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                    )
+                """,
+                )
+                _execute(
+                    conn,
+                    "CREATE INDEX IF NOT EXISTS idx_idempotency_keys_created_at ON idempotency_keys(created_at)",
+                )
+
             _execute(conn, "DELETE FROM schema_version")
             _execute(conn, "INSERT INTO schema_version (version) VALUES (%s)", (_CURRENT_SCHEMA_VERSION,))
             logger.info("Postgres schema migrated to version %d", _CURRENT_SCHEMA_VERSION)
@@ -336,6 +393,67 @@ def _ensure_schema() -> None:
 # ───────────────────────────────────────────────────────────────────────
 # Serialization helpers
 # ───────────────────────────────────────────────────────────────────────
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Companion-table dual-write helpers (Schema v4)
+# ───────────────────────────────────────────────────────────────────────
+
+
+def _sync_job_results(conn, job_id: str, results: list) -> None:
+    """Replace the ``job_results`` rows for ``job_id`` with ``results``.
+
+    Dual-write helper called by ``save_single`` and ``save_all``.
+    The legacy JSON column in ``jobs`` is still populated; this is an
+    additive write for the new per-row reader path.
+    """
+    _execute(conn, "DELETE FROM job_results WHERE job_id = %s", (job_id,))
+    for idx, payload in enumerate(results):
+        try:
+            encoded = json.dumps(payload, default=str)
+        except (TypeError, ValueError):
+            encoded = json.dumps(str(payload))
+        _execute(
+            conn,
+            "INSERT INTO job_results (job_id, result_index, payload) VALUES (%s, %s, %s)",
+            (job_id, idx, encoded),
+        )
+
+
+def _sync_job_events(conn, job_id: str, logs) -> None:
+    """Replace the ``job_events`` rows for ``job_id`` with ``logs``.
+
+    Dual-write helper called by ``save_single`` and ``save_all``.
+    """
+    _execute(conn, "DELETE FROM job_events WHERE job_id = %s", (job_id,))
+    for entry in logs or []:
+        if hasattr(entry, "model_dump"):
+            try:
+                entry_dict = entry.model_dump()
+            except Exception:
+                entry_dict = {
+                    "timestamp": "",
+                    "level": "info",
+                    "message": str(entry),
+                }
+        elif isinstance(entry, dict):
+            entry_dict = entry
+        else:
+            entry_dict = {
+                "timestamp": "",
+                "level": "info",
+                "message": str(entry),
+            }
+        _execute(
+            conn,
+            "INSERT INTO job_events (job_id, timestamp, level, message) VALUES (%s, %s, %s, %s)",
+            (
+                job_id,
+                str(entry_dict.get("timestamp") or ""),
+                str(entry_dict.get("level") or "info"),
+                str(entry_dict.get("message") or ""),
+            ),
+        )
 
 
 def _job_to_row(job: Job) -> dict:
@@ -579,6 +697,104 @@ class PostgresJobRepository(JobRepository):
                     jobs[job.id] = job
             return jobs
 
+    def read_results(
+        self,
+        job_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict]:
+        """Read a job's results from the ``job_results`` companion table.
+
+        Returns results in insertion order. Returns ``[]`` when the
+        companion table is empty (pre-v4 or results on disk) so the
+        caller can fall back to ``Job.results``.
+        """
+        self._ensure()
+        safe_limit = max(1, min(int(limit), 1000))
+        safe_offset = max(0, int(offset))
+        sql = "SELECT payload FROM job_results WHERE job_id = %s ORDER BY result_index ASC LIMIT %s OFFSET %s"
+        try:
+            with _conn() as conn:
+                rows = _fetch_all(conn, sql, (job_id, safe_limit, safe_offset))
+        except Exception:
+            return []
+        out: list[dict] = []
+        for row in rows:
+            try:
+                out.append(json.loads(row["payload"]))
+            except (TypeError, ValueError):
+                out.append({"_unparseable": row["payload"]})
+        return out
+
+    def lookup_idempotency_key(self, idem_key: str) -> str | None:
+        """Lookup an idempotency key in Postgres."""
+        if not idem_key:
+            return None
+        self._ensure()
+        try:
+            with _conn() as conn:
+                row = _fetch_one(
+                    conn,
+                    "SELECT job_id FROM idempotency_keys WHERE idem_key = %s",
+                    (idem_key,),
+                )
+                return str(row["job_id"]) if row else None
+        except Exception:
+            return None
+
+    def record_idempotency_key(
+        self,
+        idem_key: str,
+        job_id: str,
+        request_fingerprint: str,
+    ) -> None:
+        """Persist an idempotency-key → job_id mapping in Postgres."""
+        if not idem_key or not job_id:
+            return
+        self._ensure()
+        try:
+            with _conn() as conn:
+                _execute(
+                    conn,
+                    """
+                    INSERT INTO idempotency_keys
+                        (idem_key, job_id, request_fingerprint)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (idem_key) DO UPDATE
+                        SET job_id = EXCLUDED.job_id,
+                            request_fingerprint = EXCLUDED.request_fingerprint,
+                            created_at = NOW()
+                    """,
+                    (idem_key, job_id, request_fingerprint),
+                )
+        except Exception:
+            logger.exception("Failed to record idempotency key %s", idem_key)
+
+    def prune_idempotency_keys(self, older_than_days: int = 7) -> int:
+        """Delete idempotency keys older than ``older_than_days`` in Postgres."""
+        self._ensure()
+        try:
+            with _conn() as conn:
+                cur = _execute(
+                    conn,
+                    "DELETE FROM idempotency_keys WHERE created_at < NOW() - INTERVAL %s",
+                    (f"{int(older_than_days)} days",),
+                )
+                deleted = cur.rowcount
+                return int(deleted) if deleted else 0
+        except Exception:
+            return 0
+
+    def cleanup_companion_data(self, job_id: str) -> None:
+        """Remove companion-table rows for a job in Postgres."""
+        self._ensure()
+        try:
+            with _conn() as conn:
+                _execute(conn, "DELETE FROM job_results WHERE job_id = %s", (job_id,))
+                _execute(conn, "DELETE FROM job_events WHERE job_id = %s", (job_id,))
+        except Exception:
+            logger.exception("Failed to clean up companion data for job %s", job_id)
+
     def list_recycle_summaries(
         self,
         limit: int = 100,
@@ -730,6 +946,9 @@ class PostgresJobRepository(JobRepository):
                     f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608 — validated as valid identifiers
                     [row[k] for k in safe_keys],
                 )
+                # Dual-write to companion tables (Schema v4)
+                _sync_job_results(conn, job.id, job.results)
+                _sync_job_events(conn, job.id, job.logs)
 
             # Only remove stale rows when explicitly requested (single-process
             # mode)
@@ -783,6 +1002,10 @@ class PostgresJobRepository(JobRepository):
                 f"INSERT INTO jobs ({cols}) VALUES ({ph}) ON CONFLICT (id) DO UPDATE SET {update_cols}",  # nosec B608 — cols/update_cols are model field names, not user input
                 list(row.values()),
             )
+            # Dual-write to companion tables (Schema v4). The legacy JSON
+            # columns in ``jobs`` are still populated; this is additive.
+            _sync_job_results(conn, job.id, job.results)
+            _sync_job_events(conn, job.id, job.logs)
 
     def read_events(
         self,
@@ -892,6 +1115,9 @@ class PostgresJobRepository(JobRepository):
             cur = _execute(conn, "DELETE FROM jobs WHERE id = %s", (job_id,))
             deleted = cur.rowcount
             _execute(conn, "DELETE FROM recycle_bin WHERE id = %s", (job_id,))
+            # Clean up companion tables (Schema v4)
+            _execute(conn, "DELETE FROM job_results WHERE job_id = %s", (job_id,))
+            _execute(conn, "DELETE FROM job_events WHERE job_id = %s", (job_id,))
             return deleted > 0  # type: ignore[no-any-return]
 
     def clear_terminal_jobs(self, older_than: str | None = None) -> int:
@@ -919,6 +1145,9 @@ class PostgresJobRepository(JobRepository):
                     f"INSERT INTO recycle_bin ({col_list}, deleted_at) VALUES ({ph}, %s) ON CONFLICT (id) DO NOTHING",  # nosec B608 — col_list are model field names, not user input
                     [row[k] for k in cols] + [now],
                 )
+                # Clean up companion tables (Schema v4)
+                _execute(conn, "DELETE FROM job_results WHERE job_id = %s", (row["id"],))
+                _execute(conn, "DELETE FROM job_events WHERE job_id = %s", (row["id"],))
             return len(rows)
 
     # ─── World state persistence ────────────────────────────────────────

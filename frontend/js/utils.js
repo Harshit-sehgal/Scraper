@@ -22,13 +22,43 @@ export function jsStr(s) {
 
 // ─── Toast Notifications ───
 
-export function toast(msg, type = 'info') {
+export function toast(msg, type = 'info', duration = 3000) {
     const c = document.getElementById('toasts');
+    if (!c) return;
     const t = document.createElement('div');
     t.className = `toast ${type}`;
-    t.textContent = msg;
+
+    // Message content
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = msg;
+    t.appendChild(msgSpan);
+
+    // Auto-dismiss timer bar
+    const timer = document.createElement('div');
+    timer.className = 'toast-timer';
+    timer.style.animationDuration = `${duration}ms`;
+    t.appendChild(timer);
+
     c.appendChild(t);
-    setTimeout(() => t.remove(), 4000);
+
+    // Auto-dismiss with animation
+    const dismissTimeout = setTimeout(() => {
+        t.classList.add('dismissing');
+        setTimeout(() => {
+            if (t.parentNode) t.remove();
+        }, 200);
+    }, duration);
+
+    // Allow click-to-dismiss
+    t.addEventListener('click', () => {
+        clearTimeout(dismissTimeout);
+        t.classList.add('dismissing');
+        setTimeout(() => {
+            if (t.parentNode) t.remove();
+        }, 200);
+    });
+
+    return t;
 }
 
 // ─── Engine Status ───

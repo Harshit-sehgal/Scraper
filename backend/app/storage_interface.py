@@ -123,8 +123,57 @@ class JobRepository(ABC):
         """
 
     @abstractmethod
+    def read_results(
+        self,
+        job_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict]:
+        """Return a job's extracted results from the companion table.
+
+        The storage-split (v4+) stores each result as a dedicated row in
+        ``job_results``. This method reads them back in insertion order.
+        Returns ``[]`` when the companion table is unavailable so the
+        caller can fall back to the ``Job.results`` list.
+        """
+
+    @abstractmethod
     def save_single(self, job: Job) -> None:
         """Atomically upsert or save a single job's status, progress, or logs."""
+
+    # ─── Idempotency-key support ───────────────────────────────────────
+    # These methods are used by ``POST /api/jobs`` so that repeat
+    # submissions with the same ``Idempotency-Key`` header return the
+    # originally-created ``job_id`` instead of creating a duplicate.
+
+    @abstractmethod
+    def lookup_idempotency_key(self, idem_key: str) -> str | None:
+        """Return the ``job_id`` previously associated with ``idem_key``.
+
+        Returns ``None`` if the key has never been seen (or the
+        backend does not support idempotency keys).
+        """
+
+    @abstractmethod
+    def record_idempotency_key(
+        self,
+        idem_key: str,
+        job_id: str,
+        request_fingerprint: str,
+    ) -> None:
+        """Persist an idempotency-key → job_id mapping.
+
+        A repeat ``POST /api/jobs`` with the same ``Idempotency-Key``
+        returns the original ``job_id`` rather than creating a duplicate.
+        """
+
+    def prune_idempotency_keys(self, older_than_days: int = 7) -> int:
+        """Delete idempotency keys older than ``older_than_days``.
+
+        Returns the number of rows deleted. Default no-op for backends
+        without idempotency-key support; override to implement.
+        """
+        return 0
 
     def health_check(self) -> dict:
         """Check repository health. Returns a dict with 'ok' key and backend info."""
@@ -156,6 +205,12 @@ class JobRepository(ABC):
     def clear_terminal_jobs(self, older_than: str | None = None) -> int:
         """Remove terminal-status jobs older than the given timestamp. Returns count removed."""
         raise NotImplementedError
+
+    def cleanup_companion_data(self, job_id: str) -> None:
+        """Remove companion-table rows (``job_results``, ``job_events``)
+        for a given job. Called during hard-delete or recycle-bin move.
+        Default no-op; override in backends that support companion tables.
+        """
 
     # ─── World state persistence ────────────────────────────────────────
 
@@ -389,6 +444,63 @@ class SQLiteJobRepository(JobRepository):
             finally:
                 conn.close()
 
+    def read_results(
+        self,
+        job_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict]:
+        """Read a job's results from the companion table.
+
+        Delegates to ``app.job_store.read_job_results`` which reads
+        from the ``job_results`` table. Returns ``[]`` when the table
+        is empty (pre-v4 or results on disk) so the caller can fall
+        back to ``Job.results``.
+        """
+        from app.job_store import read_job_results as _read_results
+
+        results = _read_results(job_id)
+        return results[offset : offset + limit]
+
+    def lookup_idempotency_key(self, idem_key: str) -> str | None:
+        """Lookup an idempotency key in SQLite."""
+        from app.job_store import lookup_idempotency_key as _lookup
+
+        return _lookup(idem_key)
+
+    def record_idempotency_key(
+        self,
+        idem_key: str,
+        job_id: str,
+        request_fingerprint: str,
+    ) -> None:
+        """Record an idempotency key in SQLite."""
+        from app.job_store import record_idempotency_key as _record
+
+        _record(idem_key, job_id, request_fingerprint)
+
+    def prune_idempotency_keys(self, older_than_days: int = 7) -> int:
+        """Prune old idempotency keys from SQLite."""
+        from app.job_store import prune_idempotency_keys as _prune
+
+        return _prune(older_than_days)
+
+    def cleanup_companion_data(self, job_id: str) -> None:
+        """Remove companion-table rows for a job in SQLite."""
+        from app.job_store import _DB_LOCK, _get_connection
+
+        with _DB_LOCK:
+            conn = _get_connection()
+            try:
+                conn.execute("DELETE FROM job_results WHERE job_id = ?", (job_id,))
+                conn.execute("DELETE FROM job_events WHERE job_id = ?", (job_id,))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
     def save_single(self, job: Job) -> None:
         from app.job_store import persist_state_single
 
@@ -509,6 +621,11 @@ class SQLiteJobRepository(JobRepository):
         (soft-deleted). The caller should not have to know which — this
         method removes the row from both tables and reports success if it
         affected either one.
+
+        Companion-table rows (``job_results``, ``job_events``) are also
+        explicitly deleted because the foreign key relationship does not
+        use ``ON DELETE CASCADE`` — that would destroy companion data
+        when a job is moved to the recycle bin rather than hard-deleted.
         """
         from app.job_store import _DB_LOCK, _get_connection
 
@@ -518,6 +635,9 @@ class SQLiteJobRepository(JobRepository):
                 jobs_cursor = conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
                 recycle_cursor = conn.execute("DELETE FROM recycle_bin WHERE id = ?", (job_id,))
                 deleted = (jobs_cursor.rowcount or 0) + (recycle_cursor.rowcount or 0)
+                # Explicitly clean up companion tables (no ON DELETE CASCADE)
+                conn.execute("DELETE FROM job_results WHERE job_id = ?", (job_id,))
+                conn.execute("DELETE FROM job_events WHERE job_id = ?", (job_id,))
                 conn.commit()
                 return deleted > 0
             except Exception:
@@ -527,7 +647,13 @@ class SQLiteJobRepository(JobRepository):
                 conn.close()
 
     def clear_terminal_jobs(self, older_than: str | None = None) -> int:
-        """Remove terminal-status jobs atomically in SQLite and move them to recycle_bin."""
+        """Remove terminal-status jobs atomically in SQLite and move them to recycle_bin.
+
+        Companion-table rows (``job_results``, ``job_events``) are also
+        explicitly deleted because the foreign key relationship does not
+        use ``ON DELETE CASCADE`` — that would destroy companion data
+        when a job is moved to the recycle bin rather than hard-deleted.
+        """
         from app.job_store import _DB_LOCK, _get_connection
 
         terminal_statuses = ("completed", "failed", "canceled", "degraded", "empty_result")
@@ -563,6 +689,9 @@ class SQLiteJobRepository(JobRepository):
                         f"INSERT OR REPLACE INTO recycle_bin ({columns}) VALUES ({placeholders})",
                         list(row_dict.values()),
                     )
+                    # Explicitly clean up companion tables (no ON DELETE CASCADE)
+                    conn.execute("DELETE FROM job_results WHERE job_id = ?", (jid,))
+                    conn.execute("DELETE FROM job_events WHERE job_id = ?", (jid,))
                 conn.commit()
                 return len(rows)
             except Exception:

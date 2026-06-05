@@ -33,17 +33,25 @@ def _save_job(job) -> None:
 
 
 def _lookup_idempotency_key(idem_key: str) -> str | None:
-    """Threadpool-safe wrapper around ``app.job_store.lookup_idempotency_key``."""
-    from app.job_store import lookup_idempotency_key
+    """Threadpool-safe wrapper around the repository's idempotency-key lookup.
 
-    return lookup_idempotency_key(idem_key)
+    Uses the ``JobRepository`` interface so both SQLite and Postgres
+    backends are supported. Falls back to ``None`` on failure.
+    """
+    try:
+        repo = get_job_repository()
+        return repo.lookup_idempotency_key(idem_key)
+    except Exception:
+        return None
 
 
 def _record_idempotency_key(idem_key: str, job_id: str, fingerprint: str) -> None:
-    """Threadpool-safe wrapper around ``app.job_store.record_idempotency_key``."""
-    from app.job_store import record_idempotency_key
-
-    record_idempotency_key(idem_key, job_id, fingerprint)
+    """Threadpool-safe wrapper around the repository's idempotency-key recording."""
+    try:
+        repo = get_job_repository()
+        repo.record_idempotency_key(idem_key, job_id, fingerprint)
+    except Exception:
+        pass
 
 
 def _is_worker_mode() -> bool:
@@ -310,12 +318,11 @@ def create_jobs_router(
                 file_path=job.results_file_path,
             )
         else:
-            from app.job_store import read_job_results
-
-            disk_results = await run_in_threadpool(read_job_results, job.id)
-            if disk_results:
-                total = len(disk_results)
-                page = disk_results[offset : offset + limit]
+            repo = get_job_repository()
+            results_list = await run_in_threadpool(repo.read_results, job.id, limit + offset, 0)
+            if results_list:
+                total = len(results_list)
+                page = results_list[offset : offset + limit]
             else:
                 results_list = list(job.results)
                 total = len(results_list)

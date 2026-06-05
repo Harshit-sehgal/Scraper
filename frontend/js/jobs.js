@@ -11,6 +11,9 @@ import { currentView } from './views.js';
 let jobsCache = [];
 const pollers = {};
 
+// Track the most recently transitioned job ID so renderJobs() can flash it
+let _flashJobId = null;
+
 export function getJobsCache() { return jobsCache; }
 export function getPollers() { return pollers; }
 
@@ -164,6 +167,8 @@ async function pollJob(id) {
         if (['completed', 'degraded', 'empty_result', 'failed', 'canceled'].includes(j.status)) {
             clearInterval(pollers[id]);
             delete pollers[id];
+            // Mark this job for a status-change flash on the next render
+            _flashJobId = id;
             refreshJobs();
             if (j.status === 'completed') toast(`"${j.name}" done — ${j.filtered_records} records`, 'success');
             else if (j.status === 'degraded') toast(`"${j.name}" finished with partial results — ${j.filtered_records} records`, 'info');
@@ -270,8 +275,12 @@ function renderJobs(jobs) {
         const hasProgress = j.progress_total > 0;
         const pct = hasProgress ? Math.round((j.progress_current / j.progress_total) * 100) : 0;
 
+        const highlightClass = j.status === 'completed' || j.status === 'degraded' ? 'completed-highlight' :
+            j.status === 'failed' ? 'failed-highlight' :
+            (j.status === 'running' || j.status === 'discovering' || j.status === 'pending') ? 'running-highlight' : '';
+
         return `
-            <div class="job-row">
+            <div class="job-row${highlightClass ? ' ' + highlightClass : ''}" data-id="${j.id}">
                 <div class="job-name-col">
                     <div class="job-name">
                         ${esc(j.name)}
@@ -296,4 +305,16 @@ function renderJobs(jobs) {
             </div>
         `;
     }).join('');
+
+    // Apply status-change flash animation if a job just transitioned
+    if (_flashJobId) {
+        const flashRow = list.querySelector(`[data-id="${_flashJobId}"]`);
+        if (flashRow) {
+            flashRow.classList.add('status-change');
+            flashRow.addEventListener('animationend', () => {
+                flashRow.classList.remove('status-change');
+            }, { once: true });
+        }
+        _flashJobId = null;
+    }
 }

@@ -31,9 +31,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.lock.txt
 
-      - name: Install Playwright Chromium with system deps
-        run: |
-          python -m playwright install --with-deps chromium
+      - name: Cache Playwright Chromium browser
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-browser-${{ hashFiles('backend/requirements-dev.lock.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright Chromium (cached)
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: python -m playwright install --with-deps chromium
+
+      - name: Install Playwright system deps only (browser cached)
+        if: steps.cache-playwright.outputs.cache-hit == 'true'
+        run: python -m playwright install-deps chromium
 
       - name: Run Browser E2E tests
         run: |

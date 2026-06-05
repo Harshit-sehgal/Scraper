@@ -56,3 +56,53 @@ groups:
         annotations:
           summary: "High API response latency"
           description: "95th percentile response latency is {{ $value }}s (threshold > 2.0s) for more than 5 minutes."
+
+      # 6. Anti-Bot / Captcha Block Rate Alert
+      - alert: HighAntiBotBlockRate
+        expr: |
+          (
+            sum(rate(dataforge_anti_bot_classifications_total{classification!="ok"}[5m]))
+            /
+            (sum(rate(dataforge_anti_bot_classifications_total[5m])) + 1)
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High anti-bot challenge rate"
+          description: "{{ $value | humanizePercentage }} of scraped pages encountered anti-bot challenges in the last 5 minutes (threshold > 50%)."
+
+      # 7. Browser Launch Failures Alert
+      - alert: BrowserLaunchFailures
+        expr: rate(dataforge_browser_launch_total{outcome="failure"}[5m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Browser launch failures detected"
+          description: "Playwright browser launches are failing at {{ $value }} failures/sec over 5 minutes. Check browser binary integrity and system dependencies."
+
+      # 8. Export Generation Failure Rate Alert
+      - alert: HighExportFailureRate
+        expr: |
+          (
+            sum(rate(dataforge_exports_total{outcome="failure"}[10m]))
+            /
+            (sum(rate(dataforge_exports_total[10m])) + 1)
+          ) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High export generation failure rate"
+          description: "{{ $value | humanizePercentage }} of export generation attempts failed in the last 10 minutes (threshold > 20%)."
+
+      # 9. SSRF Block Rate Spike Alert
+      - alert: HighSSRFBlockRate
+        expr: rate(dataforge_ssrf_rejects_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High SSRF reject rate"
+          description: "SSRF guard is rejecting {{ $value | humanize }} requests/sec. Possible malicious scanning or misconfigured URLs."

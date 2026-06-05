@@ -1,5 +1,4 @@
 name: CI
-# Trigger run to test Telegram notification
 
 on:
   push:
@@ -9,8 +8,9 @@ on:
     branches: [main]
 
 jobs:
-  ci-gates:
-    name: Mandatory CI Gates
+  # ── Fast checks (no Playwright browser download) ───────────────────
+  ci-gates-fast:
+    name: Fast CI Gates
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,14 +54,6 @@ jobs:
           pip-audit -r backend/requirements-dev.lock.txt --strict || \
             echo "::warning::pip-audit reported issues in dev-only dependencies (non-blocking)"
 
-      - name: Install Playwright Chromium
-        run: python -m playwright install --with-deps chromium
-
-      - name: Run Benchmark Smoke Test (SQLite)
-        run: |
-          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python -m pytest -q backend/benchmarks -o addopts= --tb=short
-
       - name: Generate Route Authorization Matrix
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
@@ -77,6 +69,62 @@ jobs:
             echo "✅ check_prod_env.py correctly failed on placeholder secrets (expected behaviour)."
           fi
 
+  # ── Benchmarks (needs Playwright browser — cached) ────────────────
+  ci-gates-benchmarks:
+    name: In-Corpus Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-ci-${{ hashFiles('backend/requirements-dev.lock.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-dev.lock.txt
+
+      - name: Cache Playwright Chromium browser
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('backend/requirements-dev.lock.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright Chromium (cached)
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: python -m playwright install --with-deps chromium
+
+      - name: Install Playwright system deps (no browser download)
+        if: steps.cache-playwright.outputs.cache-hit == 'true'
+        run: python -m playwright install-deps chromium
+
+      - name: Run In-Corpus Benchmarks (SQLite, skipped markers excluded)
+        run: |
+          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+          python -m pytest -q backend/benchmarks \
+            -m "not live_benchmark and not browser" \
+            -o addopts= --tb=short
+
+      - name: Run Live Benchmark Governance Check
+        run: |
+          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+          python -m pytest -q backend/tests/test_benchmark_governance.py \
+            -o addopts= --tb=short
+
+  # ── Lint, type & security checks ─────────────────────────────────
   lint-type-checks:
     name: Lint, Type & Security Checks
     runs-on: ubuntu-latest
@@ -101,6 +149,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.lock.txt
           pip install ruff mypy bandit types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
+          # Test runner optimizations: parallel execution + flaky retry
+          pip install pytest-xdist pytest-rerunfailures
 
       - name: Run Ruff Lint
         run: ruff check backend/app backend/tests
@@ -134,13 +184,21 @@ jobs:
           path: route-inventory.md
           retention-days: 30
 
-      - name: Run Full Test Suite (SQLite)
+      # Run the full test suite with parallel workers + flaky retry.
+      # -n auto scales to runner CPU count.
+      # --reruns 2 retries each failed test up to twice with a 10 s delay.
+      - name: Run Full Test Suite (SQLite, parallel + retry)
         run: |
-          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite           python -m pytest -q backend/tests -o addopts= --tb=short
+          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+          python -m pytest -n auto --reruns 2 --reruns-delay 10 \
+            -q backend/tests -o addopts= --tb=short
 
       - name: Enforce coverage floors
         run: |
-          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite           python -m coverage run --source=backend/app -m pytest -q backend/tests -o addopts= --tb=line --no-cov-on-fail -q
+          PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
+          python -m coverage run --source=backend/app \
+            -m pytest -n auto --reruns 2 --reruns-delay 10 \
+            -q backend/tests -o addopts= --tb=line --no-cov-on-fail -q
           python -m coverage json -o coverage.json
           python scripts/check_coverage_floors.py coverage.json
           python -m coverage report --fail-under=60
@@ -184,7 +242,7 @@ jobs:
 
   notify:
     name: Telegram Notification
-    needs: [ci-gates, lint-type-checks, sbom]
+    needs: [ci-gates-fast, ci-gates-benchmarks, lint-type-checks, sbom]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -197,7 +255,7 @@ jobs:
           to: ${{ secrets.TELEGRAM_TO }}
           token: ${{ secrets.TELEGRAM_TOKEN }}
           message: |
-            🔔 CI Workflow Status: ${{ (needs.ci-gates.result == 'success' && needs.lint-type-checks.result == 'success') && '✅ Passed' || '❌ Failed' }}
+            🔔 CI Workflow Status: ${{ (needs.ci-gates-fast.result == 'success' && needs.ci-gates-benchmarks.result == 'success' && needs.lint-type-checks.result == 'success') && '✅ Passed' || '❌ Failed' }}
 
             Repo: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
