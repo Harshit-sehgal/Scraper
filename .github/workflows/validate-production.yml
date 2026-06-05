@@ -406,24 +406,32 @@ jobs:
               body: report
             });
 
-  notify-on-failure:
-    name: Notify on Failure
-    runs-on: ubuntu-latest
+  notify:
+    name: Telegram Notification
     needs:
       - syntax-and-architecture
       - test-collection
       - test-sqlite
       - test-security
+      - test-benchmarks
       - test-postgres
       - test-browser-e2e
       - test-golden-dataset
-    if: failure()
+      - docker-build
+      - docs-validation
+      - final-report
+    runs-on: ubuntu-latest
+    if: always()
     steps:
-      - name: Notify Slack
-        if: env.SLACK_WEBHOOK != ''
-        uses: 8398a7/action-slack@v3
+      - name: Send Telegram Message
+        uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b
         with:
-          status: ${{ job.status }}
-          text: 'Production readiness validation failed'
-          webhook_url: ${{ env.SLACK_WEBHOOK }}
-          fields: repo,message,commit,author
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🔔 Production Readiness Status: ${{ (needs.syntax-and-architecture.result == 'success' && needs.test-collection.result == 'success' && needs.test-sqlite.result == 'success' && needs.test-security.result == 'success' && needs.test-benchmarks.result == 'success' && needs.test-postgres.result == 'success' && needs.test-browser-e2e.result == 'success' && needs.test-golden-dataset.result == 'success' && needs.docker-build.result == 'success' && needs.docs-validation.result == 'success' && needs.final-report.result == 'success') && '✅ Passed' || '❌ Failed' }}
+
+            Repo: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+            Author: ${{ github.actor }}

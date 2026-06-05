@@ -107,7 +107,7 @@ def create_jobs_router(
     run_job_coro_fn: Callable,
     config: dict | None = None,
 ):
-    router = APIRouter()
+    router = APIRouter(tags=["jobs"])
 
     # ── Thread-safe store access ───────────────────────────────────────
     # Protect concurrent access to jobs_store and recycle_bin_store.

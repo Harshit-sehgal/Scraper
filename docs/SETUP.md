@@ -39,6 +39,19 @@ DATAFORGE_ADMIN_API_KEY=local-admin-key
 
 Use strong random values outside local development.
 
+## Rate Limiting
+
+The API applies dual-layer rate limiting out of the box:
+
+- **Global cap**: `600 requests/minute` across all clients (`DATAFORGE_RATE_LIMIT_GLOBAL`)
+- **Per-IP cap**: `100 requests/minute` per client (`DATAFORGE_RATE_LIMIT_PER_IP`)
+
+Both tiers must be satisfied for a request to proceed. Per-IP tracking can be disabled
+with `DATAFORGE_RATE_LIMIT_PER_IP_ENABLED=false`.
+
+In production/staging, rate limiting auto-promotes to the shared database-backed store
+for multi-worker consistency. See `docs/API.md` for the full rate limiting reference.
+
 ## Common Commands
 
 Use explicit local settings to avoid accidental Postgres dependency:

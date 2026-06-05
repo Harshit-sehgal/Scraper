@@ -47,3 +47,22 @@ jobs:
         run: |
           docker compose -f docker-compose.yml config -q
           docker compose -f docker-compose.prod.yml config -q
+
+  notify:
+    name: Telegram Notification
+    needs: [build-production]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Send Telegram Message
+        uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🔔 Image Build & Smoke Status: ${{ needs.build-production.result == 'success' && '✅ Passed' || '❌ Failed' }}
+
+            Repo: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+            Author: ${{ github.actor }}

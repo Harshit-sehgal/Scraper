@@ -36,3 +36,22 @@ jobs:
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
           python -m pytest -v backend/tests -o addopts= --tb=short
+
+  notify:
+    name: Telegram Notification
+    needs: [nightly-sqlite]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Send Telegram Message
+        uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🔔 Nightly Integration Tests Status: ${{ needs.nightly-sqlite.result == 'success' && '✅ Passed' || '❌ Failed' }}
+
+            Repo: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+            Author: ${{ github.actor }}

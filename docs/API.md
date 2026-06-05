@@ -105,6 +105,94 @@ Admin-only routes include system merge, scheduler step, refactor compression, di
 
 `GET /metrics` is protected by `DATAFORGE_METRICS_TOKEN` if configured. Local Compose verified public Nginx returns 404 for `/metrics`, while Prometheus scrapes `http://dataforge:8000/metrics` internally with the configured bearer token. Repeat this check behind the target ingress.
 
+## Batch Export
+
+`POST /api/exports/batch` — Export results from multiple jobs in a single request.
+
+| Property | Type | Default | Description |
+| --- | --- | --- | --- |
+| `job_ids` | `string[]` | (required) | Job IDs to export (1–50) |
+| `format` | `string` | `"csv"` | Output format: `csv`, `json`, or `xlsx` |
+| `flatten` | `bool` | `true` | When True, results are combined into a single output. When False, jobs are separated (CSV uses separator rows, JSON uses an `exports` array, Excel uses one sheet per job). |
+
+### CSV (`format: "csv"`)
+
+- **flatten=True** (default): Single CSV table with all rows from all jobs. A `_source_job` column identifies the origin job. All fields across jobs are unioned into the header.
+- **flatten=False**: Separator rows (`--- Job Name ---`) divide job sections. No `_source_job` column.
+
+### JSON (`format: "json"`)
+
+- **flatten=True**: Single JSON array where every object includes a `_source_job` field.
+- **flatten=False**: A JSON object with an `exports` array:
+
+  ```json
+  {
+    "exports": [
+      {
+        "job_id": "uuid-1",
+        "job_name": "Job A",
+        "results": [...]
+      },
+      {
+        "job_id": "uuid-2",
+        "job_name": "Job B",
+        "results": [...]
+      }
+    ]
+  }
+  ```
+
+### Excel (`format: "xlsx"`)
+
+- **flatten=True**: Single "Combined" sheet with a `_source_job` column.
+- **flatten=False**: One sheet per job (sheet name truncated to 31 characters).
+
+### Error codes
+
+| Status | Meaning |
+| --- | --- |
+| 200 | Successful export (file download) |
+| 400 | None of the specified jobs have results |
+| 404 | One or more job IDs not found |
+| 422 | Empty `job_ids`, invalid format, or validation failure |
+
+### Example
+
+```bash
+curl -X POST https://dataforge.example.com/api/exports/batch \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_ids": ["abc-123", "def-456"],
+    "format": "csv",
+    "flatten": true
+  }' \
+  -o combined_export.csv
+```
+
+## Rate Limiting
+
+The API applies sliding-window rate limiting with two independent tiers:
+
+**Tier 1: Aggregate global cap** — Controls total throughput across all clients combined.
+- Default: `600 requests/minute` (`DATAFORGE_RATE_LIMIT_GLOBAL`)
+- Route-specific overrides apply for expensive endpoints (URL analyze: 10/min, discovery: 15/min, etc.)
+
+**Tier 2: Per-IP fair-sharing cap** — Ensures no single client can monopolise the API.
+- Default: `100 requests/minute` per IP (`DATAFORGE_RATE_LIMIT_PER_IP`)
+- Can be disabled via `DATAFORGE_RATE_LIMIT_PER_IP_ENABLED=false`
+- This tier is separate from route-specific limits (those apply only to the aggregate tier)
+
+**Database-backed counters**: In production/staging, `RATE_LIMIT_DB_BACKED` auto-promotes to `True`, using the shared `rate_limits` table so counters survive process restarts and work across multiple workers.
+
+**Response headers**: Every API response includes:
+- `X-RateLimit-Limit` — Max requests per window
+- `X-RateLimit-Remaining` — Requests remaining in current window
+- `X-RateLimit-Reset` — Unix timestamp when the window resets
+- `Retry-After` — Seconds until retry (only on 429 responses)
+
+**Safe IP extraction**: `X-Forwarded-For` is only trusted when the immediate peer is a private or loopback address (localhost, Docker subnet). External clients cannot spoof their IP.
+
 ## Auth Notes
 
 - `X-API-Key` or `Authorization: Bearer <token>` can provide user/operator/admin credentials.
