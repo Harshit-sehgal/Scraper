@@ -294,7 +294,17 @@ class Settings(BaseSettings):
     METRICS_HISTOGRAM_BUCKETS: str = "0.01,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0,30.0,60.0,120.0"
     """Comma-separated bucket boundaries for duration histograms (seconds)."""
     RATE_LIMIT_GLOBAL: str = "600/minute"
-    """Global rate limit for /api/* endpoints (slowapi format). Empty = disabled."""
+    """Aggregate rate limit across all clients for /api/* endpoints. Empty = disabled."""
+    RATE_LIMIT_PER_IP: str = "100/minute"
+    """Per-IP rate limit when per-IP tracking is enabled. Each client IP gets its own
+    counter with this cap, separate from the aggregate global cap. Empty = disabled."""
+    RATE_LIMIT_PER_IP_ENABLED: bool = True
+    """Enable per-IP rate limiting. When True, each client IP is rate-limited
+    independently using ``RATE_LIMIT_PER_IP`` as the cap. When False, only the
+    aggregate ``RATE_LIMIT_GLOBAL`` applies across all clients combined.
+    In-memory counters are used for single-process deployments; the database-backed
+    store is used when ``RATE_LIMIT_DB_BACKED`` is True (auto-promoted in
+    production/staging)."""
     RATE_LIMIT_JOB_CREATE: str = "10/minute"
     """Stricter rate limit for job creation (POST /api / jobs)."""
     RATE_LIMIT_DISCOVER: str = "20/minute"

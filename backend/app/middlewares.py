@@ -179,4 +179,6 @@ async def csp_report_only_middleware(request: Request, call_next):
 
 rate_limiter = RateLimiterMiddleware(
     global_limit=settings.RATE_LIMIT_GLOBAL,
+    per_ip=settings.RATE_LIMIT_PER_IP_ENABLED,
+    per_ip_limit=settings.RATE_LIMIT_PER_IP,
 )

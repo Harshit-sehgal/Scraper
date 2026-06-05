@@ -347,38 +347,63 @@ class SlidingWindowCounter:
 
 
 class RateLimiterMiddleware:
-    """In-memory sliding window rate limiter for FastAPI.
+    """Sliding window rate limiter for FastAPI with dual-layer support.
 
-    Applies a global rate limit across all /api/ endpoints,
-    plus optional stricter limits for specific route patterns.
+    Applies an **aggregate global** rate limit across all /api/ endpoints,
+    plus optional **per-IP** limits that are enforced independently for each
+    client. A request must pass BOTH tiers to proceed.
+
+    Features:
+    - Aggregate global cap across all clients combined
+    - Per-IP cap for fair sharing across clients
+    - Route-specific stricter limits for expensive endpoints
+    - In-memory counters for single-process deployments
+    - Database-backed counters (``DatabaseSlidingWindowCounter``) for
+      multi-process / multi-worker deployments
+    - Safe IP extraction behind nginx reverse proxy
 
     Safe IP extraction:
     - Only trusts X-Forwarded-For when the connection comes from localhost / 127.0.0.1
       (i.e., through nginx on the same machine or Docker network).
     - In all other cases, falls back to the direct remote address.
+
+    Usage:
+        rate_limiter = RateLimiterMiddleware(
+            global_limit="10000/minute",
+            per_ip=True,
+            per_ip_limit="100/minute",
+        )
+        app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limiter.middleware)
     """
 
     def __init__(
         self,
         global_limit: str = "",
         per_ip: bool = True,
+        per_ip_limit: str = "",
         cleanup_interval: int = 300,
     ) -> None:
         self._global_max, self._global_window = _parse_rate_limit(global_limit)
         self._per_ip = per_ip
+        self._per_ip_max, self._per_ip_window = _parse_rate_limit(per_ip_limit)
         self._counters: dict[str, SlidingWindowCounter | DatabaseSlidingWindowCounter] = {}
         self._last_cleanup = time.time()
-        self._cleanup_interval = cleanup_interval  # seconds between TTL cleanups
+        self._cleanup_interval = cleanup_interval
 
-        if self._global_max > 0:
+        if self._global_max > 0 or self._per_ip_max > 0:
             logger.info(
-                "Rate limiter: %d requests per %.0fs (global), cleanup every %ds",
+                "Rate limiter: global=%d/%.0fs per_ip=%s/%.0fs (per_ip_enabled=%s) cleanup=%ds",
                 self._global_max,
                 self._global_window,
+                self._per_ip_max,
+                self._per_ip_window,
+                self._per_ip,
                 self._cleanup_interval,
             )
         else:
             logger.info("Rate limiter: disabled")
+
+    # ── IP extraction ──────────────────────────────────────────────────
 
     @staticmethod
     def _extract_client_ip(request: Request) -> str:
@@ -394,7 +419,6 @@ class RateLimiterMiddleware:
         if not client_host:
             return "unknown"
 
-        # Only trust X-Forwarded-For when the immediate peer is internal
         try:
             peer_ip = ipaddress.ip_address(client_host)
             is_trusted_proxy = peer_ip.is_private or peer_ip.is_loopback
@@ -404,43 +428,63 @@ class RateLimiterMiddleware:
         if is_trusted_proxy:
             forwarded = request.headers.get("X-Forwarded-For", "")
             if forwarded:
-                # Take the first (original client) IP from the chain
                 return forwarded.split(",")[0].strip()
 
         return client_host
 
-    def _get_client_key(self, path: str, method: str, client_ip: str | None = None) -> str:
-        """Build a composite key from client identity and route pattern."""
-        if client_ip is None:
-            client_ip = method
-            method = "POST"
+    # ── Key building ───────────────────────────────────────────────────
+
+    def _get_aggregate_key(self, path: str, method: str) -> str:
+        """Composite key for the aggregate (global) counter."""
+        route_key = _get_route_key(path, method)
+        return f"_global:{route_key}:{method}"
+
+    def _get_per_ip_key(self, path: str, method: str, client_ip: str) -> str:
+        """Composite key for the per-IP counter."""
         route_key = _get_route_key(path, method)
         return f"{route_key}:{method}:{client_ip}"
 
-    def _get_limits_for_path(self, path: str, method: str = "POST") -> tuple[int, float]:
-        """Determine the most restrictive limits for a path.
+    # ── Limit resolution ───────────────────────────────────────────────
 
-        Uses the global limit as a baseline, then applies route-specific
-        limits if they are stricter (smaller max or same max with shorter window).
-        """
+    def _get_limits_for_path(self, path: str, method: str = "POST") -> tuple[int, float]:
+        """Resolve the effective limit for a path by merging global and
+        route-specific caps. Returns (max_requests, window_seconds)."""
         route_key = _get_route_key(path, method)
         limits = _get_effective_route_limits(method)
         if route_key in limits:
             route_max, route_window = limits[route_key]
             if self._global_max <= 0:
                 return route_max, route_window
-            # Use the stricter of global vs route-specific limits
             if route_max < self._global_max:
                 return route_max, min(route_window, self._global_window)
             if route_window < self._global_window:
                 return min(route_max, self._global_max), route_window
         return self._global_max, self._global_window
 
-    def _prune_expired_counters(self) -> None:
-        """Remove expired counters to prevent unbounded memory growth.
+    # ── Counter lifecycle ──────────────────────────────────────────────
 
-        Runs periodically based on cleanup_interval.
+    def _get_or_create_counter(
+        self, key: str, max_req: int, window_sec: float
+    ) -> SlidingWindowCounter | DatabaseSlidingWindowCounter:
+        """Get an existing counter or create a new one.
+
+        Uses ``DatabaseSlidingWindowCounter`` when ``RATE_LIMIT_DB_BACKED``
+        is True, otherwise falls back to in-memory ``SlidingWindowCounter``.
         """
+        if key in self._counters:
+            return self._counters[key]
+
+        from app.config import settings
+
+        if settings.RATE_LIMIT_DB_BACKED:
+            counter: SlidingWindowCounter | DatabaseSlidingWindowCounter = DatabaseSlidingWindowCounter(max_req, window_sec, key)
+        else:
+            counter = SlidingWindowCounter(max_req, window_sec)
+        self._counters[key] = counter
+        return counter
+
+    def _prune_expired_counters(self) -> None:
+        """Remove expired counters to prevent unbounded memory growth."""
         now = time.time()
         if now - self._last_cleanup < self._cleanup_interval:
             return
@@ -451,9 +495,53 @@ class RateLimiterMiddleware:
         if before > after:
             logger.debug("Rate limiter: pruned %d expired counter(s)", before - after)
 
+    # ── Rate-limit response builder ───────────────────────────────────
+
+    def _build_429_response(
+        self, counter: SlidingWindowCounter | DatabaseSlidingWindowCounter, client_ip: str, path: str
+    ) -> JSONResponse:
+        """Build a 429 Too Many Requests response with standard headers."""
+        logger.warning(
+            "Rate limit exceeded for %s on %s (%d/%d per %.0fs)",
+            client_ip,
+            path,
+            counter.remaining(),
+            counter.max_requests,
+            counter.window_seconds,
+        )
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": "Rate limit exceeded. Try again later.",
+                "retry_after_seconds": counter.reset_in(),
+            },
+            headers={
+                "X-RateLimit-Limit": str(counter.max_requests),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(int(time.time() + counter.reset_in())),
+                "Retry-After": str(int(counter.reset_in())),
+            },
+        )
+
+    def _add_rate_limit_headers(self, response: Response, counter: SlidingWindowCounter | DatabaseSlidingWindowCounter) -> None:
+        """Attach rate-limit metadata headers to the outgoing response."""
+        try:
+            response.headers["X-RateLimit-Limit"] = str(counter.max_requests)
+            response.headers["X-RateLimit-Remaining"] = str(counter.remaining())
+            response.headers["X-RateLimit-Reset"] = str(int(time.time() + counter.reset_in()))
+        except (AttributeError, TypeError, ValueError):
+            pass
+
+    # ── Main middleware dispatch ───────────────────────────────────────
+
     async def middleware(self, request: Request, call_next: Callable) -> Response:
-        """ASGI middleware dispatch."""
-        if self._global_max <= 0:
+        """ASGI middleware dispatch with dual-layer rate limiting.
+
+        A request must pass **both** the aggregate global counter and
+        the per-IP counter (if enabled) to proceed. If either is
+        exceeded, a 429 response is returned immediately.
+        """
+        if self._global_max <= 0 and not (self._per_ip and self._per_ip_max > 0):
             return await call_next(request)  # type: ignore[no-any-return]
 
         path = request.url.path
@@ -463,70 +551,60 @@ class RateLimiterMiddleware:
         if "/docs" in path or "/openapi" in path:
             return await call_next(request)  # type: ignore[no-any-return]
 
-        # Prune expired counters periodically
         self._prune_expired_counters()
 
-        # Determine client identity
         client_ip = self._extract_client_ip(request)
         method = request.method
 
-        # Build per-route, per-IP limit key
-        key = self._get_client_key(path, method, client_ip) if self._per_ip else f"{_get_route_key(path, method)}:{method}"
+        # ── Tier 1: Aggregate global counter ───────────────────────
+        if self._global_max > 0:
+            agg_key = self._get_aggregate_key(path, method)
+            agg_limit = self._get_limits_for_path(path, method)
+            agg_counter = self._get_or_create_counter(agg_key, *agg_limit)
 
-        # Get limits for this route (stricter of global and route-specific)
-        max_req, window_sec = self._get_limits_for_path(path, method)
-        if max_req <= 0:
-            return await call_next(request)  # type: ignore[no-any-return]
+            if not agg_counter.allow():
+                return self._build_429_response(agg_counter, client_ip, path)
 
-        # Get or create counter
-        if key not in self._counters:
-            from app.config import settings
+        # ── Tier 2: Per-IP counter ─────────────────────────────────
+        # The per-IP tier is a pure fair-sharing cap — it uses ONLY the
+        # configured ``per_ip_limit`` and does NOT apply route-specific
+        # overrides (which are already enforced by the aggregate tier).
+        # This keeps the two tiers cleanly separated:
+        #   Tier 1 = aggregate (global + route-specific)
+        #   Tier 2 = fair-share (per-IP only)
+        active_per_ip_counter: SlidingWindowCounter | DatabaseSlidingWindowCounter | None = None
+        if self._per_ip and self._per_ip_max > 0:
+            ip_key = self._get_per_ip_key(path, method, client_ip)
+            ip_counter = self._get_or_create_counter(ip_key, self._per_ip_max, self._per_ip_window)
+            active_per_ip_counter = ip_counter
 
-            if settings.RATE_LIMIT_DB_BACKED:
-                self._counters[key] = DatabaseSlidingWindowCounter(max_req, window_sec, key)
-            else:
-                self._counters[key] = SlidingWindowCounter(max_req, window_sec)
-        counter = self._counters[key]
+            if not ip_counter.allow():
+                return self._build_429_response(ip_counter, client_ip, path)
 
-        # Check rate limit
-        if not counter.allow():
-            logger.warning(
-                "Rate limit exceeded for %s on %s (%d/%d per %.0fs)",
-                client_ip,
-                path,
-                counter.remaining(),
-                max_req,
-                window_sec,
-            )
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "detail": "Rate limit exceeded. Try again later.",
-                    "retry_after_seconds": counter.reset_in(),
-                },
-                headers={
-                    "X-RateLimit-Limit": str(counter.max_requests),
-                    "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Reset": str(int(time.time() + counter.reset_in())),
-                    "Retry-After": str(int(counter.reset_in())),
-                },
-            )
-
+        # ── Proceed with the request ───────────────────────────────
         response = await call_next(request)
 
-        # Add rate limit headers
-        response.headers["X-RateLimit-Limit"] = str(counter.max_requests)
-        response.headers["X-RateLimit-Remaining"] = str(counter.remaining())
-        response.headers["X-RateLimit-Reset"] = str(int(time.time() + counter.reset_in()))
+        # Add rate limit headers from the per-IP counter (most relevant to clients)
+        if active_per_ip_counter is not None:
+            self._add_rate_limit_headers(response, active_per_ip_counter)
+        elif self._global_max > 0:
+            agg_counter = self._get_or_create_counter(
+                self._get_aggregate_key(path, method),
+                *self._get_limits_for_path(path, method),
+            )
+            self._add_rate_limit_headers(response, agg_counter)
 
         return response  # type: ignore[no-any-return]
 
     def get_stats(self) -> dict:
         """Return current rate limiter stats (for observability)."""
         return {
-            "enabled": self._global_max > 0,
-            "limit_per_window": self._global_max,
-            "window_seconds": self._global_window,
+            "enabled": self._global_max > 0 or (self._per_ip and self._per_ip_max > 0),
+            "global_limit_per_window": self._global_max,
+            "global_window_seconds": self._global_window,
+            "per_ip_enabled": self._per_ip,
+            "per_ip_limit_per_window": self._per_ip_max,
+            "per_ip_window_seconds": self._per_ip_window,
             "active_keys": len(self._counters),
             "route_limits": {k: {"max_requests": v[0], "window_seconds": v[1]} for k, v in _get_effective_route_limits().items()},
         }

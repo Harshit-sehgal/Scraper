@@ -4,11 +4,12 @@ import io
 import json
 import logging
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Annotated, Any
 
 from app.config import settings
 from app.utils.export import safe_export_filename
-from fastapi import APIRouter, HTTPException, Response
+from app.utils.rbac import UserRole, require_role
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from pydantic import BaseModel, Field
@@ -426,7 +427,10 @@ def create_exports_router(jobs_store: dict):
     # ─── Batch Export ────────────────────────────────────────────────────
 
     @router.post("/api/exports/batch")
-    async def batch_export(body: BatchExportRequest):
+    async def batch_export(
+        body: BatchExportRequest,
+        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    ):
         try:
             return await _batch_export_impl(body)
         except HTTPException:
