@@ -25,6 +25,7 @@ from app.scrape_telemetry import get_scrape_telemetry
 from app.utils.rbac import UserRole, require_role
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
 
@@ -79,20 +80,20 @@ class ModeBody(BaseModel):
 
 @router.get("/mode")
 async def get_current_mode():
-    """Get the current operator mode and its configuration.
+    """Get the current operator mode and its configuration."""
+    try:
+        from app.visualization import OperatorMode  # research-shell, lazy
 
-    Returns the active operator profile and the corresponding
-    runtime settings that are currently applied.
-    """
-    from app.visualization import OperatorMode  # research-shell, lazy
-
-    dashboard = get_governance_dashboard()
-    governance_summary = dashboard.get_governance_summary()
-    return {
-        "active_mode": dashboard.active_mode.value,
-        "available_modes": [m.value for m in OperatorMode],
-        "settings": governance_summary,
-    }
+        dashboard = get_governance_dashboard()
+        governance_summary = await run_in_threadpool(dashboard.get_governance_summary)
+        return {
+            "active_mode": dashboard.active_mode.value,
+            "available_modes": [m.value for m in OperatorMode],
+            "settings": governance_summary,
+        }
+    except Exception as e:
+        logger.exception("Failed to get operator mode")
+        raise HTTPException(status_code=500, detail=f"Failed to get operator mode: {e}")
 
 
 @router.post("/mode")
@@ -101,50 +102,37 @@ async def set_operator_mode(
     body: ModeBody,
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN]))],
 ):
-    """Switch the system to a different operator mode.
-
-    Dynamically adjusts runtime settings (timeout, settle delay,
-    stealth mode, etc.) for the selected operational profile.
-
-    Requires admin-level privileges — this operation is powerful and can
-    switch the runtime into stealth / forensic / benchmark modes that bypass
-    normal timing and anti-bot limits.
-
-    Modes:
-      - production: High-yield throughput, stable data capture
-      - benchmark: Hostile validation, full telemetry
-      - forensic: Deep diagnostics, verbose logging
-      - stealth: Maximum anti-bot camouflage
-      - low_cost: Resource conservation mode
-
-    Args:
-        body.mode: One of 'production', 'benchmark', 'forensic', 'stealth', 'low_cost'.
-
-    """
-    from app.visualization import OperatorMode  # research-shell, lazy
-
-    mode = body.mode
+    """Switch the system to a different operator mode."""
     try:
-        target_mode = OperatorMode(mode.lower())
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid mode: '{mode}'. Valid modes: {[m.value for m in OperatorMode]}",
+        from app.visualization import OperatorMode  # research-shell, lazy
+
+        mode = body.mode
+        try:
+            target_mode = OperatorMode(mode.lower())
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid mode: '{mode}'. Valid modes: {[m.value for m in OperatorMode]}",
+            )
+
+        dashboard = get_governance_dashboard()
+        adjustments = await run_in_threadpool(dashboard.set_operator_mode, target_mode)
+        logger.info(
+            "[Operator] Mode switched to '%s': %s",
+            target_mode.value,
+            adjustments,
         )
 
-    dashboard = get_governance_dashboard()
-    adjustments = dashboard.set_operator_mode(target_mode)
-    logger.info(
-        "[Operator] Mode switched to '%s': %s",
-        target_mode.value,
-        adjustments,
-    )
-
-    return {
-        "active_mode": target_mode.value,
-        "adjustments": adjustments,
-        "message": f"Switched to {target_mode.value} mode",
-    }
+        return {
+            "active_mode": target_mode.value,
+            "adjustments": adjustments,
+            "message": f"Switched to {target_mode.value} mode",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to set operator mode")
+        raise HTTPException(status_code=500, detail=f"Failed to switch operator mode: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -163,48 +151,52 @@ async def get_system_dashboard():
     - Telemetry stats (recent scrape success / failure counts)
     - Resource governor report (memory, queue, token spend)
     """
-    dashboard = get_governance_dashboard()
-    governance = dashboard.get_governance_summary()
+    try:
+        dashboard = get_governance_dashboard()
+        governance = await run_in_threadpool(dashboard.get_governance_summary)
 
-    # Domain health summary
-    monitor = get_domain_health_monitor()
-    domains_health = monitor.get_all_domains_health()
+        # Domain health summary
+        monitor = get_domain_health_monitor()
+        domains_health = await run_in_threadpool(monitor.get_all_domains_health)
 
-    # Browser pool metrics
-    browser_metrics = get_browser_pool().get_metrics()
+        # Browser pool metrics
+        browser_metrics = get_browser_pool().get_metrics()
 
-    # Telemetry stats
-    telemetry = get_scrape_telemetry()
-    recent = telemetry.get_recent(100)
-    recent_successes = sum(1 for t in recent if not t.get("fallback_triggered", False))
-    recent_failures = len(recent) - recent_successes if recent else 0
+        # Telemetry stats
+        telemetry = get_scrape_telemetry()
+        recent = telemetry.get_recent(100)
+        recent_successes = sum(1 for t in recent if not t.get("fallback_triggered", False))
+        recent_failures = len(recent) - recent_successes if recent else 0
 
-    return {
-        "active_mode": dashboard.active_mode.value,
-        "resources": governance.get("resources", {}),
-        "domains": {
-            "total_monitored": len(domains_health),
-            "healthy": sum(1 for d in domains_health if d.get("health_level") == "healthy"),
-            "degrading": sum(1 for d in domains_health if d.get("health_level") == "degrading"),
-            "unhealthy": sum(1 for d in domains_health if d.get("health_level") == "unhealthy"),
-            "critical": sum(1 for d in domains_health if d.get("health_level") in ("critical", "blacklisted")),
-        },
-        "browser": {
-            "active_contexts": browser_metrics.get("active_contexts", 0),
-            "total_contexts": browser_metrics.get("total_contexts", 0),
-        },
-        "telemetry": {
-            "recent_scrapes": len(recent),
-            "recent_successes": recent_successes,
-            "recent_failures": recent_failures,
-            "success_rate": round(recent_successes / max(len(recent), 1), 3),
-        },
-        "governor": {
-            "token_spend_dollars": governance.get("resources", {}).get("token_spend_dollars", 0),
-            "browser_prunes": governance.get("resources", {}).get("metrics", {}).get("browser_prunes", 0),
-            "queue_sheds": governance.get("resources", {}).get("metrics", {}).get("queue_sheds", 0),
-        },
-    }
+        return {
+            "active_mode": dashboard.active_mode.value,
+            "resources": governance.get("resources", {}),
+            "domains": {
+                "total_monitored": len(domains_health),
+                "healthy": sum(1 for d in domains_health if d.get("health_level") == "healthy"),
+                "degrading": sum(1 for d in domains_health if d.get("health_level") == "degrading"),
+                "unhealthy": sum(1 for d in domains_health if d.get("health_level") == "unhealthy"),
+                "critical": sum(1 for d in domains_health if d.get("health_level") in ("critical", "blacklisted")),
+            },
+            "browser": {
+                "active_contexts": browser_metrics.get("active_contexts", 0),
+                "total_contexts": browser_metrics.get("total_contexts", 0),
+            },
+            "telemetry": {
+                "recent_scrapes": len(recent),
+                "recent_successes": recent_successes,
+                "recent_failures": recent_failures,
+                "success_rate": round(recent_successes / max(len(recent), 1), 3),
+            },
+            "governor": {
+                "token_spend_dollars": governance.get("resources", {}).get("token_spend_dollars", 0),
+                "browser_prunes": governance.get("resources", {}).get("metrics", {}).get("browser_prunes", 0),
+                "queue_sheds": governance.get("resources", {}).get("metrics", {}).get("queue_sheds", 0),
+            },
+        }
+    except Exception as e:
+        logger.exception("Failed to get operator system dashboard")
+        raise HTTPException(status_code=500, detail=f"Failed to load dashboard: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -230,42 +222,46 @@ async def get_degradation_predictions(
         A prediction report with per-domain predictions and system risk.
 
     """
-    telemetry_history = get_scrape_telemetry().get_recent(window)
+    try:
+        telemetry_history = get_scrape_telemetry().get_recent(window)
 
-    if not telemetry_history:
-        return {
-            "generated_at": None,
-            "domains_analyzed": 0,
-            "predictions": [],
-            "summary": {
-                "critical": 0,
-                "high": 0,
-                "medium": 0,
-                "low": 0,
-                "cascade_risks": 0,
-            },
-            "systemic_risk_level": "low",
-            "top_risks": [],
-            "message": "No telemetry data available for predictions",
-        }
+        if not telemetry_history:
+            return {
+                "generated_at": None,
+                "domains_analyzed": 0,
+                "predictions": [],
+                "summary": {
+                    "critical": 0,
+                    "high": 0,
+                    "medium": 0,
+                    "low": 0,
+                    "cascade_risks": 0,
+                },
+                "systemic_risk_level": "low",
+                "top_risks": [],
+                "message": "No telemetry data available for predictions",
+            }
 
-    # Get domain trends first
-    analyzer = TrendAnalyzer(history_window=window)
-    report = analyzer.analyze(telemetry_history)
+        # Get domain trends first
+        analyzer = TrendAnalyzer(history_window=window)
+        report = await run_in_threadpool(analyzer.analyze, telemetry_history)
 
-    # Run degradation predictor
-    predictor = get_degradation_predictor()
-    prediction_report = predictor.predict(telemetry_history, report.domain_trends)
+        # Run degradation predictor
+        predictor = get_degradation_predictor()
+        prediction_report = await run_in_threadpool(predictor.predict, telemetry_history, report.domain_trends)
 
-    result = prediction_report.to_dict()
+        result = prediction_report.to_dict()
 
-    # Filter by minimum confidence if requested
-    if min_confidence > 0:
-        result["predictions"] = [p for p in result["predictions"] if p.get("confidence", 0) >= min_confidence]
-        result["top_risks"] = [r for r in result["top_risks"] if r.get("confidence", 0) >= min_confidence]
-        result["summary"]["total_filtered"] = len(result["predictions"])
+        # Filter by minimum confidence if requested
+        if min_confidence > 0:
+            result["predictions"] = [p for p in result["predictions"] if p.get("confidence", 0) >= min_confidence]
+            result["top_risks"] = [r for r in result["top_risks"] if r.get("confidence", 0) >= min_confidence]
+            result["summary"]["total_filtered"] = len(result["predictions"])
 
-    return result
+        return result
+    except Exception as e:
+        logger.exception("Failed to get degradation predictions")
+        raise HTTPException(status_code=500, detail=f"Failed to get degradation predictions: {e}")
 
 
 @router.get("/predictions/{domain}")
@@ -283,36 +279,42 @@ async def get_domain_prediction(
         Predictions for the specified domain.
 
     """
-    telemetry_history = get_scrape_telemetry().get_recent(window)
+    try:
+        telemetry_history = get_scrape_telemetry().get_recent(window)
 
-    # Filter to only this domain's events
-    domain_events = [e for e in telemetry_history if TrendAnalyzer.extract_domain(e.get("url", "")) == domain.lower()]
+        # Filter to only this domain's events
+        domain_events = [e for e in telemetry_history if TrendAnalyzer.extract_domain(e.get("url", "")) == domain.lower()]
 
-    if not domain_events:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No telemetry data found for domain: {domain}",
-        )
+        if not domain_events:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No telemetry data found for domain: {domain}",
+            )
 
-    # Analyze domain trend
-    analyzer = TrendAnalyzer(history_window=window)
-    trend = analyzer.analyze_domain(domain, domain_events)
+        # Analyze domain trend
+        analyzer = TrendAnalyzer(history_window=window)
+        trend = await run_in_threadpool(analyzer.analyze_domain, domain, domain_events)
 
-    # Predict for this domain
-    predictor = get_degradation_predictor()
-    report = predictor.predict(domain_events, {domain: trend})
+        # Predict for this domain
+        predictor = get_degradation_predictor()
+        report = await run_in_threadpool(predictor.predict, domain_events, {domain: trend})
 
-    domain_predictions = [p.to_dict() for p in report.predictions]
+        domain_predictions = [p.to_dict() for p in report.predictions]
 
-    return {
-        "domain": domain,
-        "health_score": trend.health_score,
-        "failure_rate": round(trend.failure_rate, 3),
-        "sample_count": trend.sample_count,
-        "quality_trend": trend.quality_trend,
-        "predictions": domain_predictions,
-        "systemic_risk_level": report.systemic_risk_level,
-    }
+        return {
+            "domain": domain,
+            "health_score": trend.health_score,
+            "failure_rate": round(trend.failure_rate, 3),
+            "sample_count": trend.sample_count,
+            "quality_trend": trend.quality_trend,
+            "predictions": domain_predictions,
+            "systemic_risk_level": report.systemic_risk_level,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to get prediction for domain %s", domain)
+        raise HTTPException(status_code=500, detail=f"Failed to predict for domain {domain}: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════

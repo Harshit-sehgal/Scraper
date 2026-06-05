@@ -6,6 +6,50 @@ from app.models import Job
 
 logger = logging.getLogger(__name__)
 
+_JOBS_COLUMNS_SQL = [
+    "mode TEXT DEFAULT 'manual'",
+    "topic TEXT DEFAULT ''",
+    "intent TEXT DEFAULT ''",
+    "urls TEXT DEFAULT '[]'",
+    "schema_fields TEXT DEFAULT '[]'",
+    "filters TEXT DEFAULT '[]'",
+    "results TEXT DEFAULT '[]'",
+    "logs TEXT DEFAULT '[]'",
+    "total_records INTEGER DEFAULT 0",
+    "filtered_records INTEGER DEFAULT 0",
+    "total_llm_calls INTEGER DEFAULT 0",
+    "error TEXT DEFAULT ''",
+    "warnings TEXT DEFAULT ''",
+    "quality_report TEXT DEFAULT '{}'",
+    "analysis TEXT DEFAULT ''",
+    "discovered_urls TEXT DEFAULT '[]'",
+    "selectors_map TEXT DEFAULT '{}'",
+    "search_params TEXT DEFAULT '{}'",
+    "max_pages INTEGER DEFAULT 0",
+    "progress_current INTEGER DEFAULT 0",
+    "progress_total INTEGER DEFAULT 0",
+    "estimated_cost_usd REAL DEFAULT 0",
+    "cancel_requested BOOLEAN DEFAULT FALSE",
+    "created_at TEXT DEFAULT ''",
+    "completed_at TEXT DEFAULT ''",
+    "min_record_score REAL DEFAULT 0.35",
+    "acquisition_mode TEXT DEFAULT 'standard'",
+    "location TEXT DEFAULT ''",
+    "preferred_domain TEXT DEFAULT ''",
+    "source_policy TEXT DEFAULT 'all_sources'",
+    "max_per_domain INTEGER DEFAULT 4",
+    "origin_location TEXT DEFAULT ''",
+    "max_distance_km REAL DEFAULT NULL",
+    "pagination BOOLEAN DEFAULT FALSE",
+    "deduplicate BOOLEAN DEFAULT TRUE",
+    "deduplicate_field TEXT DEFAULT ''",
+    "started_at TEXT DEFAULT ''",
+    "results_on_disk BOOLEAN DEFAULT FALSE",
+    "results_file_path TEXT DEFAULT ''",
+    "updated_at TEXT DEFAULT ''",
+    "deleted_at TEXT DEFAULT NULL",
+]
+
 
 class JobRepository(ABC):
     """Generic repository interface to support SQLite, Postgres, or other databases.
@@ -460,15 +504,12 @@ class SQLiteJobRepository(JobRepository):
     ) -> list[dict]:
         """Read a job's results from the companion table.
 
-        Delegates to ``app.job_store.read_job_results`` which reads
-        from the ``job_results`` table. Returns ``[]`` when the table
-        is empty (pre-v4 or results on disk) so the caller can fall
-        back to ``Job.results``.
+        Delegates to ``app.job_store.read_job_results_paginated`` which reads
+        from the ``job_results`` table with pagination.
         """
-        from app.job_store import read_job_results as _read_results
+        from app.job_store import read_job_results_paginated as _read_paginated
 
-        results = _read_results(job_id)
-        return results[offset : offset + limit]
+        return _read_paginated(job_id, limit=limit, offset=offset)
 
     def lookup_idempotency_key(self, idem_key: str) -> str | None:
         """Lookup an idempotency key in SQLite."""

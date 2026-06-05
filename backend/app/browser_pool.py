@@ -170,9 +170,14 @@ class BrowserPool:
                     def on_close(p) -> None:
                         self._active_fetches = max(0, self._active_fetches - 1)
                         logger.debug("[BrowserPool] Page closed. Active: %d", self._active_fetches)
-                        task = asyncio.create_task(self._check_and_trigger_recycle())
-                        self._background_tasks.add(task)
-                        task.add_done_callback(self._background_tasks.discard)
+                        # Only schedule a recycle check if recycling might be
+                        # needed — this avoids creating asyncio tasks (and
+                        # unawaited-coroutine warnings in tests) when the
+                        # pool is far from any recycling threshold.
+                        if self._should_recycle():
+                            task = asyncio.create_task(self._check_and_trigger_recycle())
+                            self._background_tasks.add(task)
+                            task.add_done_callback(self._background_tasks.discard)
 
                     page.on("close", on_close)
 
@@ -270,6 +275,15 @@ class BrowserPool:
                     logger.debug("[BrowserPool] Failed to close context during close(): %s", e)
             self._contexts.clear()
             self._context_use_count.clear()
+
+            # Cancel any lingering background tasks to avoid RuntimeWarnings
+            # about unawaited coroutines (AsyncMock in tests, or leaked tasks
+            # in production).
+            for task in list(self._background_tasks):
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await task
+            self._background_tasks.clear()
 
             if self._browser:
                 try:

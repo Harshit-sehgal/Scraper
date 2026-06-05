@@ -179,7 +179,10 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch) -> None:
     saved_jobs: list[Job] = []
 
     # Mock _save_job to track what gets saved
-    monkeypatch.setattr("app.routers.jobs._save_job", saved_jobs.append)
+    async def mock_save_job(job) -> None:
+        saved_jobs.append(job)
+
+    monkeypatch.setattr("app.routers.jobs._save_job", mock_save_job)
 
     # Track if persist_state gets called
     persist_called = False

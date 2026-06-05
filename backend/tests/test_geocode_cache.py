@@ -6,36 +6,34 @@ import contextlib
 import os
 
 import pytest
-from app.geocode_cache import CACHE_DB_PATH, GeocodeCache, reset_geocode_cache
+from app.geocode_cache import GeocodeCache
 
 
-def _clean_cache_db_files() -> None:
+def _clean_cache_db_files(db_path: str) -> None:
     """Remove the geocode cache DB file along with any WAL / SHM journal files."""
-    base = CACHE_DB_PATH
     for suffix in ["", "-wal", "-shm", "-journal"]:
-        path = base + suffix
+        path = db_path + suffix
         with contextlib.suppress(FileNotFoundError):
             os.remove(path)
 
 
 @pytest.fixture(autouse=True)
-def clean_cache_env():
-    # Remove existing files if any (including WAL / SHM journal files)
-    _clean_cache_db_files()
-    reset_geocode_cache()
-    yield
-    # Cleanup files after test run
-    _clean_cache_db_files()
-    reset_geocode_cache()
+def clean_cache_env(tmp_path):
+    # Use a unique DB per test (and per pytest-xdist worker) to avoid
+    # cross-process SQLite lock contention when tests run in parallel.
+    db_path = str(tmp_path / "geocoding_cache.db")
+    _clean_cache_db_files(db_path)
+    yield db_path
+    _clean_cache_db_files(db_path)
 
 
-def test_geocode_cache_initialization() -> None:
-    GeocodeCache()
-    assert os.path.exists(CACHE_DB_PATH)
+def test_geocode_cache_initialization(clean_cache_env) -> None:
+    GeocodeCache(db_path=clean_cache_env)
+    assert os.path.exists(clean_cache_env)
 
 
-def test_geocode_cache_set_and_get() -> None:
-    cache = GeocodeCache()
+def test_geocode_cache_set_and_get(clean_cache_env) -> None:
+    cache = GeocodeCache(db_path=clean_cache_env)
 
     # Try a query not in the cache (should miss)
     result = cache.get("1600 Amphitheatre Pkwy, Mountain View, CA")
@@ -55,8 +53,8 @@ def test_geocode_cache_set_and_get() -> None:
     assert cache.get_hit_rate() == 0.5
 
 
-def test_negative_caching() -> None:
-    cache = GeocodeCache()
+def test_negative_caching(clean_cache_env) -> None:
+    cache = GeocodeCache(db_path=clean_cache_env)
 
     # Query negative entry
     cache.set_negative("Invalid Address Here")

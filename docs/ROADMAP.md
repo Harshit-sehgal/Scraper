@@ -163,7 +163,7 @@ after the deep-research remediation pass (2026-06).
 
 ### W10 — Test strategy — done in this pass
 
-- **Status:** 2774 tests pass, 87 skipped (fast lane). The optional
+- **Status:** 2891 tests pass, 87 skipped (fast lane). The optional
   postgres / browser / golden-dataset lanes are opt-in.
 - **Status details:**
   1. **Repository parity tests** — `test_repository_parity.py` provides
@@ -246,7 +246,7 @@ after the deep-research remediation pass (2026-06).
   Wire up alertmanager_data volume to backup schedule.
 - **Done in this pass:** alertmanager.yml, Prometheus alerting block,
   docker-compose.prod.yml service, severity-based routing, inhibition
-  rules, env var templating.
+  rules,  env var templating.
 
 ### W15 — Frontend tooling (CSS lint) — done in this pass
 
@@ -262,12 +262,64 @@ after the deep-research remediation pass (2026-06).
 - **Done in this pass:** package.json, .stylelintrc.json, CI job with
   npm cache, CSS fixes (modern notation, duplicate selector removal).
 
+### W16 — Batch export API — done in this pass
+
+- **Status:** `POST /api/exports/batch` accepts up to 50 job IDs and exports
+  combined results in CSV, JSON, or Excel format. Supports `flatten=True`
+  (single combined output with `_source_job` column) and `flatten=False`
+  (separator rows for CSV, `exports` object for JSON, one sheet per job
+  for Excel). Fieldnames are computed as the union of all fields across
+  all jobs. Empty-result jobs are silently skipped. Fails fast on missing
+  job IDs (404) or no results at all (400). Reuses existing helpers
+  (`_strip_system_fields`, `_flat_row`, `_safe_cell`). Pinned by
+  20 tests in `test_exports_router.py`.
+- **Next:** add support for streaming large disk-backed datasets in pages
+  (currently loads all results at once to union fieldnames).
+- **Done in this pass:** `BatchExportRequest` model, `_batch_csv`/
+  `_batch_json`/`_batch_xlsx` format handlers, per-job result
+  collection with union fieldnames, 20 tests covering all formats,
+  both flatten modes, and error paths.
+
+### W17 — Per-IP rate limiting — done in this pass
+
+- **Status:** Rate limiting upgraded from a flat per-IP model to a
+  **dual-layer** approach: Tier 1 (aggregate global cap, 600/minute)
+  controls total throughput across all clients combined; Tier 2 (per-IP
+  fair-share cap, 100/minute) ensures no single client monopolises the
+  API. A request must pass both tiers to proceed. Configurable via
+  `DATAFORGE_RATE_LIMIT_PER_IP` (env var) and toggleable via
+  `DATAFORGE_RATE_LIMIT_PER_IP_ENABLED`. In production/staging, counters
+  auto-promote to the shared `rate_limits` database table for
+  multi-worker consistency. Pinned by 25 tests.
+- **Next:** add Prometheus counters for global vs per-IP rate limit hits.
+  Expose `get_stats()` at `/api/system/rate-limit-stats`.
+- **Done in this pass:** `RATE_LIMIT_PER_IP` and `RATE_LIMIT_PER_IP_ENABLED`
+  settings, dual-layer middleware dispatch (aggregate aggregate + per-IP),
+  `_get_aggregate_key` / `_get_per_ip_key` key builders,
+  `_get_or_create_counter` helper, refactored `_build_429_response` and
+  `_add_rate_limit_headers`, middleware wiring in `middlewares.py`,
+  5 new tests (stats, counter selection, key distinctness).
+
+### W18 — Documentation (export + rate limiting + setup) — done in this pass
+
+- **Status:** `docs/API.md` documents the batch export endpoint with format
+  options, flatten modes, error codes, and a curl example — plus a new Rate
+  Limiting section explaining the dual-layer tiers, response headers, safe IP
+  extraction, and DB-backed promotion. `.env.example` and `backend/.env.example`
+  include `RATE_LIMIT_GLOBAL`, `RATE_LIMIT_PER_IP`, `RATE_LIMIT_PER_IP_ENABLED`,
+  and `RATE_LIMIT_DB_BACKED`. `docs/SETUP.md` has a new Rate Limiting section
+  explaining defaults and production auto-promotion.
+- **Next:** auto-generate the API doc route table from the live FastAPI app
+  and commit the diff on `main`.
+- **Done in this pass:** API.md sections, env example files, SETUP.md note.
+
 ## Phased plan
 
 | Phase | Window | Theme | Items |
 |-------|--------|-------|-------|
 | Late Q2 | 2026-06 | Hygiene + hard gates | W1–W11 (deep-research pass) |
 | Late Q2 | 2026-06 | Observability + tooling | W6 (Grafana + alerts), W14 (Alertmanager), W15 (CSS lint) |
+| Late Q2 | 2026-06 | API + infrastructure | W16 (Batch export), W17 (Per-IP rate limiting), W18 (Docs) |
 | Q3 | 2026-07 → 2026-09 | Storage + coverage | v5 column drop, raise Postgres coverage floors to 40% |
 | Q4 | 2026-10 → 2026-12 | DR + release engineering | W12 (DR drills), W13 (cosign, GHCR) |
 | Q1 2027 | 2027-01 → 2027-03 | Storage split v6 + v2 dashboard auth | v6 JSONB, HTTP-only cookie auth |

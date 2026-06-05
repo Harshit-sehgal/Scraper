@@ -200,18 +200,21 @@ jobs:
 
       # Run the full test suite with parallel workers + flaky retry.
       # -n auto scales to runner CPU count.
-      # --reruns 2 retries each failed test up to twice with a 10 s delay.
+      # --reruns 3 retries each failed test up to three times with a 10 s delay.
+      # --dist loadscope groups tests from the same class/module in a single
+      # worker to reduce contention on module-level singletons and shared
+      # SQLite databases.
       - name: Run Full Test Suite (SQLite, parallel + retry)
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python -m pytest -n auto --reruns 2 --reruns-delay 10 \
+          python -m pytest -n auto --reruns 3 --reruns-delay 10 --dist loadscope \
             -q backend/tests -o addopts= --tb=short
 
       - name: Enforce coverage floors
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
           python -m coverage run --source=backend/app \
-            -m pytest -n auto --reruns 2 --reruns-delay 10 \
+            -m pytest -n auto --reruns 3 --reruns-delay 10 --dist loadscope \
             -q backend/tests -o addopts= --tb=line --no-cov-on-fail -q
           python -m coverage json -o coverage.json
           python scripts/check_coverage_floors.py coverage.json

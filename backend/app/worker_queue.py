@@ -292,6 +292,31 @@ class WorkerQueue:
 
     # ─── Task lifecycle ────────────────────────────────────────────────
 
+    def _enqueue_sync(self, task: QueueTask) -> None:
+        conn = self._conn()
+        try:
+            conn.execute(
+                """INSERT OR IGNORE INTO tasks
+                   (id, type, payload, priority, status, created_at,
+                    scheduled_at, attempts, max_attempts, timeout_seconds)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    task.id,
+                    task.type,
+                    json.dumps(task.payload),
+                    int(task.priority),
+                    task.status,
+                    task.created_at,
+                    task.scheduled_at,
+                    task.attempts,
+                    task.max_attempts,
+                    task.timeout_seconds,
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
     async def enqueue(
         self,
         task_type: str,
@@ -314,29 +339,7 @@ class WorkerQueue:
         )
 
         async with self._in_flight_lock:
-            conn = self._conn()
-            try:
-                conn.execute(
-                    """INSERT OR IGNORE INTO tasks
-                       (id, type, payload, priority, status, created_at,
-                        scheduled_at, attempts, max_attempts, timeout_seconds)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (
-                        task.id,
-                        task.type,
-                        json.dumps(task.payload),
-                        int(task.priority),
-                        task.status,
-                        task.created_at,
-                        task.scheduled_at,
-                        task.attempts,
-                        task.max_attempts,
-                        task.timeout_seconds,
-                    ),
-                )
-                conn.commit()
-            finally:
-                conn.close()
+            await asyncio.to_thread(self._enqueue_sync, task)
 
         return task.id
 
@@ -348,7 +351,7 @@ class WorkerQueue:
         """
         deadline = time.time() + timeout
         while time.time() < deadline:
-            task = self._dequeue_one()
+            task = await asyncio.to_thread(self._dequeue_one)
             if task:
                 return task
             await asyncio.sleep(0.25)
@@ -389,17 +392,112 @@ class WorkerQueue:
             finally:
                 conn.close()
 
+    def _complete_sync(self, task_id: str, result: dict | None) -> None:
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn = self._conn()
+        try:
+            # Fetch task for history
+            row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            if row:
+                task_data = dict(row)
+                # Archive to history
+                conn.execute(
+                    """INSERT OR REPLACE INTO task_history
+                       (id, type, payload, priority, status, created_at,
+                        started_at, completed_at, attempts, max_attempts,
+                        last_error, result, timeout_seconds, finished_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        task_data["id"],
+                        task_data["type"],
+                        task_data["payload"],
+                        task_data["priority"],
+                        TaskStatus.COMPLETED,
+                        task_data["created_at"],
+                        task_data["started_at"],
+                        now,
+                        task_data["attempts"],
+                        task_data["max_attempts"],
+                        None,
+                        json.dumps(result) if result else None,
+                        task_data.get("timeout_seconds", 300),
+                        now,
+                    ),
+                )
+                # Remove from active queue
+                conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+
+            conn.commit()
+        finally:
+            conn.close()
+
     async def complete(self, task_id: str, result: dict | None = None) -> None:
         """Mark a task as completed successfully."""
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         async with self._in_flight_lock:
-            conn = self._conn()
-            try:
-                # Fetch task for history
-                row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-                if row:
-                    task_data = dict(row)
-                    # Archive to history
+            await asyncio.to_thread(self._complete_sync, task_id, result)
+
+    def _fail_sync(
+        self,
+        task_id: str,
+        error: str,
+        retry: bool,
+        retry_after: float | None,
+        task_type: str | None,
+        now: str,
+    ) -> None:
+        conn = self._conn()
+        try:
+            row = conn.execute(
+                "SELECT attempts, max_attempts, type FROM tasks WHERE id = ?",
+                (task_id,),
+            ).fetchone()
+
+            if row:
+                attempts = row["attempts"]
+                max_attempts = row["max_attempts"]
+                actual_type = task_type or row["type"]
+
+                if retry and attempts < max_attempts:
+                    # Use explicit retry-after if provided (rate-limit aware),
+                    # otherwise use standard exponential backoff.
+                    if retry_after is not None and retry_after > 0:
+                        backoff = min(retry_after, 3600.0)
+                    else:
+                        backoff = float(min(2 ** (attempts - 1) * 30, 3600))
+
+                    retry_at = (datetime.datetime.now() + datetime.timedelta(seconds=backoff)).strftime("%Y-%m-%d %H:%M:%S")
+                    conn.execute(
+                        "UPDATE tasks SET status = ?, last_error = ?, scheduled_at = ? WHERE id = ?",
+                        (TaskStatus.PENDING, error, retry_at, task_id),
+                    )
+                    logger.info(
+                        "Task %s failed (attempt %d/%d). Retrying in %ds: %s",
+                        task_id,
+                        attempts,
+                        max_attempts,
+                        backoff,
+                        error,
+                    )
+                else:
+                    # Move to dead letter queue (archive)
+                    task_row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+                    if task_row is None:
+                        # Task was deleted between the two SELECTs (e.g.,
+                        # by a concurrent cancel). Nothing more to do.
+                        logger.debug(
+                            "Task %s vanished while moving to dead-letter; concurrent cancel suspected",
+                            task_id,
+                        )
+                        conn.commit()
+                        return
+                    task_data = dict(task_row)
+                    # Record worker failure counter for metrics
+                    try:
+                        from app.metrics_collector import record_worker_failure
+
+                        record_worker_failure(actual_type)
+                    except Exception:
+                        pass  # noqa: BLE001
                     conn.execute(
                         """INSERT OR REPLACE INTO task_history
                            (id, type, payload, priority, status, created_at,
@@ -411,24 +509,29 @@ class WorkerQueue:
                             task_data["type"],
                             task_data["payload"],
                             task_data["priority"],
-                            TaskStatus.COMPLETED,
+                            TaskStatus.DEAD_LETTER,
                             task_data["created_at"],
                             task_data["started_at"],
                             now,
                             task_data["attempts"],
                             task_data["max_attempts"],
+                            error,
                             None,
-                            json.dumps(result) if result else None,
                             task_data.get("timeout_seconds", 300),
                             now,
                         ),
                     )
-                    # Remove from active queue
                     conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+                    logger.warning(
+                        "Task %s moved to dead letter after %d attempts: %s",
+                        task_id,
+                        attempts,
+                        error,
+                    )
 
-                conn.commit()
-            finally:
-                conn.close()
+            conn.commit()
+        finally:
+            conn.close()
 
     async def fail(
         self,
@@ -438,170 +541,28 @@ class WorkerQueue:
         retry_after: float | None = None,
         task_type: str | None = None,
     ) -> None:
-        """Mark a task as failed. Retries if attempts remain.
-
-        Args:
-            task_id: The task to fail.
-            error: Error description.
-            retry: Whether to retry (if attempts remain).
-            retry_after: Optional explicit retry-after seconds (e.g. from
-                Retry-After header for rate-limited tasks). If set, this
-                overrides the default exponential backoff.
-            task_type: The task type, used for rate-limit state tracking.
-                If omitted, inferred from the DB row.
-
-        """
+        """Mark a task as failed. Retries if attempts remain."""
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         async with self._in_flight_lock:
-            conn = self._conn()
-            try:
-                row = conn.execute(
-                    "SELECT attempts, max_attempts, type FROM tasks WHERE id = ?",
-                    (task_id,),
-                ).fetchone()
+            await asyncio.to_thread(
+                self._fail_sync,
+                task_id,
+                error,
+                retry,
+                retry_after,
+                task_type,
+                now,
+            )
 
-                if row:
-                    attempts = row["attempts"]
-                    max_attempts = row["max_attempts"]
-                    actual_type = task_type or row["type"]
-
-                    if retry and attempts < max_attempts:
-                        # Use explicit retry-after if provided (rate-limit aware),
-                        # otherwise use standard exponential backoff.
-                        if retry_after is not None and retry_after > 0:
-                            backoff = min(retry_after, 3600.0)
-                        else:
-                            backoff = float(min(2 ** (attempts - 1) * 30, 3600))
-
-                        retry_at = (datetime.datetime.now() + datetime.timedelta(seconds=backoff)).strftime("%Y-%m-%d %H:%M:%S")
-                        conn.execute(
-                            "UPDATE tasks SET status = ?, last_error = ?, scheduled_at = ? WHERE id = ?",
-                            (TaskStatus.PENDING, error, retry_at, task_id),
-                        )
-                        logger.info(
-                            "Task %s failed (attempt %d/%d). Retrying in %ds: %s",
-                            task_id,
-                            attempts,
-                            max_attempts,
-                            backoff,
-                            error,
-                        )
-                    else:
-                        # Move to dead letter queue (archive)
-                        task_row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-                        if task_row is None:
-                            # Task was deleted between the two SELECTs (e.g.,
-                            # by a concurrent cancel). Nothing more to do.
-                            logger.debug(
-                                "Task %s vanished while moving to dead-letter; concurrent cancel suspected",
-                                task_id,
-                            )
-                            conn.commit()
-                            return
-                        task_data = dict(task_row)
-                        # Record worker failure counter for metrics
-                        try:
-                            from app.metrics_collector import record_worker_failure
-
-                            record_worker_failure(actual_type)
-                        except Exception:
-                            pass  # nosec B110
-                        conn.execute(
-                            """INSERT OR REPLACE INTO task_history
-                               (id, type, payload, priority, status, created_at,
-                                started_at, completed_at, attempts, max_attempts,
-                                last_error, result, timeout_seconds, finished_at)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                            (
-                                task_data["id"],
-                                task_data["type"],
-                                task_data["payload"],
-                                task_data["priority"],
-                                TaskStatus.DEAD_LETTER,
-                                task_data["created_at"],
-                                task_data["started_at"],
-                                now,
-                                task_data["attempts"],
-                                task_data["max_attempts"],
-                                error,
-                                None,
-                                task_data.get("timeout_seconds", 300),
-                                now,
-                            ),
-                        )
-                        conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-                        logger.warning(
-                            "Task %s moved to dead letter after %d attempts: %s",
-                            task_id,
-                            attempts,
-                            error,
-                        )
-
-                conn.commit()
-            finally:
-                conn.close()
-
-    async def cancel(self, task_id: str) -> bool:
-        """Cancel a task. Handles both pending (SQLite) and in-flight (asyncio) tasks.
-        Pending tasks are archived to task_history and removed from the queue.
-        In-flight tasks also have their asyncio task cancelled.
-        Returns True if cancelled.
-        """
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        async with self._in_flight_lock:
-            # Check in-flight tasks first (running tasks)
-            if task_id in self._in_flight:
-                flight_task = self._in_flight[task_id]
-                flight_task.cancel()
-                # Archive to history
-                conn = self._conn()
-                try:
-                    row = conn.execute(
-                        "SELECT * FROM tasks WHERE id = ?",
-                        (task_id,),
-                    ).fetchone()
-                    if row:
-                        task_data = dict(row)
-                        conn.execute(
-                            """INSERT OR REPLACE INTO task_history
-                               (id, type, payload, priority, status, created_at,
-                                started_at, completed_at, attempts, max_attempts,
-                                last_error, result, timeout_seconds, finished_at)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                            (
-                                task_data["id"],
-                                task_data["type"],
-                                task_data["payload"],
-                                task_data["priority"],
-                                TaskStatus.CANCELLED,
-                                task_data["created_at"],
-                                task_data.get("started_at"),
-                                now,
-                                task_data["attempts"],
-                                task_data["max_attempts"],
-                                "Cancelled by user (in-flight)",
-                                None,
-                                task_data.get("timeout_seconds", 300),
-                                now,
-                            ),
-                        )
-                        conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-                        conn.commit()
-                    return True
-                finally:
-                    conn.close()
-
-            # Check pending tasks
-            conn = self._conn()
-            try:
-                row = conn.execute(
-                    "SELECT * FROM tasks WHERE id = ? AND status = 'pending'",
-                    (task_id,),
-                ).fetchone()
-                if row is None:
-                    return False
+    def _cancel_in_flight_sync(self, task_id: str, now: str) -> None:
+        conn = self._conn()
+        try:
+            row = conn.execute(
+                "SELECT * FROM tasks WHERE id = ?",
+                (task_id,),
+            ).fetchone()
+            if row:
                 task_data = dict(row)
-                # Archive to history before deleting
                 conn.execute(
                     """INSERT OR REPLACE INTO task_history
                        (id, type, payload, priority, status, created_at,
@@ -619,7 +580,7 @@ class WorkerQueue:
                         now,
                         task_data["attempts"],
                         task_data["max_attempts"],
-                        "Cancelled by user",
+                        "Cancelled by user (in-flight)",
                         None,
                         task_data.get("timeout_seconds", 300),
                         now,
@@ -627,9 +588,62 @@ class WorkerQueue:
                 )
                 conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
                 conn.commit()
+        finally:
+            conn.close()
+
+    def _cancel_pending_sync(self, task_id: str, now: str) -> bool:
+        conn = self._conn()
+        try:
+            row = conn.execute(
+                "SELECT * FROM tasks WHERE id = ? AND status = 'pending'",
+                (task_id,),
+            ).fetchone()
+            if row is None:
+                return False
+            task_data = dict(row)
+            # Archive to history before deleting
+            conn.execute(
+                """INSERT OR REPLACE INTO task_history
+                   (id, type, payload, priority, status, created_at,
+                    started_at, completed_at, attempts, max_attempts,
+                    last_error, result, timeout_seconds, finished_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    task_data["id"],
+                    task_data["type"],
+                    task_data["payload"],
+                    task_data["priority"],
+                    TaskStatus.CANCELLED,
+                    task_data["created_at"],
+                    None,
+                    now,
+                    task_data["attempts"],
+                    task_data["max_attempts"],
+                    "Cancelled by user (pending)",
+                    None,
+                    task_data.get("timeout_seconds", 300),
+                    now,
+                ),
+            )
+            conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    async def cancel(self, task_id: str) -> bool:
+        """Cancel a task. Handles both pending (SQLite) and in-flight (asyncio) tasks."""
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        async with self._in_flight_lock:
+            # Check in-flight tasks first (running tasks)
+            if task_id in self._in_flight:
+                flight_task = self._in_flight[task_id]
+                flight_task.cancel()
+                await asyncio.to_thread(self._cancel_in_flight_sync, task_id, now)
                 return True
-            finally:
-                conn.close()
+
+            # Check pending tasks
+            return await asyncio.to_thread(self._cancel_pending_sync, task_id, now)
 
     # ─── Worker loop ───────────────────────────────────────────────────
 

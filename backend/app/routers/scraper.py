@@ -23,6 +23,7 @@ from app.scraper_diagnostics import run_diagnostics
 from app.selector_memory import get_selector_memory
 from app.utils.rbac import UserRole, require_role
 from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette.concurrency import run_in_threadpool
 
 if TYPE_CHECKING:
     from app.models import SchemaField
@@ -148,38 +149,42 @@ async def get_extraction_trends(window: Annotated[int, Query(ge=10, le=500)] = 1
         A TrendReport with domain-level trends, global metrics, and alerts.
 
     """
-    from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
+    try:
+        from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
 
-    telemetry_history = get_scrape_telemetry().get_recent(window)
-    analyzer = TrendAnalyzer(history_window=window)
-    report = analyzer.analyze(telemetry_history)
-    return {
-        "generated_at": report.generated_at,
-        "domain_count": report.domain_count,
-        "degrading_domains": report.degrading_domains,
-        "improving_domains": report.improving_domains,
-        "stable_domains": report.stable_domains,
-        "unseen_domains": report.unseen_domains,
-        "global_failure_rate": round(report.global_failure_rate, 3),
-        "global_avg_latency_ms": round(report.global_avg_latency_ms, 1),
-        "total_scrapes": report.total_scrapes,
-        "alerts": report.alerts,
-        "domain_trends": {
-            d: {
-                "health_score": t.health_score,
-                "failure_rate": round(t.failure_rate, 3),
-                "avg_fetch_ms": round(t.avg_fetch_ms, 1),
-                "avg_quality_score": round(t.avg_quality_score, 3),
-                "quality_trend": t.quality_trend,
-                "anti_bot_trend": t.anti_bot_trend,
-                "fetch_latency_trend": t.fetch_latency_trend,
-                "selector_decay_accelerating": t.selector_decay_accelerating,
-                "top_failure_categories": t.top_failure_categories,
-                "sample_count": t.sample_count,
-            }
-            for d, t in report.domain_trends.items()
-        },
-    }
+        telemetry_history = get_scrape_telemetry().get_recent(window)
+        analyzer = TrendAnalyzer(history_window=window)
+        report = await run_in_threadpool(analyzer.analyze, telemetry_history)
+        return {
+            "generated_at": report.generated_at,
+            "domain_count": report.domain_count,
+            "degrading_domains": report.degrading_domains,
+            "improving_domains": report.improving_domains,
+            "stable_domains": report.stable_domains,
+            "unseen_domains": report.unseen_domains,
+            "global_failure_rate": round(report.global_failure_rate, 3),
+            "global_avg_latency_ms": round(report.global_avg_latency_ms, 1),
+            "total_scrapes": report.total_scrapes,
+            "alerts": report.alerts,
+            "domain_trends": {
+                d: {
+                    "health_score": t.health_score,
+                    "failure_rate": round(t.failure_rate, 3),
+                    "avg_fetch_ms": round(t.avg_fetch_ms, 1),
+                    "avg_quality_score": round(t.avg_quality_score, 3),
+                    "quality_trend": t.quality_trend,
+                    "anti_bot_trend": t.anti_bot_trend,
+                    "fetch_latency_trend": t.fetch_latency_trend,
+                    "selector_decay_accelerating": t.selector_decay_accelerating,
+                    "top_failure_categories": t.top_failure_categories,
+                    "sample_count": t.sample_count,
+                }
+                for d, t in report.domain_trends.items()
+            },
+        }
+    except Exception as e:
+        logger.exception("Failed to get extraction trends")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze extraction trends: {e}")
 
 
 @router.get("/trends/{domain}")
@@ -188,40 +193,46 @@ async def get_domain_trend(
     window: Annotated[int, Query(ge=10, le=500)] = 100,
 ):
     """Get detailed trend analysis for a specific domain."""
-    telemetry_history = get_scrape_telemetry().get_recent(window)
+    try:
+        telemetry_history = get_scrape_telemetry().get_recent(window)
 
-    # Filter to only this domain's events
-    from app.trend_analyzer import TrendAnalyzer as TA
+        # Filter to only this domain's events
+        from app.trend_analyzer import TrendAnalyzer as TA
 
-    domain_events = [e for e in telemetry_history if TA.extract_domain(e.get("url", "")) == domain.lower()]
+        domain_events = [e for e in telemetry_history if TA.extract_domain(e.get("url", "")) == domain.lower()]
 
-    if not domain_events:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No telemetry data found for domain: {domain}",
-        )
+        if not domain_events:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No telemetry data found for domain: {domain}",
+            )
 
-    from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
+        from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
 
-    analyzer = TrendAnalyzer(history_window=window)
-    trend = analyzer.analyze_domain(domain, domain_events)
+        analyzer = TrendAnalyzer(history_window=window)
+        trend = await run_in_threadpool(analyzer.analyze_domain, domain, domain_events)
 
-    return {
-        "domain": trend.domain,
-        "health_score": trend.health_score,
-        "total_scrapes": trend.total_scrapes,
-        "total_failures": trend.total_failures,
-        "failure_rate": round(trend.failure_rate, 3),
-        "avg_fetch_ms": round(trend.avg_fetch_ms, 1),
-        "avg_quality_score": round(trend.avg_quality_score, 3),
-        "fetch_latency_trend": trend.fetch_latency_trend,
-        "quality_trend": trend.quality_trend,
-        "anti_bot_trend": trend.anti_bot_trend,
-        "selector_decay_accelerating": trend.selector_decay_accelerating,
-        "avg_cost_usd": round(trend.avg_cost_usd, 4),
-        "top_failure_categories": trend.top_failure_categories,
-        "sample_count": trend.sample_count,
-    }
+        return {
+            "domain": trend.domain,
+            "health_score": trend.health_score,
+            "total_scrapes": trend.total_scrapes,
+            "total_failures": trend.total_failures,
+            "failure_rate": round(trend.failure_rate, 3),
+            "avg_fetch_ms": round(trend.avg_fetch_ms, 1),
+            "avg_quality_score": round(trend.avg_quality_score, 3),
+            "fetch_latency_trend": trend.fetch_latency_trend,
+            "quality_trend": trend.quality_trend,
+            "anti_bot_trend": trend.anti_bot_trend,
+            "selector_decay_accelerating": trend.selector_decay_accelerating,
+            "avg_cost_usd": round(trend.avg_cost_usd, 4),
+            "top_failure_categories": trend.top_failure_categories,
+            "sample_count": trend.sample_count,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to get trend for domain %s", domain)
+        raise HTTPException(status_code=500, detail=f"Failed to get domain trend: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -244,35 +255,45 @@ async def get_regression_archive(limit: Annotated[int, Query(ge=1, le=100)] = 20
         Archive statistics and the most recent capture entries.
 
     """
-    capture = get_regression_capture()
-    stats = capture.get_statistics()
-    # Trim recent captures to the requested limit
-    stats["recent_captures"] = stats.get("recent_captures", [])[:limit]
-    return stats
+    try:
+        capture = get_regression_capture()
+        stats = await run_in_threadpool(capture.get_statistics)
+        # Trim recent captures to the requested limit
+        stats["recent_captures"] = stats.get("recent_captures", [])[:limit]
+        return stats
+    except Exception as e:
+        logger.exception("Failed to get regression archive")
+        raise HTTPException(status_code=500, detail=f"Failed to get regression archive: {e}")
 
 
 @router.get("/regressions/{entry_id}")
 async def get_regression_detail(entry_id: str):
     """Return detailed information about a specific regression capture."""
-    capture = get_regression_capture()
-    registry = capture.get_registry()
-    for e in registry.entries:
-        if e.id == entry_id:
-            return {
-                "id": e.id,
-                "url": e.url,
-                "domain": e.domain,
-                "failure_category": e.failure_category,
-                "failure_confidence": e.failure_confidence,
-                "html_preview": e.html_preview[:500],
-                "html_size": e.html_size,
-                "captured_at": e.captured_at,
-                "schema_fields": e.schema_fields,
-                "fixture_filename": e.fixture_filename,
-                "has_replay_test": e.replay_test_generated,
-                "telemetry_snapshot": e.telemetry_snapshot,
-            }
-    raise HTTPException(status_code=404, detail=f"Regression entry not found: {entry_id}")
+    try:
+        capture = get_regression_capture()
+        registry = await run_in_threadpool(capture.get_registry)
+        for e in registry.entries:
+            if e.id == entry_id:
+                return {
+                    "id": e.id,
+                    "url": e.url,
+                    "domain": e.domain,
+                    "failure_category": e.failure_category,
+                    "failure_confidence": e.failure_confidence,
+                    "html_preview": e.html_preview[:500],
+                    "html_size": e.html_size,
+                    "captured_at": e.captured_at,
+                    "schema_fields": e.schema_fields,
+                    "fixture_filename": e.fixture_filename,
+                    "has_replay_test": e.replay_test_generated,
+                    "telemetry_snapshot": e.telemetry_snapshot,
+                }
+        raise HTTPException(status_code=404, detail=f"Regression entry not found: {entry_id}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to get regression detail for entry %s", entry_id)
+        raise HTTPException(status_code=500, detail=f"Failed to get regression detail: {e}")
 
 
 @router.post("/regressions/{entry_id}/generate-test")
@@ -281,25 +302,35 @@ async def generate_regression_replay_test(
     _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
     """Generate a pytest replay test for a captured regression."""
-    capture = get_regression_capture()
-    test_code = capture.generate_replay_test(entry_id)
-    if test_code is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Regression entry not found or fixture missing: {entry_id}",
-        )
-    return {"entry_id": entry_id, "test_code": test_code}
+    try:
+        capture = get_regression_capture()
+        test_code = await run_in_threadpool(capture.generate_replay_test, entry_id)
+        if test_code is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Regression entry not found or fixture missing: {entry_id}",
+            )
+        return {"entry_id": entry_id, "test_code": test_code}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to generate regression replay test for entry %s", entry_id)
+        raise HTTPException(status_code=500, detail=f"Failed to generate replay test: {e}")
 
 
 @router.post("/regressions/generate-all-tests")
 async def generate_all_replay_tests(_role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))]):
     """Generate replay tests for all captured regressions that lack one."""
-    capture = get_regression_capture()
-    all_tests = capture.generate_all_replay_tests()
-    return {
-        "total_tests_generated": all_tests.count("TEST SEPARATOR") + 1 if all_tests else 0,
-        "test_code": all_tests,
-    }
+    try:
+        capture = get_regression_capture()
+        all_tests = await run_in_threadpool(capture.generate_all_replay_tests)
+        return {
+            "total_tests_generated": all_tests.count("TEST SEPARATOR") + 1 if all_tests else 0,
+            "test_code": all_tests,
+        }
+    except Exception as e:
+        logger.exception("Failed to generate all regression replay tests")
+        raise HTTPException(status_code=500, detail=f"Failed to generate replay tests: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -583,36 +614,42 @@ async def optimize_domain_selectors(
     Requires operator or admin role — triggers ML computation.
 
     """
-    from app.selector_ml_optimizer import get_selector_optimizer
+    try:
+        from app.selector_ml_optimizer import get_selector_optimizer
 
-    optimizer = get_selector_optimizer()
+        optimizer = get_selector_optimizer()
 
-    # Get selectors to optimize
-    if selectors is None:
-        selector_memory = get_selector_memory()
-        url = f"https://{domain}/"
-        cached = selector_memory.get_selectors(url)
+        # Get selectors to optimize
+        if selectors is None:
+            selector_memory = get_selector_memory()
+            url = f"https://{domain}/"
+            cached = selector_memory.get_selectors(url)
 
-        if not cached:
-            raise HTTPException(status_code=404, detail=f"No selectors found for domain: {domain}")
+            if not cached:
+                raise HTTPException(status_code=404, detail=f"No selectors found for domain: {domain}")
 
-        selectors = cached
+            selectors = cached
 
-    # Run optimization
-    report = optimizer.optimize_selectors(domain, selectors)
+        # Run optimization
+        report = await run_in_threadpool(optimizer.optimize_selectors, domain, selectors)
 
-    return {
-        "domain": domain,
-        "timestamp": report["timestamp"],
-        "original_count": report["original_count"],
-        "avg_quality": round(report["summary"]["total_quality"], 3),
-        "recommendations": {
-            "keep": report["summary"]["keep"],
-            "improve": report["summary"]["improve"],
-            "replace": report["summary"]["replace"],
-        },
-        "optimizations": report["optimizations"],
-    }
+        return {
+            "domain": domain,
+            "timestamp": report["timestamp"],
+            "original_count": report["original_count"],
+            "avg_quality": round(report["summary"]["total_quality"], 3),
+            "recommendations": {
+                "keep": report["summary"]["keep"],
+                "improve": report["summary"]["improve"],
+                "replace": report["summary"]["replace"],
+            },
+            "optimizations": report["optimizations"],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to optimize selectors for domain %s", domain)
+        raise HTTPException(status_code=500, detail=f"Selector optimization failed: {e}")
 
 
 @router.get("/ml/optimize/domain/{domain}/history")
@@ -621,16 +658,20 @@ async def get_optimization_history(domain: str, limit: Annotated[int, Query(ge=1
 
     Shows how selector quality has evolved over time.
     """
-    from app.selector_ml_optimizer import get_selector_optimizer
+    try:
+        from app.selector_ml_optimizer import get_selector_optimizer
 
-    optimizer = get_selector_optimizer()
-    history = optimizer.get_optimization_history(domain, limit)
+        optimizer = get_selector_optimizer()
+        history = await run_in_threadpool(optimizer.get_optimization_history, domain, limit)
 
-    return {
-        "domain": domain,
-        "count": len(history),
-        "history": history,
-    }
+        return {
+            "domain": domain,
+            "count": len(history),
+            "history": history,
+        }
+    except Exception as e:
+        logger.exception("Failed to get optimization history for domain %s", domain)
+        raise HTTPException(status_code=500, detail=f"Failed to get optimization history: {e}")
 
 
 @router.post("/ml/learn")
@@ -651,16 +692,20 @@ async def record_selector_learning(
         - quality: Actual quality score achieved [0, 1]
 
     """
-    from app.selector_ml_optimizer import get_selector_optimizer
+    try:
+        from app.selector_ml_optimizer import get_selector_optimizer
 
-    optimizer = get_selector_optimizer()
-    optimizer.learn_from_results(domain, selector, quality)
+        optimizer = get_selector_optimizer()
+        await run_in_threadpool(optimizer.learn_from_results, domain, selector, quality)
 
-    return {
-        "status": "learned",
-        "domain": domain,
-        "quality": quality,
-    }
+        return {
+            "status": "learned",
+            "domain": domain,
+            "quality": quality,
+        }
+    except Exception as e:
+        logger.exception("Failed selector learning for domain %s", domain)
+        raise HTTPException(status_code=500, detail=f"Selector learning failed: {e}")
 
 
 # ─── Strategy Evolution Endpoints (EXPERIMENTAL / RESEARCH ONLY) ─────────
@@ -672,19 +717,23 @@ async def recommend_fetch_strategy(domain: str):
 
     Returns the best strategy based on historical performance.
     """
-    from app.strategy_evolution import get_strategy_evolution_engine
+    try:
+        from app.strategy_evolution import get_strategy_evolution_engine
 
-    engine = get_strategy_evolution_engine()
-    recommendation = engine.recommend_strategy(domain)
+        engine = get_strategy_evolution_engine()
+        recommendation = await run_in_threadpool(engine.recommend_strategy, domain)
 
-    return {
-        "domain": domain,
-        "recommended_strategy": recommendation.recommended_strategy.value,
-        "alternatives": [s.value for s in recommendation.alternatives],
-        "reason": recommendation.reason,
-        "confidence": round(recommendation.confidence, 3),
-        "estimated_success_rate": round(recommendation.estimated_success_rate, 3),
-    }
+        return {
+            "domain": domain,
+            "recommended_strategy": recommendation.recommended_strategy.value,
+            "alternatives": [s.value for s in recommendation.alternatives],
+            "reason": recommendation.reason,
+            "confidence": round(recommendation.confidence, 3),
+            "estimated_success_rate": round(recommendation.estimated_success_rate, 3),
+        }
+    except Exception as e:
+        logger.exception("Failed to recommend strategy for domain %s", domain)
+        raise HTTPException(status_code=500, detail=f"Failed to recommend strategy: {e}")
 
 
 @router.post("/strategy/record")
@@ -709,23 +758,29 @@ async def record_strategy_attempt(
         - failure_reason: Optional failure category
 
     """
-    from app.strategy_evolution import FetchStrategy, get_strategy_evolution_engine
-
-    engine = get_strategy_evolution_engine()
-
     try:
-        strategy_enum = FetchStrategy(strategy)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Unknown strategy: {strategy}")
+        from app.strategy_evolution import FetchStrategy, get_strategy_evolution_engine
 
-    engine.record_fetch_attempt(domain, strategy_enum, success, time_ms, quality, failure_reason)
+        engine = get_strategy_evolution_engine()
 
-    return {
-        "status": "recorded",
-        "domain": domain,
-        "strategy": strategy,
-        "success": success,
-    }
+        try:
+            strategy_enum = FetchStrategy(strategy)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Unknown strategy: {strategy}")
+
+        await run_in_threadpool(engine.record_fetch_attempt, domain, strategy_enum, success, time_ms, quality, failure_reason)
+
+        return {
+            "status": "recorded",
+            "domain": domain,
+            "strategy": strategy,
+            "success": success,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to record strategy attempt for domain %s", domain)
+        raise HTTPException(status_code=500, detail=f"Failed to record strategy attempt: {e}")
 
 
 @router.get("/strategy/domain/{domain}")
@@ -734,10 +789,14 @@ async def get_domain_strategy_analysis(domain: str):
 
     Shows performance of all strategies and evolution history.
     """
-    from app.strategy_evolution import get_strategy_evolution_engine
+    try:
+        from app.strategy_evolution import get_strategy_evolution_engine
 
-    engine = get_strategy_evolution_engine()
-    return engine.get_domain_strategy_report(domain)
+        engine = get_strategy_evolution_engine()
+        return await run_in_threadpool(engine.get_domain_strategy_report, domain)
+    except Exception as e:
+        logger.exception("Failed to get strategy analysis for domain %s", domain)
+        raise HTTPException(status_code=500, detail=f"Failed to get domain strategy report: {e}")
 
 
 @router.get("/strategy/report")
@@ -746,10 +805,14 @@ async def get_all_strategies_report():
 
     High-level overview of which strategies work best across the system.
     """
-    from app.strategy_evolution import get_strategy_evolution_engine
+    try:
+        from app.strategy_evolution import get_strategy_evolution_engine
 
-    engine = get_strategy_evolution_engine()
-    return engine.get_all_domains_strategy_report()
+        engine = get_strategy_evolution_engine()
+        return await run_in_threadpool(engine.get_all_domains_strategy_report)
+    except Exception as e:
+        logger.exception("Failed to get all strategies report")
+        raise HTTPException(status_code=500, detail=f"Failed to get all strategy reports: {e}")
 
 
 @router.post("/strategy/evolve/{domain}")
@@ -762,23 +825,27 @@ async def evolve_domain_strategy(
     Useful when current strategy is degraded.
     Returns the new strategy recommended.
     """
-    from app.strategy_evolution import get_strategy_evolution_engine
+    try:
+        from app.strategy_evolution import get_strategy_evolution_engine
 
-    engine = get_strategy_evolution_engine()
-    new_strategy = engine.evolve_strategy(domain)
+        engine = get_strategy_evolution_engine()
+        new_strategy = await run_in_threadpool(engine.evolve_strategy, domain)
 
-    state = engine.domain_states.get(domain)
-    if state:
-        current_perf = state.strategies[new_strategy]
+        state = engine.domain_states.get(domain)
+        if state:
+            current_perf = state.strategies[new_strategy]
+            return {
+                "domain": domain,
+                "new_strategy": new_strategy.value,
+                "success_rate": round(current_perf.success_rate, 3),
+                "switches": state.strategy_switch_count,
+            }
+
         return {
             "domain": domain,
             "new_strategy": new_strategy.value,
-            "success_rate": round(current_perf.success_rate, 3),
-            "switches": state.strategy_switch_count,
+            "status": "evolved",
         }
-
-    return {
-        "domain": domain,
-        "new_strategy": new_strategy.value,
-        "status": "evolved",
-    }
+    except Exception as e:
+        logger.exception("Failed manual strategy evolution for domain %s", domain)
+        raise HTTPException(status_code=500, detail=f"Strategy evolution failed: {e}")

@@ -164,6 +164,15 @@ async def lifespan(app: FastAPI):
 
     close_postgres_pool()
 
+    # Close browser pool to prevent zombie chromium processes
+    try:
+        from app.browser_pool import get_browser_pool
+
+        await get_browser_pool().close()
+        logger.info("Browser pool closed successfully")
+    except Exception as e:
+        logger.warning("Failed to close browser pool during shutdown: %s", e)
+
 
 def schedule_background_task(coro):
     """Schedule a background task with error handling."""
