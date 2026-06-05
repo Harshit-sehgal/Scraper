@@ -79,22 +79,43 @@ async def lifespan(app: FastAPI):
         )
         gossip, heartbeat_mgr = None, None
 
-    # Runtime safety rails — driven by centralized config
-    CONFIG.update(
-        {
-            "max_discovery_urls": settings.MAX_DISCOVERY_URLS,
-            "per_url_timeout_seconds": settings.PER_URL_TIMEOUT_SECONDS,
-            "max_job_runtime_seconds": settings.MAX_JOB_RUNTIME_SECONDS,
-            "ai_structuring_timeout_seconds": settings.AI_STRUCTURING_TIMEOUT_SECONDS,
-            "insight_timeout_seconds": settings.INSIGHT_TIMEOUT_SECONDS,
-            "max_job_history": settings.MAX_JOB_HISTORY,
-            "max_recycle_bin_history": settings.MAX_RECYCLE_BIN_HISTORY,
-        },
-    )
+    # Runtime safety rails — driven by centralized config.
+    # The legacy ``CONFIG`` mapping is re-synced here so any back-compat
+    # reader (e.g. ``run_job_wrapper`` reading ``CONFIG["..."]``) sees
+    # the current settings values.
+    from app.globals import rebuild_config_from_settings
+
+    rebuild_config_from_settings()
 
     # Resolve the repository lazily
     global job_repo
     job_repo = get_job_repository()
+
+    # SSRF transport self-check: confirm the safe-transport factory still
+    # injects a SafeAsyncNetworkBackend into the httpx connection pool.
+    # The check is non-fatal at import time but hard-fails in production
+    # so a silent upgrade of httpx/httpcore cannot degrade SSRF posture.
+    from app.url_safety import verify_ssrf_self_check
+
+    ssrf_check = verify_ssrf_self_check()
+    if not ssrf_check.get("ok"):
+        msg = (
+            f"SSRF self-check failed: {ssrf_check.get('reason', 'unknown')}. "
+            f"httpx={ssrf_check.get('httpx_version')} "
+            f"httpcore={ssrf_check.get('httpcore_version')}. "
+            "Pin supported versions in backend/requirements.lock.txt."
+        )
+        if settings.ENV.lower() in ("production", "staging"):
+            raise RuntimeError(msg)
+        logger.warning(msg)
+    else:
+        logger.info(
+            "SSRF self-check passed: httpx=%s httpcore=%s anyio_backend=%s sync_backend=%s",
+            ssrf_check.get("httpx_version"),
+            ssrf_check.get("httpcore_version"),
+            ssrf_check.get("has_anyio_backend"),
+            ssrf_check.get("has_sync_backend"),
+        )
 
     # Durable job store & semantic field state — single DB read on startup
     loaded_jobs, loaded_recycle, world_state_data = job_repo.load_all()

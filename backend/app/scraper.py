@@ -46,10 +46,15 @@ from app.html_utils import (
     _is_empty_value,
     fetch_page_content,
 )
+from app.metrics_collector import (
+    record_anti_bot_classification,
+    record_extraction_method,
+)
 from app.page_evidence_collector import collect_page_evidence
 from app.regression_capture import get_regression_capture
 from app.scrape_telemetry import (
     detect_anti_bot,
+    detect_anti_bot_platform,
     estimate_dom_nodes,
     get_scrape_telemetry,
 )
@@ -57,6 +62,21 @@ from app.selector_profiles.loader import match_profile_for_url, try_profile_extr
 from app.zero_result_classifier import classify_zero_result
 
 logger = logging.getLogger(__name__)
+
+
+def _record_extraction_method_safe(method: str | None) -> None:
+    """Best-effort observability hook. Never raises into the scraper path.
+
+    ``record_extraction_method`` already no-ops on empty/None, but we wrap it
+    anyway so an unrelated observability bug (e.g. metrics_collector import
+    error) cannot break extraction.
+    """
+    if not method:
+        return
+    try:
+        record_extraction_method(method)
+    except (ImportError, AttributeError, TypeError, ValueError):
+        pass
 
 
 class ScrapeAttemptResult(list):
@@ -314,6 +334,7 @@ async def scrape_url(
             error=blocked_reason,
             fetch_ms=(time.time() - start_time) * 1000,
         )
+        _record_extraction_method_safe("blocked")
         return ScrapeAttemptResult(
             [],
             html=None,
@@ -392,6 +413,7 @@ async def scrape_url(
                     fetch_ms=(time.time() - start_time) * 1000,
                 )
                 policy.record_result(url, success=True)
+                _record_extraction_method_safe("profile")
                 return ScrapeAttemptResult(
                     results,
                     html=None,
@@ -485,6 +507,7 @@ async def scrape_url(
                 recommended_next_action = RecoveryAction(classification.recovery_strategy).value
             except (ValueError, AttributeError):
                 recommended_next_action = classification.recovery_strategy
+        _record_extraction_method_safe("fetch_failed")
         return ScrapeAttemptResult(
             [],
             html=None,
@@ -567,6 +590,19 @@ async def scrape_url(
     anti_bot = detect_anti_bot(html)
     dom_nodes = estimate_dom_nodes(html)
 
+    # Observability: emit anti-bot classification per request. ``ok`` when the
+    # score is below the soft threshold; the matched platform name otherwise.
+    try:
+        if anti_bot >= settings.ANTIBOT_HARD_BLOCK_THRESHOLD:
+            record_anti_bot_classification(detect_anti_bot_platform(html) or "anti_bot_block")
+        elif anti_bot >= settings.CLASSIFY_ANTIBOT_SCORE_THRESHOLD:
+            record_anti_bot_classification(detect_anti_bot_platform(html) or "anti_bot_block")
+        else:
+            record_anti_bot_classification("ok")
+    except (ImportError, AttributeError, TypeError, ValueError):
+        # Never let observability break the scraper.
+        pass
+
     # Calculate token density
     soup_for_density = BeautifulSoup(html, "html.parser")
     page_text = soup_for_density.get_text()
@@ -611,6 +647,10 @@ async def scrape_url(
     provenance_builder.set_memory_hit(ext_result.method == "memory")
     if ext_result.method == "regex":
         provenance_builder.add_fallback_step("regex")
+
+    # Observability: emit the chosen extraction method (one of network_json,
+    # memory, discovery, container_discovery, visible_text, regex, profile).
+    _record_extraction_method_safe(ext_result.method)
 
     # Phase 80: Record successful attempt and extraction quality
     avg_score = 0.0

@@ -10,9 +10,15 @@ Use explicit environment variables so local `.env` files do not change results.
 ```bash
 python3 -m compileall -q backend scripts architecture_validator.py
 PYTHONPATH=backend python3 architecture_validator.py
+python3 scripts/validate_dependency_bounds.py
+python3 scripts/frontend_syntax_check.py
 PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest --collect-only -q backend/tests backend/benchmarks -o addopts=
 PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/tests -o addopts=
 PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m pytest -q backend/benchmarks -o addopts=
+PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite python3 -m coverage run --source=backend/app -m pytest -q backend/tests -o addopts= --tb=line --no-cov-on-fail
+python3 -m coverage json -o coverage.json
+python3 scripts/check_coverage_floors.py coverage.json
+python3 -m coverage report --fail-under=60
 ```
 
 ## Latest Results

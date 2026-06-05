@@ -16,9 +16,10 @@ This route list was generated from the FastAPI app during the audit. Production 
 
 | Method | Path | Intended Access |
 | --- | --- | --- |
-| GET | `/api/jobs` | Authenticated user |
+| GET | `/api/jobs` | Authenticated user (paginated: `?limit=&cursor=`, returns `next_cursor`) |
 | GET | `/api/jobs/{job_id}` | Authenticated user |
-| GET | `/api/jobs/{job_id}/results` | Authenticated user |
+| GET | `/api/jobs/{job_id}/results` | Authenticated user (paginated: `?limit=&offset=`) |
+| GET | `/api/jobs/{job_id}/events` | Authenticated user (paginated: `?limit=&offset=&level=`) |
 | POST | `/api/jobs` | Operator or admin |
 | POST | `/api/jobs/{job_id}/cancel` | Operator or admin |
 | POST | `/api/jobs/{job_id}/reclean` | Operator or admin |
@@ -50,13 +51,53 @@ This route list was generated from the FastAPI app during the audit. Production 
 
 Most scraper mutation or diagnostic routes should be operator/admin only. Read-only telemetry routes still require API authentication when keys are configured.
 
-Important routes include `/api/scraper/config`, `/api/scraper/telemetry`, `/api/scraper/stats`, `/api/scraper/browser`, `/api/scraper/diagnostics`, `/api/scraper/regressions/*`, `/api/scraper/selectors/*`, `/api/scraper/ml/*`, and `/api/scraper/strategy/*`.
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| GET | `/api/scraper/browser` | Operator or admin |
+| GET | `/api/scraper/config` | Operator or admin |
+| GET | `/api/scraper/economics` | Operator or admin |
+| GET | `/api/scraper/health/summary` | Operator or admin |
+| GET | `/api/scraper/health/legacy` | Operator or admin |
+| GET | `/api/scraper/health/domains` | Operator or admin |
+| GET | `/api/scraper/health/domain/{domain}` | Operator or admin |
+| GET | `/api/scraper/memory/stats` | Operator or admin |
+| GET | `/api/scraper/regressions` | Operator or admin |
+| GET | `/api/scraper/regressions/{entry_id}` | Operator or admin |
+| GET | `/api/scraper/selectors/domain/{domain}` | Operator or admin |
+| GET | `/api/scraper/selectors/low-confidence` | Operator or admin |
+| GET | `/api/scraper/selectors/stats` | Operator or admin |
+| GET | `/api/scraper/stats` | Operator or admin |
+| GET | `/api/scraper/strategy/domain/{domain}` | Operator or admin |
+| GET | `/api/scraper/strategy/recommend/{domain}` | Operator or admin |
+| GET | `/api/scraper/strategy/report` | Operator or admin |
+| GET | `/api/scraper/telemetry` | Operator or admin |
+| GET | `/api/scraper/trends` | Operator or admin |
+| GET | `/api/scraper/trends/{domain}` | Operator or admin |
+| GET | `/api/scraper/ml/optimize/domain/{domain}/history` | Operator or admin |
+| DELETE | `/api/scraper/telemetry` | Admin |
+| POST | `/api/scraper/diagnostics` | Operator or admin |
+| POST | `/api/scraper/regressions/generate-all-tests` | Admin |
+| POST | `/api/scraper/regressions/{entry_id}/generate-test` | Admin |
+| POST | `/api/scraper/selectors/cleanup` | Admin |
+| POST | `/api/scraper/strategy/evolve/{domain}` | Admin |
+| POST | `/api/scraper/strategy/record` | Operator or admin |
+| POST | `/api/scraper/ml/learn` | Admin |
+| POST | `/api/scraper/ml/optimize/domain/{domain}` | Admin |
 
 ## Operator and System Routes
 
-Operator routes include `/api/operator/mode`, `/api/operator/dashboard`, `/api/operator/predictions`, and `/api/operator/health`.
-
-System routes include `/api/system/status`, `/api/system/topology`, `/api/system/export/knowledge`, `/api/system/merge/knowledge`, `/api/system/scheduler/step`, `/api/system/refactor/compress`, and `/api/system/diagnostics/export`.
+| Method | Path | Intended Access |
+| --- | --- | --- |
+| GET | `/api/operator/dashboard` | Operator or admin |
+| GET | `/api/operator/health` | Operator or admin |
+| GET | `/api/operator/mode` | Operator or admin |
+| GET | `/api/operator/predictions` | Operator or admin |
+| GET | `/api/operator/predictions/{domain}` | Operator or admin |
+| POST | `/api/operator/mode` | Admin |
+| GET | `/api/system/status` | Operator or admin |
+| GET | `/api/system/storage/status` | Operator or admin |
+| GET | `/api/system/diagnostics/export` | Admin |
+| POST | `/api/system/csp-violations` | Unauthenticated (browser-reported) |
 
 Admin-only routes include system merge, scheduler step, refactor compression, diagnostics export, and operator mode changes.
 
@@ -69,3 +110,17 @@ Admin-only routes include system merge, scheduler step, refactor compression, di
 - `X-API-Key` or `Authorization: Bearer <token>` can provide user/operator/admin credentials.
 - `X-Admin-Key` is accepted for admin compatibility.
 - In development with no configured keys, routes may be permissive. Do not use that mode for production.
+
+## Idempotency
+
+`POST /api/jobs` accepts an optional `Idempotency-Key` request header
+(up to 128 characters). When set, a repeat request with the same
+header value returns the originally-created `job_id` and the
+response includes `idempotent_replay: true`. The first response
+carries `idempotent_replay: false`. The mapping is persisted in
+the `idempotency_keys` companion table and pruned after 7 days by
+default (operators can call `prune_idempotency_keys(older_than_days=...)`).
+
+This is a best-effort deduplication mechanism for client retry loops.
+A conflicting `request_fingerprint` does not currently cause a
+409; the latest record wins.

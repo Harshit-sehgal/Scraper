@@ -173,6 +173,19 @@ def classify_zero_result(
 
 def _build(failure_class: str, confidence: float) -> ZeroResultClassification:
     msg = _MESSAGES.get(failure_class, _MESSAGES["genuinely_empty"])
+
+    # Observability: emit anti-bot classification counter. The four
+    # zero-result categories that map to anti-bot blocks are
+    # ``anti_bot_block``, ``auth_required``, ``empty_response``, and
+    # ``js_render_required`` (JS shells that look like anti-bot).
+    try:
+        from app.metrics_collector import record_anti_bot_classification
+
+        if failure_class in ("anti_bot_block", "auth_required", "empty_response"):
+            record_anti_bot_classification(failure_class)
+    except (ImportError, AttributeError, TypeError, ValueError):
+        pass
+
     return ZeroResultClassification(
         zero_result=True,
         failure_class=failure_class,

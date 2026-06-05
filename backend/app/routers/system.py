@@ -254,6 +254,64 @@ async def export_system_diagnostics(_role=Depends(require_role([UserRole.ADMIN])
     return Response(zip_buffer.getvalue(), media_type="application/zip", headers=headers)
 
 
+# ─── CSP Violations Endpoint ───────────────────────────────────────────
+
+
+@router.post("/api/system/csp-violations")
+async def csp_violations(request: Request):
+    """Receive a Content-Security-Policy violation report from a browser.
+
+    The browser POSTs a JSON body of shape
+    ``{"csp-report": {"violated-directive": "script-src 'self'", ...}}`` when
+    any directive in the report-only policy attached by
+    ``csp_report_only_middleware`` is violated. This endpoint normalises the
+    directive label and increments ``dataforge_csp_violations_total{directive=...}``.
+
+    The endpoint is unauthenticated on purpose — the browser cannot carry the
+    API key — but it is rate-limited by the global /api/* middleware. The
+    body is bounded by the body-size middleware (5 MB) so an attacker cannot
+    flood the metrics counters.
+    """
+    try:
+        payload = await request.json()
+    except (ValueError, TypeError):
+        # Browsers occasionally send the report as ``application/csp-report``
+        # with the fields at the top level. Accept both shapes.
+        try:
+            body_bytes = await request.body()
+            payload = json.loads(body_bytes.decode("utf-8", errors="replace")) if body_bytes else {}
+        except (ValueError, TypeError, UnicodeDecodeError):
+            return JSONResponse(status_code=204, content=None)
+
+    # Normalise: the spec wraps the actual report under ``csp-report``; some
+    # browsers omit the wrapper and put fields at the top level.
+    csp_report = payload.get("csp-report") if isinstance(payload, dict) else None
+    if not isinstance(csp_report, dict):
+        csp_report = payload if isinstance(payload, dict) else {}
+
+    directive = csp_report.get("violated-directive") or csp_report.get("effective-directive") or csp_report.get("original-policy")
+    directive_label = "unspecified"
+    if isinstance(directive, str):
+        first_token = directive.strip().split(" ", 1)[0]
+        if first_token:
+            directive_label = first_token.lower()
+
+    try:
+        from app.metrics_collector import record_csp_violation
+
+        record_csp_violation(directive_label)
+    except (ImportError, AttributeError, TypeError, ValueError):
+        pass
+
+    logger.info(
+        "CSP violation: directive=%s blocked=%s document-uri=%s",
+        directive_label,
+        csp_report.get("blocked-uri"),
+        csp_report.get("document-uri"),
+    )
+    return JSONResponse(status_code=204, content=None)
+
+
 # ─── URL Analyzer Endpoint ──────────────────────────────────────────────
 
 
@@ -333,11 +391,18 @@ def _basic_metric_line(name: str, value: float, labels: dict[str, str] | None = 
 def _render_basic_metrics_text() -> str:
     """Render a minimal Prometheus exposition if prometheus_client is unavailable."""
     from app.metrics_collector import (
+        get_anti_bot_classifications,
+        get_browser_launch_outcomes,
+        get_csp_violations,
         get_errors,
+        get_export_outcomes,
+        get_extraction_method_counts,
         get_health_check_latencies,
         get_llm_calls,
+        get_repo_query_latencies,
         get_request_latencies,
         get_requests_total,
+        get_ssrf_rejects,
         get_worker_failures,
     )
     from app.models import JobStatus
@@ -400,6 +465,43 @@ def _render_basic_metrics_text() -> str:
 
     lines.append(_basic_metric_line("dataforge_llm_calls_total", get_llm_calls()))
     lines.append(_basic_metric_line("dataforge_requests_total", get_requests_total()))
+
+    # New gauges — observability targets.
+    for method, count in get_extraction_method_counts().items():
+        lines.append(_basic_metric_line("dataforge_extraction_method_total", count, {"method": method}))
+    for cls, count in get_anti_bot_classifications().items():
+        lines.append(_basic_metric_line("dataforge_anti_bot_classifications_total", count, {"classification": cls}))
+    for fmt, outcomes in get_export_outcomes().items():
+        for outcome, count in outcomes.items():
+            lines.append(
+                _basic_metric_line(
+                    "dataforge_export_outcomes_total",
+                    count,
+                    {"format": fmt, "outcome": outcome},
+                ),
+            )
+    for outcome, count in get_browser_launch_outcomes().items():
+        lines.append(_basic_metric_line("dataforge_browser_launch_total", count, {"outcome": outcome}))
+    for reason, count in get_ssrf_rejects().items():
+        lines.append(_basic_metric_line("dataforge_ssrf_rejects_total", count, {"reason": reason}))
+
+    repo_latencies = get_repo_query_latencies()
+    if repo_latencies:
+        sorted_lat = sorted(repo_latencies)
+        n = len(sorted_lat)
+        p50 = sorted_lat[min(n - 1, int(0.50 * n))]
+        p95 = sorted_lat[min(n - 1, int(0.95 * n))]
+        lines.append(
+            _basic_metric_line("dataforge_repo_query_latency_seconds", p50, {"quantile": "0.5"}),
+        )
+        lines.append(
+            _basic_metric_line("dataforge_repo_query_latency_seconds", p95, {"quantile": "0.95"}),
+        )
+
+    for directive, count in get_csp_violations().items():
+        lines.append(
+            _basic_metric_line("dataforge_csp_violations_total", count, {"directive": directive}),
+        )
 
     return "\n".join(lines) + "\n"
 
@@ -569,5 +671,106 @@ async def metrics(request: Request):
     # Cumulative requests count
     requests_gauge = Gauge("dataforge_requests_total", "Total requests count", registry=registry)
     requests_gauge.set(get_requests_total())
+
+    # Extraction-method distribution. One row per method so a
+    # spike in ``regex`` is visible alongside the structured
+    # methods.
+    from app.metrics_collector import (
+        get_anti_bot_classifications,
+        get_browser_launch_outcomes,
+        get_csp_violations,
+        get_export_outcomes,
+        get_extraction_method_counts,
+        get_repo_query_latencies,
+        get_ssrf_rejects,
+    )
+
+    method_counts = get_extraction_method_counts()
+    if method_counts:
+        method_gauge = Gauge(
+            "dataforge_extraction_method_total",
+            "Extraction method distribution",
+            ["method"],
+            registry=registry,
+        )
+        for method, count in method_counts.items():
+            method_gauge.labels(method=method).set(count)
+
+    # Anti-bot classification counts.
+    classifications = get_anti_bot_classifications()
+    if classifications:
+        cls_gauge = Gauge(
+            "dataforge_anti_bot_classifications_total",
+            "Anti-bot classification counts",
+            ["classification"],
+            registry=registry,
+        )
+        for cls, count in classifications.items():
+            cls_gauge.labels(classification=cls).set(count)
+
+    # Export generation outcomes by format and outcome.
+    export_outcomes = get_export_outcomes()
+    if export_outcomes:
+        export_gauge = Gauge(
+            "dataforge_export_outcomes_total",
+            "Export generation outcomes by format",
+            ["format", "outcome"],
+            registry=registry,
+        )
+        for fmt, outcomes in export_outcomes.items():
+            for outcome, count in outcomes.items():
+                export_gauge.labels(format=fmt, outcome=outcome).set(count)
+
+    # Browser launch outcomes.
+    browser_outcomes = get_browser_launch_outcomes()
+    if browser_outcomes:
+        browser_gauge = Gauge(
+            "dataforge_browser_launch_total",
+            "Playwright browser launch outcomes",
+            ["outcome"],
+            registry=registry,
+        )
+        for outcome, count in browser_outcomes.items():
+            browser_gauge.labels(outcome=outcome).set(count)
+
+    # SSRF validation rejects.
+    ssrf_rejects = get_ssrf_rejects()
+    if ssrf_rejects:
+        ssrf_gauge = Gauge(
+            "dataforge_ssrf_rejects_total",
+            "SSRF validation rejects by reason",
+            ["reason"],
+            registry=registry,
+        )
+        for reason, count in ssrf_rejects.items():
+            ssrf_gauge.labels(reason=reason).set(count)
+
+    # Repository query latencies — p50 / p95 derived from the ring buffer.
+    repo_latencies = get_repo_query_latencies()
+    if repo_latencies:
+        sorted_lat = sorted(repo_latencies)
+        n = len(sorted_lat)
+        p50 = sorted_lat[min(n - 1, int(0.50 * n))]
+        p95 = sorted_lat[min(n - 1, int(0.95 * n))]
+        repo_gauge = Gauge(
+            "dataforge_repo_query_latency_seconds",
+            "Repository query latency percentiles (p50, p95)",
+            ["quantile"],
+            registry=registry,
+        )
+        repo_gauge.labels(quantile="0.5").set(p50)
+        repo_gauge.labels(quantile="0.95").set(p95)
+
+    # CSP violations.
+    csp_violations = get_csp_violations()
+    if csp_violations:
+        csp_gauge = Gauge(
+            "dataforge_csp_violations_total",
+            "CSP violation counts by directive",
+            ["directive"],
+            registry=registry,
+        )
+        for directive, count in csp_violations.items():
+            csp_gauge.labels(directive=directive).set(count)
 
     return Response(content=generate_latest(registry), media_type="text/plain")

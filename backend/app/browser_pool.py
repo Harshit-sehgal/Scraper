@@ -77,7 +77,19 @@ class BrowserPool:
                 except Exception:
                     self.crash_count += 1
                     logger.exception("[BrowserPool] Failed to launch browser: %s")
+                    try:
+                        from app.metrics_collector import record_browser_launch
+
+                        record_browser_launch(success=False)
+                    except Exception:  # noqa: BLE001
+                        pass
                     raise
+                try:
+                    from app.metrics_collector import record_browser_launch
+
+                    record_browser_launch(success=True)
+                except Exception:  # noqa: BLE001
+                    pass
 
                 # Ensure background cleanup is running
                 if not self._cleanup_task or self._cleanup_task.done():

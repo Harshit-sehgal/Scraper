@@ -33,6 +33,41 @@ _llm_calls_total_lock = threading.Lock()
 _requests_total: int = 0
 _requests_total_lock = threading.Lock()
 
+# Extraction-method distribution: method -> count
+# Populated by the scraper engine when a record's extraction succeeds.
+_extraction_method_counts: dict[str, int] = {}
+_extraction_method_counts_lock = threading.Lock()
+
+# Anti-bot classification counts: classification -> count
+# e.g. "captcha", "cloudflare_challenge", "rate_limited", "ok"
+_anti_bot_classifications: dict[str, int] = {}
+_anti_bot_classifications_lock = threading.Lock()
+
+# Export generation outcomes: format -> outcome -> count
+# e.g. {"csv": {"success": 12, "failure": 1}, "excel": {...}}
+_export_outcomes: dict[str, dict[str, int]] = {}
+_export_outcomes_lock = threading.Lock()
+
+# Browser launch outcomes: outcome -> count
+_browser_launch_outcomes: dict[str, int] = {}
+_browser_launch_outcomes_lock = threading.Lock()
+
+# SSRF validation rejects: reason -> count
+_ssrf_rejects: dict[str, int] = {}
+_ssrf_rejects_lock = threading.Lock()
+
+# Repository query latencies (seconds) — ring buffer
+_repo_query_latencies: list[float] = []
+_repo_query_latencies_lock = threading.Lock()
+
+# CSP violation counts: directive -> count. Populated by the
+# ``/api/system/csp-violations`` endpoint when a browser reports a
+# Content-Security-Policy violation. The directive is the policy clause that
+# was violated (e.g. ``script-src``, ``img-src``); "unspecified" when the
+# browser does not report one.
+_csp_violations: dict[str, int] = {}
+_csp_violations_lock = threading.Lock()
+
 
 def record_request_latency(duration_seconds: float) -> None:
     """Record an API request duration for metrics export."""
@@ -76,6 +111,108 @@ def record_llm_call() -> None:
         _llm_calls_total += 1
 
 
+def record_extraction_method(method: str) -> None:
+    """Record one record-extraction event with its chosen method.
+
+    The deep-research report's monitoring target calls for an
+    *extraction method distribution* metric so operators can spot
+    regressions to the regex fallback before they turn into data
+    quality incidents.
+    """
+    if not method:
+        return
+    with _extraction_method_counts_lock:
+        _extraction_method_counts[method] = _extraction_method_counts.get(method, 0) + 1
+
+
+def record_anti_bot_classification(classification: str) -> None:
+    """Record a single anti-bot classification event.
+
+    Examples: ``"captcha"``, ``"cloudflare_challenge"``,
+    ``"rate_limited"``, ``"ok"``. Operators can alert when the
+    ratio of non-OK classifications to total requests crosses a
+    threshold.
+    """
+    if not classification:
+        return
+    with _anti_bot_classifications_lock:
+        _anti_bot_classifications[classification] = (
+            _anti_bot_classifications.get(
+                classification,
+                0,
+            )
+            + 1
+        )
+
+
+def record_export_outcome(fmt: str, success: bool) -> None:
+    """Record an export generation outcome.
+
+    Tracks both successes and failures so operators can alert on
+    export-failure ratios that exceed the report's *export
+    generation failures* monitoring target.
+    """
+    if not fmt:
+        return
+    outcome = "success" if success else "failure"
+    with _export_outcomes_lock:
+        bucket = _export_outcomes.setdefault(fmt, {"success": 0, "failure": 0})
+        bucket[outcome] = bucket.get(outcome, 0) + 1
+
+
+def record_browser_launch(success: bool) -> None:
+    """Record a Playwright browser launch outcome.
+
+    Used to detect environments where Playwright is missing its
+    runtime libraries or the bundled browsers are corrupt.
+    """
+    outcome = "success" if success else "failure"
+    with _browser_launch_outcomes_lock:
+        _browser_launch_outcomes[outcome] = _browser_launch_outcomes.get(outcome, 0) + 1
+
+
+def record_ssrf_reject(reason: str) -> None:
+    """Record an SSRF validation reject.
+
+    Operators can use this to spot scraping attempts that target
+    private address space and to tune the SSRF guard.
+    """
+    if not reason:
+        reason = "unspecified"
+    with _ssrf_rejects_lock:
+        _ssrf_rejects[reason] = _ssrf_rejects.get(reason, 0) + 1
+
+
+def record_repo_query_latency(duration_seconds: float) -> None:
+    """Record a single repository query latency (seconds).
+
+    The deep-research report's *Repository query latency* target
+    wants p50/p95 visibility on storage calls. A ring buffer is
+    good enough for our short-lived single-process metrics
+    endpoint; long-term storage should use Prometheus's own
+    histogram type.
+    """
+    global _repo_query_latencies
+    with _repo_query_latencies_lock:
+        _repo_query_latencies.append(duration_seconds)
+        if len(_repo_query_latencies) > _MAX_METRIC_SAMPLES:
+            _repo_query_latencies = _repo_query_latencies[-_MAX_METRIC_SAMPLES:]
+
+
+def record_csp_violation(directive: str) -> None:
+    """Record a Content-Security-Policy violation report.
+
+    Called by the ``/api/system/csp-violations`` endpoint when a browser
+    reports a violation. The directive is the policy clause that was
+    violated (``script-src``, ``img-src``, ``connect-src``, …); the value
+    is normalised to lowercase and defaults to ``"unspecified"`` if the
+    browser does not report a directive.
+    """
+    label = (directive or "unspecified").strip().lower() or "unspecified"
+    with _csp_violations_lock:
+        _csp_violations[label] = _csp_violations.get(label, 0) + 1
+
+
 def get_request_latencies() -> list[float]:
     with _request_latencies_lock:
         return list(_request_latencies)
@@ -106,6 +243,41 @@ def get_requests_total() -> int:
         return _requests_total
 
 
+def get_extraction_method_counts() -> dict[str, int]:
+    with _extraction_method_counts_lock:
+        return dict(_extraction_method_counts)
+
+
+def get_anti_bot_classifications() -> dict[str, int]:
+    with _anti_bot_classifications_lock:
+        return dict(_anti_bot_classifications)
+
+
+def get_export_outcomes() -> dict[str, dict[str, int]]:
+    with _export_outcomes_lock:
+        return {fmt: dict(outcomes) for fmt, outcomes in _export_outcomes.items()}
+
+
+def get_browser_launch_outcomes() -> dict[str, int]:
+    with _browser_launch_outcomes_lock:
+        return dict(_browser_launch_outcomes)
+
+
+def get_ssrf_rejects() -> dict[str, int]:
+    with _ssrf_rejects_lock:
+        return dict(_ssrf_rejects)
+
+
+def get_repo_query_latencies() -> list[float]:
+    with _repo_query_latencies_lock:
+        return list(_repo_query_latencies)
+
+
+def get_csp_violations() -> dict[str, int]:
+    with _csp_violations_lock:
+        return dict(_csp_violations)
+
+
 def reset_for_testing() -> None:
     """Reset all counters and buffers (for test isolation)."""
     global _llm_calls_total, _requests_total
@@ -121,3 +293,17 @@ def reset_for_testing() -> None:
         _llm_calls_total = 0
     with _requests_total_lock:
         _requests_total = 0
+    with _extraction_method_counts_lock:
+        _extraction_method_counts.clear()
+    with _anti_bot_classifications_lock:
+        _anti_bot_classifications.clear()
+    with _export_outcomes_lock:
+        _export_outcomes.clear()
+    with _browser_launch_outcomes_lock:
+        _browser_launch_outcomes.clear()
+    with _ssrf_rejects_lock:
+        _ssrf_rejects.clear()
+    with _repo_query_latencies_lock:
+        _repo_query_latencies.clear()
+    with _csp_violations_lock:
+        _csp_violations.clear()

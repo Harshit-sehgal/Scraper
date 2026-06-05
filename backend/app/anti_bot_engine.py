@@ -34,6 +34,7 @@ CHALLENGE_PATTERNS = {
     "datadome": ["dd-captcha", "datadome", "dd="],
     "perimeterx": ["perimeterx", "px-captcha", "_px"],
     "incapsula": ["incapsula", "visid_incap", "incap_ses", "imperva"],
+    "captcha": ["g-recaptcha", "h-captcha", "recaptcha", "hcaptcha"],
     "generic_block": [
         "access denied",
         "blocked",
@@ -132,6 +133,51 @@ class AntiBotEngine:
                 max_score = max(max_score, 0.5)
 
         return max_score
+
+    def detect_challenge_platform(self, html: str, headers: dict | None = None) -> str:
+        """Identify which anti-bot platform matched (best-effort, single label).
+
+        Returns the platform name (``"cloudflare"``, ``"akamai"``, ``"datadome"``,
+        ``"perimeterx"``, ``"incapsula"``, ``"captcha"``, ``"rate_limit"``,
+        ``"generic_block"``, ``"js_required"``) or ``"ok"`` when no platform
+        matched. Used by the observability layer to record
+        ``dataforge_anti_bot_classifications_total{classification=...}``.
+        """
+        if not html:
+            return "ok"
+
+        lower_html = html.lower()
+
+        # Order matters: more specific patterns win over generic ones.
+        ordered_platforms = (
+            "cloudflare",
+            "akamai",
+            "datadome",
+            "perimeterx",
+            "incapsula",
+            "captcha",
+            "rate_limit",
+            "js_required",
+            "generic_block",
+        )
+        for platform in ordered_platforms:
+            patterns = CHALLENGE_PATTERNS.get(platform, [])
+            for p in patterns:
+                if p in lower_html:
+                    return platform
+
+        if headers:
+            headers_lower = {k.lower(): str(v).lower() for k, v in headers.items()}
+            server = headers_lower.get("server", "")
+            if "cloudflare" in server:
+                return "cloudflare"
+            if "akamai" in server:
+                return "akamai"
+            cookies = headers_lower.get("set-cookie", "")
+            if any(p in cookies for p in ["_abck", "_px", "datadome", "incap_ses"]):
+                return "captcha"
+
+        return "ok"
 
     def should_evolve_to_stealth(self, domain: str) -> bool:
         """Heuristic check if a domain requires stealth mode."""

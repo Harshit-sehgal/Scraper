@@ -5,6 +5,15 @@ Replaces JSON persistence with durable SQLite storage. Provides:
 - Schema versioning and migrations
 - Shutdown flush for pending writes
 - Same API surface as state_store.py (load_state, save_state, persist_state_fn)
+
+Schema v4 introduces two companion tables — ``job_results`` and
+``job_events`` — that hold the heavy per-job payloads (``results``
+list and ``logs`` list) in dedicated rows. The original ``jobs`` /
+``recycle_bin`` tables continue to carry the lightweight summary
+columns and the embedded ``results`` / ``logs`` JSON for backward
+compatibility. Writes are dual (the new tables and the legacy JSON
+column both get the same data) so existing readers keep working
+while new readers can opt into the cheaper per-row queries.
 """
 
 import datetime
@@ -19,15 +28,15 @@ from app.models import Job, JobStatus, SourcePolicy
 logger = logging.getLogger(__name__)
 
 _DB_LOCK = Lock()
-_CURRENT_SCHEMA_VERSION = 3
+_CURRENT_SCHEMA_VERSION = 4
 _MIGRATIONS_RUN_FOR: set[Path] = set()
 
 
 def _get_db_path() -> Path:
     from app.config import settings
 
-    if settings.STATE_FILE_PATH:
-        base = Path(settings.STATE_FILE_PATH).expanduser()
+    if settings.STATE_FILE_PATH_DYNAMIC:
+        base = Path(settings.STATE_FILE_PATH_DYNAMIC).expanduser()
     else:
         base = Path(__file__).resolve().parent.parent / "data" / "jobs_state.json"
     return base.with_suffix(".db")
@@ -432,6 +441,63 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                         conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_def}")
             current = 3
 
+        if current < 4:
+            # v4: split the heavy per-job payloads out of the main
+            # ``jobs`` row. ``job_results`` and ``job_events`` are
+            # populated by dual-write from ``save_single`` / ``save_state``
+            # and remain the source of truth for new endpoints that
+            # only need results or logs (e.g. ``/api/jobs/{id}/events``).
+            # The legacy JSON columns in ``jobs`` are preserved for
+            # back-compat with the single-row reader.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS job_results (
+                    job_id TEXT NOT NULL,
+                    result_index INTEGER NOT NULL,
+                    payload TEXT NOT NULL,
+                    PRIMARY KEY (job_id, result_index),
+                    FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS job_events (
+                    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    job_id TEXT NOT NULL,
+                    timestamp TEXT NOT NULL DEFAULT '',
+                    level TEXT NOT NULL DEFAULT 'info',
+                    message TEXT NOT NULL,
+                    FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_job_events_job_id ON job_events(job_id, event_id)",
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_job_results_job_id ON job_results(job_id)",
+            )
+            # v4.1 (still in the v4 migration window): idempotency-key
+            # tracking. A client that retries a ``POST /api/jobs`` with
+            # the same ``Idempotency-Key`` header receives the
+            # originally-created job_id instead of a duplicate. The
+            # table is additive; older deployments ignore it.
+            #
+            # The ``job_id`` column is intentionally NOT a foreign key
+            # because we want the idempotency record to survive even
+            # after the underlying job is hard-deleted (otherwise a
+            # retry of a deleted job would 404 even though the
+            # client thought it was the same logical request).
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS idempotency_keys (
+                    idem_key TEXT PRIMARY KEY,
+                    job_id TEXT NOT NULL,
+                    request_fingerprint TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_idempotency_keys_created_at ON idempotency_keys(created_at)",
+            )
+            current = 4
+
         conn.execute("DELETE FROM schema_version")
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
         conn.commit()
@@ -519,6 +585,8 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job], pr
         try:
             if prune_missing:
                 conn.execute("DELETE FROM jobs")
+                conn.execute("DELETE FROM job_results")
+                conn.execute("DELETE FROM job_events")
 
             for job in jobs_store.values():
                 row = _job_to_row(job)
@@ -528,6 +596,8 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job], pr
                     f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",
                     list(row.values()),
                 )
+                _sync_job_results(conn, job.id, job.results)
+                _sync_job_events(conn, job.id, job.logs)
 
             if prune_missing:
                 conn.execute("DELETE FROM recycle_bin")
@@ -540,6 +610,8 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job], pr
                     f"INSERT OR REPLACE INTO recycle_bin ({columns}) VALUES ({placeholders})",
                     list(row.values()),
                 )
+                _sync_job_results(conn, job.id, job.results)
+                _sync_job_events(conn, job.id, job.logs)
 
             conn.commit()
         except Exception:
@@ -550,7 +622,14 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job], pr
 
 
 def persist_state_single(job: Job) -> None:
-    """Persist a single job row (upsert) — used for frequent progress updates."""
+    """Persist a single job row (upsert) — used for frequent progress updates.
+
+    Dual-writes the heavy payloads (``results``, ``logs``) into the
+    dedicated ``job_results`` and ``job_events`` companion tables so
+    that future readers do not have to parse the entire JSON blob in
+    the main ``jobs`` row. The legacy JSON columns are still kept
+    in sync for back-compat with the existing single-row reader.
+    """
     with _DB_LOCK:
         conn = _get_connection()
         try:
@@ -562,6 +641,8 @@ def persist_state_single(job: Job) -> None:
                 f"INSERT OR REPLACE INTO jobs ({columns}) VALUES ({placeholders})",
                 values,
             )
+            _sync_job_results(conn, job.id, job.results)
+            _sync_job_events(conn, job.id, job.logs)
             conn.commit()
         except Exception:
             conn.rollback()
@@ -571,6 +652,67 @@ def persist_state_single(job: Job) -> None:
             conn.close()
 
 
+def _sync_job_results(
+    conn: sqlite3.Connection,
+    job_id: str,
+    results: list,
+) -> None:
+    """Replace the ``job_results`` rows for ``job_id`` with ``results``.
+
+    Dual-write helper used by ``persist_state_single`` and ``save_state``.
+    """
+    conn.execute("DELETE FROM job_results WHERE job_id = ?", (job_id,))
+    for idx, payload in enumerate(results):
+        try:
+            encoded = json.dumps(payload, default=str)
+        except (TypeError, ValueError):
+            encoded = json.dumps(str(payload))
+        conn.execute(
+            "INSERT INTO job_results (job_id, result_index, payload) VALUES (?, ?, ?)",
+            (job_id, idx, encoded),
+        )
+
+
+def _sync_job_events(
+    conn: sqlite3.Connection,
+    job_id: str,
+    logs,
+) -> None:
+    """Replace the ``job_events`` rows for ``job_id`` with ``logs``.
+
+    ``logs`` may be a list of Pydantic ``LogEntry`` objects or a list
+    of dicts with ``timestamp`` / ``level`` / ``message`` keys.
+    """
+    conn.execute("DELETE FROM job_events WHERE job_id = ?", (job_id,))
+    for entry in logs or []:
+        if hasattr(entry, "model_dump"):
+            try:
+                entry_dict = entry.model_dump()
+            except Exception:
+                entry_dict = {
+                    "timestamp": "",
+                    "level": "info",
+                    "message": str(entry),
+                }
+        elif isinstance(entry, dict):
+            entry_dict = entry
+        else:
+            entry_dict = {
+                "timestamp": "",
+                "level": "info",
+                "message": str(entry),
+            }
+        conn.execute(
+            "INSERT INTO job_events (job_id, timestamp, level, message) VALUES (?, ?, ?, ?)",
+            (
+                job_id,
+                str(entry_dict.get("timestamp") or ""),
+                str(entry_dict.get("level") or "info"),
+                str(entry_dict.get("message") or ""),
+            ),
+        )
+
+
 def flush_state() -> None:
     """Ensure all pending writes are flushed (no-op for SQLite — writes are synchronous)."""
 
@@ -578,6 +720,163 @@ def flush_state() -> None:
 def shutdown() -> None:
     """Clean shutdown — ensure all connections are closed."""
     logger.info("SQLite job store shutdown complete")
+
+
+# ─── Companion-table readers (v4 schema) ─────────────────────────────────
+
+
+def read_job_results(job_id: str) -> list[dict]:
+    """Read a job's results from the dedicated ``job_results`` table.
+
+    Returns a list of dicts in the original ``results`` order. If the
+    companion table is empty (e.g. a pre-v4 database that has not
+    been backfilled) the returned list is empty — the caller is
+    responsible for falling back to the JSON column on the ``jobs``
+    row if it needs the legacy view.
+    """
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            rows = conn.execute(
+                "SELECT payload FROM job_results WHERE job_id = ? ORDER BY result_index ASC",
+                (job_id,),
+            ).fetchall()
+        finally:
+            conn.close()
+    out: list[dict] = []
+    for row in rows:
+        try:
+            out.append(json.loads(row["payload"]))
+        except (TypeError, ValueError):
+            out.append({"_unparseable": row["payload"]})
+    return out
+
+
+def read_job_events(
+    job_id: str,
+    limit: int = 200,
+    offset: int = 0,
+    level_prefix: str | None = None,
+) -> list[dict]:
+    """Read a job's lifecycle events from the dedicated ``job_events`` table.
+
+    Returns ``[{timestamp, level, message}, ...]`` ordered by ``event_id``
+    ascending (insertion order). Supports keyset pagination via
+    ``offset`` and optional ``level_prefix`` filtering.
+    """
+    safe_limit = max(1, min(int(limit), 1000))
+    safe_offset = max(0, int(offset))
+    sql = "SELECT timestamp, level, message FROM job_events WHERE job_id = ?"
+    params: list[object] = [job_id]
+    if level_prefix:
+        sql += " AND LOWER(level) LIKE ?"
+        params.append(f"{level_prefix.lower()}%")
+    sql += " ORDER BY event_id ASC LIMIT ? OFFSET ?"
+    params.extend([safe_limit, safe_offset])
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            rows = conn.execute(sql, tuple(params)).fetchall()
+        finally:
+            conn.close()
+    return [
+        {
+            "timestamp": row["timestamp"] or "",
+            "level": row["level"] or "info",
+            "message": row["message"] or "",
+        }
+        for row in rows
+    ]
+
+
+def count_job_events(job_id: str) -> int:
+    """Return the number of events currently stored in ``job_events``."""
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM job_events WHERE job_id = ?",
+                (job_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+    return int(row["n"]) if row else 0
+
+
+def lookup_idempotency_key(idem_key: str) -> str | None:
+    """Return the ``job_id`` previously associated with ``idem_key``,
+    or ``None`` if the key has never been seen.
+    """
+    if not idem_key:
+        return None
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            row = conn.execute(
+                "SELECT job_id FROM idempotency_keys WHERE idem_key = ?",
+                (idem_key,),
+            ).fetchone()
+        finally:
+            conn.close()
+    return str(row["job_id"]) if row else None
+
+
+def record_idempotency_key(
+    idem_key: str,
+    job_id: str,
+    request_fingerprint: str,
+) -> None:
+    """Persist an idempotency-key → job_id mapping.
+
+    A repeat ``POST /api/jobs`` with the same ``Idempotency-Key``
+    returns the original ``job_id`` rather than creating a duplicate.
+    A conflicting ``request_fingerprint`` is ignored (the new request
+    wins); a future tightening could reject it instead.
+    """
+    if not idem_key or not job_id:
+        return
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            conn.execute(
+                """
+                INSERT INTO idempotency_keys
+                    (idem_key, job_id, request_fingerprint)
+                VALUES (?, ?, ?)
+                ON CONFLICT(idem_key) DO UPDATE
+                    SET job_id = excluded.job_id,
+                        request_fingerprint = excluded.request_fingerprint,
+                        created_at = datetime('now')
+                """,
+                (idem_key, job_id, request_fingerprint),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def prune_idempotency_keys(older_than_days: int = 7) -> int:
+    """Delete idempotency keys older than ``older_than_days``.
+
+    Returns the number of rows deleted. Operators can call this from a
+    scheduled task to keep the table small; the default 7-day window
+    is more than enough for a client retry loop.
+    """
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            cur = conn.execute(
+                """
+                DELETE FROM idempotency_keys
+                WHERE created_at < datetime('now', ?)
+                """,
+                (f"-{int(older_than_days)} days",),
+            )
+            deleted = cur.rowcount
+            conn.commit()
+        finally:
+            conn.close()
+    return int(deleted)
 
 
 def get_storage_health() -> dict:
@@ -596,6 +895,21 @@ def get_storage_health() -> dict:
         schema_version = schema_row[0] if schema_row and schema_row[0] is not None else 0
         jobs_ok = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone() is not None
         recycle_ok = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='recycle_bin'").fetchone() is not None
+        # v4 companion tables must be present and have a matching row.
+        companion_ok = True
+        companion_missing: str | None = None
+        for companion in ("job_results", "job_events", "idempotency_keys"):
+            present = (
+                conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                    (companion,),
+                ).fetchone()
+                is not None
+            )
+            if not present:
+                companion_ok = False
+                companion_missing = companion
+                break
         conn.close()
 
         if schema_version == 0:
@@ -623,6 +937,13 @@ def get_storage_health() -> dict:
             return {
                 "ok": False,
                 "error": "recycle_bin table is missing",
+                "schema_version": schema_version,
+                "expected_version": _CURRENT_SCHEMA_VERSION,
+            }
+        if not companion_ok:
+            return {
+                "ok": False,
+                "error": f"{companion_missing} table is missing",
                 "schema_version": schema_version,
                 "expected_version": _CURRENT_SCHEMA_VERSION,
             }

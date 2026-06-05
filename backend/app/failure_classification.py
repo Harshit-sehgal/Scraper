@@ -499,6 +499,25 @@ def _build_classification(
 ) -> FailureClassification:
     """Build a FailureClassification with the appropriate recovery strategy."""
     strategy_def = RECOVERY_STRATEGIES.get(category, RECOVERY_STRATEGIES[FailureCategory.UNKNOWN])
+
+    # Observability: emit anti-bot classification counter for the four
+    # categories that map to anti-bot blocks. Categories outside this set
+    # (DNS, timeout, browser crash, etc.) are not "anti_bot_classifications"
+    # and are tracked separately via dataforge_errors_total.
+    try:
+        from app.metrics_collector import record_anti_bot_classification
+
+        if category in (
+            FailureCategory.ANTI_BOT_BLOCK,
+            FailureCategory.CAPTCHA,
+            FailureCategory.IP_BANNED,
+            FailureCategory.RATE_LIMITED,
+        ):
+            record_anti_bot_classification(category.value)
+    except (ImportError, AttributeError, TypeError, ValueError):
+        # Never let observability break classification.
+        pass
+
     return FailureClassification(
         category=category,
         confidence=round(confidence, 3),

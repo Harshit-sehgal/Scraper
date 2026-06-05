@@ -9,6 +9,7 @@ from app.utils.export import safe_export_filename
 from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
+from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,21 @@ def _safe_cell(value):
     return value
 
 
+def _record_export_outcome(fmt: str, success: bool) -> None:
+    """Record an export generation outcome for the metrics endpoint.
+
+    Mirrors :func:`app.metrics_collector.record_export_outcome`. The
+    function is intentionally tolerant: a broken metrics subsystem
+    must never turn a successful export into a 5xx.
+    """
+    try:
+        from app.metrics_collector import record_export_outcome
+
+        record_export_outcome(fmt, success)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def create_exports_router(jobs_store: dict):
     router = APIRouter()
 
@@ -75,24 +91,42 @@ def create_exports_router(jobs_store: dict):
     _store_lock = threading.Lock()
 
     def _refresh_job_for_export(job_id: str) -> None:
-        """Refresh job from repository in worker mode to avoid stale exports."""
+        """Refresh job from repository in worker mode to avoid stale exports.
+
+        Uses the targeted ``get_job()`` read instead of loading all jobs
+        and filtering client-side. This helper is synchronous; async
+        export routes call it via ``run_in_threadpool``.
+        """
         if settings.WORKER_QUEUE:
             try:
                 from app.storage_interface import get_job_repository
 
                 repo = get_job_repository()
-                fresh_jobs = repo.load_jobs()
-                if job_id in fresh_jobs:
+                fresh = repo.get_job(job_id)
+                if fresh is not None:
                     with _store_lock:
-                        jobs_store[job_id] = fresh_jobs[job_id]
+                        jobs_store[job_id] = fresh
             except Exception:
                 logger.debug("Failed to refresh job %s from repo for export", job_id)
 
     @router.get("/api/jobs/{job_id}/export/csv")
     async def export_csv(job_id: str):
+        try:
+            return await _export_csv_impl(job_id)
+        except HTTPException:
+            _record_export_outcome("csv", False)
+            raise
+        except Exception:  # noqa: BLE001
+            _record_export_outcome("csv", False)
+            raise
+        else:
+            _record_export_outcome("csv", True)
+            return
+
+    async def _export_csv_impl(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
-        _refresh_job_for_export(job_id)
+        await run_in_threadpool(_refresh_job_for_export, job_id)
         job = jobs_store[job_id]
 
         if job.results_on_disk:
@@ -171,9 +205,22 @@ def create_exports_router(jobs_store: dict):
 
     @router.get("/api/jobs/{job_id}/export/json")
     async def export_json(job_id: str):
+        try:
+            return await _export_json_impl(job_id)
+        except HTTPException:
+            _record_export_outcome("json", False)
+            raise
+        except Exception:  # noqa: BLE001
+            _record_export_outcome("json", False)
+            raise
+        else:
+            _record_export_outcome("json", True)
+            return
+
+    async def _export_json_impl(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
-        _refresh_job_for_export(job_id)
+        await run_in_threadpool(_refresh_job_for_export, job_id)
         job = jobs_store[job_id]
 
         if job.results_on_disk:
@@ -238,9 +285,22 @@ def create_exports_router(jobs_store: dict):
 
     @router.get("/api/jobs/{job_id}/export/excel")
     async def export_excel(job_id: str):
+        try:
+            return await _export_excel_impl(job_id)
+        except HTTPException:
+            _record_export_outcome("excel", False)
+            raise
+        except Exception:  # noqa: BLE001
+            _record_export_outcome("excel", False)
+            raise
+        else:
+            _record_export_outcome("excel", True)
+            return
+
+    async def _export_excel_impl(job_id: str):
         if job_id not in jobs_store:
             raise HTTPException(status_code=404, detail="Job not found")
-        _refresh_job_for_export(job_id)
+        await run_in_threadpool(_refresh_job_for_export, job_id)
         job = jobs_store[job_id]
 
         wb = Workbook(write_only=True)

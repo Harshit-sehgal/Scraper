@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install -q -r requirements-dev.txt
+          pip install -q -r requirements-dev.lock.txt
 
       - name: Syntax check
         run: |
@@ -48,7 +48,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install -q -r requirements-dev.txt
+          pip install -q -r requirements-dev.lock.txt
 
       - name: Collect tests
         run: |
@@ -75,7 +75,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install -q -r requirements-dev.txt
+          pip install -q -r requirements-dev.lock.txt
           python -m playwright install --with-deps chromium
 
       - name: Run safe backend tests
@@ -105,7 +105,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install -q -r requirements-dev.txt
+          pip install -q -r requirements-dev.lock.txt
 
       - name: Run security tests
         run: |
@@ -137,7 +137,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install -q -r requirements-dev.txt
+          pip install -q -r requirements-dev.lock.txt
 
       - name: Run benchmark smoke test
         run: |
@@ -182,7 +182,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install -q -r requirements-dev.txt
+          pip install -q -r requirements-dev.lock.txt
           pip install psycopg2-binary testcontainers
 
       - name: Run Postgres tests
@@ -214,7 +214,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install -q -r requirements-dev.txt
+          pip install -q -r requirements-dev.lock.txt
 
       - name: Install Playwright Chromium with system deps
         run: |
@@ -248,7 +248,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install -q -r requirements-dev.txt
+          pip install -q -r requirements-dev.lock.txt
 
       - name: Run golden dataset tests
         run: |

@@ -171,6 +171,18 @@ def detect_anti_bot(html: str) -> float:
     return get_anti_bot_engine().detect_challenges(html)
 
 
+def detect_anti_bot_platform(html: str) -> str:
+    """Identify which anti-bot platform matched (best-effort, single label).
+
+    Returns the platform name (``"cloudflare"``, ``"akamai"``, ``"datadome"``,
+    ``"perimeterx"``, ``"incapsula"``, ``"captcha"``, ``"rate_limit"``,
+    ``"generic_block"``, ``"js_required"``) or ``"ok"`` when no platform
+    matched. Used by the observability layer to record
+    ``dataforge_anti_bot_classifications_total{classification=...}``.
+    """
+    return get_anti_bot_engine().detect_challenge_platform(html)
+
+
 def estimate_dom_nodes(html: str) -> int:
     """Quick approximate DOM node count from raw HTML."""
     if not html:

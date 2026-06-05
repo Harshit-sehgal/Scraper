@@ -143,6 +143,27 @@ if __name__ == "__main__":
     parser.add_argument("--max-attempts", type=int, default=3, help="Max retry attempts for failures")
     args = parser.parse_args()
 
+    # Benchmark governance: live-internet benchmarks are explicitly opt-in.
+    # They hit real websites (quotes.toscrape.com by default) and are
+    # unsuitable for CI. Set DATAFORGE_RUN_LIVE_BENCHMARKS=1 to enable.
+    # The CI lane (workflow file) sets this flag only on manual dispatch
+    # with the "live-benchmarks" input. The default corpus is recorded in
+    # backend/tests/test_extraction_precision.py and test_accuracy.py.
+    import os
+
+    if not os.environ.get("DATAFORGE_RUN_LIVE_BENCHMARKS") == "1":
+        print(
+            "Live benchmark disabled. Set DATAFORGE_RUN_LIVE_BENCHMARKS=1 to enable.",
+            file=sys.stderr,
+        )
+        print(
+            "For deterministic in-corpus benchmarks, run:\n"
+            "  pytest backend/tests/test_extraction_precision.py\n"
+            "  pytest backend/tests/test_accuracy.py",
+            file=sys.stderr,
+        )
+        sys.exit(78)  # 78 = SKIPPED in CI; the workflow treats this as success.
+
     # Determine targets
     if args.url:
         targets = [

@@ -4,12 +4,20 @@
  */
 
 // ─── API key management (shared with main dashboard) ───────────────────
+// SECURITY: API key is held in memory only — never in sessionStorage /
+// localStorage. Page reload clears the key; the user re-enters it.
+let _dashboardApiKey = "";
+
 function getDashboardApiKey() {
-    try { return sessionStorage.getItem("dataforge_api_key") || ""; } catch { return ""; }
+    return _dashboardApiKey;
 }
 
 function setDashboardApiKey(key) {
-    try { sessionStorage.setItem("dataforge_api_key", key); } catch {}
+    _dashboardApiKey = (key || "").trim();
+}
+
+function clearDashboardApiKey() {
+    _dashboardApiKey = "";
 }
 
 let dashboardApiLast403 = 0;

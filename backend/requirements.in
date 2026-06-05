@@ -1,0 +1,63 @@
+# =============================================================================
+# DataForge Scraper — Production Dependency Intent
+# =============================================================================
+# This is the CANONICAL authoring source for runtime/production
+# dependencies. Lock it with:
+#
+#   pip-compile --generate-hashes --output-file=requirements.lock.txt \
+#               requirements.in
+#
+# Install in production images with:
+#
+#   pip install --no-cache-dir -r requirements.lock.txt
+#
+# NEVER add dev/test/lint tooling here. Those live in
+# requirements-dev.in (which extends this file).
+# =============================================================================
+
+# ─── Web Framework ──────────────────────────────────────────────────────────
+fastapi>=0.110.0,<1.0.0
+uvicorn[standard]>=0.27.0,<1.0.0
+pydantic>=2.5.0,<3.0.0
+pydantic-settings>=2.1.0,<3.0.0
+python-dotenv>=1.0.0,<2.0.0
+
+# ─── Web Scraping & Browser Automation ──────────────────────────────────────
+playwright>=1.45.0,<2.0.0
+# httpx / httpcore: pinned to ranges that expose the PUBLIC
+# ``AnyIOBackend`` / ``SyncBackend`` classes used by app.url_safety.
+# A startup self-check in lifespan() detects when an upstream rename
+# of the private ``_pool._network_backend`` attribute breaks the
+# SSRF guard.
+httpx>=0.27.0,<1.0.0
+httpcore>=1.0.0,<2.0.0
+beautifulsoup4>=4.12.0,<5.0.0
+lxml>=5.0.0,<7.0.0
+duckduckgo_search>=5.0.0,<9.0.0
+ddgs>=9.0.0,<10.0.0
+
+# ─── Data Processing ────────────────────────────────────────────────────────
+pandas>=2.0.0,<4.0.0
+openpyxl>=3.1.0,<4.0.0
+numpy>=1.24.0,<3.0.0
+
+# ─── Database ──────────────────────────────────────────────────────────────
+# psycopg 3 is the recommended Postgres driver; it ships with its own
+# connection pool (``psycopg_pool.ConnectionPool``). Opt in via
+# ``DATAFORGE_PG_DRIVER=psycopg3``. ``psycopg2-binary`` is intentionally
+# NOT in the production image; it is a dev-only optional dependency
+# (see ``backend/requirements-dev.in``) for operators who still need the
+# legacy ``PostgresJobRepository`` (psycopg2 driver).
+psycopg[binary,pool]>=3.2.0,<4.0.0
+aiosqlite>=0.20.0,<1.0.0
+
+# ─── Geocoding ──────────────────────────────────────────────────────────────
+geopy>=2.4.0,<3.0.0
+
+# ─── Prometheus Metrics ───────────────────────────────────────────────────
+prometheus-client>=0.19.0,<1.0.0
+
+# ─── Utilities ──────────────────────────────────────────────────────────────
+aiofiles>=23.0.0,<26.0.0
+aiohttp>=3.9.0,<4.0.0
+requests>=2.31.0,<3.0.0

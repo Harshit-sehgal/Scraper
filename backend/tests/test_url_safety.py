@@ -382,7 +382,12 @@ async def test_get_safe_async_client_blocks_private_ip() -> None:
     from app.url_safety import get_safe_async_client
 
     async with get_safe_async_client() as client:
-        with pytest.raises(ValueError, match="Rejected connection to unsafe IP address"):
+        # The PUBLIC-API transport wrapper is the primary SSRF layer
+        # and short-circuits the request before the network backend is
+        # consulted. The wrapper raises with a "Transport rejected"
+        # message; the network backend's "Rejected connection" message
+        # is only reached if the wrapper is bypassed.
+        with pytest.raises(ValueError, match="(Transport rejected|Rejected connection)"):
             await client.get("http://127.0.0.1:8000")
 
 

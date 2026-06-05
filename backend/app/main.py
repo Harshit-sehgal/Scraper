@@ -27,6 +27,7 @@ from app.lifespan import (
 from app.middlewares import (
     api_key_middleware,
     body_size_middleware,
+    csp_report_only_middleware,
     latency_tracking_middleware,
     rate_limiter,
 )
@@ -73,7 +74,7 @@ __all__ = [
 
 
 def configure_middleware(app: FastAPI) -> None:
-    """Configure CORS, body size limit, API key auth, rate limiter, and latency tracking middlewares."""
+    """Configure CORS, body size limit, API key auth, rate limiter, latency tracking, and CSP report-only middlewares."""
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
@@ -81,6 +82,7 @@ def configure_middleware(app: FastAPI) -> None:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.middleware("http")(csp_report_only_middleware)
     app.middleware("http")(body_size_middleware)
     app.middleware("http")(api_key_middleware)
     app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limiter.middleware)

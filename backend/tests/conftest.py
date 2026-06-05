@@ -155,6 +155,19 @@ except ImportError as e:
     warnings.warn(f"Could not import app.main (tests requiring the client fixture will fail): {e}", stacklevel=2)
 
 
+# Pre-import ``app.services.state`` so the conftest's monkeypatch.setattr
+# string path ``app.services.state.persist_state`` resolves deterministically.
+# ``app.services`` is a namespace package (no ``__init__.py``) and
+# ``app.main`` does not transitively import ``app.services.state``; without
+# this pre-import, the ``client`` fixture below can fail with
+# ``AttributeError: module 'app.services' has no attribute 'state'`` in
+# full-suite collection order (PR review, 2026-06).
+try:
+    import app.services.state  # noqa: F401  (preload for client fixture)
+except ImportError:
+    pass
+
+
 @pytest.fixture(autouse=True)
 def reset_semantic_world_state():
     try:
@@ -179,6 +192,23 @@ def reset_failure_injection():
     set_injection_probability(0.0)
     yield
     set_injection_probability(0.0)
+
+
+@pytest.fixture(autouse=True)
+def reset_queue():
+    try:
+        from app.worker_queue import reset_worker_queue
+
+        reset_worker_queue()
+    except ImportError:
+        pass
+    yield
+    try:
+        from app.worker_queue import reset_worker_queue
+
+        reset_worker_queue()
+    except ImportError:
+        pass
 
 
 from app.models import FieldType, SchemaField
@@ -249,8 +279,13 @@ def client(monkeypatch):
             pass
         return None
 
-    # Avoid writing persistence files in API unit tests.
-    monkeypatch.setattr("app.services.state.persist_state", lambda **kwargs: None)
+    # Avoid writing persistence files in API unit tests. We resolve the
+    # module through a direct import (cached at conftest load) rather than
+    # a string path, so the patch is robust to ``app.services.state`` not
+    # being in ``sys.modules`` at fixture time.
+    from app.services import state as _app_services_state_mod
+
+    monkeypatch.setattr(_app_services_state_mod, "persist_state", lambda **kwargs: None)
     monkeypatch.setattr(main_mod, "run_job", fake_run_job)
     # Also patch lifespan.run_job because run_job_wrapper imports run_job at
     # module level from app.services.job_runner, not from app.main. Without

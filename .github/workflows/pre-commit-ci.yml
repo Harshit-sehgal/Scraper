@@ -41,7 +41,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install mypy types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
-          pip install -r backend/requirements-dev.txt
+          pip install -r backend/requirements-dev.lock.txt
 
       - name: Run mypy
         run: python -m mypy backend/app --ignore-missing-imports
@@ -85,7 +85,7 @@ jobs:
     if: always()
     steps:
       - name: Send Telegram Message
-        uses: appleboy/telegram-action@master
+        uses: appleboy/telegram-action@37056891d444f558225b59f0d26b4b05c5e9828b  # master @ 2026-04-08
         with:
           to: ${{ secrets.TELEGRAM_TO }}
           token: ${{ secrets.TELEGRAM_TOKEN }}
