@@ -497,7 +497,7 @@ class WorkerQueue:
 
                         record_worker_failure(actual_type)
                     except Exception:
-                        pass  # noqa: BLE001
+                        pass  # noqa: BLE001  # nosec B110
                     conn.execute(
                         """INSERT OR REPLACE INTO task_history
                            (id, type, payload, priority, status, created_at,
