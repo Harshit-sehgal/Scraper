@@ -27,9 +27,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.concurrency import run_in_threadpool
 
 
-def _save_job(job) -> None:
+async def _save_job(job) -> None:
     """Persist a single job through the configured repository."""
-    get_job_repository().save_single(job)
+    await run_in_threadpool(get_job_repository().save_single, job)
 
 
 def _lookup_idempotency_key(idem_key: str) -> str | None:
@@ -451,7 +451,7 @@ def create_jobs_router(
         if job.results_on_disk:
             from app.utils.job_results_store import load_job_results_from_disk
 
-            results_list = load_job_results_from_disk(job.id, job.results_file_path)
+            results_list = await run_in_threadpool(load_job_results_from_disk, job.id, job.results_file_path)
 
         from app.discovery import infer_source_metadata
         from app.utils.quality import safe_score
@@ -471,8 +471,8 @@ def create_jobs_router(
             if job.results_on_disk:
                 from app.utils.job_results_store import save_job_results_to_disk
 
-                save_job_results_to_disk(job.id, results_list)
-            _save_job(job)
+                await run_in_threadpool(save_job_results_to_disk, job.id, results_list)
+            await _save_job(job)
 
         return {"message": "Metadata backfilled successfully", "updated": updated}
 
@@ -552,7 +552,7 @@ def create_jobs_router(
             min_record_score=job_data.min_record_score,
         )
         jobs_store[job.id] = job
-        _save_job(job)
+        await _save_job(job)
 
         if idem_key:
             fingerprint = f"{job_data.mode.value}:{job_data.name}:{','.join(manual_urls)}"
@@ -651,7 +651,7 @@ def create_jobs_router(
                     e,
                 )
 
-        _save_job(job)
+        await _save_job(job)
         return {
             "job_id": job.id,
             "status": job.status.value,
@@ -826,7 +826,7 @@ def create_jobs_router(
                 "warnings": reclean_warnings,
             }
             job.quality_report = quality
-            _save_job(job)
+            await _save_job(job)
         except Exception as e:  # noqa: BLE001
             # Restore the previous (terminal) status so the job isn't
             # permanently stuck in ``RUNNING``. Log the failure prominently.
@@ -838,7 +838,7 @@ def create_jobs_router(
             job.status = previous_status
             reclean_warnings.append(f"Reclean failed: {e}")
             try:
-                _save_job(job)
+                await _save_job(job)
             except Exception:  # noqa: BLE001
                 logging.getLogger(__name__).exception(
                     "Job %s: Failed to persist job state after reclean rollback",
@@ -863,7 +863,7 @@ def create_jobs_router(
             if job.status in {JobStatus.PENDING, JobStatus.DISCOVERING, JobStatus.RUNNING}:
                 raise HTTPException(status_code=409, detail="Cannot delete/recycle an active job. Cancel the job first.")
         repo = get_job_repository()
-        repo.move_to_recycle_bin(job_id)
+        await run_in_threadpool(repo.move_to_recycle_bin, job_id)
         with _store_lock:
             if job_id in jobs_store:
                 recycle_bin_store[job_id] = jobs_store.pop(job_id)
@@ -901,7 +901,7 @@ def create_jobs_router(
         for jid, _ in terminal:
             if jid in keep_ids:
                 continue
-            repo.move_to_recycle_bin(jid)
+            await run_in_threadpool(repo.move_to_recycle_bin, jid)
             with _store_lock:
                 if jid in jobs_store:
                     recycle_bin_store[jid] = jobs_store.pop(jid)
@@ -962,7 +962,7 @@ def create_jobs_router(
             if job_id not in recycle_bin_store:
                 raise HTTPException(status_code=404, detail="Job not in recycle bin")
         repo = get_job_repository()
-        repo.restore_from_recycle_bin(job_id)
+        await run_in_threadpool(repo.restore_from_recycle_bin, job_id)
         with _store_lock:
             if job_id in recycle_bin_store:
                 jobs_store[job_id] = recycle_bin_store.pop(job_id)
@@ -975,11 +975,12 @@ def create_jobs_router(
                 raise HTTPException(status_code=404, detail="Job not in recycle bin")
             job = recycle_bin_store.get(job_id)
             file_path = job.results_file_path if job else None
-        from app.utils.job_results_store import delete_job_results_from_disk
+        if file_path:
+            from app.utils.job_results_store import delete_job_results_from_disk
 
-        delete_job_results_from_disk(job_id, file_path)
+            await run_in_threadpool(delete_job_results_from_disk, job_id, file_path)
         repo = get_job_repository()
-        repo.hard_delete(job_id)
+        await run_in_threadpool(repo.hard_delete, job_id)
         with _store_lock:
             recycle_bin_store.pop(job_id, None)
         return {"message": "Job permanently deleted"}
@@ -993,10 +994,11 @@ def create_jobs_router(
             count = len(snapshot)
         for jid, job in snapshot:
             file_path = job.results_file_path if job else None
-            delete_job_results_from_disk(jid, file_path)
+            if file_path:
+                await run_in_threadpool(delete_job_results_from_disk, jid, file_path)
         repo = get_job_repository()
         for jid, _ in snapshot:
-            repo.hard_delete(jid)
+            await run_in_threadpool(repo.hard_delete, jid)
         with _store_lock:
             for jid, _ in snapshot:
                 recycle_bin_store.pop(jid, None)

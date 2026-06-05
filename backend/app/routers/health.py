@@ -13,6 +13,7 @@ from app.config import settings
 from app.globals import jobs_store, recycle_bin_store
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +50,11 @@ async def ready():
     repo = get_job_repository()
     try:
         if getattr(repo, "backend", "") == "postgres":
-            health_info = repo.health_check()
+            health_info = await run_in_threadpool(repo.health_check)
         else:
             from app.job_store import get_storage_health
 
-            health_info = get_storage_health()
+            health_info = await run_in_threadpool(get_storage_health)
 
         duration = time.time() - start_time
         from app.metrics_collector import record_health_check_latency as _rchl

@@ -34,6 +34,8 @@ DEV_ONLY_PACKAGES: set[str] = {
     "pytest-asyncio",
     "pytest-timeout",
     "pytest-mock",
+    "pytest-xdist",
+    "pytest-rerunfailures",
     "testcontainers",
     "coverage",
     "pyflakes",
@@ -66,6 +68,8 @@ def parse_lock(path: Path) -> dict[str, str]:
         line = line.strip()
         if not line or line.startswith("#"):
             continue
+        # Strip PEP 508 extras like ``coverage[toml]`` before matching.
+        line = re.sub(r"\[[^\]]*\]", "", line)
         m = _PIN_RE.match(line)
         if not m:
             continue

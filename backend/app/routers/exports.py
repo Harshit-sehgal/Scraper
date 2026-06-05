@@ -163,7 +163,8 @@ def create_exports_router(jobs_store: dict):
             )
 
             # Load the first page to determine headers and total count
-            first_page, total = load_paginated_job_results_from_disk(
+            first_page, total = await run_in_threadpool(
+                load_paginated_job_results_from_disk,
                 job.id,
                 limit=_PAGINATION_CHUNK_SIZE,
                 offset=0,
@@ -192,7 +193,8 @@ def create_exports_router(jobs_store: dict):
                 # Stream remaining pages
                 offset = _PAGINATION_CHUNK_SIZE
                 while offset < total:
-                    page, _ = load_paginated_job_results_from_disk(
+                    page, _ = await run_in_threadpool(
+                        load_paginated_job_results_from_disk,
                         job.id,
                         limit=_PAGINATION_CHUNK_SIZE,
                         offset=offset,
@@ -256,7 +258,8 @@ def create_exports_router(jobs_store: dict):
                 load_paginated_job_results_from_disk,
             )
 
-            first_page, total = load_paginated_job_results_from_disk(
+            first_page, total = await run_in_threadpool(
+                load_paginated_job_results_from_disk,
                 job.id,
                 limit=_PAGINATION_CHUNK_SIZE,
                 offset=0,
@@ -277,7 +280,8 @@ def create_exports_router(jobs_store: dict):
                 offset = _PAGINATION_CHUNK_SIZE
                 idx = len(first_page)
                 while offset < total:
-                    page, _ = load_paginated_job_results_from_disk(
+                    page, _ = await run_in_threadpool(
+                        load_paginated_job_results_from_disk,
                         job.id,
                         limit=_PAGINATION_CHUNK_SIZE,
                         offset=offset,
@@ -331,55 +335,34 @@ def create_exports_router(jobs_store: dict):
         await run_in_threadpool(_refresh_job_for_export, job_id)
         job = jobs_store[job_id]
 
-        wb = Workbook(write_only=True)
-        from unittest.mock import Mock
+        def _build_excel_content():
+            wb = Workbook(write_only=True)
+            from unittest.mock import Mock
 
-        if isinstance(wb, Mock) and getattr(wb, "active", None) is None:
-            raise HTTPException(status_code=500, detail="Failed to create worksheet")
-        ws = wb.create_sheet(title="Scraped Data")
+            if isinstance(wb, Mock) and getattr(wb, "active", None) is None:
+                raise HTTPException(status_code=500, detail="Failed to create worksheet")
+            ws = wb.create_sheet(title="Scraped Data")
 
-        if job.results_on_disk:
-            from app.utils.job_results_store import load_paginated_job_results_from_disk
+            if job.results_on_disk:
+                from app.utils.job_results_store import load_paginated_job_results_from_disk
 
-            # Load the first page to determine headers and total count
-            first_page, total = load_paginated_job_results_from_disk(
-                job.id,
-                limit=_PAGINATION_CHUNK_SIZE,
-                offset=0,
-                file_path=job.results_file_path,
-            )
-            if not first_page:
-                raise HTTPException(status_code=400, detail="No results to export")
-
-            fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(first_page)
-
-            # Write headers
-            ws.append(fieldnames)
-
-            # Write first page data
-            for row in first_page:
-                row_values = []
-                for field in fieldnames:
-                    value = row.get(field)
-                    if isinstance(value, list):
-                        value = _safe_cell(", ".join(str(i) for i in value if i is not None))
-                    else:
-                        value = _safe_cell(value)
-                    row_values.append(value)
-                ws.append(row_values)
-
-            # Stream remaining pages
-            offset = _PAGINATION_CHUNK_SIZE
-            while offset < total:
-                page, _ = load_paginated_job_results_from_disk(
+                # Load the first page to determine headers and total count
+                first_page, total = load_paginated_job_results_from_disk(
                     job.id,
                     limit=_PAGINATION_CHUNK_SIZE,
-                    offset=offset,
+                    offset=0,
                     file_path=job.results_file_path,
                 )
-                if not page:
-                    break
-                for row in page:
+                if not first_page:
+                    raise HTTPException(status_code=400, detail="No results to export")
+
+                fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(first_page)
+
+                # Write headers
+                ws.append(fieldnames)
+
+                # Write first page data
+                for row in first_page:
                     row_values = []
                     for field in fieldnames:
                         value = row.get(field)
@@ -389,37 +372,62 @@ def create_exports_router(jobs_store: dict):
                             value = _safe_cell(value)
                         row_values.append(value)
                     ws.append(row_values)
-                offset += _PAGINATION_CHUNK_SIZE
-        else:
-            # In-memory results
-            results_list = list(job.results)
-            if not results_list:
-                raise HTTPException(status_code=400, detail="No results to export")
 
-            fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(results_list)
+                # Stream remaining pages
+                offset = _PAGINATION_CHUNK_SIZE
+                while offset < total:
+                    page, _ = load_paginated_job_results_from_disk(
+                        job.id,
+                        limit=_PAGINATION_CHUNK_SIZE,
+                        offset=offset,
+                        file_path=job.results_file_path,
+                    )
+                    if not page:
+                        break
+                    for row in page:
+                        row_values = []
+                        for field in fieldnames:
+                            value = row.get(field)
+                            if isinstance(value, list):
+                                value = _safe_cell(", ".join(str(i) for i in value if i is not None))
+                            else:
+                                value = _safe_cell(value)
+                            row_values.append(value)
+                        ws.append(row_values)
+                    offset += _PAGINATION_CHUNK_SIZE
+            else:
+                # In-memory results
+                results_list = list(job.results)
+                if not results_list:
+                    raise HTTPException(status_code=400, detail="No results to export")
 
-            # Write headers
-            ws.append(fieldnames)
+                fieldnames = [f.name for f in job.schema_fields] if job.schema_fields else _user_fieldnames(results_list)
 
-            # Write data
-            for row in results_list:
-                row_values = []
-                for field in fieldnames:
-                    value = row.get(field)
-                    if isinstance(value, list):
-                        value = _safe_cell(", ".join(str(i) for i in value if i is not None))
-                    else:
-                        value = _safe_cell(value)
-                    row_values.append(value)
-                ws.append(row_values)
+                # Write headers
+                ws.append(fieldnames)
 
-        # Save to bytes
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
+                # Write data
+                for row in results_list:
+                    row_values = []
+                    for field in fieldnames:
+                        value = row.get(field)
+                        if isinstance(value, list):
+                            value = _safe_cell(", ".join(str(i) for i in value if i is not None))
+                        else:
+                            value = _safe_cell(value)
+                        row_values.append(value)
+                    ws.append(row_values)
+
+            # Save to bytes
+            output = io.BytesIO()
+            wb.save(output)
+            output.seek(0)
+            return output.getvalue()
+
+        content_bytes = await run_in_threadpool(_build_excel_content)
 
         return Response(
-            content=output.getvalue(),
+            content=content_bytes,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f'attachment; filename="{safe_export_filename(job.name, "xlsx")}"'},
         )
@@ -476,7 +484,8 @@ def create_exports_router(jobs_store: dict):
                     load_paginated_job_results_from_disk,
                 )
 
-                page, _ = load_paginated_job_results_from_disk(
+                page, _ = await run_in_threadpool(
+                    load_paginated_job_results_from_disk,
                     job.id,
                     limit=1_000_000,
                     offset=0,
@@ -509,11 +518,11 @@ def create_exports_router(jobs_store: dict):
         # ── Route to format-specific handler ────────────────────────────
 
         if fmt == "csv":
-            return _batch_csv(per_job_results, fieldnames, body.flatten)
+            return await run_in_threadpool(_batch_csv, per_job_results, fieldnames, body.flatten)
         if fmt == "json":
-            return _batch_json(per_job_results, fieldnames, body.flatten)
+            return await run_in_threadpool(_batch_json, per_job_results, fieldnames, body.flatten)
         # fmt == "xlsx"
-        return _batch_xlsx(per_job_results, fieldnames, body.flatten)
+        return await run_in_threadpool(_batch_xlsx, per_job_results, fieldnames, body.flatten)
 
     def _batch_csv(
         per_job_results: list[tuple[str, str, list[dict[str, Any]]]],

@@ -45,7 +45,7 @@ def _get_db_path() -> Path:
 def _get_connection() -> sqlite3.Connection:
     path = _get_db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(path), timeout=10)
+    conn = sqlite3.connect(str(path), timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
@@ -354,7 +354,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
 
             conn.execute("DROP TABLE IF EXISTS recycle_bin")
             conn.execute("""
-                CREATE TABLE recycle_bin (
+                CREATE TABLE IF NOT EXISTS recycle_bin (
                     id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
                     status TEXT NOT NULL,
@@ -749,6 +749,26 @@ def read_job_results(job_id: str) -> list[dict]:
             rows = conn.execute(
                 "SELECT payload FROM job_results WHERE job_id = ? ORDER BY result_index ASC",
                 (job_id,),
+            ).fetchall()
+        finally:
+            conn.close()
+    out: list[dict] = []
+    for row in rows:
+        try:
+            out.append(json.loads(row["payload"]))
+        except (TypeError, ValueError):
+            out.append({"_unparseable": row["payload"]})
+    return out
+
+
+def read_job_results_paginated(job_id: str, limit: int = 100, offset: int = 0) -> list[dict]:
+    """Read a job's results with limit and offset from the dedicated ``job_results`` table."""
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            rows = conn.execute(
+                "SELECT payload FROM job_results WHERE job_id = ? ORDER BY result_index ASC LIMIT ? OFFSET ?",
+                (job_id, limit, offset),
             ).fetchall()
         finally:
             conn.close()

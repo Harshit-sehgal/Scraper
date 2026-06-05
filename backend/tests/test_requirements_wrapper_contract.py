@@ -55,7 +55,9 @@ def _parse_lock(path: Path) -> dict[str, str]:
     out: dict[str, str] = {}
     for line in path.read_text().splitlines():
         line = line.strip()
-        m = re.match(r"^([A-Za-z0-9_.\-]+)==([0-9][^\s#]*)", line)
+        # Strip PEP 508 extras like ``coverage[toml]`` before matching.
+        normalised = re.sub(r"\[[^\]]*\]", "", line)
+        m = re.match(r"^([A-Za-z0-9_.\-]+)==([0-9][^\s#]*)", normalised)
         if m:
             out[m.group(1).lower()] = m.group(2)
     return out

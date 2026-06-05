@@ -167,14 +167,64 @@ def _execute(conn, sql: str, params=None):
 # ───────────────────────────────────────────────────────────────────────
 
 
-# Reuse the column list from the psycopg2 module so the two backends
+# Reuse the column list from storage_interface so the two backends
 # stay schema-compatible. Importing locally to avoid a hard dependency
-# at module import time (psycopg2 may not be installed in psycopg3-only
-# deployments in the future).
+# at module import time.
 def _columns_sql() -> list[str]:
-    from app.postgres_repository import _JOBS_COLUMNS_SQL
+    from app.storage_interface import _JOBS_COLUMNS_SQL
 
     return list(_JOBS_COLUMNS_SQL)
+
+
+def _sync_job_results(conn, job_id: str, results: list) -> None:
+    """Replace the ``job_results`` rows for ``job_id`` with ``results``.
+
+    This aligns storage with Schema v4.
+    """
+    _execute(conn, "DELETE FROM job_results WHERE job_id = %s", (job_id,))
+    if results:
+        for idx, res in enumerate(results):
+            _execute(
+                conn,
+                "INSERT INTO job_results (job_id, result_index, payload) VALUES (%s, %s, %s)",
+                (job_id, idx, json.dumps(res)),
+            )
+
+
+def _sync_job_events(conn, job_id: str, logs) -> None:
+    """Replace the ``job_events`` rows for ``job_id`` with ``logs``.
+
+    Dual-write helper called by ``save_single`` and ``save_all``.
+    """
+    _execute(conn, "DELETE FROM job_events WHERE job_id = %s", (job_id,))
+    for entry in logs or []:
+        if hasattr(entry, "model_dump"):
+            try:
+                entry_dict = entry.model_dump()
+            except Exception:
+                entry_dict = {
+                    "timestamp": "",
+                    "level": "info",
+                    "message": str(entry),
+                }
+        elif isinstance(entry, dict):
+            entry_dict = entry
+        else:
+            entry_dict = {
+                "timestamp": "",
+                "level": "info",
+                "message": str(entry),
+            }
+        _execute(
+            conn,
+            "INSERT INTO job_events (job_id, timestamp, level, message) VALUES (%s, %s, %s, %s)",
+            (
+                job_id,
+                str(entry_dict.get("timestamp") or ""),
+                str(entry_dict.get("level") or "info"),
+                str(entry_dict.get("message") or ""),
+            ),
+        )
 
 
 def _build_create_jobs_sql() -> str:
@@ -586,8 +636,6 @@ class Psycopg3JobRepository(JobRepository):
                     [row[k] for k in safe_keys],
                 )
                 # Dual-write to companion tables (Schema v4)
-                from app.postgres_repository import _sync_job_events, _sync_job_results
-
                 _sync_job_results(conn, job.id, job.results)
                 _sync_job_events(conn, job.id, job.logs)
             if prune_missing:
@@ -738,8 +786,6 @@ class Psycopg3JobRepository(JobRepository):
                 list(row.values()),
             )
             # Dual-write to companion tables (Schema v4)
-            from app.postgres_repository import _sync_job_events, _sync_job_results
-
             _sync_job_results(conn, job.id, job.results)
             _sync_job_events(conn, job.id, job.logs)
 

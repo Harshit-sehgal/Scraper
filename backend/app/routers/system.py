@@ -21,6 +21,7 @@ from app.utils.rbac import UserRole, require_role
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["system"])
@@ -58,7 +59,7 @@ async def storage_status():
     """Detailed storage backend status."""
     repo = get_job_repository()
     if getattr(repo, "backend", "") == "postgres":
-        health = repo.health_check()
+        health = await run_in_threadpool(repo.health_check)
         return {
             "backend": getattr(repo, "backend", "postgres"),
             "ok": health.get("ok", False),
@@ -70,7 +71,7 @@ async def storage_status():
         }
     from app.job_store import get_storage_status
 
-    return get_storage_status()
+    return await run_in_threadpool(get_storage_status)
 
 
 @router.get("/api/system/status")
@@ -531,7 +532,8 @@ async def metrics(request: Request):
     try:
         from prometheus_client import Gauge, Histogram, generate_latest
     except ModuleNotFoundError:
-        return Response(content=_render_basic_metrics_text(), media_type="text/plain")
+        content = await run_in_threadpool(_render_basic_metrics_text)
+        return Response(content=content, media_type="text/plain")
     from prometheus_client.core import CollectorRegistry
 
     registry = CollectorRegistry()
@@ -583,7 +585,7 @@ async def metrics(request: Request):
         from app.worker_queue import get_worker_queue
 
         q = get_worker_queue()
-        q_status = q.get_status()
+        q_status = await run_in_threadpool(q.get_status)
         queue_pending = Gauge("dataforge_queue_pending", "Pending tasks in worker queue", registry=registry)
         queue_pending.set(q_status.get("pending", 0))
         queue_running = Gauge("dataforge_queue_running", "Running tasks in worker queue", registry=registry)

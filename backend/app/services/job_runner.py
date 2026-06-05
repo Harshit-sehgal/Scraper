@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
 from app.config import settings
@@ -15,6 +16,7 @@ from app.scraper import (
 from app.storage_interface import get_job_repository
 from app.utils.job import deduplicate_results, mark_job_canceled, normalize_job_results
 from app.utils.quality import build_quality_report, compute_source_breakdown, safe_score
+from starlette.concurrency import run_in_threadpool
 
 
 # --- Dynamic delegation to research-shell modules to keep imports lazy but mockable ---
@@ -42,14 +44,17 @@ def run_pipeline(*args, **kwargs):
     return impl(*args, **kwargs)
 
 
+_log_persist_executor = ThreadPoolExecutor(max_workers=1)
+
+
 def _add_job_log(job, message: str, level: str = "info", persist_fn=None, persist_single_fn=None) -> None:
     from app.models import LogEntry
 
     job.logs.append(LogEntry(message=message, level=level))
     if persist_single_fn:
-        persist_single_fn()
+        _log_persist_executor.submit(persist_single_fn)
     elif persist_fn:
-        persist_fn()
+        _log_persist_executor.submit(persist_fn)
 
 
 async def run_job(
@@ -68,15 +73,20 @@ async def run_job(
     if not job:
         return
 
-    # ── Cross-process cancellation check ───────────────────────────────
-    # In worker mode (separate process), the API may have cancelled this job
-    # via the database. Poll the repository for the latest flag.
-    def _cancel_requested_from_db() -> bool:
+    async def _cancel_requested_from_db() -> bool:
         """Check the persistent store for a cross-process cancellation signal."""
         try:
-            return get_job_repository().is_cancel_requested(job_id)
+            return await run_in_threadpool(get_job_repository().is_cancel_requested, job_id)
         except (AttributeError, ImportError, RuntimeError):
             return False
+
+    async def _persist_job_state(critical: bool = False) -> None:
+        if critical and persist_state_single_critical_fn:
+            await run_in_threadpool(persist_state_single_critical_fn)
+        elif persist_state_single_fn:
+            await run_in_threadpool(persist_state_single_fn)
+        elif persist_state_fn:
+            await run_in_threadpool(persist_state_fn)
 
     # Optimize persistence: use single-row updates for job-local saves
     # when available, while preserving persist_state_fn for full-store saves.
@@ -111,13 +121,10 @@ async def run_job(
     if not job.started_at:
         job.started_at = datetime.datetime.now().isoformat()
 
-    if job.cancel_requested or _cancel_requested_from_db():
+    if job.cancel_requested or await _cancel_requested_from_db():
         job.cancel_requested = True
         mark_job_canceled(job, "Canceled before execution.")
-        if persist_state_single_critical_fn:
-            persist_state_single_critical_fn()
-        else:
-            persist_state_fn()
+        await _persist_job_state(critical=True)
         return
 
     try:
@@ -168,23 +175,18 @@ async def run_job(
             job.urls = safe_urls
 
             if not job.urls:
-                if job.cancel_requested or _cancel_requested_from_db():
+                if job.cancel_requested or await _cancel_requested_from_db():
                     job.cancel_requested = True
                     mark_job_canceled(job)
                     _add_job_log(job, "Job canceled during discovery", level="warning", persist_fn=persist_job_state_fn)
-                    if persist_state_single_critical_fn:
-                        persist_state_single_critical_fn()
-                    else:
-                        persist_state_fn()
+                    await _persist_job_state(critical=True)
+                    return
                 else:
                     job.status = JobStatus.FAILED
                     job.error = "Could not discover any URLs for this topic"
                     job.completed_at = datetime.datetime.now().isoformat()
                     _add_job_log(job, "Discovery failed: No URLs found", level="error", persist_fn=persist_job_state_fn)
-                    if persist_state_single_critical_fn:
-                        persist_state_single_critical_fn()
-                    else:
-                        persist_state_fn()
+                    await _persist_job_state(critical=True)
                 return
 
             _add_job_log(job, f"Discovered {len(job.urls)} potential source URLs", persist_fn=persist_job_state_fn)
@@ -192,14 +194,15 @@ async def run_job(
             job.progress_current = 1
             logging.info("Job %s: Discovered %d URLs", job_id, len(job.urls))
 
-            if job.cancel_requested or _cancel_requested_from_db():
+            if job.cancel_requested or await _cancel_requested_from_db():
                 job.cancel_requested = True
                 mark_job_canceled(job)
-                _add_job_log(job, "Job canceled after discovery", level="warning", persist_fn=persist_job_state_fn)
-                if persist_state_single_critical_fn:
-                    persist_state_single_critical_fn()
+                if job.error:
+                    _add_job_log(job, job.error, level="warning", persist_fn=persist_job_state_fn)
+                    await _persist_job_state(critical=True)
                 else:
-                    persist_state_fn()
+                    _add_job_log(job, "Job degraded", level="warning", persist_fn=persist_job_state_fn)
+                    await _persist_job_state(critical=True)
                 return
 
         job.status = JobStatus.RUNNING
@@ -237,7 +240,7 @@ async def run_job(
                 warnings.append(msg)
 
         async def _scrape_single_url(idx: int, url: str) -> tuple[int, list[dict], bool, dict]:
-            if job.cancel_requested or _cancel_requested_from_db():
+            if job.cancel_requested or await _cancel_requested_from_db():
                 job.cancel_requested = True
                 return idx, [], False, {}
             elapsed = time.monotonic() - started_at
@@ -398,17 +401,14 @@ async def run_job(
             if all(task.done() for task in scrape_tasks):
                 break
 
-            if job.cancel_requested or _cancel_requested_from_db():
+            if job.cancel_requested or await _cancel_requested_from_db():
                 job.cancel_requested = True
                 for task in scrape_tasks:
                     if not task.done():
                         task.cancel()
                 scraped_raw = await asyncio.gather(*scrape_tasks, return_exceptions=True)
                 mark_job_canceled(job)
-                if persist_state_single_critical_fn:
-                    persist_state_single_critical_fn()
-                else:
-                    persist_state_fn()
+                await _persist_job_state(critical=True)
                 return
 
             await asyncio.sleep(0.25)
@@ -417,13 +417,10 @@ async def run_job(
         scraped: list[tuple[int, list[dict], bool, dict]] = [r for r in scraped_raw if isinstance(r, tuple) and len(r) == 4]
 
         for _idx, results, success, meta in sorted(scraped, key=lambda x: x[0]):
-            if job.cancel_requested or _cancel_requested_from_db():
+            if job.cancel_requested or await _cancel_requested_from_db():
                 job.cancel_requested = True
                 mark_job_canceled(job)
-                if persist_state_single_critical_fn:
-                    persist_state_single_critical_fn()
-                else:
-                    persist_state_fn()
+                await _persist_job_state(critical=True)
                 return
             if success:
                 all_raw_results.extend(results)
@@ -449,11 +446,10 @@ async def run_job(
                 )
                 run_global_ai_structuring = False
 
-        if job.cancel_requested or _cancel_requested_from_db():
+        if job.cancel_requested or await _cancel_requested_from_db():
             job.cancel_requested = True
             mark_job_canceled(job)
-            if persist_state_single_critical_fn:
-                persist_state_single_critical_fn()
+            await _persist_job_state(critical=True)
             return
 
         if run_global_ai_structuring:
@@ -474,12 +470,10 @@ async def run_job(
                     timeout=ai_structuring_timeout_seconds,
                 )
                 job.total_llm_calls += get_llm_call_count()
-                # Integration Phase: ensure AI-cleaned records are integrated
-                # into the world state
                 from app.semantic_world_state import get_world_state
 
                 with get_world_state().transaction("global_ai_structuring"):
-                    all_raw_results = run_pipeline(all_raw_results, [f.name for f in job.schema_fields])
+                    all_raw_results = await run_in_threadpool(run_pipeline, all_raw_results, [f.name for f in job.schema_fields])
 
                 if ai_structuring_report.get("capped_records", 0) > 0:
                     warnings.append(
@@ -597,7 +591,7 @@ async def run_job(
 
         # AI Insight Phase
         if job.results:
-            if job.cancel_requested or _cancel_requested_from_db():
+            if job.cancel_requested or await _cancel_requested_from_db():
                 job.cancel_requested = True
                 mark_job_canceled(job)
                 _add_job_log(job, "Job canceled before AI insight", level="warning", persist_fn=persist_job_state_fn)
@@ -643,7 +637,7 @@ async def run_job(
             try:
                 from app.utils.job_results_store import save_job_results_to_disk
 
-                file_path = save_job_results_to_disk(job.id, job.results)
+                file_path = await run_in_threadpool(save_job_results_to_disk, job.id, filtered_results)
                 job.results_on_disk = True
                 job.results_file_path = file_path
                 job.results = []
@@ -662,8 +656,7 @@ async def run_job(
             job.status = JobStatus.EMPTY_RESULT
             job.error = "No URLs to scrape (empty URL list)."
             _add_job_log(job, job.error, level="warning", persist_fn=persist_job_state_fn)
-            if persist_state_single_critical_fn:
-                persist_state_single_critical_fn()
+            await _persist_job_state(critical=True)
         elif len(all_raw_results) == 0:
             job.status = JobStatus.EMPTY_RESULT
             job.error = (
@@ -672,8 +665,7 @@ async def run_job(
                 "JavaScript-rendered results, or missing search-form replay."
             )
             _add_job_log(job, job.error, level="warning", persist_fn=persist_job_state_fn)
-            if persist_state_single_critical_fn:
-                persist_state_single_critical_fn()
+            await _persist_job_state(critical=True)
         elif urls_with_records > 0 and urls_with_records < total_urls:
             job.status = JobStatus.DEGRADED
             msg = (
@@ -683,8 +675,7 @@ async def run_job(
             )
             job.error = msg
             _add_job_log(job, msg, level="warning", persist_fn=persist_job_state_fn)
-            if persist_state_single_critical_fn:
-                persist_state_single_critical_fn()
+            await _persist_job_state(critical=True)
         else:
             job.status = JobStatus.COMPLETED
             job.error = ""
@@ -696,16 +687,13 @@ async def run_job(
         # terminal state
         if job.status == JobStatus.COMPLETED:
             _add_job_log(job, "Job completed successfully", persist_fn=persist_job_state_fn)
-            if persist_state_single_critical_fn:
-                persist_state_single_critical_fn()
+            await _persist_job_state(critical=True)
         elif job.status == JobStatus.DEGRADED:
             _add_job_log(job, "Job completed with degraded results", level="warning", persist_fn=persist_job_state_fn)
-            if persist_state_single_critical_fn:
-                persist_state_single_critical_fn()
+            await _persist_job_state(critical=True)
         elif job.status == JobStatus.EMPTY_RESULT:
             _add_job_log(job, "Job completed with empty result", level="warning", persist_fn=persist_job_state_fn)
-            if persist_state_single_critical_fn:
-                persist_state_single_critical_fn()
+            await _persist_job_state(critical=True)
 
         logging.info("Job %s: Completed (%s): %d total, %d after filtering", job_id, job.status.value, total, filtered_count)
 
@@ -721,7 +709,4 @@ async def run_job(
             job.completed_at = datetime.datetime.now().isoformat()
             _add_job_log(job, f"Job failed: {e!s}", level="error")
             logging.exception("Job %s: Failed", job_id)
-        if persist_state_single_critical_fn:
-            persist_state_single_critical_fn()
-        else:
-            persist_state_fn()
+        await _persist_job_state(critical=True)
