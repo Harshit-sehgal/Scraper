@@ -53,8 +53,18 @@ jobs:
           DATAFORGE_METRICS_TOKEN: ci_validation_placeholder
           GRAFANA_PASSWORD: ci_validation_placeholder
         run: |
-          docker compose -f docker-compose.yml config -q
-          docker compose -f docker-compose.prod.yml config -q
+          # Try docker compose (v2 plugin) first, fall back to docker-compose (v1).
+          DC=""
+          if command -v docker-compose &>/dev/null; then
+            DC="docker-compose"
+          elif docker compose version &>/dev/null; then
+            DC="docker compose"
+          else
+            echo "ERROR: No Docker Compose found (tried docker-compose and docker compose)"
+            exit 1
+          fi
+          $DC -f docker-compose.yml config -q
+          $DC -f docker-compose.prod.yml config -q
 
   notify:
     name: Telegram Notification
