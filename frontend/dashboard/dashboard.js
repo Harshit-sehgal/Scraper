@@ -164,7 +164,7 @@ function setupControls() {
         liveBtn.classList.add('bg-gray-800', 'text-gray-500', 'border-gray-700');
         liveBtn.innerText = "REPLAY";
 
-        currentReplayIdx = parseInt(e.target.value);
+        currentReplayIdx = parseInt(e.target.value, 10);
         if (topologyHistory[currentReplayIdx]) {
             const topology = topologyHistory[currentReplayIdx].topology || {};
             renderTopology(topology.regions || [], topology.communities || [], []); // Hide edges in replay for now

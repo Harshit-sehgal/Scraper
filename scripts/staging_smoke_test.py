@@ -20,12 +20,65 @@ from app.config import settings
 
 settings.STATE_FILE_PATH = str(temp_state_file)
 
+# If no API keys are configured and we're in development mode, the dev
+# escape hatch in ``app.utils.rbac.get_current_role`` requires
+# ``ALLOW_INSECURE_DEV_AUTH=True`` to skip the 403. The smoke test is a
+# local drill (not a real auth test) so enable it.
+if not settings.API_KEY and not settings.ADMIN_API_KEY and settings.ENV.lower() == "development":
+    settings.ALLOW_INSECURE_DEV_AUTH = True
+
 from app.job_store import _get_connection, load_state, reset_job_store_for_tests
 from app.main import app
 from app.models import JobStatus
 from fastapi.testclient import TestClient
 
-client = TestClient(app)
+# Resolve the API key once. Operators and Admins need a header on every
+# call, so we wrap the TestClient in a thin ``AuthClient`` that injects
+# ``X-API-Key`` unless the caller already passed one. The dev escape hatch
+# in ``app.utils.rbac.get_current_role`` is taken when no keys are
+# configured and ``DATAFORGE_ENV=development``, but production-style envs
+# require the header.
+api_key = os.environ.get("DATAFORGE_API_KEY") or os.environ.get("STAGING_API_KEY") or getattr(settings, "API_KEY", "") or "test"
+
+
+class AuthClient:
+    """Thin wrapper that injects X-API-Key on every TestClient call."""
+
+    def __init__(self, app, api_key: str) -> None:
+        self._client = TestClient(app)
+        self._api_key = api_key
+
+    def _headers(self, headers):
+        merged = dict(headers or {})
+        merged.setdefault("X-API-Key", self._api_key)
+        return merged
+
+    def request(self, method, url, **kwargs):
+        kwargs["headers"] = self._headers(kwargs.get("headers"))
+        return self._client.request(method, url, **kwargs)
+
+    def get(self, url, **kwargs):
+        kwargs["headers"] = self._headers(kwargs.get("headers"))
+        return self._client.get(url, **kwargs)
+
+    def post(self, url, **kwargs):
+        kwargs["headers"] = self._headers(kwargs.get("headers"))
+        return self._client.post(url, **kwargs)
+
+    def delete(self, url, **kwargs):
+        kwargs["headers"] = self._headers(kwargs.get("headers"))
+        return self._client.delete(url, **kwargs)
+
+    def put(self, url, **kwargs):
+        kwargs["headers"] = self._headers(kwargs.get("headers"))
+        return self._client.put(url, **kwargs)
+
+    def patch(self, url, **kwargs):
+        kwargs["headers"] = self._headers(kwargs.get("headers"))
+        return self._client.patch(url, **kwargs)
+
+
+client = AuthClient(app, api_key)
 
 
 def _check(condition: bool, message: str) -> None:
@@ -169,7 +222,7 @@ def run_drill():
     job.results = [{"flight_no": "AA123", "price": 450.0}]
     persist_state_single(job)
     # Get the job results
-    response = client.get(f"/api/jobs/{export_job_id}")
+    response = client.get(f"/api/jobs/{export_job_id}", params={"include_results": "true"})
     _check(response.status_code == 200, f"Failed to get job: {response.text}")
     job_details = response.json()
     _check(len(job_details["results"]) == 1, "Results failed to serialize/deserialize!")
