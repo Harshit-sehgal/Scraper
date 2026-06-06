@@ -17,10 +17,62 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
 
+from starlette.concurrency import run_in_threadpool
+
 from app.config import settings
 from app.crawl_policy import get_crawl_policy
 
 logger = logging.getLogger(__name__)
+
+
+# ─── SQLite DB helper functions for threadpool-safe execution ─────────
+
+
+def _db_insert_queue(db_path: str, priority: int, url: str, depth: int, source_url: str | None, added_at: float) -> None:
+    import sqlite3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO queue VALUES (?, ?, ?, ?, ?)",
+            (priority, url, depth, source_url, added_at),
+        )
+        conn.commit()
+
+
+def _db_delete_queue(db_path: str, url: str) -> None:
+    import sqlite3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DELETE FROM queue WHERE url = ?", (url,))
+        conn.commit()
+
+
+def _db_mark_completed(db_path: str, url: str) -> None:
+    import sqlite3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DELETE FROM queue WHERE url = ?", (url,))
+        conn.execute("DELETE FROM failed WHERE url = ?", (url,))
+        conn.execute("INSERT OR REPLACE INTO completed VALUES (?)", (url,))
+        conn.commit()
+
+
+def _db_mark_failed(db_path: str, url: str, count: int) -> None:
+    import sqlite3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DELETE FROM queue WHERE url = ?", (url,))
+        conn.execute("INSERT OR REPLACE INTO failed VALUES (?, ?)", (url, count))
+        conn.commit()
+
+
+def _db_finalize_failed_as_completed(db_path: str, url: str) -> None:
+    import sqlite3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DELETE FROM failed WHERE url = ?", (url,))
+        conn.execute("INSERT OR REPLACE INTO completed VALUES (?)", (url,))
+        conn.commit()
 
 
 @dataclass(order=True)
@@ -145,15 +197,16 @@ class CrawlFrontier:
             heapq.heappush(self._queue, item)
             self._pending.add(url)
 
-            import sqlite3
-
             try:
-                with sqlite3.connect(self._db_path) as conn:
-                    conn.execute(
-                        "INSERT OR REPLACE INTO queue VALUES (?, ?, ?, ?, ?)",
-                        (item_priority, url, depth, source_url, item.added_at),
-                    )
-                    conn.commit()
+                await run_in_threadpool(
+                    _db_insert_queue,
+                    self._db_path,
+                    item_priority,
+                    url,
+                    depth,
+                    source_url,
+                    item.added_at,
+                )
             except Exception:
                 logger.exception("Failed to insert URL into SQLite: %s")
 
@@ -177,15 +230,16 @@ class CrawlFrontier:
                         if item.url not in self._completed:
                             heapq.heappush(self._queue, item)
                             self._pending.add(item.url)
-                            import sqlite3
-
                             try:
-                                with sqlite3.connect(self._db_path) as conn:
-                                    conn.execute(
-                                        "INSERT OR REPLACE INTO queue VALUES (?, ?, ?, ?, ?)",
-                                        (item.priority, item.url, item.depth, item.source_url, item.added_at),
-                                    )
-                                    conn.commit()
+                                await run_in_threadpool(
+                                    _db_insert_queue,
+                                    self._db_path,
+                                    item.priority,
+                                    item.url,
+                                    item.depth,
+                                    item.source_url,
+                                    item.added_at,
+                                )
                             except Exception:
                                 logger.exception("Failed to restore URL to SQLite: %s")
                     return None
@@ -194,12 +248,8 @@ class CrawlFrontier:
                 # Temporarily remove from pending during active policy check
                 self._pending.discard(item.url)
 
-                import sqlite3
-
                 try:
-                    with sqlite3.connect(self._db_path) as conn:
-                        conn.execute("DELETE FROM queue WHERE url = ?", (item.url,))
-                        conn.commit()
+                    await run_in_threadpool(_db_delete_queue, self._db_path, item.url)
                 except Exception:
                     logger.exception("Failed to delete URL from SQLite queue: %s")
 
@@ -211,15 +261,16 @@ class CrawlFrontier:
                 # Target is eligible! Restore its pending status and return
                 async with self._lock:
                     self._pending.add(item.url)
-                    import sqlite3
-
                     try:
-                        with sqlite3.connect(self._db_path) as conn:
-                            conn.execute(
-                                "INSERT OR REPLACE INTO queue VALUES (?, ?, ?, ?, ?)",
-                                (item.priority, item.url, item.depth, item.source_url, item.added_at),
-                            )
-                            conn.commit()
+                        await run_in_threadpool(
+                            _db_insert_queue,
+                            self._db_path,
+                            item.priority,
+                            item.url,
+                            item.depth,
+                            item.source_url,
+                            item.added_at,
+                        )
                     except Exception:
                         logger.exception("Failed to restore URL to SQLite: %s")
                     # Restore other tried items under the lock
@@ -228,27 +279,31 @@ class CrawlFrontier:
                             heapq.heappush(self._queue, t_item)
                             self._pending.add(t_item.url)
                             try:
-                                with sqlite3.connect(self._db_path) as conn:
-                                    conn.execute(
-                                        "INSERT OR REPLACE INTO queue VALUES (?, ?, ?, ?, ?)",
-                                        (t_item.priority, t_item.url, t_item.depth, t_item.source_url, t_item.added_at),
-                                    )
-                                    conn.commit()
+                                await run_in_threadpool(
+                                    _db_insert_queue,
+                                    self._db_path,
+                                    t_item.priority,
+                                    t_item.url,
+                                    t_item.depth,
+                                    t_item.source_url,
+                                    t_item.added_at,
+                                )
                             except Exception:
                                 logger.exception("Failed to restore tried URL to SQLite: %s")
                 return item.url
             # Blocked! Restore pending status and track in tried list
             async with self._lock:
                 self._pending.add(item.url)
-                import sqlite3
-
                 try:
-                    with sqlite3.connect(self._db_path) as conn:
-                        conn.execute(
-                            "INSERT OR REPLACE INTO queue VALUES (?, ?, ?, ?, ?)",
-                            (item.priority, item.url, item.depth, item.source_url, item.added_at),
-                        )
-                        conn.commit()
+                    await run_in_threadpool(
+                        _db_insert_queue,
+                        self._db_path,
+                        item.priority,
+                        item.url,
+                        item.depth,
+                        item.source_url,
+                        item.added_at,
+                    )
                 except Exception:
                     logger.exception("Failed to save blocked URL: %s")
             tried.append(item)
@@ -263,15 +318,16 @@ class CrawlFrontier:
                 if item.url not in self._completed:
                     heapq.heappush(self._queue, item)
                     self._pending.add(item.url)
-                    import sqlite3
-
                     try:
-                        with sqlite3.connect(self._db_path) as conn:
-                            conn.execute(
-                                "INSERT OR REPLACE INTO queue VALUES (?, ?, ?, ?, ?)",
-                                (item.priority, item.url, item.depth, item.source_url, item.added_at),
-                            )
-                            conn.commit()
+                        await run_in_threadpool(
+                            _db_insert_queue,
+                            self._db_path,
+                            item.priority,
+                            item.url,
+                            item.depth,
+                            item.source_url,
+                            item.added_at,
+                        )
                     except Exception:
                         logger.exception("Failed to restore tried URLs: %s")
         return None
@@ -282,8 +338,6 @@ class CrawlFrontier:
             if url in self._pending:
                 self._pending.remove(url)
 
-            import sqlite3
-
             if success:
                 self._completed.add(url)
                 from urllib.parse import urlparse
@@ -292,21 +346,14 @@ class CrawlFrontier:
                 self._domain_page_counts[domain] = self._domain_page_counts.get(domain, 0) + 1
                 self._failed.pop(url, None)
                 try:
-                    with sqlite3.connect(self._db_path) as conn:
-                        conn.execute("DELETE FROM queue WHERE url = ?", (url,))
-                        conn.execute("DELETE FROM failed WHERE url = ?", (url,))
-                        conn.execute("INSERT OR REPLACE INTO completed VALUES (?)", (url,))
-                        conn.commit()
+                    await run_in_threadpool(_db_mark_completed, self._db_path, url)
                 except Exception:
                     logger.exception("Failed to mark completed in SQLite: %s")
             else:
                 count = self._failed.get(url, 0) + 1
                 self._failed[url] = count
                 try:
-                    with sqlite3.connect(self._db_path) as conn:
-                        conn.execute("DELETE FROM queue WHERE url = ?", (url,))
-                        conn.execute("INSERT OR REPLACE INTO failed VALUES (?, ?)", (url, count))
-                        conn.commit()
+                    await run_in_threadpool(_db_mark_failed, self._db_path, url, count)
                 except Exception:
                     logger.exception("Failed to update failed count in SQLite: %s")
 
@@ -317,12 +364,15 @@ class CrawlFrontier:
                     heapq.heappush(self._queue, item)
                     self._pending.add(url)
                     try:
-                        with sqlite3.connect(self._db_path) as conn:
-                            conn.execute(
-                                "INSERT OR REPLACE INTO queue VALUES (?, ?, ?, ?, ?)",
-                                (item.priority, url, item.depth, item.source_url, item.added_at),
-                            )
-                            conn.commit()
+                        await run_in_threadpool(
+                            _db_insert_queue,
+                            self._db_path,
+                            item.priority,
+                            url,
+                            item.depth,
+                            item.source_url,
+                            item.added_at,
+                        )
                     except Exception:
                         logger.exception("Failed to insert retry URL in SQLite: %s")
                 else:
@@ -333,10 +383,7 @@ class CrawlFrontier:
                     domain = urlparse(url).netloc
                     self._domain_page_counts[domain] = self._domain_page_counts.get(domain, 0) + 1
                     try:
-                        with sqlite3.connect(self._db_path) as conn:
-                            conn.execute("DELETE FROM failed WHERE url = ?", (url,))
-                            conn.execute("INSERT OR REPLACE INTO completed VALUES (?)", (url,))
-                            conn.commit()
+                        await run_in_threadpool(_db_finalize_failed_as_completed, self._db_path, url)
                     except Exception:
                         logger.exception("Failed to finalize failed URL as completed in SQLite: %s")
 
@@ -403,12 +450,9 @@ class CrawlFrontier:
                 if domain in urlparse(item.url).netloc:
                     domain_urls.append(item.url)
                     self._pending.discard(item.url)
-                    import sqlite3
 
                     try:
-                        with sqlite3.connect(self._db_path) as conn:
-                            conn.execute("DELETE FROM queue WHERE url = ?", (item.url,))
-                            conn.commit()
+                        await run_in_threadpool(_db_delete_queue, self._db_path, item.url)
                     except Exception:
                         logger.exception("Failed to delete domain URL from SQLite: %s")
                 else:
