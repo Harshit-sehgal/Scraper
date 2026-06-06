@@ -44,13 +44,17 @@ jobs:
           docker stop dataforge-smoke || true
 
       - name: Validate compose config
+        # The required env vars for docker-compose.prod.yml are passed inline
+        # to avoid depending on --env-file (not supported in older Docker Compose
+        # versions). docker-compose.yml (dev) uses only vars with :- defaults so
+        # it needs no explicit env vars.
+        env:
+          DATAFORGE_DB_PASSWORD: ci_validation_placeholder
+          DATAFORGE_METRICS_TOKEN: ci_validation_placeholder
+          GRAFANA_PASSWORD: ci_validation_placeholder
         run: |
-          # `docker compose config` only needs the compose files plus the
-          # .env defaults; it does NOT require a real .env on disk.
-          # Copying the example to .env would clobber any real .env the
-          # runner may have, so just use --env-file explicitly instead.
-          docker compose --env-file .env.example -f docker-compose.yml config -q
-          docker compose --env-file .env.example -f docker-compose.prod.yml config -q
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.prod.yml config -q
 
   notify:
     name: Telegram Notification
