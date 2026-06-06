@@ -53,6 +53,10 @@ export async function viewResults(id) {
     try {
         const r = await apiFetch(`${API}/api/jobs/${id}`);
         const j = await r.json();
+        // Guard against stale responses: if the user has since clicked
+        // another job's "View Results", ``currentJobId`` will have been
+        // updated and this response is no longer relevant.
+        if (currentJobId !== id) return;
         document.getElementById('res-title').textContent = j.name;
         document.getElementById('res-meta').textContent = `${j.filtered_records} records extracted (${j.total_records} total)`;
 
@@ -270,7 +274,7 @@ function renderTable(results, emptyMessage = 'No results') {
 
 // ─── Scroll Slider ───
 
-function syncResultsScrollSlider() {
+export function syncResultsScrollSlider() {
     const wrap = document.querySelector('#view-results .table-wrap');
     const row = document.getElementById('results-scrollbar');
     const slider = document.getElementById('results-scroll-slider');

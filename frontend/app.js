@@ -112,16 +112,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ── Resize ──
-    window.addEventListener('resize', () => {
-        import('./js/results.js').then(m => {
-            // syncResultsScrollSlider is not exported, just call the related handler
-            const slider = document.getElementById('results-scroll-slider');
-            if (slider) {
-                // Trigger a manual scroll sync
-                const wrap = document.querySelector('#view-results .table-wrap');
-                if (wrap) wrap.dispatchEvent(new Event('scroll'));
-            }
-        });
+    // The horizontal scroll-snap slider needs to recompute its range
+    // when the viewport changes width. ResizeObserver is a no-op for
+    // window, so we hook the event directly and call the exported
+    // ``syncResultsScrollSlider`` from results.js. We do not dispatch a
+    // synthetic ``scroll`` event on the table wrap — that would mix input
+    // and resize handling and could fire onResultsTableScroll() with a
+    // stale state.
+    import('./js/results.js').then(({ syncResultsScrollSlider }) => {
+        window.addEventListener('resize', () => syncResultsScrollSlider());
     });
 
     // ── Init theme ──
