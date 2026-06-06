@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
-from app.routers.operator import router as operator_router
+from app.routers.experimental import router as experimental_router
 from app.visualization import OperatorMode
 from fastapi import FastAPI
 
@@ -38,9 +38,12 @@ class LocalASGIClient:
 
 
 @pytest.fixture
-def app():
+def app(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ENABLE_EXPERIMENTAL_ROUTES", True)
     a = FastAPI()
-    a.include_router(operator_router)
+    a.include_router(experimental_router)
     return a
 
 
@@ -56,7 +59,7 @@ def client(app):
 
 class TestGetMode:
     def test_get_mode_returns_valid_response(self, client) -> None:
-        with patch("app.routers.operator.get_governance_dashboard") as mock_dash:
+        with patch("app.visualization.get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.PRODUCTION
             mock_instance.get_governance_summary.return_value = {
@@ -73,7 +76,7 @@ class TestGetMode:
             assert "forensic" in data["available_modes"]
 
     def test_get_mode_has_all_five_modes(self, client) -> None:
-        with patch("app.routers.operator.get_governance_dashboard") as mock_dash:
+        with patch("app.visualization.get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.PRODUCTION
             mock_instance.get_governance_summary.return_value = {}
@@ -87,7 +90,7 @@ class TestGetMode:
 
 class TestSetMode:
     def test_set_mode_valid(self, client) -> None:
-        with patch("app.routers.operator.get_governance_dashboard") as mock_dash:
+        with patch("app.visualization.get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.FORENSIC
             mock_instance.set_operator_mode.return_value = {"settle_delay": 1500}
@@ -105,7 +108,7 @@ class TestSetMode:
         assert "detail" in resp.json()
 
     def test_set_mode_case_insensitive(self, client) -> None:
-        with patch("app.routers.operator.get_governance_dashboard") as mock_dash:
+        with patch("app.visualization.get_governance_dashboard") as mock_dash:
             mock_instance = MagicMock()
             mock_instance.active_mode = OperatorMode.STEALTH
             mock_instance.set_operator_mode.return_value = {"stealth": True}
@@ -117,7 +120,7 @@ class TestSetMode:
 
     def test_set_mode_all_modes_valid(self, client) -> None:
         for mode in ("production", "benchmark", "forensic", "stealth", "low_cost"):
-            with patch("app.routers.operator.get_governance_dashboard") as mock_dash:
+            with patch("app.visualization.get_governance_dashboard") as mock_dash:
                 mock_instance = MagicMock()
                 mock_instance.active_mode = OperatorMode(mode)
                 mock_instance.set_operator_mode.return_value = {}
@@ -135,10 +138,10 @@ class TestSetMode:
 class TestDashboard:
     def test_dashboard_returns_all_sections(self, client) -> None:
         with (
-            patch("app.routers.operator.get_governance_dashboard") as mock_dash,
-            patch("app.routers.operator.get_domain_health_monitor") as mock_monitor,
-            patch("app.routers.operator.get_browser_pool") as mock_pool,
-            patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry,
+            patch("app.visualization.get_governance_dashboard") as mock_dash,
+            patch("app.domain_health_alerts.get_domain_health_monitor") as mock_monitor,
+            patch("app.browser_pool.get_browser_pool") as mock_pool,
+            patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry,
         ):
             # Mock dashboard
             dash_instance = MagicMock()
@@ -197,7 +200,7 @@ class TestDashboard:
 
 class TestPredictionEndpoints:
     def test_get_predictions_no_data(self, client) -> None:
-        with patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry:
+        with patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry:
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = []
             mock_telemetry.return_value = telemetry_instance
@@ -210,9 +213,9 @@ class TestPredictionEndpoints:
 
     def test_get_predictions_with_data(self, client) -> None:
         with (
-            patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry,
-            patch("app.routers.operator.get_degradation_predictor") as mock_predictor,
-            patch("app.routers.operator.TrendAnalyzer") as mock_analyzer_cls,
+            patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry,
+            patch("app.degradation_predictor.get_degradation_predictor") as mock_predictor,
+            patch("app.trend_analyzer.TrendAnalyzer") as mock_analyzer_cls,
         ):
             # Telemetry with data
             telemetry_instance = MagicMock()
@@ -244,9 +247,9 @@ class TestPredictionEndpoints:
 
     def test_get_predictions_min_confidence_filter(self, client) -> None:
         with (
-            patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry,
-            patch("app.routers.operator.get_degradation_predictor") as mock_predictor,
-            patch("app.routers.operator.TrendAnalyzer") as mock_analyzer_cls,
+            patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry,
+            patch("app.degradation_predictor.get_degradation_predictor") as mock_predictor,
+            patch("app.trend_analyzer.TrendAnalyzer") as mock_analyzer_cls,
         ):
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = [{"url": "https://example.com/page", "success": True} for _ in range(10)]
@@ -276,7 +279,7 @@ class TestPredictionEndpoints:
             assert data["summary"]["total_filtered"] == 1
 
     def test_get_domain_prediction_not_found(self, client) -> None:
-        with patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry:
+        with patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry:
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = [{"url": "https://other.com/page", "success": True}]
             mock_telemetry.return_value = telemetry_instance
@@ -293,10 +296,10 @@ class TestPredictionEndpoints:
 class TestHealthSummary:
     def test_health_summary_healthy(self, client) -> None:
         with (
-            patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry,
-            patch("app.routers.operator.get_browser_pool") as mock_pool,
-            patch("app.routers.operator.get_domain_health_monitor") as mock_monitor,
-            patch("app.routers.operator.get_governance_dashboard") as mock_dash,
+            patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry,
+            patch("app.browser_pool.get_browser_pool") as mock_pool,
+            patch("app.domain_health_alerts.get_domain_health_monitor") as mock_monitor,
+            patch("app.visualization.get_governance_dashboard") as mock_dash,
         ):
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = [{"fallback_triggered": False} for _ in range(20)]
@@ -326,10 +329,10 @@ class TestHealthSummary:
 
     def test_health_summary_degraded(self, client) -> None:
         with (
-            patch("app.routers.operator.get_scrape_telemetry") as mock_telemetry,
-            patch("app.routers.operator.get_browser_pool") as mock_pool,
-            patch("app.routers.operator.get_domain_health_monitor") as mock_monitor,
-            patch("app.routers.operator.get_governance_dashboard") as mock_dash,
+            patch("app.routers.experimental.get_scrape_telemetry") as mock_telemetry,
+            patch("app.browser_pool.get_browser_pool") as mock_pool,
+            patch("app.domain_health_alerts.get_domain_health_monitor") as mock_monitor,
+            patch("app.visualization.get_governance_dashboard") as mock_dash,
         ):
             telemetry_instance = MagicMock()
             telemetry_instance.get_recent.return_value = [

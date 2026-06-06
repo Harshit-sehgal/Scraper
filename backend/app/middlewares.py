@@ -78,6 +78,11 @@ async def api_key_middleware(request: Request, call_next):
     ):
         if request.method == "OPTIONS" and request.headers.get("Origin") and request.headers.get("Access-Control-Request-Method"):
             return await call_next(request)
+        # CSP violation reports are sent by browsers, which cannot carry API keys.
+        # This endpoint must remain unauthenticated but is still rate-limited
+        # and body-size-capped by the other middlewares.
+        if request.url.path == "/api/system/csp-violations":
+            return await call_next(request)
         is_docs_path = "/docs" in request.url.path or "/openapi" in request.url.path
         if not is_docs_path or settings.ENV.lower() == "production":
             api_key = request.headers.get("X-API-Key", "")

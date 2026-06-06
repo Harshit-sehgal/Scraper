@@ -28,7 +28,7 @@ from app.models import Job, JobStatus, SourcePolicy
 logger = logging.getLogger(__name__)
 
 _DB_LOCK = Lock()
-_CURRENT_SCHEMA_VERSION = 4
+_CURRENT_SCHEMA_VERSION = 5
 _MIGRATIONS_RUN_FOR: set[Path] = set()
 
 
@@ -495,6 +495,18 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
                 "CREATE INDEX IF NOT EXISTS idx_idempotency_keys_created_at ON idempotency_keys(created_at)",
             )
             current = 4
+
+        if current < 5:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS worker_heartbeats (
+                    worker_id TEXT PRIMARY KEY,
+                    last_heartbeat TEXT NOT NULL,
+                    hostname TEXT NOT NULL DEFAULT '',
+                    pid INTEGER NOT NULL DEFAULT 0,
+                    started_at TEXT NOT NULL DEFAULT ''
+                )
+            """)
+            current = 5
 
         conn.execute("DELETE FROM schema_version")
         conn.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
@@ -1055,6 +1067,111 @@ def get_storage_status() -> dict:
             "recycle_bin_count": -1,
             "wal_mode": "unknown",
         }
+
+
+# ─── Worker heartbeat ───────────────────────────────────────────────────
+
+
+def record_worker_heartbeat(worker_id: str, hostname: str, pid: int) -> None:
+    """Record a heartbeat from a worker process.
+
+    Upserts the worker's heartbeat timestamp so the healthcheck
+    can verify the worker is alive by checking recency.
+    """
+    now = datetime.datetime.now().isoformat()
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            conn.execute(
+                """INSERT INTO worker_heartbeats
+                   (worker_id, last_heartbeat, hostname, pid, started_at)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT(worker_id) DO UPDATE SET
+                     last_heartbeat = excluded.last_heartbeat,
+                     hostname = excluded.hostname,
+                     pid = excluded.pid""",
+                (worker_id, now, hostname, pid, now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def get_worker_health(worker_id: str, ttl_seconds: int = 60) -> dict:
+    """Return health info for a specific worker.
+
+    Returns a dict with:
+    - alive: bool — True if a heartbeat exists and is within ttl_seconds
+    - last_heartbeat: str | None
+    - hostname: str | None
+    - pid: int | None
+    - worker_id: str
+    """
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            row = conn.execute(
+                "SELECT last_heartbeat, hostname, pid FROM worker_heartbeats WHERE worker_id = ?",
+                (worker_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+    if not row:
+        return {
+            "alive": False,
+            "worker_id": worker_id,
+            "last_heartbeat": None,
+            "hostname": None,
+            "pid": None,
+        }
+    last_heartbeat = row["last_heartbeat"] if row else None
+    alive = False
+    if last_heartbeat:
+        try:
+            delta = datetime.datetime.now() - datetime.datetime.fromisoformat(last_heartbeat)
+            alive = delta.total_seconds() < ttl_seconds
+        except (ValueError, TypeError):
+            alive = False
+    return {
+        "alive": alive,
+        "worker_id": worker_id,
+        "last_heartbeat": last_heartbeat,
+        "hostname": row["hostname"] if row else None,
+        "pid": row["pid"] if row else None,
+    }
+
+
+def get_all_worker_healths(ttl_seconds: int = 60) -> list[dict]:
+    """Return health info for all registered workers."""
+    with _DB_LOCK:
+        conn = _get_connection()
+        try:
+            rows = conn.execute(
+                "SELECT worker_id, last_heartbeat, hostname, pid FROM worker_heartbeats",
+            ).fetchall()
+        finally:
+            conn.close()
+    results: list[dict] = []
+    for row in rows:
+        wid = row["worker_id"]
+        last_hb = row["last_heartbeat"]
+        alive = False
+        if last_hb:
+            try:
+                delta = datetime.datetime.now() - datetime.datetime.fromisoformat(last_hb)
+                alive = delta.total_seconds() < ttl_seconds
+            except (ValueError, TypeError):
+                alive = False
+        results.append(
+            {
+                "alive": alive,
+                "worker_id": wid,
+                "last_heartbeat": last_hb,
+                "hostname": row["hostname"],
+                "pid": row["pid"],
+            },
+        )
+    return results
 
 
 def reset_job_store_for_tests() -> None:

@@ -305,6 +305,7 @@ def client(monkeypatch):
     monkeypatch.setattr(main_mod.settings, "OPERATOR_API_KEY", "")
     monkeypatch.setattr(main_mod.settings, "METRICS_TOKEN", "")
     monkeypatch.setattr(main_mod.settings, "ALLOW_INSECURE_DEV_AUTH", True)
+    monkeypatch.setattr(main_mod.settings, "ENABLE_EXPERIMENTAL_ROUTES", True)
 
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()

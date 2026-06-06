@@ -182,7 +182,8 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch) -> None:
     async def mock_save_job(job) -> None:
         saved_jobs.append(job)
 
-    monkeypatch.setattr("app.routers.jobs._save_job", mock_save_job)
+    # monkeypatch at the import site (jobs_write has already imported save_job at module level)
+    monkeypatch.setattr("app.routers.jobs_write.save_job", mock_save_job)
 
     # Track if persist_state gets called
     persist_called = False
@@ -194,11 +195,8 @@ def test_backfill_metadata_only_saves_single_job(client, monkeypatch) -> None:
     monkeypatch.setattr("app.services.state.persist_state", mock_persist_state)
 
     # Mock infer_source_metadata to return a mock inferred dict
-    from app import discovery
-
     monkeypatch.setattr(
-        discovery,
-        "infer_source_metadata",
+        "app.routers.jobs_write.infer_source_metadata",
         lambda url: {"source_type": "inferred_type", "source_trust_score": 0.85},
     )
 
@@ -275,7 +273,7 @@ def test_auto_discovery_url_filtering(client, monkeypatch) -> None:
             {"url": "https://google.com/safe-google"},
         ]
 
-    monkeypatch.setattr("app.routers.jobs.discover_urls", mock_discover)
+    monkeypatch.setattr("app.routers.jobs_write.discover_urls", mock_discover)
 
     # Verify discover API endpoint filters out loopback & internal targets
     payload = {"topic": "test", "domain": "example.com", "num_results": 5, "schema_field_names": ["title"]}

@@ -28,7 +28,15 @@ def get_job_repository():
 
 @router.get("/")
 async def root():
-    """Root path — API identification."""
+    """Root path — API identification.
+
+    In production mode, /docs, /redoc, /openapi.json, and /app are disabled,
+    so we omit them from the response to avoid confusing operators and clients.
+    """
+    from app.config import settings
+
+    if settings.ENV.lower() == "production":
+        return {"message": "DataForge API v2"}
     return {"message": "DataForge API v2", "docs": "/docs", "dashboard": "/app"}
 
 

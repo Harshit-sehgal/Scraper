@@ -155,6 +155,18 @@ class SelectorMap(BaseModel):
         return self
 
 
+class ScraperDiagnosticsRequest(BaseModel):
+    """Request body for the scraper diagnostics endpoint.
+
+    Replaces the broken inline ``fields: list[SchemaField]`` signature
+    that caused PydanticUserError in OpenAPI generation.
+    """
+
+    url: str = Field(..., description="The URL to run diagnostics on")
+    fields: list[SchemaField] = Field(..., description="Schema fields to attempt extraction for", max_length=50)
+    min_score: float = Field(0.3, ge=0.0, le=1.0, description="Minimum quality score for records to be included")
+
+
 class JobCreate(BaseModel):
     """Request body to create a new scraping job."""
 

@@ -1,22 +1,20 @@
 """Scraper Router — endpoints for scraper observability, memory, configuration,
-trend analysis, and economic tracking.
+and diagnostics.
 
-Research-shell boundary
------------------------
-`app.trend_analyzer` is part of the research shell (see
-backend/app/research/__init__.py). The EconomicTracker and TrendAnalyzer
-classes are imported lazily inside the endpoint functions that use them
-so that the router module does not pull the research shell into the
-product kernel at startup.
+This router only exposes PRODUCT KERNEL endpoints. All research-backed routes
+(trend analysis, economics, domain health alerts, ML selector optimization,
+strategy evolution) have been quarantined to ``routers/experimental.py``
+and require ``DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true``.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from app.browser_pool import get_browser_pool
 from app.config import settings
+from app.models import ScraperDiagnosticsRequest
 from app.regression_capture import get_regression_capture
 from app.scrape_telemetry import get_scrape_telemetry
 from app.scraper_diagnostics import run_diagnostics
@@ -25,9 +23,6 @@ from app.url_safety import validate_public_http_url
 from app.utils.rbac import UserRole, require_role
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.concurrency import run_in_threadpool
-
-if TYPE_CHECKING:
-    from app.models import SchemaField
 
 router = APIRouter(prefix="/api/scraper", tags=["scraper"])
 logger = logging.getLogger(__name__)
@@ -120,10 +115,8 @@ async def clear_telemetry(_role: Annotated[UserRole, Depends(require_role([UserR
 
 @router.post("/diagnostics")
 async def get_scraper_diagnostics(
-    url: str,
-    fields: list[SchemaField],
-    min_score: float = 0.3,
-    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),  # noqa: B008
+    req: ScraperDiagnosticsRequest,
+    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
 ):
     """Run a deep diagnostic scrape for a URL.
 
@@ -133,124 +126,19 @@ async def get_scraper_diagnostics(
     # link-local, cloud-metadata, internal TLDs) before any outbound
     # call so the operator can't pivot to internal services.
     try:
-        validate_public_http_url(url)
+        validate_public_http_url(req.url)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="URL not allowed for diagnostics") from exc
     try:
-        report = await run_diagnostics(url, fields, min_record_score=min_score)
+        report = await run_diagnostics(req.url, req.fields, min_record_score=req.min_score)
     except Exception:
         # Never leak internal error details; log server-side instead.
-        logger.exception("Diagnostics run failed for %s", url)
+        logger.exception("Diagnostics run failed for %s", req.url)
         raise HTTPException(status_code=500, detail="Diagnostics run failed") from None
     return report.to_dict()
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# Trend Analysis & Telemetry Intelligence (EXPERIMENTAL / RESEARCH ONLY)
-# ═══════════════════════════════════════════════════════════════════════
-
-
-@router.get("/trends")
-async def get_extraction_trends(window: Annotated[int, Query(ge=10, le=500)] = 100):
-    """Analyze scrape telemetry for degradation patterns, domain health trends,
-    and actionable alerts.
-
-    Args:
-        window: Number of recent telemetry events to analyze (10 - 500).
-
-    Returns:
-        A TrendReport with domain-level trends, global metrics, and alerts.
-
-    """
-    try:
-        from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
-
-        telemetry_history = get_scrape_telemetry().get_recent(window)
-        analyzer = TrendAnalyzer(history_window=window)
-        report = await run_in_threadpool(analyzer.analyze, telemetry_history)
-        return {
-            "generated_at": report.generated_at,
-            "domain_count": report.domain_count,
-            "degrading_domains": report.degrading_domains,
-            "improving_domains": report.improving_domains,
-            "stable_domains": report.stable_domains,
-            "unseen_domains": report.unseen_domains,
-            "global_failure_rate": round(report.global_failure_rate, 3),
-            "global_avg_latency_ms": round(report.global_avg_latency_ms, 1),
-            "total_scrapes": report.total_scrapes,
-            "alerts": report.alerts,
-            "domain_trends": {
-                d: {
-                    "health_score": t.health_score,
-                    "failure_rate": round(t.failure_rate, 3),
-                    "avg_fetch_ms": round(t.avg_fetch_ms, 1),
-                    "avg_quality_score": round(t.avg_quality_score, 3),
-                    "quality_trend": t.quality_trend,
-                    "anti_bot_trend": t.anti_bot_trend,
-                    "fetch_latency_trend": t.fetch_latency_trend,
-                    "selector_decay_accelerating": t.selector_decay_accelerating,
-                    "top_failure_categories": t.top_failure_categories,
-                    "sample_count": t.sample_count,
-                }
-                for d, t in report.domain_trends.items()
-            },
-        }
-    except Exception:
-        logger.exception("Failed to get extraction trends")
-        raise HTTPException(status_code=500, detail="Failed to analyze extraction trends") from None
-
-
-@router.get("/trends/{domain}")
-async def get_domain_trend(
-    domain: str,
-    window: Annotated[int, Query(ge=10, le=500)] = 100,
-):
-    """Get detailed trend analysis for a specific domain."""
-    try:
-        telemetry_history = get_scrape_telemetry().get_recent(window)
-
-        # Filter to only this domain's events
-        from app.trend_analyzer import TrendAnalyzer as TA
-
-        domain_events = [e for e in telemetry_history if TA.extract_domain(e.get("url", "")) == domain.lower()]
-
-        if not domain_events:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No telemetry data found for domain: {domain}",
-            )
-
-        from app.trend_analyzer import TrendAnalyzer  # research-shell, lazy
-
-        analyzer = TrendAnalyzer(history_window=window)
-        trend = await run_in_threadpool(analyzer.analyze_domain, domain, domain_events)
-
-        return {
-            "domain": trend.domain,
-            "health_score": trend.health_score,
-            "total_scrapes": trend.total_scrapes,
-            "total_failures": trend.total_failures,
-            "failure_rate": round(trend.failure_rate, 3),
-            "avg_fetch_ms": round(trend.avg_fetch_ms, 1),
-            "avg_quality_score": round(trend.avg_quality_score, 3),
-            "fetch_latency_trend": trend.fetch_latency_trend,
-            "quality_trend": trend.quality_trend,
-            "anti_bot_trend": trend.anti_bot_trend,
-            "selector_decay_accelerating": trend.selector_decay_accelerating,
-            "avg_cost_usd": round(trend.avg_cost_usd, 4),
-            "top_failure_categories": trend.top_failure_categories,
-            "sample_count": trend.sample_count,
-        }
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Failed to get trend for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Failed to get domain trend") from None
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# Regression Capture & Autonomous Benchmark Evolution (EXPERIMENTAL / RESEARCH ONLY)
-# ═══════════════════════════════════════════════════════════════════════
+# ─── Regression Capture (product kernel) ───────────────────────────────
 
 
 @router.get("/regressions")
@@ -266,7 +154,6 @@ async def get_regression_archive(limit: Annotated[int, Query(ge=1, le=100)] = 20
 
     Returns:
         Archive statistics and the most recent capture entries.
-
     """
     try:
         capture = get_regression_capture()
@@ -346,147 +233,7 @@ async def generate_all_replay_tests(_role: Annotated[UserRole, Depends(require_r
         raise HTTPException(status_code=500, detail="Failed to generate replay tests") from None
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# Economic Tracking & Cost Analysis (EXPERIMENTAL / RESEARCH ONLY)
-# ═══════════════════════════════════════════════════════════════════════
-
-
-@router.get("/economics")
-async def get_extraction_economics(window: Annotated[int, Query(ge=10, le=1000)] = 200):
-    """Return extraction cost and efficiency analysis.
-
-    Provides cost breakdowns by domain and category (LLM, browser, network),
-    with efficiency ratings.
-    """
-    from app.trend_analyzer import EconomicTracker  # research-shell, lazy
-
-    telemetry_history = get_scrape_telemetry().get_recent(window)
-    tracker = EconomicTracker()
-    report = await run_in_threadpool(tracker.analyze, telemetry_history)
-
-    return {
-        "generated_at": report.generated_at,
-        "total_cost_usd": report.total_cost_usd,
-        "total_scrapes": report.total_scrapes,
-        "total_records": report.total_records,
-        "avg_cost_per_scrape": report.avg_cost_per_scrape,
-        "avg_cost_per_record": report.avg_cost_per_record,
-        "efficiency_rating": report.efficiency_rating,
-        "cost_by_category": report.cost_by_category,
-        "most_expensive_domains": report.most_expensive_domains,
-        "least_expensive_domains": report.least_expensive_domains,
-        "cost_by_domain": {
-            d: {
-                "total_cost_usd": s.total_cost_usd,
-                "avg_cost_per_scrape": s.avg_cost_per_scrape,
-                "avg_cost_per_record": s.avg_cost_per_record,
-                "total_records": s.total_records,
-                "total_scrapes": s.total_scrapes,
-                "cost_breakdown": s.cost_breakdown,
-                "efficiency_rating": s.efficiency_rating,
-            }
-            for d, s in report.cost_by_domain.items()
-        },
-    }
-
-
-# ─── Domain Health Monitoring Endpoints (EXPERIMENTAL / RESEARCH ONLY) ───
-
-
-@router.get("/health/domains")
-async def get_all_domains_health():
-    """Get health status for all monitored domains.
-
-    Returns a sorted list of domains with health scores and alerts.
-    Useful for dashboards and automated alerting systems.
-    """
-    from app.domain_health_alerts import get_domain_health_monitor
-
-    monitor = get_domain_health_monitor()
-    domains_health = monitor.get_all_domains_health()
-
-    return {
-        "total_domains_monitored": len(domains_health),
-        "domains": domains_health,
-        "summary": {
-            "healthy": sum(1 for d in domains_health if d["health_level"] == "healthy"),
-            "degrading": sum(1 for d in domains_health if d["health_level"] == "degrading"),
-            "unhealthy": sum(1 for d in domains_health if d["health_level"] == "unhealthy"),
-            "critical": sum(1 for d in domains_health if d["health_level"] == "critical"),
-            "blacklisted": sum(1 for d in domains_health if d["health_level"] == "blacklisted"),
-        },
-    }
-
-
-@router.get("/health/domain/{domain}")
-async def get_domain_health(domain: str):
-    """Get detailed health status for a specific domain.
-
-    Returns comprehensive health metrics including:
-    - Health level (healthy / degrading / unhealthy / critical / blacklisted)
-    - Health score (0.0 to 1.0)
-    - Success rate
-    - Consistency score (how uniform failures are)
-    - Degradation trend (positive = worsening)
-    - Total attempts
-    - Recent failure category
-    """
-    from app.domain_health_alerts import get_domain_health_monitor
-
-    monitor = get_domain_health_monitor()
-
-    # Create a fake URL to extract domain
-    url = f"https://{domain}/"
-    health = monitor.get_domain_health(url)
-
-    if health is None:
-        raise HTTPException(status_code=404, detail=f"No health data for domain: {domain}")
-
-    return health
-
-
-@router.get("/health/summary")
-async def get_system_health_summary():
-    """Get system-wide health summary.
-
-    Provides a quick overview of system health across all domains.
-    Useful for dashboards and status pages.
-    """
-    from app.domain_health_alerts import get_domain_health_monitor
-
-    monitor = get_domain_health_monitor()
-    domains_health = monitor.get_all_domains_health()
-
-    if not domains_health:
-        return {
-            "status": "no_data",
-            "domains_monitored": 0,
-            "overall_health_score": 0.0,
-        }
-
-    # Calculate overall health score
-    overall_score = sum(d["health_score"] for d in domains_health) / len(domains_health)
-
-    # Determine overall status
-    if overall_score >= 0.8:
-        overall_status = "healthy"
-    elif overall_score >= 0.7:
-        overall_status = "degrading"
-    elif overall_score >= 0.5:
-        overall_status = "unhealthy"
-    else:
-        overall_status = "critical"
-
-    return {
-        "status": overall_status,
-        "overall_health_score": round(overall_score, 3),
-        "domains_monitored": len(domains_health),
-        "critical_count": sum(1 for d in domains_health if d["health_level"] in ["critical", "blacklisted"]),
-        "unhealthy_count": sum(1 for d in domains_health if d["health_level"] in ["unhealthy", "critical"]),
-    }
-
-
-# ─── Selector Memory Stats Endpoints (EXPERIMENTAL / RESEARCH ONLY) ───────
+# ─── Selector Memory (product kernel) ─────────────────────────────────
 
 
 @router.get("/selectors/stats")
@@ -602,263 +349,3 @@ async def get_low_confidence_selectors(threshold: Annotated[float, Query(ge=0, l
         "count": len(low_confidence),
         "selectors": low_confidence,
     }
-
-
-# ─── ML Selector Optimization Endpoints (EXPERIMENTAL / RESEARCH ONLY) ───
-
-
-@router.post("/ml/optimize/domain/{domain}")
-async def optimize_domain_selectors(
-    domain: str,
-    selectors: dict | None = None,
-    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),  # noqa: B008
-):
-    """Optimize selectors for a domain using ML predictions.
-
-    Analyzes CSS selector patterns and predicts quality.
-    Returns recommendations for improving selectors.
-
-    Parameters
-    ----------
-        - domain: Domain name
-        - selectors: Optional dict of {field: css_selector} to analyze
-
-    If no selectors provided, uses cached selectors from memory.
-    Requires operator or admin role — triggers ML computation.
-
-    """
-    try:
-        from app.selector_ml_optimizer import get_selector_optimizer
-
-        optimizer = get_selector_optimizer()
-
-        # Get selectors to optimize
-        if selectors is None:
-            selector_memory = get_selector_memory()
-            url = f"https://{domain}/"
-            cached = selector_memory.get_selectors(url)
-
-            if not cached:
-                raise HTTPException(status_code=404, detail=f"No selectors found for domain: {domain}")
-
-            selectors = cached
-
-        # Run optimization
-        report = await run_in_threadpool(optimizer.optimize_selectors, domain, selectors)
-
-        return {
-            "domain": domain,
-            "timestamp": report["timestamp"],
-            "original_count": report["original_count"],
-            "avg_quality": round(report["summary"]["total_quality"], 3),
-            "recommendations": {
-                "keep": report["summary"]["keep"],
-                "improve": report["summary"]["improve"],
-                "replace": report["summary"]["replace"],
-            },
-            "optimizations": report["optimizations"],
-        }
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Failed to optimize selectors for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Selector optimization failed") from None
-
-
-@router.get("/ml/optimize/domain/{domain}/history")
-async def get_optimization_history(domain: str, limit: Annotated[int, Query(ge=1, le=100)] = 10):
-    """Get historical optimization reports for a domain.
-
-    Shows how selector quality has evolved over time.
-    """
-    try:
-        from app.selector_ml_optimizer import get_selector_optimizer
-
-        optimizer = get_selector_optimizer()
-        history = await run_in_threadpool(optimizer.get_optimization_history, domain, limit)
-
-        return {
-            "domain": domain,
-            "count": len(history),
-            "history": history,
-        }
-    except Exception:
-        logger.exception("Failed to get optimization history for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Failed to get optimization history") from None
-
-
-@router.post("/ml/learn")
-async def record_selector_learning(
-    domain: str,
-    selector: str,
-    quality: Annotated[float, Query(ge=0, le=1)] = 0.0,
-    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),  # noqa: B008
-):
-    """Record actual selector performance for ML model improvement.
-
-    This feedback helps the ML model learn which selectors work best.
-
-    Parameters
-    ----------
-        - domain: Domain name
-        - selector: CSS selector that was used
-        - quality: Actual quality score achieved [0, 1]
-
-    """
-    try:
-        from app.selector_ml_optimizer import get_selector_optimizer
-
-        optimizer = get_selector_optimizer()
-        await run_in_threadpool(optimizer.learn_from_results, domain, selector, quality)
-
-        return {
-            "status": "learned",
-            "domain": domain,
-            "quality": quality,
-        }
-    except Exception:
-        logger.exception("Failed selector learning for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Selector learning failed") from None
-
-
-# ─── Strategy Evolution Endpoints (EXPERIMENTAL / RESEARCH ONLY) ─────────
-
-
-@router.get("/strategy/recommend/{domain}")
-async def recommend_fetch_strategy(domain: str):
-    """Get recommended fetch strategy for a domain.
-
-    Returns the best strategy based on historical performance.
-    """
-    try:
-        from app.strategy_evolution import get_strategy_evolution_engine
-
-        engine = get_strategy_evolution_engine()
-        recommendation = await run_in_threadpool(engine.recommend_strategy, domain)
-
-        return {
-            "domain": domain,
-            "recommended_strategy": recommendation.recommended_strategy.value,
-            "alternatives": [s.value for s in recommendation.alternatives],
-            "reason": recommendation.reason,
-            "confidence": round(recommendation.confidence, 3),
-            "estimated_success_rate": round(recommendation.estimated_success_rate, 3),
-        }
-    except Exception:
-        logger.exception("Failed to recommend strategy for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Failed to recommend strategy") from None
-
-
-@router.post("/strategy/record")
-async def record_strategy_attempt(
-    domain: str,
-    strategy: str,
-    success: bool,
-    time_ms: Annotated[float, Query(ge=0)] = 0,
-    quality: Annotated[float, Query(ge=0, le=1)] = 0.5,
-    failure_reason: str | None = None,
-    _role: UserRole = Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR])),  # noqa: B008
-):
-    """Record a strategy attempt for learning.
-
-    Parameters
-    ----------
-        - domain: Domain being fetched
-        - strategy: Fetch strategy used (e.g., "playwright_full", "httpx_basic")
-        - success: Whether attempt succeeded
-        - time_ms: Time taken in milliseconds
-        - quality: Quality of extracted data [0, 1]
-        - failure_reason: Optional failure category
-
-    """
-    try:
-        from app.strategy_evolution import FetchStrategy, get_strategy_evolution_engine
-
-        engine = get_strategy_evolution_engine()
-
-        try:
-            strategy_enum = FetchStrategy(strategy)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Unknown strategy: {strategy}")
-
-        await run_in_threadpool(engine.record_fetch_attempt, domain, strategy_enum, success, time_ms, quality, failure_reason)
-
-        return {
-            "status": "recorded",
-            "domain": domain,
-            "strategy": strategy,
-            "success": success,
-        }
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Failed to record strategy attempt for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Failed to record strategy attempt") from None
-
-
-@router.get("/strategy/domain/{domain}")
-async def get_domain_strategy_analysis(domain: str):
-    """Get detailed strategy analysis for a domain.
-
-    Shows performance of all strategies and evolution history.
-    """
-    try:
-        from app.strategy_evolution import get_strategy_evolution_engine
-
-        engine = get_strategy_evolution_engine()
-        return await run_in_threadpool(engine.get_domain_strategy_report, domain)
-    except Exception:
-        logger.exception("Failed to get strategy analysis for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Failed to get domain strategy report") from None
-
-
-@router.get("/strategy/report")
-async def get_all_strategies_report():
-    """Get strategy performance report for all domains.
-
-    High-level overview of which strategies work best across the system.
-    """
-    try:
-        from app.strategy_evolution import get_strategy_evolution_engine
-
-        engine = get_strategy_evolution_engine()
-        return await run_in_threadpool(engine.get_all_domains_strategy_report)
-    except Exception:
-        logger.exception("Failed to get all strategies report")
-        raise HTTPException(status_code=500, detail="Failed to get all strategy reports") from None
-
-
-@router.post("/strategy/evolve/{domain}")
-async def evolve_domain_strategy(
-    domain: str,
-    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
-):
-    """Manually trigger strategy evolution for a domain.
-
-    Useful when current strategy is degraded.
-    Returns the new strategy recommended.
-    """
-    try:
-        from app.strategy_evolution import get_strategy_evolution_engine
-
-        engine = get_strategy_evolution_engine()
-        new_strategy = await run_in_threadpool(engine.evolve_strategy, domain)
-
-        state = engine.domain_states.get(domain)
-        if state:
-            current_perf = state.strategies[new_strategy]
-            return {
-                "domain": domain,
-                "new_strategy": new_strategy.value,
-                "success_rate": round(current_perf.success_rate, 3),
-                "switches": state.strategy_switch_count,
-            }
-
-        return {
-            "domain": domain,
-            "new_strategy": new_strategy.value,
-            "status": "evolved",
-        }
-    except Exception:
-        logger.exception("Failed manual strategy evolution for domain %s", domain)
-        raise HTTPException(status_code=500, detail="Strategy evolution failed") from None

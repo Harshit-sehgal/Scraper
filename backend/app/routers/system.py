@@ -76,7 +76,115 @@ async def storage_status():
 
 @router.get("/api/system/status")
 async def system_status():
-    """Detailed system and active jobs overview."""
+    """Detailed system and active jobs overview.
+
+    In worker mode (multi-process deployment), queries the persistent
+    repository for job counts rather than relying on the API process's
+    in-memory store, which may be stale or empty.
+    """
+    from app.models import JobStatus
+    from app.routers.jobs_state import is_worker_mode
+
+    repo = get_job_repository()
+    backend = getattr(repo, "backend", "sqlite")
+
+    if is_worker_mode():
+        # In worker mode, the API's in-memory jobs_store may be stale
+        # because the worker process updates jobs independently. Query
+        # the persistent store for accurate counts.
+        try:
+            # Use health_check for total counts (efficient, single query)
+            health = await run_in_threadpool(repo.health_check)
+            job_total = health.get("job_count", 0)
+            recycle_count = health.get("recycle_bin_count", 0)
+
+            # Use list_job_summaries with a high limit to compute
+            # per-status counts without loading full job rows.
+            summaries = await run_in_threadpool(repo.list_job_summaries, limit=5000)
+            counts = {s.value: 0 for s in JobStatus}
+            for s in summaries:
+                raw_status = s.get("status") or ""
+                if hasattr(raw_status, "value"):
+                    status_key = raw_status.value
+                else:
+                    status_key = str(raw_status)
+                counts[status_key] = counts.get(status_key, 0) + 1
+
+            active = (
+                counts.get(JobStatus.PENDING.value, 0)
+                + counts.get(JobStatus.DISCOVERING.value, 0)
+                + counts.get(JobStatus.RUNNING.value, 0)
+            )
+        except (AttributeError, ImportError, RuntimeError):
+            logger.debug("Failed to query repo for system status, falling back to in-memory")
+            # Fall back to in-memory stores (imported from app.globals)
+            counts = _compute_job_counts()
+            job_total = sum(counts.values())
+            recycle_count = len(recycle_bin_store)
+            active = (
+                counts.get(JobStatus.PENDING.value, 0)
+                + counts.get(JobStatus.DISCOVERING.value, 0)
+                + counts.get(JobStatus.RUNNING.value, 0)
+            )
+    else:
+        # Single-process mode: use in-memory stores (fast path)
+        counts = _compute_job_counts()
+        active = (
+            counts.get(JobStatus.PENDING.value, 0)
+            + counts.get(JobStatus.DISCOVERING.value, 0)
+            + counts.get(JobStatus.RUNNING.value, 0)
+        )
+        job_total = len(jobs_store)
+        recycle_count = len(recycle_bin_store)
+
+    response: dict = {
+        "status": "online",
+        "backend": backend,
+        "worker_mode": is_worker_mode(),
+        "jobs": {
+            "total": job_total,
+            "active": active,
+            "completed": counts.get(JobStatus.COMPLETED.value, 0),
+            "degraded": counts.get(JobStatus.DEGRADED.value, 0),
+            "empty_result": counts.get(JobStatus.EMPTY_RESULT.value, 0),
+            "failed": counts.get(JobStatus.FAILED.value, 0),
+            "canceled": counts.get(JobStatus.CANCELED.value, 0),
+        },
+        "recycle_bin_count": recycle_count,
+        "runtime_limits": config_view(),
+    }
+
+    # Worker health: show registered workers and their heartbeat status
+    try:
+        worker_healths = await run_in_threadpool(repo.get_all_worker_healths, 60)
+        if worker_healths:
+            response["workers"] = worker_healths
+    except (AttributeError, ImportError, RuntimeError):
+        pass
+
+    # Queue status
+    try:
+        from app.worker_queue import get_worker_queue
+
+        q_status = await run_in_threadpool(get_worker_queue().get_status)
+        response["queue"] = {
+            "pending": q_status.get("pending", 0),
+            "running": q_status.get("running", 0),
+            "dead_letter": q_status.get("dead_letter", 0),
+            "max_concurrency": q_status.get("max_concurrency", 0),
+        }
+    except (AttributeError, ImportError, RuntimeError):
+        pass
+
+    if settings.ENV.lower() != "production":
+        from app.state_store import get_state_file_path
+
+        response["state_file"] = str(get_state_file_path())
+    return response
+
+
+def _compute_job_counts() -> dict:
+    """Compute per-status job counts from the in-memory jobs_store."""
     from app.models import JobStatus
 
     counts = {s.value: 0 for s in JobStatus}
@@ -85,34 +193,7 @@ async def system_status():
         if status_key not in counts:
             counts[status_key] = 0
         counts[status_key] += 1
-
-    active = (
-        counts.get(JobStatus.PENDING.value, 0)
-        + counts.get(JobStatus.DISCOVERING.value, 0)
-        + counts.get(JobStatus.RUNNING.value, 0)
-    )
-
-    from app.state_store import get_state_file_path
-
-    repo = get_job_repository()
-    backend = getattr(repo, "backend", "sqlite")
-    response = {
-        "status": "online",
-        "backend": backend,
-        "jobs": {
-            "total": len(jobs_store),
-            "active": active,
-            "completed": counts.get(JobStatus.COMPLETED.value, 0),
-            "degraded": counts.get(JobStatus.DEGRADED.value, 0),
-            "empty_result": counts.get(JobStatus.EMPTY_RESULT.value, 0),
-            "failed": counts.get(JobStatus.FAILED.value, 0),
-            "canceled": counts.get(JobStatus.CANCELED.value, 0),
-        },
-        "runtime_limits": config_view(),
-    }
-    if settings.ENV.lower() != "production":
-        response["state_file"] = str(get_state_file_path())
-    return response
+    return counts
 
 
 # ─── Diagnostics ZIP Export ─────────────────────────────────────────────
@@ -445,6 +526,35 @@ def _render_basic_metrics_text() -> str:
     for task_type, count in get_worker_failures().items():
         lines.append(_basic_metric_line("dataforge_worker_failures_total", count, {"task_type": task_type}))
 
+    # Worker heartbeat health metrics
+    try:
+        repo = get_job_repository()
+        worker_healths = repo.get_all_worker_healths(ttl_seconds=60)
+        for wh in worker_healths:
+            wid = wh.get("worker_id", "unknown")
+            hostname = wh.get("hostname", "")
+            alive = 1 if wh.get("alive") else 0
+            lines.append(_basic_metric_line("dataforge_worker_heartbeat_alive", alive, {"worker_id": wid, "hostname": hostname}))
+            last_hb = wh.get("last_heartbeat")
+            if last_hb:
+                try:
+                    import datetime as _dt
+
+                    age = (_dt.datetime.now() - _dt.datetime.fromisoformat(last_hb)).total_seconds()
+                except (ValueError, TypeError):
+                    age = -1.0
+            else:
+                age = -1.0
+            lines.append(
+                _basic_metric_line(
+                    "dataforge_worker_heartbeat_age_seconds",
+                    age,
+                    {"worker_id": wid, "hostname": hostname},
+                )
+            )
+    except (AttributeError, ImportError, RuntimeError):
+        logger.debug("Metrics fallback: worker heartbeat collection failed")
+
     if settings.METRICS_ENABLE_HISTOGRAMS:
         request_latencies = get_request_latencies()
         if request_latencies:
@@ -622,6 +732,42 @@ async def metrics(request: Request):
         )
         for task_type, count in failures.items():
             failure_gauge.labels(task_type=task_type).set(count)
+
+    # Worker heartbeat health gauges
+    try:
+        repo = get_job_repository()
+        worker_healths = repo.get_all_worker_healths(ttl_seconds=60)
+        if worker_healths:
+            hb_alive_gauge = Gauge(
+                "dataforge_worker_heartbeat_alive",
+                "Whether a worker has a recent heartbeat (1=alive, 0=dead)",
+                ["worker_id", "hostname"],
+                registry=registry,
+            )
+            hb_age_gauge = Gauge(
+                "dataforge_worker_heartbeat_age_seconds",
+                "Seconds since the last worker heartbeat (-1 if never received)",
+                ["worker_id", "hostname"],
+                registry=registry,
+            )
+            for wh in worker_healths:
+                wid = wh.get("worker_id", "unknown")
+                hostname = wh.get("hostname", "")
+                hb_alive_gauge.labels(worker_id=wid, hostname=hostname).set(1 if wh.get("alive") else 0)
+                last_hb = wh.get("last_heartbeat")
+                if last_hb:
+                    try:
+                        import datetime as _dt
+
+                        age = (_dt.datetime.now() - _dt.datetime.fromisoformat(last_hb)).total_seconds()
+                    except (ValueError, TypeError):
+                        age = -1.0
+                else:
+                    age = -1.0
+                hb_age_gauge.labels(worker_id=wid, hostname=hostname).set(age)
+    except (AttributeError, ImportError, RuntimeError):
+        METRICS_COLLECTION_ERRORS += 1
+        logger.debug("Metrics: worker heartbeat collection failed")
 
     # Request duration histogram
     from app.metrics_collector import get_health_check_latencies, get_request_latencies

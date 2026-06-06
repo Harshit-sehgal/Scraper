@@ -33,7 +33,7 @@ def test_discover_endpoint_returns_503_when_discovery_dependency_missing(client,
         msg = "Discovery requires ddgs or duckduckgo_search."
         raise DiscoveryDependencyError(msg)
 
-    monkeypatch.setattr("app.routers.jobs.discover_urls", missing_discovery)
+    monkeypatch.setattr("app.routers.jobs_write.discover_urls", missing_discovery)
 
     response = client.post(
         "/api/discover",

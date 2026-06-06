@@ -1,6 +1,7 @@
 import re
 
-import app.scraper as scraper_mod
+from app.data_utils import _limit_source_records
+from app.html_utils import _boost_contacts_with_page_html
 from app.models import FieldType, SchemaField
 from app.selector_engine import apply_selectors, extract_with_regex
 
@@ -75,7 +76,7 @@ def test_limit_source_records_prioritizes_contact_rows(monkeypatch) -> None:
         {"company_name": "Has Phone", "record_score": 0.79, "phone": "+91 98888 77777"},
     ]
 
-    trimmed = scraper_mod._limit_source_records(records, schema)
+    trimmed = _limit_source_records(records, schema)
 
     assert len(trimmed) == 2
     names = {r.get("company_name") for r in trimmed}
@@ -102,7 +103,7 @@ def test_boost_contacts_with_page_html_injects_page_contact_when_missing() -> No
     </body></html>
     """
 
-    boosted = scraper_mod._boost_contacts_with_page_html(rows, html, schema)
+    boosted = _boost_contacts_with_page_html(rows, html, schema)
 
     assert boosted[0].get("email") == "hello@gamma.example"
     assert re.sub(r"\D", "", boosted[0].get("phone") or "") == "919000011111"

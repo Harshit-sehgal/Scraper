@@ -125,3 +125,33 @@ def test_metrics_invalid_auth_header(client, monkeypatch) -> None:
     monkeypatch.setattr("app.config.settings.METRICS_TOKEN", "secure-token")
     r = client.get("/metrics", headers={"Authorization": "Basic dGVzdDp0ZXN0"})
     assert r.status_code == 403
+
+
+def test_metrics_worker_heartbeat_present(client, monkeypatch) -> None:
+    """Worker heartbeat metrics should appear when a heartbeat has been recorded."""
+    from app.storage_interface import get_job_repository, reset_repository
+
+    monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
+    monkeypatch.delenv("DATAFORGE_DATABASE_URL", raising=False)
+    reset_repository()
+
+    repo = get_job_repository()
+    import os as _os
+    import socket as _socket
+
+    # Record a heartbeat so the metric has data
+    repo.record_worker_heartbeat("metrics-test-worker", _socket.gethostname(), _os.getpid())
+
+    r = client.get("/metrics")
+    assert r.status_code == 200
+    text = r.text
+
+    # Heartbeat metric should be present
+    assert "dataforge_worker_heartbeat_alive" in text, "Worker heartbeat alive metric must appear in /metrics output"
+    assert "dataforge_worker_heartbeat_age_seconds" in text, "Worker heartbeat age metric must appear in /metrics output"
+    # The test worker should be marked alive (just wrote heartbeat)
+    assert 'dataforge_worker_heartbeat_alive{worker_id="metrics-test-worker"' in text, (
+        "Test worker should appear in heartbeat metrics"
+    )
+
+    reset_repository()

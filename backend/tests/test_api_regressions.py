@@ -30,6 +30,9 @@ def test_system_status_shape(client) -> None:
     assert "jobs" in data
     assert "runtime_limits" in data
     assert data["jobs"]["total"] == 0
+    # New fields from worker-mode / repository-backed refactor
+    assert "worker_mode" in data, "System status must include worker_mode flag"
+    assert "recycle_bin_count" in data, "System status must include recycle_bin_count"
 
 
 def test_healthcheck_route(client) -> None:
@@ -278,7 +281,7 @@ def test_auto_discovery_empty_with_cancel_marks_canceled(monkeypatch) -> None:
         return []
 
     # Mock in the routers/jobs module where it's used
-    monkeypatch.setattr("app.routers.jobs.discover_urls", fake_discover_urls)
+    monkeypatch.setattr("app.routers.jobs_write.discover_urls", fake_discover_urls)
     # Mock the wrapper in main_mod
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
 
@@ -306,7 +309,7 @@ def test_auto_discovery_empty_marks_failed_with_terminal_time(monkeypatch) -> No
         return []
 
     # Mock in the routers/jobs module where it's used
-    monkeypatch.setattr("app.routers.jobs.discover_urls", fake_discover_urls)
+    monkeypatch.setattr("app.routers.jobs_write.discover_urls", fake_discover_urls)
     # Also mock in services/job_runner where it might be used
     monkeypatch.setattr("app.services.job_runner.discover_urls", fake_discover_urls)
     monkeypatch.setattr(main_mod, "_persist_state_wrapper", lambda: None)
