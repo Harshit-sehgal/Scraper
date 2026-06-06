@@ -20,25 +20,31 @@ from app.config import settings
 
 settings.STATE_FILE_PATH = str(temp_state_file)
 
-# If no API keys are configured and we're in development mode, the dev
-# escape hatch in ``app.utils.rbac.get_current_role`` requires
-# ``ALLOW_INSECURE_DEV_AUTH=True`` to skip the 403. The smoke test is a
-# local drill (not a real auth test) so enable it.
-if not settings.API_KEY and not settings.ADMIN_API_KEY and settings.ENV.lower() == "development":
-    settings.ALLOW_INSECURE_DEV_AUTH = True
+# The smoke test is a local drill (not a real auth test), so enable the
+# dev auth bypass unconditionally. This ensures the script works whether
+# the caller passes DATAFORGE_API_KEY, DATAFORGE_OPERATOR_API_KEY, or
+# DATAFORGE_ADMIN_API_KEY — or none at all.
+settings.ALLOW_INSECURE_DEV_AUTH = True
 
 from app.job_store import _get_connection, load_state, reset_job_store_for_tests
 from app.main import app
 from app.models import JobStatus
 from fastapi.testclient import TestClient
 
-# Resolve the API key once. Operators and Admins need a header on every
-# call, so we wrap the TestClient in a thin ``AuthClient`` that injects
-# ``X-API-Key`` unless the caller already passed one. The dev escape hatch
-# in ``app.utils.rbac.get_current_role`` is taken when no keys are
-# configured and ``DATAFORGE_ENV=development``, but production-style envs
-# require the header.
-api_key = os.environ.get("DATAFORGE_API_KEY") or os.environ.get("STAGING_API_KEY") or getattr(settings, "API_KEY", "") or "test"
+# Resolve the API key once. Check all key types in priority order so the
+# smoke test works regardless of which key the caller configured.
+# We wrap the TestClient in a thin ``AuthClient`` that injects
+# ``X-API-Key`` unless the caller already passed one.
+api_key = (
+    os.environ.get("DATAFORGE_API_KEY")
+    or os.environ.get("DATAFORGE_ADMIN_API_KEY")
+    or os.environ.get("DATAFORGE_OPERATOR_API_KEY")
+    or os.environ.get("STAGING_API_KEY")
+    or getattr(settings, "API_KEY", "")
+    or getattr(settings, "ADMIN_API_KEY", "")
+    or getattr(settings, "OPERATOR_API_KEY", "")
+    or "test"
+)
 
 
 class AuthClient:

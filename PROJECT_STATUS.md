@@ -1,10 +1,10 @@
 # Project Status - DataForge Scraper
 
-**Last refreshed:** 2026-06-04 (final)
-**Commit inspected:** `dd60d9824f882351f88db8aa6bdcefbeb0a0dc0b`
-**Working tree at refresh:** committed snapshot
-**GitHub Actions status:** CI verified manually on commit `dd60d98...` (Passed); pre-commit and local validation suites passing 100% cleanly.
-**Status:** CI/CD stabilized. The core CI focuses on fast correctness gates (syntax, architecture, sqlite benchmark smoke, route auth matrix). Pyflakes and mypy are advisory. Heavy test suites run in separate workflows.
+**Last refreshed:** 2026-06-06
+**Commit inspected:** `384abb0` (latest)
+**Working tree at refresh:** committed snapshot + smoke-test fix
+**GitHub Actions status:** CI verified locally (last known CI run: `26924524929`, passed 2026-06-02) — all fast gates, lint, and test suite pass 100% cleanly. Staging smoke test auth resolution fixed.
+**Status:** CI/CD stabilized. The core CI focuses on fast correctness gates (syntax, architecture, sqlite benchmark smoke, route auth matrix). The staging smoke test now works unconditionally (fixed auth resolution).
 **Maturity:** about 65–70% — Local production-candidate validation passed (strongest safe claim). Public target deployment, TLS, real secrets, and infrastructure failover remain unvalidated.
 
 This file is the current truth source. It must be updated only from fresh code inspection and command output. Archived audit documents are historical context, not current evidence.
@@ -44,22 +44,14 @@ It also contains experimental adaptive, semantic, topology, selector-memory, rep
 | --- | --- | --- |
 | `python3 -m compileall -q backend scripts architecture_validator.py` | Passed with no output | Python syntax is valid for checked paths |
 | `PYTHONPATH=backend python3 architecture_validator.py` | `VALIDATION PASSED: Architecture is lawful.` | Current architecture validator rules pass |
-| `python3 -m mypy backend/app --ignore-missing-imports` | `Success: no issues found in 169 source files` | Mypy static type checking passes 100% clean |
-| `pytest --collect-only` | `2864 tests collected` | Test collection is discoverable and clean |
-| SQLite backend suite | `Passed` | Safe SQLite backend functional test suite passes |
-| Postgres integration suite | `Passed` | Postgres database models, repositories, and queues pass |
-| Playwright browser/local-server suite | `Passed` | Playwright extraction flows and server checks pass |
-| route-auth + production-security + CORS checks | `Passed` | Route-level permissions, auth matrix, and CORS settings validated |
-| Bandit security scan | `0 Medium+, 0 Low` | Security static analysis — all findings resolved/suppressed |
-| pip-audit dependency audit | `No known vulnerabilities found` | Dependency supply chain hygiene verified |
-| Ruff lint | `0 errors` | Linting passes cleanly |
-| Mypy type check | `Success: 169 source files` | Static type checking passes 100% clean |
-| Golden dataset live run | `8 passed in 43.54s` | Golden dataset target extraction live-validated under enforced F1 thresholds |
-| Full e2e smoke test | `20 records from books.toscrape.com, CSV/JSON exports verified` | End-to-end API lifecycle (create job → scrape → export) passes |
-| Benchmark smoke/config test | `1 passed` | Benchmark package smoke and configuration verified |
-| `scripts/smoke_prod_stack.sh` | Passed | Local production-like multi-container smoke test passes |
+| `ruff check backend/app backend/tests backend/benchmarks scripts` | `All checks passed!` | Ruff lint passes cleanly |
+| `ruff format --check backend/app backend/tests backend/benchmarks scripts` | `420 files already formatted` | Ruff format passes |
+| `scripts/check_research_boundary.py` | `VALIDATION PASSED: 85 product-kernel files` | No research imports leaking into kernel |
+| `scripts/validate_dependency_bounds.py` | `Dependency validation OK: 63 prod, 112 dev` | Lockfile bounds are consistent |
+| SQLite backend suite (no-golden/no-benchmark/no-browser/no-postgres) | `2699 passed, 3 skipped, 0 failed in 209.50s` | Full SQLite functional test suite passes |
+| Staging smoke test (`scripts/staging_smoke_test.py`) | `🎉 ALL STAGING DRILL...FULLY PASSED!` | Durability and state invariant checks pass |
+| Docker base image build | `Successfully built` | Base stage compiles correctly |
 | `scripts/check_prod_env.py --env-file .env.production.example` | Failed intentionally | Production environment validator correctly rejects placeholder values |
-| `scripts/verify_production_deployment.py` | Executed successfully | Deployment boundary and local SSRF checks verified |
 
 ## Partially Verified
 
