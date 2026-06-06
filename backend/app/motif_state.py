@@ -210,12 +210,24 @@ class MotifState:
 
     def from_dict(self, data: dict) -> None:
         self.clear()
+        # Build the three target containers in local variables, then assign
+        # them through ``_set_struct`` so the active transaction's staging
+        # area is updated in lock-step (previously we wrote directly to
+        # ``self._motif_counts[...]`` which bypassed the staging — a
+        # in-flight transaction would never see the new keys and a
+        # rollback would leave the in-memory state out of sync).
+        counts: Counter = Counter()
         for k, v in data.get("motif_counts", {}).items():
-            self._motif_counts[tuple(self._parse_motif_key(k))] = v
+            counts[tuple(self._parse_motif_key(k))] = v
+        timestamps: dict = {}
         for k, v in data.get("motif_timestamps", {}).items():
-            self._motif_timestamps[tuple(self._parse_motif_key(k))] = v
+            timestamps[tuple(self._parse_motif_key(k))] = v
+        stability: dict = {}
         for k, v in data.get("motif_stability", {}).items():
-            self._motif_stability[tuple(self._parse_motif_key(k))] = v
+            stability[tuple(self._parse_motif_key(k))] = v
+        self._set_struct("motif_counts", counts)
+        self._set_struct("motif_timestamps", timestamps)
+        self._set_struct("motif_stability", stability)
 
     MAX_MOTIF_KEY_LENGTH = 1_000_000
 

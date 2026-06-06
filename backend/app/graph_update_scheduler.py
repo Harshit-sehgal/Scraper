@@ -208,13 +208,19 @@ class GraphUpdateScheduler:
 
 
 _scheduler: Any = None
+_initializing = False
 
 
 def get_scheduler() -> GraphUpdateScheduler:
-    global _scheduler
+    global _scheduler, _initializing
     if _scheduler is None:
-        _scheduler = object()
-        _scheduler = GraphUpdateScheduler()
+        if _initializing:
+            return None  # type: ignore[return-value]
+        _initializing = True
+        try:
+            _scheduler = GraphUpdateScheduler()
+        finally:
+            _initializing = False
     return _scheduler  # type: ignore[no-any-return]
 
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections import deque
 from dataclasses import asdict, dataclass, field
 
 from app.anti_bot_engine import get_anti_bot_engine
@@ -75,7 +76,7 @@ class ScrapeTelemetryCollector:
     """Collects and emits scrape telemetry for observability."""
 
     def __init__(self) -> None:
-        self._history: list[ScrapeTelemetry] = []
+        self._history: deque[ScrapeTelemetry] = deque(maxlen=10000)
 
     def record(self, url: str, **kwargs) -> ScrapeTelemetry:
         """Record a scrape telemetry event."""
@@ -132,18 +133,18 @@ class ScrapeTelemetryCollector:
 
     def get_recent(self, n: int = 20) -> list[dict]:
         """Get the N most recent telemetry snapshots."""
-        return [t.to_dict() for t in self._history[-n:]]
+        return [t.to_dict() for t in list(self._history)[-n:]]
 
     def get_confidence_histogram(self, n: int = 100) -> dict[str, int]:
         """Return a histogram of extraction confidence scores from recent history."""
         # 10 buckets: 0.0 - 0.1, 0.1 - 0.2, ... 0.9 - 1.0
         bins = [0] * 10
-        recent = self._history[-n:]
+        recent = list(self._history)[-n:]
         for t in recent:
             if not t.confidence_map:
                 continue
             score = t.confidence_map.get("overall_avg", 0.0)
-            idx = min(9, int(score * 10))
+            idx = max(0, min(9, int(score * 10)))
             bins[idx] += 1
 
         return {f"{i / 10:.1f}-{i / 10 + 0.1:.1f}": count for i, count in enumerate(bins)}

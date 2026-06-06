@@ -91,9 +91,12 @@ async def get_current_mode():
             "available_modes": [m.value for m in OperatorMode],
             "settings": governance_summary,
         }
-    except Exception as e:
+    except Exception:
+        # Log the full exception server-side; return a generic message
+        # to the client to avoid leaking internal paths / library
+        # internals / stack traces.
         logger.exception("Failed to get operator mode")
-        raise HTTPException(status_code=500, detail=f"Failed to get operator mode: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get operator mode") from None
 
 
 @router.post("/mode")
@@ -130,9 +133,9 @@ async def set_operator_mode(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to set operator mode")
-        raise HTTPException(status_code=500, detail=f"Failed to switch operator mode: {e}")
+        raise HTTPException(status_code=500, detail="Failed to switch operator mode") from None
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -194,9 +197,9 @@ async def get_system_dashboard():
                 "queue_sheds": governance.get("resources", {}).get("metrics", {}).get("queue_sheds", 0),
             },
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get operator system dashboard")
-        raise HTTPException(status_code=500, detail=f"Failed to load dashboard: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load dashboard") from None
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -259,9 +262,9 @@ async def get_degradation_predictions(
             result["summary"]["total_filtered"] = len(result["predictions"])
 
         return result
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get degradation predictions")
-        raise HTTPException(status_code=500, detail=f"Failed to get degradation predictions: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get degradation predictions") from None
 
 
 @router.get("/predictions/{domain}")
@@ -312,9 +315,9 @@ async def get_domain_prediction(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get prediction for domain %s", domain)
-        raise HTTPException(status_code=500, detail=f"Failed to predict for domain {domain}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to predict for domain") from None
 
 
 # ═══════════════════════════════════════════════════════════════════════

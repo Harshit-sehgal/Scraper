@@ -310,6 +310,10 @@ class GossipSubstrate:
         success_count = 0
 
         for peer_id in peers:
+            # ``select_peers_for_gossip`` already excludes ``self.node_id``,
+            # but defend-in-depth: skip if the local node slipped in.
+            if peer_id == self.node_id:
+                continue
             # Simulate state transfer through peer provider
             peer_provider = self.peers.get(peer_id)
             if peer_provider and hasattr(peer_provider, "receive_state"):
@@ -317,10 +321,16 @@ class GossipSubstrate:
                     if state_key is not None:
                         peer_provider.receive_state(state_key, state_value, self.vector_clock.to_dict())
                     elif hasattr(peer_provider, "to_dict"):
-                        # General gossip sync: exchange state
-                        remote_state = peer_provider.to_dict()
-                        if hasattr(peer_provider, "merge_state"):
-                            peer_provider.merge_state(remote_state)
+                        # General gossip sync: exchange state.  Look up the
+                        # local provider to push *our* state at the peer.
+                        # If the local node was never registered as a peer
+                        # (e.g. single-node deployment) we skip the push —
+                        # a self-merge would inflate the vector clock and
+                        # overwrite our own state with the same state.
+                        local_provider = self.peers.get(self.node_id) if self.node_id in self.peers else None
+                        if local_provider is not None and local_provider is not peer_provider:
+                            if hasattr(local_provider, "to_dict") and hasattr(peer_provider, "merge_state"):
+                                peer_provider.merge_state(local_provider.to_dict())
                     success_count += 1
                     self.peer_health[peer_id].success_count += 1
                     self.peer_health[peer_id].last_seen = time.time()

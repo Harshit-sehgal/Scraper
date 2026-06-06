@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import secrets
 import time
+from typing import ClassVar
 
 from app.config import settings
 from app.utils.rbac import UserRole, require_role
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 
@@ -41,6 +41,14 @@ router = APIRouter(dependencies=[Depends(verify_experimental_enabled)])
 class KnowledgeMergeRequest(BaseModel):
     """Validated request body for merge / knowledge endpoint."""
 
+    model_config = ConfigDict(extra="forbid")
+
+    # Cap the number of roles / exclusions that can be merged in a single
+    # request; otherwise a malicious caller could OOM the persistent
+    # world-state manifold.
+    MAX_ROLES: ClassVar[int] = 500
+    MAX_EXCLUSIONS: ClassVar[int] = 500
+
     role_manifold: dict[str, list[float]] = Field(
         default_factory=dict,
         description="Role vectors to merge into the field manifold",
@@ -52,15 +60,23 @@ class KnowledgeMergeRequest(BaseModel):
 
     @classmethod
     def validate_payload(cls, data: dict) -> KnowledgeMergeRequest:
-        """Validate and cap payload size."""
-        max_roles = 500
-        max_exclusions = 500
-        # Clamp to max sizes
-        if "role_manifold" in data and len(data["role_manifold"]) > max_roles:
-            data["role_manifold"] = dict(list(data["role_manifold"].items())[:max_roles])
-        if "learned_exclusions" in data and len(data["learned_exclusions"]) > max_exclusions:
-            data["learned_exclusions"] = dict(list(data["learned_exclusions"].items())[:max_exclusions])
-        return cls(**data)
+        """Validate and cap payload size.
+
+        Operates on a shallow copy so the caller's dict is never mutated
+        (a failed ``cls(**data)`` after a partial clamp previously left
+        the request dict in an inconsistent state).
+        """
+        # Fast-path: pydantic does the type validation; we just enforce
+        # the size caps.
+        if isinstance(data, dict):
+            payload = dict(data)
+        else:  # pragma: no cover -- FastAPI guarantees a dict
+            payload = data
+        if isinstance(payload.get("role_manifold"), dict) and len(payload["role_manifold"]) > cls.MAX_ROLES:
+            payload["role_manifold"] = dict(list(payload["role_manifold"].items())[: cls.MAX_ROLES])
+        if isinstance(payload.get("learned_exclusions"), dict) and len(payload["learned_exclusions"]) > cls.MAX_EXCLUSIONS:
+            payload["learned_exclusions"] = dict(list(payload["learned_exclusions"].items())[: cls.MAX_EXCLUSIONS])
+        return cls(**payload)
 
 
 def _require_admin_key(request: Request) -> None:
@@ -144,21 +160,26 @@ async def export_knowledge():
 
 
 @router.post("/api/system/merge/knowledge")
-async def merge_knowledge(request: Request, data: dict, _role=Depends(require_role([UserRole.ADMIN]))):  # noqa: B008
+async def merge_knowledge(
+    request: Request,
+    req: KnowledgeMergeRequest,
+    _role: UserRole = Depends(require_role([UserRole.ADMIN])),  # noqa: B008
+):
     """Merge an external knowledge manifold into the current field.
 
     Validated with size caps: max 500 roles, max 500 exclusions.
     Requires admin API key if DATAFORGE_ADMIN_API_KEY is configured.
+
+    The body is declared as ``KnowledgeMergeRequest`` so Pydantic
+    validates the shape of ``role_manifold`` (``dict[str, list[float]]``)
+    and ``learned_exclusions`` (``dict[str, float]``) before any code
+    runs, preventing type-coercion bugs (``list("foo")`` ->
+    ``['f','o','o']``) from corrupting the persistent world state.
     """
     _require_admin_key(request)
-    # Validate payload with size caps
-    try:
-        req = KnowledgeMergeRequest.validate_payload(data)
-    except Exception as e:
-        return JSONResponse(
-            status_code=422,
-            content={"detail": f"Invalid merge payload: {e}"},
-        )
+
+    if isinstance(req, dict):
+        req = KnowledgeMergeRequest(**req)
 
     from app.semantic_world_state import get_world_state
 
@@ -168,6 +189,9 @@ async def merge_knowledge(request: Request, data: dict, _role=Depends(require_ro
     remote_manifold = req.role_manifold
     merged_roles = 0
     for role, vec in remote_manifold.items():
+        # ``vec`` is already validated as ``list[float]`` by the
+        # Pydantic model — defensive cast to list is harmless if a
+        # future refactor weakens the model.
         if ws.has_manifold_role(role):
             ws.blend_manifold_vector(role, list(vec), alpha=0.7, beta=0.3)
         else:
