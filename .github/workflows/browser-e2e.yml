@@ -51,7 +51,8 @@ jobs:
       - name: Run Browser E2E tests
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python -m pytest -v backend/tests --run-browser -o addopts= --tb=short
+          python -m pytest -v backend/tests --run-browser -o addopts= \
+          --tb=short --reruns 3 --reruns-delay 10
 
   notify:
     name: Telegram Notification

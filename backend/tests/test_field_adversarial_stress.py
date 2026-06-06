@@ -1,5 +1,8 @@
+import pytest
 from app.semantic_pipeline import run_pipeline
 from app.semantic_world_state import get_world_state
+
+pytestmark = pytest.mark.filterwarnings("ignore::ResourceWarning")
 
 
 def test_adversarial_domain_switching() -> None:

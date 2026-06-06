@@ -27,11 +27,11 @@ cd "$PROJECT_ROOT"
 
 # Detect local docker-compose or system command
 if [ -f "./bin/docker-compose" ]; then
-    DOCKER_COMPOSE="./bin/docker-compose"
+    DOCKER_COMPOSE=("./bin/docker-compose")
 elif command -v docker-compose &> /dev/null; then
-    DOCKER_COMPOSE="docker-compose"
+    DOCKER_COMPOSE=("docker-compose")
 else
-    DOCKER_COMPOSE="docker compose"
+    DOCKER_COMPOSE=("docker" "compose")
 fi
 
 # Colors
@@ -128,7 +128,7 @@ unset DATAFORGE_SKIP_DB_CHECK
 echo ""
 echo "─── Step 2: Docker Compose config validation ─────────────────────────"
 
-if "$DOCKER_COMPOSE" -f docker-compose.prod.yml config > /dev/null 2>&1; then
+if "${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml config > /dev/null 2>&1; then
     echo -e "  $PASS  docker-compose.prod.yml is valid"
 else
     echo -e "  $FAIL  docker-compose.prod.yml has errors"
@@ -139,7 +139,7 @@ fi
 echo ""
 echo "─── Step 3: Building production images ───────────────────────────────"
 
-if "$DOCKER_COMPOSE" -f docker-compose.prod.yml build --no-cache 2>&1 | tail -5; then
+if "${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml build --no-cache 2>&1 | tail -5; then
     echo -e "  $PASS  Production images built successfully"
 else
     echo -e "  $FAIL  Production image build failed"
@@ -154,17 +154,17 @@ echo "─── Step 4: Starting production stack ──────────
 export DATAFORGE_SMOKE_TEST_MODE=true
 export DATAFORGE_ALLOWED_INTERNAL_HOSTS=nginx
 
-"$DOCKER_COMPOSE" -f docker-compose.prod.yml up -d 2>&1
+"${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml up -d 2>&1
 echo -e "  $INFO  Waiting for services to start (30s)..."
 sleep 30
 
 # Check all containers are running (including monitoring services)
 for svc in dataforge worker postgres nginx prometheus grafana; do
-    if "$DOCKER_COMPOSE" -f docker-compose.prod.yml ps "$svc" --format json 2>/dev/null | grep -q '"State":"running"'; then
+    if "${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml ps "$svc" --format json 2>/dev/null | grep -q '"State":"running"'; then
         echo -e "  $PASS  $svc is running"
     else
         echo -e "  $FAIL  $svc is not running"
-        "$DOCKER_COMPOSE" -f docker-compose.prod.yml logs "$svc" --tail=20 2>&1 || true
+        "${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml logs "$svc" --tail=20 2>&1 || true
         ALL_PASS=false
     fi
 done
@@ -296,7 +296,7 @@ fi
 echo ""
 echo "─── Step 9: Worker logs (last 20 lines) ──────────────────────────────"
 
-"$DOCKER_COMPOSE" -f docker-compose.prod.yml logs worker --tail=20 2>&1 || true
+"${DOCKER_COMPOSE[@]}" -f docker-compose.prod.yml logs worker --tail=20 2>&1 || true
 
 # ───── Summary ────────────────────────────────────────────────────────────
 echo ""

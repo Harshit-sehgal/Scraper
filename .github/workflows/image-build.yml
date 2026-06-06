@@ -45,6 +45,7 @@ jobs:
 
       - name: Validate compose config
         run: |
+          cp .env.example .env
           docker compose -f docker-compose.yml config -q
           docker compose -f docker-compose.prod.yml config -q
 

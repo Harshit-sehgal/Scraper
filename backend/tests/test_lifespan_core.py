@@ -55,8 +55,10 @@ class TestPersistSingleWrapper:
         job = Job(name="test-job", id="test-id")
         jobs_store["test-id"] = job
 
+        from unittest.mock import MagicMock
+
         mock_repo = AsyncMock()
-        mock_repo.save_single = AsyncMock()
+        mock_repo.save_single = MagicMock()
         monkeypatch.setattr("app.lifespan.get_job_repository", lambda: mock_repo)
 
         persist_single_wrapper("test-id")
