@@ -10,9 +10,12 @@ Provides:
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any
+
+_REPLAY_LOCK = threading.Lock()
 
 logger = logging.getLogger(__name__)
 
@@ -251,10 +254,10 @@ class FederationManager:
         }
 
         # Prevent replay storm if local world state is currently processing
-        if getattr(self.ws, "_replaying", False):
-            return replay_report
-
-        self.ws._replaying = True
+        with _REPLAY_LOCK:
+            if getattr(self.ws, "_replaying", False):
+                return replay_report
+            self.ws._replaying = True
         try:
             for delta in sorted(deltas, key=lambda d: d.get("timestamp", 0.0)):
                 try:

@@ -25,12 +25,15 @@ class HeartbeatManager:
         now = time.time()
         active_nodes = []
 
-        # 1. Prune stale nodes (seen > 60s ago)
+        # 1. Prune stale nodes (seen > 60s ago, evict if > 300s)
         for nid in list(self.node_registry.keys()):
             node = self.node_registry[nid]
-            if now - node["last_seen"] > 60:
+            time_since_seen = now - node["last_seen"]
+            if time_since_seen > 60:
                 node["status"] = "offline"
-            if now - node["last_seen"] < 10:
+            if time_since_seen > 300:
+                del self.node_registry[nid]
+            elif time_since_seen < 10:
                 active_nodes.append(node)
 
         if not active_nodes:
