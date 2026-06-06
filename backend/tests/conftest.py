@@ -293,6 +293,8 @@ def client(monkeypatch):
     monkeypatch.setattr("app.lifespan.run_job", fake_run_job)
     monkeypatch.setattr(main_mod, "_schedule_background_task", fake_schedule_background_task)
 
+    assert main_mod is not None
+
     # Disable API-key auth and metrics-token auth for unit tests. Local
     # tests run against a fresh in-process app and the dev escape hatch in
     # ``rbac.get_current_role`` requires ``ALLOW_INSECURE_DEV_AUTH=True`` to
@@ -304,7 +306,6 @@ def client(monkeypatch):
     monkeypatch.setattr(main_mod.settings, "METRICS_TOKEN", "")
     monkeypatch.setattr(main_mod.settings, "ALLOW_INSECURE_DEV_AUTH", True)
 
-    assert main_mod is not None
     main_mod.jobs_store.clear()
     main_mod.recycle_bin_store.clear()
 
