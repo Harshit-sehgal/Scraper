@@ -21,6 +21,7 @@ from app.regression_capture import get_regression_capture
 from app.scrape_telemetry import get_scrape_telemetry
 from app.scraper_diagnostics import run_diagnostics
 from app.selector_memory import get_selector_memory
+from app.url_safety import validate_public_http_url
 from app.utils.rbac import UserRole, require_role
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.concurrency import run_in_threadpool
@@ -128,7 +129,19 @@ async def get_scraper_diagnostics(
 
     Requires operator or admin role — triggers browser / network work.
     """
-    report = await run_diagnostics(url, fields, min_record_score=min_score)
+    # Defence-in-depth: reject SSRF targets (loopback, private RFC1918,
+    # link-local, cloud-metadata, internal TLDs) before any outbound
+    # call so the operator can't pivot to internal services.
+    try:
+        validate_public_http_url(url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="URL not allowed for diagnostics") from exc
+    try:
+        report = await run_diagnostics(url, fields, min_record_score=min_score)
+    except Exception:
+        # Never leak internal error details; log server-side instead.
+        logger.exception("Diagnostics run failed for %s", url)
+        raise HTTPException(status_code=500, detail="Diagnostics run failed") from None
     return report.to_dict()
 
 
@@ -182,9 +195,9 @@ async def get_extraction_trends(window: Annotated[int, Query(ge=10, le=500)] = 1
                 for d, t in report.domain_trends.items()
             },
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get extraction trends")
-        raise HTTPException(status_code=500, detail=f"Failed to analyze extraction trends: {e}")
+        raise HTTPException(status_code=500, detail="Failed to analyze extraction trends") from None
 
 
 @router.get("/trends/{domain}")
@@ -230,9 +243,9 @@ async def get_domain_trend(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get trend for domain %s", domain)
-        raise HTTPException(status_code=500, detail=f"Failed to get domain trend: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get domain trend") from None
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -261,9 +274,9 @@ async def get_regression_archive(limit: Annotated[int, Query(ge=1, le=100)] = 20
         # Trim recent captures to the requested limit
         stats["recent_captures"] = stats.get("recent_captures", [])[:limit]
         return stats
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get regression archive")
-        raise HTTPException(status_code=500, detail=f"Failed to get regression archive: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get regression archive") from None
 
 
 @router.get("/regressions/{entry_id}")
@@ -291,9 +304,9 @@ async def get_regression_detail(entry_id: str):
         raise HTTPException(status_code=404, detail=f"Regression entry not found: {entry_id}")
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get regression detail for entry %s", entry_id)
-        raise HTTPException(status_code=500, detail=f"Failed to get regression detail: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get regression detail") from None
 
 
 @router.post("/regressions/{entry_id}/generate-test")
@@ -313,9 +326,9 @@ async def generate_regression_replay_test(
         return {"entry_id": entry_id, "test_code": test_code}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to generate regression replay test for entry %s", entry_id)
-        raise HTTPException(status_code=500, detail=f"Failed to generate replay test: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate replay test") from None
 
 
 @router.post("/regressions/generate-all-tests")
@@ -328,9 +341,9 @@ async def generate_all_replay_tests(_role: Annotated[UserRole, Depends(require_r
             "total_tests_generated": all_tests.count("TEST SEPARATOR") + 1 if all_tests else 0,
             "test_code": all_tests,
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to generate all regression replay tests")
-        raise HTTPException(status_code=500, detail=f"Failed to generate replay tests: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate replay tests") from None
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -647,9 +660,9 @@ async def optimize_domain_selectors(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to optimize selectors for domain %s", domain)
-        raise HTTPException(status_code=500, detail=f"Selector optimization failed: {e}")
+        raise HTTPException(status_code=500, detail="Selector optimization failed") from None
 
 
 @router.get("/ml/optimize/domain/{domain}/history")
@@ -669,9 +682,9 @@ async def get_optimization_history(domain: str, limit: Annotated[int, Query(ge=1
             "count": len(history),
             "history": history,
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get optimization history for domain %s", domain)
-        raise HTTPException(status_code=500, detail=f"Failed to get optimization history: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get optimization history") from None
 
 
 @router.post("/ml/learn")
@@ -703,9 +716,9 @@ async def record_selector_learning(
             "domain": domain,
             "quality": quality,
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Failed selector learning for domain %s", domain)
-        raise HTTPException(status_code=500, detail=f"Selector learning failed: {e}")
+        raise HTTPException(status_code=500, detail="Selector learning failed") from None
 
 
 # ─── Strategy Evolution Endpoints (EXPERIMENTAL / RESEARCH ONLY) ─────────
@@ -731,9 +744,9 @@ async def recommend_fetch_strategy(domain: str):
             "confidence": round(recommendation.confidence, 3),
             "estimated_success_rate": round(recommendation.estimated_success_rate, 3),
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to recommend strategy for domain %s", domain)
-        raise HTTPException(status_code=500, detail=f"Failed to recommend strategy: {e}")
+        raise HTTPException(status_code=500, detail="Failed to recommend strategy") from None
 
 
 @router.post("/strategy/record")
@@ -778,9 +791,9 @@ async def record_strategy_attempt(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to record strategy attempt for domain %s", domain)
-        raise HTTPException(status_code=500, detail=f"Failed to record strategy attempt: {e}")
+        raise HTTPException(status_code=500, detail="Failed to record strategy attempt") from None
 
 
 @router.get("/strategy/domain/{domain}")
@@ -794,9 +807,9 @@ async def get_domain_strategy_analysis(domain: str):
 
         engine = get_strategy_evolution_engine()
         return await run_in_threadpool(engine.get_domain_strategy_report, domain)
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get strategy analysis for domain %s", domain)
-        raise HTTPException(status_code=500, detail=f"Failed to get domain strategy report: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get domain strategy report") from None
 
 
 @router.get("/strategy/report")
@@ -810,9 +823,9 @@ async def get_all_strategies_report():
 
         engine = get_strategy_evolution_engine()
         return await run_in_threadpool(engine.get_all_domains_strategy_report)
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get all strategies report")
-        raise HTTPException(status_code=500, detail=f"Failed to get all strategy reports: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get all strategy reports") from None
 
 
 @router.post("/strategy/evolve/{domain}")
@@ -846,6 +859,6 @@ async def evolve_domain_strategy(
             "new_strategy": new_strategy.value,
             "status": "evolved",
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Failed manual strategy evolution for domain %s", domain)
-        raise HTTPException(status_code=500, detail=f"Strategy evolution failed: {e}")
+        raise HTTPException(status_code=500, detail="Strategy evolution failed") from None

@@ -515,8 +515,13 @@ async def metrics(request: Request):
         auth_header = request.headers.get("Authorization", "")
         api_key_header = request.headers.get("X-API-Key", "")
         bearer_token = ""  # nosec B105
-        if auth_header.startswith("Bearer "):
-            bearer_token = auth_header[7:]
+        # Case-insensitive scheme match (matches api_key_middleware in
+        # app.middlewares) so ``bearer <token>`` and ``BEARER <token>``
+        # both authenticate consistently.
+        if auth_header:
+            scheme, _, _token = auth_header.partition(" ")
+            if scheme.lower() == "bearer":
+                bearer_token = _token
         if not secrets.compare_digest(bearer_token, settings.METRICS_TOKEN) and not secrets.compare_digest(
             api_key_header,
             settings.METRICS_TOKEN,

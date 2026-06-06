@@ -372,7 +372,7 @@ def _extract_hydration_data(soup: BeautifulSoup) -> dict[str, Any]:
     hydration: dict[str, Any] = {}
 
     # JSON-LD structured data
-    jsonld_scripts = soup.find_all("script", type="application / ld+json")
+    jsonld_scripts = soup.find_all("script", type=re.compile(r"application\s*/\s*ld\+json"))
     jsonld_data = []
     for script in jsonld_scripts:
         try:

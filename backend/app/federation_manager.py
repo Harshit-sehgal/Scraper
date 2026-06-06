@@ -61,6 +61,11 @@ class FederationManager:
         if node_id == self.node_id:
             return
 
+        if len(self.registered_nodes) >= 1000 and node_id not in self.registered_nodes:
+            # Evict the oldest seen node to prevent memory exhaustion
+            oldest = min(self.registered_nodes.keys(), key=lambda k: self.registered_nodes[k].get("last_seen", 0))
+            self.registered_nodes.pop(oldest, None)
+
         self.registered_nodes[node_id] = {
             "shard_id": shard_id,
             "last_seen": time.time(),
