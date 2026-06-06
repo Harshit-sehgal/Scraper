@@ -44,27 +44,46 @@ jobs:
           docker stop dataforge-smoke || true
 
       - name: Validate compose config
-        # The required env vars for docker-compose.prod.yml are passed inline
-        # to avoid depending on --env-file (not supported in older Docker Compose
-        # versions). docker-compose.yml (dev) uses only vars with :- defaults so
-        # it needs no explicit env vars.
+        # Use Python YAML validation instead of `docker compose config` because
+        # Docker Compose CLI version and availability varies across runner images.
+        # PyYAML is installed on-demand so it works regardless of the lockfile.
         env:
           DATAFORGE_DB_PASSWORD: ci_validation_placeholder
           DATAFORGE_METRICS_TOKEN: ci_validation_placeholder
           GRAFANA_PASSWORD: ci_validation_placeholder
         run: |
-          # Try docker compose (v2 plugin) first, fall back to docker-compose (v1).
-          DC=""
-          if command -v docker-compose &>/dev/null; then
-            DC="docker-compose"
-          elif docker compose version &>/dev/null; then
-            DC="docker compose"
-          else
-            echo "ERROR: No Docker Compose found (tried docker-compose and docker compose)"
-            exit 1
-          fi
-          $DC -f docker-compose.yml config -q
-          $DC -f docker-compose.prod.yml config -q
+          pip install -q PyYAML
+          python3 << 'PYEOF'
+          import os, yaml, sys
+
+          # Check required env vars docker-compose.prod.yml expects
+          required_vars = {
+              "DATAFORGE_DB_PASSWORD": "PostgreSQL password",
+              "DATAFORGE_METRICS_TOKEN": "Prometheus metrics auth",
+              "GRAFANA_PASSWORD": "Grafana admin password",
+          }
+          exit_code = 0
+          for var, purpose in required_vars.items():
+              val = os.environ.get(var, "")
+              if not val:
+                  print(f"❌ Missing required env var: {var} ({purpose})")
+                  exit_code = 1
+
+          # Validate both compose files as valid YAML
+          for f in ("docker-compose.yml", "docker-compose.prod.yml"):
+              if not os.path.isfile(f):
+                  print(f"❌ {f}: file not found")
+                  exit_code = 1
+                  continue
+              with open(f) as fh:
+                  try:
+                      yaml.safe_load(fh)
+                      print(f"✅ {f}: valid YAML")
+                  except yaml.YAMLError as e:
+                      print(f"❌ {f}: YAML error — {e}")
+                      exit_code = 1
+          sys.exit(exit_code)
+          PYEOF
 
   notify:
     name: Telegram Notification
