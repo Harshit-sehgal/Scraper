@@ -9,6 +9,7 @@ Provides:
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -18,6 +19,27 @@ from typing import Any
 _REPLAY_LOCK = threading.Lock()
 
 logger = logging.getLogger(__name__)
+
+
+def _encode_motif_fields(fields: list[str]) -> str:
+    """Encode motif fields without depending on field-name delimiters."""
+    return json.dumps(sorted(fields), separators=(",", ":"))
+
+
+def _decode_motif_key(key: str) -> list[str]:
+    """Decode a motif key, preserving support for the legacy dash format."""
+    try:
+        decoded = json.loads(key)
+    except json.JSONDecodeError:
+        return key.split("-")
+    if isinstance(decoded, list) and all(isinstance(item, str) for item in decoded):
+        return decoded
+    return key.split("-")
+
+
+def _schema_contains_motif(schema: set[str], motif_fields: list[str]) -> bool:
+    expected = sorted(motif_fields)
+    return any(sorted(_decode_motif_key(existing)) == expected for existing in schema)
 
 
 @dataclass
@@ -91,9 +113,8 @@ class FederationManager:
                 "last_update": state.last_fetch_time,
             }
 
-        # 2. Gather learned motifs from world state (split dash hashes into
-        # arrays)
-        motifs = [m.split("-") for m in getattr(self.ws, "_evolved_schema", set())]
+        # 2. Gather learned motifs from world state.
+        motifs = [_decode_motif_key(m) for m in getattr(self.ws, "_evolved_schema", set())]
 
         # 3. Gather local topology coordinates from world state (serialize
         # tuple keys)
@@ -164,8 +185,8 @@ class FederationManager:
 
         # Rule 2: Structural Union for Learned Motifs
         for motif_fields in remote.motifs:
-            motif_hash = "-".join(sorted(motif_fields))
-            if motif_hash not in self.ws._evolved_schema:
+            motif_hash = _encode_motif_fields(motif_fields)
+            if not _schema_contains_motif(self.ws._evolved_schema, motif_fields):
                 self.ws._evolved_schema.add(motif_hash)
                 merge_report["merged_motifs"] += 1
 

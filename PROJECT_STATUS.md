@@ -132,7 +132,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | Item | Status | Details |
 | --- | --- | --- |
 | Replace pyflakes + .flake8 with Ruff | ✅ Done | `.flake8` removed, Ruff in pyproject.toml + pre-commit + CI |
-| Add coverage thresholds | ✅ Done | `fail_under = 50` in pyproject.toml (actual: 75.3%) |
+| Add coverage thresholds | ✅ Done | `fail_under = 60` in pyproject.toml (actual: 75.3%) |
 | Add contract tests for exports and job lifecycle | ✅ Done | 26 contract tests in `test_api_contract.py` |
 | Add deterministic fixture-based extraction tests | 🔲 Deferred | Additive work — existing extraction tests provide coverage |
 | Simplify dashboard to read-only internal surface | ✅ Done | Frontend is static/internal-only, no session handling |
@@ -151,7 +151,7 @@ The following is the comprehensive audit against `deep-research-report.md` check
 | Ruff | ✅ Configured | pyproject.toml + pre-commit + CI |
 | Ruff formatter | ✅ Configured | pre-commit has ruff-format |
 | mypy | ✅ 0 errors | 349 source files, `Success: no issues found` (core backend modules unignored and fully type-checked) |
-| pytest + pytest-cov | ✅ Configured | `fail_under = 50`, actual: 75.3% |
+| pytest + pytest-cov | ✅ Configured | `fail_under = 60`, actual: 75.3% |
 | Bandit | ✅ Running | 0 Low/0 Medium/0 High — all findings clean |
 | pip-audit | ✅ Running | 0 known vulnerabilities |
 | pre-commit | ✅ Configured | `.pre-commit-config.yaml` with 4 repos |
