@@ -909,6 +909,9 @@ def prune_idempotency_keys(older_than_days: int = 7) -> int:
     scheduled task to keep the table small; the default 7-day window
     is more than enough for a client retry loop.
     """
+    if older_than_days <= 0:
+        return 0
+
     with _DB_LOCK:
         conn = _get_connection()
         try:

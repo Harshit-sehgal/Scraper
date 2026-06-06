@@ -540,7 +540,7 @@ async def trigger_selector_cleanup(_role: Annotated[UserRole, Depends(require_ro
     Returns cleanup statistics.
     """
     selector_memory = get_selector_memory()
-    stats = selector_memory.force_cleanup()
+    stats = await run_in_threadpool(selector_memory.force_cleanup)
 
     if not stats:
         return {

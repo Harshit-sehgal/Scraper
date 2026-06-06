@@ -752,6 +752,8 @@ class Psycopg3JobRepository(JobRepository):
             logger.exception("Failed to record idempotency key %s", idem_key)
 
     def prune_idempotency_keys(self, older_than_days: int = 7) -> int:
+        if older_than_days <= 0:
+            return 0
         self._ensure()
         try:
             with _conn() as conn:
