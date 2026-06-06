@@ -28,6 +28,25 @@ logger = logging.getLogger(__name__)
 _CURRENT_QUEUE_SCHEMA_VERSION = 3
 
 
+def _add_column_if_missing(conn, table: str, column: str, col_type: str) -> None:
+    """Run ``ALTER TABLE ADD COLUMN`` safely inside a SAVEPOINT.
+
+    A bare ``try / except`` swallows the error but leaves the connection in an
+    aborted transaction state (psycopg2 error state 25P02) so every subsequent
+    statement on the same connection raises ``InFailedSqlTransaction``. Using
+    SAVEPOINT / ROLLBACK TO SAVEPOINT rolls the failed statement back cleanly
+    and keeps the surrounding transaction usable.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SAVEPOINT add_col_sp")
+        try:
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+        except Exception:
+            cur.execute("ROLLBACK TO SAVEPOINT add_col_sp")
+        else:
+            cur.execute("RELEASE SAVEPOINT add_col_sp")
+
+
 def _ensure_schema() -> None:
     """Create queue tables and run schema migrations."""
     with _conn() as conn:
@@ -39,11 +58,19 @@ def _ensure_schema() -> None:
             "WHERE table_schema = 'public' AND table_name = 'queue_schema_version'",
         )
         if table_exists:
-            # Verify the table has the expected structure
-            try:
-                old_row = _fetch_one(conn, "SELECT id FROM queue_schema_version LIMIT 1")
-            except Exception:
-                old_row = None
+            # Verify the table has the expected structure. Use a SAVEPOINT so any
+            # error (e.g. missing column) leaves the connection in a usable
+            # transaction state, not an aborted one.
+            with conn.cursor() as cur:
+                cur.execute("SAVEPOINT schema_check_sp")
+                try:
+                    cur.execute("SELECT id FROM queue_schema_version LIMIT 1")
+                    old_row = cur.fetchone()
+                except Exception:
+                    old_row = None
+                    cur.execute("ROLLBACK TO SAVEPOINT schema_check_sp")
+                else:
+                    cur.execute("RELEASE SAVEPOINT schema_check_sp")
             if old_row is None:
                 _execute(conn, "DROP TABLE IF EXISTS queue_schema_version CASCADE")
 
@@ -137,19 +164,15 @@ def _ensure_schema() -> None:
                 current = 1
 
             if current < 2:
-                # Add result column (used for storing successful task results)
-                try:
-                    _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN result TEXT")
-                except Exception:
-                    pass  # nosec B110
+                # Add result column (used for storing successful task results).
+                # Wrap in a SAVEPOINT so a pre-existing column doesn't leave the
+                # connection in an aborted transaction state.
+                _add_column_if_missing(conn, "queue_task_history", "result", "TEXT")
                 current = 2
 
             if current < 3:
                 # Add execution_time_ms column for tracking task latencies
-                try:
-                    _execute(conn, "ALTER TABLE queue_task_history ADD COLUMN execution_time_ms INTEGER")
-                except Exception:
-                    pass  # nosec B110
+                _add_column_if_missing(conn, "queue_task_history", "execution_time_ms", "INTEGER")
                 current = 3
 
             _execute(
@@ -173,10 +196,17 @@ class PostgresWorkerQueue:
         self._max_concurrency = max_concurrency
         self._poll_interval = poll_interval
         self._running = False
+        self._start_lock = asyncio.Lock()
         self._worker_task: asyncio.Task | None = None
         self._in_flight: dict[str, asyncio.Task] = {}
         self._handlers: dict[str, Callable] = {}
         self._in_flight_lock = asyncio.Lock()
+        # Semaphore gives us atomic acquire/release for the concurrency
+        # budget. Reserving a permit *before* dequeue closes the race in
+        # which a task is claimed from the DB (status='running') but not
+        # yet registered in ``_in_flight``, allowing the loop to
+        # over-subscribe ``max_concurrency``.
+        self._concurrency_sem = asyncio.Semaphore(max_concurrency)
         _ensure_schema()
 
     # ─── Task registration ─────────────────────────────────────────────
@@ -211,18 +241,17 @@ class PostgresWorkerQueue:
             scheduled_at=scheduled_at,
         )
 
-        async with self._in_flight_lock:
-            await asyncio.to_thread(
-                self._enqueue_sync,
-                task.id,
-                task.type,
-                json.dumps(task.payload),
-                int(task.priority),
-                task.status,
-                task.attempts,
-                task.max_attempts,
-                task.timeout_seconds,
-            )
+        await asyncio.to_thread(
+            self._enqueue_sync,
+            task.id,
+            task.type,
+            json.dumps(task.payload),
+            int(task.priority),
+            task.status,
+            task.attempts,
+            task.max_attempts,
+            task.timeout_seconds,
+        )
 
         return task.id
 
@@ -330,12 +359,11 @@ class PostgresWorkerQueue:
 
     async def complete(self, task_id: str, result: dict | None = None) -> None:
         """Mark a task as completed successfully."""
-        async with self._in_flight_lock:
-            await asyncio.to_thread(
-                self._complete_sync,
-                task_id,
-                json.dumps(result) if result else None,
-            )
+        await asyncio.to_thread(
+            self._complete_sync,
+            task_id,
+            json.dumps(result) if result else None,
+        )
 
     def _complete_sync(self, task_id: str, result_json: str | None) -> None:
         """Synchronous complete — runs in a thread to avoid blocking the event loop."""
@@ -379,15 +407,14 @@ class PostgresWorkerQueue:
         Mirrors the SQLite ``WorkerQueue.fail`` signature so callers can
         treat the two backends interchangeably.
         """
-        async with self._in_flight_lock:
-            await asyncio.to_thread(
-                self._fail_sync,
-                task_id,
-                error,
-                retry,
-                retry_after,
-                task_type,
-            )
+        await asyncio.to_thread(
+            self._fail_sync,
+            task_id,
+            error,
+            retry,
+            retry_after,
+            task_type,
+        )
 
     def _fail_sync(
         self,
@@ -467,21 +494,26 @@ class PostgresWorkerQueue:
         """Cancel a task. Handles both pending and in-flight tasks.
         Returns True if cancelled.
         """
+        # Capture the in-flight task under the lock, then release the lock
+        # before doing any DB I/O. Holding an asyncio.Lock across
+        # ``asyncio.to_thread`` blocks every other coroutine that needs
+        # the same lock (worker loop, _cleanup_in_flight) for the
+        # duration of the synchronous DB call.
+        flight_task: asyncio.Task | None = None
         async with self._in_flight_lock:
-            # Check in-flight tasks first
-            if task_id in self._in_flight:
-                flight_task = self._in_flight[task_id]
-                flight_task.cancel()
-                return await asyncio.to_thread(
-                    self._cancel_in_flight_sync,
-                    task_id,
-                )
+            flight_task = self._in_flight.get(task_id)
 
-            # Check pending tasks
+        if flight_task is not None:
+            flight_task.cancel()
             return await asyncio.to_thread(
-                self._cancel_pending_sync,
+                self._cancel_in_flight_sync,
                 task_id,
             )
+
+        return await asyncio.to_thread(
+            self._cancel_pending_sync,
+            task_id,
+        )
 
     def _cancel_in_flight_sync(self, task_id: str) -> bool:
         """Synchronous cancel for in-flight tasks — runs in a thread."""
@@ -555,17 +587,24 @@ class PostgresWorkerQueue:
     # ─── Worker loop ───────────────────────────────────────────────────
 
     async def start(self) -> None:
-        """Start the background worker loop with recovery of stuck tasks."""
-        if self._running:
-            return
-        await asyncio.to_thread(self._recover_stuck_tasks)
-        self._running = True
-        self._worker_task = asyncio.create_task(self._worker_loop())
-        logger.info(
-            "Postgres worker queue started: max_concurrency=%d, poll_interval=%.1fs",
-            self._max_concurrency,
-            self._poll_interval,
-        )
+        """Start the background worker loop with recovery of stuck tasks.
+
+        ``_start_lock`` makes the ``_running`` check-and-set atomic. Without
+        it, two concurrent ``start()`` calls can both pass the ``if
+        self._running`` check and spawn duplicate worker loops, each of
+        which would race to dequeue the same tasks.
+        """
+        async with self._start_lock:
+            if self._running:
+                return
+            await asyncio.to_thread(self._recover_stuck_tasks)
+            self._running = True
+            self._worker_task = asyncio.create_task(self._worker_loop())
+            logger.info(
+                "Postgres worker queue started: max_concurrency=%d, poll_interval=%.1fs",
+                self._max_concurrency,
+                self._poll_interval,
+            )
 
     def _recover_stuck_tasks(self) -> None:
         """Reset any tasks stuck in 'running' state back to 'pending' for retry.
@@ -604,14 +643,25 @@ class PostgresWorkerQueue:
         """Main worker loop: dequeue and dispatch tasks."""
         while self._running:
             try:
-                async with self._in_flight_lock:
-                    active = len(self._in_flight)
-                if active >= self._max_concurrency:
-                    await asyncio.sleep(self._poll_interval)
+                # Acquire a concurrency permit *before* dequeue so the
+                # budget is reserved atomically. If the permit is not
+                # available we yield for a poll interval and try again —
+                # the semaphore is fair-ish and won't busy-spin.
+                acquired = False
+                try:
+                    await asyncio.wait_for(
+                        self._concurrency_sem.acquire(),
+                        timeout=self._poll_interval,
+                    )
+                    acquired = True
+                except TimeoutError:
+                    continue
+                if not acquired:
                     continue
 
                 task = await self.dequeue(timeout=self._poll_interval)
                 if task is None:
+                    self._concurrency_sem.release()
                     continue
 
                 t = asyncio.create_task(self._execute_task(task))
@@ -622,14 +672,43 @@ class PostgresWorkerQueue:
                     self._in_flight[task_id] = t
 
                 def _on_task_done(fut: object, tid: str = task_id) -> None:
-                    asyncio.ensure_future(self._cleanup_in_flight(tid))
+                    # Schedule cleanup on the currently running event loop,
+                    # not whichever loop ``asyncio.ensure_future`` happens
+                    # to pick up. Avoids a ``RuntimeError`` when the worker
+                    # is bound to a different loop from the caller's
+                    # context (e.g. across test scopes or shutdown).
+                    try:
+                        loop = asyncio.get_running_loop()
+                        loop.create_task(self._cleanup_in_flight(tid))
+                    except RuntimeError:
+                        logger.debug(
+                            "No running event loop to schedule _cleanup_in_flight for %s",
+                            tid,
+                        )
+
+                def _release(_fut: object, tid: str = task_id) -> None:
+                    # Release the semaphore permit exactly once when the
+                    # task finishes (success, failure, or cancellation).
+                    try:
+                        self._concurrency_sem.release()
+                    except ValueError:
+                        # Permit already released — should not happen, but
+                        # never let a done-callback raise.
+                        logger.debug("Semaphore release failed for task %s", tid)
 
                 t.add_done_callback(_on_task_done)
+                t.add_done_callback(_release)
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error("Worker loop error: %s", e, exc_info=True)
+                # Best-effort release if we acquired a permit but failed
+                # before installing the done-callbacks.
+                try:
+                    self._concurrency_sem.release()
+                except ValueError:
+                    pass
                 await asyncio.sleep(1)
 
     async def _execute_task(self, task: QueueTask) -> None:
@@ -768,7 +847,7 @@ class PostgresWorkerQueue:
                     (limit,),
                 )
         except Exception:
-            logger.exception("Failed to get dead letter queue: %s")
+            logger.exception("Failed to get dead letter queue")
             return []
 
     async def get_dead_letter_queue_async(self, limit: int = 50) -> list[dict]:
@@ -835,7 +914,7 @@ class PostgresWorkerQueue:
                     (older_than_days,),
                 )
         except Exception:
-            logger.exception("Failed to clear completed history: %s")
+            logger.exception("Failed to clear completed history")
 
     async def clear_completed_history_async(self, older_than_days: int = 7) -> None:
         """Async version of ``clear_completed_history`` — runs the blocking DB call in a thread."""

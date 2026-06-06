@@ -40,6 +40,36 @@ def is_safe_ip(ip_str: str) -> bool:
         return False
 
 
+def _normalize_ip_literal(hostname: str) -> str | None:
+    """Recognise non-canonical IPv4 literal forms and return the canonical dotted-decimal string.
+
+    ``ipaddress.ip_address`` only accepts canonical decimal/dotted forms,
+    so a hostname like ``0x7f.0.0.1`` (hex), ``0177.0.0.1`` (octal), or
+    ``2130706433`` (single decimal) would fall through to DNS resolution
+    and bypass our IP-literal safety check. This helper uses
+    :func:`socket.inet_aton` (which accepts all of these forms) to
+    normalise the literal, and returns the canonical dotted-decimal
+    string the rest of the safety checks can validate.
+
+    Returns ``None`` if the input is not an IPv4 literal in any form.
+    IPv6 is handled by :mod:`ipaddress` directly in the caller.
+    """
+    candidate = hostname.strip("[]")
+    # Reject anything that has DNS-illegal characters before we hand it
+    # to inet_aton (which silently accepts some weird inputs).
+    if not candidate or any(c.isspace() or ord(c) < 32 for c in candidate):
+        return None
+    # Single-decimal form (e.g. "2130706433") is sometimes accepted by
+    # inet_aton but is not a valid hostname; reject it explicitly.
+    if "." not in candidate:
+        return None
+    try:
+        packed = socket.inet_aton(candidate)
+    except OSError:
+        return None
+    return socket.inet_ntoa(packed)
+
+
 def validate_public_http_url(url: str) -> None:
     """Raise ValueError if the URL resolves to or points to a private / internal network target.
 
@@ -96,10 +126,15 @@ def validate_public_http_url(url: str) -> None:
         raise ValueError(msg)
 
     # 4. Reject direct IP literals without depending on DNS.
+    #    Handle canonical IPv4/IPv6 via ipaddress, then non-canonical
+    #    IPv4 forms (hex / octal / mixed) via _normalize_ip_literal.
+    ip_literal = None
     try:
         ip_literal = ipaddress.ip_address(hostname_lower.strip("[]"))
     except ValueError:
-        ip_literal = None
+        normalized = _normalize_ip_literal(hostname_lower)
+        if normalized is not None:
+            ip_literal = ipaddress.ip_address(normalized)
     if ip_literal is not None:
         if not is_safe_ip(str(ip_literal)):
             msg = f"URL hostname '{hostname}' resolves to restricted IP {ip_literal} — rejected for security (SSRF protection)."
@@ -204,19 +239,26 @@ class SafeAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
         import asyncio
 
         loop = asyncio.get_event_loop()
-        try:
-            infos = await loop.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
-            for _family, _type, _proto, _canonname, sockaddr in infos:
-                ip = str(sockaddr[0])
-                if not is_safe_ip(ip):
-                    msg = f"Rejected connection to unsafe IP address: {ip}"
-                    raise ValueError(msg)
-        except Exception as e:
-            if isinstance(e, ValueError):
-                raise
+        infos = await loop.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+        safe_ip: str | None = None
+        for _family, _type, _proto, _canonname, sockaddr in infos:
+            ip = str(sockaddr[0])
+            if not is_safe_ip(ip):
+                msg = f"Rejected connection to unsafe IP address: {ip}"
+                raise ValueError(msg)
+            if safe_ip is None:
+                safe_ip = ip
+        if safe_ip is None:
+            msg = f"No usable addresses resolved for host: {host}"
+            raise ValueError(msg)
 
+        # Pin the connection to the validated IP to close the DNS-rebinding
+        # window between this check and the underlying connect. For HTTPS,
+        # the URL host is still used for SNI / cert verification by httpx
+        # when it wraps this stream in TLS — only the TCP socket target is
+        # pinned.
         return await self._backend.connect_tcp(
-            host,
+            safe_ip,
             port,
             timeout=timeout,
             local_address=local_address,
@@ -250,19 +292,22 @@ class SafeNetworkBackend(httpcore.NetworkBackend):
         local_address: str | None = None,
         socket_options: Any = None,
     ) -> httpcore.NetworkStream:
-        try:
-            infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
-            for _family, _type, _proto, _canonname, sockaddr in infos:
-                ip = str(sockaddr[0])
-                if not is_safe_ip(ip):
-                    msg = f"Rejected connection to unsafe IP address: {ip}"
-                    raise ValueError(msg)
-        except Exception as e:
-            if isinstance(e, ValueError):
-                raise
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+        safe_ip: str | None = None
+        for _family, _type, _proto, _canonname, sockaddr in infos:
+            ip = str(sockaddr[0])
+            if not is_safe_ip(ip):
+                msg = f"Rejected connection to unsafe IP address: {ip}"
+                raise ValueError(msg)
+            if safe_ip is None:
+                safe_ip = ip
+        if safe_ip is None:
+            msg = f"No usable addresses resolved for host: {host}"
+            raise ValueError(msg)
 
+        # Pin to validated IP — see SafeAsyncNetworkBackend for rationale.
         return self._backend.connect_tcp(
-            host,
+            safe_ip,
             port,
             timeout=timeout,
             local_address=local_address,

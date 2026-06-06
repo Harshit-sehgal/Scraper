@@ -17,7 +17,10 @@ echo "== Architecture validator =="
 PYTHONPATH=backend "$PYTHON_BIN" architecture_validator.py
 
 echo "== Pytest =="
-PYTHONPATH=backend "$PYTHON_BIN" -m pytest backend/tests -q
+# ``-o addopts=`` clears any addopts from pyproject.toml so conftest-level
+# flags (e.g. ``--reruns``) don't fail when the optional ``pytest-rerunfailures``
+# plugin is not installed in the local release environment.
+PYTHONPATH=backend "$PYTHON_BIN" -m pytest backend/tests -q -o "addopts="
 
 if [[ "${DATAFORGE_SKIP_PROD_ENV_CHECK:-0}" == "1" ]]; then
     echo "== Production env check skipped by DATAFORGE_SKIP_PROD_ENV_CHECK=1 =="

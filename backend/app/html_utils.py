@@ -414,9 +414,7 @@ async def fetch_page_content(
         # Phase 80: Lightweight mode filters more resources
         async def _route_filter(route) -> None:
             req_url = route.request.url
-            from unittest.mock import Mock
-
-            if not isinstance(req_url, Mock):
+            if isinstance(req_url, str):
                 try:
                     _validate_url_safe(req_url)
                 except ValueError as e:

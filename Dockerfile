@@ -57,16 +57,18 @@ RUN pip install --no-cache-dir -r /tmp/requirements-dev.lock.txt && \
     rm -f /tmp/requirements-dev.lock.txt
 
 # Install Playwright browsers (deferred to runtime in dev for faster image builds)
-RUN playwright install chromium 2>&1 | tail -5
+RUN playwright install chromium
 
 # Copy application code (thin layer — source changes don't invalidate deps)
 COPY backend/ backend/
 COPY frontend/ frontend/
 COPY scripts/ scripts/
 
-# Health check
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import http.client; http.client.HTTPConnection('localhost', 8000).request('GET', '/');" || exit 1
+# Health check — must exercise /ready (proves storage reachability, not
+# just that the process answers TCP). Status check guards against the
+# app returning 5xx once it has accepted the connection.
+HEALTHCHECK --interval=15s --timeout=6s --start-period=10s --retries=3 \
+    CMD python -c "import http.client,sys; c=http.client.HTTPConnection('localhost', 8000, timeout=4); c.request('GET', '/ready'); r=c.getresponse(); sys.exit(0 if 200 <= r.status < 500 else 1)" || exit 1
 
 EXPOSE 8000
 
@@ -82,7 +84,7 @@ RUN groupadd -r dataforge && useradd -r -g dataforge -d /app -s /usr/sbin/nologi
 
 # Install Playwright browser binaries. The base image stage installs the runtime
 # libraries explicitly, so avoid a second apt-driven install-deps pass here.
-RUN mkdir -p /ms-playwright && playwright install chromium 2>&1 | tail -3 && chown -R dataforge:dataforge /ms-playwright
+RUN mkdir -p /ms-playwright && playwright install chromium && chown -R dataforge:dataforge /ms-playwright
 
 # Copy application code
 COPY backend/ backend/
@@ -98,7 +100,7 @@ USER dataforge
 
 # Health check — uses /ready (proves storage reachability, not just process alive)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD python -c "import http.client; c=http.client.HTTPConnection('localhost', 8000); c.request('GET', '/ready'); r=c.getresponse(); exit(0 if r.status==200 else 1)" || exit 1
+    CMD python -c "import http.client,sys; c=http.client.HTTPConnection('localhost', 8000, timeout=8); c.request('GET', '/ready'); r=c.getresponse(); sys.exit(0 if r.status==200 else 1)" || exit 1
 
 EXPOSE 8000
 

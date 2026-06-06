@@ -95,7 +95,17 @@ def load_env_file(path: Path) -> dict[str, str]:
                 continue
             key, _, value = line.partition("=")
             key = key.strip()
-            value = value.strip().strip("\"'")
+            value = value.strip()
+            if value.startswith('"'):
+                last_quote = value.rfind('"')
+                if last_quote > 0:
+                    value = value[1:last_quote]
+            elif value.startswith("'"):
+                last_quote = value.rfind("'")
+                if last_quote > 0:
+                    value = value[1:last_quote]
+            else:
+                value = value.partition("#")[0].strip()
             env[key] = value
     return env
 

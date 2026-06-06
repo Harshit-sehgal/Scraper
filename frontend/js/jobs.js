@@ -14,6 +14,24 @@ const pollers = {};
 // Track the most recently transitioned job ID so renderJobs() can flash it
 let _flashJobId = null;
 
+// Track jobs the user just interacted with so the poller's terminal-state
+// toast does not double up on the action toast (e.g. clicking "Cancel"
+// already shows "Cancellation requested"; the poller must not also show
+// "Job canceled" a few seconds later).
+const _recentUserActions = new Map(); // jobId -> expiresAt (ms)
+const _USER_ACTION_TTL_MS = 8000;
+
+function _markUserAction(id) {
+    _recentUserActions.set(id, Date.now() + _USER_ACTION_TTL_MS);
+}
+
+function _consumeRecentUserAction(id) {
+    const exp = _recentUserActions.get(id);
+    if (exp === undefined) return false;
+    _recentUserActions.delete(id);
+    return exp >= Date.now();
+}
+
 export function getJobsCache() { return jobsCache; }
 export function getPollers() { return pollers; }
 
@@ -170,6 +188,13 @@ async function pollJob(id) {
             // Mark this job for a status-change flash on the next render
             _flashJobId = id;
             refreshJobs();
+            // Skip the poller's terminal-state toast if the user just
+            // initiated the action — they already saw the "Cancellation
+            // requested" / "Job deleted" toast and a second one for the
+            // same event would be noisy and confusing.
+            if (_consumeRecentUserAction(id)) {
+                return;
+            }
             if (j.status === 'completed') toast(`"${j.name}" done — ${j.filtered_records} records`, 'success');
             else if (j.status === 'degraded') toast(`"${j.name}" finished with partial results — ${j.filtered_records} records`, 'info');
             else if (j.status === 'empty_result') toast(`"${j.name}" finished — 0 records. ${j.error || 'Page may be empty, blocked, or require JS rendering.'}`, 'warning');
@@ -184,6 +209,7 @@ async function pollJob(id) {
 export async function cancelJob(id) {
     showConfirm('Cancel Job?', 'Cancel this running job?', async () => {
     try {
+        _markUserAction(id);
         const r = await apiFetch(`${API}/api/jobs/${id}/cancel`, { method: 'POST' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Cancel failed');
@@ -198,6 +224,7 @@ export async function cancelJob(id) {
 export async function deleteJob(id) {
     showConfirm('Delete Job?', 'Move this job to the recycle bin?', async () => {
     try {
+        _markUserAction(id);
         const r = await apiFetch(`${API}/api/jobs/${id}`, { method: 'DELETE' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Delete failed');

@@ -318,16 +318,15 @@ def create_exports_router(jobs_store: dict):
     @router.get("/api/jobs/{job_id}/export/excel")
     async def export_excel(job_id: str):
         try:
-            return await _export_excel_impl(job_id)
+            result = await _export_excel_impl(job_id)
         except HTTPException:
             _record_export_outcome("excel", False)
             raise
         except Exception:  # noqa: BLE001
             _record_export_outcome("excel", False)
             raise
-        else:
-            _record_export_outcome("excel", True)
-            return
+        _record_export_outcome("excel", True)
+        return result
 
     async def _export_excel_impl(job_id: str):
         if job_id not in jobs_store:

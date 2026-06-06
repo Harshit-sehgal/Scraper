@@ -52,7 +52,17 @@ PYTHONPATH=backend $PYTHON_EXE -c "from app.main import app; print('FastAPI impo
 
 echo "=== 3. Validating Startup Script Syntax ==="
 STEP=3
-bash -n scripts/start.sh scripts/start_server.sh scripts/start_worker.sh 2>&1
+# `bash -n` only validates a single file per invocation and exits on
+# the first error, so looping here ensures all three scripts are
+# actually checked. Without the loop, a syntax error in start_server.sh
+# or start_worker.sh would slip through silently.
+for script in scripts/start.sh scripts/start_server.sh scripts/start_worker.sh; do
+    if [ -f "$script" ]; then
+        bash -n "$script" 2>&1
+    else
+        echo "  [WARN] $script not found, skipping"
+    fi
+done
 
 echo "=== 4. Checking Unsafe eval() in Source ==="
 STEP=4

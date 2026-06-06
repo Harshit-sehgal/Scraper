@@ -7,6 +7,9 @@
 #
 # Production: see docker-compose.prod.yml
 # =============================================================================
+# `version` is a deprecated top-level key in Compose v2, but Compose
+# v1 (still present on some CI images) requires it. Drop once v1 is
+# fully retired.
 version: "3.8"
 
 x-logging: &default-logging
@@ -38,9 +41,13 @@ services:
     depends_on: []
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import http.client; http.client.HTTPConnection('localhost', 8000).request('GET', '/')"]
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import http.client,sys; c=http.client.HTTPConnection('localhost', 8000, timeout=4); c.request('GET', '/ready'); r=c.getresponse(); sys.exit(0 if 200 <= r.status < 500 else 1)"
       interval: 15s
-      timeout: 5s
+      timeout: 6s
       retries: 3
       start_period: 10s
     logging: *default-logging

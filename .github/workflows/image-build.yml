@@ -45,9 +45,12 @@ jobs:
 
       - name: Validate compose config
         run: |
-          cp .env.example .env
-          docker compose -f docker-compose.yml config -q
-          docker compose -f docker-compose.prod.yml config -q
+          # `docker compose config` only needs the compose files plus the
+          # .env defaults; it does NOT require a real .env on disk.
+          # Copying the example to .env would clobber any real .env the
+          # runner may have, so just use --env-file explicitly instead.
+          docker compose --env-file .env.example -f docker-compose.yml config -q
+          docker compose --env-file .env.example -f docker-compose.prod.yml config -q
 
   notify:
     name: Telegram Notification

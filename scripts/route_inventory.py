@@ -94,7 +94,7 @@ def main() -> int:
         print("| Method | Path |")
         print("| --- | --- |")
         for method, path in by_section["Other"]:
-            print(f"| {method} | `{method} {path}` |")
+            print(f"| {method} | `{path}` |")
     return 0
 
 

@@ -1004,7 +1004,7 @@ def get_storage_health() -> dict:
             "expected_version": _CURRENT_SCHEMA_VERSION,
         }
     except Exception as e:
-        logger.exception("Storage health check failed: %s")
+        logger.exception("Storage health check failed")
         return {
             "ok": False,
             "error": str(e),

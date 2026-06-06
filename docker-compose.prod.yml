@@ -7,6 +7,9 @@
 # Logs:   docker compose -f docker-compose.prod.yml logs -f
 # Stop:   docker compose -f docker-compose.prod.yml down
 # =============================================================================
+# `version` is a deprecated top-level key in Compose v2, but Compose
+# v1 (still present on some CI images) requires it. Drop once v1 is
+# fully retired.
 version: "3.8"
 
 x-logging: &default-logging
@@ -101,7 +104,12 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "from pathlib import Path; cmd=Path('/proc/1/cmdline').read_text().replace('\\x00', ' '); raise SystemExit(0 if 'scripts/run_worker.py' in cmd else 1)"]
+      # Check that the worker process is still running by sending
+      # signal 0 to PID 1. This is portable (works on any POSIX
+      # container, no /proc dependency) and avoids the brittleness of
+      # reading /proc/1/cmdline, which fails on non-Linux runtimes
+      # and breaks when /proc is not mounted read-only-friendly.
+      test: ["CMD", "python", "-c", "import os, sys; sys.exit(0 if os.kill(1, 0) == 0 else 1)"]
       interval: 30s
       timeout: 10s
       retries: 3

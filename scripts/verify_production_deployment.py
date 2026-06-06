@@ -64,7 +64,11 @@ def main():
 
     # Run in process
     code, out = run_command(prod_check_cmd)
-    if "Result: required production environment checks passed" in out or code == 0:
+    # Require BOTH the explicit success marker AND a zero exit code so
+    # a partial pass (e.g. one check failed silently) cannot be
+    # reported as success. The previous `or code == 0` clause let a
+    # failing env-check exit 0 in some environments, masking the gap.
+    if "Result: required production environment checks passed" in out and code == 0:
         print("  [OK] Environment variables passed all placeholder and security validations.")
     else:
         print("  [FAIL] check_prod_env validation failed. Out:")

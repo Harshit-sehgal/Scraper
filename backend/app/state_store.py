@@ -180,7 +180,7 @@ def save_state(jobs_store: dict[str, Job], recycle_bin_store: dict[str, Job]) ->
         ws = get_world_state()
         world_state_data = ws.to_dict()
     except Exception:
-        logging.exception("Failed to serialize semantic world state: %s")
+        logging.exception("Failed to serialize semantic world state")
 
     payload = {
         "saved_at": _now_iso(),

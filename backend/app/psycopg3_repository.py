@@ -849,11 +849,13 @@ class Psycopg3JobRepository(JobRepository):
             insert_cols = ", ".join(cols_to_copy)
             insert_vals = ", ".join("%s" for _ in cols_to_copy)
             params = [row[k] for k in cols_to_copy] + [now]
+            # ``insert_cols`` and ``insert_vals`` come from the schema and a
+            # fixed join, not user input — safe to interpolate. Using an
+            # f-string here avoids the fragile double-brace + ``.format()``
+            # escape pattern that was here before.
             _execute(
                 conn,
-                f"INSERT INTO recycle_bin ({insert_cols}, deleted_at) VALUES ({{}}, %s) ON CONFLICT (id) DO NOTHING".format(  # nosec B608
-                    insert_vals
-                ),
+                f"INSERT INTO recycle_bin ({insert_cols}, deleted_at) VALUES ({insert_vals}, %s) ON CONFLICT (id) DO NOTHING",  # nosec B608
                 params,
             )
             return True
@@ -909,9 +911,11 @@ class Psycopg3JobRepository(JobRepository):
                 cols = [k for k in row if k != "deleted_at"]
                 col_list = ", ".join(cols)
                 ph = ", ".join("%s" for _ in cols)
+                # ``col_list`` and ``ph`` come from the schema and a fixed
+                # join, not user input — safe to interpolate.
                 _execute(
                     conn,
-                    f"INSERT INTO recycle_bin ({col_list}, deleted_at) VALUES ({{}}, %s) ON CONFLICT (id) DO NOTHING".format(ph),  # nosec B608
+                    f"INSERT INTO recycle_bin ({col_list}, deleted_at) VALUES ({ph}, %s) ON CONFLICT (id) DO NOTHING",  # nosec B608
                     [row[k] for k in cols] + [now],
                 )
                 # Clean up companion tables (Schema v4)
@@ -964,7 +968,7 @@ class Psycopg3JobRepository(JobRepository):
                     "recycle_bin_count": recycle_count or 0,
                 }
         except Exception as e:
-            logger.exception("Postgres (psycopg3) health check failed: %s")
+            logger.exception("Postgres (psycopg3) health check failed")
             return {
                 "ok": False,
                 "backend": "postgres-psycopg3",
