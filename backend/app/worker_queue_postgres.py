@@ -310,8 +310,9 @@ class PostgresWorkerQueue:
                     return None
 
                 # Normalize Postgres datetime objects to strings for QueueTask
-                # compatibility
-                _ts_fields = ("created_at", "started_at", "completed_at", "scheduled_at", "finished_at")
+                # compatibility. ``queue_tasks`` does NOT have a ``finished_at``
+                # column (that lives on ``queue_task_history`` only).
+                _ts_fields = ("created_at", "started_at", "completed_at", "scheduled_at")
                 for _f in _ts_fields:
                     v = row.get(_f)
                     if isinstance(v, (datetime.datetime, datetime.date)):
@@ -370,17 +371,32 @@ class PostgresWorkerQueue:
         task_id: str,
         error: str,
         retry: bool = True,
+        retry_after: float | None = None,
+        task_type: str | None = None,
     ) -> None:
-        """Mark a task as failed. Retries if attempts remain."""
+        """Mark a task as failed. Retries if attempts remain.
+
+        Mirrors the SQLite ``WorkerQueue.fail`` signature so callers can
+        treat the two backends interchangeably.
+        """
         async with self._in_flight_lock:
             await asyncio.to_thread(
                 self._fail_sync,
                 task_id,
                 error,
                 retry,
+                retry_after,
+                task_type,
             )
 
-    def _fail_sync(self, task_id: str, error: str, retry: bool = True) -> None:
+    def _fail_sync(
+        self,
+        task_id: str,
+        error: str,
+        retry: bool = True,
+        retry_after: float | None = None,
+        task_type: str | None = None,
+    ) -> None:
         """Synchronous fail — runs in a thread to avoid blocking the event loop."""
         with _conn() as conn:
             row = _fetch_one(
@@ -392,10 +408,15 @@ class PostgresWorkerQueue:
             if row:
                 attempts = row["attempts"]
                 max_attempts = row["max_attempts"]
+                actual_type = task_type or row["type"]
 
                 if retry and attempts < max_attempts:
-                    # Schedule retry with exponential backoff
-                    backoff = min(2 ** (attempts - 1) * 30, 3600)
+                    # Use explicit retry-after if provided (rate-limit aware),
+                    # otherwise use standard exponential backoff.
+                    if retry_after is not None and retry_after > 0:
+                        backoff = min(retry_after, 3600.0)
+                    else:
+                        backoff = float(min(2 ** (attempts - 1) * 30, 3600))
                     _execute(
                         conn,
                         "UPDATE queue_tasks SET status = 'pending', last_error = %s, "
@@ -422,7 +443,7 @@ class PostgresWorkerQueue:
                                    %s, NOW(), %s, %s, %s, %s, %s, NOW())""",
                         (
                             row["id"],
-                            row["type"],
+                            actual_type,
                             row["payload"],
                             row["priority"],
                             row["created_at"],
@@ -692,6 +713,13 @@ class PostgresWorkerQueue:
             with _conn() as conn:
                 pending = _fetch_one(conn, "SELECT COUNT(*) AS cnt FROM queue_tasks WHERE status = 'pending'")
                 running = _fetch_one(conn, "SELECT COUNT(*) AS cnt FROM queue_tasks WHERE status = 'running'")
+                # "Effectively retrying" = pending with future scheduled_at
+                # (the queue never uses the ``retrying`` TaskStatus value;
+                # it transitions failed tasks back to ``pending`` instead).
+                retrying = _fetch_one(
+                    conn,
+                    "SELECT COUNT(*) AS cnt FROM queue_tasks WHERE status = 'pending' AND scheduled_at > NOW()",
+                )
                 dead_letter = _fetch_one(
                     conn,
                     "SELECT COUNT(*) AS cnt FROM queue_task_history WHERE status = 'dead_letter'",
@@ -713,7 +741,7 @@ class PostgresWorkerQueue:
                     "backend": "postgres",
                     "pending": pending["cnt"] if pending else 0,
                     "running": running["cnt"] if running else 0,
-                    "retrying": 0,
+                    "retrying": retrying["cnt"] if retrying else 0,
                     "dead_letter": dead_letter["cnt"] if dead_letter else 0,
                     "completed_24h": completed_24h["cnt"] if completed_24h else 0,
                     "max_concurrency": self._max_concurrency,

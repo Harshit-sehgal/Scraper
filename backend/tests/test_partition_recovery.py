@@ -72,3 +72,27 @@ def test_epoch_divergence_resolution(nodes) -> None:
     ws_b.merge_state(ws_a.to_dict())
     assert ws_b._topology._topology_epoch >= ws_a._topology._topology_epoch
     assert ws_b.get_topology_view().region_count() == 6
+
+
+def test_tombstone_persists_outside_transaction(nodes) -> None:
+    """Regression: removing a region OUTSIDE a transaction must record the
+    region_id in the (non-staging) tombstone set so that merge_state can
+    prevent zombie re-introduction on the peer node.
+
+    Previously, ``TopologyState.__init__`` never initialised
+    ``_tombstones_real``; the ``_tombstones`` property then returned a
+    fresh empty ``set()`` on every access via ``__dict__.get(..., set())``
+    and any ``.add()`` from the non-staging path in ``remove()`` was
+    silently lost.
+    """
+    ws_a, _ = nodes
+
+    with ws_a.transaction("setup"):
+        r = ws_a._topology.add(["role_x"], "token_x")
+        rid = r.region_id
+
+    # Remove OUTSIDE a transaction — this hits the non-staging branch
+    reg = next(x for x in ws_a._topology._regions if x.region_id == rid)
+    removed = ws_a._topology.remove(reg)
+    assert removed is True
+    assert rid in ws_a._topology._tombstones

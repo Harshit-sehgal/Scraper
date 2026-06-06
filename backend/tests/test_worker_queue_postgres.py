@@ -830,6 +830,7 @@ class TestPostgresQueueMocked:
         counts = [
             {"cnt": 5},  # pending
             {"cnt": 2},  # running
+            {"cnt": 3},  # retrying (pending + future scheduled_at)
             {"cnt": 1},  # dead_letter
             {"cnt": 10},  # completed_24h
         ]
@@ -841,6 +842,7 @@ class TestPostgresQueueMocked:
         assert status["backend"] == "postgres"
         assert status["pending"] == 5
         assert status["running"] == 2
+        assert status["retrying"] == 3
         assert status["dead_letter"] == 1
         assert status["completed_24h"] == 10
         assert status["max_concurrency"] == 5

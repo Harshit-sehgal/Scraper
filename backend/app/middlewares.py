@@ -20,10 +20,18 @@ MAX_BODY_SIZE = 5 * 1024 * 1024  # 5MB
 
 
 async def body_size_middleware(request: Request, call_next):
-    """Limit request body size to prevent abuse."""
+    """Limit request body size to prevent abuse.
+
+    Always streams and counts the body, regardless of ``Content-Length``.
+    A client cannot bypass the cap by lying about the Content-Length
+    and then streaming many gigabytes of chunked-encoded data.
+    """
     if request.method not in ("POST", "PUT", "PATCH") or not request.url.path.startswith("/api/"):
         return await call_next(request)
 
+    # Fast path: trust Content-Length as an early reject, but still
+    # stream-verify on the way in. The actual byte-counting happens
+    # in the loop below, so a lying Content-Length cannot bypass.
     content_length = request.headers.get("content-length")
     if content_length:
         try:
@@ -32,9 +40,8 @@ async def body_size_middleware(request: Request, call_next):
                     status_code=413,
                     content={"detail": "Request body too large (max 5MB)"},
                 )
-            return await call_next(request)
         except (ValueError, TypeError):
-            pass  # nosec B110
+            pass  # nosec B110 — unparseable CL falls through to streaming check
 
     chunks: list[bytes] = []
     bytes_received = 0
@@ -58,6 +65,10 @@ async def body_size_middleware(request: Request, call_next):
         return {"type": "http.request", "body": body, "more_body": False}
 
     request._receive = replay_body
+    # Pre-populate the cached body so downstream Request.body() / .stream()
+    # calls short-circuit on ``_body`` and never re-read ``_receive``.
+    # This is the canonical Starlette pattern for re-readable body streams.
+    request._body = body
     return await call_next(request)
 
 

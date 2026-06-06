@@ -82,11 +82,13 @@ def validate_production_credentials(settings) -> None:
     """Validate that API keys and database password are secure in production.
 
     Raises ValueError if any credential does not meet production strength criteria.
+    Also runs in staging so misconfigurations are caught before promotion.
     """
-    if settings.ENV.lower() != "production":
+    env = settings.ENV.lower()
+    if env not in ("production", "staging"):
         return
 
-    logger.info("Running production security credential checks (hard startup gates)...")
+    logger.info("Running %s security credential checks (hard startup gates)...", env)
 
     # 1. API Keys Validation
     keys_to_check = [
@@ -94,6 +96,12 @@ def validate_production_credentials(settings) -> None:
         ("DATAFORGE_OPERATOR_API_KEY", settings.OPERATOR_API_KEY),
         ("DATAFORGE_ADMIN_API_KEY", settings.ADMIN_API_KEY),
     ]
+    # 2. METRICS_TOKEN: optional in dev, mandatory in production/staging
+    # when the /metrics endpoint is exposed.
+    if getattr(settings, "METRICS_TOKEN", ""):
+        keys_to_check.append(
+            ("DATAFORGE_METRICS_TOKEN", settings.METRICS_TOKEN),
+        )
 
     for name, value in keys_to_check:
         val = (value or "").strip()

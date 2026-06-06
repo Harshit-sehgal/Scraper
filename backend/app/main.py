@@ -75,6 +75,14 @@ __all__ = [
 
 def configure_middleware(app: FastAPI) -> None:
     """Configure CORS, body size limit, API key auth, rate limiter, latency tracking, and CSP report-only middlewares."""
+    # Refuse to start with CORS_ORIGINS=["*"] when credentials are
+    # allowed — Starlette silently accepts this combination but it is
+    # a credential-leak catastrophe (any origin can issue authenticated
+    # cross-site requests). Fail closed in production.
+    if "*" in settings.CORS_ORIGINS and settings.ENV.lower() == "production":
+        raise RuntimeError(
+            "CORS_ORIGINS cannot contain '*' in production when allow_credentials=True",
+        )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,

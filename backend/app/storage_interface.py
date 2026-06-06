@@ -1,10 +1,12 @@
 import logging
 import os
+import threading
 from abc import ABC, abstractmethod
 
 from app.models import Job
 
 logger = logging.getLogger(__name__)
+_REPOSITORY_LOCK = threading.Lock()
 
 _JOBS_COLUMNS_SQL = [
     "mode TEXT DEFAULT 'manual'",
@@ -281,6 +283,28 @@ class SQLiteJobRepository(JobRepository):
     """
 
     backend = "sqlite"
+
+    def health_check(self) -> dict:
+        """Check the SQLite backend's health and schema state.
+
+        Returns a dict with ``ok`` flag, schema version, and row counts.
+        Mirrors the contract implemented by the Postgres backends so the
+        ``/ready`` endpoint behaves consistently across storage drivers.
+        """
+        try:
+            from app.job_store import _CURRENT_SCHEMA_VERSION, get_storage_health
+
+            return get_storage_health()
+        except Exception as exc:  # noqa: BLE001 - health probe must not raise
+            return {
+                "ok": False,
+                "backend": "sqlite",
+                "error": str(exc),
+                "schema_version": 0,
+                "expected_version": _CURRENT_SCHEMA_VERSION,
+                "job_count": -1,
+                "recycle_bin_count": -1,
+            }
 
     def load_jobs(self) -> dict[str, Job]:
         from app.job_store import load_state
@@ -773,86 +797,93 @@ def get_job_repository() -> JobRepository:
     all callers share the same instance.
 
     """
+    # Fast-path check: avoid acquiring the lock on every call.
     global _repository_instance
     if _repository_instance is not None:
         return _repository_instance
 
-    from app.config import settings
+    with _REPOSITORY_LOCK:
+        # Re-check under the lock to avoid duplicate initialisation when
+        # two threads race the first call.
+        if _repository_instance is not None:
+            return _repository_instance
 
-    storage_backend = settings.STORAGE_BACKEND
+        from app.config import settings
 
-    if storage_backend == "postgres":
-        database_url = settings.DATABASE_URL
-        if not database_url:
-            msg = (
-                "DATAFORGE_STORAGE_BACKEND=postgres requires DATAFORGE_DATABASE_URL "
-                "to be set. Example: postgresql://user:pass@host:5432/dataforge"
-            )
-            raise RuntimeError(
-                msg,
-            )
-        # Phase A: driver selection via DATAFORGE_PG_DRIVER. Defaults to
-        # psycopg2 (preserves existing behaviour). Set
-        # DATAFORGE_PG_DRIVER=psycopg3 to opt in to the new driver.
-        pg_driver = (os.environ.get("DATAFORGE_PG_DRIVER") or "psycopg2").strip().lower()
+        storage_backend = settings.STORAGE_BACKEND
 
-        if pg_driver == "psycopg3":
-            try:
-                from app.psycopg3_repository import (
-                    Psycopg3JobRepository,
-                    verify_psycopg3_connectivity,
-                )
-
-                connectivity = verify_psycopg3_connectivity()
-                if not connectivity.get("ok"):
-                    msg = (
-                        f"Postgres (psycopg3) connectivity check failed: "
-                        f"{connectivity.get('error', 'unknown error')}. "
-                        "Cannot use Postgres backend. Check DATAFORGE_DATABASE_URL "
-                        "and ensure the database is running."
-                    )
-                    raise RuntimeError(msg)
-                repo: JobRepository = Psycopg3JobRepository()
-                _repository_instance = repo
-                logger.info("Using Psycopg3JobRepository (STORAGE_BACKEND=postgres, PG_DRIVER=psycopg3)")
-                return repo
-            except RuntimeError:
-                raise
-            except Exception as e:
+        if storage_backend == "postgres":
+            database_url = settings.DATABASE_URL
+            if not database_url:
                 msg = (
-                    f"Failed to create Psycopg3JobRepository: {e}. "
-                    "Install psycopg 3 with: pip install 'psycopg[binary,pool]>=3.2'"
-                )
-                raise RuntimeError(msg) from e
-
-        try:
-            from app.postgres_repository import PostgresJobRepository, verify_postgres_connectivity
-
-            connectivity = verify_postgres_connectivity()
-            if not connectivity.get("ok"):
-                msg = (
-                    f"Postgres connectivity check failed: {connectivity.get('error', 'unknown error')}. "
-                    "Cannot use Postgres backend. Check DATAFORGE_DATABASE_URL and ensure "
-                    "the database is running."
+                    "DATAFORGE_STORAGE_BACKEND=postgres requires DATAFORGE_DATABASE_URL "
+                    "to be set. Example: postgresql://user:pass@host:5432/dataforge"
                 )
                 raise RuntimeError(
                     msg,
                 )
-            repo = PostgresJobRepository()
-            _repository_instance = repo
-            logger.info("Using PostgresJobRepository (explicit STORAGE_BACKEND=postgres)")
-            return repo
-        except RuntimeError:
-            raise
-        except Exception as e:
-            msg = f"Failed to create PostgresJobRepository: {e}. Install psycopg2-binary: pip install psycopg2-binary"
-            raise RuntimeError(
-                msg,
-            ) from e
+            # Phase A: driver selection via DATAFORGE_PG_DRIVER. Defaults to
+            # psycopg2 (preserves existing behaviour). Set
+            # DATAFORGE_PG_DRIVER=psycopg3 to opt in to the new driver.
+            pg_driver = (os.environ.get("DATAFORGE_PG_DRIVER") or "psycopg2").strip().lower()
 
-    repo_sqlite: JobRepository = SQLiteJobRepository()
-    _repository_instance = repo_sqlite
-    return repo_sqlite
+            if pg_driver == "psycopg3":
+                try:
+                    from app.psycopg3_repository import (
+                        Psycopg3JobRepository,
+                        verify_psycopg3_connectivity,
+                    )
+
+                    connectivity = verify_psycopg3_connectivity()
+                    if not connectivity.get("ok"):
+                        msg = (
+                            f"Postgres (psycopg3) connectivity check failed: "
+                            f"{connectivity.get('error', 'unknown error')}. "
+                            "Cannot use Postgres backend. Check DATAFORGE_DATABASE_URL "
+                            "and ensure the database is running."
+                        )
+                        raise RuntimeError(msg)
+                    repo: JobRepository = Psycopg3JobRepository()
+                    _repository_instance = repo
+                    logger.info("Using Psycopg3JobRepository (STORAGE_BACKEND=postgres, PG_DRIVER=psycopg3)")
+                    return repo
+                except RuntimeError:
+                    raise
+                except Exception as e:
+                    msg = (
+                        f"Failed to create Psycopg3JobRepository: {e}. "
+                        "Install psycopg 3 with: pip install 'psycopg[binary,pool]>=3.2'"
+                    )
+                    raise RuntimeError(msg) from e
+
+            try:
+                from app.postgres_repository import PostgresJobRepository, verify_postgres_connectivity
+
+                connectivity = verify_postgres_connectivity()
+                if not connectivity.get("ok"):
+                    msg = (
+                        f"Postgres connectivity check failed: {connectivity.get('error', 'unknown error')}. "
+                        "Cannot use Postgres backend. Check DATAFORGE_DATABASE_URL and ensure "
+                        "the database is running."
+                    )
+                    raise RuntimeError(
+                        msg,
+                    )
+                repo = PostgresJobRepository()
+                _repository_instance = repo
+                logger.info("Using PostgresJobRepository (explicit STORAGE_BACKEND=postgres)")
+                return repo
+            except RuntimeError:
+                raise
+            except Exception as e:
+                msg = f"Failed to create PostgresJobRepository: {e}. Install psycopg2-binary: pip install psycopg2-binary"
+                raise RuntimeError(
+                    msg,
+                ) from e
+
+        repo_sqlite: JobRepository = SQLiteJobRepository()
+        _repository_instance = repo_sqlite
+        return repo_sqlite
 
 
 _repository_instance: JobRepository | None = None
@@ -861,16 +892,26 @@ _repository_instance: JobRepository | None = None
 def reset_repository() -> None:
     """Reset the cached repository instance (for testing).
 
-    If a PostgresJobRepository was cached, also closes the psycopg2 pool
-    to prevent connection leaks.
+    If a PostgresJobRepository (psycopg2) was cached, also closes the
+    psycopg2 connection pool. If a Psycopg3JobRepository was cached,
+    closes the psycopg 3 connection pool. Prevents connection leaks
+    across test runs.
     """
     global _repository_instance
     if _repository_instance is not None:
-        if hasattr(_repository_instance, "__class__") and "PostgresJobRepository" in type(_repository_instance).__name__:
+        cls_name = type(_repository_instance).__name__
+        if "PostgresJobRepository" in cls_name:
             try:
                 from app.postgres_repository import shutdown_postgres
 
                 shutdown_postgres()
+            except Exception:  # nosec B110
+                pass  # nosec B110
+        elif "Psycopg3JobRepository" in cls_name:
+            try:
+                from app.psycopg3_repository import shutdown_psycopg3
+
+                shutdown_psycopg3()
             except Exception:  # nosec B110
                 pass  # nosec B110
     _repository_instance = None

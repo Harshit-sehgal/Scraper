@@ -11,6 +11,11 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Allowed outbound HTTP(S) ports. Restricts SSRF probes to the standard
+# web service ports; an attacker cannot use the proxy to reach internal
+# services listening on SSH, Redis, Memcached, Postgres, etc.
+_ALLOWED_HTTP_PORTS: frozenset[int] = frozenset({80, 443, 8080, 8443})
+
 
 def is_safe_ip(ip_str: str) -> bool:
     """Return True if the IP address is a public, routable IP address.
@@ -19,8 +24,18 @@ def is_safe_ip(ip_str: str) -> bool:
     """
     try:
         ip = ipaddress.ip_address(ip_str)
-        # Check standard unsafe ranges:
-        return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified)
+        # Check standard unsafe ranges plus non-globally-routable ranges.
+        # `is_global` rejects documentation, benchmark, and IETF-assigned
+        # blocks that the other predicates do not always cover.
+        return not (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+            or not ip.is_global
+        )
     except ValueError:
         return False
 
@@ -46,6 +61,17 @@ def validate_public_http_url(url: str) -> None:
         msg = f"URL '{url}' does not contain a valid hostname."
         _record_ssrf_reject("no_hostname")
         raise ValueError(msg)
+
+    # Port allowlist: restrict outbound HTTP requests to well-known web
+    # service ports. Prevents an attacker from probing internal services
+    # listening on non-HTTP ports (SSH, Redis, Memcached, etc.). The
+    # allowlist is bypassed in smoke-test mode (where integration
+    # endpoints may bind to ephemeral ports).
+    if parsed.port is not None and not settings.SMOKE_TEST_MODE:
+        if parsed.port not in _ALLOWED_HTTP_PORTS:
+            msg = f"URL port '{parsed.port}' is not in the allowed list."
+            _record_ssrf_reject("disallowed_port")
+            raise ValueError(msg)
 
     # Lowercase for safe comparison
     hostname_lower = hostname.lower()
