@@ -18,8 +18,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Ruff
-        run: pip install ruff==0.15.0
+      - name: Install dependencies
+        run: pip install -r backend/requirements-dev.lock.txt
 
       - name: Run Ruff lint
         run: ruff check backend/app backend/tests backend/benchmarks scripts

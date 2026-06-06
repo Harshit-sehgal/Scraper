@@ -104,7 +104,8 @@ def _top_level_research_imports(path: str) -> list[tuple[int, str, list[str]]]:
     ignored: the former do not run at runtime, the latter are not top-level.
     """
     try:
-        src = open(path, encoding="utf-8").read()
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
     except OSError as exc:
         print(f"WARNING: could not read {path}: {exc}", file=sys.stderr)
         return []

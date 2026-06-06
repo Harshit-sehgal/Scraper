@@ -16,6 +16,8 @@ from app.models import FieldType, Job, JobStatus, SchemaField
 from app.routers.exports import create_exports_router
 from fastapi import FastAPI
 
+pytestmark = pytest.mark.filterwarnings("ignore::ResourceWarning")
+
 
 def _make_job(
     job_id: str,

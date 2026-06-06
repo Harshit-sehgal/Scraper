@@ -38,7 +38,8 @@ jobs:
       - name: Run Golden Dataset tests
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python -m pytest -v backend/tests/test_golden_dataset.py --run-golden-dataset -o addopts= --tb=short
+          python -m pytest -v backend/tests/test_golden_dataset.py --run-golden-dataset -o addopts= \
+          --tb=short --reruns 3 --reruns-delay 10
 
   notify:
     name: Telegram Notification

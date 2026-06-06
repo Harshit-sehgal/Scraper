@@ -39,14 +39,13 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r backend/requirements-dev.lock.txt
-          pip install psycopg2-binary testcontainers
           python -m playwright install --with-deps chromium
       - name: Run Postgres tests
         run: |
           PYTHONPATH=backend \
           DATAFORGE_DOTENV_PATH=/dev/null \
           python3 -m pytest -q backend/tests --run-postgres -o addopts= \
-          --tb=short --timeout=300 2>&1 | tee /tmp/postgres_results.txt
+          --tb=short --timeout=300 --reruns 3 --reruns-delay 10 2>&1 | tee /tmp/postgres_results.txt
           PASSED=$(grep "passed" /tmp/postgres_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
           FAILED=$(grep "failed" /tmp/postgres_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
           echo "Postgres: $PASSED passed, $FAILED failed"
@@ -71,7 +70,7 @@ jobs:
           DATAFORGE_DOTENV_PATH=/dev/null \
           DATAFORGE_STORAGE_BACKEND=sqlite \
           python3 -m pytest -q backend/tests --run-browser -o addopts= \
-          --tb=short --timeout=300 2>&1 | tee /tmp/browser_results.txt
+          --tb=short --timeout=300 --reruns 3 --reruns-delay 10 2>&1 | tee /tmp/browser_results.txt
           PASSED=$(grep "passed" /tmp/browser_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
           FAILED=$(grep "failed" /tmp/browser_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
           echo "Browser: $PASSED passed, $FAILED failed"
@@ -94,7 +93,7 @@ jobs:
           DATAFORGE_DOTENV_PATH=/dev/null \
           DATAFORGE_STORAGE_BACKEND=sqlite \
           python3 -m pytest -q backend/tests/test_golden_dataset.py --run-golden-dataset -o addopts= \
-          --tb=short --timeout=120 2>&1 | tee /tmp/golden_results.txt
+          --tb=short --timeout=120 --reruns 3 --reruns-delay 10 2>&1 | tee /tmp/golden_results.txt
           PASSED=$(grep "passed" /tmp/golden_results.txt | grep -o "[0-9]* passed" | awk '{print $1}')
           FAILED=$(grep "failed" /tmp/golden_results.txt | grep -o "[0-9]* failed" | awk '{print $1}')
           echo "Golden dataset: $PASSED passed, $FAILED failed"

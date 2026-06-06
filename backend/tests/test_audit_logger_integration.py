@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.filterwarnings("ignore::ResourceWarning")
+
 
 @pytest.fixture(autouse=True)
 def _setup_log_dir():

@@ -5,6 +5,35 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from app.browser_pool import BrowserPool, get_browser_pool
 
+
+def _sync_mock_context() -> MagicMock:
+    """Create a context mock where sync methods don't return unawaited coroutines.
+
+    ``AsyncMock`` auto-mocks every attribute access, so ``ctx.on(…)" creates a
+    coroutine that is never awaited — producing a ``RuntimeWarning``. This helper
+    explicitly marks sync Playwright methods as ``MagicMock`` so the event loop
+    stays quiet.
+    """
+    ctx = AsyncMock()
+    ctx.on = MagicMock()
+    ctx.new_page = AsyncMock()
+    return ctx
+
+
+def _sync_browser_mock(is_connected: bool = True) -> MagicMock:
+    """Create a browser mock where ``is_connected`` is a sync method.
+
+    ``AsyncMock`` would make ``is_connected()`` return an unawaited coroutine.
+    Production ``Browser.is_connected`` is a sync property, so we use a
+    ``MagicMock`` for the browser and only keep ``new_context`` as async.
+    """
+    b = MagicMock()
+    b.is_connected = MagicMock(return_value=is_connected)
+    b.new_context = AsyncMock()
+    b.close = AsyncMock()
+    return b
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Initialization & Basic Properties
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -147,7 +176,7 @@ class TestClose:
     @pytest.mark.asyncio
     async def test_close_with_contexts_closes_them(self) -> None:
         pool = BrowserPool()
-        mock_ctx = AsyncMock()
+        mock_ctx = _sync_mock_context()
         pool._contexts["test"] = mock_ctx
         pool._context_use_count["test"] = 5
         await pool.close()
@@ -175,9 +204,8 @@ class TestGetContext:
     @pytest.mark.asyncio
     async def test_launches_playwright_and_browser(self) -> None:
         pool = BrowserPool()
-        mock_browser = AsyncMock()
-        mock_browser.is_connected.return_value = True
-        mock_context = AsyncMock()
+        mock_browser = _sync_browser_mock(is_connected=True)
+        mock_context = _sync_mock_context()
         mock_browser.new_context.return_value = mock_context
 
         with (
@@ -212,9 +240,8 @@ class TestGetContext:
     @pytest.mark.asyncio
     async def test_reuses_existing_browser(self) -> None:
         pool = BrowserPool()
-        mock_browser = AsyncMock()
-        mock_browser.is_connected.return_value = True
-        mock_context = AsyncMock()
+        mock_browser = _sync_browser_mock(is_connected=True)
+        mock_context = _sync_mock_context()
         mock_browser.new_context.return_value = mock_context
         pool._browser = mock_browser
         pool._playwright = MagicMock()
@@ -241,9 +268,8 @@ class TestGetContext:
     @pytest.mark.asyncio
     async def test_reuses_existing_context_within_lifetime(self) -> None:
         pool = BrowserPool()
-        mock_browser = AsyncMock()
-        mock_browser.is_connected.return_value = True
-        mock_context = AsyncMock()
+        mock_browser = _sync_browser_mock(is_connected=True)
+        mock_context = _sync_mock_context()
         pool._browser = mock_browser
         pool._playwright = MagicMock()
         pool._contexts["example.com:playwright_full"] = mock_context
@@ -265,10 +291,9 @@ class TestGetContext:
     @pytest.mark.asyncio
     async def test_rotates_context_when_lifetime_exceeded(self) -> None:
         pool = BrowserPool()
-        mock_browser = AsyncMock()
-        mock_browser.is_connected.return_value = True
-        old_context = AsyncMock()
-        new_context = AsyncMock()
+        mock_browser = _sync_browser_mock(is_connected=True)
+        old_context = _sync_mock_context()
+        new_context = _sync_mock_context()
         mock_browser.new_context.return_value = new_context
         pool._browser = mock_browser
         pool._playwright = MagicMock()
@@ -329,9 +354,8 @@ class TestCheckHealth:
     @pytest.mark.asyncio
     async def test_returns_true_when_browser_healthy(self) -> None:
         pool = BrowserPool()
-        mock_browser = AsyncMock()
-        mock_browser.is_connected.return_value = True
-        mock_ctx = AsyncMock()
+        mock_browser = _sync_browser_mock(is_connected=True)
+        mock_ctx = _sync_mock_context()
         mock_page = AsyncMock()
         mock_browser.new_context.return_value = mock_ctx
         mock_ctx.new_page.return_value = mock_page
@@ -345,8 +369,7 @@ class TestCheckHealth:
     @pytest.mark.asyncio
     async def test_returns_false_when_browser_disconnected(self) -> None:
         pool = BrowserPool()
-        mock_browser = MagicMock()
-        mock_browser.is_connected.return_value = False
+        mock_browser = _sync_browser_mock(is_connected=False)
         pool._browser = mock_browser
 
         result = await pool.check_health()
@@ -355,8 +378,7 @@ class TestCheckHealth:
     @pytest.mark.asyncio
     async def test_returns_false_when_health_check_raises(self) -> None:
         pool = BrowserPool()
-        mock_browser = AsyncMock()
-        mock_browser.is_connected.return_value = True
+        mock_browser = _sync_browser_mock(is_connected=True)
         mock_browser.new_context.side_effect = Exception("Connection error")
         pool._browser = mock_browser
 
@@ -373,9 +395,9 @@ class TestHardRecycle:
     @pytest.mark.asyncio
     async def test_clears_all_contexts_and_browser(self) -> None:
         pool = BrowserPool()
-        pool._contexts["test"] = AsyncMock()
+        pool._contexts["test"] = _sync_mock_context()
         pool._context_use_count["test"] = 5
-        pool._browser = AsyncMock()
+        pool._browser = _sync_browser_mock(is_connected=True)
         pool._playwright = MagicMock()
         pool.active_contexts = 3
         pool._active_fetches = 2
@@ -394,10 +416,10 @@ class TestHardRecycle:
     @pytest.mark.asyncio
     async def test_handles_close_exceptions_gracefully(self) -> None:
         pool = BrowserPool()
-        failing_ctx = AsyncMock()
+        failing_ctx = _sync_mock_context()
         failing_ctx.close.side_effect = Exception("Close failed")
         pool._contexts["test"] = failing_ctx
-        pool._browser = AsyncMock()
+        pool._browser = _sync_browser_mock(is_connected=True)
         pool._playwright = MagicMock()
 
         await pool._hard_recycle()  # Should not raise
@@ -419,9 +441,8 @@ class TestStealthContext:
     @pytest.mark.asyncio
     async def test_creates_context_with_stealth_profile(self) -> None:
         pool = BrowserPool()
-        mock_browser = AsyncMock()
-        mock_browser.is_connected.return_value = True
-        mock_context = AsyncMock()
+        mock_browser = _sync_browser_mock(is_connected=True)
+        mock_context = _sync_mock_context()
         mock_browser.new_context.return_value = mock_context
         pool._browser = mock_browser
         pool._playwright = MagicMock()
@@ -451,9 +472,8 @@ class TestProxyContext:
     @pytest.mark.asyncio
     async def test_creates_context_with_proxy_settings(self) -> None:
         pool = BrowserPool()
-        mock_browser = AsyncMock()
-        mock_browser.is_connected.return_value = True
-        mock_context = AsyncMock()
+        mock_browser = _sync_browser_mock(is_connected=True)
+        mock_context = _sync_mock_context()
         mock_browser.new_context.return_value = mock_context
         pool._browser = mock_browser
         pool._playwright = MagicMock()
@@ -494,11 +514,9 @@ class TestBrowserReconnection:
     @pytest.mark.asyncio
     async def test_relaunches_when_browser_disconnected(self) -> None:
         pool = BrowserPool()
-        mock_browser = MagicMock()
-        mock_browser.is_connected.return_value = False  # Disconnected (sync method)
-        new_browser = AsyncMock()
-        new_browser.is_connected = MagicMock(return_value=True)  # sync
-        mock_context = AsyncMock()
+        mock_browser = _sync_browser_mock(is_connected=False)
+        new_browser = _sync_browser_mock(is_connected=True)
+        mock_context = _sync_mock_context()
         new_browser.new_context.return_value = mock_context
 
         pool._browser = mock_browser

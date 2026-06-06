@@ -149,8 +149,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.lock.txt
           pip install ruff mypy bandit types-beautifulsoup4 types-openpyxl types-requests types-html5lib types-webencodings
-          # Test runner optimizations: parallel execution + flaky retry
-          pip install pytest-xdist pytest-rerunfailures
 
       - name: Run Ruff Lint
         run: ruff check backend/app backend/tests
@@ -198,23 +196,23 @@ jobs:
           path: route-inventory.md
           retention-days: 30
 
-      # Run the full test suite with parallel workers + flaky retry.
-      # -n auto scales to runner CPU count.
-      # --reruns 3 retries each failed test up to three times with a 10 s delay.
-      # --dist loadscope groups tests from the same class/module in a single
-      # worker to reduce contention on module-level singletons and shared
-      # SQLite databases.
-      - name: Run Full Test Suite (SQLite, parallel + retry)
+      # Run the full test suite serially with flaky retry. Several tests
+      # share module-level singletons (domain policy, scrape telemetry,
+      # SQLite databases) which makes the suite inherently order-sensitive.
+      # Parallel execution (-n auto) introduced occasional SQLite lock
+      # contention and singleton-state races; serial execution is reliable
+      # at ~3 min 30 s on a 4-core runner.
+      - name: Run Full Test Suite (SQLite, serial + retry)
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
-          python -m pytest -n auto --reruns 3 --reruns-delay 10 --dist loadscope \
+          python -m pytest --reruns 3 --reruns-delay 10 \
             -q backend/tests -o addopts= --tb=short
 
       - name: Enforce coverage floors
         run: |
           PYTHONPATH=backend DATAFORGE_DOTENV_PATH=/dev/null DATAFORGE_STORAGE_BACKEND=sqlite \
           python -m coverage run --source=backend/app \
-            -m pytest -n auto --reruns 3 --reruns-delay 10 --dist loadscope \
+            -m pytest --reruns 3 --reruns-delay 10 \
             -q backend/tests -o addopts= --tb=line --no-cov-on-fail -q
           python -m coverage json -o coverage.json
           python scripts/check_coverage_floors.py coverage.json

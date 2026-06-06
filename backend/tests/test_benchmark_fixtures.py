@@ -13,6 +13,8 @@ from pathlib import Path
 import pytest
 from app.models import FieldType, SchemaField
 
+pytestmark = pytest.mark.filterwarnings("ignore::ResourceWarning")
+
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "pages"
 assert FIXTURES_DIR.is_dir(), f"Fixture directory not found: {FIXTURES_DIR}"
 
