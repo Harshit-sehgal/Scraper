@@ -746,6 +746,8 @@ class PostgresJobRepository(JobRepository):
 
     def prune_idempotency_keys(self, older_than_days: int = 7) -> int:
         """Delete idempotency keys older than ``older_than_days`` in Postgres."""
+        if older_than_days <= 0:
+            return 0
         self._ensure()
         try:
             with _conn() as conn:
