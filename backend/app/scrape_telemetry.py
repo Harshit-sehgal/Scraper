@@ -15,13 +15,34 @@ observability layer for dashboard visualisation.
 from __future__ import annotations
 
 import logging
+import math
 import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
+from typing import Any
 
 from app.anti_bot_engine import get_anti_bot_engine
 
 logger = logging.getLogger(__name__)
+
+
+def coerce_finite_float(value: Any) -> float | None:
+    """Return a finite float, or None for malformed telemetry values."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
+        return None
+    return number
+
+
+def coerce_confidence_score(value: Any) -> float | None:
+    """Normalize confidence values to the supported [0.0, 1.0] range."""
+    score = coerce_finite_float(value)
+    if score is None:
+        return None
+    return max(0.0, min(1.0, score))
 
 
 @dataclass
@@ -143,7 +164,9 @@ class ScrapeTelemetryCollector:
         for t in recent:
             if not t.confidence_map:
                 continue
-            score = t.confidence_map.get("overall_avg", 0.0)
+            score = coerce_confidence_score(t.confidence_map.get("overall_avg", 0.0))
+            if score is None:
+                continue
             idx = max(0, min(9, int(score * 10)))
             bins[idx] += 1
 

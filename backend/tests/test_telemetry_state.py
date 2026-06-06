@@ -5,6 +5,7 @@ Tests TelemetryStateAdapter methods and the module-level singleton.
 
 from __future__ import annotations
 
+import math
 from unittest.mock import patch
 
 from app.telemetry_state import TelemetryStateAdapter, get_telemetry_state
@@ -99,6 +100,23 @@ class TestTelemetryStateAdapter:
             assert stats["avg_fetch_ms"] == 200.0  # (200+300+100)/3 = 200
             assert stats["fallback_rate"] == 0.333  # 1/3
             assert stats["avg_confidence"] == 0.85  # (0.85+0.75+0.95)/3 = 0.85
+
+    def test_get_stats_ignores_malformed_numeric_telemetry(self) -> None:
+        adapter = TelemetryStateAdapter()
+        mock_recent = [
+            {"fetch_ms": 100.0, "fallback_triggered": False, "confidence_map": {"overall_avg": 0.25}},
+            {"fetch_ms": "bad", "fallback_triggered": True, "confidence_map": {"overall_avg": 2.0}},
+            {"fetch_ms": math.inf, "fallback_triggered": False, "confidence_map": {"overall_avg": "bad"}},
+            {"fetch_ms": None, "fallback_triggered": False, "confidence_map": {"overall_avg": math.nan}},
+        ]
+
+        with patch.object(adapter._telemetry, "get_recent", return_value=mock_recent):
+            stats = adapter.get_stats()
+
+        assert stats["total_scrapes"] == 4
+        assert stats["avg_fetch_ms"] == 25.0
+        assert stats["fallback_rate"] == 0.25
+        assert stats["avg_confidence"] == 0.62
 
 
 class TestGetTelemetryState:

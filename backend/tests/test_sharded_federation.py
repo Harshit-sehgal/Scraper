@@ -6,7 +6,7 @@ import time
 
 import pytest
 from app.crawl_policy import get_crawl_policy
-from app.federation_manager import FederationManager, ShardStateSnapshot
+from app.federation_manager import FederationManager, ShardStateSnapshot, _decode_motif_key
 from app.semantic_world_state import get_world_state
 
 
@@ -110,7 +110,26 @@ def test_motifs_union_merge(clean_world_state) -> None:
 
     report = federation.merge_remote_state(snapshot)
     assert report["merged_motifs"] == 1
-    assert "price-rating" in clean_world_state._evolved_schema
+    decoded_motifs = [sorted(_decode_motif_key(m)) for m in clean_world_state._evolved_schema]
+    assert ["price", "rating"] in decoded_motifs
+
+
+def test_motif_fields_with_hyphens_round_trip(clean_world_state) -> None:
+    federation = FederationManager(clean_world_state)
+
+    snapshot = ShardStateSnapshot(
+        node_id="remote-node",
+        shard_id="shard-2",
+        timestamp=time.time(),
+        transaction_id=1,
+        motifs=[["product-name", "sale-price"]],
+    )
+
+    report = federation.merge_remote_state(snapshot)
+    exported = federation.export_local_state()
+
+    assert report["merged_motifs"] == 1
+    assert sorted(["product-name", "sale-price"]) in [sorted(m) for m in exported.motifs]
 
 
 def test_topological_affinity_consensus_merge(clean_world_state) -> None:

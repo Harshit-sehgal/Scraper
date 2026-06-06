@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.scrape_telemetry import get_scrape_telemetry
+from app.scrape_telemetry import coerce_confidence_score, coerce_finite_float, get_scrape_telemetry
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +57,17 @@ class TelemetryStateAdapter:
             }
 
         total_scrapes = len(recent)
-        total_fetch_ms = sum(r.get("fetch_ms", 0.0) for r in recent)
+        fetch_values = [coerce_finite_float(r.get("fetch_ms", 0.0)) for r in recent]
+        total_fetch_ms = sum(value for value in fetch_values if value is not None)
         fallbacks = sum(1 for r in recent if r.get("fallback_triggered", False))
 
-        confidence_scores = [r.get("confidence_map", {}).get("overall_avg", 0.0) for r in recent if r.get("confidence_map")]
+        confidence_scores = [
+            score
+            for r in recent
+            if r.get("confidence_map")
+            for score in [coerce_confidence_score(r.get("confidence_map", {}).get("overall_avg", 0.0))]
+            if score is not None
+        ]
         avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
 
         return {
